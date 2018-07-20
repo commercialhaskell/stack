@@ -278,19 +278,19 @@ instance Show StackDockerException where
                ,"your configuration file."]
     show (DockerTooOldException minVersion haveVersion) =
         concat ["Minimum docker version '"
-               ,versionString minVersion
+               ,displayC minVersion
                ,"' is required by "
                ,stackProgName
                ," (you have '"
-               ,versionString haveVersion
+               ,displayC haveVersion
                ,"')."]
     show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
         concat ["These Docker versions are incompatible with "
                ,stackProgName
                ," (you have '"
-               ,versionString haveVersion
+               ,displayC haveVersion
                ,"'): "
-               ,intercalate ", " (map versionString prohibitedVersions)
+               ,intercalate ", " (map displayC prohibitedVersions)
                ,"."]
     show (BadDockerVersionException requiredRange haveVersion) =
         concat ["The version of 'docker' you are using ("
@@ -305,23 +305,23 @@ instance Show StackDockerException where
         concat ["The host's version of '"
                ,stackProgName
                ,"' is too old for this Docker image.\nVersion "
-               ,versionString minVersion
+               ,displayC minVersion
                ," is required; you have "
-               ,versionString hostVersion
+               ,displayC hostVersion
                ,"."]
     show (HostStackTooOldException minVersion Nothing) =
         concat ["The host's version of '"
                ,stackProgName
                ,"' is too old.\nVersion "
-               ,versionString minVersion
+               ,displayC minVersion
                ," is required."]
     show (ContainerStackTooOldException requiredVersion containerVersion) =
         concat ["The Docker container's version of '"
                ,stackProgName
                ,"' is too old.\nVersion "
-               ,versionString requiredVersion
+               ,displayC requiredVersion
                ," is required; the container has "
-               ,versionString containerVersion
+               ,displayC containerVersion
                ,"."]
     show CannotDetermineProjectRootException =
         "Cannot determine project root directory for Docker sandbox."

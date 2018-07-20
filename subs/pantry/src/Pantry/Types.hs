@@ -13,6 +13,7 @@ module Pantry.Types
   , BlobKey (..)
   , PackageName
   , Version
+  , PackageIdentifier (..)
   , Revision (..)
   , CabalHash (..)
   , CabalFileInfo (..)
@@ -34,6 +35,8 @@ module Pantry.Types
   , Archive (..)
   , Repo (..)
   , RepoType (..)
+  , parseC
+  , displayC
   ) where
 
 import RIO
@@ -48,6 +51,8 @@ import Database.Persist
 import Database.Persist.Sql
 import Pantry.StaticSHA256
 import Distribution.Types.PackageName (PackageName)
+import Distribution.PackageDescription (FlagName)
+import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.Types.Version (Version)
 import Data.Store (Store (..)) -- FIXME remove
@@ -408,3 +413,30 @@ data PackageTarball = PackageTarball
   -- overwritten by the value of @ptCabal@.
   }
   deriving Show
+
+-- | Parse Cabal types using 'Distribution.Text.Text'.
+parseC :: Distribution.Text.Text a => String -> Maybe a
+parseC = Distribution.Text.simpleParse
+
+-- | Display Cabal types using 'Distribution.Text.Text'.
+displayC :: (IsString str, Distribution.Text.Text a) => a -> str
+displayC = fromString . Distribution.Text.display
+
+-- FIXME ORPHANS remove
+
+instance Store PackageIdentifier where
+  size = undefined
+  peek = undefined
+  poke = undefined
+instance Store PackageName where
+  size = undefined
+  peek = undefined
+  poke = undefined
+instance Store Version where
+  size = undefined
+  peek = undefined
+  poke = undefined
+instance Store FlagName where
+  size = undefined
+  peek = undefined
+  poke = undefined

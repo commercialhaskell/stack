@@ -20,7 +20,7 @@ ghciOptsParser = GhciOpts
                          completer (targetCompleter <> fileExtCompleter [".hs", ".lhs"]) <>
                          help ("If none specified, use all local packages. " <>
                                "See https://docs.haskellstack.org/en/v" <>
-                               versionString stackMinorVersion <>
+                               displayC stackMinorVersion <>
                                "/build_command/#target-syntax for details. " <>
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
              <*> fmap concat (many (argsOption (long "ghci-options" <>

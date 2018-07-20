@@ -68,7 +68,7 @@ ghcPkgDescribe
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
+ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", displayC pkgName]
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
@@ -162,7 +162,7 @@ sinkMatching :: Monad m
                          (Map PackageName (DumpPackage Bool Bool Bool))
 sinkMatching reqProfiling reqHaddock reqSymbols allowed =
       Map.fromList
-    . map (packageIdentifierName . dpPackageIdent &&& id)
+    . map (pkgName . dpPackageIdent &&& id)
     . Map.elems
     . pruneDeps
         id

@@ -15,7 +15,6 @@ module Options.Applicative.Complicated
 
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
-import           Data.Version
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Options.Applicative.Builder.Internal
@@ -57,7 +56,7 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd footerS
         desc = fullDesc <> header h <> progDesc pd <> footer footerStr
         versionOptions =
           case versionString of
-            Nothing -> versionOption (showVersion numericVersion)
+            Nothing -> versionOption (displayC numericVersion)
             Just s -> versionOption s <*> numericVersionOption <*> numericHpackVersionOption
         versionOption s =
           infoOption
@@ -66,7 +65,7 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd footerS
              help "Show version")
         numericVersionOption =
           infoOption
-            (showVersion numericVersion)
+            (displayC numericVersion)
             (long "numeric-version" <>
              help "Show only version number")
         numericHpackVersionOption =

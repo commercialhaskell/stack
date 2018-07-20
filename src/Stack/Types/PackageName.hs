@@ -12,13 +12,8 @@
 module Stack.Types.PackageName
   (PackageName
   ,PackageNameParseFail(..)
-  ,packageNameParser
   ,parsePackageName
   ,parsePackageNameFromString
-  ,packageNameString
-  ,packageNameText
-  ,fromCabalPackageName
-  ,toCabalPackageName
   ,parsePackageNameFromFilePath
   ,mkPackageName
   ,packageNameArgument)
@@ -49,21 +44,7 @@ instance Show PackageNameParseFail where
     show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
     show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
 
--- | A package name.
-newtype PackageName =
-  PackageName Text
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,NFData,Store,ToJSON,ToJSONKey)
-
-instance Lift PackageName where
-  lift (PackageName n) =
-    appE (conE 'PackageName)
-         (stringE (T.unpack n))
-
-instance Show PackageName where
-  show (PackageName n) = T.unpack n
-instance Display PackageName where
-  display (PackageName n) = display n
-
+    {- FIXME
 instance FromJSON PackageName where
   parseJSON j =
     do s <- parseJSON j
@@ -75,55 +56,25 @@ instance FromJSON PackageName where
 instance FromJSONKey PackageName where
   fromJSONKey = FromJSONKeyTextParser $ \k ->
     either (fail . show) return $ parsePackageName k
-
--- | Attoparsec parser for a package name
-packageNameParser :: Parser PackageName
-packageNameParser =
-  fmap (PackageName . T.pack . intercalate "-")
-       (sepBy1 word (char '-'))
-  where
-    word = concat <$> sequence [many digit,
-                                pured letter,
-                                many (alternating letter digit)]
+    -}
 
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
 mkPackageName s =
   case parsePackageNameFromString s of
-    Nothing -> qRunIO $ throwString ("Invalid package name: " ++ show s)
-    Just pn -> [|pn|]
+    Left e -> qRunIO $ throwIO e
+    Right _ -> [|Cabal.mkPackageName s|]
 
 -- | Parse a package name from a 'Text'.
 parsePackageName :: MonadThrow m => Text -> m PackageName
-parsePackageName x = go x
-  where go =
-          either (const (throwM (PackageNameParseFail x))) return .
-          parseOnly (packageNameParser <* endOfInput)
+parsePackageName = parsePackageNameFromString . T.unpack
 
 -- | Parse a package name from a 'String'.
 parsePackageNameFromString :: MonadThrow m => String -> m PackageName
-parsePackageNameFromString =
-  parsePackageName . T.pack
-
--- | Produce a string representation of a package name.
-packageNameString :: PackageName -> String
-packageNameString (PackageName n) = T.unpack n
-
--- | Produce a string representation of a package name.
-packageNameText :: PackageName -> Text
-packageNameText (PackageName n) = n
-
--- | Convert from a Cabal package name.
-fromCabalPackageName :: Cabal.PackageName -> PackageName
-fromCabalPackageName name =
-  let !x = T.pack $ Cabal.unPackageName name
-  in PackageName x
-
--- | Convert to a Cabal package name.
-toCabalPackageName :: PackageName -> Cabal.PackageName
-toCabalPackageName (PackageName name) =
-  let !x = T.unpack name
-  in Cabal.mkPackageName x
+parsePackageNameFromString str =
+  case parseC str of
+    Nothing -> throwM $ PackageNameParseFail $ T.pack str
+    Just pn -> pure pn
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName

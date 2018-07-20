@@ -21,6 +21,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | The Config type.
 
@@ -564,11 +565,7 @@ lpvRoot = parent . lpvCabalFP
 -- | Package name for the given 'LocalPackageView
 lpvName :: LocalPackageView -> PackageName
 lpvName lpv =
-  let PackageIdentifier name _version =
-         fromCabalPackageIdentifier
-       $ C.package
-       $ C.packageDescription
-       $ lpvGPD lpv
+  let PackageIdentifier name _version = C.package $ C.packageDescription $ lpvGPD lpv
    in name
 
 -- | All components available in the given 'LocalPackageView'
@@ -589,11 +586,7 @@ lpvComponents lpv = Set.fromList $ concat
 -- | Version for the given 'LocalPackageView
 lpvVersion :: LocalPackageView -> Version
 lpvVersion lpv =
-  let PackageIdentifier _name version =
-         fromCabalPackageIdentifier
-       $ C.package
-       $ C.packageDescription
-       $ lpvGPD lpv
+  let PackageIdentifier _name version = C.package $ C.packageDescription $ lpvGPD lpv
    in version
 
 -- | Value returned by 'Stack.Config.loadConfig'.
@@ -643,7 +636,7 @@ instance ToJSON Project where
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
       , if null extraDeps then [] else ["extra-deps" .= extraDeps]
-      , if Map.null flags then [] else ["flags" .= flags]
+      , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
       , ["resolver" .= resolver]
       ]
@@ -1045,7 +1038,7 @@ instance Show ConfigException where
         ]
     show (BadStackVersionException requiredRange) = concat
         [ "The version of stack you are using ("
-        , show (fromCabalVersion (mkVersion' Meta.version))
+        , show (mkVersion' Meta.version)
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
@@ -1127,7 +1120,7 @@ instance Show ConfigException where
       where
         go (name, dirs) = unlines
             $ ""
-            : (packageNameString name ++ " used in:")
+            : (displayC name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
 instance Exception ConfigException
@@ -1305,7 +1298,7 @@ compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (
 compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
-        GhcVersion version -> versionString version
+        GhcVersion version -> displayC version
         GhcjsVersion {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
@@ -1443,7 +1436,7 @@ parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         packages <- o ..:? "packages" ..!= ["."]
         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
-        flags <- o ..:? "flags" ..!= mempty
+        ((fmap unCabalStringMap) . unCabalStringMap -> flags) <- o ..:? "flags" ..!= mempty
 
         resolver <- (o ..: "resolver")
                 >>= either (fail . show) return
@@ -1558,7 +1551,7 @@ data VersionedDownloadInfo = VersionedDownloadInfo
 
 instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
-        version <- o ..: "version"
+        CabalString version <- o ..: "version"
         downloadInfo <- parseDownloadInfoFromObject o
         return VersionedDownloadInfo
             { vdiVersion = version
@@ -1598,9 +1591,9 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         siSevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
-        siGHCs <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
+        (fmap unCabalStringMap -> siGHCs) <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
         siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
-        siStack <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
+        (fmap unCabalStringMap -> siStack) <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
         return SetupInfo {..}
 
 -- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.

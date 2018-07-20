@@ -11,6 +11,7 @@ module Stack.Types.Package where
 
 import           Stack.Prelude
 import qualified Data.ByteString as S
+import qualified RIO.Text as T
 import           Data.List
 import qualified Data.Map as M
 import qualified Data.Set as Set
@@ -50,7 +51,7 @@ instance Show PackageException where
     show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse cabal file "
         , case loc of
-            Left pir -> "for " ++ packageIdentifierRevisionString pir
+            Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
             Right fp -> toFilePath fp
         {-
 
@@ -97,16 +98,16 @@ instance Show PackageException where
         , toFilePath fp
         , " does not match the package name it defines.\n"
         , "Please rename the file to: "
-        , packageNameString name
+        , displayC name
         , ".cabal\n"
         , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
     show (MismatchedCabalIdentifier pir ident) = concat
         [ "Mismatched package identifier."
         , "\nFound:    "
-        , packageIdentifierString ident
+        , displayC ident
         , "\nExpected: "
-        , packageIdentifierRevisionString pir
+        , T.unpack $ utf8BuilderToText $ display pir
         ]
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
@@ -261,7 +262,7 @@ data PackageSource
 
 piiVersion :: PackageSource -> Version
 piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
-piiVersion (PSIndex _ _ _ (PackageIdentifierRevision _ v _)) = fromCabalVersion v
+piiVersion (PSIndex _ _ _ (PackageIdentifierRevision _ v _)) = v
 
 piiLocation :: PackageSource -> InstallLocation
 piiLocation (PSFiles _ loc) = loc
@@ -407,4 +408,6 @@ installedPackageIdentifier (Executable pid) = pid
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
-installedVersion = packageIdentifierVersion . installedPackageIdentifier
+installedVersion i =
+  let PackageIdentifier _ version = installedPackageIdentifier i
+   in version

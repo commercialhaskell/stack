@@ -34,9 +34,6 @@ import           Network.HTTP.StackClient              (Request, RequestBody(Req
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier         (PackageIdentifier, packageIdentifierString,
-                                                        packageIdentifierName)
-import           Stack.Types.PackageName               (packageNameString)
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
 import           System.FilePath                       ((</>), takeFileName)
@@ -173,12 +170,12 @@ uploadRevision :: HackageCreds
                -> PackageIdentifier
                -> L.ByteString
                -> IO ()
-uploadRevision creds ident cabalFile = do
+uploadRevision creds ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
     [ "https://hackage.haskell.org/package/"
-    , packageIdentifierString ident
+    , displayC ident
     , "/"
-    , packageNameString $ packageIdentifierName ident
+    , displayC name
     , ".cabal/edit"
     ]
   req1 <- formDataBody

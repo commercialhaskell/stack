@@ -79,13 +79,11 @@ import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
-import           Pantry
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
@@ -107,7 +105,7 @@ getRawInput boptscli locals =
         textTargets =
             -- Handle the no targets case, which means we pass in the names of all project packages
             if null textTargets'
-                then map packageNameText (Map.keys locals)
+                then map displayC (Map.keys locals)
                 else textTargets'
      in (textTargets', map RawInput textTargets)
 
@@ -258,7 +256,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                     ]
     go (RTPackageComponent name ucomp) = return $
         case Map.lookup name locals of
-            Nothing -> Left $ T.pack $ "Unknown local package: " ++ packageNameString name
+            Nothing -> Left $ T.pack $ "Unknown local package: " ++ displayC name
             Just lpv ->
                 case ucomp of
                     ResolvedComponent comp
@@ -273,7 +271,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                             [ "Component "
                             , show comp
                             , " does not exist in package "
-                            , packageNameString name
+                            , displayC name
                             ]
                     UnresolvedComponent comp ->
                         case filter (isCompNamed comp) $ Set.toList $ lpvComponents lpv of
@@ -281,7 +279,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                                 [ "Component "
                                 , comp
                                 , " does not exist in package "
-                                , T.pack $ packageNameString name
+                                , displayC name
                                 ]
                             [x] -> Right ResolveResult
                               { rrName = name
@@ -294,7 +292,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                                 [ "Ambiguous component name "
                                 , comp
                                 , " for package "
-                                , T.pack $ packageNameString name
+                                , displayC name
                                 , ": "
                                 , T.pack $ show matches
                                 ]
@@ -317,8 +315,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = Dependency
           }
       | otherwise = do
-          mversion <- getLatestHackageVersion $ toCabalPackageName name
-          return $ case (\(x, y, z) -> (fromCabalVersion x, y, z)) <$> mversion of
+          mversion <- getLatestHackageVersion name
+          return $ case mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
             -- this until the ConstructPlan phase, and let it complain
@@ -342,7 +340,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
-            [ packageNameText name
+            [ displayC name
             , " target has a specific version number, but it is a local package."
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
             , "\nTo build the local package, specify the target without an explicit version."
@@ -356,7 +354,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                   , rrRaw = ri
                   , rrComponent = Nothing
                   , rrAddedDep =
-                      if version == fromCabalVersion versionLoc
+                      if version == versionLoc
                         -- But no need to override anyway, this is already the
                         -- version we have
                         then Nothing
@@ -368,7 +366,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
             -- index, so refuse to do the override
             Just loc' -> Left $ T.concat
               [ "Package with identifier was targeted on the command line: "
-              , packageIdentifierText ident
+              , displayC ident
               , ", but it was specified from a non-index location: "
               , T.pack $ show loc'
               , ".\nRecommendation: add the correctly desired version to extra-deps."
@@ -386,10 +384,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
         allLocs :: Map PackageName (Either (Path Abs Dir) PackageLocation)
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> Right $ PLHackage $ PackageIdentifierRevision
-                  (toCabalPackageName name')
-                  (toCabalVersion (lpiVersion lpi))
-                  CFILatest)
+              (\name' lpi -> Right $ PLHackage $ PackageIdentifierRevision name' (lpiVersion lpi) CFILatest) -- FIXME better to use rev0 for reproducibility
               globals
           , Map.map (Right . lpiLocation) snap
           , Map.map snd deps
@@ -420,10 +415,7 @@ combineResolveResults results = do
         Just version -> do
           return $ Map.singleton (rrName result)
                  $ PLHackage
-                 $ PackageIdentifierRevision
-                     (toCabalPackageName (rrName result))
-                     (toCabalVersion version)
-                     CFILatest
+                 $ PackageIdentifierRevision (rrName result) version CFILatest
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -437,7 +429,7 @@ combineResolveResults results = do
                   | all isJust mcomps -> Right $ Map.singleton name $ TargetComps $ Set.fromList $ catMaybes mcomps
                   | otherwise -> Left $ T.concat
                       [ "The package "
-                      , packageNameText name
+                      , displayC name
                       , " was specified in multiple, incompatible ways: "
                       , T.unwords $ map (unRawInput . rrRaw) rrs
                       ]
@@ -552,7 +544,4 @@ parseTargets needTargets boptscli = do
   return (ls, localDeps, targets)
 
 gpdVersion :: GenericPackageDescription -> Version
-gpdVersion gpd =
-    version
-  where
-    PackageIdentifier _ version = fromCabalPackageIdentifier $ package $ packageDescription gpd
+gpdVersion = pkgVersion . package . packageDescription

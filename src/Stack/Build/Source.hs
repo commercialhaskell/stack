@@ -104,7 +104,7 @@ loadSourceMapFull needTargets boptsCli = do
       , sequence $ Map.mapWithKey (goLPI Snap) (undefined (lsPackages ls))
       ]
     let sourceMap = sourceMap'
-            `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+            `Map.difference` Map.fromList (map (, ()) (toList wiredInPackages))
 
     return
       ( targets

@@ -28,7 +28,7 @@ listPackages = do
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
         (gpd, _) <- readPackageUnresolvedDir dir False
-        (logInfo . display) (gpdPackageName gpd)
+        (logInfo . displayC) (gpdPackageName gpd)
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()

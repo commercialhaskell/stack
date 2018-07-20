@@ -33,8 +33,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           RIO.Process
@@ -64,7 +62,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
     docFile <-
         case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
             ([_], [Just (pkgId, iloc)]) -> do
-                pkgRelDir <- (parseRelDir . packageIdentifierString) pkgId
+                pkgRelDir <- (parseRelDir . displayC) pkgId
                 let docLocation =
                         case iloc of
                             Snap -> snapDocDir bco
@@ -236,8 +234,8 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                 let (PackageIdentifier name _) = dpPackageIdent
                     destInterfaceRelFP =
                         docRelFP FP.</>
-                        packageIdentifierString dpPackageIdent FP.</>
-                        (packageNameString name FP.<.> "haddock")
+                        displayC dpPackageIdent FP.</>
+                        (displayC name FP.<.> "haddock")
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
                 return $
@@ -247,7 +245,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                             Just
                                 ( [ "-i"
                                   , concat
-                                        [ docRelFP FP.</> packageIdentifierString dpPackageIdent
+                                        [ docRelFP FP.</> displayC dpPackageIdent
                                         , ","
                                         , destInterfaceRelFP ]]
                                 , srcInterfaceModTime

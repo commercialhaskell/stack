@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-module Stack.Types.VersionIntervals
+module Stack.Types.VersionIntervals -- FIXME remove this module
   ( VersionIntervals
   , toVersionRange
   , fromVersionRange
@@ -40,7 +40,7 @@ fromVersionRange :: C.VersionRange -> VersionIntervals
 fromVersionRange = fromCabal . C.toVersionIntervals
 
 withinIntervals :: Version -> VersionIntervals -> Bool
-withinIntervals v vi = C.withinIntervals (toCabalVersion v) (toCabal vi)
+withinIntervals v vi = C.withinIntervals v (toCabal vi)
 
 unionVersionIntervals :: VersionIntervals -> VersionIntervals -> VersionIntervals
 unionVersionIntervals x y = fromCabal $ C.unionVersionIntervals
@@ -57,10 +57,10 @@ toCabal (VersionIntervals vi) =
   C.mkVersionIntervals $ map go vi
   where
     go (VersionInterval lowerV lowerB mupper) =
-        ( C.LowerBound (toCabalVersion lowerV) (toCabalBound lowerB)
+        ( C.LowerBound lowerV (toCabalBound lowerB)
         , case mupper of
             Nothing -> C.NoUpperBound
-            Just (v, b) -> C.UpperBound (toCabalVersion v) (toCabalBound b)
+            Just (v, b) -> C.UpperBound v (toCabalBound b)
         )
 
 fromCabal :: C.VersionIntervals -> VersionIntervals
@@ -68,12 +68,12 @@ fromCabal =
     VersionIntervals . map go . C.versionIntervals
   where
     go (C.LowerBound lowerV lowerB, upper) = VersionInterval
-      { viLowerVersion = fromCabalVersion lowerV
+      { viLowerVersion = lowerV
       , viLowerBound = fromCabalBound lowerB
       , viUpper =
           case upper of
             C.NoUpperBound -> Nothing
-            C.UpperBound v b -> Just (fromCabalVersion v, fromCabalBound b)
+            C.UpperBound v b -> Just (v, fromCabalBound b)
       }
 
 toCabalBound :: Bound -> C.Bound

@@ -80,12 +80,12 @@ scriptCmd opts go' = do
                           $ words
                           $ S8.unpack
                           $ S8.concat bss
-            if Set.null $ Set.difference (Set.map packageNameString targetsSet) installed
+            if Set.null $ Set.difference (Set.map displayC targetsSet) installed
                 then logDebug "All packages already installed"
                 else do
                     logDebug "Missing packages, performing installation"
                     Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
-                        { boptsCLITargets = map packageNameText $ Set.toList targetsSet
+                        { boptsCLITargets = map displayC $ Set.toList targetsSet
                         }
 
         let ghcArgs = concat
@@ -94,7 +94,7 @@ scriptCmd opts go' = do
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
                     $ Set.insert "base"
-                    $ Set.map packageNameString targetsSet
+                    $ Set.map displayC targetsSet
                 , case soCompile opts of
                     SEInterpret -> []
                     SECompile -> []
@@ -148,7 +148,7 @@ getPackagesFromModuleInfo mi scriptFP = do
                                     [ "Module "
                                     , S8.unpack $ unModuleName mn
                                     , " appears in multiple packages: "
-                                    , unwords $ map packageNameString pns'
+                                    , unwords $ map displayC pns'
                                     ]
                         Nothing -> return Set.empty
                 return $ Set.unions pns `Set.difference` blacklist

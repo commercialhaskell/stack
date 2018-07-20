@@ -22,7 +22,8 @@ module Pantry.StaticBytes
   , fromStatic
   ) where
 
-import Stack.Prelude hiding (words)
+import RIO hiding (words)
+import Data.Store (Store) -- FIXME remove
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.Vector.Primitive as VP

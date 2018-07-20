@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -205,15 +204,6 @@ styleTarget = cyan . ondullblack
 -- | Style an 'AnsiDoc' as a module name
 styleModule :: AnsiDoc -> AnsiDoc
 styleModule = magenta . ondullblack -- TODO: what color should this be?
-
-instance Display PackageName where
-    display = fromString . packageNameString
-
-instance Display PackageIdentifier where
-    display = fromString . packageIdentifierString
-
-instance Display Version where
-    display = fromString . versionString
 
 instance Display (Path b File) where
     display = styleFile . fromString . toFilePath

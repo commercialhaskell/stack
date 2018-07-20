@@ -157,7 +157,7 @@ getSDistTarball mpvpBounds pkgDir = do
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
-        pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
+        pkgId = displayC (packageIdentifier (lpPackage lp))
     dirEntries <- mapM packDir (dirsFromFiles files)
     fileEntries <- mapM packFile files
     mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
@@ -182,7 +182,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
                                 sourceMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
-          map (fromCabalPackageName . Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
+          map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
         gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
         gpd'' =
           case mrev of
@@ -256,17 +256,16 @@ getCabalLbs pvpBounds mrev cabalfp = do
       )
   where
     addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages sourceMap installedMap dep@(Dependency cname range) =
+    addBounds internalPackages sourceMap installedMap dep@(Dependency name range) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
           Nothing -> dep
-          Just version -> Dependency cname $ simplifyVersionRange
+          Just version -> Dependency name $ simplifyVersionRange
             $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
             $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
               range
       where
-        name = fromCabalPackageName cname
         foundVersion =
           case Map.lookup name sourceMap of
               Just ps -> Just (piiVersion ps)
@@ -276,9 +275,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
                       Nothing -> Nothing
 
     addUpper version = intersectVersionRanges
-        (earlierVersion $ toCabalVersion $ nextMajorVersion version)
-    addLower version = intersectVersionRanges
-        (orLaterVersion (toCabalVersion version))
+        (earlierVersion $ nextMajorVersion version)
+    addLower version = intersectVersionRanges (orLaterVersion version)
 
     (toAddLower, toAddUpper) =
       case pvpBounds of
@@ -406,7 +404,7 @@ checkPackageInExtractedTarball pkgDir = do
     config  <- getDefaultPackageConfig
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
     logInfo $
-        "Checking package '" <> RIO.display name <> "' for common mistakes"
+        "Checking package '" <> displayC name <> "' for common mistakes"
     let pkgChecks =
           -- MSS 2017-12-12: Try out a few different variants of
           -- pkgDesc to try and provoke an error or warning. I don't

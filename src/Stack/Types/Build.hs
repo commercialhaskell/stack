@@ -141,9 +141,9 @@ data UnusedFlags = UFNoPackage FlagSource PackageName
 
 instance Show StackBuildException where
     show (Couldn'tFindPkgId name) =
-              "After installing " <> packageNameString name <>
+              "After installing " <> displayC name <>
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
-               packageNameString name <> "). This shouldn't happen, " <>
+               displayC name <> "). This shouldn't happen, " <>
                "please report as a bug"
     show (CompilerVersionMismatch mactual (expected, earch) ghcVariant ghcBuild check mstack resolution) = concat
                 [ case mactual of
@@ -182,9 +182,9 @@ instance Show StackBuildException where
             | Set.null noKnown = []
             | otherwise = return $
                 "The following target packages were not found: " ++
-                intercalate ", " (map packageNameString $ Set.toList noKnown) ++
+                intercalate ", " (map displayC $ Set.toList noKnown) ++
                 "\nSee https://docs.haskellstack.org/en/v"
-                <> versionString stackMinorVersion <>
+                <> displayC stackMinorVersion <>
                 "/build_command/#target-syntax for details."
         notInSnapshot'
             | Map.null notInSnapshot = []
@@ -196,11 +196,11 @@ instance Show StackBuildException where
                 : "but there's no guarantee that they'll build together)."
                 : ""
                 : map
-                    (\(name, version') -> "- " ++ packageIdentifierString
+                    (\(name, version') -> "- " ++ displayC
                         (PackageIdentifier name version'))
                     (Map.toList notInSnapshot)
     show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
-        [ ["Test suite failure for package " ++ packageIdentifierString ident]
+        [ ["Test suite failure for package " ++ displayC ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
             [ "    "
             , T.unpack name
@@ -230,11 +230,11 @@ instance Show StackBuildException where
     show (ExecutionFailure es) = intercalate "\n\n" $ map show es
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Version for local package "
-        , packageNameString name
+        , displayC name
         , " is "
-        , versionString localV
+        , displayC localV
         , ", but you asked for "
-        , versionString requestedV
+        , displayC requestedV
         , " on the command line"
         ]
     show (NoSetupHsFound dir) =
@@ -250,7 +250,7 @@ instance Show StackBuildException where
         go :: UnusedFlags -> String
         go (UFNoPackage src name) = concat
             [ "- Package '"
-            , packageNameString name
+            , displayC name
             , "' not found"
             , showFlagSrc src
             ]
@@ -261,18 +261,18 @@ instance Show StackBuildException where
             , showFlagSrc src
             , ":\n"
             , intercalate "\n"
-                          (map (\flag -> "  " ++ flagNameString flag)
+                          (map (\flag -> "  " ++ displayC flag)
                                (Set.toList flags))
             , "\n- Flags defined by package '" ++ name ++ "':\n"
             , intercalate "\n"
-                          (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
+                          (map (\flag -> "  " ++ name ++ ":" ++ displayC flag)
                                (Set.toList pkgFlags))
             ]
-          where name = packageNameString (packageName pkg)
+          where name = displayC (packageName pkg)
                 pkgFlags = packageDefinedFlags pkg
         go (UFSnapshot name) = concat
             [ "- Attempted to set flag on snapshot package "
-            , packageNameString name
+            , displayC name
             , ", please add to extra-deps"
             ]
     show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
@@ -311,7 +311,7 @@ instance Show StackBuildException where
     show (ConstructPlanFailed msg) = msg
     show (LocalPackagesPresent locals) = unlines
       $ "Local packages are not allowed when using the script command. Packages found:"
-      : map (\ident -> "- " ++ packageIdentifierString ident) locals
+      : map (\ident -> "- " ++ displayC ident) locals
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =
@@ -369,7 +369,7 @@ instance Exception StackBuildException
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
     PkgDeps PackageName
-    deriving (Show,Typeable,Eq,Hashable,Store,NFData)
+    deriving (Show,Typeable,Eq,Store,NFData)
 
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
@@ -568,7 +568,7 @@ configureOptsDirs bco loc package = concat
             Nothing -> installRoot </> docDirSuffix
             Just dir -> installRoot </> docDirSuffix </> dir
     pkgVerDir =
-        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
+        parseRelDir (displayC (PackageIdentifier (packageName package)
                                                                 (packageVersion package)) ++
                      [pathSeparator])
 
@@ -593,7 +593,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        (if enabled
                            then ""
                            else "-") <>
-                       flagNameString name)
+                       displayC name)
                     (Map.toList flags)
     , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
     , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
@@ -623,18 +623,18 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 
-    toDepOption1_22 ident gid = concat
+    toDepOption1_22 (PackageIdentifier name _) gid = concat
         [ "--dependency="
-        , packageNameString $ packageIdentifierName ident
+        , displayC name
         , "="
         , ghcPkgIdString gid
         ]
 
     toDepOption1_18 ident _gid = concat
         [ "--constraint="
-        , packageNameString name
+        , displayC name
         , "=="
-        , versionString version'
+        , displayC version'
         ]
       where
         PackageIdentifier name version' = ident

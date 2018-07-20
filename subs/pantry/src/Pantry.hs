@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Pantry
   ( -- * Congiruation
     PantryConfig
@@ -19,8 +20,17 @@ module Pantry
   , Repo (..)
   , RepoType (..)
   , PackageIdentifierRevision (..)
-  -- FIXME , PackageName
-  -- FIXME , Version
+  , PackageName
+  , Version
+  , PackageIdentifier (..)
+  , FlagName
+
+    -- ** Cabal helpers
+  , parseC
+  , displayC
+  , CabalString (..)
+  , toCabalStringMap
+  , unCabalStringMap
 
     -- * Cabal files
   , parseCabalFile
@@ -40,6 +50,7 @@ module Pantry
 import RIO
 import RIO.FilePath ((</>))
 import qualified RIO.Map as Map
+import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
 import Pantry.StaticSHA256
@@ -47,9 +58,13 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
+import Data.Aeson (ToJSON (..), FromJSON (..), withText, ToJSONKey (..), FromJSONKey (..))
+import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
+import qualified Distribution.Text
 import Data.List.NonEmpty (NonEmpty)
-import Distribution.PackageDescription (GenericPackageDescription)
+import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Data.List.NonEmpty as NE
+import Data.Coerce (coerce)
 
 mkPantryConfig
   :: HasLogFunc env
@@ -212,8 +227,8 @@ getLatestHackageVersion =
       pure (version, rev, ch)
 
 fetchPackages
-  :: (HasPantryConfig env, HasLogFunc env)
-  => [(PackageName, Version)]
+  :: (HasPantryConfig env, HasLogFunc env, Foldable f)
+  => f PackageIdentifier
   -> RIO env ()
 fetchPackages _ = undefined
 
@@ -233,3 +248,38 @@ parseCabalFile
   => PackageLocation
   -> RIO env GenericPackageDescription
 parseCabalFile = undefined
+
+-- | Newtype wrapper for easier JSON integration with Cabal types.
+newtype CabalString a = CabalString { unCabalString :: a }
+  deriving (Show, Eq, Ord, Typeable)
+
+toCabalStringMap :: Map a v -> Map (CabalString a) v
+toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
+
+unCabalStringMap :: Map (CabalString a) v -> Map a v
+unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
+
+instance Distribution.Text.Text a => ToJSON (CabalString a) where
+  toJSON = toJSON . Distribution.Text.display . unCabalString
+instance Distribution.Text.Text a => ToJSONKey (CabalString a) where
+  toJSONKey = toJSONKeyText $ displayC . unCabalString
+
+instance forall a. IsCabalString a => FromJSON (CabalString a) where
+  parseJSON = withText name $ \t ->
+    case Distribution.Text.simpleParse $ T.unpack t of
+      Nothing -> fail $ "Invalid " ++ name ++ ": " ++ T.unpack t
+      Just x -> pure $ CabalString x
+    where
+      name = cabalStringName (Nothing :: Maybe a)
+instance forall a. IsCabalString a => FromJSONKey (CabalString a)
+
+class Distribution.Text.Text a => IsCabalString a where
+  cabalStringName :: proxy a -> String
+instance IsCabalString PackageName where
+  cabalStringName _ = "package name"
+instance IsCabalString Version where
+  cabalStringName _ = "version"
+instance IsCabalString PackageIdentifier where
+  cabalStringName _ = "package identifier"
+instance IsCabalString FlagName where
+  cabalStringName _ = "flag name"

@@ -84,7 +84,7 @@ getInstalledExes loc = do
         -- before https://github.com/commercialhaskell/stack/issues/2373
         -- was fixed), then we don't know which is correct - ignore them.
         M.fromListWith (\_ _ -> []) $
-        map (\x -> (packageIdentifierName x, [x])) $
+        map (\x -> (pkgName x, [x])) $
         mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
@@ -93,12 +93,12 @@ markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     ensureDir dir
-    ident' <- parseRelFile $ packageIdentifierString ident
+    ident' <- parseRelFile $ displayC ident
     let fp = toFilePath $ dir </> ident'
     -- Remove old install records for this package.
     -- TODO: This is a bit in-efficient. Put all this metadata into one file?
     installed <- getInstalledExes loc
-    forM_ (filter (\x -> packageIdentifierName ident == packageIdentifierName x) installed)
+    forM_ (filter (\x -> pkgName ident == pkgName x) installed)
           (markExeNotInstalled loc)
     -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
@@ -110,7 +110,7 @@ markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThr
                     => InstallLocation -> PackageIdentifier -> m ()
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
-    ident' <- parseRelFile $ packageIdentifierString ident
+    ident' <- parseRelFile $ displayC ident
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
 buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
@@ -192,7 +192,7 @@ flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of
             Library _ gid _ -> ghcPkgIdString gid
-            Executable ident -> packageIdentifierString ident
+            Executable ident -> displayC ident
     dir <- flagCacheLocal
     return $ dir </> rel
 
@@ -264,14 +264,14 @@ precompiledCacheFile loc copts installedPackageIDs = do
   ec <- view envConfigL
 
   compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
-  cabal <- view cabalVersionL >>= parseRelDir . versionString
+  cabal <- view cabalVersionL >>= parseRelDir . displayC
   let mpkgRaw =
         -- The goal here is to come up with a string representing the
         -- package location which is unique. For archives and repos,
         -- we rely upon cryptographic hashes paired with
         -- subdirectories to identify this specific package version.
         case loc of -- FIXME use the pantry tree key instead
-          PLHackage pir -> Just $ packageIdentifierRevisionString pir
+          PLHackage pir -> Just $ T.unpack $ utf8BuilderToText $ display pir
           PLArchive a -> fmap
             (\h -> T.unpack $ staticSHA256ToText h <> archiveSubdir a)
             (archiveHash a)

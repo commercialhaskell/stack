@@ -85,11 +85,9 @@ import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
@@ -128,10 +126,7 @@ rawParseGPD
   -> m ([PWarning], GenericPackageDescription)
 rawParseGPD key bs =
     case eres of
-      Left (mversion, errs) -> throwM $ PackageInvalidCabalFile key
-        (fromCabalVersion <$> mversion)
-        errs
-        warnings
+      Left (mversion, errs) -> throwM $ PackageInvalidCabalFile key mversion errs warnings
       Right gpkg -> return (warnings, gpkg)
   where
     (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
@@ -172,18 +167,18 @@ readPackageUnresolvedDir dir printWarnings = do
         -- Previously, we just use parsePackageNameFromFilePath. However, that can
         -- lead to confusing error messages. See:
         -- https://github.com/commercialhaskell/stack/issues/895
-        let expected = packageNameString name ++ ".cabal"
+        let expected = displayC name ++ ".cabal"
         when (expected /= toFilePath (filename cabalfp))
             $ throwM $ MismatchedCabalName cabalfp name
 
 gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
-gpdPackageIdentifier = fromCabalPackageIdentifier . D.package . D.packageDescription
+gpdPackageIdentifier = D.package . D.packageDescription
 
 gpdPackageName :: GenericPackageDescription -> PackageName
-gpdPackageName = packageIdentifierName . gpdPackageIdentifier
+gpdPackageName = pkgName . gpdPackageIdentifier
 
 gpdVersion :: GenericPackageDescription -> Version
-gpdVersion = packageIdentifierVersion . gpdPackageIdentifier
+gpdVersion = pkgVersion . gpdPackageIdentifier
 
 -- | Read the 'GenericPackageDescription' from the given
 -- 'PackageIdentifierRevision'.
@@ -204,7 +199,7 @@ readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXM
       (_warnings, gpd) <- rawParseGPD (Left pir) bs
       let foundPI = D.package $ D.packageDescription gpd
           pi' = D.PackageIdentifier pn v
-      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir $ fromCabalPackageIdentifier foundPI
+      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
       atomicModifyIORef' ref $ \(m1, m2) ->
         ((M.insert pir gpd m1, m2), gpd)
 
@@ -260,7 +255,7 @@ packageFromPackageDescription :: PackageConfig
 packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
     Package
     { packageName = name
-    , packageVersion = fromCabalVersion (pkgVersion pkgId)
+    , packageVersion = pkgVersion pkgId
     , packageLicense = licenseRaw pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
@@ -268,7 +263,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
-      [(fromCabalFlagName (flagName flag), flagDefault flag) | flag <- pkgFlags]
+      [(flagName flag, flagDefault flag) | flag <- pkgFlags]
     , packageAllDeps = S.fromList (M.keys deps)
     , packageLibraries =
         let mlib = do
@@ -363,7 +358,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
                  return $ if hpackExists then S.singleton hpackPath else S.empty
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
-    name = fromCabalPackageName (pkgName pkgId)
+    name = pkgName pkgId
 
     (unknownTools, knownTools) = packageDescTools pkg
 
@@ -388,7 +383,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 
     -- Is the package dependency mentioned here me: either the package
     -- name itself, or the name of one of the sub libraries
-    isMe name' = name' == name || packageNameText name' `S.member` extraLibNames
+    isMe name' = name' == name || displayC name' `S.member` extraLibNames
 
 -- | Generate GHC options for the package's components, and a list of
 -- options which apply generally to the package, not one specific
@@ -504,16 +499,15 @@ generateBuildInfoOpts BioInput {..} =
         concat
             [ case M.lookup name biInstalledMap of
                 Just (_, Stack.Types.Package.Library _ident ipid _) -> ["-package-id=" <> ghcPkgIdString ipid]
-                _ -> ["-package=" <> packageNameString name <>
+                _ -> ["-package=" <> displayC name <>
                  maybe "" -- This empty case applies to e.g. base.
-                     ((("-" <>) . versionString) . piiVersion)
+                     ((("-" <>) . displayC) . piiVersion)
                      (M.lookup name biSourceMap)]
             | name <- pkgs]
     pkgs =
         biAddPackages ++
         [ name
-        | Dependency cname _ <- targetBuildDepends biBuildInfo
-        , let name = fromCabalPackageName cname
+        | Dependency name _ <- targetBuildDepends biBuildInfo
         , name `notElem` biOmitPackages]
     ghcOpts = concatMap snd . filter (isGhc . fst) $ options biBuildInfo
       where
@@ -717,7 +711,7 @@ packageDescTools pd =
         go2 (Cabal.ExeDependency pkg _name range)
           | pkg `S.member` preInstalledPackages = Nothing
           | otherwise = Just
-              ( fromCabalPackageName pkg
+              ( pkg
               , DepValue
                   { dvVersionRange = range
                   , dvType = AsBuildTool
@@ -1090,7 +1084,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
 flagMap :: [Flag] -> Map FlagName Bool
 flagMap = M.fromList . map pair
   where pair :: Flag -> (FlagName, Bool)
-        pair (MkFlag (fromCabalFlagName -> name) _desc def _manual) = (name,def)
+        pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: Map FlagName Bool
@@ -1139,7 +1133,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
                     Flag flag ->
-                      fromMaybe False $ M.lookup (fromCabalFlagName flag) (rcFlags rc)
+                      fromMaybe False $ M.lookup flag (rcFlags rc)
                       -- NOTE:  ^^^^^ This should never happen, as all flags
                       -- which are used must be declared. Defaulting to
                       -- False.
@@ -1153,7 +1147,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
 
 -- | Get the name of a dependency.
 depName :: Dependency -> PackageName
-depName (Dependency n _) = fromCabalPackageName n
+depName (Dependency n _) = n
 
 -- | Get the version range of a dependency.
 depRange :: Dependency -> VersionRange
@@ -1357,7 +1351,7 @@ findCandidate dirs exts name = do
             DotCabalMain{} -> DotCabalMainPath
             DotCabalFile{} -> DotCabalFilePath
             DotCabalCFile{} -> DotCabalCFilePath
-    paths_pkg pkg = "Paths_" ++ packageNameString pkg
+    paths_pkg pkg = "Paths_" ++ displayC pkg
     makeNameCandidates =
         liftM (nubOrd . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates :: Path Abs Dir
@@ -1523,7 +1517,7 @@ buildLogPath package' msuffix = do
   env <- ask
   let stack = getProjectWorkDir env
   fp <- parseRelFile $ concat $
-    packageIdentifierString (packageIdentifier package') :
+    displayC (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]
   return $ stack </> $(mkRelDir "logs") </> fp
 
@@ -1563,17 +1557,11 @@ resolveDirOrWarn = resolveOrWarn "Directory" f
 
 -- | Extract the @PackageIdentifier@ given an exploded haskell package
 -- path.
-cabalFilePackageId
+cabalFilePackageId -- FIXME remove and use the caching logic in pantry
     :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m PackageIdentifier
 cabalFilePackageId fp = do
-    pkgDescr <- liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
-    (toStackPI . D.package . D.packageDescription) pkgDescr
-  where
-    toStackPI (D.PackageIdentifier (D.unPackageName -> name) ver) = do
-        name' <- parsePackageNameFromString name
-        let ver' = fromCabalVersion ver
-        return (PackageIdentifier name' ver')
+    (D.package . D.packageDescription) <$> liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
 
 parseSingleCabalFile -- FIXME rename and add docs
   :: forall env. HasConfig env

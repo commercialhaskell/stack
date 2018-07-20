@@ -87,7 +87,7 @@ instance Show SnapshotException where
     ]
   show (PackageDefinedTwice name loc1 loc2) = concat
     [ "Package "
-    , packageNameString name
+    , displayC name
     , " is defined twice, at "
     , show loc1
     , " and "
@@ -98,19 +98,19 @@ instance Show SnapshotException where
     where
       go (name, deps) = concat
         $ "\n"
-        : packageNameString name
+        : displayC name
         : " is missing:\n"
         : map goDep (Map.toList deps)
 
       goDep (dep, (intervals, mversion)) = concat
         [ "- "
-        , packageNameString dep
+        , displayC dep
         , ". Requires: "
         , display $ toVersionRange intervals
         , ", "
         , case mversion of
             Nothing -> "none present"
-            Just version -> versionString version ++ " found"
+            Just version -> displayC version ++ " found"
         , "\n"
         ]
   show (FilepathInCustomSnapshot url) =
@@ -121,7 +121,7 @@ instance Show SnapshotException where
     T.unpack url
   show (MissingPackages names) =
     "The following packages specified by flags or options are not found: " ++
-    unwords (map packageNameString (Set.toList names))
+    unwords (map displayC (Set.toList names))
   show (CustomResolverException url loc e) = concat
     [ "Unable to load custom resolver "
     , T.unpack url
@@ -191,7 +191,7 @@ loadResolver (ResolverStackage name) = do
 
     parseStackageSnapshot = withObject "StackageSnapshotDef" $ \o -> do
         Object si <- o .: "system-info"
-        ghcVersion <- si .:? "ghc-version"
+        ghcVersion <- fmap unCabalString <$> (si .:? "ghc-version")
         compilerVersion <- si .:? "compiler-version"
         compilerVersion' <-
             case (ghcVersion, compilerVersion) of
@@ -200,7 +200,7 @@ loadResolver (ResolverStackage name) = do
                 (_, Just compiler) -> return compiler
                 _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
         let sdParent = Left compilerVersion'
-        sdGlobalHints <- si .: "core-packages"
+        sdGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (si .: "core-packages")
 
         packages <- o .: "packages"
         (Endo mkLocs, sdFlags, sdHidden) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages
@@ -216,8 +216,16 @@ loadResolver (ResolverStackage name) = do
 
         return SnapshotDef {..}
       where
-        goPkg name' = withObject "StackagePackageDef" $ \o -> do
-            version <- o .: "version"
+        goPkg
+          :: CabalString PackageName
+          -> Value
+          -> Parser
+               ( Endo [PackageLocation]
+               , Map PackageName (Map FlagName Bool)
+               , Map PackageName Bool
+               )
+        goPkg (CabalString name') = withObject "StackagePackageDef" $ \o -> do
+            CabalString version <- o .: "version"
             mcabalFileInfo <- o .:? "cabal-file-info"
             mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
                 msize <- Just <$> o' .: "size"
@@ -234,14 +242,14 @@ loadResolver (ResolverStackage name) = do
             Object constraints <- o .: "constraints"
 
             flags <- constraints .: "flags"
-            let flags' = Map.singleton name' flags
+            let flags' = Map.singleton name' $ unCabalStringMap flags
 
             hide <- constraints .:? "hide" .!= False
             let hide' = if hide then Map.singleton name' True else Map.empty
 
             let location = PLHackage $ PackageIdentifierRevision
-                  (toCabalPackageName name')
-                  (toCabalVersion version)
+                  name'
+                  version
                   (fromMaybe CFILatest mcabalFileInfo')
 
             return (Endo (location:), flags', hide')
@@ -353,11 +361,11 @@ loadResolver (ResolverCustom url loc) = do
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverStackage (LTS 0 0))
             <$> (o ..: "name")
             <*> undefined -- jsonSubWarningsT (o ..:? "packages" ..!= [])
-            <*> o ..:? "drop-packages" ..!= Set.empty
-            <*> o ..:? "flags" ..!= Map.empty
-            <*> o ..:? "hidden" ..!= Map.empty
-            <*> o ..:? "ghc-options" ..!= Map.empty
-            <*> o ..:? "global-hints" ..!= Map.empty)
+            <*> (Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty))
+            <*> ((unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty))
+            <*> (unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty))
+            <*> (unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty))
+            <*> (unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)))
         <*> (o ..:? "resolver")
         <*> (o ..:? "compiler")
 
@@ -575,7 +583,7 @@ fromGlobalHints =
       -- project compatibility.
       , lpiLocation = either impureThrow id
                     $ parseGhcPkgId
-                    $ packageIdentifierText
+                    $ displayC
                     $ PackageIdentifier name ver
       , lpiFlags = Map.empty
       , lpiGhcOptions = []
@@ -695,7 +703,7 @@ findPackage platform compilerVersion (gpd, loc, localLoc) = do
 
     assert (name == name') $ put (m', allFlags', allHide', allOptions')
   where
-    PackageIdentifier name _version = fromCabalPackageIdentifier $ C.package $ C.packageDescription gpd
+    PackageIdentifier name _version = C.package $ C.packageDescription gpd
 
 -- | Some hard-coded fixes for build plans, only for hysterical raisins.
 snapshotDefFixes :: SnapshotDef -> SnapshotDef
@@ -720,7 +728,7 @@ snapshotDefFixes sd = sd
 -- creating a 'PackageLocation'.
 globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocation
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PLHackage (PackageIdentifierRevision (toCabalPackageName name) (toCabalVersion (lpiVersion lpi)) CFILatest)
+    { lpiLocation = PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest)
     }
 
 -- | Split the packages into those which have their dependencies met,
@@ -807,7 +815,7 @@ calculate gpd platform compilerVersion loc flags hide options =
     -- We want to ignore test suites and benchmarks, therefore choose
     -- the package description which modifies buildable
     pd = pdpModifiedBuildable $ resolvePackageDescription pconfig gpd
-    PackageIdentifier name version = fromCabalPackageIdentifier $ C.package pd
+    PackageIdentifier name version = C.package pd
     lpi = LoadedPackageInfo
       { lpiVersion = version
       , lpiLocation = loc
@@ -818,7 +826,7 @@ calculate gpd platform compilerVersion loc flags hide options =
                        $ packageDependencies pconfig pd
       , lpiExposedModules = maybe
           Set.empty
-          (Set.fromList . map fromCabalModuleName . C.exposedModules)
+          (Set.fromList . map fromCabalModuleName . C.exposedModules) -- FIXME remove fromCabalModuleName
           (C.library pd)
       , lpiHide = hide
       }

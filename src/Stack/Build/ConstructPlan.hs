@@ -231,7 +231,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
   where
     hasBaseInDeps bconfig =
         elem $(mkPackageName "base")
-        [fromCabalPackageName n | (PLHackage (PackageIdentifierRevision n _ _)) <- snd (bcDependencies bconfig)]
+        [n | (PLHackage (PackageIdentifierRevision n _ _)) <- snd (bcDependencies bconfig)]
 
     mkCtx econfig = Ctx
         { ls = ls0
@@ -241,10 +241,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
-        , getVersions = fmap (Map.mapKeysMonotonic fromCabalVersion)
-                      . runRIO econfig
-                      . getPackageVersions
-                      . toCabalPackageName
+        , getVersions = runRIO econfig . getPackageVersions
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
@@ -324,11 +321,11 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
-          = Just $ "Dependency being unregistered: " <> packageIdentifierText dep
+          = Just $ "Dependency being unregistered: " <> displayC dep
       -- None of the above, keep it!
       | otherwise = Nothing
       where
-        name = packageIdentifierName ident
+        name = displayC ident
 
 -- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for
 -- running its tests and benchmarks.
@@ -409,10 +406,7 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
-                              (PackageIdentifierRevision
-                                 (toCabalPackageName name)
-                                 (toCabalVersion (installedVersion installed))
-                                 CFILatest)
+                              (PackageIdentifierRevision name (installedVersion installed) CFILatest)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
@@ -438,7 +432,7 @@ tellExecutables (PSIndex loc flags _ghcOptions pir) =
 tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream pir@(PackageIdentifierRevision name _ _) loc flags = do
     ctx <- ask
-    when (fromCabalPackageName name `Set.member` extraToBuild ctx) $ do
+    when (name `Set.member` extraToBuild ctx) $ do
         p <- loadPackage ctx (PLHackage pir) flags []
         tellExecutablesPackage loc p
 
@@ -549,7 +543,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             shouldInstall <- checkDirtiness ps installed package present (wanted ctx)
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
-            let t = T.intercalate ", " $ map (T.pack . packageNameString . packageIdentifierName) (Set.toList missing)
+            let t = T.intercalate ", " $ map (displayC . pkgName) (Set.toList missing)
             tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
@@ -646,9 +640,9 @@ addPackageDeps treatAsDep package = do
                                     [ "WARNING: Ignoring out of range dependency"
                                     , reason
                                     , ": "
-                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
+                                    , displayC $ PackageIdentifier depname (adrVersion adr)
                                     , ". "
-                                    , T.pack $ packageNameString $ packageName package
+                                    , displayC $ packageName package
                                     , " requires: "
                                     , versionRangeText range
                                     ]
@@ -687,7 +681,7 @@ addPackageDeps treatAsDep package = do
             package
             (Map.fromList errs)
   where
-    adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
+    adrVersion (ADRToInstall task) = pkgVersion $ taskProvides task
     adrVersion (ADRFound _ installed) = installedVersion installed
     -- Update the parents map, for later use in plan construction errors
     -- - see 'getShortestDepsPath'.
@@ -865,7 +859,7 @@ toolWarningText (ToolWarning (ExeName toolName) pkgName) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
-    T.pack (show (packageNameString pkgName))
+    displayC pkgName
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan
@@ -885,7 +879,7 @@ stripNonDeps deps plan = plan
     , planInstallExes = Map.empty -- TODO maybe don't disable this?
     }
   where
-    checkTask task = packageIdentifierName (taskProvides task) `Set.member` deps
+    checkTask task = pkgName (taskProvides task) `Set.member` deps
 
 markAsDep :: PackageName -> M ()
 markAsDep name = tell mempty { wDeps = Set.singleton name }
@@ -983,8 +977,8 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
        go _ = Map.empty
     pprintExtra (name, (version, cabalHash)) =
       let cfInfo = CFIHash cabalHash
-          packageIdRev = PackageIdentifierRevision (toCabalPackageName name) (toCabalVersion version) cfInfo
-       in fromString $ packageIdentifierRevisionString packageIdRev
+          packageIdRev = PackageIdentifierRevision name version cfInfo
+       in fromString $ T.unpack $ utf8BuilderToText $ RIO.display packageIdRev
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
@@ -1004,7 +998,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (styleError . display) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (styleError . displayC) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -1018,18 +1012,18 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     Just (target:path) -> line <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [styleTarget . display $ target] ++
-                            map display path ++
+                            [styleTarget . displayC $ target] ++
+                            map displayC path ++
                             [pkgIdent]
               where
-                pkgName = styleCurrent . display $ packageName pkg
-                pkgIdent = styleCurrent . display $ packageIdentifier pkg
+                pkgName = styleCurrent . displayC $ packageName pkg
+                pkgIdent = styleCurrent . displayC $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
-        | name `HashSet.member` wiredInPackages =
-            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . display $ name)
-        | otherwise = Just $ flow "Unknown package:" <+> (styleCurrent . display $ name)
+        | name `Set.member` wiredInPackages =
+            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . displayC $ name)
+        | otherwise = Just $ flow "Unknown package:" <+> (styleCurrent . displayC $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -1039,7 +1033,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            styleError (display name) <+>
+            styleError (displayC name) <+>
             align ((if range == Cabal.anyVersion
                       then flow "needed"
                       else flow "must match" <+> goodRange) <> "," <> softline <>
@@ -1047,7 +1041,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            (styleError . display) (PackageIdentifier name version) <+>
+            (styleError . displayC) (PackageIdentifier name version) <+>
             align (flow "from stack configuration does not match" <+> goodRange <+>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
@@ -1055,7 +1049,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
         HasNoLibrary -> Just $
-            styleError (display name) <+>
+            styleError (displayC name) <+>
             align (flow "is a library dependency, but the package provides no library")
       where
         goodRange = styleGood (fromString (Cabal.display range))
@@ -1069,7 +1063,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     | Just laVer == mversion -> softline <>
                         flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        flow "(latest matching version is" <+> styleGood (display laVer) <> ")"
+                        flow "(latest matching version is" <+> styleGood (displayC laVer) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
@@ -1086,7 +1080,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted name =
             Nothing -> Nothing
             Just (_, parents) -> Just $ findShortest 256 paths0
               where
-                paths0 = M.fromList $ map (\(ident, _) -> (packageIdentifierName ident, startDepsPath ident)) parents
+                paths0 = M.fromList $ map (\(ident, _) -> (pkgName ident, startDepsPath ident)) parents
   where
     -- The 'paths' map is a map from PackageName to the shortest path
     -- found to get there. It is the frontier of our breadth-first
@@ -1108,7 +1102,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted name =
     extendPath (n, dp) =
         case M.lookup n parentsMap of
             Nothing -> []
-            Just (_, parents) -> map (\(pkgId, _) -> (packageIdentifierName pkgId, extendDepsPath pkgId dp)) parents
+            Just (_, parents) -> map (\(pkgId, _) -> (pkgName pkgId, extendDepsPath pkgId dp)) parents
 
 data DepsPath = DepsPath
     { dpLength :: Int -- ^ Length of dpPath
@@ -1122,14 +1116,14 @@ data DepsPath = DepsPath
 startDepsPath :: PackageIdentifier -> DepsPath
 startDepsPath ident = DepsPath
     { dpLength = 1
-    , dpNameLength = T.length (packageNameText (packageIdentifierName ident))
+    , dpNameLength = T.length (displayC (pkgName ident))
     , dpPath = [ident]
     }
 
 extendDepsPath :: PackageIdentifier -> DepsPath -> DepsPath
 extendDepsPath ident dp = DepsPath
     { dpLength = dpLength dp + 1
-    , dpNameLength = dpNameLength dp + T.length (packageNameText (packageIdentifierName ident))
+    , dpNameLength = dpNameLength dp + T.length (displayC (pkgName ident))
     , dpPath = [ident]
     }
 

@@ -75,9 +75,9 @@ parseCompilerVersion t
 
 compilerVersionText :: CompilerVersion a -> T.Text
 compilerVersionText (GhcVersion vghc) =
-    "ghc-" <> versionText vghc
+    "ghc-" <> displayC vghc
 compilerVersionText (GhcjsVersion vghcjs vghc) =
-    "ghcjs-" <> versionText vghcjs <> "_ghc-" <> versionText vghc
+    "ghcjs-" <> displayC vghcjs <> "_ghc-" <> displayC vghc
 
 compilerVersionString :: CompilerVersion a -> String
 compilerVersionString = T.unpack . compilerVersionText

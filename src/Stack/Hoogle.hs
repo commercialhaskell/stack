@@ -15,10 +15,8 @@ import qualified Data.Text as T
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
-import           Pantry
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit
@@ -83,29 +81,25 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
         hooglePackageIdentifier <- do
-          mversion <- getLatestHackageVersion $ toCabalPackageName hooglePackageName
+          mversion <- getLatestHackageVersion hooglePackageName
 
           -- FIXME For a while, we've been following the logic of
           -- taking the latest Hoogle version available. However, we
           -- may want to instead grab the version of Hoogle present in
           -- the snapshot current being used instead.
           pure $ fromMaybe (Left hoogleMinIdent) $ do
-            (verC, _revision, cabalHash) <- mversion
-            let ver = fromCabalVersion verC
+            (ver, _revision, cabalHash) <- mversion
             guard $ ver >= hoogleMinVersion
-            Just $ Right $ PackageIdentifierRevision
-              (toCabalPackageName hooglePackageName)
-              (toCabalVersion ver)
-              (CFIHash cabalHash)
+            Just $ Right $ PackageIdentifierRevision hooglePackageName ver (CFIHash cabalHash)
 
         case hooglePackageIdentifier of
             Left{} -> logInfo $
               "Minimum " <>
-              display hoogleMinIdent <>
+              displayC hoogleMinIdent <>
               " is not in your index. Installing the minimum version."
             Right ident -> logInfo $
               "Minimum version is " <>
-              display hoogleMinIdent <>
+              displayC hoogleMinIdent <>
               ". Found acceptable " <>
               display ident <>
               " in your index, installing it."
@@ -123,8 +117,8 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 { boptsCLITargets =
                                     pure $
                                     either
-                                     packageIdentifierText
-                                     (fromString . packageIdentifierRevisionString)
+                                     displayC
+                                     (utf8BuilderToText . display)
                                      hooglePackageIdentifier
                                 }))
                  (\(e :: ExitCode) ->
@@ -173,7 +167,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 [ "Installed Hoogle is too old, "
                                 , T.pack hooglePath
                                 , " is version "
-                                , versionText ver
+                                , displayC ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of

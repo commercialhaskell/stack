@@ -27,7 +27,6 @@ import           Stack.Config
 #ifdef WINDOWS
 import           Stack.DefaultColorWhen (defaultColorWhen)
 #endif
-import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.PackageName
@@ -153,9 +152,9 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             Just downloadVersion -> do
                 prettyInfoL
                     [ flow "Current Stack version:"
-                    , display stackVersion <> ","
+                    , displayC stackVersion <> ","
                     , flow "available download version:"
-                    , display downloadVersion
+                    , displayC downloadVersion
                     ]
                 return $ downloadVersion > stackVersion
 
@@ -226,24 +225,19 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         versions0 <- getPackageVersions "stack"
         let versions
                 = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ map fromCabalVersion
                 $ Map.keys versions0
 
         when (null versions) (throwString "No stack found in package indices")
 
         let version = Data.List.maximum versions
-        if version <= fromCabalVersion (mkVersion' Paths.version)
+        if version <= mkVersion' Paths.version
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                suffix <- parseRelDir $ "stack-" ++ versionString version
+                suffix <- parseRelDir $ "stack-" ++ displayC version
                 let dir = tmp </> suffix
-                unpackPackageIdent
-                  (toFilePath dir)
-                  (toCabalPackageName $(mkPackageName "stack"))
-                  (toCabalVersion version)
-                  CFILatest -- accept latest cabal revision
+                unpackPackageIdent (toFilePath dir) $(mkPackageName "stack") version CFILatest -- accept latest cabal revision
                 pure $ Just dir
 
     forM_ mdir $ \dir -> do

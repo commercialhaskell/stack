@@ -27,7 +27,6 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.Char (isSpace)
 import           Data.Conduit.Process.Typed (eceStderr)
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
 import           Data.List                   ( (\\), isSuffixOf
                                              , minimumBy, isPrefixOf
                                              , intersperse)
@@ -50,7 +49,6 @@ import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
-import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -61,7 +59,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.Version
 import qualified System.Directory as D
@@ -137,8 +134,7 @@ cabalSolver cabalfps constraintType
             logInfo $ RIO.display $ cabalBuildErrMsg msg
             let pkgs = parseConflictingPkgs msg
                 mPkgNames = map (C.simpleParse . T.unpack) pkgs
-                pkgNames  = map (fromCabalPackageName . C.pkgName)
-                                (catMaybes mPkgNames)
+                pkgNames  = map C.pkgName (catMaybes mPkgNames)
 
             when (any isNothing mPkgNames) $ do
                   logInfo $ "*** Only some package names could be parsed: " <>
@@ -157,11 +153,11 @@ cabalSolver cabalfps constraintType
             select s = (T.isPrefixOf "trying:" s
                       || T.isPrefixOf "next goal:" s)
                       && T.isSuffixOf "(user goal)" s
-            pkgName =   take 1
+            pkgName' =  take 1
                       . T.words
                       . T.drop 1
                       . T.dropWhile (/= ':')
-        in concatMap pkgName (filter select ls)
+        in concatMap pkgName' (filter select ls)
 
     parseCabalOutput bs = do
         let ls = drop 1
@@ -183,7 +179,7 @@ cabalSolver cabalfps constraintType
     formatFlagConstraint package flag enabled =
         let sign = if enabled then '+' else '-'
         in
-        "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
+        "--constraint=" ++ unwords [displayC package, sign : displayC flag]
 
     -- Note the order of the Map union is important
     -- We override a package in snapshot by a src package
@@ -244,15 +240,15 @@ getCabalConfig dir constraintType constraints = do
     return $ cache : remote : map goConstraint (Map.toList constraints)
   where
     goConstraint (name, version) =
-        assert (not . null . versionString $ version) $
+        assert (not . T.null . displayC $ version) $
             T.concat
               [ if constraintType == Constraint
-                   || name `HashSet.member` wiredInPackages
+                   || name `Set.member` wiredInPackages
                 then "constraint: "
                 else "preference: "
-              , T.pack $ packageNameString name
+              , displayC name
               , "=="
-              , T.pack $ versionString version
+              , displayC version
               ]
 
 setupCompiler
@@ -307,12 +303,12 @@ setupCabalEnv compiler inner = do
         Just version
             | version < $(mkVersion "1.24") -> prettyWarn $
                 "Installed version of cabal-install (" <>
-                display version <>
+                displayC version <>
                 ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
                 "To resolve this, install a newer version via 'stack install cabal-install'." <> line
             | version >= $(mkVersion "1.25") -> prettyWarn $
                 "Installed version of cabal-install (" <>
-                display version <>
+                displayC version <>
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
@@ -614,7 +610,7 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
 -- dependencies in an existing stack.yaml and suggest changes in flags or
 -- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
-    :: HasEnvConfig env
+    :: forall env. HasEnvConfig env
     => Bool -- ^ modify stack.yaml?
     -> RIO env ()
 solveExtraDeps modStackYaml = do
@@ -728,14 +724,20 @@ solveExtraDeps modStackYaml = do
             unless (Map.null fl) $ do
                 logInfo $ fromString msg
                 logInfo $ RIO.display $ indentLines $ decodeUtf8 $ Yaml.encode
-                                       $ object ["flags" .= fl]
+                                       $ object ["flags" .= toCabalStringMap (fmap toCabalStringMap fl)]
 
         printDeps deps msg = do
             unless (Map.null deps) $ do
                 logInfo $ fromString msg
                 logInfo $ RIO.display $ indentLines $ decodeUtf8 $ Yaml.encode $ object
-                        ["extra-deps" .= map fromTuple (Map.toList deps)]
+                        ["extra-deps" .= map (CabalString . uncurry PackageIdentifier) (Map.toList deps)]
 
+        writeStackYaml
+          :: Path Abs File
+          -> ResolverWith SnapshotHash
+          -> Map PackageName Version
+          -> Map PackageName (Map FlagName Bool)
+          -> RIO env ()
         writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
@@ -743,8 +745,8 @@ solveExtraDeps modStackYaml = do
             _ <- loadConfigYaml (parseProjectAndConfigMonoid (parent path)) path
             let obj' =
                     HashMap.insert "extra-deps"
-                        (toJSON $ map fromTuple $ Map.toList deps)
-                  $ HashMap.insert ("flags" :: Text) (toJSON fl)
+                        (toJSON $ map (CabalString . uncurry PackageIdentifier) $ Map.toList deps)
+                  $ HashMap.insert ("flags" :: Text) (toJSON $ toCabalStringMap $ toCabalStringMap <$> fl)
                   $ HashMap.insert ("resolver" :: Text) (toJSON res) obj
             liftIO $ Yaml.encodeFile fp obj'
 

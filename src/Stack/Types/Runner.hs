@@ -24,7 +24,6 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
-import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
 import           System.Console.ANSI
 import           RIO.Process (HasProcessContext (..), ProcessContext, mkDefaultProcessContext)
 import           System.Terminal
@@ -37,7 +36,7 @@ data Runner = Runner
   , runnerLogFunc    :: !LogFunc
   , runnerTermWidth  :: !Int
   , runnerProcessContext :: !ProcessContext
-  , runnerParsedCabalFiles :: !(IORef
+  , runnerParsedCabalFiles :: !(IORef -- FIXME remove
       ( Map PackageIdentifierRevision GenericPackageDescription
       , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
       ))

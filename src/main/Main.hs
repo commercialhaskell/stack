@@ -85,7 +85,6 @@ import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
-import           Pantry
 import qualified Stack.Path
 import           Stack.PrettyPrint
 import           Stack.Runners
@@ -195,7 +194,7 @@ main = do
       case globalReExecVersion global of
           Just expectVersion -> do
               expectVersion' <- parseVersionFromString expectVersion
-              unless (checkVersion MatchMinor expectVersion' (fromCabalVersion (mkVersion' Meta.version)))
+              unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
                   $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()
       run global `catch` \e ->
@@ -218,7 +217,7 @@ commandLineHandler
   -> Bool
   -> IO (GlobalOptsMonoid, GlobalOpts -> IO ())
 commandLineHandler currentDir progName isInterpreter = complicatedOptions
-  Meta.version
+  (mkVersion' Meta.version)
   (Just versionString')
   VERSION_hpack
   "stack - The Haskell Tool Stack"

@@ -466,7 +466,7 @@ loadConfigMaybeProject configArgs mresolver mproject = do
           LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
-    unless (fromCabalVersion (mkVersion' Meta.version) `withinRange` configRequireStackVersion config)
+    unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
 
     let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
@@ -654,12 +654,7 @@ getLocalPackages = do
 
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
-            let wrapGPD (gpd, loc) =
-                     let PackageIdentifier name _version =
-                                fromCabalPackageIdentifier
-                              $ C.package
-                              $ C.packageDescription gpd
-                      in (name, (gpd, loc))
+            let wrapGPD (gpd, loc) = (pkgName $ C.package $ C.packageDescription gpd, (gpd, loc))
             deps <- map wrapGPD . concat
                 <$> mapM undefined (bcDependencies bc)
 

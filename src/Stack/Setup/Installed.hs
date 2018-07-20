@@ -38,7 +38,6 @@ import           Path.IO
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           RIO.Process
 
@@ -47,11 +46,11 @@ data Tool
     | ToolGhcjs (CompilerVersion 'CVActual) -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
 
 toolString :: Tool -> String
-toolString (Tool ident) = packageIdentifierString ident
+toolString (Tool ident) = displayC ident
 toolString (ToolGhcjs cv) = compilerVersionString cv
 
 toolNameString :: Tool -> String
-toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
+toolNameString (Tool ident) = displayC $ pkgName ident
 toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool

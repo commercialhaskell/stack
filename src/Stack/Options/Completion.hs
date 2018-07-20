@@ -27,9 +27,7 @@ import           Stack.Runners (loadConfigWithOpts)
 import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageName
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)
 
@@ -88,7 +86,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
             $ Map.toList lpvs
         normalFlags
             = concatMap (\(name, lpv) ->
-                map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
+                map (\fl -> displayC name ++ ":" ++ flagString name fl)
                     (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         flagString name fl =
@@ -96,7 +94,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
              in (if flagEnabled name fl then "-" else "") ++ flname
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
-            Map.lookup (fromCabalFlagName (C.flagName fl)) $
+            Map.lookup (C.flagName fl) $
             Map.findWithDefault Map.empty name (bcFlags bconfig)
     return $ filter (input `isPrefixOf`) $
         case input of

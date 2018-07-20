@@ -25,7 +25,7 @@ module Stack.BuildPlan
 
 import           Stack.Prelude hiding (Display (..))
 import qualified Data.Foldable as F
-import qualified Data.HashSet as HashSet
+import qualified Data.Set as Set
 import           Data.List (intercalate)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
@@ -90,20 +90,20 @@ instance Show BuildPlanException where
                     [] -> []
                     noKnown ->
                         [ "There are no known versions of the following packages:"
-                        , intercalate ", " $ map packageNameString noKnown
+                        , intercalate ", " $ map displayC noKnown
                         ]
                 ]
           where
-            go (dep, (_, users)) | Set.null users = packageNameString dep
+            go (dep, (_, users)) | Set.null users = displayC dep
             go (dep, (_, users)) = concat
-                [ packageNameString dep
+                [ displayC dep
                 , " (used by "
-                , intercalate ", " $ map packageNameString $ Set.toList users
+                , intercalate ", " $ map displayC $ Set.toList users
                 , ")"
                 ]
 
             goRecommend (name, (Just version, _)) =
-                Just $ "- " ++ packageIdentifierString (PackageIdentifier name version)
+                Just $ "- " ++ displayC (PackageIdentifier name version)
             goRecommend (_, (Nothing, _)) = Nothing
 
             getNoKnown (name, (Nothing, _)) = Just name
@@ -122,17 +122,17 @@ instance Show BuildPlanException where
                 , ["Note: further dependencies may need to be added"]
                 ]
           where
-            go (dep, users) | Set.null users = packageNameString dep ++ " (internal stack error: this should never be null)"
+            go (dep, users) | Set.null users = displayC dep ++ " (internal stack error: this should never be null)"
             go (dep, users) = concat
-                [ packageNameString dep
+                [ displayC dep
                 , " (used by "
                 , intercalate ", "
-                    $ map (packageNameString . packageIdentifierName)
+                    $ map (displayC . pkgName)
                     $ Set.toList users
                 , ")"
                 ]
 
-            extraDeps = map (\ident -> "- " ++ packageIdentifierString ident)
+            extraDeps = map (\ident -> "- " ++ displayC ident)
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
@@ -142,11 +142,9 @@ instance Show BuildPlanException where
         ", because no 'compiler' or 'resolver' is specified."
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
-gpdPackages gpds = Map.fromList $
-            map (fromCabalIdent . C.package . C.packageDescription) gpds
+gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
     where
-        fromCabalIdent (C.PackageIdentifier name version) =
-            (fromCabalPackageName name, fromCabalVersion version)
+        toPair (C.PackageIdentifier name version) = (name, version)
 
 gpdPackageDeps
     :: GenericPackageDescription
@@ -188,10 +186,9 @@ removeSrcPkgDefaultFlags gpds flags =
             let tuples = map getDefault (C.genPackageFlags gpd)
             in Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
 
-        flagName' = fromCabalFlagName . C.flagName
         getDefault f
-            | C.flagDefault f = (flagName' f, True)
-            | otherwise       = (flagName' f, False)
+            | C.flagDefault f = (C.flagName f, True)
+            | otherwise       = (C.flagName f, False)
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
@@ -232,7 +229,7 @@ selectPackageBuildPlan platform compiler pool gpd =
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]
             | otherwise = (fname, False) :| [(fname, True)]
-          where fname = (fromCabalFlagName . flagName) f
+          where fname = flagName f
 
 -- | Check whether with the given set of flags a package's dependency
 -- constraints can be satisfied against a given build plan or pool of packages.
@@ -372,7 +369,7 @@ checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
             -- FIXME not sure how to handle ghcjs boot packages
             | otherwise = Map.empty
 
-        isGhcWiredIn p _ = p `HashSet.member` wiredInPackages
+        isGhcWiredIn p _ = p `Set.member` wiredInPackages
         ghcErrors = Map.filterWithKey isGhcWiredIn
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
@@ -438,7 +435,7 @@ showPackageFlags pkg fl =
     if not $ Map.null fl then
         T.concat
             [ "    - "
-            , T.pack $ packageNameString pkg
+            , T.pack $ displayC pkg
             , ": "
             , T.pack $ intercalate ", "
                      $ map formatFlags (Map.toList fl)
@@ -478,12 +475,12 @@ showDepErrors flags errs =
             ]
 
         showDepVersion depName mversion = T.concat
-            [ T.pack $ packageNameString depName
+            [ T.pack $ displayC depName
             , case mversion of
                 Nothing -> " not found"
                 Just version -> T.concat
                     [ " version "
-                    , T.pack $ versionString version
+                    , T.pack $ displayC version
                     , " found"
                     ]
             , "\n"
@@ -491,7 +488,7 @@ showDepErrors flags errs =
 
         showRequirement (user, range) = T.concat
             [ "    - "
-            , T.pack $ packageNameString user
+            , T.pack $ displayC user
             , " requires "
             , T.pack $ display range
             , "\n"

@@ -14,7 +14,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Distribution.System (OS (..))
 import Stack.Constants
-import Stack.Types.Version
 import Stack.Types.Nix
 import Stack.Types.Compiler
 import Stack.Types.Runner
@@ -68,7 +67,7 @@ nixCompiler compilerVersion =
       fixMinor v = v
       nixCompilerFromVersion v = T.append (T.pack "haskell.compiler.ghc")
                                           (T.filter (/= '.')
-                                             (fixMinor (versionText v)))
+                                             (fixMinor (displayC v)))
   in case compilerVersion of
        GhcVersion v -> Right $ nixCompilerFromVersion v
        _ -> Left $ stringException "Only GHC is supported by stack --nix"

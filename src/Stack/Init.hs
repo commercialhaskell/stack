@@ -119,7 +119,7 @@ initProject whichCmd currDir initOpts mresolver = do
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
             , projectDependencies = undefined $ map
-                (\(n, v) -> PLHackage $ PackageIdentifierRevision (toCabalPackageName n) (toCabalVersion v) CFILatest)
+                (\(n, v) -> PLHackage $ PackageIdentifierRevision n v CFILatest)
                 (Map.toList extraDeps)
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = resolver
@@ -292,8 +292,7 @@ renderStackYaml p ignoredPackages dupPackages =
         ]
 
     footerHelp =
-        let major = toCabalVersion
-                    $ toMajorVersion $ fromCabalVersion $ C.mkVersion' Meta.version
+        let major = toMajorVersion $ C.mkVersion' Meta.version
         in commentHelp
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"
@@ -408,7 +407,7 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
                           logWarn $ display $ indent $ showItems ignored
                         else
                           logWarn $ "*** Ignoring package: "
-                                 <> display
+                                 <> displayC
                                       (case ignored of
                                         [] -> error "getWorkingResolverPlan.head"
                                         x:_ -> x)

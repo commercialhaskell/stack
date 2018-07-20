@@ -87,7 +87,6 @@ import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.PackageIdentifier
 import              Stack.Types.PackageName
 import              Stack.Types.Runner
 import              Stack.Types.Version
@@ -199,7 +198,7 @@ instance Show SetupException where
     show (DockerStackExeNotFound stackVersion' osKey) = concat
         [ stackProgName
         , "-"
-        , versionString stackVersion'
+        , displayC stackVersion'
         , " executable not found for "
         , T.unpack osKey
         , "\nUse the '"
@@ -673,7 +672,7 @@ ensureDockerStackExe containerPlatform = do
           "Downloading Docker-compatible " <>
           fromString stackProgName <>
           " executable"
-        sri <- downloadStackReleaseInfo Nothing Nothing (Just (versionString stackMinorVersion))
+        sri <- downloadStackReleaseInfo Nothing Nothing (Just (displayC stackMinorVersion))
         platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
@@ -695,21 +694,21 @@ upgradeCabal wc upgradeTo = do
             else
                 logInfo $
                   "No install necessary. Cabal " <>
-                  RIO.display installed <>
+                  displayC installed <>
                   " is already installed"
         Latest -> do
-          mversion <- getLatestHackageVersion $ toCabalPackageName name
+          mversion <- getLatestHackageVersion name
           case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
-            Just (fromCabalVersion -> latestVersion, _revision, _cabalHash) -> do
+            Just (latestVersion, _revision, _cabalHash) -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else
                     logInfo $
                         "No upgrade necessary: Cabal-" <>
-                        RIO.display latestVersion <>
+                        displayC latestVersion <>
                         " is the same or newer than latest hackage version " <>
-                        RIO.display installed
+                        displayC installed
 
 -- Configure and run the necessary commands for a cabal install
 doCabalInstall :: (HasConfig env, HasGHCVariant env)
@@ -725,20 +724,16 @@ doCabalInstall wc installed wantedVersion = do
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         logInfo $
             "Installing Cabal-" <>
-            RIO.display wantedVersion <>
+            displayC wantedVersion <>
             " to replace " <>
-            RIO.display installed
+            displayC installed
         let name = $(mkPackageName "Cabal")
-            suffix = "Cabal-" ++ versionString wantedVersion
+            suffix = "Cabal-" ++ displayC wantedVersion
             dir = toFilePath tmpdir FP.</> suffix
-        unpackPackageIdent
-          dir
-          (toCabalPackageName name)
-          (toCabalVersion wantedVersion)
-          CFILatest
+        unpackPackageIdent dir name wantedVersion CFILatest
         compilerPath <- findExecutable (compilerExeName wc)
                     >>= either throwM parseAbsFile
-        versionDir <- parseRelDir $ versionString wantedVersion
+        versionDir <- parseRelDir $ displayC wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
                                     </> versionDir
@@ -817,12 +812,12 @@ getInstalledTool :: [Tool]            -- ^ already installed
 getInstalledTool installed name goodVersion =
     if null available
         then Nothing
-        else Just $ Tool $ maximumBy (comparing packageIdentifierVersion) available
+        else Just $ Tool $ maximumBy (comparing pkgVersion) available
   where
     available = mapMaybe goodPackage installed
     goodPackage (Tool pi') =
-        if packageIdentifierName pi' == name &&
-           goodVersion (packageIdentifierVersion pi')
+        if pkgName pi' == name &&
+           goodVersion (pkgVersion pi')
             then Just pi'
             else Nothing
     goodPackage _ = Nothing
@@ -1095,7 +1090,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     dir <-
         liftM (tempDir </>) $
         parseRelDir $
-        "ghc-" ++ versionString version
+        "ghc-" ++ displayC version
 
     let runStep step wd env cmd args = do
             menv' <- modifyEnvVars menv (Map.union env)
@@ -1252,7 +1247,7 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else
                         liftM ((destDir </> $(mkRelDir "src")) </>) $
-                        parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
+                        parseRelFile $ "ghcjs-" ++ displayC ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
                     throwString "Error: Couldn't find GHCJS stack.yaml in old or new location."
@@ -1274,20 +1269,20 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
             | v < $(mkVersion "1.22.4") -> do
                 logInfo $
                     "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
-                    RIO.display v <>
+                    displayC v <>
                     ")."
                 return True
             | v >= $(mkVersion "1.23") -> do
                 logWarn $
                     "The cabal-install found on PATH is a version stack doesn't know about, version " <>
-                    RIO.display v <>
+                    displayC v <>
                     ". This may or may not work.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return False
             | ghcjsVersion >= $(mkVersion "0.2.0.20160413") && v >= $(mkVersion "1.22.8") -> do
                 logWarn $
                     "The cabal-install found on PATH, version " <>
-                    RIO.display v <>
+                    displayC v <>
                     ", is >= 1.22.8.\n" <>
                     "That version has a bug preventing ghcjs < 0.2.0.20160413 from booting.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
@@ -1405,7 +1400,7 @@ installGHCWindows :: HasConfig env
                   -> Path Abs Dir
                   -> RIO env ()
 installGHCWindows version si archiveFile archiveType _tempDir destDir = do
-    tarComponent <- parseRelDir $ "ghc-" ++ versionString version
+    tarComponent <- parseRelDir $ "ghc-" ++ displayC version
     withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
     logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 

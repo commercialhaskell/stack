@@ -11,8 +11,6 @@ import           Stack.Options.Completion
 import           Stack.Options.PackageParser (readFlag)
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.FlagName
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | Parser for CLI-only build arguments
@@ -91,7 +89,7 @@ targetsParser =
               completer targetCompleter <>
               help ("If none specified, use all local packages. " <>
                     "See https://docs.haskellstack.org/en/v" <>
-                    versionString stackMinorVersion <>
+                    displayC stackMinorVersion <>
                     "/build_command/#target-syntax for details.")))
 
 flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))

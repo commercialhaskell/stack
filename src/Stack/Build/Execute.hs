@@ -107,17 +107,15 @@ preFetch plan
     | otherwise = do
         logDebug $
             "Prefetching: " <>
-            mconcat (intersperse ", " (RIO.display <$> Set.toList idents))
-        fetchPackages $ ((toCabalPackageName *** toCabalVersion) . toTuple) <$> Set.toList idents
+            mconcat (intersperse ", " (displayC <$> Set.toList idents))
+        fetchPackages idents
   where
     idents = Set.unions $ map toIdent $ Map.elems $ planTasks plan
 
     toIdent task =
         case taskType task of
             TTFiles{} -> Set.empty
-            TTIndex _ _ (PackageIdentifierRevision name ver _) -> Set.singleton $ PackageIdentifier
-              (fromCabalPackageName name)
-              (fromCabalVersion ver)
+            TTIndex _ _ (PackageIdentifierRevision name ver _) -> Set.singleton $ PackageIdentifier name ver
 
 -- | Print a description of build plan for human consumption.
 printPlan :: HasRunner env => Plan -> RIO env ()
@@ -127,7 +125,7 @@ printPlan plan = do
         xs -> do
             logInfo "Would unregister locally:"
             forM_ xs $ \(ident, reason) -> logInfo $
-                RIO.display ident <>
+                displayC ident <>
                 if T.null reason
                   then ""
                   else " (" <> RIO.display reason <> ")"
@@ -171,7 +169,7 @@ printPlan plan = do
 -- | For a dry run
 displayTask :: Task -> Utf8Builder
 displayTask task =
-    RIO.display (taskProvides task) <>
+    displayC (taskProvides task) <>
     ": database=" <>
     (case taskLocation task of
         Snap -> "snapshot"
@@ -183,7 +181,7 @@ displayTask task =
     (if Set.null missing
         then ""
         else ", after: " <>
-             mconcat (intersperse "," (RIO.display <$> Set.toList missing)))
+             mconcat (intersperse "," (displayC <$> Set.toList missing)))
   where
     missing = tcoMissing $ taskConfigOpts task
 
@@ -253,7 +251,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
     wc <- view $ actualCompilerVersionL.whichCompilerL
     platformDir <- platformGhcRelDir
     config <- view configL
-    cabalVersionString <- view $ cabalVersionL.to versionString
+    cabalVersionString <- view $ cabalVersionL.to displayC
     actualCompilerVersionString <- view $ actualCompilerVersionL.to compilerVersionString
     platform <- view platformL
     let baseNameS = concat
@@ -600,7 +598,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
             localDB <- packageDatabaseLocal
             forM_ ids $ \(id', (ident, reason)) -> do
                 logInfo $
-                    RIO.display ident <>
+                    displayC ident <>
                     ": unregistering" <>
                     if T.null reason
                         then ""
@@ -634,9 +632,10 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     run $ logStickyDone ("Completed " <> RIO.display total <> " action(s).")
                 | otherwise = do
                     inProgress <- readTVarIO actionsVar
-                    let packageNames = map (\(ActionId pkgID _) -> packageIdentifierText pkgID) (toList inProgress)
+                    let packageNames = map (\(ActionId pkgID _) -> displayC pkgID) (toList inProgress)
+                        nowBuilding :: [PackageName] -> Utf8Builder
                         nowBuilding []    = ""
-                        nowBuilding names = mconcat $ ": " : intersperse ", " (map RIO.display names)
+                        nowBuilding names = mconcat $ ": " : intersperse ", " (map displayC names)
                     when terminal $ run $
                         logSticky $
                             "Progress " <> RIO.display prev <> "/" <> RIO.display total <>
@@ -670,7 +669,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
   where
     installedMap' = Map.difference installedMap0
                   $ Map.fromList
-                  $ map (\(ident, _) -> (packageIdentifierName ident, ()))
+                  $ map (\(ident, _) -> (pkgName ident, ()))
                   $ Map.elems
                   $ planUnregisterLocal plan
 
@@ -776,7 +775,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                     -- Expect to instead find it in installedMap if it's
                     -- an initialBuildSteps target.
                     | boptsCLIInitialBuildSteps eeBuildOptsCLI && taskIsTarget task,
-                      Just (_, installed) <- Map.lookup (packageIdentifierName ident) installedMap
+                      Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
                 _ -> error "singleBuild: invariant violated, missing package ID missing"
@@ -796,7 +795,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                     TTFiles lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTIndex{} -> Set.empty
             , configCacheHaddock =
-                shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
+                shouldHaddockPackage eeBuildOpts eeWanted (pkgName taskProvides)
             , configCachePkgSrc = taskCachePkgSrc
             }
         allDepsMap = Map.union missing' taskPresent
@@ -874,7 +873,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
 
 announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
 announceTask task x = logInfo $
-    RIO.display (taskProvides task) <>
+    displayC (taskProvides task) <>
     ": " <>
     RIO.display x
 
@@ -962,15 +961,15 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                   ensureDir $ parent newDist
                   renameDir oldDist newDist
 
-                let name = packageIdentifierName taskProvides
-                cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
+                let name = pkgName taskProvides
+                cabalfpRel <- parseRelFile $ displayC name ++ ".cabal"
                 let cabalfp = dir </> cabalfpRel
                 inner package cabalfp dir
 
     withOutputType pkgDir package inner
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
-        | boptsInterleavedOutput eeBuildOpts = inner $ OTConsole $ RIO.display (packageName package) <> "> "
+        | boptsInterleavedOutput eeBuildOpts = inner $ OTConsole $ displayC (packageName package) <> "> "
 
         -- Not in interleaved mode. When building a single wanted package, dump
         -- to the console with no prefix.
@@ -1025,7 +1024,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                     -- https://github.com/commercialhaskell/stack/issues/1356
                     | packageName package == $(mkPackageName "Cabal") = []
                     | otherwise =
-                        ["-package=" ++ packageIdentifierString
+                        ["-package=" ++ displayC
                                             (PackageIdentifier cabalPackageName
                                                               eeCabalPkgVer)]
                 packageDBArgs =
@@ -1044,7 +1043,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (TTFiles lp Local, C.Custom) | lpWanted lp -> do
                             prettyWarnL
                                 [ flow "Package"
-                                , display $ packageName package
+                                , displayC $ packageName package
                                 , flow "uses a custom Cabal build, but does not use a custom-setup stanza"
                                 ]
                         _ -> return ()
@@ -1060,7 +1059,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (Just customSetupDeps, _) -> do
                             unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
                                 prettyWarnL
-                                    [ display $ packageName package
+                                    [ displayC $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]
                             allDeps <-
@@ -1076,11 +1075,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                 case filter (matches . fst) (Map.toList allDeps) of
                                     x:xs -> do
                                         unless (null xs)
-                                            (logWarn ("Found multiple installed packages for custom-setup dep: " <> RIO.display name))
-                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (toCabalPackageIdentifier (fst x)))
+                                            (logWarn ("Found multiple installed packages for custom-setup dep: " <> displayC name))
+                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
                                     [] -> do
-                                        logWarn ("Could not find custom-setup dep: " <> RIO.display name)
-                                        return ("-package=" ++ packageNameString name, Nothing)
+                                        logWarn ("Could not find custom-setup dep: " <> displayC name)
+                                        return ("-package=" ++ displayC name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
@@ -1261,7 +1260,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             writeFlagCache installed cache
             liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
   where
-    pname = packageIdentifierName taskProvides
+    pname = pkgName taskProvides
     shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
     doHaddock package = shouldHaddockPackage' &&
                         not isFinalBuild &&
@@ -1338,9 +1337,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
           subLibNames = map T.unpack . Set.toList $ case taskType of
             TTFiles lp _ -> packageInternalLibraries $ lpPackage lp
             TTIndex p _ _ -> packageInternalLibraries p
-          (name, version) = toTuple taskProvides
-          mainLibName = packageNameString name
-          mainLibVersion = versionString version
+          PackageIdentifier name version = taskProvides
+          mainLibName = displayC name
+          mainLibVersion = displayC version
           pkgName = mainLibName ++ "-" ++ mainLibVersion
           -- z-package-z-internal for internal lib internal of package package
           toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
@@ -1398,7 +1397,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
                  (logInfo
-                      ("Building all executables for `" <> RIO.display (packageName package) <>
+                      ("Building all executables for `" <> displayC (packageName package) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
@@ -1553,7 +1552,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 sublibsPkgIds <- fmap catMaybes $
                   forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
                     -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
-                    let sublibName = T.concat ["z-", packageNameText $ packageName package, "-z-", sublib]
+                    let sublibName = T.concat ["z-", displayC $ packageName package, "-z-", sublib]
                     case parsePackageName sublibName of
                       Nothing -> return Nothing -- invalid lib, ignored
                       Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
@@ -1802,7 +1801,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         logError $ displayShow $ TestSuiteExeMissing
                             (packageBuildType package == C.Simple)
                             exeName
-                            (packageNameString (packageName package))
+                            (displayC (packageName package))
                             (T.unpack testName)
                         return $ Map.singleton testName Nothing
 
@@ -1974,7 +1973,7 @@ primaryComponentOptions executableBuildStatuses lp =
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
-           $ T.append "lib:" (packageNameText (packageName package))
+           $ T.append "lib:" (displayC (packageName package))
            : map (T.append "flib:") (Set.toList names)) ++
       map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
@@ -2052,7 +2051,7 @@ addGlobalPackages deps globals0 =
 
     -- Create a Map of unique package names in the global database
     globals2 = Map.fromListWith chooseBest
-             $ map (packageIdentifierName . dpPackageIdent &&& id) globals1
+             $ map (pkgName . dpPackageIdent &&& id) globals1
 
     -- Final result: add in globals that have their dependencies met
     res = loop id (Map.elems globals2) $ Set.fromList res0
@@ -2065,15 +2064,15 @@ addGlobalPackages deps globals0 =
     isCabal (PackageIdentifier name _) = name == $(mkPackageName "Cabal")
 
     -- Is the given package name provided by the package dependencies?
-    isDep dp = packageIdentifierName (dpPackageIdent dp) `Set.member` depNames
-    depNames = Set.map packageIdentifierName $ Map.keysSet deps
+    isDep dp = pkgName (dpPackageIdent dp) `Set.member` depNames
+    depNames = Set.map pkgName $ Map.keysSet deps
 
     -- Choose the best of two competing global packages (the newest version)
     chooseBest dp1 dp2
         | getVer dp1 < getVer dp2 = dp2
         | otherwise               = dp1
       where
-        getVer = packageIdentifierVersion . dpPackageIdent
+        getVer = pkgVersion . dpPackageIdent
 
     -- Are all dependencies of the given package met by the given Set of
     -- installed packages

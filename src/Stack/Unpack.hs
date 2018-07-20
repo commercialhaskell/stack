@@ -47,7 +47,7 @@ unpackPackages mSnapshotDef dest input = do
     let pirs = Map.fromList $ map
           (\pir@(PackageIdentifierRevision name version _) ->
                ( pir
-               , dest </> packageIdentifierString (PackageIdentifier (fromCabalPackageName name) (fromCabalVersion version))
+               , dest </> displayC (PackageIdentifier name version)
                )
           )
           (pirs1 ++ pirs2)
@@ -69,21 +69,21 @@ unpackPackages mSnapshotDef dest input = do
     toPIR = maybe toPIRNoSnapshot toPIRSnapshot mSnapshotDef
 
     toPIRNoSnapshot name = do
-      mver1 <- getLatestHackageVersion $ toCabalPackageName name
+      mver1 <- getLatestHackageVersion name
       mver <-
         case mver1 of
           Just _ -> pure mver1
           Nothing -> do
-            updated <- updateHackageIndex $ Just $ "Could not find package " <> display name <> ", updating"
+            updated <- updateHackageIndex $ Just $ "Could not find package " <> displayC name <> ", updating"
             if updated
-              then getLatestHackageVersion $ toCabalPackageName name
+              then getLatestHackageVersion name
               else pure Nothing
       pure $
         case mver of
           -- consider updating the index
-          Nothing -> Left $ "Could not find package " ++ packageNameString name
+          Nothing -> Left $ "Could not find package " ++ displayC name
           Just (ver, _rev, cabalHash) -> Right $ PackageIdentifierRevision
-            (toCabalPackageName name)
+            name
             ver
             (CFIHash cabalHash)
 
@@ -91,12 +91,12 @@ unpackPackages mSnapshotDef dest input = do
     toPIRSnapshot sd name =
         pure $
           case mapMaybe go $ sdLocations sd of
-            [] -> Left $ "Package does not appear in snapshot: " ++ packageNameString name
+            [] -> Left $ "Package does not appear in snapshot: " ++ displayC name
             pir:_ -> Right pir
       where
         -- FIXME should work for things besides PLHackage
         go (PLHackage pir@(PackageIdentifierRevision name' _ _))
-          | name' == toCabalPackageName name = Just pir
+          | name' == name = Just pir
         go _ = Nothing
 
     -- Possible future enhancement: parse names as name + version range
