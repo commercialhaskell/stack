@@ -121,8 +121,6 @@ instance HasRunner PathInfo where
 instance HasConfig PathInfo
 instance HasPantryConfig PathInfo where
     pantryConfigL = configL.pantryConfigL
-instance HasCabalLoader PathInfo where
-    cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext PathInfo where
     processContextL = configL.processContextL
 instance HasBuildConfig PathInfo where

@@ -112,8 +112,6 @@ instance HasRunner Ctx where
 instance HasConfig Ctx
 instance HasPantryConfig Ctx where
     pantryConfigL = configL.pantryConfigL
-instance HasCabalLoader Ctx where
-    cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext Ctx where
     processContextL = configL.processContextL
 instance HasBuildConfig Ctx
@@ -189,10 +187,10 @@ gpdVersion = packageIdentifierVersion . gpdPackageIdentifier
 -- | Read the 'GenericPackageDescription' from the given
 -- 'PackageIdentifierRevision'.
 readPackageUnresolvedIndex
-  :: forall env. HasCabalLoader env
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasRunner env)
   => PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' cfi) = do
+readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' cfi) = do -- FIXME move to pantry
   ref <- view $ runnerL.to runnerParsedCabalFiles
   (m, _) <- readIORef ref
   case M.lookup pir m of

@@ -234,7 +234,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> RIO env Config
 configFromConfigMonoid
-    clStackRoot configUserConfigPath configAllowLocals mresolver
+    configStackRoot configUserConfigPath configAllowLocals mresolver
     mproject ConfigMonoid{..} = do
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
@@ -285,7 +285,7 @@ configFromConfigMonoid
 
      let configBuild = buildOptsFromMonoid configMonoidBuildOpts
      configDocker <-
-         dockerOptsFromMonoid (fmap fst mproject) clStackRoot mresolver configMonoidDockerOpts
+         dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      configSystemGHC <-
@@ -309,7 +309,7 @@ configFromConfigMonoid
      let configProcessContextSettings _ = return origEnv
 
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
-       Nothing -> getDefaultLocalProgramsBase clStackRoot configPlatform origEnv
+       Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
        Just path -> return path
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
@@ -364,14 +364,13 @@ configFromConfigMonoid
 
      -- Disable logging from mkPantryConfig to silence persistent's
      -- logging output, otherwise --verbose gets totally flooded
-     clPantryConfig <- runRIO (mempty :: LogFunc) $ mkPantryConfig
-       (toFilePath (clStackRoot </> $(mkRelDir "pantry")))
+     configPantryConfig <- runRIO (mempty :: LogFunc) $ mkPantryConfig
+       (toFilePath (configStackRoot </> $(mkRelDir "pantry")))
        (case getFirst configMonoidPackageIndices of
           Nothing -> defaultHackageSecurityConfig
        )
 
      let configRunner = set processContextL origEnv configRunner'
-         configCabalLoader = CabalLoader {..}
 
      return Config {..}
 
@@ -410,8 +409,6 @@ instance HasProcessContext MiniConfig where
     processContextL = configL.processContextL
 instance HasPantryConfig MiniConfig where
     pantryConfigL = configL.pantryConfigL
-instance HasCabalLoader MiniConfig where
-    cabalLoaderL = configL.cabalLoaderL
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
     ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })

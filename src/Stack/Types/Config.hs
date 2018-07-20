@@ -168,9 +168,6 @@ module Stack.Types.Config
   -- * Lens reexport
   ,view
   ,to
-  -- * FIXME!
-  , CabalLoader (..)
-  , HasCabalLoader (..)
   ) where
 
 import           Control.Monad.Writer (tell)
@@ -342,7 +339,8 @@ data Config =
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
          ,configRunner              :: !Runner
-         ,configCabalLoader         :: !CabalLoader
+         ,configPantryConfig        :: !PantryConfig
+         ,configStackRoot           :: !(Path Abs Dir)
          }
 
 data HpackExecutable
@@ -1857,7 +1855,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasProcessContext env, HasCabalLoader env) => HasConfig env where
+class (HasPlatform env, HasProcessContext env, HasPantryConfig env, HasLogFunc env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1904,22 +1902,13 @@ instance HasProcessContext EnvConfig where
     processContextL = configL.processContextL
 
 instance HasPantryConfig Config where
-    pantryConfigL = cabalLoaderL.pantryConfigL
+    pantryConfigL = lens configPantryConfig (\x y -> x { configPantryConfig = y })
 instance HasPantryConfig LoadConfig where
     pantryConfigL = configL.pantryConfigL
 instance HasPantryConfig BuildConfig where
     pantryConfigL = configL.pantryConfigL
 instance HasPantryConfig EnvConfig where
     pantryConfigL = configL.pantryConfigL
-
-instance HasCabalLoader Config where
-    cabalLoaderL = lens configCabalLoader (\x y -> x { configCabalLoader = y })
-instance HasCabalLoader LoadConfig where
-    cabalLoaderL = configL.cabalLoaderL
-instance HasCabalLoader BuildConfig where
-    cabalLoaderL = configL.cabalLoaderL
-instance HasCabalLoader EnvConfig where
-    cabalLoaderL = configL.cabalLoaderL
 
 instance HasConfig Config where
     configL = id
@@ -1961,25 +1950,8 @@ instance HasLogFunc EnvConfig where
 -- Helper lenses
 -----------------------------------
 
-class (HasRunner env, HasPantryConfig env) => HasCabalLoader env where -- FIXME!
-  cabalLoaderL :: Lens' env CabalLoader
-
-data CabalLoader = CabalLoader
-  { clPantryConfig :: !PantryConfig
-  , clStackRoot :: !(Path Abs Dir) -- FIXME move to Config
-  -- ^ ~/.stack more often than not
-  , clConnectionCount :: !Int -- FIXME move to PantryConfig
-  -- ^ How many concurrent connections are allowed when downloading
-  , clIgnoreRevisionMismatch :: !Bool -- FIXME hopefully no longer needed at all
-  -- ^ Ignore a revision mismatch when loading up cabal files,
-  -- and fall back to the latest revision. See:
-  -- <https://github.com/commercialhaskell/stack/issues/3520>
-  }
-instance HasPantryConfig CabalLoader where
-  pantryConfigL = lens clPantryConfig (\x y -> x { clPantryConfig = y })
-
-stackRootL :: HasCabalLoader s => Lens' s (Path Abs Dir)
-stackRootL = cabalLoaderL.lens clStackRoot (\x y -> x { clStackRoot = y })
+stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
+stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!

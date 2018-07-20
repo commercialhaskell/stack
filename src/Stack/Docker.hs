@@ -758,7 +758,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
-          error "FIXME clIndices"
+          -- FIXME Manny: would it make sense to copy over the entire pantry directory?
           {-
           forM_ clIndices $ \pkgIdx -> do
             msrcIndex <- runRIO (set stackRootL origStackRoot config) $ do
@@ -779,7 +779,6 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           -}
     return True
   where
-    CabalLoader {..} = configCabalLoader
     updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do
       case estackUserEntry of
         Left _ -> do

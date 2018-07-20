@@ -148,8 +148,6 @@ instance HasRunner Ctx where
 instance HasConfig Ctx
 instance HasPantryConfig Ctx where
     pantryConfigL = configL.pantryConfigL
-instance HasCabalLoader Ctx where
-    cabalLoaderL = configL.cabalLoaderL
 instance HasProcessContext Ctx where
     processContextL = configL.processContextL
 instance HasBuildConfig Ctx
