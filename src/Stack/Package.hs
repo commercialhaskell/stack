@@ -35,7 +35,8 @@ module Stack.Package
   ,cabalFilePackageId
   ,gpdPackageIdentifier
   ,gpdPackageName
-  ,gpdVersion)
+  ,gpdVersion
+  ,parseSingleCabalFile)
   where
 
 import qualified Data.ByteString as BS
@@ -190,23 +191,20 @@ readPackageUnresolvedIndex
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasRunner env)
   => PackageIdentifierRevision
   -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex pir@(PackageIdentifierRevision pi' cfi) = do -- FIXME move to pantry
+readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXME move to pantry
   ref <- view $ runnerL.to runnerParsedCabalFiles
   (m, _) <- readIORef ref
   case M.lookup pir m of
     Just gpd -> return gpd
     Nothing -> do
-      let PackageIdentifier pn v = pi'
-      ebs <- loadFromIndex (toCabalPackageName pn) (toCabalVersion v) cfi
+      ebs <- loadFromIndex pn v cfi
       bs <-
         case ebs of
           Right bs -> pure bs
       (_warnings, gpd) <- rawParseGPD (Left pir) bs
-      let foundPI =
-              fromCabalPackageIdentifier
-            $ D.package
-            $ D.packageDescription gpd
-      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
+      let foundPI = D.package $ D.packageDescription gpd
+          pi' = D.PackageIdentifier pn v
+      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir $ fromCabalPackageIdentifier foundPI
       atomicModifyIORef' ref $ \(m1, m2) ->
         ((M.insert pir gpd m1, m2), gpd)
 
@@ -1576,3 +1574,15 @@ cabalFilePackageId fp = do
         name' <- parsePackageNameFromString name
         let ver' = fromCabalVersion ver
         return (PackageIdentifier name' ver')
+
+parseSingleCabalFile -- FIXME rename and add docs
+  :: forall env. HasConfig env
+  => Bool -- ^ print warnings?
+  -> Path Abs Dir
+  -> RIO env LocalPackageView
+parseSingleCabalFile printWarnings dir = do
+  (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
+  return LocalPackageView
+    { lpvCabalFP = cabalfp
+    , lpvGPD = gpd
+    }

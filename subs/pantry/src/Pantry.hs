@@ -14,8 +14,16 @@ module Pantry
   , CabalFileInfo (..)
   , Revision (..)
   , FileSize (..)
+  , PackageLocation (..)
+  , Archive (..)
+  , Repo (..)
+  , RepoType (..)
+  , PackageIdentifierRevision (..)
   -- FIXME , PackageName
   -- FIXME , Version
+
+    -- * Cabal files
+  , parseCabalFile
 
     -- * Hackage index
   , updateHackageIndex
@@ -40,6 +48,7 @@ import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
 import Data.List.NonEmpty (NonEmpty)
+import Distribution.PackageDescription (GenericPackageDescription)
 import qualified Data.List.NonEmpty as NE
 
 mkPantryConfig
@@ -97,7 +106,7 @@ loadFromIndex name version cfi = do
     Nothing -> do
       updated <- updateHackageIndex $ Just $
                 "Didn't see " <>
-                displayPackageIdentifierRevision name version cfi <>
+                display (PackageIdentifierRevision name version cfi) <>
                 " in your package indices.\n" <>
                 "Updating and trying again."
       if updated
@@ -218,3 +227,9 @@ unpackPackageIdent
 unpackPackageIdent fp name ver cfi = do
   (_treekey, tree) <- getHackageTarball name ver cfi
   unpackTree fp tree
+
+parseCabalFile
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env GenericPackageDescription
+parseCabalFile = undefined

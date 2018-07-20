@@ -9,7 +9,12 @@ Major changes:
 
 * Drop support for multiple package indices and legacy `00-index.tar` style
   indices. See [#4137](https://github.com/commercialhaskell/stack/issues/4137).
-* All package types besides local file paths must now be treated as `extra-dep`s.
+* Changes to parsing of packages in `stack.yaml` files:
+    * All package types besides local file paths must now be treated as `extra-dep`s.
+    * Only local filepaths can be specified in `packages`. All other
+      must be specified in `extra-deps`.
+    * The `extra-dep` key in `packages` is no longer supported; please
+      move any such specifications to `extra-deps`.
 
 Behavior changes:
 

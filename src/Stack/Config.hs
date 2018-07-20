@@ -68,7 +68,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry (HasPantryConfig (..), mkPantryConfig, defaultHackageSecurityConfig)
+import           Pantry (HasPantryConfig (..), mkPantryConfig, defaultHackageSecurityConfig, PackageLocation)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -80,7 +80,7 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.PackageLocation
+import           Stack.Package (parseSingleCabalFile)
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -609,7 +609,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         , bcSnapshotDef = sd
         , bcGHCVariant = configGHCVariantDefault config
         , bcPackages = packages
-        , bcDependencies = projectDependencies project
+        , bcDependencies = undefined (projectDependencies project)
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
@@ -661,10 +661,10 @@ getLocalPackages = do
                               $ C.packageDescription gpd
                       in (name, (gpd, loc))
             deps <- map wrapGPD . concat
-                <$> mapM (parseMultiCabalFilesIndex root) (bcDependencies bc)
+                <$> mapM undefined (bcDependencies bc)
 
             checkDuplicateNames $
-              map (second (PLOther . PLFilePath . toFilePath . lpvRoot)) packages ++
+              map (second (Left . lpvRoot)) packages ++
               map (second snd) deps
 
             return LocalPackages
@@ -674,7 +674,7 @@ getLocalPackages = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocationIndex FilePath)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, Either (Path Abs Dir) PackageLocation)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

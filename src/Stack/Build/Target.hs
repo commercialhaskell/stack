@@ -80,7 +80,6 @@ import           Path.Extra (rejectMissingDir)
 import           Path.IO
 import           Stack.Config (getLocalPackages)
 import           Pantry
-import           Stack.PackageLocation
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -219,8 +218,8 @@ data ResolveResult = ResolveResult
 resolveRawTarget
   :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-  -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
-  -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps
+  -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+  -> Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
   -> RIO env (Either Text ResolveResult)
@@ -352,12 +351,12 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLIndex (PackageIdentifierRevision (PackageIdentifier _name versionLoc) _mcfi)) -> Right ResolveResult
+            Just (Right (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi))) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
                   , rrAddedDep =
-                      if version == versionLoc
+                      if version == fromCabalVersion versionLoc
                         -- But no need to override anyway, this is already the
                         -- version we have
                         then Nothing
@@ -367,7 +366,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                   }
             -- The package was coming from something besides the
             -- index, so refuse to do the override
-            Just (PLOther loc') -> Left $ T.concat
+            Just loc' -> Left $ T.concat
               [ "Package with identifier was targeted on the command line: "
               , packageIdentifierText ident
               , ", but it was specified from a non-index location: "
@@ -384,14 +383,15 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               }
 
       where
-        allLocs :: Map PackageName (PackageLocationIndex FilePath)
+        allLocs :: Map PackageName (Either (Path Abs Dir) PackageLocation)
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> PLIndex $ PackageIdentifierRevision
-                  (PackageIdentifier name' (lpiVersion lpi))
+              (\name' lpi -> Right $ PLHackage $ PackageIdentifierRevision
+                  (toCabalPackageName name')
+                  (toCabalVersion (lpiVersion lpi))
                   CFILatest)
               globals
-          , Map.map lpiLocation snap
+          , Map.map (Right . lpiLocation) snap
           , Map.map snd deps
           ]
 
@@ -412,14 +412,18 @@ data PackageType = ProjectPackage | Dependency
 combineResolveResults
   :: forall env. HasLogFunc env
   => [ResolveResult]
-  -> RIO env ([Text], Map PackageName Target, Map PackageName (PackageLocationIndex FilePath))
+  -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocation)
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
         Nothing -> return Map.empty
         Just version -> do
-          let ident = PackageIdentifier (rrName result) version
-          return $ Map.singleton (rrName result) $ PLIndex $ PackageIdentifierRevision ident CFILatest
+          return $ Map.singleton (rrName result)
+                 $ PLHackage
+                 $ PackageIdentifierRevision
+                     (toCabalPackageName (rrName result))
+                     (toCabalVersion version)
+                     CFILatest
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -450,7 +454,7 @@ parseTargets
     -> BuildOptsCLI
     -> RIO env
          ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
-         , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- all local deps
+         , Map PackageName (LoadedPackageInfo PackageLocation) -- all local deps
          , Map PackageName Target
          )
 parseTargets needTargets boptscli = do
@@ -508,17 +512,17 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseSingleCabalFileIndex root loc
-      return (name, (gpd, loc, Nothing))
+      gpd <- undefined loc
+      return (name, (gpd, Right loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
     -- command line
-    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath, Maybe LocalPackageView)
+    let allLocals :: Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation, Maybe LocalPackageView)
         allLocals = Map.unions
           [ -- project packages
             Map.map
-              (\lpv -> (lpvGPD lpv, PLOther $ PLFilePath $ toFilePath $ lpvRoot lpv, Just lpv))
+              (\lpv -> (lpvGPD lpv, Left $ lpvRoot lpv, Just lpv))
               (lpProject lp)
           , -- added deps take precendence over local deps
             addedDeps'
@@ -529,7 +533,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      root ls0 (Map.elems allLocals)
+      root ls0 (undefined (Map.elems allLocals))
       flags hides options drops
 
   let ls = LoadedSnapshot

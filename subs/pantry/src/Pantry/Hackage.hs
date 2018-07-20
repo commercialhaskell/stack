@@ -261,7 +261,7 @@ resolveCabalFileInfo name ver cfi = do
   case mres of
     Just res -> pure res
     Nothing -> do
-      let msg = "Could not find cabal file info for " <> displayPackageIdentifierRevision name ver cfi
+      let msg = "Could not find cabal file info for " <> display (PackageIdentifierRevision name ver cfi)
       updated <- updateHackageIndex $ Just $ msg <> ", updating"
       mres' <- if updated then inner else pure Nothing
       case mres' of

@@ -32,7 +32,6 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
-    ,ttPackageLocation
     ,TaskConfigOpts(..)
     ,BuildCache(..)
     ,buildCacheVC
@@ -68,7 +67,6 @@ import qualified Distribution.Text               as C
 import           Path                            (mkRelDir, parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -467,10 +465,6 @@ instance Show TaskConfigOpts where
 data TaskType = TTFiles LocalPackage InstallLocation
               | TTIndex Package InstallLocation PackageIdentifierRevision -- FIXME major overhaul for PackageLocation?
     deriving Show
-
-ttPackageLocation :: TaskType -> PackageLocationIndex FilePath
-ttPackageLocation (TTFiles lp _) = PLOther (PLFilePath (toFilePath (parent (lpCabalFile lp))))
-ttPackageLocation (TTIndex _ _ pir) = PLIndex pir
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =

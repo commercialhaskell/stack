@@ -82,23 +82,7 @@ instance FromJSON PackageIdentifier where
       Left e -> fail $ show (e, t)
       Right x -> return x
 
--- | A 'PackageIdentifier' combined with optionally specified Hackage
--- cabal file revision.
-data PackageIdentifierRevision = PackageIdentifierRevision
-  { pirIdent :: !PackageIdentifier
-  , pirRevision :: !CabalFileInfo
-  } deriving (Eq,Ord,Generic,Data,Typeable)
-
-instance NFData PackageIdentifierRevision where
-  rnf (PackageIdentifierRevision !i !c) =
-      seq (rnf i) (rnf c)
-
-instance Hashable PackageIdentifierRevision
-instance Store PackageIdentifierRevision
-
-instance Show PackageIdentifierRevision where
-  show = show . packageIdentifierRevisionString
-
+{- FIXME
 instance ToJSON PackageIdentifierRevision where
   toJSON = toJSON . packageIdentifierRevisionString
 instance FromJSON PackageIdentifierRevision where
@@ -106,6 +90,7 @@ instance FromJSON PackageIdentifierRevision where
     case parsePackageIdentifierRevision t of
       Left e -> fail $ show (e, t)
       Right x -> return x
+-}
 
 -- | Convert from a package identifier to a tuple.
 toTuple :: PackageIdentifier -> (PackageName,Version)
@@ -142,9 +127,10 @@ parsePackageIdentifierRevision x = go x
       either (const (throwM (PackageIdentifierRevisionParseFail x))) return .
       parseOnly (parser <* endOfInput)
 
-    parser = PackageIdentifierRevision
-        <$> packageIdentifierParser
-        <*> (cfiHash <|> cfiRevision <|> pure CFILatest)
+    parser = do
+      PackageIdentifier name version <- packageIdentifierParser
+      cfi <- cfiHash <|> cfiRevision <|> pure CFILatest
+      pure $ PackageIdentifierRevision (toCabalPackageName name) (toCabalVersion version) cfi
 
     cfiHash = do
       _ <- string $ T.pack "@sha256:"
@@ -166,12 +152,9 @@ parsePackageIdentifierRevision x = go x
 packageIdentifierString :: PackageIdentifier -> String
 packageIdentifierString = T.unpack . packageIdentifierText
 
-instance Display PackageIdentifierRevision where
-  display (PackageIdentifierRevision ident cfi) = display ident <> display cfi
-
 -- | Get a string representation of the package identifier with revision; name-ver[@hashtype:hash[,size]].
 packageIdentifierRevisionString :: PackageIdentifierRevision -> String
-packageIdentifierRevisionString = T.unpack . utf8BuilderToText . display
+packageIdentifierRevisionString = show
 
 -- | Get a Text representation of the package identifier; name-ver.
 packageIdentifierText :: PackageIdentifier -> Text

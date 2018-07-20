@@ -115,7 +115,9 @@ preFetch plan
     toIdent task =
         case taskType task of
             TTFiles{} -> Set.empty
-            TTIndex _ _ (PackageIdentifierRevision ident _) -> Set.singleton ident
+            TTIndex _ _ (PackageIdentifierRevision name ver _) -> Set.singleton $ PackageIdentifier
+              (fromCabalPackageName name)
+              (fromCabalVersion ver)
 
 -- | Print a description of build plan for human consumption.
 printPlan :: HasRunner env => Plan -> RIO env ()
@@ -942,14 +944,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         case taskType of
             TTFiles lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp) -- TODO remove this third argument, it's redundant with the second
             TTIndex package _ pir -> do
-                let PackageIdentifierRevision (PackageIdentifier name' ver) cfi =
-                      pir
+                let PackageIdentifierRevision name' ver cfi = pir
                     dir = eeTempDir
-                unpackPackageIdent
-                  (toFilePath dir)
-                  (toCabalPackageName name')
-                  (toCabalVersion ver)
-                  cfi
+                unpackPackageIdent (toFilePath dir) name' ver cfi
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir
@@ -1304,8 +1301,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             Snap | not shouldHaddockPackage' -> do
                 mpc <-
                   case taskLocation task of
-                    Snap -> readPrecompiledCache
-                      (ttPackageLocation taskType)
+                    Snap -> fmap join $ for (ttPackageLocation taskType) $ \loc -> readPrecompiledCache
+                      loc
                       (configCacheOpts cache)
                       (configCacheDeps cache)
                     _ -> return Nothing
@@ -1570,10 +1567,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 return (Executable ident, []) -- don't return sublibs in this case
 
         case taskLocation task of
-            Snap ->
+            Snap -> for_ (ttPackageLocation taskType) $ \loc ->
               writePrecompiledCache
                 eeBaseConfigOpts
-                (ttPackageLocation taskType)
+                loc
                 (configCacheOpts cache)
                 (configCacheDeps cache)
                 mpkgid sublibsPkgIds (packageExes package)
@@ -2093,3 +2090,7 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
+
+ttPackageLocation :: TaskType -> Maybe PackageLocation
+ttPackageLocation (TTFiles lp i) = Nothing -- FIXME! Need to handle archive/repo
+ttPackageLocation (TTIndex _ _ pir) = Just $ PLHackage pir

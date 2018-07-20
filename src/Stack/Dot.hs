@@ -25,6 +25,7 @@ import qualified Data.Traversable as T
 import           Distribution.Text (display)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
+import           Pantry
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -35,7 +36,6 @@ import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..))
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -204,7 +204,7 @@ createDepLoader :: Applicative m
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> PackageLocationIndex FilePath ->
+                -> (PackageName -> Version -> PackageLocation ->
                     Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
@@ -216,8 +216,10 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
               pkg = localPackageToPackage lp
           Just (PSIndex _ flags ghcOptions loc) ->
               -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
-              let PackageIdentifierRevision (PackageIdentifier name version) _ = loc
-               in assert (pkgName == name) (loadPackageDeps pkgName version (PLIndex loc) flags ghcOptions)
+              let PackageIdentifierRevision name' version' _ = loc
+                  name = fromCabalPackageName name'
+                  version = fromCabalVersion version'
+               in assert (pkgName == name) (loadPackageDeps pkgName version (PLHackage loc) flags ghcOptions)
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of

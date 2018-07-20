@@ -94,7 +94,8 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
             let ver = fromCabalVersion verC
             guard $ ver >= hoogleMinVersion
             Just $ Right $ PackageIdentifierRevision
-              (PackageIdentifier hooglePackageName ver)
+              (toCabalPackageName hooglePackageName)
+              (toCabalVersion ver)
               (CFIHash cabalHash)
 
         case hooglePackageIdentifier of

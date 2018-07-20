@@ -45,9 +45,9 @@ unpackPackages mSnapshotDef dest input = do
       [] -> pure ()
       errs -> throwM $ CouldNotParsePackageSelectors errs
     let pirs = Map.fromList $ map
-          (\pir@(PackageIdentifierRevision ident _) ->
+          (\pir@(PackageIdentifierRevision name version _) ->
                ( pir
-               , dest </> packageIdentifierString ident
+               , dest </> packageIdentifierString (PackageIdentifier (fromCabalPackageName name) (fromCabalVersion version))
                )
           )
           (pirs1 ++ pirs2)
@@ -58,12 +58,8 @@ unpackPackages mSnapshotDef dest input = do
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
     forM_ (Map.toList pirs) $ \(pir, dest') -> do
-      let PackageIdentifierRevision (PackageIdentifier name ver) cfi = pir
-      unpackPackageIdent
-        dest'
-        (toCabalPackageName name)
-        (toCabalVersion ver)
-        cfi
+      let PackageIdentifierRevision name ver cfi = pir
+      unpackPackageIdent dest' name ver cfi
       logInfo $
         "Unpacked " <>
         display pir <>
@@ -87,18 +83,20 @@ unpackPackages mSnapshotDef dest input = do
           -- consider updating the index
           Nothing -> Left $ "Could not find package " ++ packageNameString name
           Just (ver, _rev, cabalHash) -> Right $ PackageIdentifierRevision
-            (PackageIdentifier name (fromCabalVersion ver))
+            (toCabalPackageName name)
+            ver
             (CFIHash cabalHash)
 
+    toPIRSnapshot :: Monad m => SnapshotDef -> PackageName -> m (Either String PackageIdentifierRevision)
     toPIRSnapshot sd name =
         pure $
           case mapMaybe go $ sdLocations sd of
             [] -> Left $ "Package does not appear in snapshot: " ++ packageNameString name
             pir:_ -> Right pir
       where
-        -- FIXME should work for things besides PLIndex
-        go (PLIndex pir@(PackageIdentifierRevision (PackageIdentifier name' _) _))
-          | name == name' = Just pir
+        -- FIXME should work for things besides PLHackage
+        go (PLHackage pir@(PackageIdentifierRevision name' _ _))
+          | name' == toCabalPackageName name = Just pir
         go _ = Nothing
 
     -- Possible future enhancement: parse names as name + version range

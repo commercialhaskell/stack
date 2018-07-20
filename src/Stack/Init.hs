@@ -26,6 +26,7 @@ import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text               as C
 import qualified Distribution.Version            as C
+import           Pantry
 import           Path
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Path.IO
@@ -117,8 +118,8 @@ initProject whichCmd currDir initOpts mresolver = do
         p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = pkgs
-            , projectDependencies = map
-                (\(n, v) -> PLIndex $ PackageIdentifierRevision (PackageIdentifier n v) CFILatest)
+            , projectDependencies = undefined $ map
+                (\(n, v) -> PLHackage $ PackageIdentifierRevision (toCabalPackageName n) (toCabalVersion v) CFILatest)
                 (Map.toList extraDeps)
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = resolver

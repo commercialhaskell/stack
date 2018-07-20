@@ -222,7 +222,6 @@ library:
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
-  - Stack.PackageLocation
   - Stack.Path
   - Stack.Prelude
   - Stack.PrettyPrint

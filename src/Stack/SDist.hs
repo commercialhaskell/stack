@@ -54,12 +54,10 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
-import           Stack.PackageLocation (parseSingleCabalFile)
 import           Stack.PrettyPrint
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
@@ -439,7 +437,6 @@ checkPackageInExtractedTarball pkgDir = do
 
 buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
-  projectRoot <- view projectRootL
   envConfig <- view envConfigL
   localPackageToBuild <- readLocalPackage pkgDir
   let allPackagePaths = bcPackages (envConfigBuildConfig envConfig)

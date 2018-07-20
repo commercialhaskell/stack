@@ -129,7 +129,7 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
 data Ctx = Ctx
     { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> M Package)
+    , loadPackage    :: !(PackageLocation -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -176,7 +176,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageLocationIndex FilePath -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
+              -> (PackageLocation -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -231,7 +231,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
   where
     hasBaseInDeps bconfig =
         elem $(mkPackageName "base")
-      $ map (packageIdentifierName . pirIdent) [i | (PLIndex i) <- bcDependencies bconfig]
+        [fromCabalPackageName n | (PLHackage (PackageIdentifierRevision n _ _)) <- snd (bcDependencies bconfig)]
 
     mkCtx econfig = Ctx
         { ls = ls0
@@ -409,7 +409,10 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
-                              (PackageIdentifierRevision (PackageIdentifier name (installedVersion installed)) CFILatest)
+                              (PackageIdentifierRevision
+                                 (toCabalPackageName name)
+                                 (toCabalVersion (installedVersion installed))
+                                 CFILatest)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
@@ -433,10 +436,10 @@ tellExecutables (PSIndex loc flags _ghcOptions pir) =
     tellExecutablesUpstream pir loc flags
 
 tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream pir@(PackageIdentifierRevision (PackageIdentifier name _) _) loc flags = do
+tellExecutablesUpstream pir@(PackageIdentifierRevision name _ _) loc flags = do
     ctx <- ask
-    when (name `Set.member` extraToBuild ctx) $ do
-        p <- loadPackage ctx (PLIndex pir) flags []
+    when (fromCabalPackageName name `Set.member` extraToBuild ctx) $ do
+        p <- loadPackage ctx (PLHackage pir) flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -473,7 +476,7 @@ installPackage treatAsDep name ps minstalled = do
     case ps of
         PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- loadPackage ctx (PLIndex pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
+            package <- loadPackage ctx (PLHackage pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
             resolveDepsAndInstall True treatAsDep ps package minstalled
         PSFiles lp _ ->
             case lpTestBench lp of
@@ -980,8 +983,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
        go _ = Map.empty
     pprintExtra (name, (version, cabalHash)) =
       let cfInfo = CFIHash cabalHash
-          packageId = PackageIdentifier name version
-          packageIdRev = PackageIdentifierRevision packageId cfInfo
+          packageIdRev = PackageIdentifierRevision (toCabalPackageName name) (toCabalVersion version) cfInfo
        in fromString $ packageIdentifierRevisionString packageIdRev
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'

@@ -49,6 +49,7 @@ import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import           Pantry (PackageLocation (..), Archive (..), Repo (..))
 import           Pantry.StaticSHA256
 import           Path
 import           Path.IO
@@ -255,7 +256,7 @@ checkTestSuccess dir =
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: HasEnvConfig env
-                     => PackageLocationIndex FilePath
+                     => PackageLocation
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe (Path Abs File))
@@ -269,14 +270,12 @@ precompiledCacheFile loc copts installedPackageIDs = do
         -- package location which is unique. For archives and repos,
         -- we rely upon cryptographic hashes paired with
         -- subdirectories to identify this specific package version.
-        case loc of
-          PLIndex pir -> Just $ packageIdentifierRevisionString pir
-          PLOther other -> case other of
-            PLFilePath _ -> assert False Nothing -- no PLFilePaths should end up in a snapshot
-            PLArchive a -> fmap
-              (\h -> T.unpack (staticSHA256ToText h) ++ archiveSubdirs a)
-              (archiveHash a)
-            PLRepo r -> Just $ T.unpack (repoCommit r) ++ repoSubdirs r
+        case loc of -- FIXME use the pantry tree key instead
+          PLHackage pir -> Just $ packageIdentifierRevisionString pir
+          PLArchive a -> fmap
+            (\h -> T.unpack $ staticSHA256ToText h <> archiveSubdir a)
+            (archiveHash a)
+          PLRepo r -> Just $ T.unpack $ repoCommit r <> repoSubdir r
 
   forM mpkgRaw $ \pkgRaw -> do
     platformRelDir <- platformGhcRelDir
@@ -321,7 +320,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
                       => BaseConfigOpts
-                      -> PackageLocationIndex FilePath
+                      -> PackageLocation
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
@@ -356,7 +355,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = d
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: forall env. HasEnvConfig env
-                     => PackageLocationIndex FilePath -- ^ target package
+                     => PackageLocation -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe PrecompiledCache)

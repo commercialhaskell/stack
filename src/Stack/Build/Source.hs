@@ -27,13 +27,13 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
+import              Pantry
 import              Path.IO (resolveDir)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
-import              Stack.PackageLocation
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
@@ -93,17 +93,15 @@ loadSourceMapFull needTargets boptsCli = do
           let configOpts = getGhcOptions bconfig boptsCli n False False
           case lpiLocation lpi of
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
-            PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
-            PLOther (PLFilePath fp) -> do
-              root <- view projectRootL
-              dir <- resolveDir root fp
+            Right (PLHackage pir) -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
+            Left dir -> do
               lpv <- parseSingleCabalFile True dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFiles lp' loc
     sourceMap' <- Map.unions <$> sequence
       [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals
-      , sequence $ Map.mapWithKey (goLPI Local) localDeps
-      , sequence $ Map.mapWithKey (goLPI Snap) (lsPackages ls)
+      , sequence $ Map.mapWithKey (goLPI Local) (undefined localDeps)
+      , sequence $ Map.mapWithKey (goLPI Snap) (undefined (lsPackages ls))
       ]
     let sourceMap = sourceMap'
             `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
@@ -320,7 +318,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ local deps
+               -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ local deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do

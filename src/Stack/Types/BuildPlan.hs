@@ -17,12 +17,6 @@ module Stack.Types.BuildPlan
       SnapshotDef (..)
     , snapshotDefVC
     , sdRawPathName
-    , PackageLocation (..)
-    , PackageLocationIndex (..)
-    , RepoType (..)
-    , Subdirs (..)
-    , Repo (..)
-    , Archive (..)
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -79,7 +73,7 @@ data SnapshotDef = SnapshotDef
     -- ^ The resolver that provides this definition.
     , sdResolverName    :: !Text
     -- ^ A user-friendly way of referring to this resolver.
-    , sdLocations :: ![PackageLocationIndex Subdirs]
+    , sdLocations :: ![PackageLocation]
     -- ^ Where to grab all of the packages from.
     , sdDropPackages :: !(Set PackageName)
     -- ^ Packages present in the parent which should not be included
@@ -106,7 +100,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v3" "gnOY1kMptOLADx6cA-gKjpXofSI="
+snapshotDefVC = storeVersionConfig "sd-v3" "tcIrN5dgR0oY1DqfLIeze2ZbcCI="
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -134,179 +128,6 @@ setCompilerVersion cv =
         Left _ -> sd { sdParent = Left cv }
         Right sd' -> sd { sdParent = Right $ go sd' }
 
--- | Where to get the contents of a package (including cabal file
--- revisions) from.
---
--- A GADT may be more logical than the index parameter, but this plays
--- more nicely with Generic deriving.
-data PackageLocation subdirs
-  = PLFilePath !FilePath
-    -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-  | PLArchive !(Archive subdirs)
-  | PLRepo !(Repo subdirs)
-  -- ^ Stored in a source control repository
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
-instance (Store a) => Store (PackageLocation a)
-instance (NFData a) => NFData (PackageLocation a)
-
--- | Add in the possibility of getting packages from the index
--- (including cabal file revisions). We have special handling of this
--- case in many places in the codebase, and therefore represent it
--- with a separate data type from 'PackageLocation'.
-data PackageLocationIndex subdirs
-  = PLIndex !PackageIdentifierRevision
-    -- ^ Grab the package from the package index with the given
-    -- version and (optional) cabal file info to specify the correct
-    -- revision.
-  | PLOther !(PackageLocation subdirs)
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
-instance (Store a) => Store (PackageLocationIndex a)
-instance (NFData a) => NFData (PackageLocationIndex a)
-
--- | A package archive, could be from a URL or a local file
--- path. Local file path archives are assumed to be unchanging
--- over time, and so are allowed in custom snapshots.
-data Archive subdirs = Archive
-  { archiveUrl :: !Text
-  , archiveSubdirs :: !subdirs
-  , archiveHash :: !(Maybe StaticSHA256)
-  , archiveSize :: !(Maybe FileSize)
-  }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
-instance Store a => Store (Archive a)
-instance NFData a => NFData (Archive a)
-
--- | The type of a source control repository.
-data RepoType = RepoGit | RepoHg
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store RepoType
-instance NFData RepoType
-
-data Subdirs
-  = DefaultSubdirs
-  | ExplicitSubdirs ![FilePath]
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store Subdirs
-instance NFData Subdirs
-instance FromJSON Subdirs where
-  parseJSON = fmap ExplicitSubdirs . parseJSON
-
--- | Information on packages stored in a source control repository.
-data Repo subdirs = Repo
-    { repoUrl :: !Text
-    , repoCommit :: !Text
-    , repoType :: !RepoType
-    , repoSubdirs :: !subdirs
-    }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Functor, Foldable, Traversable)
-instance Store a => Store (Repo a)
-instance NFData a => NFData (Repo a)
-
-instance subdirs ~ Subdirs => ToJSON (PackageLocationIndex subdirs) where
-    toJSON (PLIndex ident) = toJSON ident
-    toJSON (PLOther loc) = toJSON loc
-
-instance subdirs ~ Subdirs => ToJSON (PackageLocation subdirs) where
-    toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLArchive (Archive t DefaultSubdirs Nothing Nothing)) = toJSON t
-    toJSON (PLArchive (Archive t subdirs msha msize)) = object $ concat
-        [ ["location" .= t]
-        , case subdirs of
-            DefaultSubdirs    -> []
-            ExplicitSubdirs x -> ["subdirs" .= x]
-        , case msha of
-            Nothing -> []
-            Just sha -> ["sha256" .= staticSHA256ToText sha]
-        , case msize of
-            Nothing -> []
-            Just size -> ["size" .= size]
-        ]
-    toJSON (PLRepo (Repo url commit typ subdirs)) = object $ concat
-        [ case subdirs of
-            DefaultSubdirs -> []
-            ExplicitSubdirs x -> ["subdirs" .= x]
-        , [urlKey .= url]
-        , ["commit" .= commit]
-        ]
-      where
-        urlKey =
-          case typ of
-            RepoGit -> "git"
-            RepoHg  -> "hg"
-
-instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocationIndex subdirs)) where
-    parseJSON v
-        = (noJSONWarnings . PLIndex <$> parseJSON v)
-      <|> (fmap PLOther <$> parseJSON v)
-
-instance subdirs ~ Subdirs => FromJSON (WithJSONWarnings (PackageLocation subdirs)) where
-    parseJSON v
-        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
-        <|> repo v
-        <|> archiveObject v
-        <|> github v
-      where
-        file t = pure $ PLFilePath $ T.unpack t
-        http t =
-            case parseRequest $ T.unpack t of
-                Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing Nothing
-
-        repo = withObjectWarnings "PLRepo" $ \o -> do
-          (repoType, repoUrl) <-
-            ((RepoGit, ) <$> o ..: "git") <|>
-            ((RepoHg, ) <$> o ..: "hg")
-          repoCommit <- o ..: "commit"
-          repoSubdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
-          return $ PLRepo Repo {..}
-
-        parseSHA o = do
-          msha <- o ..:? "sha256"
-          case msha of
-            Nothing -> return Nothing
-            Just t ->
-              case mkStaticSHA256FromText t of
-                Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
-                Right x -> return $ Just x
-
-        parseSize o = o ..:? "size"
-
-        archiveObject = withObjectWarnings "PLArchive" $ \o -> do
-          url <- o ..: "archive"
-          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
-          msha <- parseSHA o
-          msize <- parseSize o
-          return $ PLArchive Archive
-            { archiveUrl = url
-            , archiveSubdirs = subdirs :: Subdirs
-            , archiveHash = msha
-            , archiveSize = msize
-            }
-
-        github = withObjectWarnings "PLArchive:github" $ \o -> do
-          GitHubRepo ghRepo <- o ..: "github"
-          commit <- o ..: "commit"
-          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
-          msha <- parseSHA o
-          msize <- parseSize o
-          return $ PLArchive Archive
-            { archiveUrl = "https://github.com/" <> ghRepo <> "/archive/" <> commit <> ".tar.gz"
-            , archiveSubdirs = subdirs
-            , archiveHash = msha
-            , archiveSize = msize
-            }
-
--- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
--- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
-newtype GitHubRepo = GitHubRepo Text
-
-instance FromJSON GitHubRepo where
-    parseJSON = withText "GitHubRepo" $ \s -> do
-        case T.split (== '/') s of
-            [x, y] | not (T.null x || T.null y) -> return (GitHubRepo s)
-            _ -> fail "expecting \"user/repo\""
-
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
@@ -320,14 +141,14 @@ newtype ExeName = ExeName { unExeName :: Text }
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !(CompilerVersion 'CVActual)
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
   }
     deriving (Generic, Show, Data, Eq, Typeable)
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "2V8vr5T-TD5XxOeImkdeFAiSg3Q="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "x8jBKUWg0pmvx-p08fPOcR66878="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

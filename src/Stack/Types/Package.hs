@@ -23,7 +23,7 @@ import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           Path as FL
-import           Stack.Types.BuildPlan (PackageLocation (..), PackageLocationIndex (..), ExeName)
+import           Stack.Types.BuildPlan (ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
@@ -261,15 +261,11 @@ data PackageSource
 
 piiVersion :: PackageSource -> Version
 piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
-piiVersion (PSIndex _ _ _ (PackageIdentifierRevision (PackageIdentifier _ v) _)) = v
+piiVersion (PSIndex _ _ _ (PackageIdentifierRevision _ v _)) = fromCabalVersion v
 
 piiLocation :: PackageSource -> InstallLocation
 piiLocation (PSFiles _ loc) = loc
 piiLocation (PSIndex loc _ _ _) = loc
-
-piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
-piiPackageLocation (PSFiles lp _) = PLOther (PLFilePath (toFilePath (parent (lpCabalFile lp))))
-piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage

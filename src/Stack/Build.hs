@@ -36,6 +36,7 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
+import           Pantry
 import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
@@ -44,7 +45,6 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Package
-import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
@@ -276,7 +276,7 @@ mkBaseConfigOpts boptsCli = do
 -- | Provide a function for loading package information from the package index
 loadPackage
   :: HasEnvConfig env
-  => PackageLocationIndex FilePath
+  => PackageLocation
   -> Map FlagName Bool
   -> [Text]
   -> RIO env Package
@@ -292,7 +292,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }
-  resolvePackage pkgConfig <$> parseSingleCabalFileIndex root loc
+  resolvePackage pkgConfig <$> parseCabalFile loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

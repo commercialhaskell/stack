@@ -498,7 +498,7 @@ data BuildConfig = BuildConfig
       -- ^ The variant of GHC used to select a GHC bindist.
     , bcPackages :: ![(Path Abs Dir, IO LocalPackageView)]
       -- ^ Local packages
-    , bcDependencies :: ![PackageLocationIndex Subdirs]
+    , bcDependencies :: !([Path Abs Dir], [PackageLocation])
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -509,10 +509,8 @@ data BuildConfig = BuildConfig
       -- ^ Location of the stack.yaml file.
       --
       -- Note: if the STACK_YAML environment variable is used, this may be
-      -- different from projectRootL </> "stack.yaml"
-      --
-      -- FIXME MSS 2016-12-08: is the above comment still true? projectRootL
-      -- is defined in terms of bcStackYaml
+      -- different from projectRootL </> "stack.yaml" if a different file
+      -- name is used.
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
@@ -550,7 +548,7 @@ data EnvConfig = EnvConfig
 
 data LocalPackages = LocalPackages
   { lpProject :: !(Map PackageName LocalPackageView)
-  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath))
+  , lpDependencies :: !(Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation))
   }
 
 -- | A view of a local package needed for resolving components
@@ -608,37 +606,6 @@ data LoadConfig = LoadConfig
         -- ^ The project root directory, if in a project.
     }
 
-data PackageEntry = PackageEntry
-    { peExtraDepMaybe :: !(Maybe TreatLikeExtraDep)
-    , peLocation :: !(PackageLocation Subdirs)
-    , peSubdirs :: !Subdirs
-    }
-    deriving Show
-
--- | Should a package be treated just like an extra-dep?
---
--- 'True' means, it will only be built as a dependency
--- for others, and its test suite/benchmarks will not be run.
---
--- Useful modifying an upstream package, see:
--- https://github.com/commercialhaskell/stack/issues/219
--- https://github.com/commercialhaskell/stack/issues/386
-type TreatLikeExtraDep = Bool
-
-instance FromJSON (WithJSONWarnings PackageEntry) where
-    parseJSON (String t) = do
-        WithJSONWarnings loc _ <- parseJSON $ String t
-        return $ noJSONWarnings
-            PackageEntry
-                { peExtraDepMaybe = Nothing
-                , peLocation = loc
-                , peSubdirs = DefaultSubdirs
-                }
-    parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
-        <$> o ..:? "extra-dep"
-        <*> jsonSubWarnings (o ..: "location")
-        <*> o ..:? "subdirs" ..!= DefaultSubdirs) v
-
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
@@ -648,7 +615,7 @@ data Project = Project
     , projectPackages :: ![FilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![PackageLocationIndex Subdirs]
+    , projectDependencies :: ![RawDependency]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
@@ -660,6 +627,14 @@ data Project = Project
     , projectExtraPackageDBs :: ![FilePath]
     }
   deriving Show
+
+-- | The raw representation of the extra-deps field allowed by Stack.
+data RawDependency = RawDependency
+  deriving Show
+instance ToJSON RawDependency where
+  toJSON = undefined
+instance FromJSON (WithJSONWarnings RawDependency) where
+  parseJSON = undefined
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
@@ -1031,7 +1006,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocationIndex FilePath])]
+  | DuplicateLocalPackageNames ![(PackageName, [Either (Path Abs Dir) PackageLocation])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1466,15 +1441,9 @@ data ProjectAndConfigMonoid
 parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ProjectAndConfigMonoid)
 parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
-        dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
-        extraDeps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
+        packages <- o ..:? "packages" ..!= ["."]
+        deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
         flags <- o ..:? "flags" ..!= mempty
-
-        -- Convert the packages/extra-deps/flags approach we use in
-        -- the stack.yaml into the internal representation.
-        let (packages, deps, errs) = convert dirs extraDeps
-
-        unless (null errs) $ fail $ unlines errs
 
         resolver <- (o ..: "resolver")
                 >>= either (fail . show) return
@@ -1493,65 +1462,6 @@ parseProjectAndConfigMonoid rootDir =
                 , projectFlags = flags
                 }
         return $ ProjectAndConfigMonoid project config
-      where
-        convert :: [PackageEntry]
-                -> [PackageLocationIndex Subdirs] -- extra-deps
-                -> ( [FilePath] -- project
-                   , [PackageLocationIndex Subdirs] -- dependencies
-                   , [String] -- errors
-                   )
-        convert entries extraDeps =
-            foldMap goEntry entries <> ([], extraDeps, [])
-          where
-            goEntry :: PackageEntry -> ([FilePath], [PackageLocationIndex Subdirs], [String])
-            goEntry (PackageEntry Nothing (PLFilePath root) DefaultSubdirs) = ([root], [], [])
-            goEntry (PackageEntry Nothing (PLFilePath root) (ExplicitSubdirs subdirs)) =
-              (map (root FilePath.</>) subdirs, [], [])
-
-            goEntry (PackageEntry (Just False) pl _) = ([], [], pure $ concat
-              [ "Refusing to treat a non FilePath as a non-extra-dep:\n"
-              , show pl
-              , "\nRecommendation: move to 'extra-deps'."
-              ])
-            goEntry (PackageEntry Nothing pl _) = ([], [], pure $ concat
-              [ "Refusing to implicitly treat package location as an extra-dep:\n"
-              , show pl
-              , "\nRecommendation: move to 'extra-deps'."
-              ])
-            goEntry (PackageEntry (Just True) pl subdirs) = ([], goEntry' pl subdirs, [])
-
-            goEntry' :: PackageLocation Subdirs
-                     -> Subdirs
-                     -> [PackageLocationIndex Subdirs]
-            goEntry' pl subdirs = map PLOther (addSubdirs pl subdirs)
-
-            combineSubdirs :: [FilePath] -> Subdirs -> Subdirs
-            combineSubdirs paths DefaultSubdirs = ExplicitSubdirs paths
-            -- this could be considered an error condition, but we'll
-            -- just try and make it work
-            combineSubdirs paths (ExplicitSubdirs paths') = ExplicitSubdirs (paths ++ paths')
-
-            -- We do the toList/fromList bit as an efficient nub, and
-            -- to avoid having duplicate subdir names (especially for
-            -- the "." case, where parsing gets wonky).
-            addSubdirs :: PackageLocation Subdirs
-                       -> Subdirs
-                       -> [PackageLocation Subdirs]
-            addSubdirs pl DefaultSubdirs = [pl]
-            addSubdirs (PLRepo repo) (ExplicitSubdirs subdirs) =
-              [PLRepo repo { repoSubdirs = combineSubdirs subdirs $ repoSubdirs repo }]
-            addSubdirs (PLArchive arch) (ExplicitSubdirs subdirs) =
-              [PLArchive arch { archiveSubdirs = combineSubdirs subdirs $ archiveSubdirs arch }]
-            addSubdirs (PLFilePath fp) (ExplicitSubdirs subdirs) =
-              map (\subdir -> PLFilePath $ fp FilePath.</> subdir) subdirs
-
--- | A PackageEntry for the current directory, used as a default
-packageEntryCurrDir :: PackageEntry
-packageEntryCurrDir = PackageEntry
-    { peExtraDepMaybe = Nothing
-    , peLocation = PLFilePath "."
-    , peSubdirs = DefaultSubdirs
-    }
 
 -- | A software control system.
 data SCM = Git

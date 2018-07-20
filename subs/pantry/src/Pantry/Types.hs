@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module Pantry.Types
   ( PantryConfig (..)
   , HackageSecurityConfig (..)
@@ -16,7 +18,7 @@ module Pantry.Types
   , CabalFileInfo (..)
   , PackageNameP (..)
   , VersionP (..)
-  , displayPackageIdentifierRevision
+  , PackageIdentifierRevision (..)
   , FileType (..)
   , FileSize (..)
   , TreeEntry (..)
@@ -28,6 +30,10 @@ module Pantry.Types
   , renderTree
   , parseTree
   , PackageTarball (..)
+  , PackageLocation (..)
+  , Archive (..)
+  , Repo (..)
+  , RepoType (..)
   ) where
 
 import RIO
@@ -35,7 +41,7 @@ import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Data.Pool (Pool)
 import Database.Persist
@@ -44,7 +50,7 @@ import Pantry.StaticSHA256
 import Distribution.Types.PackageName (PackageName)
 import qualified Distribution.Text
 import Distribution.Types.Version (Version)
-import Data.Store (Store) -- FIXME remove
+import Data.Store (Store (..)) -- FIXME remove
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -70,12 +76,156 @@ data PantryConfig = PantryConfig
   , pcRootDir :: !FilePath
   , pcStorage :: !Storage
   , pcUpdateRef :: !(MVar Bool)
+    {- FIXME add this shortly
   -- ^ Want to try updating the index once during a single run for missing
   -- package identifiers. We also want to ensure we only update once at a
   -- time. Start at @True@.
   --
   -- TODO: probably makes sense to move this concern into getPackageCaches
+  , pcParsedCabalFiles ::
+      !(IORef
+          ( Map PackageLocation GenericPackageDescription
+          , Map FilePath        GenericPackageDescription
+          )
+       )
+  -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
+    -}
   }
+
+-- | Location for remote packages (i.e., not local file paths).
+data PackageLocation
+  = PLHackage !PackageIdentifierRevision
+  | PLArchive !Archive
+  | PLRepo    !Repo
+  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance NFData PackageLocation
+instance Store PackageLocation
+
+-- | A package archive, could be from a URL or a local file
+-- path. Local file path archives are assumed to be unchanging
+-- over time, and so are allowed in custom snapshots.
+data Archive = Archive
+  { archiveUrl :: !Text
+  , archiveSubdir :: !Text
+  , archiveHash :: !(Maybe StaticSHA256)
+  , archiveSize :: !(Maybe FileSize)
+  }
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance Store Archive
+instance NFData Archive
+
+-- | The type of a source control repository.
+data RepoType = RepoGit | RepoHg
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance Store RepoType
+instance NFData RepoType
+
+-- | Information on packages stored in a source control repository.
+data Repo = Repo
+    { repoUrl :: !Text
+    , repoCommit :: !Text
+    , repoType :: !RepoType
+    , repoSubdir :: !Text
+    }
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance Store Repo
+instance NFData Repo
+
+instance ToJSON PackageLocation where
+    toJSON (PLArchive (Archive t "" Nothing Nothing)) = toJSON t
+    toJSON (PLArchive (Archive t subdir msha msize)) = object $ concat
+        [ ["location" .= t]
+        , if T.null subdir
+            then []
+            else ["subdir" .= subdir]
+        , case msha of
+            Nothing -> []
+            Just sha -> ["sha256" .= staticSHA256ToText sha]
+        , case msize of
+            Nothing -> []
+            Just size -> ["size" .= size]
+        ]
+    toJSON (PLRepo (Repo url commit typ subdir)) = object $ concat
+        [ if T.null subdir
+            then []
+            else ["subdir" .= subdir]
+        , [urlKey .= url]
+        , ["commit" .= commit]
+        ]
+      where
+        urlKey =
+          case typ of
+            RepoGit -> "git"
+            RepoHg  -> "hg"
+
+    {- FIXME
+instance FromJSON (WithJSONWarnings PackageLocation) where
+    parseJSON v
+        = (noJSONWarnings <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        <|> repo v
+        <|> archiveObject v
+        <|> github v
+      where
+        file t = pure $ PLFilePath $ T.unpack t
+        http t =
+            case parseRequest $ T.unpack t of
+                Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
+                Right _ -> return $ PLArchive $ Archive t DefaultSubdirs Nothing Nothing
+
+        repo = withObjectWarnings "PLRepo" $ \o -> do
+          (repoType, repoUrl) <-
+            ((RepoGit, ) <$> o ..: "git") <|>
+            ((RepoHg, ) <$> o ..: "hg")
+          repoCommit <- o ..: "commit"
+          repoSubdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          return $ PLRepo Repo {..}
+
+        parseSHA o = do
+          msha <- o ..:? "sha256"
+          case msha of
+            Nothing -> return Nothing
+            Just t ->
+              case mkStaticSHA256FromText t of
+                Left e -> fail $ "Invalid SHA256: " ++ T.unpack t ++ ", " ++ show e
+                Right x -> return $ Just x
+
+        parseSize o = o ..:? "size"
+
+        archiveObject = withObjectWarnings "PLArchive" $ \o -> do
+          url <- o ..: "archive"
+          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          msha <- parseSHA o
+          msize <- parseSize o
+          return $ PLArchive Archive
+            { archiveUrl = url
+            , archiveSubdirs = subdirs :: Subdirs
+            , archiveHash = msha
+            , archiveSize = msize
+            }
+
+        github = withObjectWarnings "PLArchive:github" $ \o -> do
+          GitHubRepo ghRepo <- o ..: "github"
+          commit <- o ..: "commit"
+          subdirs <- o ..:? "subdirs" ..!= DefaultSubdirs
+          msha <- parseSHA o
+          msize <- parseSize o
+          return $ PLArchive Archive
+            { archiveUrl = "https://github.com/" <> ghRepo <> "/archive/" <> commit <> ".tar.gz"
+            , archiveSubdirs = subdirs
+            , archiveHash = msha
+            , archiveSize = msize
+            }
+    -}
+
+-- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
+-- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
+newtype GitHubRepo = GitHubRepo Text
+
+instance FromJSON GitHubRepo where
+    parseJSON = withText "GitHubRepo" $ \s -> do
+        case T.split (== '/') s of
+            [x, y] | not (T.null x || T.null y) -> return (GitHubRepo s)
+            _ -> fail "expecting \"user/repo\""
 
 data HackageSecurityConfig = HackageSecurityConfig
   { hscKeyIds :: ![Text]
@@ -138,15 +288,26 @@ instance Display CabalFileInfo where
     "@sha256:" <> display hash' <> maybe mempty (\i -> "," <> display i) msize
   display (CFIRevision rev) = "@rev:" <> display rev
 
-displayPackageIdentifierRevision
-  :: PackageName
-  -> Version
-  -> CabalFileInfo
-  -> Utf8Builder
-displayPackageIdentifierRevision name version cfi =
-  fromString (Distribution.Text.display name) <> "-" <>
-  fromString (Distribution.Text.display version) <>
-  display cfi
+data PackageIdentifierRevision = PackageIdentifierRevision !PackageName !Version !CabalFileInfo
+  deriving (Generic, Eq, Ord, Data, Typeable)
+instance NFData PackageIdentifierRevision
+{- FIXME
+instance Hashable PackageIdentifierRevision where
+  hashWithSalt = undefined
+-}
+instance Store PackageIdentifierRevision where
+  size = undefined
+  poke = undefined
+  peek = undefined
+
+instance Show PackageIdentifierRevision where
+  show = T.unpack . utf8BuilderToText . display
+
+instance Display PackageIdentifierRevision where
+  display (PackageIdentifierRevision name version cfi) =
+    fromString (Distribution.Text.display name) <> "-" <>
+    fromString (Distribution.Text.display version) <>
+    display cfi
 
 data FileType = FTNormal | FTExecutable
   deriving Show
