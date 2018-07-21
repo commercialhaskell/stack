@@ -7,7 +7,6 @@ cabal-version: 1.20
 synopsis: Upload test
 description: Upload test description
 license: BSD3
-license-file: LICENSE
 library
   build-depends: base >= 4.7 && < 5
   exposed-modules: Foo
