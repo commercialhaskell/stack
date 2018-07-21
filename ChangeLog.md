@@ -81,6 +81,9 @@ Other enhancements:
   rather than after
 * Bump to hpack 0.29.0
 * With GHC 8.4 and later, Haddock is given the `--quickjump` flag.
+* It is possible to specify the Hackage base URL to upload packages to, instead
+  of the default of `https://hackage.haskell.org/`, by using `hackage-base-url`
+  configuration option.
 
 Bug fixes:
 
