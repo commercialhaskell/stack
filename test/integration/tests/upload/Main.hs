@@ -2,7 +2,8 @@ import           Control.Concurrent
 
 import           StackTest
 
-import           System.Directory   (createDirectoryIfMissing)
+import           System.Directory   (createDirectoryIfMissing,
+                                     getCurrentDirectory)
 import           System.Environment (getEnv, setEnv)
 import           System.FilePath    ((</>))
 import           System.Process
@@ -10,14 +11,24 @@ import           System.Process
 main :: IO ()
 main =
     withFakeHackage $ do
+        disableGpg
         stackRoot <- getEnv "STACK_ROOT"
         -- Ensure there are credentials available for uploading
         createDirectoryIfMissing True (stackRoot </> "upload")
         writeFile
             (stackRoot </> "upload" </> "credentials.json")
             "{\"username\":\"fake\",\"password\":\"fake\"}"
-        -- Upload
+        -- Test the upload with no signing
         stack ["upload", "--no-signature", "."]
+        -- Test failure signing
+        stackErr ["upload", "."]
+
+-- | Ensure gpg is unusable by putting a broken one on PATH
+disableGpg :: IO ()
+disableGpg = do
+    originalPath <- getEnv "PATH"
+    cwd <- getCurrentDirectory
+    setEnv "PATH" $ (cwd </> "gpg-disabled") ++ ":" ++ originalPath
 
 -- | Start a fake Hackage server to test the upload
 withFakeHackage :: IO a -> IO a
