@@ -878,6 +878,17 @@ save-hackage-creds: true
 
 Since 1.5.0
 
+### hackage-base-url
+
+Sets the address of the Hackage server to upload the package to. Default is
+`https://hackage.haskell.org/`.
+
+```yaml
+hackage-base-url: https://hackage.example.com/
+```
+
+Since 1.8.0
+
 ### ignore-revision-mismatch
 
 Cabal files in packages can be specified via exact revisions to deal

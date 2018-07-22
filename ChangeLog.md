@@ -40,6 +40,9 @@ Behavior changes:
 * Mustache templating is not applied to large files (over 50kb) to
   avoid performance degredation. See:
   [#4133](https://github.com/commercialhaskell/stack/issues/4133).
+* `stack upload` signs the package by default, as documented. `--no-signature`
+  turns the signing off.
+  [#3739](https://github.com/commercialhaskell/stack/issues/3739)
 
 Other enhancements:
 
@@ -78,6 +81,9 @@ Other enhancements:
   rather than after
 * Bump to hpack 0.29.0
 * With GHC 8.4 and later, Haddock is given the `--quickjump` flag.
+* It is possible to specify the Hackage base URL to upload packages to, instead
+  of the default of `https://hackage.haskell.org/`, by using `hackage-base-url`
+  configuration option.
 
 Bug fixes:
 
@@ -129,6 +135,9 @@ Bug fixes:
   #3942).
 * Fix invalid "While building Setup.hs" when Cabal calls fail. See:
   [#3934](https://github.com/commercialhaskell/stack/issues/3934)
+* `stack upload` signs the package by default, as documented. `--no-signature`
+  turns the signing off.
+  [#3739](https://github.com/commercialhaskell/stack/issues/3739)
 
 
 ## v1.7.1

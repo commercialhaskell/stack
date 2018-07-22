@@ -15,7 +15,7 @@ sdistOptsParser signDefault = SDistOpts <$>
   optional pvpBoundsOption <*>
   ignoreCheckSwitch <*>
   (if signDefault
-    then switch (long "no-signature" <> help "Do not sign & upload signatures")
+    then not <$> switch (long "no-signature" <> help "Do not sign & upload signatures")
     else switch (long "sign" <> help "Sign & upload signatures")) <*>
   strOption
   (long "sig-server" <> metavar "URL" <> showDefault <>

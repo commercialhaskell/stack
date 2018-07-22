@@ -717,6 +717,7 @@ uploadCmd sdistOpts go = do
                 ]
             liftIO exitFailure
         config <- view configL
+        let hackageUrl = T.unpack $ configHackageBaseUrl config
         getCreds <- liftIO (runOnce (Upload.loadCreds config))
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_
@@ -725,7 +726,7 @@ uploadCmd sdistOpts go = do
                   do tarFile <- resolveFile' file
                      liftIO $ do
                        creds <- getCreds
-                       Upload.upload creds (toFilePath tarFile)
+                       Upload.upload hackageUrl creds (toFilePath tarFile)
                      when
                          (sdoptsSign sdistOpts)
                          (void $
@@ -739,8 +740,8 @@ uploadCmd sdistOpts go = do
                 checkSDistTarball' sdistOpts tarName tarBytes
                 liftIO $ do
                   creds <- getCreds
-                  Upload.uploadBytes creds tarName tarBytes
-                  forM_ mcabalRevision $ uncurry $ Upload.uploadRevision creds
+                  Upload.uploadBytes hackageUrl creds tarName tarBytes
+                  forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
                 tarPath <- parseRelFile tarName
                 when
                     (sdoptsSign sdistOpts)
