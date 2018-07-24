@@ -2,7 +2,7 @@ resolver: lts-11.6
 
 packages:
 - location:
-    git: git@github.com:cjdev/cloudseeder.git
+    git: https://github.com/cjdev/cloudseeder.git
     commit: c7068f25c41bcc0b4bdfc9b38ee5b05b5caefae5
   extra-dep: true
 
