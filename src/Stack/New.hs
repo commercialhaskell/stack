@@ -18,6 +18,7 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
+import           Control.Monad (void)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.List
@@ -156,7 +157,7 @@ loadTemplate name logIt = do
     downloadTemplate req path = do
         logIt RemoteTemp
         catch
-          (redownload req path >> return ())
+          (void $ redownload req path)
           (useCachedVersionOrThrow path)
 
         loadLocalFile path
@@ -348,7 +349,7 @@ instance Show NewException where
 
     show (FailedToDownloadTemplate name (RedownloadHttpError httpError)) =
           "There was an unexpected HTTP error while downloading template " <>
-          T.unpack (templateName name) <> ": " <> (show httpError)
+          T.unpack (templateName name) <> ": " <> show httpError
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (MissingParameters name template missingKeys userConfigPath) =
