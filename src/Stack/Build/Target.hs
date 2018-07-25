@@ -169,8 +169,8 @@ parseRawTargetDirs root locals ri =
 -- directory.
 parseRawTarget :: Text -> Maybe RawTarget
 parseRawTarget t =
-        (RTPackageIdentifier <$> parsePackageIdentifier t)
-    <|> (RTPackage <$> parsePackageNameFromString s)
+        (RTPackageIdentifier <$> parsePackageIdentifier s)
+    <|> (RTPackage <$> parsePackageName s)
     <|> (RTComponent <$> T.stripPrefix ":" t)
     <|> parsePackageComponent
   where
@@ -179,13 +179,13 @@ parseRawTarget t =
     parsePackageComponent =
         case T.splitOn ":" t of
             [pname, "lib"]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                | Just pname' <- parsePackageName (T.unpack pname) ->
                     Just $ RTPackageComponent pname' $ ResolvedComponent CLib
             [pname, cname]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                | Just pname' <- parsePackageName (T.unpack pname) ->
                     Just $ RTPackageComponent pname' $ UnresolvedComponent cname
             [pname, typ, cname]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname)
+                | Just pname' <- parsePackageName (T.unpack pname)
                 , Just wrapper <- parseCompType typ ->
                     Just $ RTPackageComponent pname' $ ResolvedComponent $ wrapper cname
             _ -> Nothing

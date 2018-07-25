@@ -1553,7 +1553,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                   forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
                     -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
                     let sublibName = T.concat ["z-", displayC $ packageName package, "-z-", sublib]
-                    case parsePackageName sublibName of
+                    case parsePackageName $ T.unpack sublibName of
                       Nothing -> return Nothing -- invalid lib, ignored
                       Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
 

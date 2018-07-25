@@ -197,7 +197,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
                   $ Cabal.packageDescription gpd'
                   }
               }
-    ident <- parsePackageIdentifierFromString $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
+    ident <- parsePackageIdentifierThrowing $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
     -- Sanity rendering and reparsing the input, to ensure there are no
     -- cabal bugs, since there have been bugs here before, and currently
     -- are at the time of writing:

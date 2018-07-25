@@ -850,7 +850,7 @@ parseConfigMonoidObject rootDir obj = do
         name <-
             if name' == "*"
                 then return Nothing
-                else case parsePackageNameFromString $ T.unpack name' of
+                else case parsePackageNameThrowing $ T.unpack name' of
                         Left e -> fail $ show e
                         Right x -> return $ Just x
         return (name, b)
@@ -1730,7 +1730,7 @@ instance FromJSONKey GhcOptionKey where
       "$locals" -> return GOKLocals
       "$targets" -> return GOKTargets
       _ ->
-        case parsePackageName t of
+        case parsePackageNameThrowing $ T.unpack t of
           Left e -> fail $ show e
           Right x -> return $ GOKPackage x
   fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"

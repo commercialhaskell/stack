@@ -150,7 +150,7 @@ findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
 findGhcPkgVersion wc pkgDbs name = do
     mv <- findGhcPkgField wc pkgDbs (displayC name) "version"
     case mv of
-        Just !v -> return (parseVersion v)
+        Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
 unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)

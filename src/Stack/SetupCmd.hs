@@ -54,7 +54,7 @@ cabalUpgradeParser = Specific <$> version' <|> latestParser
     where
         versionReader = do
             s <- OA.readerAsk
-            case parseVersion (T.pack s) of
+            case parseVersion s of
                 Nothing -> OA.readerError $ "Invalid version: " ++ s
                 Just v  -> return v
         version' = OA.option versionReader (

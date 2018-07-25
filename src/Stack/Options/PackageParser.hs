@@ -15,7 +15,7 @@ readFlag = do
     case break (== ':') s of
         (pn, ':':mflag) -> do
             pn' <-
-                case parsePackageNameFromString pn of
+                case parsePackageName pn of
                     Nothing
                         | pn == "*" -> return Nothing
                         | otherwise -> readerError $ "Invalid package name: " ++ pn
@@ -25,7 +25,7 @@ readFlag = do
                         '-':x -> (False, x)
                         _ -> (True, mflag)
             flagN <-
-                case parseFlagNameFromString flagS of
+                case parseFlagName flagS of
                     Nothing -> readerError $ "Invalid flag name: " ++ flagS
                     Just x -> return x
             return $ Map.singleton pn' $ Map.singleton flagN b

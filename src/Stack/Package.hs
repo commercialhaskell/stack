@@ -296,8 +296,9 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
               let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
-              excludedInternals <- mapM parsePackageName internals
-              mungedInternals <- mapM (parsePackageName . toInternalPackageMungedName) internals
+              excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
+              mungedInternals <- mapM (parsePackageNameThrowing . T.unpack .
+                                       toInternalPackageMungedName) internals
               componentsOpts <-
                   generatePkgDescOpts sourceMap installedMap
                   (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)

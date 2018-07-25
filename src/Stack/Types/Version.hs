@@ -16,7 +16,7 @@ module Stack.Types.Version
   ,IntersectingVersionRange(..)
   ,VersionCheck(..)
   ,parseVersion
-  ,parseVersionFromString
+  ,parseVersionThrowing
   ,mkVersion
   ,versionRangeText
   ,withinRange
@@ -86,23 +86,19 @@ instance Monoid IntersectingVersionRange where
     mempty = IntersectingVersionRange Cabal.anyVersion
     mappend = (<>)
 
--- | Convenient way to parse a package version from a 'Text'.
-parseVersion :: MonadThrow m => Text -> m Version
-parseVersion = parseVersionFromString . T.unpack
-
--- | Migration function.
-parseVersionFromString :: MonadThrow m => String -> m Version
-parseVersionFromString str =
-  case parseC str of
+-- | Convenient way to parse a package version from a 'String'.
+parseVersionThrowing :: MonadThrow m => String -> m Version
+parseVersionThrowing str =
+  case parseVersion str of
     Nothing -> throwM $ VersionParseFail $ T.pack str
     Just v -> pure v
 
 -- | Make a package version.
 mkVersion :: String -> Q Exp
 mkVersion s =
-  case parseVersionFromString s of
-    Left e -> qRunIO $ throwIO e
-    Right (versionNumbers -> vs) -> [|Cabal.mkVersion vs|]
+  case parseVersion s of
+    Nothing -> qRunIO $ throwIO (VersionParseFail $ T.pack s)
+    Just (versionNumbers -> vs) -> [|Cabal.mkVersion vs|]
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text

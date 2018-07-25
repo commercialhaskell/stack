@@ -211,8 +211,8 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
     mk :: String -> [Maybe (Bool, String)] -> Maybe (PackageName, (Version, Map FlagName Bool))
     mk ident fl = do
         PackageIdentifier name version <-
-            parsePackageIdentifierFromString ident
-        fl' <- (traverse . traverse) parseFlagNameFromString $ catMaybes fl
+            parsePackageIdentifierThrowing ident
+        fl' <- (traverse . traverse) parseFlagNameThrowing $ catMaybes fl
         return (name, (version, Map.fromList $ map swap fl'))
 
     lexeme r = some (psym isSpace) *> r

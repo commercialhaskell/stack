@@ -336,8 +336,8 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
-    let mres = (pkgName <$> parsePackageIdentifierFromString name)
-            <|> parsePackageNameFromString name
+    let mres = (pkgName <$> parsePackageIdentifier name)
+            <|> parsePackageNameThrowing name
     maybe (throwM $ InvalidPackageOption name) return mres
 
 runGhci

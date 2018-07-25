@@ -12,7 +12,7 @@
 
 module Stack.Types.PackageIdentifier
   ( parsePackageIdentifier
-  , parsePackageIdentifierFromString
+  , parsePackageIdentifierThrowing
   ) where
 
 import           Stack.Prelude
@@ -57,13 +57,9 @@ instance FromJSON PackageIdentifierRevision where
       Right x -> return x
 -}
 
--- | Convenient way to parse a package identifier from a 'Text'.
-parsePackageIdentifier :: MonadThrow m => Text -> m PackageIdentifier
-parsePackageIdentifier = parsePackageIdentifierFromString . T.unpack
-
 -- | Convenience function for parsing from a 'String'.
-parsePackageIdentifierFromString :: MonadThrow m => String -> m PackageIdentifier
-parsePackageIdentifierFromString str =
-  case parseC str of
+parsePackageIdentifierThrowing :: MonadThrow m => String -> m PackageIdentifier
+parsePackageIdentifierThrowing str =
+  case parsePackageIdentifier str of
     Nothing -> throwM $ PackageIdentifierParseFail $ T.pack str
     Just ident -> pure ident

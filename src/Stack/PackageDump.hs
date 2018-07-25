@@ -342,8 +342,8 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
     case Map.lookup "id" m of
         Just ["builtin_rts"] -> return Nothing
         _ -> do
-            name <- parseS "name" >>= parsePackageName
-            version <- parseS "version" >>= parseVersion
+            name <- parseS "name" >>= parsePackageNameThrowing . T.unpack
+            version <- parseS "version" >>= parseVersionThrowing . T.unpack
             ghcPkgId <- parseS "id" >>= parseGhcPkgId
 
             -- if a package has no modules, these won't exist
@@ -360,7 +360,8 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
             -- Handle sublibs by recording the name of the parent library
             -- If name of parent library is missing, this is not a sublib.
             let mkParentLib n = PackageIdentifier n version
-                parentLib = mkParentLib <$> (parseS "package-name" >>= parsePackageName)
+                parentLib = mkParentLib <$> (parseS "package-name" >>=
+                                             parsePackageNameThrowing . T.unpack)
 
             let parseQuoted key =
                     case mapM (P.parseOnly (argsParser NoEscaping)) val of

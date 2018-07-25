@@ -63,12 +63,12 @@ wantedToActual (GhcjsVersion x y) = GhcjsVersion x y
 parseCompilerVersion :: T.Text -> Maybe (CompilerVersion a)
 parseCompilerVersion t
     | Just t' <- T.stripPrefix "ghc-" t
-    , Just v <- parseVersionFromString $ T.unpack t'
+    , Just v <- parseVersion $ T.unpack t'
         = Just (GhcVersion v)
     | Just t' <- T.stripPrefix "ghcjs-" t
     , [tghcjs, tghc] <- T.splitOn "_ghc-" t'
-    , Just vghcjs <- parseVersionFromString $ T.unpack tghcjs
-    , Just vghc <- parseVersionFromString $ T.unpack tghc
+    , Just vghcjs <- parseVersion $ T.unpack tghcjs
+    , Just vghc <- parseVersion $ T.unpack tghc
         = Just (GhcjsVersion vghcjs vghc)
     | otherwise
         = Nothing

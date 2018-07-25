@@ -85,7 +85,7 @@ getInstalledExes loc = do
         -- was fixed), then we don't know which is correct - ignore them.
         M.fromListWith (\_ _ -> []) $
         map (\x -> (pkgName x, [x])) $
-        mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
+        mapMaybe (parsePackageIdentifier . toFilePath . filename) files
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)

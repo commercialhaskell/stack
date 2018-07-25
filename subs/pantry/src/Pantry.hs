@@ -32,7 +32,10 @@ module Pantry
   , completePackageLocation
 
     -- ** Cabal helpers
-  , parseC
+  , parsePackageIdentifier
+  , parsePackageName
+  , parseFlagName
+  , parseVersion
   , displayC
   , CabalString (..)
   , toCabalStringMap

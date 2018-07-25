@@ -697,7 +697,7 @@ checkDockerVersion docker =
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (stripVersion v) of
+         case parseVersion (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwIO (DockerTooOldException minimumDockerVersion v')

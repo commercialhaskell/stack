@@ -444,7 +444,7 @@ ensureCompiler sopts = do
                         Ghc -> do
                             ghcBuilds <- getGhcBuilds
                             forM ghcBuilds $ \ghcBuild -> do
-                                ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
+                                ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
                                 return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
                         Ghcjs -> return [(getInstalledGhcjs installed isWanted, CompilerBuildStandard)]
             let existingCompilers = concatMap
@@ -770,7 +770,7 @@ getSystemCompiler wc = do
             let minfo = do
                     Right lbs <- Just eres
                     pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
-                    version <- lookup "Project version" pairs_ >>= parseVersionFromString
+                    version <- lookup "Project version" pairs_ >>= parseVersionThrowing
                     arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)
             case (wc, minfo) of
@@ -898,7 +898,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
             b -> " (" <> fromString (compilerBuildName b) <> ")") <>
         " to an isolated location."
     logInfo "This will not interfere with any system-level installation."
-    ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
+    ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
 downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
@@ -1362,8 +1362,10 @@ getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Ma
 getCabalInstallVersion = do
     ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcess_
     case ebs of
-        Left _ -> return Nothing
-        Right (bs, _) -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
+        Left _ ->
+          return Nothing
+        Right (bs, _) ->
+          Just <$> parseVersionThrowing (T.unpack $ T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
@@ -2031,4 +2033,4 @@ getDownloadVersion (StackReleaseInfo val) = do
     Object o <- Just val
     String rawName <- HashMap.lookup "name" o
     -- drop the "v" at the beginning of the name
-    parseVersion $ T.drop 1 rawName
+    parseVersion $ T.unpack (T.drop 1 rawName)
