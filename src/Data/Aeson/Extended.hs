@@ -35,7 +35,7 @@ import qualified Data.Set as Set
 import Data.Text (unpack)
 import qualified Data.Text as T
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
-import Stack.Prelude
+import RIO
 
 -- | Extends @.:@ warning to include field name.
 (.:) :: FromJSON a => Object -> Text -> Parser a

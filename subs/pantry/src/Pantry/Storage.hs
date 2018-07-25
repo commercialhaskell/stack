@@ -407,11 +407,14 @@ loadTreeByEnt (Entity tid t) = do
     (Just tarball, Just cabal, Just subdir) -> do
       tarballkey <- getBlobKey tarball
       cabalkey <- getBlobKey cabal
+      error "we don't support TreeTarball yet"
+      {-
       pure $ TreeTarball PackageTarball
         { ptBlob = tarballkey
         , ptCabal = cabalkey
         , ptSubdir = T.unpack subdir
         }
+      -}
     (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
       entries <- rawSql
         "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\

@@ -25,12 +25,21 @@ module Pantry
   , PackageIdentifier (..)
   , FlagName
 
+    -- ** Raw package locations
+  , RawPackageLocation
+  , unRawPackageLocation
+  , mkRawPackageLocation
+  , completePackageLocation
+
     -- ** Cabal helpers
   , parseC
   , displayC
   , CabalString (..)
   , toCabalStringMap
   , unCabalStringMap
+
+    -- ** Parsers
+  , parsePackageIdentifierRevision
 
     -- * Cabal files
   , parseCabalFile
@@ -249,37 +258,23 @@ parseCabalFile
   -> RIO env GenericPackageDescription
 parseCabalFile = undefined
 
--- | Newtype wrapper for easier JSON integration with Cabal types.
-newtype CabalString a = CabalString { unCabalString :: a }
-  deriving (Show, Eq, Ord, Typeable)
-
 toCabalStringMap :: Map a v -> Map (CabalString a) v
 toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
 
 unCabalStringMap :: Map (CabalString a) v -> Map a v
 unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
 
-instance Distribution.Text.Text a => ToJSON (CabalString a) where
-  toJSON = toJSON . Distribution.Text.display . unCabalString
-instance Distribution.Text.Text a => ToJSONKey (CabalString a) where
-  toJSONKey = toJSONKeyText $ displayC . unCabalString
+-- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
+unRawPackageLocation :: RawPackageLocation -> [PackageLocation]
+unRawPackageLocation = undefined
 
-instance forall a. IsCabalString a => FromJSON (CabalString a) where
-  parseJSON = withText name $ \t ->
-    case Distribution.Text.simpleParse $ T.unpack t of
-      Nothing -> fail $ "Invalid " ++ name ++ ": " ++ T.unpack t
-      Just x -> pure $ CabalString x
-    where
-      name = cabalStringName (Nothing :: Maybe a)
-instance forall a. IsCabalString a => FromJSONKey (CabalString a)
+-- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
+mkRawPackageLocation :: PackageLocation -> RawPackageLocation
+mkRawPackageLocation = undefined
 
-class Distribution.Text.Text a => IsCabalString a where
-  cabalStringName :: proxy a -> String
-instance IsCabalString PackageName where
-  cabalStringName _ = "package name"
-instance IsCabalString Version where
-  cabalStringName _ = "version"
-instance IsCabalString PackageIdentifier where
-  cabalStringName _ = "package identifier"
-instance IsCabalString FlagName where
-  cabalStringName _ = "flag name"
+-- | Fill in optional fields in a 'PackageLocation' for more reproducible builds.
+completePackageLocation
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env PackageLocation
+completePackageLocation = undefined

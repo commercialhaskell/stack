@@ -608,7 +608,7 @@ data Project = Project
     , projectPackages :: ![FilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![RawDependency]
+    , projectDependencies :: ![RawPackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
@@ -620,14 +620,6 @@ data Project = Project
     , projectExtraPackageDBs :: ![FilePath]
     }
   deriving Show
-
--- | The raw representation of the extra-deps field allowed by Stack.
-data RawDependency = RawDependency
-  deriving Show
-instance ToJSON RawDependency where
-  toJSON = undefined
-instance FromJSON (WithJSONWarnings RawDependency) where
-  parseJSON = undefined
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
@@ -1436,7 +1428,10 @@ parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         packages <- o ..:? "packages" ..!= ["."]
         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
-        ((fmap unCabalStringMap) . unCabalStringMap -> flags) <- o ..:? "flags" ..!= mempty
+        flags' <- o ..:? "flags" ..!= mempty
+        let flags = fmap unCabalStringMap
+                  $ unCabalStringMap
+                    (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
         resolver <- (o ..: "resolver")
                 >>= either (fail . show) return

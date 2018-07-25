@@ -15,6 +15,7 @@ module Pantry.StaticSHA256
   ) where
 
 import RIO
+import Data.Aeson
 import Database.Persist.Sql
 import Pantry.StaticBytes
 import Data.Store (Store) -- FIXME remove
@@ -88,3 +89,16 @@ mkStaticSHA256FromText t =
       , " into SHA256: "
       , show e
       ]
+
+instance ToJSON StaticSHA256 where
+  toJSON = toJSON . staticSHA256ToText
+instance FromJSON StaticSHA256 where
+  parseJSON = withText "StaticSHA256" $ \t ->
+    case mkStaticSHA256FromText t of
+      Right x -> pure x
+      Left e -> fail $ concat
+        [ "Invalid SHA256 "
+        , show t
+        , ": "
+        , show e
+        ]

@@ -13,7 +13,6 @@
 module Stack.Types.PackageIdentifier
   ( parsePackageIdentifier
   , parsePackageIdentifierFromString
-  , parsePackageIdentifierRevision
   ) where
 
 import           Stack.Prelude
@@ -35,11 +34,9 @@ import           Stack.Types.Version
 -- | A parse fail.
 data PackageIdentifierParseFail
   = PackageIdentifierParseFail Text
-  | PackageIdentifierRevisionParseFail Text
   deriving (Typeable)
 instance Show PackageIdentifierParseFail where
     show (PackageIdentifierParseFail bs) = "Invalid package identifier: " ++ show bs
-    show (PackageIdentifierRevisionParseFail bs) = "Invalid package identifier (with optional revision): " ++ show bs
 instance Exception PackageIdentifierParseFail
 
 {- FIXME
@@ -70,30 +67,3 @@ parsePackageIdentifierFromString str =
   case parseC str of
     Nothing -> throwM $ PackageIdentifierParseFail $ T.pack str
     Just ident -> pure ident
-
--- | Parse a 'PackageIdentifierRevision'
-parsePackageIdentifierRevision :: MonadThrow m => Text -> m PackageIdentifierRevision
-parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionParseFail t) pure $ do
-  let (identT, cfiT) = T.break (== '@') t
-  PackageIdentifier name version <- parsePackageIdentifier identT
-  cfi <- either (const Nothing) Just $ parseOnly (parser <* endOfInput) cfiT
-  pure $ PackageIdentifierRevision name version cfi
-  where
-    parser = cfiHash <|> cfiRevision <|> pure CFILatest
-
-    cfiHash = do
-      _ <- string $ T.pack "@sha256:"
-      hash' <- A.takeWhile (/= ',')
-      hash'' <- either (\e -> fail $ "Invalid SHA256: " ++ show e) return
-              $ mkStaticSHA256FromText hash'
-      msize <- optional $ do
-        _ <- A.char ','
-        FileSize <$> A.decimal
-      A.endOfInput
-      return $ CFIHash $ CabalHash hash'' msize
-
-    cfiRevision = do
-      _ <- string $ T.pack "@rev:"
-      y <- A.decimal
-      A.endOfInput
-      return $ CFIRevision $ Revision y
