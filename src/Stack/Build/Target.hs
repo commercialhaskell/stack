@@ -340,7 +340,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
-            [ displayC name
+            [ tshow (displayC name :: String)
             , " target has a specific version number, but it is a local package."
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
             , "\nTo build the local package, specify the target without an explicit version."
