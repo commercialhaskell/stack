@@ -103,14 +103,14 @@ withGlobalConfigAndLock
     :: GlobalOpts
     -> RIO Config ()
     -> IO ()
-withGlobalConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
-    lc <- runRIO runner $
-        loadConfigMaybeProject
-            globalConfigMonoid
-            Nothing
-            LCSNoProject
-    withUserFileLock go (view stackRootL lc) $ \_lk ->
-        runRIO (lcConfig lc) inner
+withGlobalConfigAndLock go@GlobalOpts{..} inner =
+    withRunnerGlobal go $ \runner ->
+    runRIO runner $ loadConfigMaybeProject
+      globalConfigMonoid
+      Nothing
+      LCSNoProject $ \lc ->
+        withUserFileLock go (view stackRootL lc) $ \_lk ->
+          runRIO (lcConfig lc) inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
@@ -201,8 +201,8 @@ loadConfigWithOpts
   -> IO a
 loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     mstackYaml <- forM globalStackYaml resolveFile'
-    runRIO runner $ do
-        lc <- loadConfig globalConfigMonoid globalResolver mstackYaml
+    runRIO runner $
+      loadConfig globalConfigMonoid globalResolver mstackYaml $ \lc -> do
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
@@ -222,14 +222,11 @@ withMiniConfigAndLock
     :: GlobalOpts
     -> RIO MiniConfig ()
     -> IO ()
-withMiniConfigAndLock go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
-    miniConfig <-
-        runRIO runner $
-        loadMiniConfig . lcConfig <$>
-        loadConfigMaybeProject
-          globalConfigMonoid
-          globalResolver
-          LCSNoProject
+withMiniConfigAndLock go@GlobalOpts{..} inner =
+  withRunnerGlobal go $ \runner ->
+  runRIO runner $
+  loadConfigMaybeProject globalConfigMonoid globalResolver LCSNoProject $ \lc -> do
+    let miniConfig = loadMiniConfig $ lcConfig lc
     runRIO miniConfig inner
 
 -- | Unlock a lock file, if the value is Just

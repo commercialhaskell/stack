@@ -244,11 +244,11 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                     CFILatest -- accept latest cabal revision
                 pure $ Just dir
 
-    forM_ mdir $ \dir -> do
-        lc <- loadConfig
-            gConfigMonoid
-            mresolver
-            (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
+    forM_ mdir $ \dir ->
+      loadConfig
+      gConfigMonoid
+      mresolver
+      (SYLOverride $ dir </> $(mkRelFile "stack.yaml")) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
         envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

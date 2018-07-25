@@ -68,7 +68,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry (HasPantryConfig (..), mkPantryConfig, defaultHackageSecurityConfig, PackageLocation)
+import           Pantry (HasPantryConfig (..), withPantryConfig, defaultHackageSecurityConfig, PackageLocation)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -211,9 +211,10 @@ configNoLocalConfig
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
-    -> RIO env Config
-configNoLocalConfig _ Nothing _ = throwIO NoResolverWhenUsingNoLocalConfig
-configNoLocalConfig stackRoot (Just resolver) configMonoid = do
+    -> (Config -> RIO env a)
+    -> RIO env a
+configNoLocalConfig _ Nothing _ _ = throwIO NoResolverWhenUsingNoLocalConfig
+configNoLocalConfig stackRoot (Just resolver) configMonoid inner = do
     userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
     configFromConfigMonoid
       stackRoot
@@ -222,6 +223,7 @@ configNoLocalConfig stackRoot (Just resolver) configMonoid = do
       (Just resolver)
       Nothing -- project
       configMonoid
+      inner
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
@@ -232,10 +234,11 @@ configFromConfigMonoid
     -> Maybe AbstractResolver
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
-    -> RIO env Config
+    -> (Config -> RIO env a)
+    -> RIO env a
 configFromConfigMonoid
     configStackRoot configUserConfigPath configAllowLocals mresolver
-    mproject ConfigMonoid{..} = do
+    mproject ConfigMonoid{..} inner = do
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
@@ -361,18 +364,13 @@ configFromConfigMonoid
      let configMaybeProject = mproject
 
      configRunner' <- view runnerL
+     let configRunner = set processContextL origEnv configRunner'
 
-     -- Disable logging from mkPantryConfig to silence persistent's
-     -- logging output, otherwise --verbose gets totally flooded
-     configPantryConfig <- runRIO (mempty :: LogFunc) $ mkPantryConfig
+     withPantryConfig
        (toFilePath (configStackRoot </> $(mkRelDir "pantry")))
        (case getFirst configMonoidPackageIndices of
           Nothing -> defaultHackageSecurityConfig
-       )
-
-     let configRunner = set processContextL origEnv configRunner'
-
-     return Config {..}
+       ) $ \configPantryConfig -> inner Config {..}
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
@@ -437,11 +435,12 @@ loadConfigMaybeProject
     -- ^ Override resolver
     -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
-    -> RIO env LoadConfig
-loadConfigMaybeProject configArgs mresolver mproject = do
+    -> (LoadConfig -> RIO env a)
+    -> RIO env a
+loadConfigMaybeProject configArgs mresolver mproject inner = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
-    let loadHelper mproject' = do
+    let loadHelper mproject' inner2 = do
           userConfigPath <- getDefaultUserConfigPath stackRoot
           extraConfigs0 <- getExtraConfigs userConfigPath >>=
               mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
@@ -458,33 +457,35 @@ loadConfigMaybeProject configArgs mresolver mproject = do
             True -- allow locals
             mresolver
             (fmap (\(x, y, _) -> (x, y)) mproject')
-            $ mconcat $ configArgs
-            : maybe id (\(_, _, projectConfig) -> (projectConfig:)) mproject' extraConfigs
+            (mconcat $ configArgs
+            : maybe id (\(_, _, projectConfig) -> (projectConfig:)) mproject' extraConfigs)
+            inner2
 
-    config <-
-        case mproject of
+    let withConfig = case mproject of
           LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
-    unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
-        (throwM (BadStackVersionException (configRequireStackVersion config)))
 
-    let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
-    unless (configAllowDifferentUser config) $ do
-        unless userOwnsStackRoot $
-            throwM (UserDoesn'tOwnDirectory stackRoot)
-        forM_ mprojectRoot $ \dir ->
-            checkOwnership (dir </> configWorkDir config)
+    withConfig $ \config -> do
+      unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
+          (throwM (BadStackVersionException (configRequireStackVersion config)))
 
-    return LoadConfig
-        { lcConfig          = config
-        , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
-        , lcProjectRoot     =
-            case mprojectRoot of
-              LCSProject fp -> Just fp
-              LCSNoProject  -> Nothing
-              LCSNoConfig _ -> Nothing
-        }
+      let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
+      unless (configAllowDifferentUser config) $ do
+          unless userOwnsStackRoot $
+              throwM (UserDoesn'tOwnDirectory stackRoot)
+          forM_ mprojectRoot $ \dir ->
+              checkOwnership (dir </> configWorkDir config)
+
+      inner LoadConfig
+          { lcConfig          = config
+          , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
+          , lcProjectRoot     =
+              case mprojectRoot of
+                LCSProject fp -> Just fp
+                LCSNoProject  -> Nothing
+                LCSNoConfig _ -> Nothing
+          }
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
@@ -496,9 +497,10 @@ loadConfig :: HasRunner env
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> RIO env LoadConfig
-loadConfig configArgs mresolver mstackYaml =
-    loadProjectConfig mstackYaml >>= loadConfigMaybeProject configArgs mresolver
+           -> (LoadConfig -> RIO env a)
+           -> RIO env a
+loadConfig configArgs mresolver mstackYaml inner =
+    loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.

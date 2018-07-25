@@ -1197,26 +1197,26 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
         destBinDir = destDir </> $(mkRelDir "bin")
     ensureDir destBinDir
-    envConfig' <- loadGhcjsEnvConfig stackYaml destBinDir
+    loadGhcjsEnvConfig stackYaml destBinDir $ \envConfig' -> do
 
-    -- On windows we need to copy options files out of the install dir.  Argh!
-    -- This is done before the build, so that if it fails, things fail
-    -- earlier.
-    mwindowsInstallDir <- case platform of
-        Platform _ Cabal.Windows ->
-            liftM Just $ runRIO envConfig' installationRootLocal
-        _ -> return Nothing
+      -- On windows we need to copy options files out of the install dir.  Argh!
+      -- This is done before the build, so that if it fails, things fail
+      -- earlier.
+      mwindowsInstallDir <- case platform of
+          Platform _ Cabal.Windows ->
+              liftM Just $ runRIO envConfig' installationRootLocal
+          _ -> return Nothing
 
-    logSticky "Installing GHCJS (this will take a long time) ..."
-    buildInGhcjsEnv envConfig' defaultBuildOptsCLI
-    -- Copy over *.options files needed on windows.
-    forM_ mwindowsInstallDir $ \dir -> do
-        (_, files) <- listDir (dir </> $(mkRelDir "bin"))
-        forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
-            let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
-            liftIO $ ignoringAbsence (removeFile dest)
-            copyFile optionsFile dest
-    logStickyDone "Installed GHCJS."
+      logSticky "Installing GHCJS (this will take a long time) ..."
+      buildInGhcjsEnv envConfig' defaultBuildOptsCLI
+      -- Copy over *.options files needed on windows.
+      forM_ mwindowsInstallDir $ \dir -> do
+          (_, files) <- listDir (dir </> $(mkRelDir "bin"))
+          forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
+              let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
+              liftIO $ ignoringAbsence (removeFile dest)
+              copyFile optionsFile dest
+      logStickyDone "Installed GHCJS."
 
 ensureGhcjsBooted :: HasConfig env
                   => CompilerVersion 'CVActual -> Bool -> [String]
@@ -1256,8 +1256,8 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
 
 bootGhcjs :: (HasRunner env, HasProcessContext env)
           => Version -> Path Abs File -> Path Abs Dir -> [String] -> RIO env ()
-bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
-    envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
+bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
+  loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin")) $ \envConfig -> do
     menv <- liftIO $ configProcessContextSettings (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
     mcabal <- withProcessContext menv getCabalInstallVersion
@@ -1334,18 +1334,23 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
     withProcessContext menv' $ proc "ghcjs-boot" bootOpts logProcessStderrStdout
     logStickyDone "GHCJS booted."
 
-loadGhcjsEnvConfig :: HasRunner env
-                   => Path Abs File -> Path b t -> RIO env EnvConfig
-loadGhcjsEnvConfig stackYaml binPath = do
-    lc <- loadConfig
-        (mempty
-            { configMonoidInstallGHC = First (Just True)
-            , configMonoidLocalBinPath = First (Just (toFilePath binPath))
-            })
-        Nothing
-        (SYLOverride stackYaml)
-    bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-    runRIO bconfig $ setupEnv Nothing
+loadGhcjsEnvConfig
+  :: HasRunner env
+  => Path Abs File
+  -> Path b t
+  -> (EnvConfig -> RIO env a)
+  -> RIO env a
+loadGhcjsEnvConfig stackYaml binPath inner = do
+    loadConfig
+      (mempty
+        { configMonoidInstallGHC = First (Just True)
+        , configMonoidLocalBinPath = First (Just (toFilePath binPath))
+        })
+      Nothing
+      (SYLOverride stackYaml) $ \lc -> do
+        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        envConfig <- runRIO bconfig $ setupEnv Nothing
+        inner envConfig
 
 buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()
 buildInGhcjsEnv envConfig boptsCli = do

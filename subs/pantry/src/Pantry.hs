@@ -7,7 +7,7 @@ module Pantry
   , HackageSecurityConfig (..)
   , defaultHackageSecurityConfig
   , HasPantryConfig (..)
-  , mkPantryConfig
+  , withPantryConfig
 
     -- * Types
   , StaticSHA256
@@ -77,15 +77,17 @@ import qualified Distribution.PackageDescription.Parsec as D
 import qualified Data.List.NonEmpty as NE
 import Data.Coerce (coerce)
 
-mkPantryConfig
+withPantryConfig
   :: HasLogFunc env
   => FilePath -- ^ pantry root
   -> HackageSecurityConfig
-  -> RIO env PantryConfig
-mkPantryConfig root hsc = do
-  storage <- initStorage $ root </> "pantry.sqlite3"
+  -> (PantryConfig -> RIO env a)
+  -> RIO env a
+withPantryConfig root hsc inner = do
+  -- Silence persistent's logging output, which is really noisy
+  storage <- runRIO (mempty :: LogFunc) $ initStorage $ root </> "pantry.sqlite3"
   ur <- newMVar True
-  pure PantryConfig
+  inner PantryConfig
     { pcHackageSecurity = hsc
     , pcRootDir = root
     , pcStorage = storage
