@@ -109,20 +109,20 @@ TreeEntryS sql=tree_entry
 initStorage
   :: HasLogFunc env
   => FilePath -- ^ storage file
-  -> RIO env Storage
-initStorage fp = do
-  pool <- createSqlitePool (fromString fp) 1
-  migrates <- runSqlPool (runMigrationSilent migrateAll) pool
+  -> (Storage -> RIO env a)
+  -> RIO env  a
+initStorage fp inner = withSqliteConn (fromString fp) $ \conn -> do
+  migrates <- runSqlConn (runMigrationSilent migrateAll) conn
   forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
-  pure (Storage pool)
+  inner (Storage conn)
 
 withStorage
   :: (HasPantryConfig env, HasLogFunc env)
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withStorage action = do
-  Storage pool <- view $ pantryConfigL.to pcStorage
-  runSqlPool action pool
+  Storage conn <- view $ pantryConfigL.to pcStorage
+  runSqlConn action conn
 
 getNameId
   :: (HasPantryConfig env, HasLogFunc env)

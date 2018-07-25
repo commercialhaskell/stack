@@ -84,15 +84,16 @@ withPantryConfig
   -> (PantryConfig -> RIO env a)
   -> RIO env a
 withPantryConfig root hsc inner = do
+  env <- ask
   -- Silence persistent's logging output, which is really noisy
-  storage <- runRIO (mempty :: LogFunc) $ initStorage $ root </> "pantry.sqlite3"
-  ur <- newMVar True
-  inner PantryConfig
-    { pcHackageSecurity = hsc
-    , pcRootDir = root
-    , pcStorage = storage
-    , pcUpdateRef = ur
-    }
+  runRIO (mempty :: LogFunc) $ initStorage (root </> "pantry.sqlite3") $ \storage -> runRIO env $ do
+    ur <- newMVar True
+    inner PantryConfig
+      { pcHackageSecurity = hsc
+      , pcRootDir = root
+      , pcStorage = storage
+      , pcUpdateRef = ur
+      }
 
 defaultHackageSecurityConfig :: HackageSecurityConfig
 defaultHackageSecurityConfig = HackageSecurityConfig

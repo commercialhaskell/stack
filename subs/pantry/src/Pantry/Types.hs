@@ -74,7 +74,7 @@ import qualified Data.Text.Read
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
 
-newtype Storage = Storage (Pool SqlBackend)
+newtype Storage = Storage SqlBackend
 
 -- | A cryptographic hash of a Cabal file and its size, if known.
 --
