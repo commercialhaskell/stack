@@ -25,7 +25,7 @@ import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), jsonSubWarningsT, withObjectWarnings, (..:))
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), withObjectWarnings, (..:))
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.Conduit.List as CL
@@ -394,6 +394,7 @@ loadSnapshot mcompiler root =
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
+      logInfo "Loading a snapshot from a SnapshotDef"
       ls0 <-
         case sdParent sd of
           Left cv ->
@@ -407,7 +408,7 @@ loadSnapshot mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (concat <$> mapM undefined (sdLocations sd))
+        (forM (sdLocations sd) $ \loc -> (, loc) <$> parseCabalFile loc)
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of

@@ -53,7 +53,7 @@ module Pantry
   , loadFromIndex
   , getPackageVersions
   , fetchPackages
-  , unpackPackageIdent
+  , unpackPackageLocation
   ) where
 
 import RIO
@@ -72,6 +72,8 @@ import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
 import qualified Distribution.Text
 import Data.List.NonEmpty (NonEmpty)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
+import Distribution.PackageDescription.Parsec
+import qualified Distribution.PackageDescription.Parsec as D
 import qualified Data.List.NonEmpty as NE
 import Data.Coerce (coerce)
 
@@ -241,22 +243,48 @@ fetchPackages
   -> RIO env ()
 fetchPackages _ = undefined
 
-unpackPackageIdent
+unpackPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => FilePath -- ^ unpack directory
-  -> PackageName
-  -> Version
-  -> CabalFileInfo
+  -> PackageLocation
   -> RIO env ()
-unpackPackageIdent fp name ver cfi = do
-  (_treekey, tree) <- getHackageTarball name ver cfi
+unpackPackageLocation fp loc = do
+  tree <- loadPackageLocation loc
   unpackTree fp tree
 
+-- | Ignores all warnings
 parseCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env GenericPackageDescription
-parseCabalFile = undefined
+parseCabalFile loc = do
+  logDebug $ "Parsing cabal file for " <> display loc
+  bs <- loadCabalFile loc
+  case runParseResult $ parseGenericPackageDescription bs of
+    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile loc mversion errs warnings
+    (_warnings, Right gpd) -> pure gpd
+
+loadCabalFile
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env ByteString
+loadCabalFile (PLHackage pir) = getHackageCabalFile pir
+{- FIXME this is relatively inefficient
+loadCabalFile loc = do
+  tree <- loadPackageLocation loc
+  mbs <- withStorage $ do
+    (_sfp, TreeEntry key _ft) <- findCabalFile loc tree
+    loadBlob key
+  case mbs of
+    Just bs -> pure bs
+    -- FIXME what to do on Nothing? perhaps download the PackageLocation again?
+-}
+
+loadPackageLocation
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env Tree
+loadPackageLocation (PLHackage pir) = snd <$> getHackageTarball pir
 
 toCabalStringMap :: Map a v -> Map (CabalString a) v
 toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
@@ -266,7 +294,7 @@ unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerc
 
 -- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
 unRawPackageLocation :: RawPackageLocation -> [PackageLocation]
-unRawPackageLocation = undefined
+unRawPackageLocation (RPLHackage pir mtree mcabal) = [PLHackage pir] -- FIXME add mtree and mcabal to PLHackage, maybe we want a wrapper type
 
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation

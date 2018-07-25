@@ -945,7 +945,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             TTIndex package _ pir -> do
                 let PackageIdentifierRevision name' ver cfi = pir
                     dir = eeTempDir
-                unpackPackageIdent (toFilePath dir) name' ver cfi
+                unpackPackageLocation (toFilePath dir) $ PLHackage pir
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir

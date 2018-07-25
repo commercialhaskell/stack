@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Pantry.Tree
   ( unpackTree
+  , findCabalFile
   ) where
 
 import RIO
@@ -36,3 +38,17 @@ unpackTree dir (TreeMap m) = do
           FTNormal -> pure ()
           FTExecutable -> liftIO $ setFileMode dest 0o755
 #endif
+
+findCabalFile
+  :: MonadThrow m
+  => PackageLocation -- ^ for exceptions
+  -> Tree
+  -> m (SafeFilePath, TreeEntry)
+findCabalFile loc (TreeMap m) = do
+  let isCabalFile (sfp, _) =
+        let txt = unSafeFilePath sfp
+         in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
+  case filter isCabalFile $ Map.toList m of
+    [] -> throwM $ TreeWithoutCabalFile loc
+    [(key, te)] -> pure (key, te)
+    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs

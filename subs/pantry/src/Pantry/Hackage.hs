@@ -6,6 +6,7 @@ module Pantry.Hackage
   ( updateHackageIndex
   , hackageIndexTarballL
   , getHackageTarball
+  , getHackageCabalFile
   ) where
 
 import RIO
@@ -250,18 +251,24 @@ instance FromJSON PackageDownload where
             Right x -> return x
         return $ PackageDownload sha256 len
 
+getHackageCabalFile
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageIdentifierRevision
+  -> RIO env ByteString
+getHackageCabalFile pir = do
+  bid <- resolveCabalFileInfo pir
+  withStorage $ loadBlobById bid
+
 resolveCabalFileInfo
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
+  => PackageIdentifierRevision
   -> RIO env BlobTableId
-resolveCabalFileInfo name ver cfi = do
+resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
   mres <- inner
   case mres of
     Just res -> pure res
     Nothing -> do
-      let msg = "Could not find cabal file info for " <> display (PackageIdentifierRevision name ver cfi)
+      let msg = "Could not find cabal file info for " <> display pir
       updated <- updateHackageIndex $ Just $ msg <> ", updating"
       mres' <- if updated then inner else pure Nothing
       case mres' of
@@ -299,12 +306,10 @@ withCachedTree name ver bid inner = do
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
+  => PackageIdentifierRevision
   -> RIO env (TreeKey, Tree)
-getHackageTarball name ver cfi = do
-  cabalFile <- resolveCabalFileInfo name ver cfi
+getHackageTarball pir@(PackageIdentifierRevision name ver cfi) = do
+  cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
   withCachedTree name ver cabalFile $ do
     mpair <- withStorage $ loadHackageTarballInfo name ver
@@ -335,16 +340,24 @@ getHackageTarball name ver cfi = do
           ]
     (_, tree) <- getArchive url "" (Just sha) (Just size)
 
+    (key, TreeEntry _origkey ft) <- findCabalFile (PLHackage pir) tree
+
     case tree of
       TreeMap m -> do
-        let isCabalFile (sfp, _) =
-              let txt = unSafeFilePath sfp
-               in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
-        (key, ft) <-
-          case filter isCabalFile $ Map.toList m of
-            [] -> error $ "Hackage tarball without a cabal file: " ++ show (name, ver)
-            [(key, TreeEntry _origkey ft)] -> pure (key, ft)
-            _:_:_ -> error $ "Hackage tarball with multiple cabal files: " ++ show (name, ver)
         let tree' = TreeMap $ Map.insert key (TreeEntry cabalFileKey ft) m
         (tid, treeKey) <- withStorage $ storeTree tree'
         pure (tid, treeKey, tree')
+
+findCabalFile
+  :: MonadThrow m
+  => PackageLocation -- ^ for exceptions
+  -> Tree
+  -> m (SafeFilePath, TreeEntry)
+findCabalFile loc (TreeMap m) = do
+  let isCabalFile (sfp, _) =
+        let txt = unSafeFilePath sfp
+         in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
+  case filter isCabalFile $ Map.toList m of
+    [] -> throwM $ TreeWithoutCabalFile loc
+    [(key, te)] -> pure (key, te)
+    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs

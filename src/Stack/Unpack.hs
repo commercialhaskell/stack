@@ -58,8 +58,7 @@ unpackPackages mSnapshotDef dest input = do
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
     forM_ (Map.toList pirs) $ \(pir, dest') -> do
-      let PackageIdentifierRevision name ver cfi = pir
-      unpackPackageIdent dest' name ver cfi
+      unpackPackageLocation dest' (PLHackage pir)
       logInfo $
         "Unpacked " <>
         display pir <>

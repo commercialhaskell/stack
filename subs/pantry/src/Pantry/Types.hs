@@ -45,6 +45,7 @@ module Pantry.Types
   , OptionalSubdirs (..)
   , CabalString (..)
   , parsePackageIdentifierRevision
+  , PantryException (..)
   ) where
 
 import RIO
@@ -60,12 +61,13 @@ import Data.Pool (Pool)
 import Database.Persist
 import Database.Persist.Sql
 import Pantry.StaticSHA256
+import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import Distribution.Types.PackageName (PackageName)
 import Distribution.PackageDescription (FlagName)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.Types.Version (Version)
-import Data.Store (Store (..)) -- FIXME remove
+import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import qualified Data.Text.Read
 
@@ -117,6 +119,9 @@ data PackageLocation
   deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance NFData PackageLocation
 instance Store PackageLocation
+
+instance Display PackageLocation where
+  display (PLHackage pir) = display pir <> " (from Hackage)"
 
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
@@ -232,14 +237,6 @@ instance Display CabalFileInfo where
 data PackageIdentifierRevision = PackageIdentifierRevision !PackageName !Version !CabalFileInfo
   deriving (Generic, Eq, Ord, Data, Typeable)
 instance NFData PackageIdentifierRevision
-{- FIXME
-instance Hashable PackageIdentifierRevision where
-  hashWithSalt = undefined
--}
-instance Store PackageIdentifierRevision where
-  size = undefined
-  poke = undefined
-  peek = undefined
 
 instance Show PackageIdentifierRevision where
   show = T.unpack . utf8BuilderToText . display
@@ -280,21 +277,64 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
         case Data.Text.Read.decimal revT of
           Right (rev, "") -> pure $ CFIRevision $ Revision rev
           _ -> Nothing
-      Nothing
-        | T.null cfiT -> pure CFILatest
-        | otherwise -> Nothing
+      Nothing -> pure CFILatest
+      _ -> Nothing
   pure $ PackageIdentifierRevision name version cfi
   where
-    splitColon t =
-      let (x, y) = T.break (== ':') t
+    splitColon t' =
+      let (x, y) = T.break (== ':') t'
        in (x, ) <$> T.stripPrefix ":" y
 
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
+  | InvalidCabalFile
+      !PackageLocation
+      !(Maybe Version)
+      ![PError]
+      ![PWarning]
+  | TreeWithoutCabalFile !PackageLocation
+  | TreeWithMultipleCabalFiles !PackageLocation ![SafeFilePath]
+
   deriving Typeable
 instance Exception PantryException where
 instance Show PantryException where
-  show (PackageIdentifierRevisionParseFail text) = "Invalid package identifier (with optional revision): " ++ show text
+  show = T.unpack . utf8BuilderToText . display
+instance Display PantryException where
+  display (PackageIdentifierRevisionParseFail text) =
+    "Invalid package identifier (with optional revision): " <>
+    display text
+  display (InvalidCabalFile loc _mversion errs warnings) =
+    "Unable to parse cabal file from package " <>
+    display loc <>
+
+    {-
+
+     Not actually needed, the errors will indicate if a newer version exists.
+     Also, it seems that this is set to Just the version even if we support it.
+
+    , case mversion of
+        Nothing -> ""
+        Just version -> "\nRequires newer Cabal file parser version: " ++
+                        versionString version
+    -}
+
+    "\n\n" <>
+    foldMap
+      (\(PError pos msg) ->
+          "- " <>
+          fromString (showPos pos) <>
+          ": " <>
+          fromString msg <>
+          "\n")
+      errs <>
+    foldMap
+      (\(PWarning _ pos msg) ->
+          "- " <>
+          fromString (showPos pos) <>
+          ": " <>
+          fromString msg <>
+          "\n")
+      warnings
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -449,7 +489,7 @@ instance ToJSON RawPackageLocation where
   toJSON (RPLArchive (RawArchive url msha msize) os) = object $ concat
     [ ["url" .= url]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
-    , maybe [] (\size -> ["size " .= size]) msize
+    , maybe [] (\size' -> ["size " .= size']) msize
     , osToPairs os
     ]
   toJSON (RPLRepo (RawRepo url commit typ) os) = object $ concat
@@ -466,7 +506,7 @@ instance ToJSON RawPackageLocation where
 
 osToPairs :: OptionalSubdirs -> [(Text, Value)]
 osToPairs (OSSubdirs subdirs) = [("subdirs" .= subdirs)]
-ostoPairs (OSPackageMetadata mname mversion mtree mcabal msubdir) = object $ concat
+osToPairs (OSPackageMetadata mname mversion mtree mcabal msubdir) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
@@ -579,18 +619,51 @@ instance IsCabalString FlagName where
 -- FIXME ORPHANS remove
 
 instance Store PackageIdentifier where
-  size = undefined
-  peek = undefined
-  poke = undefined
+  size =
+    VarSize $ \(PackageIdentifier name version) ->
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f name) +
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f version)
+  peek = PackageIdentifier <$> peek <*> peek
+  poke (PackageIdentifier name version) = poke name *> poke version
 instance Store PackageName where
-  size = undefined
-  peek = undefined
-  poke = undefined
+  size =
+    VarSize $ \name ->
+    case size of
+      ConstSize x -> x
+      VarSize f -> f (displayC name :: String)
+  peek = peek >>= maybe (fail "Invalid package name") pure . parseC
+  poke name = poke (displayC name :: String)
 instance Store Version where
-  size = undefined
-  peek = undefined
-  poke = undefined
+  size =
+    VarSize $ \version ->
+    case size of
+      ConstSize x -> x
+      VarSize f -> f (displayC version :: String)
+  peek = peek >>= maybe (fail "Invalid version") pure . parseC
+  poke version = poke (displayC version :: String)
 instance Store FlagName where
-  size = undefined
-  peek = undefined
-  poke = undefined
+  size =
+    VarSize $ \fname ->
+    case size of
+      ConstSize x -> x
+      VarSize f -> f (displayC fname :: String)
+  peek = peek >>= maybe (fail "Invalid flag name") pure . parseC
+  poke fname = poke (displayC fname :: String)
+instance Store PackageIdentifierRevision where
+  size =
+    VarSize $ \(PackageIdentifierRevision name version cfi) ->
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f name) +
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f version) +
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f cfi)
+  peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
+  poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi

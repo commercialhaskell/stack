@@ -80,7 +80,7 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Package (parseSingleCabalFile)
+import           Stack.Package (parseSingleCabalFile, readPackageUnresolvedDir)
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -604,12 +604,19 @@ loadBuildConfig mproject maresolver mcompiler = do
       dir <- resolveDir (parent stackYamlFP) fp
       (dir,) <$> runOnce (parseSingleCabalFile True dir)
 
+    deps <- fmap fold $ forM (projectDependencies project) $ \x ->
+      case x of
+        RawPackageLocation rpl -> pure ([], unRawPackageLocation rpl)
+        RPLFilePath fp -> do
+          dir <- resolveDir (parent stackYamlFP) fp
+          pure ([dir], [])
+
     return BuildConfig
         { bcConfig = config
         , bcSnapshotDef = sd
         , bcGHCVariant = configGHCVariantDefault config
         , bcPackages = packages
-        , bcDependencies = undefined (projectDependencies project)
+        , bcDependencies = deps
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
@@ -652,11 +659,15 @@ getLocalPackages = do
             root <- view projectRootL
             bc <- view buildConfigL
 
+            let (depsLocal, depsRemote) = bcDependencies bc
+
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
-            let wrapGPD (gpd, loc) = (pkgName $ C.package $ C.packageDescription gpd, (gpd, loc))
-            deps <- map wrapGPD . concat
-                <$> mapM undefined (bcDependencies bc)
+            deps1 <- forM depsRemote $ \loc -> (, Right loc) <$> parseCabalFile loc
+            deps2 <- forM depsLocal $ \dir -> ((, Left dir) . fst) <$> readPackageUnresolvedDir dir False
+            let deps = map
+                  (\(gpd, x) -> (pkgName $ C.package $ C.packageDescription gpd, (gpd, x)))
+                  (deps1 ++ deps2)
 
             checkDuplicateNames $
               map (second (Left . lpvRoot)) packages ++

@@ -13,6 +13,7 @@ module Pantry.Storage
   , withStorage
   , storeBlob
   , loadBlob
+  , loadBlobById
   , getBlobKey
   , clearHackageRevisions
   , storeHackageRevision
@@ -174,6 +175,16 @@ loadBlob (BlobKey sha size) = do
              "Mismatched blob size detected for SHA " <> display sha <>
              ". Expected size: " <> display size <>
              ". Actual size: " <> display (blobTableSize bt))
+
+loadBlobById
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobTableId
+  -> ReaderT SqlBackend (RIO env) ByteString
+loadBlobById bid = do
+  mbt <- get bid
+  case mbt of
+    Nothing -> error "loadBlobById: ID doesn't exist in database"
+    Just bt -> pure $ blobTableContents bt
 
 getBlobKey
   :: (HasPantryConfig env, HasLogFunc env)

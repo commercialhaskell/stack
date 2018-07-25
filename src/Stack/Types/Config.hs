@@ -32,6 +32,7 @@ module Stack.Types.Config
    HasPlatform(..)
   ,PlatformVariant(..)
   -- ** Config & HasConfig
+  ,RawPackageLocationOrPath(..)
   ,Config(..)
   ,HasConfig(..)
   ,askLatestSnapshotUrl
@@ -599,6 +600,18 @@ data LoadConfig = LoadConfig
         -- ^ The project root directory, if in a project.
     }
 
+data RawPackageLocationOrPath
+  = RawPackageLocation !RawPackageLocation
+  | RPLFilePath !FilePath
+  deriving Show
+instance ToJSON RawPackageLocationOrPath where
+  toJSON (RawPackageLocation rpl) = toJSON rpl
+  toJSON (RPLFilePath fp) = toJSON fp
+instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
+  parseJSON v =
+    (fmap RawPackageLocation <$> parseJSON v) <|>
+    ((noJSONWarnings . RPLFilePath) <$> parseJSON v)
+
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
@@ -608,7 +621,7 @@ data Project = Project
     , projectPackages :: ![FilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![RawPackageLocation]
+    , projectDependencies :: ![RawPackageLocationOrPath]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
