@@ -14,6 +14,7 @@ module Pantry.Storage
   , storeBlob
   , loadBlob
   , loadBlobById
+  , loadBlobBySHA
   , getBlobKey
   , clearHackageRevisions
   , storeHackageRevision
@@ -175,6 +176,12 @@ loadBlob (BlobKey sha size) = do
              "Mismatched blob size detected for SHA " <> display sha <>
              ". Expected size: " <> display size <>
              ". Actual size: " <> display (blobTableSize bt))
+
+loadBlobBySHA
+  :: (HasPantryConfig env, HasLogFunc env)
+  => StaticSHA256
+  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
+loadBlobBySHA sha = fmap (fmap (blobTableContents . entityVal)) $ getBy $ UniqueBlobHash sha
 
 loadBlobById
   :: (HasPantryConfig env, HasLogFunc env)

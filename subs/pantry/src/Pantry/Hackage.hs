@@ -255,6 +255,27 @@ getHackageCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
   -> RIO env ByteString
+getHackageCabalFile pir@(PackageIdentifierRevision _ _ (CFIHash (CabalHash sha msize))) = do
+  mbs <- inner
+  case mbs of
+    Just bs -> pure bs
+    Nothing -> do
+      let msg = "Could not find cabal file info for " <> display pir
+      updated <- updateHackageIndex $ Just $ msg <> ", updating"
+      mres' <- if updated then inner else pure Nothing
+      case mres' of
+        Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME proper exception
+        Just res -> pure res
+  where
+    inner = do
+      mbs <- withStorage $ loadBlobBySHA sha
+      pure $
+        case mbs of
+          Nothing -> Nothing
+          Just bs
+            | maybe True (== FileSize (fromIntegral (B.length bs))) msize -> Just bs
+            | otherwise -> Nothing -- maybe check the SHA here, and then report the SHA256 collision
+
 getHackageCabalFile pir = do
   bid <- resolveCabalFileInfo pir
   withStorage $ loadBlobById bid
