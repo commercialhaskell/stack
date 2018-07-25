@@ -1,29 +1,24 @@
 import StackTest
+import Control.Monad (unless)
 import Data.List (isInfixOf)
 import System.Directory
-import System.Environment (getEnv)
+import System.Environment (getEnv, setEnv)
 import System.FilePath
-
-wrongDnsTemplateUrl :: String
-wrongDnsTemplateUrl =
-  "http://fake-host.fake-tld/simple.hsfiles"
 
 main :: IO ()
 main = do
-  stackRoot <- getEnv "STACK_ROOT"
-  run "mkdir" ["-p", templateDir stackRoot]
-  copy "simple.hsfiles" (templatePath stackRoot)
-  stackCheckStderr ["new", "tmp", wrongDnsTemplateUrl] $ \stderr -> do
-    if ("Using cached local version" `isInfixOf` stderr)
-      then return ()
-      else error "stack didn't load the cached template"
-    where
-      templateDir :: FilePath -> FilePath
-      templateDir stackRoot = foldl (</>) stackRoot
-                        [ "templates"
-                        , "http:"
-                        , "fake-host.fake-tld"
-                        ]
+  stack ["new", "tmp", templateUrl]
+  removeDirectoryRecursive "tmp"
+  setEnv "HTTPS_PROXY" "http://adfafdadfadf" -- make https requests fail
+  stackCheckStderr ["new", "tmp", templateUrl] $ \stderr -> 
+     unless ("Using cached local version" `isInfixOf` stderr) 
+     (error "stack didn't load the cached template")
 
-      templatePath :: FilePath -> FilePath
-      templatePath sr = templateDir sr </> "simple.hsfiles"
+  where
+    -- this templates has a `stack.yaml` file
+    -- so `stack new` does not have to `stack init`
+    -- and therefore the test runs faster
+    templateUrl :: String
+    templateUrl =
+      "https://raw.githubusercontent.com/commercialhaskell/stack-templates/986836cc85b0c8c5bbb78d7b94347ba095089b03/tasty-discover.hsfiles"
+
