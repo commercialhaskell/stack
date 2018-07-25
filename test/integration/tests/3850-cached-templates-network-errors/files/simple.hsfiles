@@ -1,0 +1,284 @@
+{-# START_FILE {{name}}.cabal #-}
+name:                {{name}}
+version:             0.1
+author:              {{author-name}} <{{author-email}}>
+maintainer:          {{author-name}} <{{author-email}}>
+--synopsis:            
+--description:         
+--homepage:            
+license:             MIT
+license-file:        LICENSE
+build-type:          Simple
+cabal-version:       >=1.10
+extra-Source-Files:  README.md
+
+library
+  default-language:    Haskell2010
+  hs-source-dirs:      src
+  GHC-options:         -Wall
+  --exposed-modules:     
+  build-depends:       base
+                     , mtl
+
+executable {{name}}
+  default-language:    Haskell2010
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  ghc-options:         -threaded -Wall -fwarn-tabs -funbox-strict-fields 
+                        -O2 -fno-warn-orphans -fno-warn-unused-do-bind            
+  other-modules:       Application
+                     , Site
+  build-depends:       base
+                     , bytestring
+                     , containers
+                     , heist
+                     , lens
+                     , map-syntax
+                     , monad-control
+                     , mtl
+                     , process
+                     , snap
+                     , snap-core 
+                     , snap-server
+                     , text
+                     , time
+                     , websockets
+                     , websockets-snap
+                     , xmlhtml
+
+test-suite {{name}}-test
+  default-language:    Haskell2010st
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , {{name}}
+                     , hspec
+                     , mtl
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+
+{-# START_FILE stack.yaml #-}
+flags: {}
+extra-package-dbs: []
+packages:
+- '.'
+extra-deps:
+- heist-1.0.1.0
+- map-syntax-0.2.0.2
+- snap-1.0.0.1
+resolver: lts-8.15
+
+{-# START_FILE .dockerignore #-}
+# Ignore swap files and stack/cabal output.
+*.hi
+*.o
+*.swo
+*.swp
+*~
+.DS_Store
+TAGS
+dist
+tags
+cabal.sandbox.config
+.cabal-sandbox/
+
+# Ignore test builds.
+tests/Main
+_cache
+_store
+_site
+
+# Other
+log/
+.git/
+.vscode/
+.stack-work/
+
+{-# START_FILE .ghci #-}
+:set -isrc
+:set -hide-package MonadCatchIO-mtl
+:set -hide-package monads-fd
+:set -XOverloadedStrings
+
+{_# START_FILE .gitignore #-}
+# Ignore swap files and stack/cabal output.
+*.hi
+*.o
+*.swo
+*.swp
+*~
+.DS_Store
+TAGS
+dist
+tags
+cabal.sandbox.config
+.cabal-sandbox/
+.stack-work
+
+# Ignore test builds.
+tests/Main
+_cache
+_store
+_site
+
+# Other
+log/
+.vscode/
+
+{-# START_FILE Dockerfile #-}
+FROM  haskell
+
+# create our src and bin directories and 
+# setup src to be our working directory
+RUN mkdir -p /opt/{{name}}/src
+RUN mkdir -p /opt/{{name}}/bin
+WORKDIR /opt/{{name}}/src
+
+# setup our PATH for the bin directory
+ENV PATH "$PATH:/opt/{{name}}/bin"
+
+# Install GHC using stack, based on the stack.yaml file.
+COPY ./stack.yaml /opt/{{name}}/src/stack.yaml
+RUN stack --no-terminal setup
+
+# Install all dependencies in the .cabal file.
+COPY ./{{name}}.cabal /opt/{{name}}/src/{{name}}.cabal
+RUN stack --no-terminal test --only-dependencies
+
+# Build application
+COPY . /opt/{{name}}/src
+RUN stack --no-terminal build
+
+# Install application binaries to /opt/{{name}}/bin.
+RUN stack --no-terminal --local-bin-path /opt/{{name}}/bin install
+
+CMD /opt/{{name}}/bin/{{name}} -p $PORT
+
+{-# START_FILE LICENSE #-}
+MIT License
+
+Copyright (c) {{year}} {{author-name}}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+{-# START_FILE README.md #-}
+{{name}}
+---------------------
+
+{-# START_FILE snaplets/heist/base.tpl #-}
+<html>
+  <head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="/styles/screen.css" />
+  </head>
+  <body>
+    <content />
+    
+    <javascript />
+  </body>
+</html>
+
+{-# START_FILE Setup.hs #-}
+import Distribution.Simple
+main = defaultMain
+
+{-# START_FILE snaplets/heist/index.tpl #-}
+<apply template="base">
+    <bind tag="content">
+    </bind>
+
+    <bind tag="javascript">
+    </bind>
+</apply>
+
+{-# START_FILE src/Application.hs #-}
+{-# LANGUAGE TemplateHaskell #-}
+module Application where
+
+
+--------------------------------------------------------------------------------
+import Control.Lens
+import Snap.Snaplet
+import Snap.Snaplet.Heist
+
+
+--------------------------------------------------------------------------------
+data App = App
+    { _heist :: Snaplet (Heist App) 
+    }
+
+makeLenses ''App
+
+instance HasHeist App where
+    heistLens = subSnaplet heist
+
+type AppHandler = Handler App App
+
+{-# START_FILE src/Main.hs #-}
+module Main where
+
+
+--------------------------------------------------------------------------------
+import Site
+import Snap.Snaplet
+import Snap.Http.Server
+
+
+--------------------------------------------------------------------------------
+main :: IO ()
+main = serveSnaplet defaultConfig siteInit
+
+{-# START_FILE src/Site.hs #-}
+{-# LANGUAGE OverloadedStrings #-}
+module Site where
+
+
+--------------------------------------------------------------------------------   
+import           Application
+import           Control.Monad           (forever)
+import           Control.Monad.State
+import qualified Data.Text               as T
+import qualified Network.WebSockets      as WS
+import qualified Network.WebSockets.Snap as WS
+import           Snap.Snaplet
+import           Snap.Snaplet.Heist      
+import           Snap.Util.FileServe 
+
+
+--------------------------------------------------------------------------------
+siteInit :: SnapletInit App App
+siteInit = makeSnaplet "app" "An snaplet example application." Nothing $ do
+    h <- nestSnaplet "" heist $ heistInit "templates"
+    addRoutes [ ("/", render "index.tpl")
+              , ("",  serveDirectory "assets")
+              ]
+    return $ App h
+
+{-# START_FILE static/styles/screen.css #-}
+body {
+}
+
+{-# START_FILE test/Spec.hs #-}
+--------------------------------------------------------------------------------
+import Test.Hspec
+
+main :: IO ()
+main = hspec $ do
+  describe "tests" $ do 
+    True `shouldBe` True
