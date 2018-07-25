@@ -191,3 +191,7 @@ project meeting the needs of Haskell users of all stripes.
 If you'd like to get involved with Stack, check out the
 [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
 label on the Github issue tracker.
+
+#### How to uninstall
+Removing ``~/.stack`` and ``/usr/local/bin/stack`` should be sufficient. You may want to delete ``.stack-work`` folders in any Haskell projects that you have built.
+

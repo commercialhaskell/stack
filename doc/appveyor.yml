@@ -12,6 +12,10 @@ environment:
   global:
     STACK_ROOT: "c:\\sr"
 
+    # Override the temp directory to avoid sed escaping issues
+    # See https://github.com/haskell/cabal/issues/5386
+    TMP: "c:\\tmp"
+
   matrix:
   - ARGS: ""
   #- ARGS: "--resolver lts-2"
@@ -20,6 +24,7 @@ environment:
   #- ARGS: "--resolver lts-7"
   - ARGS: "--resolver lts-9"
   - ARGS: "--resolver lts-11"
+  - ARGS: "--resolver lts-12"
   #- ARGS: "--resolver nightly"
 
 test_script:
@@ -29,4 +34,4 @@ test_script:
 
 # The ugly echo "" hack is to avoid complaints about 0 being an invalid file
 # descriptor
-- echo "" | stack %ARGS% --no-terminal test --pedantic
+- echo "" | stack %ARGS% --no-terminal test
