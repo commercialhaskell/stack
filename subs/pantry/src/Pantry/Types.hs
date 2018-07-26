@@ -442,8 +442,9 @@ data PackageTarball = PackageTarball
   }
   deriving Show
 
--- | Modified version of Cabal's parser - we don't need null version
--- in package indentifiers
+-- | This is almost a copy of Cabal's parser for package identifiers,
+-- the main difference is in the fact that Stack requires version to be
+-- present while Cabal uses "null version" as a defaul value
 parsePackageIdentifier :: String -> Maybe PackageIdentifier
 parsePackageIdentifier str =
     case [p | (p, s) <- Parse.readP_to_S parser str, all isSpace s] of
@@ -452,6 +453,7 @@ parsePackageIdentifier str =
   where
     parser = do
         n <- Distribution.Text.parse
+        -- version is a required component of a package identifier for Stack
         v <- Parse.char '-' >> Distribution.Text.parse
         return (PackageIdentifier n v)
 
