@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pantry.Hackage
   ( updateHackageIndex
   , hackageIndexTarballL
@@ -26,7 +27,7 @@ import Pantry.StaticSHA256
 import Network.URI (parseURI)
 import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Time (getCurrentTime)
-import RIO.FilePath ((</>))
+import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
 import qualified Distribution.Text
 import Distribution.Types.PackageName (unPackageName)
 import System.IO (SeekMode (..))
@@ -38,11 +39,11 @@ import qualified Hackage.Security.Client.Repository.HttpLib.HttpClient as HS
 import qualified Hackage.Security.Util.Path as HS
 import qualified Hackage.Security.Util.Pretty as HS
 
-hackageDirL :: HasPantryConfig env => SimpleGetter env FilePath
-hackageDirL = pantryConfigL.to ((</> "hackage") . pcRootDir)
+hackageDirL :: HasPantryConfig env => SimpleGetter env (Path Abs Dir)
+hackageDirL = pantryConfigL.to ((</> $(mkRelDir "hackage")) . pcRootDir)
 
-hackageIndexTarballL :: HasPantryConfig env => SimpleGetter env FilePath
-hackageIndexTarballL = hackageDirL.to (</> "00-index.tar")
+hackageIndexTarballL :: HasPantryConfig env => SimpleGetter env (Path Abs File)
+hackageIndexTarballL = hackageDirL.to (</> $(mkRelFile "00-index.tar"))
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
@@ -71,7 +72,7 @@ updateHackageIndex mreason = gateUpdate $ do
             [baseURI]
             HS.defaultRepoOpts
             HS.Cache
-                { HS.cacheRoot = HS.fromAbsoluteFilePath root
+                { HS.cacheRoot = HS.fromAbsoluteFilePath $ toFilePath root
                 , HS.cacheLayout = HS.cabalCacheLayout
                 }
             HS.hackageRepoLayout
@@ -111,7 +112,7 @@ updateHackageIndex mreason = gateUpdate $ do
       -- match, we can do an efficient fast forward. Otherwise, we
       -- clear the old cache and repopulate.
       minfo <- loadLatestCacheUpdate
-      (offset, newHash, newSize) <- lift $ withBinaryFile tarball ReadMode $ \h -> do
+      (offset, newHash, newSize) <- lift $ withBinaryFile (toFilePath tarball) ReadMode $ \h -> do
         logInfo "Calculating hashes to check for hackage-security rebases or filesystem changes"
 
         -- The size of the new index tarball, ignoring the required
@@ -164,10 +165,10 @@ updateHackageIndex mreason = gateUpdate $ do
 -- | Populate the SQLite tables with Hackage index information.
 populateCache
   :: (HasPantryConfig env, HasLogFunc env)
-  => FilePath -- ^ tarball
+  => Path Abs File -- ^ tarball
   -> Integer -- ^ where to start processing from
   -> ReaderT SqlBackend (RIO env) ()
-populateCache fp offset = withBinaryFile fp ReadMode $ \h -> do
+populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
   lift $ logInfo "Populating package index cache ..."
   counter <- newIORef (0 :: Int)
   hSeek h AbsoluteSeek offset
@@ -255,7 +256,7 @@ getHackageCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
   -> RIO env ByteString
-getHackageCabalFile pir@(PackageIdentifierRevision _ _ (CFIHash (CabalHash sha msize))) = do
+getHackageCabalFile pir@(PackageIdentifierRevision _ _ (CFIHash sha msize)) = do
   mbs <- inner
   case mbs of
     Just bs -> pure bs
@@ -300,7 +301,7 @@ resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
       revs <- withStorage $ loadHackagePackageVersion name ver
       pure $
         case cfi of
-          CFIHash (CabalHash sha msize) -> listToMaybe $ mapMaybe
+          CFIHash sha msize -> listToMaybe $ mapMaybe
             (\(bid, BlobKey sha' size') ->
                if sha' == sha && maybe True (== size') msize
                  then Just bid
@@ -359,9 +360,9 @@ getHackageTarball pir@(PackageIdentifierRevision name ver cfi) = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    (_, tree) <- getArchive url "" (Just sha) (Just size)
+    (treeKey, tree) <- getArchive url "" (Just sha) (Just size)
 
-    (key, TreeEntry _origkey ft) <- findCabalFile (PLHackage pir) tree
+    (key, TreeEntry _origkey ft) <- findCabalFile (PLHackage pir (Just treeKey)) tree
 
     case tree of
       TreeMap m -> do

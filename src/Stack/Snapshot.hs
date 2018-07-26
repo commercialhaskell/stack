@@ -234,7 +234,7 @@ loadResolver (ResolverStackage name) = do
                       case mkStaticSHA256FromText shaText of
                         Left e -> fail $ "Invalid SHA256: " ++ show e
                         Right x -> return x
-                return $ CFIHash $ CabalHash hash' msize
+                return $ CFIHash hash' msize
 
             Object constraints <- o .: "constraints"
 
@@ -244,10 +244,11 @@ loadResolver (ResolverStackage name) = do
             hide <- constraints .:? "hide" .!= False
             let hide' = if hide then Map.singleton name' True else Map.empty
 
-            let location = PLHackage $ PackageIdentifierRevision
+            let location = PLHackage (PackageIdentifierRevision
                   name'
                   version
-                  (fromMaybe CFILatest mcabalFileInfo')
+                  (fromMaybe CFILatest mcabalFileInfo'))
+                  Nothing -- FIXME get the pantry key from Stackage? Or just support it in the new format?
 
             return (Endo (location:), flags', hide')
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
@@ -282,29 +283,11 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: FilePath -> RIO env SnapshotDef
     load fp = do
-      let resolveLocalArchives sd = sd {
-            sdLocations = resolveLocalArchive <$> sdLocations sd
-          }
-          resolveLocalArchive (PLArchive archive) =
-            PLArchive $ archive {
-              archiveUrl = T.pack $ resolveLocalFilePath (T.unpack $ archiveUrl archive)
-            }
-          resolveLocalArchive pl = pl
-          resolveLocalFilePath path =
-            if isURI path || FilePath.isAbsolute path
-              then path
-              else FilePath.dropFileName fp FilePath.</> FilePath.normalise path
-
       WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
         liftIO (decodeFileEither fp) >>= either
           (throwM . CustomResolverException url loc)
           (either (throwM . CustomResolverException url loc . AesonException) return . parseEither parseCustom)
       logJSONWarnings (T.unpack url) warnings
-      forM_ (sdLocations sd0) $ \loc' ->
-        case loc' of
-          -- FIXME PLOther (PLFilePath _) -> throwM $ FilepathInCustomSnapshot url
-          _ -> return ()
-      let sd0' = resolveLocalArchives sd0
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
       -- above.
@@ -344,7 +327,7 @@ loadResolver (ResolverCustom url loc) = do
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
             return (Right parent', hash')
-      return $ overrideCompiler sd0'
+      return $ overrideCompiler sd0
         { sdParent = parent'
         , sdResolver = ResolverCustom url hash'
         }
@@ -405,7 +388,7 @@ loadSnapshot mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (forM (sdLocations sd) $ \loc -> (, PackageLocation loc) <$> parseCabalFile loc)
+        (forM (sdLocations sd) $ \loc -> (, PLRemote loc) <$> parseCabalFile loc)
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
@@ -726,7 +709,7 @@ snapshotDefFixes sd = sd
 -- creating a 'PackageLocationOrPath'.
 globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocationOrPath
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PackageLocation (PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest))
+    { lpiLocation = PLRemote (PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest) Nothing)
     }
 
 -- | Split the packages into those which have their dependencies met,

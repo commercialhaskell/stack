@@ -943,7 +943,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             TTIndex package _ pir -> do
                 let PackageIdentifierRevision name' ver cfi = pir
                     dir = eeTempDir
-                unpackPackageLocation (toFilePath dir) $ PLHackage pir
+                unpackPackageLocation (toFilePath dir) $ PLHackage pir Nothing -- FIXME
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir
@@ -2100,4 +2100,4 @@ addGlobalPackages deps globals0 =
 
 ttPackageLocation :: TaskType -> Maybe PackageLocation
 ttPackageLocation (TTFiles lp i) = Nothing -- FIXME! Need to handle archive/repo
-ttPackageLocation (TTIndex _ _ pir) = Just $ PLHackage pir
+ttPackageLocation (TTIndex _ _ pir) = Just $ PLHackage pir Nothing -- FIXME

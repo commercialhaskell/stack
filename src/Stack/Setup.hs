@@ -700,7 +700,7 @@ upgradeCabal wc upgradeTo = do
           mversion <- getLatestHackageVersion name
           case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
-            Just (latestVersion, _revision, _cabalHash) -> do
+            Just (PackageIdentifierRevision _name latestVersion _cabalHash) -> do
                 if installed < latestVersion then
                     doCabalInstall wc installed latestVersion
                 else
@@ -730,7 +730,9 @@ doCabalInstall wc installed wantedVersion = do
         let name = $(mkPackageName "Cabal")
             suffix = "Cabal-" ++ displayC wantedVersion
             dir = toFilePath tmpdir FP.</> suffix
-        unpackPackageLocation dir $ PLHackage $ PackageIdentifierRevision name wantedVersion CFILatest
+        unpackPackageLocation dir $ PLHackage
+          (PackageIdentifierRevision name wantedVersion CFILatest)
+          Nothing
         compilerPath <- findExecutable (compilerExeName wc)
                     >>= either throwM parseAbsFile
         versionDir <- parseRelDir $ displayC wantedVersion

@@ -223,7 +223,7 @@ getCabalConfig :: HasConfig env
                -> Map PackageName Version -- ^ constraints
                -> RIO env [Text]
 getCabalConfig dir constraintType constraints = do
-    src <- view hackageIndexTarballL
+    src <- view $ hackageIndexTarballL.to toFilePath
     let dstdir = dir FP.</> "hackage"
         -- NOTE: see https://github.com/commercialhaskell/stack/issues/2888
         -- for why we are pretending that a 01-index.tar is actually a

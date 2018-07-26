@@ -52,6 +52,7 @@ import RIO.Orphans ()
 import Pantry.StaticSHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
+import Path (Path, Abs, File, toFilePath)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -108,10 +109,10 @@ TreeEntryS sql=tree_entry
 
 initStorage
   :: HasLogFunc env
-  => FilePath -- ^ storage file
+  => Path Abs File -- ^ storage file
   -> (Storage -> RIO env a)
   -> RIO env  a
-initStorage fp inner = withSqliteConn (fromString fp) $ \conn -> do
+initStorage fp inner = withSqliteConn (fromString $ toFilePath fp) $ \conn -> do
   migrates <- runSqlConn (runMigrationSilent migrateAll) conn
   forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
   inner (Storage conn)
@@ -243,7 +244,7 @@ storeHackageRevision name version key = do
 loadHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
-  -> ReaderT SqlBackend (RIO env) (Map Version (Map Revision CabalHash))
+  -> ReaderT SqlBackend (RIO env) (Map Version (Map Revision BlobKey))
 loadHackagePackageVersions name = do
   nameid <- getNameId name
   -- would be better with esequeleto
@@ -256,7 +257,7 @@ loadHackagePackageVersions name = do
     [toPersistValue nameid]
   where
     go (Single revision, Single (VersionP version), Single key, Single size) =
-      (version, Map.singleton revision (CabalHash key (Just size)))
+      (version, Map.singleton revision (BlobKey key size))
 
 loadHackagePackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
@@ -295,7 +296,7 @@ loadHackageCabalFile name version cfi = do
       [Desc HackageCabalRevision] >>= withHackEnt
     CFIRevision rev ->
       getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
-    CFIHash (CabalHash sha msize) -> do
+    CFIHash sha msize -> do
       ment <- getBy $ UniqueBlobHash sha
       pure $ do
         Entity _ bt <- ment

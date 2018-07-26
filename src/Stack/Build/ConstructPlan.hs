@@ -130,7 +130,7 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (Map Version (Map Revision CabalHash)))
+    , getVersions    :: !(PackageName -> IO (Map Version (Map Revision BlobKey)))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -227,7 +227,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
   where
     hasBaseInDeps bconfig =
         elem $(mkPackageName "base")
-        [n | (PackageLocation (PLHackage (PackageIdentifierRevision n _ _))) <- bcDependencies bconfig]
+        [n | (PLRemote (PLHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx
         { ls = ls0
@@ -429,7 +429,7 @@ tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map F
 tellExecutablesUpstream pir@(PackageIdentifierRevision name _ _) loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- loadPackage ctx (PLHackage pir) flags []
+        p <- loadPackage ctx (PLHackage pir Nothing) flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -466,7 +466,7 @@ installPackage treatAsDep name ps minstalled = do
     case ps of
         PSIndex _ flags ghcOptions pkgLoc -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- loadPackage ctx (PLHackage pkgLoc) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
+            package <- loadPackage ctx (PLHackage pkgLoc Nothing) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
             resolveDepsAndInstall True treatAsDep ps package minstalled
         PSFiles lp _ ->
             case lpTestBench lp of
@@ -606,7 +606,7 @@ addPackageDeps treatAsDep package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep treatAsDep depname
-        let getLatestApplicableVersionAndRev :: M (Maybe (Version, CabalHash))
+        let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev =
               liftIO $ flip fmap (getVersions ctx depname) $ \vsAndRevs -> do
                 lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
@@ -901,7 +901,7 @@ deriving instance Ord VersionRange
 
 -- | The latest applicable version and it's latest cabal file revision.
 -- For display purposes only, Nothing if package not found
-type LatestApplicableVersion = Maybe (Version, CabalHash)
+type LatestApplicableVersion = Maybe (Version, BlobKey)
 
 -- | Reason why a dependency was not used
 data BadDependency
@@ -971,8 +971,8 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
        go (name, (_range, Just (version,cabalHash), DependencyMismatch{})) =
            Map.singleton name (version, cabalHash)
        go _ = Map.empty
-    pprintExtra (name, (version, cabalHash)) =
-      let cfInfo = CFIHash cabalHash
+    pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
+      let cfInfo = CFIHash cabalHash (Just cabalSize)
           packageIdRev = PackageIdentifierRevision name version cfInfo
        in fromString $ T.unpack $ utf8BuilderToText $ RIO.display packageIdRev
 

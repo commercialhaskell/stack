@@ -48,7 +48,7 @@ unpackPackages mSnapshotDef dest input = do
                )
           )
           (map (\pir@(PackageIdentifierRevision name ver _) ->
-                  (PLHackage pir, PackageIdentifier name ver)) pirs1 ++
+                  (PLHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
            locs2)
 
     alreadyUnpacked <- filterM doesDirectoryExist $ Map.elems locs
@@ -81,8 +81,8 @@ unpackPackages mSnapshotDef dest input = do
         case mver of
           -- consider updating the index
           Nothing -> Left $ "Could not find package " ++ displayC name
-          Just (ver, _rev, cabalHash) -> Right
-            ( PLHackage $ PackageIdentifierRevision name ver (CFIHash cabalHash)
+          Just pir@(PackageIdentifierRevision _ ver _) -> Right
+            ( PLHackage pir Nothing
             , PackageIdentifier name ver
             )
 

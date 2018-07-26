@@ -213,7 +213,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
           Just (PSIndex _ flags ghcOptions loc) ->
               -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
               let PackageIdentifierRevision name version _ = loc
-               in assert (pkgName == name) (loadPackageDeps pkgName version (PLHackage loc) flags ghcOptions)
+               in assert (pkgName == name) (loadPackageDeps pkgName version (PLHackage loc Nothing) flags ghcOptions)
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of

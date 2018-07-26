@@ -18,7 +18,6 @@ module Pantry.Types
   , Version
   , PackageIdentifier (..)
   , Revision (..)
-  , CabalHash (..)
   , CabalFileInfo (..)
   , PackageNameP (..)
   , VersionP (..)
@@ -33,7 +32,7 @@ module Pantry.Types
   , Tree (..)
   , renderTree
   , parseTree
-  , PackageTarball (..)
+  -- , PackageTarball (..)
   , PackageLocation (..)
   , Archive (..)
   , Repo (..)
@@ -44,8 +43,6 @@ module Pantry.Types
   , parseVersion
   , displayC
   , RawPackageLocation (..)
-  , RawArchive (..)
-  , RawRepo (..)
   , OptionalSubdirs (..)
   , ArchiveLocation (..)
   , RawPackageLocationOrPath (..)
@@ -88,31 +85,15 @@ newtype Revision = Revision Word
 
 newtype Storage = Storage SqlBackend
 
--- | A cryptographic hash of a Cabal file and its size, if known.
---
--- We only keep the size as a @Maybe@ for compatibility with cases
--- where users may not provide the file size. However, for security,
--- they should be provided in all cases.
-data CabalHash = CabalHash
-  { chHash :: !StaticSHA256
-  , chSize :: !(Maybe FileSize)
-  }
-    deriving (Generic, Show, Eq, Data, Typeable, Ord)
-instance Store CabalHash
-instance NFData CabalHash
-instance Hashable CabalHash
-
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
-  , pcRootDir :: !FilePath
+  , pcRootDir :: !(Path Abs Dir)
   , pcStorage :: !Storage
   , pcUpdateRef :: !(MVar Bool)
-    {- FIXME add this shortly
   -- ^ Want to try updating the index once during a single run for missing
   -- package identifiers. We also want to ensure we only update once at a
   -- time. Start at @True@.
-  --
-  -- TODO: probably makes sense to move this concern into getPackageCaches
+  {- FIXME add this shortly
   , pcParsedCabalFiles ::
       !(IORef
           ( Map PackageLocation GenericPackageDescription
@@ -120,13 +101,14 @@ data PantryConfig = PantryConfig
           )
        )
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
-    -}
+  -}
   }
 
 -- | A directory which was loaded up relative and has been resolved
 -- against the config file it came from.
 data ResolvedDir = ResolvedDir
   { resolvedRelative :: !Text
+  -- ^ Original value parsed from a config file.
   , resolvedAbsoluteHack :: !FilePath -- FIXME when we ditch store, use this !(Path Abs Dir)
   }
   deriving (Show, Eq, Data, Generic)
@@ -137,31 +119,34 @@ instance Store ResolvedDir
 resolvedAbsolute :: ResolvedDir -> Path Abs Dir
 resolvedAbsolute = either impureThrow id . parseAbsDir . resolvedAbsoluteHack
 
+-- | Either a remote package location or a local package directory.
 data PackageLocationOrPath
-  = PackageLocation !PackageLocation
+  = PLRemote !PackageLocation
   | PLFilePath !ResolvedDir
   deriving (Show, Eq, Data, Generic)
 instance NFData PackageLocationOrPath
 instance Store PackageLocationOrPath
 
+instance Display PackageLocationOrPath where
+  display (PLRemote loc) = display loc
+
 -- | Location for remote packages (i.e., not local file paths).
 data PackageLocation
-  = PLHackage !PackageIdentifierRevision
-  | PLArchive !Archive
-  | PLRepo    !Repo
+  = PLHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  | PLArchive !Archive !PackageMetadata
+  | PLRepo    !Repo !PackageMetadata
   deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance NFData PackageLocation
 instance Store PackageLocation
 
 instance Display PackageLocation where
-  display (PLHackage pir) = display pir <> " (from Hackage)"
+  display (PLHackage pir _tree) = display pir <> " (from Hackage)"
 
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
 -- over time, and so are allowed in custom snapshots.
 data Archive = Archive
-  { archiveUrl :: !Text
-  , archiveSubdir :: !Text
+  { archiveLocation :: !ArchiveLocation
   , archiveHash :: !(Maybe StaticSHA256)
   , archiveSize :: !(Maybe FileSize)
   }
@@ -180,7 +165,6 @@ data Repo = Repo
     { repoUrl :: !Text
     , repoCommit :: !Text
     , repoType :: !RepoType
-    , repoSubdir :: !Text
     }
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store Repo
@@ -210,7 +194,14 @@ newtype FileSize = FileSize Word
   deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, ToJSON, FromJSON)
 
 data BlobKey = BlobKey !StaticSHA256 !FileSize
-  deriving (Show, Eq)
+  deriving (Eq, Ord, Data, Typeable, Generic)
+instance Store BlobKey
+instance NFData BlobKey
+
+instance Show BlobKey where
+  show = T.unpack . utf8BuilderToText . display
+instance Display BlobKey where
+  display (BlobKey sha size) = display sha <> "," <> display size
 
 instance ToJSON BlobKey where
   toJSON (BlobKey sha size') = object
@@ -224,10 +215,10 @@ instance FromJSON BlobKey where
 
 newtype PackageNameP = PackageNameP PackageName
 instance PersistField PackageNameP where
-  toPersistValue (PackageNameP pn) = PersistText $ T.pack $ Distribution.Text.display pn
+  toPersistValue (PackageNameP pn) = PersistText $ displayC pn
   fromPersistValue v = do
     str <- fromPersistValue v
-    case Distribution.Text.simpleParse str of
+    case parsePackageName str of
       Nothing -> Left $ "Invalid package name: " <> T.pack str
       Just pn -> Right $ PackageNameP pn
 instance PersistFieldSql PackageNameP where
@@ -235,10 +226,10 @@ instance PersistFieldSql PackageNameP where
 
 newtype VersionP = VersionP Version
 instance PersistField VersionP where
-  toPersistValue (VersionP v) = PersistText $ T.pack $ Distribution.Text.display v
+  toPersistValue (VersionP v) = PersistText $ displayC v
   fromPersistValue v = do
     str <- fromPersistValue v
-    case Distribution.Text.simpleParse str of
+    case parseVersion str of
       Nothing -> Left $ "Invalid version number: " <> T.pack str
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
@@ -251,11 +242,15 @@ data CabalFileInfo
   -- isn't reproducible at all, but the running assumption (not
   -- necessarily true) is that cabal file revisions do not change
   -- semantics of the build.
-  | CFIHash !CabalHash
-  -- ^ Identify by contents of the cabal file itself
+  | CFIHash !StaticSHA256 !(Maybe FileSize)
+  -- ^ Identify by contents of the cabal file itself. Only reason for
+  -- @Maybe@ on @FileSize@ is for compatibility with input that
+  -- doesn't include the file size.
   | CFIRevision !Revision
   -- ^ Identify by revision number, with 0 being the original and
-  -- counting upward.
+  -- counting upward. This relies on Hackage providing consistent
+  -- versioning. @CFIHash@ should be preferred wherever possible for
+  -- reproducibility.
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
@@ -263,7 +258,7 @@ instance Hashable CabalFileInfo
 
 instance Display CabalFileInfo where
   display CFILatest = mempty
-  display (CFIHash (CabalHash hash' msize)) =
+  display (CFIHash hash' msize) =
     "@sha256:" <> display hash' <> maybe mempty (\i -> "," <> display i) msize
   display (CFIRevision rev) = "@rev:" <> display rev
 
@@ -276,9 +271,7 @@ instance Show PackageIdentifierRevision where
 
 instance Display PackageIdentifierRevision where
   display (PackageIdentifierRevision name version cfi) =
-    fromString (Distribution.Text.display name) <> "-" <>
-    fromString (Distribution.Text.display version) <>
-    display cfi
+    displayC name <> displayC version <> display cfi
 
 instance ToJSON PackageIdentifierRevision where
   toJSON = toJSON . utf8BuilderToText . display
@@ -292,7 +285,7 @@ instance FromJSON PackageIdentifierRevision where
 parsePackageIdentifierRevision :: MonadThrow m => Text -> m PackageIdentifierRevision
 parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionParseFail t) pure $ do
   let (identT, cfiT) = T.break (== '@') t
-  PackageIdentifier name version <- Distribution.Text.simpleParse $ T.unpack identT
+  PackageIdentifier name version <- parsePackageIdentifier $ T.unpack identT
   cfi <-
     case splitColon cfiT of
       Just ("@sha256", shaSizeT) -> do
@@ -305,7 +298,7 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
               case Data.Text.Read.decimal sizeT' of
                 Right (size', "") -> Just $ Just $ FileSize size'
                 _ -> Nothing
-        pure $ CFIHash $ CabalHash sha msize
+        pure $ CFIHash sha msize
       Just ("@rev", revT) ->
         case Data.Text.Read.decimal revT of
           Right (rev, "") -> pure $ CFIRevision $ Revision rev
@@ -416,7 +409,7 @@ mkSafeFilePath t = do
   Just $ SafeFilePath t
 
 newtype TreeKey = TreeKey BlobKey
-  deriving (Show, Eq, ToJSON, FromJSON)
+  deriving (Show, Eq, Ord, Generic, Data, Typeable, ToJSON, FromJSON, NFData, Store, Display)
 
 newtype Tree
   = TreeMap (Map SafeFilePath TreeEntry)
@@ -457,6 +450,7 @@ parseTree bs1 = do
 parseTree' :: ByteString -> Maybe Tree
 parseTree' = undefined
 
+    {-
 data PackageTarball = PackageTarball
   { ptBlob :: !BlobKey
   -- ^ Contains the tarball itself
@@ -470,6 +464,7 @@ data PackageTarball = PackageTarball
   -- overwritten by the value of @ptCabal@.
   }
   deriving Show
+    -}
 
 -- | This is almost a copy of Cabal's parser for package identifiers,
 -- the main difference is in the fact that Stack requires version to be
@@ -501,26 +496,34 @@ displayC = fromString . Distribution.Text.display
 
 data OptionalSubdirs
   = OSSubdirs ![Text]
-  | OSPackageMetadata
-      !(Maybe PackageName)
-      !(Maybe Version)
-      !(Maybe TreeKey)
-      !(Maybe BlobKey)
-      !(Maybe Text) -- subdir
+  | OSPackageMetadata !PackageMetadata
   deriving Show
 
+data PackageMetadata = PackageMetadata
+  { pmName :: !(Maybe PackageName)
+  , pmVersion :: !(Maybe Version)
+  , pmTree :: !(Maybe TreeKey)
+  , pmCabal :: !(Maybe BlobKey)
+  , pmSubdir :: !(Maybe Text) -- subdir
+  }
+  deriving (Show, Eq, Ord, Generic, Data, Typeable)
+instance Store PackageMetadata
+instance NFData PackageMetadata
+
 osNoInfo :: OptionalSubdirs
-osNoInfo = OSPackageMetadata Nothing Nothing Nothing Nothing Nothing
+osNoInfo = OSPackageMetadata $ PackageMetadata Nothing Nothing Nothing Nothing Nothing
 
 -- | File path relative to the configuration file it was parsed from
 newtype RelFilePath = RelFilePath Text
-  deriving (Show, ToJSON, FromJSON)
+  deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Data, Typeable, Store, NFData)
 
 data ArchiveLocation
   = ALUrl !Text
   | ALFilePath !RelFilePath
   -- ^ relative to the configuration file it came from
-  deriving Show
+  deriving (Show, Eq, Ord, Generic, Data, Typeable)
+instance Store ArchiveLocation
+instance NFData ArchiveLocation
 instance ToJSON ArchiveLocation where
   toJSON (ALUrl url) = object ["url" .= url]
   toJSON (ALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
@@ -545,40 +548,25 @@ instance FromJSON ArchiveLocation where
           then pure (RelFilePath t)
           else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
-data RawArchive = RawArchive
-  { raLocation :: !ArchiveLocation
-  , raHash :: !(Maybe StaticSHA256)
-  , raSize :: !(Maybe FileSize)
-  }
-  deriving Show
-
-data RawRepo = RawRepo
-  { rrUrl :: !Text
-  , rrCommit :: !Text
-  , rrType :: !RepoType
-  }
-  deriving Show
-
 -- | The raw representation of packages allowed in a snapshot
 -- specification. Does /not/ allow local filepaths.
 data RawPackageLocation
-  = RPLHackage !PackageIdentifierRevision !(Maybe TreeKey) !(Maybe BlobKey)
-  | RPLArchive !RawArchive !OptionalSubdirs
-  | RPLRepo !RawRepo !OptionalSubdirs
+  = RPLHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  | RPLArchive !Archive !OptionalSubdirs
+  | RPLRepo !Repo !OptionalSubdirs
   deriving Show
 instance ToJSON RawPackageLocation where
-  toJSON (RPLHackage pir mtree mcabal) = object $ concat
+  toJSON (RPLHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
-    , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
     ]
-  toJSON (RPLArchive (RawArchive loc msha msize) os) = object $ concat
+  toJSON (RPLArchive (Archive loc msha msize) os) = object $ concat
     [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
     , osToPairs os
     ]
-  toJSON (RPLRepo (RawRepo url commit typ) os) = object $ concat
+  toJSON (RPLRepo (Repo url commit typ) os) = object $ concat
     [ [ urlKey .= url
       , "commit" .= commit
       ]
@@ -592,7 +580,7 @@ instance ToJSON RawPackageLocation where
 
 osToPairs :: OptionalSubdirs -> [(Text, Value)]
 osToPairs (OSSubdirs subdirs) = [("subdirs" .= subdirs)]
-osToPairs (OSPackageMetadata mname mversion mtree mcabal msubdir) = concat
+osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal msubdir)) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
@@ -612,58 +600,57 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
       http = withText "RawPackageLocation.RPLArchive (Text)" $ \t -> do
         loc <- parseJSON $ String t
         pure $ noJSONWarnings $ RPLArchive
-          RawArchive
-            { raLocation = loc
-            , raHash = Nothing
-            , raSize = Nothing
+          Archive
+            { archiveLocation = loc
+            , archiveHash = Nothing
+            , archiveSize = Nothing
             }
           osNoInfo
 
       hackageText = withText "RawPackageLocation.RPLHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
           Left e -> fail $ show e
-          Right pir -> pure $ noJSONWarnings $ RPLHackage pir Nothing Nothing
+          Right pir -> pure $ noJSONWarnings $ RPLHackage pir Nothing
 
       hackageObject = withObjectWarnings "RawPackageLocation.RPLHackage" $ \o -> RPLHackage
         <$> o ..: "hackage"
         <*> o ..:? "pantry-key"
-        <*> o ..:? "cabal-file"
 
       optionalSubdirs o =
         (OSSubdirs <$> o ..: "subdirs") <|>
-        (OSPackageMetadata
+        (OSPackageMetadata <$> (PackageMetadata
             <$> (fmap unCabalString <$> (o ..:? "name"))
             <*> (fmap unCabalString <$> (o ..:? "version"))
             <*> o ..:? "pantry-tree"
             <*> o ..:? "cabal-file"
-            <*> o ..:? "subdir")
+            <*> o ..:? "subdir"))
 
       repo = withObjectWarnings "RawPackageLocation.RPLRepo" $ \o -> do
-        (rrType, rrUrl) <-
+        (repoType, repoUrl) <-
           ((RepoGit, ) <$> o ..: "git") <|>
           ((RepoHg, ) <$> o ..: "hg")
-        rrCommit <- o ..: "commit"
-        RPLRepo RawRepo {..} <$> optionalSubdirs o
+        repoCommit <- o ..: "commit"
+        RPLRepo Repo {..} <$> optionalSubdirs o
 
       archiveObject = withObjectWarnings "RawPackageLocation.RPLArchive" $ \o -> do
-        raLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
-        raHash <- o ..:? "sha256"
-        raSize <- o ..:? "size"
-        RPLArchive RawArchive {..} <$> optionalSubdirs o
+        archiveLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        archiveHash <- o ..:? "sha256"
+        archiveSize <- o ..:? "size"
+        RPLArchive Archive {..} <$> optionalSubdirs o
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let raLocation = ALUrl $ T.concat
+        let archiveLocation = ALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
               , commit
               , ".tar.gz"
               ]
-        raHash <- o ..:? "sha256"
-        raSize <- o ..:? "size"
-        RPLArchive RawArchive {..} <$> optionalSubdirs o
+        archiveHash <- o ..:? "sha256"
+        archiveSize <- o ..:? "size"
+        RPLArchive Archive {..} <$> optionalSubdirs o
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.
 newtype CabalString a = CabalString { unCabalString :: a }
@@ -676,7 +663,7 @@ instance Distribution.Text.Text a => ToJSONKey (CabalString a) where
 
 instance forall a. IsCabalString a => FromJSON (CabalString a) where
   parseJSON = withText name $ \t ->
-    case Distribution.Text.simpleParse $ T.unpack t of
+    case cabalStringParser $ T.unpack t of
       Nothing -> fail $ "Invalid " ++ name ++ ": " ++ T.unpack t
       Just x -> pure $ CabalString x
     where
@@ -684,22 +671,27 @@ instance forall a. IsCabalString a => FromJSON (CabalString a) where
 instance forall a. IsCabalString a => FromJSONKey (CabalString a) where
   fromJSONKey =
     FromJSONKeyTextParser $ \t ->
-    case Distribution.Text.simpleParse $ T.unpack t of
+    case cabalStringParser $ T.unpack t of
       Nothing -> fail $ "Invalid " ++ name ++ ": " ++ T.unpack t
       Just x -> pure $ CabalString x
     where
       name = cabalStringName (Nothing :: Maybe a)
 
-class Distribution.Text.Text a => IsCabalString a where
+class IsCabalString a where
   cabalStringName :: proxy a -> String
+  cabalStringParser :: String -> Maybe a
 instance IsCabalString PackageName where
   cabalStringName _ = "package name"
+  cabalStringParser = parsePackageName
 instance IsCabalString Version where
   cabalStringName _ = "version"
+  cabalStringParser = parseVersion
 instance IsCabalString PackageIdentifier where
   cabalStringName _ = "package identifier"
+  cabalStringParser = parsePackageIdentifier
 instance IsCabalString FlagName where
   cabalStringName _ = "flag name"
+  cabalStringParser = parseFlagName
 
 -- FIXME ORPHANS remove
 
@@ -755,15 +747,13 @@ instance Store PackageIdentifierRevision where
 
 -- | A raw package location /or/ a file path to a directory containing a package.
 data RawPackageLocationOrPath
-  = RawPackageLocation !RawPackageLocation
+  = RPLRemote !RawPackageLocation
   | RPLFilePath !RelFilePath
   deriving Show
 instance ToJSON RawPackageLocationOrPath where
-  toJSON (RawPackageLocation rpl) = toJSON rpl
+  toJSON (RPLRemote rpl) = toJSON rpl
   toJSON (RPLFilePath (RelFilePath fp)) = toJSON fp
 instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
   parseJSON v =
-    (fmap RawPackageLocation <$> parseJSON v) <|>
+    (fmap RPLRemote <$> parseJSON v) <|>
     ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)
-instance Display PackageLocationOrPath where
-  display (PackageLocation loc) = display loc

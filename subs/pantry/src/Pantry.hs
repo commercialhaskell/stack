@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pantry
   ( -- * Congiruation
     PantryConfig
@@ -11,7 +12,6 @@ module Pantry
 
     -- * Types
   , StaticSHA256
-  , CabalHash (..)
   , CabalFileInfo (..)
   , Revision (..)
   , FileSize (..)
@@ -29,6 +29,8 @@ module Pantry
   , Version
   , PackageIdentifier (..)
   , FlagName
+  , TreeKey (..)
+  , BlobKey (..)
 
     -- ** Raw package locations
   , RawPackageLocation
@@ -56,6 +58,7 @@ module Pantry
   , parseCabalFile
   , parseCabalFileOrPath
   , getPackageLocationIdent
+  , getPackageLocationTreeKey
 
     -- * Hackage index
   , updateHackageIndex
@@ -70,7 +73,7 @@ module Pantry
   ) where
 
 import RIO
-import RIO.FilePath ((</>), takeDirectory)
+import RIO.FilePath (takeDirectory)
 import qualified RIO.Map as Map
 import qualified RIO.Text as T
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -79,21 +82,21 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, parent, toFilePath)
+import Path (Path, Abs, File, parent, toFilePath, Dir, mkRelFile, (</>))
 import Path.IO (resolveDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import Distribution.PackageDescription.Parsec
 
 withPantryConfig
   :: HasLogFunc env
-  => FilePath -- ^ pantry root
+  => Path Abs Dir -- ^ pantry root
   -> HackageSecurityConfig
   -> (PantryConfig -> RIO env a)
   -> RIO env a
 withPantryConfig root hsc inner = do
   env <- ask
   -- Silence persistent's logging output, which is really noisy
-  runRIO (mempty :: LogFunc) $ initStorage (root </> "pantry.sqlite3") $ \storage -> runRIO env $ do
+  runRIO (mempty :: LogFunc) $ initStorage (root </> $(mkRelFile "pantry.sqlite3")) $ \storage -> runRIO env $ do
     ur <- newMVar True
     inner PantryConfig
       { pcHackageSecurity = hsc
@@ -231,7 +234,7 @@ typoCorrectionCandidates name' =
 getPackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
-  -> RIO env (Map Version (Map Revision CabalHash))
+  -> RIO env (Map Version (Map Revision BlobKey))
 getPackageVersions = withStorage . loadHackagePackageVersions
 
 -- | Returns the latest version of the given package available from
@@ -239,13 +242,13 @@ getPackageVersions = withStorage . loadHackagePackageVersions
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
-  -> RIO env (Maybe (Version, Revision, CabalHash))
-getLatestHackageVersion =
-  fmap ((fmap fst . Map.maxViewWithKey) >=> go) . getPackageVersions
+  -> RIO env (Maybe PackageIdentifierRevision)
+getLatestHackageVersion name =
+  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getPackageVersions name
   where
     go (version, m) = do
-      (rev, ch) <- fst <$> Map.maxViewWithKey m
-      pure (version, rev, ch)
+      (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m
+      pure $ PackageIdentifierRevision name version $ CFIHash sha $ Just size
 
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
@@ -271,7 +274,7 @@ parseCabalFile loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
   case runParseResult $ parseGenericPackageDescription bs of
-    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile (PackageLocation loc) mversion errs warnings
+    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile (PLRemote loc) mversion errs warnings
     (_warnings, Right gpd) -> pure gpd
 
 -- | Same as 'parseCabalFile', but takes a 'PackageLocationOrPath'.
@@ -279,14 +282,14 @@ parseCabalFileOrPath
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocationOrPath
   -> RIO env GenericPackageDescription
-parseCabalFileOrPath (PackageLocation loc) = parseCabalFile loc
+parseCabalFileOrPath (PLRemote loc) = parseCabalFile loc
 parseCabalFileOrPath (PLFilePath rfp) = undefined
 
 loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env ByteString
-loadCabalFile (PLHackage pir) = getHackageCabalFile pir
+loadCabalFile (PLHackage pir mtree) = getHackageCabalFile pir
 {- FIXME this is relatively inefficient
 loadCabalFile loc = do
   tree <- loadPackageLocation loc
@@ -302,7 +305,9 @@ loadPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env Tree
-loadPackageLocation (PLHackage pir) = snd <$> getHackageTarball pir
+loadPackageLocation (PLHackage pir mtree) =
+  case mtree of
+    Nothing -> snd <$> getHackageTarball pir
 
 toCabalStringMap :: Map a v -> Map (CabalString a) v
 toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
@@ -312,7 +317,7 @@ unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerc
 
 -- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
 unRawPackageLocation :: RawPackageLocation -> [PackageLocation]
-unRawPackageLocation (RPLHackage pir mtree mcabal) = [PLHackage pir] -- FIXME add mtree and mcabal to PLHackage, maybe we want a wrapper type
+unRawPackageLocation (RPLHackage pir mtree) = [PLHackage pir mtree]
 
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
@@ -324,8 +329,8 @@ unRawPackageLocationOrPath
   => Path Abs File -- ^ configuration file to be used for resolving relative file paths
   -> RawPackageLocationOrPath
   -> m [PackageLocationOrPath]
-unRawPackageLocationOrPath _ (RawPackageLocation rpl) =
-  pure $ PackageLocation <$> unRawPackageLocation rpl
+unRawPackageLocationOrPath _ (RPLRemote rpl) =
+  pure $ PLRemote <$> unRawPackageLocation rpl
 unRawPackageLocationOrPath configFile (RPLFilePath fp) = do
   rfp <- resolveDirWithRel configFile fp
   pure [PLFilePath rfp]
@@ -354,4 +359,10 @@ getPackageLocationIdent
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env PackageIdentifier
-getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _)) = pure $ PackageIdentifier name version
+getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
+
+getPackageLocationTreeKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env TreeKey
+getPackageLocationTreeKey = undefined

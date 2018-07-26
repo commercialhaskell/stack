@@ -237,11 +237,12 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ displayC version
                 let dir = tmp </> suffix
-                unpackPackageLocation (toFilePath dir) $ PLHackage $
-                  PackageIdentifierRevision
+                unpackPackageLocation (toFilePath dir) $ PLHackage
+                  (PackageIdentifierRevision
                     $(mkPackageName "stack")
                     version
-                    CFILatest -- accept latest cabal revision
+                    CFILatest) -- accept latest cabal revision
+                  Nothing
                 pure $ Just dir
 
     forM_ mdir $ \dir ->

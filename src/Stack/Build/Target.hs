@@ -328,7 +328,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrAddedDep = Nothing
               , rrPackageType = Dependency
               }
-            Just (version, _revision, _cabalHash) -> Right ResolveResult
+            Just (PackageIdentifierRevision _name version cfi) -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
@@ -347,7 +347,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PackageLocation (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi))) -> Right ResolveResult
+            Just (PLRemote (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi) mtree)) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -382,7 +382,9 @@ resolveRawTarget globals snap deps locals (ri, rt) =
         allLocs :: Map PackageName PackageLocationOrPath
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> PackageLocation $ PLHackage $ PackageIdentifierRevision name' (lpiVersion lpi) CFILatest) -- FIXME better to use rev0 for reproducibility
+              (\name' lpi -> PLRemote $ PLHackage
+                  (PackageIdentifierRevision name' (lpiVersion lpi) CFILatest)
+                  Nothing) -- FIXME better to use rev0 for reproducibility
               globals
           , Map.map lpiLocation snap
           , Map.map snd deps
@@ -413,7 +415,8 @@ combineResolveResults results = do
         Just version -> do
           return $ Map.singleton (rrName result)
                  $ PLHackage
-                 $ PackageIdentifierRevision (rrName result) version CFILatest
+                     (PackageIdentifierRevision (rrName result) version CFILatest)
+                     Nothing
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -503,7 +506,7 @@ parseTargets needTargets boptscli = do
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
       gpd <- parseCabalFile loc
-      return (name, (gpd, PackageLocation loc, Nothing))
+      return (name, (gpd, PLRemote loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the

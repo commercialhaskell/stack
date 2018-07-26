@@ -367,7 +367,7 @@ configFromConfigMonoid
      let configRunner = set processContextL origEnv configRunner'
 
      withPantryConfig
-       (toFilePath (configStackRoot </> $(mkRelDir "pantry")))
+       (configStackRoot </> $(mkRelDir "pantry"))
        (case getFirst configMonoidPackageIndices of
           Nothing -> defaultHackageSecurityConfig
        ) $ \configPantryConfig -> inner Config {..}
