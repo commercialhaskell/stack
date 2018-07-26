@@ -7,15 +7,17 @@ import System.FilePath
 
 main :: IO ()
 main = do
-  stack ["new", "tmp", templateUrl]
+  let arguments = ["new", "tmp", templateUrl]
+
+  stack arguments
   removeDirectoryRecursive "tmp"
   setEnv "HTTPS_PROXY" "http://adfafdadfadf" -- make https requests fail
-  stackCheckStderr ["new", "tmp", templateUrl] $ \stderr -> 
+  stackCheckStderr arguments $ \stderr ->
      unless ("Using cached local version" `isInfixOf` stderr) 
      (error "stack didn't load the cached template")
 
   where
-    -- this templates has a `stack.yaml` file
+    -- this template has a `stack.yaml` file
     -- so `stack new` does not have to `stack init`
     -- and therefore the test runs faster
     templateUrl :: String
