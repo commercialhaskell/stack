@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Stack.Unpack
   ( unpackPackages
   ) where
@@ -32,7 +33,7 @@ instance Show UnpackException where
 
 -- | Intended to work for the command line command.
 unpackPackages
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
   => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
   -> FilePath -- ^ destination
   -> [String] -- ^ names or identifiers
@@ -40,34 +41,37 @@ unpackPackages
 unpackPackages mSnapshotDef dest input = do
     let (errs1, (names, pirs1)) =
           fmap partitionEithers $ partitionEithers $ map parse input
-    (errs2, pirs2) <- fmap partitionEithers $ traverse toPIR names
+    (errs2, locs2) <- fmap partitionEithers $ traverse toLoc names
     case errs1 ++ errs2 of
       [] -> pure ()
       errs -> throwM $ CouldNotParsePackageSelectors errs
-    let pirs = Map.fromList $ map
-          (\pir@(PackageIdentifierRevision name version _) ->
+    let locs = Map.fromList $ map
+          (\(pir, PackageIdentifier name version) ->
                ( pir
                , dest </> displayC (PackageIdentifier name version)
                )
           )
-          (pirs1 ++ pirs2)
+          (map (\pir@(PackageIdentifierRevision name ver _) ->
+                  (PLHackage pir, PackageIdentifier name ver)) pirs1 ++
+           locs2)
 
-    alreadyUnpacked <- filterM doesDirectoryExist $ Map.elems pirs
+    alreadyUnpacked <- filterM doesDirectoryExist $ Map.elems locs
 
     unless (null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
-    forM_ (Map.toList pirs) $ \(pir, dest') -> do
-      unpackPackageLocation dest' (PLHackage pir)
+    forM_ (Map.toList locs) $ \(loc, dest') -> do
+      unpackPackageLocation dest' loc
       logInfo $
         "Unpacked " <>
-        display pir <>
+        display loc <>
         " to " <>
         fromString dest'
   where
-    toPIR = maybe toPIRNoSnapshot toPIRSnapshot mSnapshotDef
+    toLoc = maybe toLocNoSnapshot toLocSnapshot mSnapshotDef
 
-    toPIRNoSnapshot name = do
+    toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocation, PackageIdentifier))
+    toLocNoSnapshot name = do
       mver1 <- getLatestHackageVersion name
       mver <-
         case mver1 of
@@ -81,22 +85,21 @@ unpackPackages mSnapshotDef dest input = do
         case mver of
           -- consider updating the index
           Nothing -> Left $ "Could not find package " ++ displayC name
-          Just (ver, _rev, cabalHash) -> Right $ PackageIdentifierRevision
-            name
-            ver
-            (CFIHash cabalHash)
+          Just (ver, _rev, cabalHash) -> Right
+            ( PLHackage $ PackageIdentifierRevision name ver (CFIHash cabalHash)
+            , PackageIdentifier name ver
+            )
 
-    toPIRSnapshot :: Monad m => SnapshotDef -> PackageName -> m (Either String PackageIdentifierRevision)
-    toPIRSnapshot sd name =
-        pure $
-          case mapMaybe go $ sdLocations sd of
-            [] -> Left $ "Package does not appear in snapshot: " ++ displayC name
-            pir:_ -> Right pir
+    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocation, PackageIdentifier))
+    toLocSnapshot sd name =
+        go $ concatMap unRawPackageLocation $ sdLocations sd
       where
-        -- FIXME should work for things besides PLHackage
-        go (PLHackage pir@(PackageIdentifierRevision name' _ _))
-          | name' == name = Just pir
-        go _ = Nothing
+        go [] = pure $ Left $ "Package does not appear in snapshot: " ++ displayC name
+        go (loc:locs) = do
+          ident@(PackageIdentifier name' _) <- getPackageLocationIdent loc
+          if name == name'
+            then pure $ Right (loc, ident)
+            else go locs
 
     -- Possible future enhancement: parse names as name + version range
     parse s =

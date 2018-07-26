@@ -41,8 +41,9 @@ module Pantry
     -- ** Parsers
   , parsePackageIdentifierRevision
 
-    -- * Cabal files
+    -- * Package location
   , parseCabalFile
+  , getPackageLocationIdent
 
     -- * Hackage index
   , updateHackageIndex
@@ -309,3 +310,10 @@ completePackageLocation
   => PackageLocation
   -> RIO env PackageLocation
 completePackageLocation = undefined
+
+-- | Get the name of the package at the given location.
+getPackageLocationIdent
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> RIO env PackageIdentifier
+getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _)) = pure $ PackageIdentifier name version

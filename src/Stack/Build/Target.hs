@@ -504,7 +504,7 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- undefined loc
+      gpd <- parseCabalFile loc
       return (name, (gpd, Right loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
