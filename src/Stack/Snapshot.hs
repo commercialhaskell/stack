@@ -65,8 +65,8 @@ import qualified System.Directory as Dir
 import qualified System.FilePath as FilePath
 
 data SnapshotException
-  = InvalidCabalFileInSnapshot !PackageLocation !PError
-  | PackageDefinedTwice !PackageName !PackageLocation !PackageLocation
+  = InvalidCabalFileInSnapshot !PackageLocationOrPath !PError
+  | PackageDefinedTwice !PackageName !PackageLocationOrPath !PackageLocationOrPath
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
   | FilepathInCustomSnapshot !Text
   | NeedResolverOrCompiler !Text
@@ -405,7 +405,7 @@ loadSnapshot mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (forM (sdLocations sd) $ \loc -> (, loc) <$> parseCabalFile loc)
+        (forM (sdLocations sd) $ \loc -> (, PackageLocation loc) <$> parseCabalFile loc)
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
@@ -450,15 +450,15 @@ calculatePackagePromotion
      (HasConfig env, HasGHCVariant env)
   => Path Abs Dir -- ^ project root
   -> LoadedSnapshot
-  -> [(GenericPackageDescription, PackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
+  -> [(GenericPackageDescription, PackageLocationOrPath, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
   -> Map PackageName Bool -- ^ overrides whether a package should be registered hidden
   -> Map PackageName [Text] -- ^ GHC options
   -> Set PackageName -- ^ packages in the snapshot to drop
   -> RIO env
        ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
-       , Map PackageName (LoadedPackageInfo PackageLocation) -- new snapshot
-       , Map PackageName (LoadedPackageInfo (PackageLocation, Maybe localLocation)) -- new locals
+       , Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- new snapshot
+       , Map PackageName (LoadedPackageInfo (PackageLocationOrPath, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
   root (LoadedSnapshot compilerVersion globals0 parentPackages0)
@@ -504,7 +504,7 @@ calculatePackagePromotion
           (globals3, noLongerGlobals2) = splitUnmetDeps Map.empty globals2
 
           -- Put together the two split out groups of packages
-          noLongerGlobals3 :: Map PackageName (LoadedPackageInfo PackageLocation)
+          noLongerGlobals3 :: Map PackageName (LoadedPackageInfo PackageLocationOrPath)
           noLongerGlobals3 = Map.mapWithKey globalToSnapshot (Map.union noLongerGlobals1 noLongerGlobals2)
 
           -- Now do the same thing with parent packages: take out the
@@ -554,8 +554,8 @@ recalculate :: forall env.
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
-            -> (PackageName, LoadedPackageInfo PackageLocation)
-            -> RIO env (PackageName, LoadedPackageInfo PackageLocation)
+            -> (PackageName, LoadedPackageInfo PackageLocationOrPath)
+            -> RIO env (PackageName, LoadedPackageInfo PackageLocationOrPath)
 recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
@@ -563,7 +563,7 @@ recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseCabalFile loc
+      gpd <- parseCabalFileOrPath loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
@@ -664,13 +664,13 @@ loadCompiler cv = do
                 }
 
 type FindPackageS localLocation =
-    ( Map PackageName (LoadedPackageInfo (PackageLocation, localLocation))
+    ( Map PackageName (LoadedPackageInfo (PackageLocationOrPath, localLocation))
     , Map PackageName (Map FlagName Bool) -- flags
     , Map PackageName Bool -- hide
     , Map PackageName [Text] -- ghc options
     )
 
--- | Find the package at the given 'PackageLocation', grab any flags,
+-- | Find the package at the given 'PackageLocationOrPath', grab any flags,
 -- hidden state, and GHC options from the 'StateT' (removing them from
 -- the 'StateT'), and add the newly found package to the contained
 -- 'Map'.
@@ -678,7 +678,7 @@ findPackage :: forall m localLocation.
                MonadThrow m
             => Platform
             -> CompilerVersion 'CVActual
-            -> (GenericPackageDescription, PackageLocation, localLocation)
+            -> (GenericPackageDescription, PackageLocationOrPath, localLocation)
             -> StateT (FindPackageS localLocation) m ()
 findPackage platform compilerVersion (gpd, loc, localLoc) = do
     (m, allFlags, allHide, allOptions) <- get
@@ -723,10 +723,10 @@ snapshotDefFixes sd | isOldStackage (sdResolver sd) = sd
 snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
--- creating a 'PackageLocation'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocation
+-- creating a 'PackageLocationOrPath'.
+globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocationOrPath
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest)
+    { lpiLocation = PackageLocation (PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest))
     }
 
 -- | Split the packages into those which have their dependencies met,

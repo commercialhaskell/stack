@@ -214,7 +214,7 @@ data ResolveResult = ResolveResult
 resolveRawTarget
   :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-  -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+  -> Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- ^ snapshot
   -> Map PackageName (GenericPackageDescription, PackageLocationOrPath) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
@@ -384,7 +384,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           [ Map.mapWithKey
               (\name' lpi -> PackageLocation $ PLHackage $ PackageIdentifierRevision name' (lpiVersion lpi) CFILatest) -- FIXME better to use rev0 for reproducibility
               globals
-          , Map.map (PackageLocation . lpiLocation) snap
+          , Map.map lpiLocation snap
           , Map.map snd deps
           ]
 
@@ -444,7 +444,7 @@ parseTargets
     -> BuildOptsCLI
     -> RIO env
          ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
-         , Map PackageName (LoadedPackageInfo PackageLocation) -- all local deps
+         , Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- all local deps
          , Map PackageName Target
          )
 parseTargets needTargets boptscli = do

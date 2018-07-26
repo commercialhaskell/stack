@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Pantry.Types
   ( PantryConfig (..)
   , HackageSecurityConfig (..)
@@ -54,6 +55,7 @@ module Pantry.Types
   , PantryException (..)
   , PackageLocationOrPath (..)
   , ResolvedDir (..)
+  , resolvedAbsolute
   ) where
 
 import RIO
@@ -79,7 +81,7 @@ import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import qualified Data.Text.Read
-import Path (Path, Abs, Dir)
+import Path (Path, Abs, Dir, parseAbsDir)
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -125,14 +127,22 @@ data PantryConfig = PantryConfig
 -- against the config file it came from.
 data ResolvedDir = ResolvedDir
   { resolvedRelative :: !Text
-  , resolvedAbsolute :: !(Path Abs Dir)
+  , resolvedAbsoluteHack :: !FilePath -- FIXME when we ditch store, use this !(Path Abs Dir)
   }
-  deriving Show
+  deriving (Show, Eq, Data, Generic)
+instance NFData ResolvedDir
+instance Store ResolvedDir
+
+-- FIXME get rid of this ugly hack!
+resolvedAbsolute :: ResolvedDir -> Path Abs Dir
+resolvedAbsolute = either impureThrow id . parseAbsDir . resolvedAbsoluteHack
 
 data PackageLocationOrPath
   = PackageLocation !PackageLocation
   | PLFilePath !ResolvedDir
-  deriving Show
+  deriving (Show, Eq, Data, Generic)
+instance NFData PackageLocationOrPath
+instance Store PackageLocationOrPath
 
 -- | Location for remote packages (i.e., not local file paths).
 data PackageLocation

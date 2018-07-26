@@ -23,6 +23,7 @@ module Pantry
   , RelFilePath (..)
   , PackageLocationOrPath (..)
   , ResolvedDir (..)
+  , resolvedAbsolute
   , PackageIdentifierRevision (..)
   , PackageName
   , Version
@@ -78,7 +79,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, parent)
+import Path (Path, Abs, File, parent, toFilePath)
 import Path.IO (resolveDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import Distribution.PackageDescription.Parsec
@@ -338,7 +339,7 @@ resolveDirWithRel configFile (RelFilePath fp) = do
   absolute <- resolveDir (parent configFile) (T.unpack fp)
   pure ResolvedDir
     { resolvedRelative = fp
-    , resolvedAbsolute = absolute
+    , resolvedAbsoluteHack = toFilePath absolute
     }
 
 -- | Fill in optional fields in a 'PackageLocation' for more reproducible builds.

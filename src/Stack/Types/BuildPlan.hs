@@ -133,14 +133,16 @@ newtype ExeName = ExeName { unExeName :: Text }
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !(CompilerVersion 'CVActual)
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocationOrPath))
+  -- ^ Snapshots themselves may not have a filepath in them, but once
+  -- we start adding in local configuration it's possible.
   }
     deriving (Generic, Show, Data, Eq, Typeable)
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "r0nKZZ5NV45uyNqL3d1nZbgAFlQ="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "IdcHzSbd9sglOibULDBXITtJAvw="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

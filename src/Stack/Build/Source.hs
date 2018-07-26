@@ -313,7 +313,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ local deps
+               -> Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- ^ local deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do

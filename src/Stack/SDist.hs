@@ -391,7 +391,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     --               ^ drop ".tar"     ^ drop ".gz"
     when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedDir
                                       { resolvedRelative = "this-is-not-used" -- FIXME ugly hack
-                                      , resolvedAbsolute = pkgDir
+                                      , resolvedAbsoluteHack = toFilePath pkgDir
                                       })
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
