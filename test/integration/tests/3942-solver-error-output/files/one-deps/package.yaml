@@ -14,4 +14,3 @@ dependencies:
 library:
   source-dirs: '.'
   exposed-modules: []
-

@@ -1,4 +1,4 @@
-resolver: lts-11.6
+resolver: lts-11.19
 
 # docker:
 #   enable: true
@@ -17,23 +17,22 @@ flags:
     hide-dependency-versions: true
     supported-build: true
 extra-deps:
-- rio-0.1.1.0@rev:0
 - Cabal-2.2.0.1@rev:0
-- hpack-0.29.0@rev:0
+- infer-license-0.2.0@rev:0
+- hpack-0.29.5@rev:0
 - http-api-data-0.3.8.1@rev:0
-- githash-0.1.0.0@rev:0
+- githash-0.1.0.1@rev:0
 
-# Avoid https://github.com/commercialhaskell/stack/issues/3922
+# Avoid https://github.com/commercialhaskell/stack/issues/4125
 # (triggered because later versions of persistent transitively depends
 # on haskell-src-exts, which needs the 'happy' build tool)
+# THIS IS FIXED AS OF STACK 1.8, but keep these here until next major
+# version to maintain the ability to build stack with older versions.
 - persistent-2.7.1@rev:0
 - persistent-sqlite-2.6.4@rev:0
 - resourcet-1.1.11@rev:0
-- conduit-1.2.13@rev:0
+- conduit-1.2.13.1@rev:0
 - conduit-extra-1.2.3.2@rev:0
-
-# Not present until resolver lts-11.9
-- ansi-terminal-0.8.0.4
 
 ghc-options:
    "$locals": -fhide-source-paths
