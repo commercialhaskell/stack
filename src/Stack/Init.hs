@@ -113,7 +113,7 @@ initProject whichCmd currDir initOpts mresolver = do
         gpds = Map.elems $ fmap snd rbundle
         p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
-            , projectPackages = pkgs
+            , projectPackages = (RelFilePath . T.pack) <$> pkgs
             , projectDependencies = undefined $ map
                 (\(n, v) -> PLHackage $ PackageIdentifierRevision n v CFILatest)
                 (Map.toList extraDeps)

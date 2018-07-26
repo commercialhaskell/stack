@@ -389,7 +389,10 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    when (sdoptsBuildTarball opts) (buildExtractedTarball pkgDir)
+    when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedDir
+                                      { resolvedRelative = "this-is-not-used" -- FIXME ugly hack
+                                      , resolvedAbsolute = pkgDir
+                                      })
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
 checkPackageInExtractedTarball
@@ -431,16 +434,16 @@ checkPackageInExtractedTarball pkgDir = do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
-buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
+buildExtractedTarball :: HasEnvConfig env => ResolvedDir -> RIO env ()
 buildExtractedTarball pkgDir = do
   envConfig <- view envConfigL
-  localPackageToBuild <- readLocalPackage pkgDir
+  localPackageToBuild <- readLocalPackage $ resolvedAbsolute pkgDir
   let allPackagePaths = bcPackages (envConfigBuildConfig envConfig)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToKeep <- filterM (fmap not . isPathToRemove . fst) allPackagePaths
+  pathsToKeep <- filterM (fmap not . isPathToRemove . resolvedAbsolute . fst) allPackagePaths
   getLPV <- runOnce $ parseSingleCabalFile True pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =

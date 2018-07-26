@@ -603,15 +603,13 @@ loadBuildConfig mproject maresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     packages <- for (projectPackages project) $ \fp -> do
-      dir <- resolveDir (parent stackYamlFP) fp
+      dir <- resolveDirWithRel stackYamlFP fp
       (dir,) <$> runOnce (parseSingleCabalFile True dir)
 
-    deps <- fmap fold $ forM (projectDependencies project) $ \x ->
-      case x of
-        RawPackageLocation rpl -> pure ([], unRawPackageLocation rpl)
-        RPLFilePath (RelFilePath fp) -> do
-          dir <- resolveDir (parent stackYamlFP) (T.unpack fp)
-          pure ([dir], [])
+    deps <-
+      fmap concat $
+      forM (projectDependencies project) $
+      unRawPackageLocationOrPath stackYamlFP
 
     return BuildConfig
         { bcConfig = config
@@ -661,18 +659,15 @@ getLocalPackages = do
             root <- view projectRootL
             bc <- view buildConfigL
 
-            let (depsLocal, depsRemote) = bcDependencies bc
-
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
-            deps1 <- forM depsRemote $ \loc -> (, Right loc) <$> parseCabalFile loc
-            deps2 <- forM depsLocal $ \dir -> ((, Left dir) . fst) <$> readPackageUnresolvedDir dir False
-            let deps = map
-                  (\(gpd, x) -> (pkgName $ C.package $ C.packageDescription gpd, (gpd, x)))
-                  (deps1 ++ deps2)
+            deps <- forM (bcDependencies bc) $ \plp -> do
+              gpd <- parseCabalFileOrPath plp
+              let name = pkgName $ C.package $ C.packageDescription gpd
+              pure (name, (gpd, plp))
 
             checkDuplicateNames $
-              map (second (Left . lpvRoot)) packages ++
+              map (second (PLFilePath . lpvResolvedDir)) packages ++
               map (second snd) deps
 
             return LocalPackages
@@ -682,7 +677,7 @@ getLocalPackages = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, Either (Path Abs Dir) PackageLocation)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocationOrPath)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

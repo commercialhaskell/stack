@@ -21,6 +21,8 @@ module Pantry
   , Repo (..)
   , RepoType (..)
   , RelFilePath (..)
+  , PackageLocationOrPath (..)
+  , ResolvedDir (..)
   , PackageIdentifierRevision (..)
   , PackageName
   , Version
@@ -32,7 +34,9 @@ module Pantry
   , RawPackageLocationOrPath (..)
   , unRawPackageLocation
   , mkRawPackageLocation
+  , unRawPackageLocationOrPath
   , completePackageLocation
+  , resolveDirWithRel
 
     -- ** Cabal helpers
   , parsePackageIdentifier
@@ -49,6 +53,7 @@ module Pantry
 
     -- * Package location
   , parseCabalFile
+  , parseCabalFileOrPath
   , getPackageLocationIdent
 
     -- * Hackage index
@@ -64,14 +69,17 @@ module Pantry
   ) where
 
 import RIO
-import RIO.FilePath ((</>))
+import RIO.FilePath ((</>), takeDirectory)
 import qualified RIO.Map as Map
+import qualified RIO.Text as T
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
+import Path (Path, Abs, File, parent)
+import Path.IO (resolveDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import Distribution.PackageDescription.Parsec
 
@@ -262,8 +270,16 @@ parseCabalFile loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
   case runParseResult $ parseGenericPackageDescription bs of
-    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile loc mversion errs warnings
+    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile (PackageLocation loc) mversion errs warnings
     (_warnings, Right gpd) -> pure gpd
+
+-- | Same as 'parseCabalFile', but takes a 'PackageLocationOrPath'.
+parseCabalFileOrPath
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocationOrPath
+  -> RIO env GenericPackageDescription
+parseCabalFileOrPath (PackageLocation loc) = parseCabalFile loc
+parseCabalFileOrPath (PLFilePath rfp) = undefined
 
 loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
@@ -300,6 +316,30 @@ unRawPackageLocation (RPLHackage pir mtree mcabal) = [PLHackage pir] -- FIXME ad
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
 mkRawPackageLocation = undefined
+
+-- | Convert a 'RawPackageLocationOrPath' into a list of 'PackageLocationOrPath's.
+unRawPackageLocationOrPath
+  :: MonadIO m
+  => Path Abs File -- ^ configuration file to be used for resolving relative file paths
+  -> RawPackageLocationOrPath
+  -> m [PackageLocationOrPath]
+unRawPackageLocationOrPath _ (RawPackageLocation rpl) =
+  pure $ PackageLocation <$> unRawPackageLocation rpl
+unRawPackageLocationOrPath configFile (RPLFilePath fp) = do
+  rfp <- resolveDirWithRel configFile fp
+  pure [PLFilePath rfp]
+
+resolveDirWithRel
+  :: MonadIO m
+  => Path Abs File -- ^ config file it was read from
+  -> RelFilePath
+  -> m ResolvedDir
+resolveDirWithRel configFile (RelFilePath fp) = do
+  absolute <- resolveDir (parent configFile) (T.unpack fp)
+  pure ResolvedDir
+    { resolvedRelative = fp
+    , resolvedAbsolute = absolute
+    }
 
 -- | Fill in optional fields in a 'PackageLocation' for more reproducible builds.
 completePackageLocation

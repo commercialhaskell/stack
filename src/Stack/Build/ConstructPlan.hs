@@ -227,7 +227,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
   where
     hasBaseInDeps bconfig =
         elem $(mkPackageName "base")
-        [n | (PLHackage (PackageIdentifierRevision n _ _)) <- snd (bcDependencies bconfig)]
+        [n | (PackageLocation (PLHackage (PackageIdentifierRevision n _ _))) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx
         { ls = ls0

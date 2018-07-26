@@ -215,7 +215,7 @@ resolveRawTarget
   :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
   -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
-  -> Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation) -- ^ local deps
+  -> Map PackageName (GenericPackageDescription, PackageLocationOrPath) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
   -> RIO env (Either Text ResolveResult)
@@ -347,7 +347,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (Right (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi))) -> Right ResolveResult
+            Just (PackageLocation (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi))) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -379,12 +379,12 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               }
 
       where
-        allLocs :: Map PackageName (Either (Path Abs Dir) PackageLocation)
+        allLocs :: Map PackageName PackageLocationOrPath
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> Right $ PLHackage $ PackageIdentifierRevision name' (lpiVersion lpi) CFILatest) -- FIXME better to use rev0 for reproducibility
+              (\name' lpi -> PackageLocation $ PLHackage $ PackageIdentifierRevision name' (lpiVersion lpi) CFILatest) -- FIXME better to use rev0 for reproducibility
               globals
-          , Map.map (Right . lpiLocation) snap
+          , Map.map (PackageLocation . lpiLocation) snap
           , Map.map snd deps
           ]
 
@@ -503,16 +503,16 @@ parseTargets needTargets boptscli = do
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
       gpd <- parseCabalFile loc
-      return (name, (gpd, Right loc, Nothing))
+      return (name, (gpd, PackageLocation loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
     -- command line
-    let allLocals :: Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation, Maybe LocalPackageView)
+    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocationOrPath, Maybe LocalPackageView)
         allLocals = Map.unions
           [ -- project packages
             Map.map
-              (\lpv -> (lpvGPD lpv, Left $ lpvRoot lpv, Just lpv))
+              (\lpv -> (lpvGPD lpv, PLFilePath $ lpvResolvedDir lpv, Just lpv))
               (lpProject lp)
           , -- added deps take precendence over local deps
             addedDeps'
@@ -523,7 +523,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      root ls0 (undefined (Map.elems allLocals))
+      root ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

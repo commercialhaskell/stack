@@ -52,6 +52,8 @@ module Pantry.Types
   , CabalString (..)
   , parsePackageIdentifierRevision
   , PantryException (..)
+  , PackageLocationOrPath (..)
+  , ResolvedDir (..)
   ) where
 
 import RIO
@@ -59,7 +61,6 @@ import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
-import RIO.FilePath (takeDirectory, (</>))
 import qualified RIO.Map as Map
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
@@ -78,6 +79,7 @@ import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import qualified Data.Text.Read
+import Path (Path, Abs, Dir)
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -118,6 +120,19 @@ data PantryConfig = PantryConfig
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
     -}
   }
+
+-- | A directory which was loaded up relative and has been resolved
+-- against the config file it came from.
+data ResolvedDir = ResolvedDir
+  { resolvedRelative :: !Text
+  , resolvedAbsolute :: !(Path Abs Dir)
+  }
+  deriving Show
+
+data PackageLocationOrPath
+  = PackageLocation !PackageLocation
+  | PLFilePath !ResolvedDir
+  deriving Show
 
 -- | Location for remote packages (i.e., not local file paths).
 data PackageLocation
@@ -296,7 +311,7 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
-      !PackageLocation
+      !PackageLocationOrPath
       !(Maybe Version)
       ![PError]
       ![PWarning]
@@ -489,13 +504,7 @@ osNoInfo = OSPackageMetadata Nothing Nothing Nothing Nothing Nothing
 
 -- | File path relative to the configuration file it was parsed from
 newtype RelFilePath = RelFilePath Text
-  deriving Show
-
-unRelFilePath
-  :: FilePath -- ^ config file it was read from
-  -> RelFilePath
-  -> FilePath
-unRelFilePath configFile (RelFilePath fp) = takeDirectory configFile </> T.unpack fp
+  deriving (Show, ToJSON, FromJSON)
 
 data ArchiveLocation
   = ALUrl !Text
@@ -746,3 +755,5 @@ instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
   parseJSON v =
     (fmap RawPackageLocation <$> parseJSON v) <|>
     ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)
+instance Display PackageLocationOrPath where
+  display (PackageLocation loc) = display loc

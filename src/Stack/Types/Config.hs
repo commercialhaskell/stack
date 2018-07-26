@@ -496,9 +496,9 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![(Path Abs Dir, IO LocalPackageView)]
+    , bcPackages :: ![(ResolvedDir, IO LocalPackageView)]
       -- ^ Local packages
-    , bcDependencies :: !([Path Abs Dir], [PackageLocation])
+    , bcDependencies :: ![PackageLocationOrPath]
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -548,12 +548,13 @@ data EnvConfig = EnvConfig
 
 data LocalPackages = LocalPackages
   { lpProject :: !(Map PackageName LocalPackageView)
-  , lpDependencies :: !(Map PackageName (GenericPackageDescription, Either (Path Abs Dir) PackageLocation))
+  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocationOrPath))
   }
 
 -- | A view of a local package needed for resolving components
 data LocalPackageView = LocalPackageView
     { lpvCabalFP    :: !(Path Abs File)
+    , lpvResolvedDir :: !ResolvedDir
     , lpvGPD        :: !GenericPackageDescription
     }
 
@@ -604,7 +605,7 @@ data Project = Project
     { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![FilePath]
+    , projectPackages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
     , projectDependencies :: ![RawPackageLocationOrPath]
@@ -996,7 +997,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | DuplicateLocalPackageNames ![(PackageName, [Either (Path Abs Dir) PackageLocation])]
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocationOrPath])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1431,7 +1432,7 @@ data ProjectAndConfigMonoid
 parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ProjectAndConfigMonoid)
 parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
-        packages <- o ..:? "packages" ..!= ["."]
+        packages <- o ..:? "packages" ..!= [RelFilePath "."]
         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
         flags' <- o ..:? "flags" ..!= mempty
         let flags = fmap unCabalStringMap

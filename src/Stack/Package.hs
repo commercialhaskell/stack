@@ -1567,11 +1567,12 @@ cabalFilePackageId fp = do
 parseSingleCabalFile -- FIXME rename and add docs
   :: forall env. HasConfig env
   => Bool -- ^ print warnings?
-  -> Path Abs Dir
+  -> ResolvedDir
   -> RIO env LocalPackageView
 parseSingleCabalFile printWarnings dir = do
-  (gpd, cabalfp) <- readPackageUnresolvedDir dir printWarnings
+  (gpd, cabalfp) <- readPackageUnresolvedDir (resolvedAbsolute dir) printWarnings
   return LocalPackageView
     { lpvCabalFP = cabalfp
     , lpvGPD = gpd
+    , lpvResolvedDir = dir
     }
