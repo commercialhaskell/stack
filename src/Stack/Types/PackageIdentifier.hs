@@ -12,24 +12,11 @@
 
 module Stack.Types.PackageIdentifier
   ( parsePackageIdentifier
-  , parsePackageIdentifierFromString
+  , parsePackageIdentifierThrowing
   ) where
 
 import           Stack.Prelude
-import           Crypto.Hash.Conduit (hashFile)
-import           Crypto.Hash as Hash (hashlazy, Digest, SHA256)
-import           Data.Aeson.Extended
-import           Data.Attoparsec.Text as A
-import qualified Data.ByteArray
-import qualified Data.ByteArray.Encoding as Mem
-import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import qualified Distribution.Package as C
-import           Pantry
-import           Pantry.StaticSHA256
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 
 -- | A parse fail.
 data PackageIdentifierParseFail
@@ -57,13 +44,9 @@ instance FromJSON PackageIdentifierRevision where
       Right x -> return x
 -}
 
--- | Convenient way to parse a package identifier from a 'Text'.
-parsePackageIdentifier :: MonadThrow m => Text -> m PackageIdentifier
-parsePackageIdentifier = parsePackageIdentifierFromString . T.unpack
-
 -- | Convenience function for parsing from a 'String'.
-parsePackageIdentifierFromString :: MonadThrow m => String -> m PackageIdentifier
-parsePackageIdentifierFromString str =
-  case parseC str of
+parsePackageIdentifierThrowing :: MonadThrow m => String -> m PackageIdentifier
+parsePackageIdentifierThrowing str =
+  case parsePackageIdentifier str of
     Nothing -> throwM $ PackageIdentifierParseFail $ T.pack str
     Just ident -> pure ident

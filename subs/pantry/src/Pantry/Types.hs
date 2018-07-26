@@ -37,7 +37,10 @@ module Pantry.Types
   , Archive (..)
   , Repo (..)
   , RepoType (..)
-  , parseC
+  , parsePackageIdentifier
+  , parsePackageName
+  , parseFlagName
+  , parseVersion
   , displayC
   , RawPackageLocation (..)
   , RawArchive (..)
@@ -52,15 +55,16 @@ import RIO
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
+import RIO.Char (isSpace)
 import qualified RIO.Map as Map
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
 import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
-import Data.Pool (Pool)
 import Database.Persist
 import Database.Persist.Sql
 import Pantry.StaticSHA256
+import qualified Distribution.Compat.ReadP as Parse
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import Distribution.Types.PackageName (PackageName)
 import Distribution.PackageDescription (FlagName)
@@ -259,7 +263,7 @@ instance FromJSON PackageIdentifierRevision where
 parsePackageIdentifierRevision :: MonadThrow m => Text -> m PackageIdentifierRevision
 parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionParseFail t) pure $ do
   let (identT, cfiT) = T.break (== '@') t
-  PackageIdentifier name version <- parseC $ T.unpack identT
+  PackageIdentifier name version <- Distribution.Text.simpleParse $ T.unpack identT
   cfi <-
     case splitColon cfiT of
       Just ("@sha256", shaSizeT) -> do
@@ -438,9 +442,29 @@ data PackageTarball = PackageTarball
   }
   deriving Show
 
--- | Parse Cabal types using 'Distribution.Text.Text'.
-parseC :: Distribution.Text.Text a => String -> Maybe a
-parseC = Distribution.Text.simpleParse
+-- | This is almost a copy of Cabal's parser for package identifiers,
+-- the main difference is in the fact that Stack requires version to be
+-- present while Cabal uses "null version" as a defaul value
+parsePackageIdentifier :: String -> Maybe PackageIdentifier
+parsePackageIdentifier str =
+    case [p | (p, s) <- Parse.readP_to_S parser str, all isSpace s] of
+        [] -> Nothing
+        (p:_) -> Just p
+  where
+    parser = do
+        n <- Distribution.Text.parse
+        -- version is a required component of a package identifier for Stack
+        v <- Parse.char '-' >> Distribution.Text.parse
+        return (PackageIdentifier n v)
+
+parsePackageName :: String -> Maybe PackageName
+parsePackageName = Distribution.Text.simpleParse
+
+parseVersion :: String -> Maybe Version
+parseVersion = Distribution.Text.simpleParse
+
+parseFlagName :: String -> Maybe FlagName
+parseFlagName = Distribution.Text.simpleParse
 
 -- | Display Cabal types using 'Distribution.Text.Text'.
 displayC :: (IsString str, Distribution.Text.Text a) => a -> str
@@ -635,7 +659,7 @@ instance Store PackageName where
     case size of
       ConstSize x -> x
       VarSize f -> f (displayC name :: String)
-  peek = peek >>= maybe (fail "Invalid package name") pure . parseC
+  peek = peek >>= maybe (fail "Invalid package name") pure . parsePackageName
   poke name = poke (displayC name :: String)
 instance Store Version where
   size =
@@ -643,7 +667,7 @@ instance Store Version where
     case size of
       ConstSize x -> x
       VarSize f -> f (displayC version :: String)
-  peek = peek >>= maybe (fail "Invalid version") pure . parseC
+  peek = peek >>= maybe (fail "Invalid version") pure . parseVersion
   poke version = poke (displayC version :: String)
 instance Store FlagName where
   size =
@@ -651,7 +675,7 @@ instance Store FlagName where
     case size of
       ConstSize x -> x
       VarSize f -> f (displayC fname :: String)
-  peek = peek >>= maybe (fail "Invalid flag name") pure . parseC
+  peek = peek >>= maybe (fail "Invalid flag name") pure . parseFlagName
   poke fname = poke (displayC fname :: String)
 instance Store PackageIdentifierRevision where
   size =

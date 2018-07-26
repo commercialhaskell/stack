@@ -41,8 +41,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.FilePath (isPathSeparator)

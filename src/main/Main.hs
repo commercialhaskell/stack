@@ -193,7 +193,7 @@ main = do
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
-              expectVersion' <- parseVersionFromString expectVersion
+              expectVersion' <- parseVersionThrowing expectVersion
               unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
                   $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()

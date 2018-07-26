@@ -41,10 +41,7 @@ import qualified Data.Text as T
 import qualified Distribution.ModuleName as C (ModuleName)
 import qualified Distribution.Text as C (display)
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
-import           Stack.Types.Version
 import           Text.PrettyPrint.Leijen.Extended
 
 displayWithColor

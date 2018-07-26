@@ -18,7 +18,6 @@ module Stack.Types.NamedComponent
 
 import Pantry
 import Stack.Prelude
-import Stack.Types.PackageName
 import qualified Data.Set as Set
 import qualified Data.Text as T
 

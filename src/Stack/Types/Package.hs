@@ -27,11 +27,8 @@ import           Path as FL
 import           Stack.Types.BuildPlan (ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.

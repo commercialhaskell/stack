@@ -45,10 +45,8 @@ import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           System.IO (putStrLn)
@@ -336,8 +334,8 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
-    let mres = (pkgName <$> parsePackageIdentifierFromString name)
-            <|> parsePackageNameFromString name
+    let mres = (pkgName <$> parsePackageIdentifier name)
+            <|> parsePackageNameThrowing name
     maybe (throwM $ InvalidPackageOption name) return mres
 
 runGhci

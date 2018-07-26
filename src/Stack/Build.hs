@@ -36,7 +36,6 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
-import           Pantry
 import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
@@ -46,13 +45,9 @@ import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Package
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 import           Stack.Types.Compiler (compilerVersionText

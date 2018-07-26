@@ -37,7 +37,6 @@ import           Path
 import           Path.IO
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version
 import           RIO.Process
 
@@ -55,7 +54,7 @@ toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool
 parseToolText (parseCompilerVersion -> Just cv@GhcjsVersion{}) = Just (ToolGhcjs cv)
-parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
+parseToolText (parsePackageIdentifier . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
 markInstalled :: (MonadIO m, MonadThrow m)
@@ -97,7 +96,7 @@ getCompilerVersion wc =
             logDebug "Asking GHC for its version"
             bs <- fst <$> proc "ghc" ["--numeric-version"] readProcess_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
-            x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
+            x <- GhcVersion <$> parseVersionThrowing (T.unpack $ T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
             return x
         Ghcjs -> do
@@ -106,9 +105,9 @@ getCompilerVersion wc =
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
             bs <- fst <$> proc "ghcjs" ["--version"] readProcess_
-            let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
-                (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
-            GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
+            let (rest, ghcVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
+                (_, ghcjsVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd rest
+            GhcjsVersion <$> parseVersionThrowing ghcjsVersion <*> parseVersionThrowing ghcVersion
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
     isValid c = c == '.' || ('0' <= c && c <= '9')

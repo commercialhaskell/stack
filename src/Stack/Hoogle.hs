@@ -159,7 +159,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                         ]
                 return $ case result of
                     Left err -> unexpectedResult $ T.pack (show err)
-                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (BL8.unpack bs)) of
+                    Right bs -> case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
                         Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
                         Just ver
                             | ver >= hoogleMinVersion -> Right hooglePath

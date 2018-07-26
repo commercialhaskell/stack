@@ -21,7 +21,6 @@ import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))
 import qualified Data.ByteString as SB
 import           Data.Char (isHexDigit)
 import qualified Data.Text as T
-import           Stack.Types.PackageName
 
 -- | A GPG signature.
 newtype Signature =
@@ -63,7 +62,7 @@ instance FromJSON (Aeson PackageName) where
         s <- parseJSON j
         case parsePackageName s of
             Just name -> return (Aeson name)
-            Nothing -> fail ("Invalid package name: " <> T.unpack s)
+            Nothing -> fail ("Invalid package name: " <> s)
 
 -- | Handy wrapper for orphan instances.
 newtype Aeson a = Aeson

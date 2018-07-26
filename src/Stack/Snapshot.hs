@@ -46,7 +46,6 @@ import           Network.HTTP.StackClient (Request)
 import           Network.HTTP.Download
 import qualified RIO
 import           Network.URI (isURI)
-import           Pantry
 import           Pantry.StaticSHA256
 import           Path
 import           Path.IO
@@ -56,9 +55,7 @@ import           Stack.PackageDump
 import           Stack.Types.BuildPlan
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.VersionIntervals
 import           Stack.Types.Config
 import           Stack.Types.Urls

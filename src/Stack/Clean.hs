@@ -17,7 +17,6 @@ import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
-import           Stack.Types.PackageName
 import           Stack.Types.Config
 import           System.Exit (exitFailure)
 

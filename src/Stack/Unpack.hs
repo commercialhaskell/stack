@@ -7,13 +7,9 @@ module Stack.Unpack
 
 import Stack.Prelude
 import Stack.Types.BuildPlan
-import Stack.Types.PackageName
-import Stack.Types.PackageIdentifier
-import Stack.Types.Version
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
-import Pantry
 import RIO.Directory (doesDirectoryExist)
 import RIO.List (intercalate)
 import RIO.FilePath ((</>))
@@ -103,9 +99,9 @@ unpackPackages mSnapshotDef dest input = do
 
     -- Possible future enhancement: parse names as name + version range
     parse s =
-        case parsePackageName t of
-            Right x -> Right $ Left x
-            Left _ ->
+        case parsePackageName (T.unpack t) of
+            Just x -> Right $ Left x
+            Nothing ->
                 case parsePackageIdentifierRevision t of
                     Right x -> Right $ Right x
                     Left _ -> Left s

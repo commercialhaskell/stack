@@ -30,7 +30,6 @@ import           Data.List (intercalate)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
@@ -45,9 +44,6 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler

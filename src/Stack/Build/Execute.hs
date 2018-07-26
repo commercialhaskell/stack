@@ -71,7 +71,6 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
-import           Pantry
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
@@ -82,7 +81,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
@@ -1553,7 +1551,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                   forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
                     -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
                     let sublibName = T.concat ["z-", displayC $ packageName package, "-z-", sublib]
-                    case parsePackageName sublibName of
+                    case parsePackageName $ T.unpack sublibName of
                       Nothing -> return Nothing -- invalid lib, ignored
                       Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
 

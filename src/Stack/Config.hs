@@ -88,7 +88,6 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.PackageName (PackageName)
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.Urls

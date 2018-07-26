@@ -29,8 +29,6 @@ module Stack.Types.BuildPlan
     , sdWantedCompilerVersion
     ) where
 
-import           Data.Aeson (ToJSON (..), FromJSON (..), withText, object, (.=))
-import           Data.Aeson.Extended (WithJSONWarnings (..), (..:), (..:?), withObjectWarnings, noJSONWarnings, (..!=))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.Version
@@ -39,17 +37,11 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
-import           Network.HTTP.StackClient (parseRequest)
 import           Pantry
-import           Pantry.StaticSHA256
 import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Resolver
-import           Stack.Types.Version
 import           Stack.Types.VersionIntervals
 
 -- | A definition of a snapshot. This could be a Stackage snapshot or

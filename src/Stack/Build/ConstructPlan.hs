@@ -21,7 +21,6 @@ module Stack.Build.ConstructPlan
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
-import qualified Data.HashSet as HashSet
 import           Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -43,17 +42,14 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
-import           Pantry
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version

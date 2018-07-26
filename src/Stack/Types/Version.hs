@@ -16,7 +16,7 @@ module Stack.Types.Version
   ,IntersectingVersionRange(..)
   ,VersionCheck(..)
   ,parseVersion
-  ,parseVersionFromString
+  ,parseVersionThrowing
   ,mkVersion
   ,versionRangeText
   ,withinRange
@@ -32,21 +32,16 @@ module Stack.Types.Version
   where
 
 import           Stack.Prelude hiding (Vector)
-import           Pantry
 import           Data.Aeson.Extended
-import           Data.Hashable (Hashable (..))
 import           Data.List
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Vector.Unboxed (Vector)
-import qualified Data.Vector.Unboxed as V
 import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
 import           Distribution.Version (Version, versionNumbers, withinRange)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import qualified Paths_stack as Meta
-import           Pantry
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.
@@ -86,23 +81,19 @@ instance Monoid IntersectingVersionRange where
     mempty = IntersectingVersionRange Cabal.anyVersion
     mappend = (<>)
 
--- | Convenient way to parse a package version from a 'Text'.
-parseVersion :: MonadThrow m => Text -> m Version
-parseVersion = parseVersionFromString . T.unpack
-
--- | Migration function.
-parseVersionFromString :: MonadThrow m => String -> m Version
-parseVersionFromString str =
-  case parseC str of
+-- | Convenient way to parse a package version from a 'String'.
+parseVersionThrowing :: MonadThrow m => String -> m Version
+parseVersionThrowing str =
+  case parseVersion str of
     Nothing -> throwM $ VersionParseFail $ T.pack str
     Just v -> pure v
 
 -- | Make a package version.
 mkVersion :: String -> Q Exp
 mkVersion s =
-  case parseVersionFromString s of
-    Left e -> qRunIO $ throwIO e
-    Right (versionNumbers -> vs) -> [|Cabal.mkVersion vs|]
+  case parseVersion s of
+    Nothing -> qRunIO $ throwIO (VersionParseFail $ T.pack s)
+    Just (versionNumbers -> vs) -> [|Cabal.mkVersion vs|]
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text
