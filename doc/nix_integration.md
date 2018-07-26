@@ -54,7 +54,7 @@ a version of GHC matching the configured resolver. Enabling Nix
 support means packages will always be built using a GHC available
 inside the shell, rather than your globally installed one if any.
 
-Note that in this mode `stack` can use only GHC versions than have
+Note that in this mode `stack` can use only GHC versions that have
 already been mirrored into the Nix package repository.
 The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
 usually picks up new versions quickly, but it takes two or three
