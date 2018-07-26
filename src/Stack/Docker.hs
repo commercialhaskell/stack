@@ -42,7 +42,6 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (showVersion)
 import           GHC.Exts (sortWith)
-import           Lens.Micro (set)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
@@ -51,8 +50,6 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
-import           Pantry
-import           Stack.Types.PackageIndex
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -697,7 +694,7 @@ checkDockerVersion docker =
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (stripVersion v) of
+         case parseVersion (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwIO (DockerTooOldException minimumDockerVersion v')

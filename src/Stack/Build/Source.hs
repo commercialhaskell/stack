@@ -22,13 +22,10 @@ import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
 import              Data.Conduit (ZipSink (..))
 import qualified    Data.Conduit.List as CL
-import qualified    Data.HashSet as HashSet
 import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
-import              Pantry
-import              Path.IO (resolveDir)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
@@ -37,10 +34,8 @@ import              Stack.Package
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
-import              Stack.Types.FlagName
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
-import              Stack.Types.PackageName
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)

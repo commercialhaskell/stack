@@ -52,7 +52,6 @@ import RIO.Orphans ()
 import Pantry.StaticSHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
-import qualified RIO.Text as T
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob

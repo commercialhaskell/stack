@@ -55,14 +55,11 @@ import           Path
 import           Path.IO
 import           Stack.Constants.Config
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.Version
 import qualified System.FilePath as FP
 
 -- | Directory containing files to mark an executable as installed
@@ -85,7 +82,7 @@ getInstalledExes loc = do
         -- was fixed), then we don't know which is correct - ignore them.
         M.fromListWith (\_ _ -> []) $
         map (\x -> (pkgName x, [x])) $
-        mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
+        mapMaybe (parsePackageIdentifier . toFilePath . filename) files
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)

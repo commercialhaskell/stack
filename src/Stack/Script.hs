@@ -64,7 +64,7 @@ scriptCmd opts go' = do
                     getPackagesFromModuleInfo moduleInfo (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
-                    targets' <- mapM parsePackageNameFromString targets
+                    targets' <- mapM parsePackageNameThrowing targets
                     return $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
@@ -242,7 +242,7 @@ parseImports =
             bs3 = fromMaybe bs2 $ stripPrefix "qualified " bs2
         case stripPrefix "\"" bs3 of
             Just bs4 -> do
-                pn <- parsePackageNameFromString $ S8.unpack $ S8.takeWhile (/= '"') bs4
+                pn <- parsePackageNameThrowing $ S8.unpack $ S8.takeWhile (/= '"') bs4
                 Just (Set.singleton pn, Set.empty)
             Nothing -> Just
                 ( Set.empty

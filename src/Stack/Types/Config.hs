@@ -177,7 +177,7 @@ import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
-                  (.=), (..:), (..:?), (..!=), Value(Bool, String),
+                  (.=), (..:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
@@ -209,18 +209,15 @@ import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
-import           Pantry
 import qualified Paths_stack as Meta
 import           Stack.Constants
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
-import           Stack.Types.FlagName
 import           Stack.Types.Image
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
@@ -855,7 +852,7 @@ parseConfigMonoidObject rootDir obj = do
         name <-
             if name' == "*"
                 then return Nothing
-                else case parsePackageNameFromString $ T.unpack name' of
+                else case parsePackageNameThrowing $ T.unpack name' of
                         Left e -> fail $ show e
                         Right x -> return $ Just x
         return (name, b)
@@ -1738,7 +1735,7 @@ instance FromJSONKey GhcOptionKey where
       "$locals" -> return GOKLocals
       "$targets" -> return GOKTargets
       _ ->
-        case parsePackageName t of
+        case parsePackageNameThrowing $ T.unpack t of
           Left e -> fail $ show e
           Right x -> return $ GOKPackage x
   fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"

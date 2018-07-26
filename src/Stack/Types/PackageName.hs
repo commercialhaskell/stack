@@ -13,18 +13,13 @@ module Stack.Types.PackageName
   (PackageName
   ,PackageNameParseFail(..)
   ,parsePackageName
-  ,parsePackageNameFromString
+  ,parsePackageNameThrowing
   ,parsePackageNameFromFilePath
   ,mkPackageName
   ,packageNameArgument)
   where
 
 import           Stack.Prelude
-import           Pantry
-import           Data.Aeson.Extended
-import           Data.Attoparsec.Combinators
-import           Data.Attoparsec.Text
-import           Data.List (intercalate)
 import qualified Data.Text as T
 import qualified Distribution.Package as Cabal
 import           Language.Haskell.TH
@@ -61,18 +56,14 @@ instance FromJSONKey PackageName where
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
 mkPackageName s =
-  case parsePackageNameFromString s of
-    Left e -> qRunIO $ throwIO e
-    Right _ -> [|Cabal.mkPackageName s|]
-
--- | Parse a package name from a 'Text'.
-parsePackageName :: MonadThrow m => Text -> m PackageName
-parsePackageName = parsePackageNameFromString . T.unpack
+  case parsePackageName s of
+    Nothing -> qRunIO $ throwIO (PackageNameParseFail $ T.pack s)
+    Just _ -> [|Cabal.mkPackageName s|]
 
 -- | Parse a package name from a 'String'.
-parsePackageNameFromString :: MonadThrow m => String -> m PackageName
-parsePackageNameFromString str =
-  case parseC str of
+parsePackageNameThrowing :: MonadThrow m => String -> m PackageName
+parsePackageNameThrowing str =
+  case parsePackageName str of
     Nothing -> throwM $ PackageNameParseFail $ T.pack str
     Just pn -> pure pn
 
@@ -80,7 +71,7 @@ parsePackageNameFromString str =
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
 parsePackageNameFromFilePath fp = do
     base <- clean $ toFilePath $ filename fp
-    case parsePackageNameFromString base of
+    case parsePackageName base of
         Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
         Just x -> return x
   where clean = liftM reverse . strip . reverse
@@ -97,7 +88,7 @@ packageNameArgument =
             either O.readerError return (p s))
   where
     p s =
-        case parsePackageNameFromString s of
+        case parsePackageName s of
             Just x -> Right x
             Nothing -> Left $ unlines
                 [ "Expected valid package name, but got: " ++ s

@@ -13,20 +13,16 @@ module Stack.Types.FlagName
   (FlagName
   ,FlagNameParseFail(..)
   ,parseFlagName
-  ,parseFlagNameFromString
+  ,parseFlagNameThrowing
   ,mkFlagName)
   where
 
 import           Stack.Prelude
-import           Data.Aeson.Extended
-import           Data.Attoparsec.Text as A
-import           Data.Char (isLetter, isDigit, toLower)
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.PackageDescription (FlagName)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Pantry
 
 -- | A parse fail.
 newtype FlagNameParseFail = FlagNameParseFail Text
@@ -52,17 +48,13 @@ instance FromJSONKey FlagName where
 -- | Make a flag name.
 mkFlagName :: String -> Q Exp
 mkFlagName s =
-  case parseFlagNameFromString s of
+  case parseFlagName s of
     Nothing -> qRunIO $ throwString ("Invalid flag name: " ++ show s)
     Just _ -> [|Cabal.mkFlagName s|]
 
--- | Convenient way to parse a flag name from a 'Text'.
-parseFlagName :: MonadThrow m => Text -> m FlagName
-parseFlagName = parseFlagNameFromString . T.unpack
-
 -- | Convenience function for parsing from a 'String'
-parseFlagNameFromString :: MonadThrow m => String -> m FlagName
-parseFlagNameFromString str =
-  case parseC str of
+parseFlagNameThrowing :: MonadThrow m => String -> m FlagName
+parseFlagNameThrowing str =
+  case parseFlagName str of
     Nothing -> throwM $ FlagNameParseFail $ T.pack str
     Just fn -> pure fn

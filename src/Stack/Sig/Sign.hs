@@ -26,7 +26,6 @@ import           Network.HTTP.StackClient (RequestBody (RequestBodyBS), setReque
 import           Path
 import           Stack.Package
 import           Stack.Sig.GPG
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Sig
 import qualified System.FilePath as FP
 

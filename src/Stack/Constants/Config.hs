@@ -23,7 +23,6 @@ import Stack.Prelude
 import Stack.Constants
 import Stack.Types.Compiler
 import Stack.Types.Config
-import Stack.Types.PackageIdentifier
 import Path
 
 -- | Output .o/.hi directory.

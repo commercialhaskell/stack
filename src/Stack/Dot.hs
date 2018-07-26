@@ -18,7 +18,6 @@ module Stack.Dot (dot
 import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
@@ -37,12 +36,9 @@ import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..))
 import           Stack.Types.Build
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-import           Stack.Types.Version
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts

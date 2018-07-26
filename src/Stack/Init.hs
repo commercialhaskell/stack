@@ -26,7 +26,6 @@ import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text               as C
 import qualified Distribution.Version            as C
-import           Pantry
 import           Path
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Path.IO
@@ -40,9 +39,6 @@ import           Stack.Solver
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP

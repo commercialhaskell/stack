@@ -33,9 +33,7 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Build
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Compiler
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.FilePath (searchPathSeparator)
 import           RIO.Process
@@ -150,7 +148,7 @@ findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
 findGhcPkgVersion wc pkgDbs name = do
     mv <- findGhcPkgField wc pkgDbs (displayC name) "version"
     case mv of
-        Just !v -> return (parseVersion v)
+        Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
 unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
