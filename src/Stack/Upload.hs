@@ -123,13 +123,14 @@ applyCreds creds req0 = do
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: HackageCreds
+uploadBytes :: String -- ^ Hackage base URL
+            -> HackageCreds
             -> String -- ^ tar file name
             -> L.ByteString -- ^ tar file contents
             -> IO ()
-uploadBytes creds tarName bytes = do
+uploadBytes baseUrl creds tarName bytes = do
     let req1 = setRequestHeader "Accept" ["text/plain"]
-               "https://hackage.haskell.org/packages/"
+               (fromString $ baseUrl <> "packages/")
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
     req2 <- formDataBody formData req1
     req3 <- applyCreds creds req2
@@ -163,16 +164,21 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
-upload :: HackageCreds -> FilePath -> IO ()
-upload creds fp = uploadBytes creds (takeFileName fp) =<< L.readFile fp
+upload :: String -- ^ Hackage base URL
+       -> HackageCreds
+       -> FilePath
+       -> IO ()
+upload baseUrl creds fp = uploadBytes baseUrl creds (takeFileName fp) =<< L.readFile fp
 
-uploadRevision :: HackageCreds
+uploadRevision :: String -- ^ Hackage base URL
+               -> HackageCreds
                -> PackageIdentifier
                -> L.ByteString
                -> IO ()
-uploadRevision creds ident@(PackageIdentifier name _) cabalFile = do
+uploadRevision baseUrl creds ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
-    [ "https://hackage.haskell.org/package/"
+    [ baseUrl
+    , "package/"
     , displayC ident
     , "/"
     , displayC name

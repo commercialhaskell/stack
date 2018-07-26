@@ -87,6 +87,16 @@ listInstalled programsPath = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parseToolText x
 
+-- | See https://github.com/commercialhaskell/stack/issues/4086.
+warnAboutGHCJS :: HasLogFunc env => RIO env ()
+warnAboutGHCJS =
+    logWarn $ "Building a GHCJS project. " <> fromString ghcjsWarning
+
+ghcjsWarning :: String
+ghcjsWarning = unwords
+     [ "Note that GHCJS support in Stack is EXPERIMENTAL"
+     ]
+
 getCompilerVersion
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
@@ -101,6 +111,7 @@ getCompilerVersion wc =
             logDebug $ "GHC version is: " <> display x
             return x
         Ghcjs -> do
+            warnAboutGHCJS
             logDebug "Asking GHCJS for its version"
             -- Output looks like
             --

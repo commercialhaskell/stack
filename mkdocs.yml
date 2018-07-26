@@ -1,7 +1,8 @@
 site_name: The Haskell Tool Stack
 site_description: The Haskell Tool Stack
 site_author: Stack contributors
-repo_url: https://github.com/commercialhaskell/stack/tree/master/doc
+repo_url: https://github.com/commercialhaskell/stack/
+edit_uri: edit/stable/doc/
 copyright: Copyright (c) 2015-2018, Stack contributors
 docs_dir: doc
 site_dir: _site
@@ -23,7 +24,7 @@ pages:
   - Build command: build_command.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
-  - GHCJS: ghcjs.md
+  - GHCJS (experimental): ghcjs.md
   - Nix integration: nix_integration.md
   - Non-standard project initialization: nonstandard_project_init.md
   - Shell auto-completion: shell_autocompletion.md

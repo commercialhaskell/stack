@@ -340,6 +340,8 @@ data Config =
          -- command disallows this.
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
+         ,configHackageBaseUrl      :: !Text
+         -- ^ Hackage base URL used when uploading packages
          ,configRunner              :: !Runner
          ,configPantryConfig        :: !PantryConfig
          ,configStackRoot           :: !(Path Abs Dir)
@@ -744,6 +746,8 @@ data ConfigMonoid =
     -- ^ See 'configDumpLogs'
     , configMonoidSaveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
+    , configMonoidHackageBaseUrl     :: !(First Text)
+    -- ^ See 'configHackageBaseUrl'
     , configMonoidIgnoreRevisionMismatch :: !(First Bool)
     -- ^ See 'configIgnoreRevisionMismatch'
     }
@@ -841,6 +845,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+    configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
     configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
 
     return ConfigMonoid {..}
@@ -980,6 +985,9 @@ configMonoidDumpLogsName = "dump-logs"
 
 configMonoidSaveHackageCredsName :: Text
 configMonoidSaveHackageCredsName = "save-hackage-creds"
+
+configMonoidHackageBaseUrlName :: Text
+configMonoidHackageBaseUrlName = "hackage-base-url"
 
 configMonoidIgnoreRevisionMismatchName :: Text
 configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
