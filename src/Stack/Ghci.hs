@@ -614,7 +614,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
     -- wouldn't have figured out the cabalfp already. In the future:
     -- retain that GenericPackageDescription in the relevant data
     -- structures to avoid reparsing.
-    (gpkgdesc, _cabalfp) <- readPackageUnresolvedDir (parent cabalfp) True
+    (gpkgdesc, _cabalfp) <- parseCabalFilePath (parent cabalfp) True
 
     -- Source the package's *.buildinfo file created by configure if any. See
     -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters

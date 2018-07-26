@@ -17,8 +17,6 @@
 
 module Stack.Package
   (readPackageDir
-  ,readPackageUnresolvedDir
-  ,readPackageUnresolvedIndex
   ,readPackageDescriptionDir
   ,readDotBuildinfo
   ,resolvePackage
@@ -33,9 +31,6 @@ module Stack.Package
   ,resolvePackageDescription
   ,packageDependencies
   ,cabalFilePackageId
-  ,gpdPackageIdentifier
-  ,gpdPackageName
-  ,gpdVersion
   ,parseSingleCabalFile)
   where
 
@@ -117,92 +112,6 @@ instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
--- | A helper function that performs the basic character encoding
--- necessary.
-rawParseGPD
-  :: MonadThrow m
-  => Either PackageIdentifierRevision (Path Abs File)
-  -> BS.ByteString
-  -> m ([PWarning], GenericPackageDescription)
-rawParseGPD key bs =
-    case eres of
-      Left (mversion, errs) -> throwM $ PackageInvalidCabalFile key mversion errs warnings
-      Right gpkg -> return (warnings, gpkg)
-  where
-    (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
-
--- | Read the raw, unresolved package information from a file.
-readPackageUnresolvedDir
-  :: forall env. HasConfig env
-  => Path Abs Dir -- ^ directory holding the cabal file
-  -> Bool -- ^ print warnings?
-  -> RIO env (GenericPackageDescription, Path Abs File)
-readPackageUnresolvedDir dir printWarnings = do
-  ref <- view $ runnerL.to runnerParsedCabalFiles
-  (_, m) <- readIORef ref
-  case M.lookup dir m of
-    Just x -> return x
-    Nothing -> do
-      cabalfp <- findOrGenerateCabalFile dir
-      bs <- liftIO $ BS.readFile $ toFilePath cabalfp
-      (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
-      when printWarnings
-        $ mapM_ (prettyWarnL . toPretty (toFilePath cabalfp)) warnings
-      checkCabalFileName (gpdPackageName gpd) cabalfp
-      let ret = (gpd, cabalfp)
-      atomicModifyIORef' ref $ \(m1, m2) ->
-        ((m1, M.insert dir ret m2), ret)
-  where
-    toPretty :: String -> PWarning -> [Doc AnsiAnn]
-    toPretty src (PWarning _type pos msg) =
-      [ flow "Cabal file warning in"
-      , fromString src <> "@"
-      , fromString (showPos pos) <> ":"
-      , flow msg
-      ]
-
-    -- | Check if the given name in the @Package@ matches the name of the .cabal file
-    checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
-    checkCabalFileName name cabalfp = do
-        -- Previously, we just use parsePackageNameFromFilePath. However, that can
-        -- lead to confusing error messages. See:
-        -- https://github.com/commercialhaskell/stack/issues/895
-        let expected = displayC name ++ ".cabal"
-        when (expected /= toFilePath (filename cabalfp))
-            $ throwM $ MismatchedCabalName cabalfp name
-
-gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
-gpdPackageIdentifier = D.package . D.packageDescription
-
-gpdPackageName :: GenericPackageDescription -> PackageName
-gpdPackageName = pkgName . gpdPackageIdentifier
-
-gpdVersion :: GenericPackageDescription -> Version
-gpdVersion = pkgVersion . gpdPackageIdentifier
-
--- | Read the 'GenericPackageDescription' from the given
--- 'PackageIdentifierRevision'.
-readPackageUnresolvedIndex
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasRunner env)
-  => PackageIdentifierRevision
-  -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXME move to pantry
-  ref <- view $ runnerL.to runnerParsedCabalFiles
-  (m, _) <- readIORef ref
-  case M.lookup pir m of
-    Just gpd -> return gpd
-    Nothing -> do
-      ebs <- loadFromIndex pn v cfi
-      bs <-
-        case ebs of
-          Right bs -> pure bs
-      (_warnings, gpd) <- rawParseGPD (Left pir) bs
-      let foundPI = D.package $ D.packageDescription gpd
-          pi' = D.PackageIdentifier pn v
-      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
-      atomicModifyIORef' ref $ \(m1, m2) ->
-        ((M.insert pir gpd m1, m2), gpd)
-
 -- | Reads and exposes the package information
 readPackageDir
   :: forall env. HasConfig env
@@ -211,7 +120,7 @@ readPackageDir
   -> Bool -- ^ print warnings from cabal file parsing?
   -> RIO env (Package, Path Abs File)
 readPackageDir packageConfig dir printWarnings =
-  first (resolvePackage packageConfig) <$> readPackageUnresolvedDir dir printWarnings
+  first (resolvePackage packageConfig) <$> parseCabalFilePath dir printWarnings
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
@@ -222,7 +131,7 @@ readPackageDescriptionDir
   -> Bool -- ^ print warnings?
   -> RIO env (GenericPackageDescription, PackageDescriptionPair)
 readPackageDescriptionDir config pkgDir printWarnings = do
-    (gdesc, _) <- readPackageUnresolvedDir pkgDir printWarnings
+    (gdesc, _) <- parseCabalFilePath pkgDir printWarnings
     return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
@@ -1432,85 +1341,6 @@ logPossibilities dirs mn = do
                                    files)))
             dirs
 
--- | Get the filename for the cabal file in the given directory.
---
--- If no .cabal file is present, or more than one is present, an exception is
--- thrown via 'throwM'.
---
--- If the directory contains a file named package.yaml, hpack is used to
--- generate a .cabal file from it.
-findOrGenerateCabalFile
-    :: forall env. HasConfig env
-    => Path Abs Dir -- ^ package directory
-    -> RIO env (Path Abs File)
-findOrGenerateCabalFile pkgDir = do
-    hpack pkgDir
-    findCabalFile
-  where
-    findCabalFile :: RIO env (Path Abs File)
-    findCabalFile = findCabalFile' >>= either throwIO return
-
-    findCabalFile' :: RIO env (Either PackageException (Path Abs File))
-    findCabalFile' = do
-        files <- liftIO $ findFiles
-            pkgDir
-            (flip hasExtension "cabal" . FL.toFilePath)
-            (const False)
-        return $ case files of
-            [] -> Left $ PackageNoCabalFileFound pkgDir
-            [x] -> Right x
-            -- If there are multiple files, ignore files that start with
-            -- ".". On unixlike environments these are hidden, and this
-            -- character is not valid in package names. The main goal is
-            -- to ignore emacs lock files - see
-            -- https://github.com/commercialhaskell/stack/issues/1897.
-            (filter (not . ("." `isPrefixOf`) . toFilePath . filename) -> [x]) -> Right x
-            _:_ -> Left $ PackageMultipleCabalFilesFound pkgDir files
-      where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
-
--- | Generate .cabal file from package.yaml, if necessary.
-hpack :: HasConfig env => Path Abs Dir -> RIO env ()
-hpack pkgDir = do
-    let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
-    exists <- liftIO $ doesFileExist hpackFile
-    when exists $ do
-        prettyDebugL [flow "Running hpack on", display hpackFile]
-
-        config <- view configL
-        case configOverrideHpack config of
-            HpackBundled -> do
-#if MIN_VERSION_hpack(0,26,0)
-                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
-#elif MIN_VERSION_hpack(0,23,0)
-                r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
-#else
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
-#endif
-                forM_ (Hpack.resultWarnings r) prettyWarnS
-                let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
-                case Hpack.resultStatus r of
-                    Hpack.Generated -> prettyDebugL
-                        [flow "hpack generated a modified version of", cabalFile]
-                    Hpack.OutputUnchanged -> prettyDebugL
-                        [flow "hpack output unchanged in", cabalFile]
-                    Hpack.AlreadyGeneratedByNewerHpack -> prettyWarnL
-                        [ cabalFile
-                        , flow "was generated with a newer version of hpack,"
-                        , flow "please upgrade and try again."
-                        ]
-                    Hpack.ExistingCabalFileWasModifiedManually -> prettyWarnL
-                        [ cabalFile
-                        , flow "was modified manually. Ignoring"
-                        , display hpackFile
-                        , flow "in favor of the cabal file. If you want to use the"
-                        , display . filename $ hpackFile
-                        , flow "file instead of the cabal file,"
-                        , flow "then please delete the cabal file."
-                        ]
-            HpackCommand command ->
-                withWorkingDir (toFilePath pkgDir) $
-                proc command [] runProcess_
-
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
              => Package -> Maybe String -> m (Path Abs File)
@@ -1568,9 +1398,9 @@ parseSingleCabalFile -- FIXME rename and add docs
   :: forall env. HasConfig env
   => Bool -- ^ print warnings?
   -> ResolvedDir
-  -> RIO env LocalPackageView
+  -> RIO env LocalPackageView -- FIXME kill off LocalPackageView? It's kinda worthless, right?
 parseSingleCabalFile printWarnings dir = do
-  (gpd, cabalfp) <- readPackageUnresolvedDir (resolvedAbsolute dir) printWarnings
+  (gpd, cabalfp) <- parseCabalFilePath (resolvedAbsolute dir) printWarnings
   return LocalPackageView
     { lpvCabalFP = cabalfp
     , lpvGPD = gpd

@@ -38,9 +38,6 @@ data PackageException
       !(Maybe Version)
       ![PError]
       ![PWarning]
-  | PackageNoCabalFileFound (Path Abs Dir)
-  | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
-  | MismatchedCabalName (Path Abs File) PackageName
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   deriving Typeable
 instance Exception PackageException
@@ -77,27 +74,6 @@ instance Show PackageException where
                 , msg
                 ])
             warnings
-        ]
-    show (PackageNoCabalFileFound dir) = concat
-        [ "Stack looks for packages in the directories configured in"
-        , " the 'packages' and 'extra-deps' fields defined in your stack.yaml\n"
-        , "The current entry points to "
-        , toFilePath dir
-        , " but no .cabal or package.yaml file could be found there."
-        ]
-    show (PackageMultipleCabalFilesFound dir files) =
-        "Multiple .cabal files found in directory " ++
-        toFilePath dir ++
-        ": " ++
-        intercalate ", " (map (toFilePath . filename) files)
-    show (MismatchedCabalName fp name) = concat
-        [ "cabal file path "
-        , toFilePath fp
-        , " does not match the package name it defines.\n"
-        , "Please rename the file to: "
-        , displayC name
-        , ".cabal\n"
-        , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
     show (MismatchedCabalIdentifier pir ident) = concat
         [ "Mismatched package identifier."

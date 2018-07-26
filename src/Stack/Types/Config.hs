@@ -288,8 +288,6 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
-         ,configOverrideHpack       :: !HpackExecutable
-         -- ^ Use Hpack executable (overrides bundled Hpack)
          ,configExtraIncludeDirs    :: !(Set FilePath)
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set FilePath)
@@ -342,11 +340,6 @@ data Config =
          ,configPantryConfig        :: !PantryConfig
          ,configStackRoot           :: !(Path Abs Dir)
          }
-
-data HpackExecutable
-    = HpackBundled
-    | HpackCommand String
-    deriving (Show, Read, Eq, Ord)
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets

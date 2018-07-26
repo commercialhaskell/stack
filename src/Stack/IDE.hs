@@ -14,7 +14,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Config (getLocalPackages)
-import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -27,7 +26,7 @@ listPackages = do
     -- the directory.
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
-        (gpd, _) <- readPackageUnresolvedDir dir False
+        (gpd, _) <- parseCabalFilePath dir False
         (logInfo . displayC) (gpdPackageName gpd)
 
 -- | List the targets in the current project.

@@ -48,7 +48,6 @@ import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (getLocalPackages, loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
-import           Stack.Package               (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -534,7 +533,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
     logInfo $ formatGroup relpaths
 
     packages <- map (\(x, y) -> (y, x)) <$>
-                mapM (flip readPackageUnresolvedDir True)
+                mapM (flip parseCabalFilePath True)
                 cabaldirs
 
     -- package name cannot be empty or missing otherwise

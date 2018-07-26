@@ -53,6 +53,7 @@ module Pantry.Types
   , PackageLocationOrPath (..)
   , ResolvedDir (..)
   , resolvedAbsolute
+  , HpackExecutable (..)
   ) where
 
 import RIO
@@ -60,6 +61,7 @@ import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
+import RIO.List (intersperse)
 import qualified RIO.Map as Map
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
@@ -78,7 +80,7 @@ import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import qualified Data.Text.Read
-import Path (Path, Abs, Dir, parseAbsDir)
+import Path (Path, Abs, Dir, File, parseAbsDir, toFilePath, filename)
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -87,6 +89,7 @@ newtype Storage = Storage SqlBackend
 
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
+  , pcHpackExecutable :: !HpackExecutable
   , pcRootDir :: !(Path Abs Dir)
   , pcStorage :: !Storage
   , pcUpdateRef :: !(MVar Bool)
@@ -314,12 +317,15 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
-      !PackageLocationOrPath
+      !(Either PackageLocation (Path Abs File))
       !(Maybe Version)
       ![PError]
       ![PWarning]
   | TreeWithoutCabalFile !PackageLocation
   | TreeWithMultipleCabalFiles !PackageLocation ![SafeFilePath]
+  | MismatchedCabalName !(Path Abs File) !PackageName
+  | NoCabalFileFound !(Path Abs Dir)
+  | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
 
   deriving Typeable
 instance Exception PantryException where
@@ -331,7 +337,7 @@ instance Display PantryException where
     display text
   display (InvalidCabalFile loc _mversion errs warnings) =
     "Unable to parse cabal file from package " <>
-    display loc <>
+    either display (fromString . toFilePath) loc <>
 
     {-
 
@@ -361,6 +367,25 @@ instance Display PantryException where
           fromString msg <>
           "\n")
       warnings
+  display (MismatchedCabalName fp name) =
+    "cabal file path " <>
+    fromString (toFilePath fp) <>
+    " does not match the package name it defines.\n" <>
+    "Please rename the file to: " <>
+    displayC name <>
+    ".cabal\n" <>
+    "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
+  display (NoCabalFileFound dir) =
+    "Stack looks for packages in the directories configured in\n" <>
+    "the 'packages' and 'extra-deps' fields defined in your stack.yaml\n" <>
+    "The current entry points to " <>
+    fromString (toFilePath dir) <>
+    ",\nbut no .cabal or package.yaml file could be found there."
+  display (MultipleCabalFilesFound dir files) =
+    "Multiple .cabal files found in directory " <>
+    fromString (toFilePath dir) <>
+    ":\n" <>
+    fold (intersperse "\n" (map (\x -> "- " <> fromString (toFilePath (filename x))) files))
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -548,6 +573,19 @@ instance FromJSON ArchiveLocation where
           then pure (RelFilePath t)
           else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
+-- | A raw package location /or/ a file path to a directory containing a package.
+data RawPackageLocationOrPath
+  = RPLRemote !RawPackageLocation
+  | RPLFilePath !RelFilePath
+  deriving Show
+instance ToJSON RawPackageLocationOrPath where
+  toJSON (RPLRemote rpl) = toJSON rpl
+  toJSON (RPLFilePath (RelFilePath fp)) = toJSON fp
+instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
+  parseJSON v =
+    (fmap RPLRemote <$> parseJSON v) <|>
+    ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)
+
 -- | The raw representation of packages allowed in a snapshot
 -- specification. Does /not/ allow local filepaths.
 data RawPackageLocation
@@ -693,6 +731,11 @@ instance IsCabalString FlagName where
   cabalStringName _ = "flag name"
   cabalStringParser = parseFlagName
 
+data HpackExecutable
+    = HpackBundled
+    | HpackCommand String
+    deriving (Show, Read, Eq, Ord)
+
 -- FIXME ORPHANS remove
 
 instance Store PackageIdentifier where
@@ -744,16 +787,3 @@ instance Store PackageIdentifierRevision where
        VarSize f -> f cfi)
   peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
   poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
-
--- | A raw package location /or/ a file path to a directory containing a package.
-data RawPackageLocationOrPath
-  = RPLRemote !RawPackageLocation
-  | RPLFilePath !RelFilePath
-  deriving Show
-instance ToJSON RawPackageLocationOrPath where
-  toJSON (RPLRemote rpl) = toJSON rpl
-  toJSON (RPLFilePath (RelFilePath fp)) = toJSON fp
-instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
-  parseJSON v =
-    (fmap RPLRemote <$> parseJSON v) <|>
-    ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)

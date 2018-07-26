@@ -388,7 +388,7 @@ loadSnapshot mcompiler root =
           Right sd' -> start sd'
 
       gpds <-
-        (forM (sdLocations sd) $ \loc -> (, PLRemote loc) <$> parseCabalFile loc)
+        (forM (sdLocations sd) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc)
         `onException` do
           logError "Unable to load cabal files for snapshot"
           case sdResolver sd of
@@ -546,7 +546,7 @@ recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseCabalFileOrPath loc
+      gpd <- parseCabalFile loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"

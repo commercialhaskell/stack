@@ -80,7 +80,7 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Package (parseSingleCabalFile, readPackageUnresolvedDir)
+import           Stack.Package (parseSingleCabalFile)
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -261,7 +261,6 @@ configFromConfigMonoid
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
          configOverrideGccPath = getFirst configMonoidOverrideGccPath
-         configOverrideHpack = maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
@@ -370,7 +369,9 @@ configFromConfigMonoid
        (configStackRoot </> $(mkRelDir "pantry"))
        (case getFirst configMonoidPackageIndices of
           Nothing -> defaultHackageSecurityConfig
-       ) $ \configPantryConfig -> inner Config {..}
+       )
+       (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
+       $ \configPantryConfig -> inner Config {..}
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
@@ -662,7 +663,7 @@ getLocalPackages = do
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
             deps <- forM (bcDependencies bc) $ \plp -> do
-              gpd <- parseCabalFileOrPath plp
+              gpd <- parseCabalFile plp
               let name = pkgName $ C.package $ C.packageDescription gpd
               pure (name, (gpd, plp))
 

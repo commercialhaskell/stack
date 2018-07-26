@@ -505,7 +505,7 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseCabalFile loc
+      gpd <- parseCabalFileRemote loc
       return (name, (gpd, PLRemote loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
@@ -543,6 +543,3 @@ parseTargets needTargets boptscli = do
           (loc, _) -> Just (name, lpi { lpiLocation = loc }) -- upgraded or local dep
 
   return (ls, localDeps, targets)
-
-gpdVersion :: GenericPackageDescription -> Version
-gpdVersion = pkgVersion . package . packageDescription

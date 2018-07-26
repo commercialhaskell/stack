@@ -168,7 +168,7 @@ getCabalLbs :: HasEnvConfig env
             -> Path Abs File -- ^ cabal file
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp = do
-    (gpd, cabalfp') <- readPackageUnresolvedDir (parent cabalfp) False
+    (gpd, cabalfp') <- parseCabalFilePath (parent cabalfp) False
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -400,7 +400,7 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    (gpd, _cabalfp) <- readPackageUnresolvedDir pkgDir True
+    (gpd, _cabalfp) <- parseCabalFilePath pkgDir True
     let name = gpdPackageName gpd
     config  <- getDefaultPackageConfig
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False

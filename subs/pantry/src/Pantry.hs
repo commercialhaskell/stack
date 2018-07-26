@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 module Pantry
   ( -- * Congiruation
     PantryConfig
@@ -31,6 +32,7 @@ module Pantry
   , FlagName
   , TreeKey (..)
   , BlobKey (..)
+  , HpackExecutable (..)
 
     -- ** Raw package locations
   , RawPackageLocation
@@ -50,13 +52,17 @@ module Pantry
   , CabalString (..)
   , toCabalStringMap
   , unCabalStringMap
+  , gpdPackageIdentifier
+  , gpdPackageName
+  , gpdVersion
 
     -- ** Parsers
   , parsePackageIdentifierRevision
 
     -- * Package location
   , parseCabalFile
-  , parseCabalFileOrPath
+  , parseCabalFileRemote
+  , parseCabalFilePath
   , getPackageLocationIdent
   , getPackageLocationTreeKey
 
@@ -75,31 +81,42 @@ module Pantry
 import RIO
 import RIO.FilePath (takeDirectory)
 import qualified RIO.Map as Map
+import qualified RIO.ByteString as B
 import qualified RIO.Text as T
+import qualified RIO.List as List
+import qualified RIO.FilePath as FilePath
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, parent, toFilePath, Dir, mkRelFile, (</>))
-import Path.IO (resolveDir)
+import Path (Path, Abs, File, parent, toFilePath, Dir, mkRelFile, (</>), filename)
+import Path.Find (findFiles)
+import Path.IO (resolveDir, doesFileExist)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
+import qualified Distribution.PackageDescription as D
 import Distribution.PackageDescription.Parsec
+import Distribution.Parsec.Common (PWarning (..), showPos)
+import qualified Hpack
+import qualified Hpack.Config as Hpack
+import RIO.Process
 
 withPantryConfig
   :: HasLogFunc env
   => Path Abs Dir -- ^ pantry root
   -> HackageSecurityConfig
+  -> HpackExecutable
   -> (PantryConfig -> RIO env a)
   -> RIO env a
-withPantryConfig root hsc inner = do
+withPantryConfig root hsc he inner = do
   env <- ask
   -- Silence persistent's logging output, which is really noisy
   runRIO (mempty :: LogFunc) $ initStorage (root </> $(mkRelFile "pantry.sqlite3")) $ \storage -> runRIO env $ do
     ur <- newMVar True
     inner PantryConfig
       { pcHackageSecurity = hsc
+      , pcHpackExecutable = he
       , pcRootDir = root
       , pcStorage = storage
       , pcUpdateRef = ur
@@ -266,24 +283,191 @@ unpackPackageLocation fp loc = do
   unpackTree fp tree
 
 -- | Ignores all warnings
-parseCabalFile
+--
+-- FIXME! Something to support hpack
+parseCabalFileRemote
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env GenericPackageDescription
-parseCabalFile loc = do
+parseCabalFileRemote loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
-  case runParseResult $ parseGenericPackageDescription bs of
-    (warnings, Left (mversion, errs)) -> throwM $ InvalidCabalFile (PLRemote loc) mversion errs warnings
-    (_warnings, Right gpd) -> pure gpd
+  (_warnings, gpd) <- rawParseGPD (Left loc) bs
+  pure gpd
 
--- | Same as 'parseCabalFile', but takes a 'PackageLocationOrPath'.
-parseCabalFileOrPath
-  :: (HasPantryConfig env, HasLogFunc env)
+    {- FIXME
+-- | Read the 'GenericPackageDescription' from the given
+-- 'PackageIdentifierRevision'.
+readPackageUnresolvedIndex
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasRunner env)
+  => PackageIdentifierRevision
+  -> RIO env GenericPackageDescription
+readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXME move to pantry
+  ref <- view $ runnerL.to runnerParsedCabalFiles
+  (m, _) <- readIORef ref
+  case M.lookup pir m of
+    Just gpd -> return gpd
+    Nothing -> do
+      ebs <- loadFromIndex pn v cfi
+      bs <-
+        case ebs of
+          Right bs -> pure bs
+      (_warnings, gpd) <- rawParseGPD (Left pir) bs
+      let foundPI = D.package $ D.packageDescription gpd
+          pi' = D.PackageIdentifier pn v
+      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((M.insert pir gpd m1, m2), gpd)
+    -}
+
+-- | A helper function that performs the basic character encoding
+-- necessary.
+rawParseGPD
+  :: MonadThrow m
+  => Either PackageLocation (Path Abs File)
+  -> ByteString
+  -> m ([PWarning], GenericPackageDescription)
+rawParseGPD loc bs =
+    case eres of
+      Left (mversion, errs) -> throwM $ InvalidCabalFile loc mversion errs warnings
+      Right gpkg -> return (warnings, gpkg)
+  where
+    (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
+
+-- | Same as 'parseCabalFileRemote', but takes a
+-- 'PackageLocationOrPath'. Never prints warnings, see
+-- 'parseCabalFilePath' for that.
+parseCabalFile
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationOrPath
   -> RIO env GenericPackageDescription
-parseCabalFileOrPath (PLRemote loc) = parseCabalFile loc
-parseCabalFileOrPath (PLFilePath rfp) = undefined
+parseCabalFile (PLRemote loc) = parseCabalFileRemote loc
+parseCabalFile (PLFilePath rfp) = fst <$> parseCabalFilePath (resolvedAbsolute rfp) False
+
+-- | Read the raw, unresolved package information from a file.
+parseCabalFilePath
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Path Abs Dir -- ^ project directory, with a cabal file or hpack file
+  -> Bool -- ^ print warnings?
+  -> RIO env (GenericPackageDescription, Path Abs File)
+parseCabalFilePath dir printWarnings = do
+    {- FIXME caching
+  ref <- view $ runnerL.to runnerParsedCabalFiles
+  (_, m) <- readIORef ref
+  case Map.lookup dir m of
+    Just x -> return x
+    Nothing -> do
+    -}
+      cabalfp <- findOrGenerateCabalFile dir
+      bs <- liftIO $ B.readFile $ toFilePath cabalfp
+      (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
+      when printWarnings
+        $ mapM_ (logWarn . toPretty cabalfp) warnings
+      checkCabalFileName (gpdPackageName gpd) cabalfp
+      let ret = (gpd, cabalfp)
+      pure ret
+    {- FIXME caching
+      atomicModifyIORef' ref $ \(m1, m2) ->
+        ((m1, M.insert dir ret m2), ret)
+    -}
+  where
+    toPretty :: Path Abs File -> PWarning -> Utf8Builder
+    toPretty src (PWarning _type pos msg) =
+      "Cabal file warning in" <>
+      fromString (toFilePath src) <> "@" <>
+      fromString (showPos pos) <> ": " <>
+      fromString msg
+
+    -- | Check if the given name in the @Package@ matches the name of the .cabal file
+    checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
+    checkCabalFileName name cabalfp = do
+        -- Previously, we just use parsePackageNameFromFilePath. However, that can
+        -- lead to confusing error messages. See:
+        -- https://github.com/commercialhaskell/stack/issues/895
+        let expected = displayC name ++ ".cabal"
+        when (expected /= toFilePath (filename cabalfp))
+            $ throwM $ MismatchedCabalName cabalfp name
+
+-- | Get the filename for the cabal file in the given directory.
+--
+-- If no .cabal file is present, or more than one is present, an exception is
+-- thrown via 'throwM'.
+--
+-- If the directory contains a file named package.yaml, hpack is used to
+-- generate a .cabal file from it.
+findOrGenerateCabalFile
+    :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => Path Abs Dir -- ^ package directory
+    -> RIO env (Path Abs File)
+findOrGenerateCabalFile pkgDir = do
+    hpack pkgDir
+    findCabalFile
+  where
+    findCabalFile :: RIO env (Path Abs File)
+    findCabalFile = findCabalFile' >>= either throwIO return
+
+    findCabalFile' :: RIO env (Either PantryException (Path Abs File))
+    findCabalFile' = do
+        files <- liftIO $ findFiles
+            pkgDir
+            (flip hasExtension "cabal" . toFilePath)
+            (const False)
+        return $ case files of
+            [] -> Left $ NoCabalFileFound pkgDir
+            [x] -> Right x
+            -- If there are multiple files, ignore files that start with
+            -- ".". On unixlike environments these are hidden, and this
+            -- character is not valid in package names. The main goal is
+            -- to ignore emacs lock files - see
+            -- https://github.com/commercialhaskell/stack/issues/1897.
+            (filter (not . ("." `List.isPrefixOf`) . toFilePath . filename) -> [x]) -> Right x
+            _:_ -> Left $ MultipleCabalFilesFound pkgDir files
+      where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
+
+-- | Generate .cabal file from package.yaml, if necessary.
+hpack
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Path Abs Dir
+  -> RIO env ()
+hpack pkgDir = do
+    let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
+    exists <- liftIO $ doesFileExist hpackFile
+    when exists $ do
+        logDebug $ "Running hpack on " <> fromString (toFilePath hpackFile)
+
+        he <- view $ pantryConfigL.to pcHpackExecutable
+        case he of
+            HpackBundled -> do
+                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
+                forM_ (Hpack.resultWarnings r) (logWarn . fromString)
+                let cabalFile = fromString . Hpack.resultCabalFile $ r
+                case Hpack.resultStatus r of
+                    Hpack.Generated -> logDebug $ "hpack generated a modified version of " <> cabalFile
+                    Hpack.OutputUnchanged -> logDebug $ "hpack output unchanged in " <> cabalFile
+                    Hpack.AlreadyGeneratedByNewerHpack -> logWarn $
+                        cabalFile <>
+                        " was generated with a newer version of hpack,\n" <>
+                        "please upgrade and try again."
+                    Hpack.ExistingCabalFileWasModifiedManually -> logWarn $
+                        cabalFile <>
+                        " was modified manually. Ignoring " <>
+                        fromString (toFilePath hpackFile) <>
+                        " in favor of the cabal file.\nIf you want to use the " <>
+                        fromString (toFilePath (filename hpackFile)) <>
+                        " file instead of the cabal file,\n" <>
+                        "then please delete the cabal file."
+            HpackCommand command ->
+                withWorkingDir (toFilePath pkgDir) $
+                proc command [] runProcess_
+
+gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
+gpdPackageIdentifier = D.package . D.packageDescription
+
+gpdPackageName :: GenericPackageDescription -> PackageName
+gpdPackageName = pkgName . gpdPackageIdentifier
+
+gpdVersion :: GenericPackageDescription -> Version
+gpdVersion = pkgVersion . gpdPackageIdentifier
 
 loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
