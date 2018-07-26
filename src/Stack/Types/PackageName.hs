@@ -20,11 +20,6 @@ module Stack.Types.PackageName
   where
 
 import           Stack.Prelude
-import           Pantry as P
-import           Data.Aeson.Extended
-import           Data.Attoparsec.Combinators
-import           Data.Attoparsec.Text
-import           Data.List (intercalate)
 import qualified Data.Text as T
 import qualified Distribution.Package as Cabal
 import           Language.Haskell.TH

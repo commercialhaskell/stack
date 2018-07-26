@@ -5,8 +5,6 @@ import qualified Data.Map                          as Map
 import           Options.Applicative
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Prelude
-import           Stack.Types.FlagName
-import           Stack.Types.PackageName
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

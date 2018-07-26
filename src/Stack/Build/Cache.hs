@@ -55,14 +55,11 @@ import           Path
 import           Path.IO
 import           Stack.Constants.Config
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.Version
 import qualified System.FilePath as FP
 
 -- | Directory containing files to mark an executable as installed

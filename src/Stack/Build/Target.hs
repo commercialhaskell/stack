@@ -82,8 +82,6 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId

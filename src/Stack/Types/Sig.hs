@@ -21,7 +21,6 @@ import           Data.Aeson (Value(..), ToJSON(..), FromJSON(..))
 import qualified Data.ByteString as SB
 import           Data.Char (isHexDigit)
 import qualified Data.Text as T
-import           Stack.Types.PackageName
 
 -- | A GPG signature.
 newtype Signature =

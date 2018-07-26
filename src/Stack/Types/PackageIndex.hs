@@ -19,18 +19,10 @@ module Stack.Types.PackageIndex
     ) where
 
 import           Data.Aeson.Extended
-import qualified Data.Foldable as F
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Path
-import           Pantry
 import           Stack.Prelude
-import           Stack.Types.PackageName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.Version
-import           Data.List.NonEmpty (NonEmpty)
 
 -- | offset in bytes into the 01-index.tar file for the .cabal file
 -- contents, and size in bytes of the .cabal file

@@ -22,7 +22,6 @@ import Conduit
 import Crypto.Hash.Conduit
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Conduit.Tar as Tar
-import qualified Codec.Archive.Zip as Zip
 import Network.HTTP.Client (parseUrlThrow)
 import Network.HTTP.Simple (httpSink)
 

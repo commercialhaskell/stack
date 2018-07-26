@@ -48,7 +48,6 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
-import qualified RIO
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
@@ -61,7 +60,6 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)

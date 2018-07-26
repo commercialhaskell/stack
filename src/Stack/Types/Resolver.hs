@@ -56,7 +56,6 @@ import           Pantry.StaticSHA256
 import           Path
 import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.PackageIdentifier
 import qualified System.FilePath as FP
 
 data IsLoaded = Loaded | NotLoaded

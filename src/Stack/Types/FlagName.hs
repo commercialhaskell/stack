@@ -18,15 +18,11 @@ module Stack.Types.FlagName
   where
 
 import           Stack.Prelude
-import           Data.Aeson.Extended
-import           Data.Attoparsec.Text as A
-import           Data.Char (isLetter, isDigit, toLower)
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.PackageDescription (FlagName)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Pantry
 
 -- | A parse fail.
 newtype FlagNameParseFail = FlagNameParseFail Text

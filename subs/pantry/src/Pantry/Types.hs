@@ -61,7 +61,6 @@ import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
 import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
-import Data.Pool (Pool)
 import Database.Persist
 import Database.Persist.Sql
 import Pantry.StaticSHA256

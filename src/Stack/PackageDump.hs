@@ -44,7 +44,6 @@ import           Stack.GhcPkg
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageDump
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Directory (getDirectoryContents, doesFileExist)

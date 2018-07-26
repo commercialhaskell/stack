@@ -63,22 +63,13 @@ import RIO
 import RIO.FilePath ((</>))
 import qualified RIO.Map as Map
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
-import qualified RIO.Set as Set
-import qualified RIO.Text as T
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Data.Aeson (ToJSON (..), FromJSON (..), withText, ToJSONKey (..), FromJSONKey (..))
-import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
-import qualified Distribution.Text
-import Data.List.NonEmpty (NonEmpty)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import Distribution.PackageDescription.Parsec
-import qualified Distribution.PackageDescription.Parsec as D
-import qualified Data.List.NonEmpty as NE
-import Data.Coerce (coerce)
 
 withPantryConfig
   :: HasLogFunc env

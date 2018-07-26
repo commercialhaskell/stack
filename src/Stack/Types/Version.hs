@@ -32,21 +32,16 @@ module Stack.Types.Version
   where
 
 import           Stack.Prelude hiding (Vector)
-import           Pantry
 import           Data.Aeson.Extended
-import           Data.Hashable (Hashable (..))
 import           Data.List
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Vector.Unboxed (Vector)
-import qualified Data.Vector.Unboxed as V
 import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
 import           Distribution.Version (Version, versionNumbers, withinRange)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import qualified Paths_stack as Meta
-import           Pantry
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.

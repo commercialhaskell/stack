@@ -16,7 +16,6 @@ import           Control.Concurrent.STM   (retry)
 import           Stack.Prelude
 import           Data.List (sortBy)
 import qualified Data.Set                 as Set
-import           Stack.Types.PackageIdentifier
 
 data ActionType
     = ATBuild

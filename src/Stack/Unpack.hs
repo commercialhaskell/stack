@@ -6,13 +6,9 @@ module Stack.Unpack
 
 import Stack.Prelude
 import Stack.Types.BuildPlan
-import Stack.Types.PackageName
-import Stack.Types.PackageIdentifier
-import Stack.Types.Version
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
-import Pantry
 import RIO.Directory (doesDirectoryExist)
 import RIO.List (intercalate)
 import RIO.FilePath ((</>))
