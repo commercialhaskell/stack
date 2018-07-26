@@ -609,8 +609,8 @@ loadBuildConfig mproject maresolver mcompiler = do
     deps <- fmap fold $ forM (projectDependencies project) $ \x ->
       case x of
         RawPackageLocation rpl -> pure ([], unRawPackageLocation rpl)
-        RPLFilePath fp -> do
-          dir <- resolveDir (parent stackYamlFP) fp
+        RPLFilePath (RelFilePath fp) -> do
+          dir <- resolveDir (parent stackYamlFP) (T.unpack fp)
           pure ([dir], [])
 
     return BuildConfig

@@ -46,6 +46,9 @@ module Pantry.Types
   , RawArchive (..)
   , RawRepo (..)
   , OptionalSubdirs (..)
+  , ArchiveLocation (..)
+  , RawPackageLocationOrPath (..)
+  , RelFilePath (..)
   , CabalString (..)
   , parsePackageIdentifierRevision
   , PantryException (..)
@@ -56,6 +59,7 @@ import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
+import RIO.FilePath (takeDirectory, (</>))
 import qualified RIO.Map as Map
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
@@ -483,8 +487,47 @@ data OptionalSubdirs
 osNoInfo :: OptionalSubdirs
 osNoInfo = OSPackageMetadata Nothing Nothing Nothing Nothing Nothing
 
+-- | File path relative to the configuration file it was parsed from
+newtype RelFilePath = RelFilePath Text
+  deriving Show
+
+unRelFilePath
+  :: FilePath -- ^ config file it was read from
+  -> RelFilePath
+  -> FilePath
+unRelFilePath configFile (RelFilePath fp) = takeDirectory configFile </> T.unpack fp
+
+data ArchiveLocation
+  = ALUrl !Text
+  | ALFilePath !RelFilePath
+  -- ^ relative to the configuration file it came from
+  deriving Show
+instance ToJSON ArchiveLocation where
+  toJSON (ALUrl url) = object ["url" .= url]
+  toJSON (ALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
+instance FromJSON ArchiveLocation where
+  parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
+    where
+      asObjectUrl = withObject "ArchiveLocation (URL object)" $ \o ->
+        ALUrl <$> ((o .: "url") >>= validateUrl)
+      asObjectFilePath = withObject "ArchiveLocation (FilePath object)" $ \o ->
+        ALFilePath <$> ((o .: "url") >>= validateFilePath)
+
+      asText = withText "ArchiveLocation (Text)" $ \t ->
+        (ALUrl <$> validateUrl t) <|> (ALFilePath <$> validateFilePath t)
+
+      validateUrl t =
+        case parseRequest $ T.unpack t of
+          Left _ -> fail $ "Could not parse URL: " ++ T.unpack t
+          Right _ -> pure t
+
+      validateFilePath t =
+        if any (\ext -> ext `T.isSuffixOf` t) (T.words ".zip .tar .tar.gz")
+          then pure (RelFilePath t)
+          else fail $ "Does not have an archive file extension: " ++ T.unpack t
+
 data RawArchive = RawArchive
-  { raUrl :: !Text
+  { raLocation :: !ArchiveLocation
   , raHash :: !(Maybe StaticSHA256)
   , raSize :: !(Maybe FileSize)
   }
@@ -510,8 +553,8 @@ instance ToJSON RawPackageLocation where
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
     ]
-  toJSON (RPLArchive (RawArchive url msha msize) os) = object $ concat
-    [ ["url" .= url]
+  toJSON (RPLArchive (RawArchive loc msha msize) os) = object $ concat
+    [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
     , osToPairs os
@@ -547,16 +590,15 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
     <|> archiveObject v
     <|> github v
     where
-      http = withText "RawPackageLocation.RPLArchive (Text)" $ \t ->
-        case parseRequest $ T.unpack t of
-          Left  _ -> fail $ "Could not parse URL: " ++ T.unpack t
-          Right _ -> pure $ noJSONWarnings $ RPLArchive
-                                RawArchive
-                                  { raUrl = t
-                                  , raHash = Nothing
-                                  , raSize = Nothing
-                                  }
-                                osNoInfo
+      http = withText "RawPackageLocation.RPLArchive (Text)" $ \t -> do
+        loc <- parseJSON $ String t
+        pure $ noJSONWarnings $ RPLArchive
+          RawArchive
+            { raLocation = loc
+            , raHash = Nothing
+            , raSize = Nothing
+            }
+          osNoInfo
 
       hackageText = withText "RawPackageLocation.RPLHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
@@ -585,7 +627,7 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
         RPLRepo RawRepo {..} <$> optionalSubdirs o
 
       archiveObject = withObjectWarnings "RawPackageLocation.RPLArchive" $ \o -> do
-        raUrl <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        raLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
         raHash <- o ..:? "sha256"
         raSize <- o ..:? "size"
         RPLArchive RawArchive {..} <$> optionalSubdirs o
@@ -593,7 +635,7 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let raUrl = T.concat
+        let raLocation = ALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
@@ -691,3 +733,16 @@ instance Store PackageIdentifierRevision where
        VarSize f -> f cfi)
   peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
   poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
+
+-- | A raw package location /or/ a file path to a directory containing a package.
+data RawPackageLocationOrPath
+  = RawPackageLocation !RawPackageLocation
+  | RPLFilePath !RelFilePath
+  deriving Show
+instance ToJSON RawPackageLocationOrPath where
+  toJSON (RawPackageLocation rpl) = toJSON rpl
+  toJSON (RPLFilePath (RelFilePath fp)) = toJSON fp
+instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
+  parseJSON v =
+    (fmap RawPackageLocation <$> parseJSON v) <|>
+    ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)

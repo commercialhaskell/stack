@@ -17,8 +17,10 @@ module Pantry
   , FileSize (..)
   , PackageLocation (..)
   , Archive (..)
+  , ArchiveLocation (..)
   , Repo (..)
   , RepoType (..)
+  , RelFilePath (..)
   , PackageIdentifierRevision (..)
   , PackageName
   , Version
@@ -27,6 +29,7 @@ module Pantry
 
     -- ** Raw package locations
   , RawPackageLocation
+  , RawPackageLocationOrPath (..)
   , unRawPackageLocation
   , mkRawPackageLocation
   , completePackageLocation
