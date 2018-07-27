@@ -38,8 +38,9 @@ module Pantry
   , RawPackageLocation
   , RawPackageLocationOrPath (..)
   , unRawPackageLocation
-  , mkRawPackageLocation
   , unRawPackageLocationOrPath
+  , mkRawPackageLocation
+  , mkRawPackageLocationOrPath
   , completePackageLocation
   , resolveDirWithRel
 
@@ -500,34 +501,43 @@ unCabalStringMap :: Map (CabalString a) v -> Map a v
 unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
 
 -- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
-unRawPackageLocation :: RawPackageLocation -> [PackageLocation]
-unRawPackageLocation (RPLHackage pir mtree) = [PLHackage pir mtree]
+unRawPackageLocation
+  :: MonadIO m
+  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
+  -> RawPackageLocation
+  -> m [PackageLocation]
+unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
 
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
 mkRawPackageLocation = undefined
 
+-- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
+mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
+mkRawPackageLocationOrPath (PLRemote loc) = RPLRemote (mkRawPackageLocation loc)
+mkRawPackageLocationOrPath (PLFilePath fp) = RPLFilePath $ resolvedRelative fp
+
 -- | Convert a 'RawPackageLocationOrPath' into a list of 'PackageLocationOrPath's.
 unRawPackageLocationOrPath
   :: MonadIO m
-  => Path Abs File -- ^ configuration file to be used for resolving relative file paths
+  => Path Abs Dir -- ^ directory containing configuration file, to be used for resolving relative file paths
   -> RawPackageLocationOrPath
   -> m [PackageLocationOrPath]
-unRawPackageLocationOrPath _ (RPLRemote rpl) =
-  pure $ PLRemote <$> unRawPackageLocation rpl
-unRawPackageLocationOrPath configFile (RPLFilePath fp) = do
-  rfp <- resolveDirWithRel configFile fp
+unRawPackageLocationOrPath dir (RPLRemote rpl) =
+  map PLRemote <$> unRawPackageLocation (Just dir) rpl
+unRawPackageLocationOrPath dir (RPLFilePath fp) = do
+  rfp <- resolveDirWithRel dir fp
   pure [PLFilePath rfp]
 
 resolveDirWithRel
   :: MonadIO m
-  => Path Abs File -- ^ config file it was read from
+  => Path Abs Dir -- ^ root directory to be relative to
   -> RelFilePath
   -> m ResolvedDir
-resolveDirWithRel configFile (RelFilePath fp) = do
-  absolute <- resolveDir (parent configFile) (T.unpack fp)
+resolveDirWithRel dir (RelFilePath fp) = do
+  absolute <- resolveDir dir (T.unpack fp)
   pure ResolvedDir
-    { resolvedRelative = fp
+    { resolvedRelative = RelFilePath fp
     , resolvedAbsoluteHack = toFilePath absolute
     }
 

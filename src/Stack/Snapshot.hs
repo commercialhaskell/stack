@@ -25,7 +25,7 @@ import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
 import           Crypto.Hash.Conduit (hashFile)
 import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), withObjectWarnings, (..:))
+import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), withObjectWarnings, (..:), jsonSubWarningsT)
 import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.Conduit.List as CL
@@ -283,7 +283,7 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: FilePath -> RIO env SnapshotDef
     load fp = do
-      WithJSONWarnings (sd0, mparentResolver, mcompiler) warnings <-
+      WithJSONWarnings (sd0, mparentResolver, mcompiler, rawLocations) warnings <-
         liftIO (decodeFileEither fp) >>= either
           (throwM . CustomResolverException url loc)
           (either (throwM . CustomResolverException url loc . AesonException) return . parseEither parseCustom)
@@ -327,20 +327,31 @@ loadResolver (ResolverCustom url loc) = do
                     ResolverCustom _ parentHash -> parentHash
                     ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
             return (Right parent', hash')
+
+      locations <- fold <$> mapM (unRawPackageLocation mdir) rawLocations
+
       return $ overrideCompiler sd0
         { sdParent = parent'
         , sdResolver = ResolverCustom url hash'
+        , sdLocations = locations
         }
 
-    -- | Note that the 'sdParent' and 'sdResolver' fields returned
+    -- | Note that the 'sdParent', 'sdResolver', and 'sdLocations' fields returned
     -- here are bogus, and need to be replaced with information only
     -- available after further processing.
     parseCustom :: Value
-                -> Parser (WithJSONWarnings (SnapshotDef, Maybe (ResolverWith ()), Maybe (CompilerVersion 'CVWanted)))
-    parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,)
+                -> Parser
+                     (WithJSONWarnings
+                       ( SnapshotDef
+                       , Maybe (ResolverWith ())
+                       , Maybe (CompilerVersion 'CVWanted)
+                       , [RawPackageLocation]
+                       )
+                     )
+    parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,,)
         <$> (SnapshotDef (Left (error "loadResolver")) (ResolverStackage (LTS 0 0))
             <$> (o ..: "name")
-            <*> undefined -- jsonSubWarningsT (o ..:? "packages" ..!= [])
+            <*> pure [] -- filled in later
             <*> (Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty))
             <*> ((unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty))
             <*> (unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty))
@@ -348,6 +359,7 @@ loadResolver (ResolverCustom url loc) = do
             <*> (unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)))
         <*> (o ..:? "resolver")
         <*> (o ..:? "compiler")
+        <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
 
     combineHash :: SnapshotHash -> SnapshotHash -> SnapshotHash
     combineHash x y = snapshotHashFromBS (snapshotHashToBS x <> snapshotHashToBS y)

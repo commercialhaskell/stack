@@ -604,13 +604,13 @@ loadBuildConfig mproject maresolver mcompiler = do
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     packages <- for (projectPackages project) $ \fp -> do
-      dir <- resolveDirWithRel stackYamlFP fp
+      dir <- resolveDirWithRel (parent stackYamlFP) fp
       (dir,) <$> runOnce (parseSingleCabalFile True dir)
 
     deps <-
       fmap concat $
       forM (projectDependencies project) $
-      unRawPackageLocationOrPath stackYamlFP
+      unRawPackageLocationOrPath (parent stackYamlFP)
 
     return BuildConfig
         { bcConfig = config

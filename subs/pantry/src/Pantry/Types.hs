@@ -110,7 +110,7 @@ data PantryConfig = PantryConfig
 -- | A directory which was loaded up relative and has been resolved
 -- against the config file it came from.
 data ResolvedDir = ResolvedDir
-  { resolvedRelative :: !Text
+  { resolvedRelative :: !RelFilePath
   -- ^ Original value parsed from a config file.
   , resolvedAbsoluteHack :: !FilePath -- FIXME when we ditch store, use this !(Path Abs Dir)
   }
@@ -522,7 +522,9 @@ displayC = fromString . Distribution.Text.display
 data OptionalSubdirs
   = OSSubdirs ![Text]
   | OSPackageMetadata !PackageMetadata
-  deriving Show
+  deriving (Show, Eq, Data, Generic)
+instance NFData OptionalSubdirs
+instance Store OptionalSubdirs
 
 data PackageMetadata = PackageMetadata
   { pmName :: !(Maybe PackageName)
@@ -592,7 +594,9 @@ data RawPackageLocation
   = RPLHackage !PackageIdentifierRevision !(Maybe TreeKey)
   | RPLArchive !Archive !OptionalSubdirs
   | RPLRepo !Repo !OptionalSubdirs
-  deriving Show
+  deriving (Show, Eq, Data, Generic)
+instance Store RawPackageLocation
+instance NFData RawPackageLocation
 instance ToJSON RawPackageLocation where
   toJSON (RPLHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]

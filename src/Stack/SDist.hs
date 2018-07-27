@@ -390,7 +390,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
     when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedDir
-                                      { resolvedRelative = "this-is-not-used" -- FIXME ugly hack
+                                      { resolvedRelative = RelFilePath "this-is-not-used" -- FIXME ugly hack
                                       , resolvedAbsoluteHack = toFilePath pkgDir
                                       })
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)

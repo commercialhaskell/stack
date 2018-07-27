@@ -111,12 +111,14 @@ initProject whichCmd currDir initOpts mresolver = do
         userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
 
         gpds = Map.elems $ fmap snd rbundle
-        p = Project
+
+    deps <- for (Map.toList extraDeps) $ \(n, v) ->
+      (mkRawPackageLocationOrPath . PLRemote) <$> completePackageLocation (PLHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+
+    let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = (RelFilePath . T.pack) <$> pkgs
-            , projectDependencies = undefined $ map
-                (\(n, v) -> PLHackage $ PackageIdentifierRevision n v CFILatest)
-                (Map.toList extraDeps)
+            , projectDependencies = deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = resolver
             , projectCompiler = Nothing
