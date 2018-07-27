@@ -86,10 +86,8 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
              -- The `locals` value above only contains local project
              -- packages, not local dependencies. This will get _all_
              -- of the local files we're interested in
-             -- watching. Arguably, we should not bother watching repo
-             -- and archive files, since those shouldn't
-             -- change. That's a possible optimization to consider.
-             [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
+             -- watching.
+             [lpFiles lp | PSFilePath lp _ <- Map.elems sourceMap]
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled
@@ -222,7 +220,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
         collect
             [ (exe,pkgName)
             | (pkgName,task) <- Map.toList (planTasks plan)
-            , TTFiles lp _ <- [taskType task] -- FIXME analyze logic here, do we need to check for Local?
+            , TTFilePath lp _ <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
     localExes :: Map Text (NonEmpty PackageName)

@@ -355,7 +355,7 @@ addFinal lp package isAllInOne = do
                             Local
                             package
                 , taskPresent = present
-                , taskType = TTFiles lp Local -- FIXME we can rely on this being Local, right?
+                , taskType = TTFilePath lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
@@ -402,7 +402,8 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
-                              (PackageIdentifierRevision name (installedVersion installed) CFILatest)
+                              (PackageIdentifier name (installedVersion installed))
+                              (PLHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
@@ -417,19 +418,19 @@ addDep treatAsDep' name = do
 
 -- FIXME what's the purpose of this? Add a Haddock!
 tellExecutables :: PackageSource -> M ()
-tellExecutables (PSFiles lp _)
+tellExecutables (PSFilePath lp _)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables (PSIndex loc flags _ghcOptions pir) =
-    tellExecutablesUpstream pir loc flags
+tellExecutables (PSRemote loc flags _ghcOptions pkgloc ident) =
+    tellExecutablesUpstream ident pkgloc loc flags
 
-tellExecutablesUpstream :: PackageIdentifierRevision -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream pir@(PackageIdentifierRevision name _ _) loc flags = do
+tellExecutablesUpstream :: PackageIdentifier -> PackageLocation -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream (PackageIdentifier name _) pkgloc loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
-        p <- loadPackage ctx (PLHackage pir Nothing) flags []
+        p <- loadPackage ctx pkgloc flags []
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -443,10 +444,10 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSFiles lp _)
+        goSource (PSFilePath lp _)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
-        goSource PSIndex{} = Set.empty
+        goSource PSRemote{} = Set.empty
 
     tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
@@ -464,11 +465,11 @@ installPackage :: Bool -- ^ is this being used by a dependency?
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        PSIndex _ flags ghcOptions pkgLoc -> do
+        PSRemote _ flags ghcOptions pkgLoc _version -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- loadPackage ctx (PLHackage pkgLoc Nothing) flags ghcOptions -- FIXME be more efficient! Get this from the LoadedPackageInfo!
+            package <- loadPackage ctx pkgLoc flags ghcOptions
             resolveDepsAndInstall True treatAsDep ps package minstalled
-        PSFiles lp _ ->
+        PSFilePath lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -564,8 +565,8 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSFiles lp loc -> TTFiles lp (loc <> minLoc)
-                    PSIndex loc _ _ pkgLoc -> TTIndex package (loc <> minLoc) pkgLoc
+                    PSFilePath lp loc -> TTFilePath lp (loc <> minLoc)
+                    PSRemote loc _ _ pkgLoc _version -> TTRemote package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
@@ -693,8 +694,8 @@ addPackageDeps treatAsDep package = do
     taskHasLibrary :: Task -> Bool
     taskHasLibrary task =
       case taskType task of
-        TTFiles lp _ -> packageHasLibrary $ lpPackage lp
-        TTIndex p _ _ -> packageHasLibrary p
+        TTFilePath lp _ -> packageHasLibrary $ lpPackage lp
+        TTRemote p _ _ -> packageHasLibrary p
 
     -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
@@ -726,8 +727,8 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSFiles lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
-                    PSIndex{} -> Set.empty
+                    PSFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    PSRemote{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
@@ -817,16 +818,16 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSFiles lp _) = lpForceDirty lp
-psForceDirty PSIndex{} = False
+psForceDirty (PSFilePath lp _) = lpForceDirty lp
+psForceDirty PSRemote{} = False
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSFiles lp _) = lpDirtyFiles lp
-psDirty PSIndex{} = Nothing -- files never change in an upstream package
+psDirty (PSFilePath lp _) = lpDirtyFiles lp
+psDirty PSRemote {} = Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
-psLocal PSIndex{} = False
+psLocal (PSFilePath _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal PSRemote{} = False
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.

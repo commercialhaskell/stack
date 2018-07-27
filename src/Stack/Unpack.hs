@@ -10,19 +10,19 @@ import Stack.Types.BuildPlan
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
-import RIO.Directory (doesDirectoryExist)
 import RIO.List (intercalate)
-import RIO.FilePath ((</>))
+import Path ((</>), parseRelDir)
+import Path.IO (doesDirExist)
 
 data UnpackException
-  = UnpackDirectoryAlreadyExists (Set FilePath)
+  = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
   | CouldNotParsePackageSelectors [String]
     deriving Typeable
 instance Exception UnpackException
 instance Show UnpackException where
     show (UnpackDirectoryAlreadyExists dirs) = unlines
         $ "Unable to unpack due to already present directories:"
-        : map ("    " ++) (Set.toList dirs)
+        : map (("    " ++) . toFilePath) (Set.toList dirs)
     show (CouldNotParsePackageSelectors strs) =
         "The following package selectors are not valid package names or identifiers: " ++
         intercalate ", " strs
@@ -31,7 +31,7 @@ instance Show UnpackException where
 unpackPackages
   :: forall env. (HasPantryConfig env, HasLogFunc env)
   => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
-  -> FilePath -- ^ destination
+  -> Path Abs Dir -- ^ destination
   -> [String] -- ^ names or identifiers
   -> RIO env ()
 unpackPackages mSnapshotDef dest input = do
@@ -41,17 +41,16 @@ unpackPackages mSnapshotDef dest input = do
     case errs1 ++ errs2 of
       [] -> pure ()
       errs -> throwM $ CouldNotParsePackageSelectors errs
-    let locs = Map.fromList $ map
-          (\(pir, PackageIdentifier name version) ->
-               ( pir
-               , dest </> displayC (PackageIdentifier name version)
-               )
+    locs <- fmap Map.fromList $ mapM
+          (\(pir, ident) -> do
+              suffix <- parseRelDir $ displayC ident
+              pure (pir, dest </> suffix)
           )
           (map (\pir@(PackageIdentifierRevision name ver _) ->
                   (PLHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
            locs2)
 
-    alreadyUnpacked <- filterM doesDirectoryExist $ Map.elems locs
+    alreadyUnpacked <- filterM doesDirExist $ Map.elems locs
 
     unless (null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
@@ -62,7 +61,7 @@ unpackPackages mSnapshotDef dest input = do
         "Unpacked " <>
         display loc <>
         " to " <>
-        fromString dest'
+        fromString (toFilePath dest')
   where
     toLoc = maybe toLocNoSnapshot toLocSnapshot mSnapshotDef
 

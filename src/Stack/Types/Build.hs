@@ -407,8 +407,8 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFiles lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
-toCachePkgSrc PSIndex{} = CacheSrcUpstream
+toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
 configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
@@ -459,21 +459,22 @@ instance Show TaskConfigOpts where
 
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
-data TaskType = TTFiles LocalPackage InstallLocation
-              | TTIndex Package InstallLocation PackageIdentifierRevision -- FIXME major overhaul for PackageLocation?
+data TaskType
+  = TTFilePath LocalPackage InstallLocation
+  | TTRemote Package InstallLocation PackageLocation
     deriving Show
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTFiles lp _ -> lpWanted lp
+        TTFilePath lp _ -> lpWanted lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
-        TTFiles _ loc -> loc
-        TTIndex _ loc _ -> loc
+        TTFilePath _ loc -> loc
+        TTRemote _ loc _ -> loc
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan

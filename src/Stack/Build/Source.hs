@@ -88,13 +88,15 @@ loadSourceMapFull needTargets boptsCli = do
           let configOpts = getGhcOptions bconfig boptsCli n False False
           case lpiLocation lpi of
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
-            PLRemote (PLHackage pir mtree) -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
+            PLRemote pkgloc -> do
+              ident <- getPackageLocationIdent pkgloc
+              return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
             PLFilePath dir -> do
               lpv <- parseSingleCabalFile True dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
-              return $ PSFiles lp' loc
+              return $ PSFilePath lp' loc
     sourceMap' <- Map.unions <$> sequence
-      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals
+      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFilePath lp' Local)) locals
       , sequence $ Map.mapWithKey (goLPI Local) localDeps
       , sequence $ Map.mapWithKey (goLPI Snap) (lsPackages ls)
       ]

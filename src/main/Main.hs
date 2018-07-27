@@ -666,7 +666,8 @@ unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
 unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
 unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
     mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    unpackPackages mSnapshotDef (T.unpack dstPath) names
+    dstPath' <- resolveDir' $ T.unpack dstPath
+    unpackPackages mSnapshotDef dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()

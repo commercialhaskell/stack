@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 module Pantry.Tree
   ( unpackTree
   , findCabalFile
@@ -14,6 +15,7 @@ import Pantry.Storage
 import Pantry.Types
 import RIO.FilePath ((</>), takeDirectory)
 import RIO.Directory (createDirectoryIfMissing)
+import Path (Path, Abs, Dir, toFilePath)
 
 #if !WINDOWS
 import System.Posix.Files (setFileMode)
@@ -21,10 +23,10 @@ import System.Posix.Files (setFileMode)
 
 unpackTree
   :: (HasPantryConfig env, HasLogFunc env)
-  => FilePath -- ^ dest dir, will be created if necessary
+  => Path Abs Dir -- ^ dest dir, will be created if necessary
   -> Tree
   -> RIO env ()
-unpackTree dir (TreeMap m) = do
+unpackTree (toFilePath -> dir) (TreeMap m) = do
   withStorage $ for_ (Map.toList m) $ \(sfp, TreeEntry blobKey ft) -> do
     let dest = dir </> T.unpack (unSafeFilePath sfp)
     createDirectoryIfMissing True $ takeDirectory dest

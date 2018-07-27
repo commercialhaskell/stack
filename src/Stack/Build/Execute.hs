@@ -101,19 +101,19 @@ data ExecutableBuildStatus
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: HasEnvConfig env => Plan -> RIO env ()
 preFetch plan
-    | Set.null idents = logDebug "Nothing to fetch"
+    | Set.null pkgLocs = logDebug "Nothing to fetch"
     | otherwise = do
         logDebug $
             "Prefetching: " <>
-            mconcat (intersperse ", " (displayC <$> Set.toList idents))
-        fetchPackages idents
+            mconcat (intersperse ", " (RIO.display <$> Set.toList pkgLocs))
+        fetchPackages pkgLocs
   where
-    idents = Set.unions $ map toIdent $ Map.elems $ planTasks plan
+    pkgLocs = Set.unions $ map toPkgLoc $ Map.elems $ planTasks plan
 
-    toIdent task =
+    toPkgLoc task =
         case taskType task of
-            TTFiles{} -> Set.empty
-            TTIndex _ _ (PackageIdentifierRevision name ver _) -> Set.singleton $ PackageIdentifier name ver
+            TTFilePath{} -> Set.empty
+            TTRemote _ _ pkgloc -> Set.singleton pkgloc
 
 -- | Print a description of build plan for human consumption.
 printPlan :: HasRunner env => Plan -> RIO env ()
@@ -174,8 +174,8 @@ displayTask task =
         Local -> "local") <>
     ", source=" <>
     (case taskType task of
-        TTFiles lp _ -> fromString $ toFilePath $ parent $ lpCabalFile lp
-        TTIndex{} -> "package index") <>
+        TTFilePath lp _ -> fromString $ toFilePath $ parent $ lpCabalFile lp
+        TTRemote{} -> "remote package") <> -- FIXME provide more information on PackageLocation?
     (if Set.null missing
         then ""
         else ", after: " <>
@@ -759,13 +759,13 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             -- 'stack test'. See:
             -- https://github.com/commercialhaskell/stack/issues/805
             case taskType of
-                TTFiles lp _ ->
+                TTFilePath lp _ ->
                   -- FIXME: make this work with exact-configuration.
                   -- Not sure how to plumb the info atm. See
                   -- https://github.com/commercialhaskell/stack/issues/2049
                   [ "--enable-tests" | enableTest || (not useExactConf && depsPresent installedMap (lpTestDeps lp))] ++
                   [ "--enable-benchmarks" | enableBench || (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
-                _ -> []
+                TTRemote{} -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
@@ -790,8 +790,8 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             , configCacheDeps = allDeps
             , configCacheComponents =
                 case taskType of
-                    TTFiles lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
-                    TTIndex{} -> Set.empty
+                    TTFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    TTRemote{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (pkgName taskProvides)
             , configCachePkgSrc = taskCachePkgSrc
@@ -920,8 +920,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     wanted =
         case taskType of
-            TTFiles lp _ -> lpWanted lp
-            TTIndex{} -> False
+            TTFilePath lp _ -> lpWanted lp
+            TTRemote{} -> False
 
     -- Output to the console if this is the last task, and the user
     -- asked to build it specifically. When the action is a
@@ -939,11 +939,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     withPackage inner =
         case taskType of
-            TTFiles lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp) -- TODO remove this third argument, it's redundant with the second
-            TTIndex package _ pir -> do
-                let PackageIdentifierRevision name' ver cfi = pir
-                    dir = eeTempDir
-                unpackPackageLocation (toFilePath dir) $ PLHackage pir Nothing -- FIXME surely we can do better than Nothing
+            TTFilePath lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp) -- TODO remove this third argument, it's redundant with the second
+            TTRemote package _ pkgloc -> do
+                suffix <- parseRelDir $ displayC $ packageIdent package
+                let dir = eeTempDir </> suffix
+                unpackPackageLocation dir pkgloc
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir
@@ -981,9 +981,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
             -- We only want to dump logs for local non-dependency packages
             case taskType of
-                TTFiles lp _ | lpWanted lp ->
+                TTFilePath lp _ | lpWanted lp ->
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
-                _ -> return ()
+                TTRemote{} -> return ()
 
             withBinaryFile fp WriteMode $ \h -> inner $ OTLogFile logPath h
 
@@ -1038,7 +1038,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
-                        (TTFiles lp Local, C.Custom) | lpWanted lp -> do
+                        (TTFilePath lp Local, C.Custom) | lpWanted lp -> do
                             prettyWarnL
                                 [ flow "Package"
                                 , displayC $ packageName package
@@ -1280,7 +1280,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             , ["bench" | enableBenchmarks]
             ]
         (hasLib, hasSubLib, hasExe) = case taskType of
-            TTFiles lp Local ->
+            TTFilePath lp Local ->
               let package = lpPackage lp
                   hasLibrary =
                     case packageLibraries package of
@@ -1333,8 +1333,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -- snapshot, in case it was built with different flags.
         let
           subLibNames = map T.unpack . Set.toList $ case taskType of
-            TTFiles lp _ -> packageInternalLibraries $ lpPackage lp
-            TTIndex p _ _ -> packageInternalLibraries p
+            TTFilePath lp _ -> packageInternalLibraries $ lpPackage lp
+            TTRemote p _ _ -> packageInternalLibraries p
           PackageIdentifier name version = taskProvides
           mainLibName = displayC name
           mainLibVersion = displayC version
@@ -1436,22 +1436,22 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
-            TTFiles lp _ -> do -- FIXME should this only be for local packages?
+            TTFilePath lp _ -> do
                 when enableTests $ unsetTestSuccess pkgDir
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList $ lpNewBuildCaches lp)
-            TTIndex{} -> return ()
+            TTRemote{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
 
         preBuildTime <- modTime <$> liftIO getCurrentTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
-                    TTFiles lp Local -> do
+                    TTFilePath lp Local -> do
                         warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
                         -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
-                    _ -> return Nothing
+                    TTRemote{} -> return Nothing
                 -- NOTE: once
                 -- https://github.com/commercialhaskell/stack/issues/2649
                 -- is resolved, we will want to partition the warnings
@@ -1478,10 +1478,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTFiles lp _, False, False) -> primaryComponentOptions executableBuildStatuses lp
-                (TTFiles lp _, False, True) -> finalComponentOptions lp
-                (TTFiles lp _, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
-                (TTIndex{}, _, _) -> [])
+                (TTFilePath lp _, False, False) -> primaryComponentOptions executableBuildStatuses lp
+                (TTFilePath lp _, False, True) -> finalComponentOptions lp
+                (TTFilePath lp _, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
+                (TTRemote{}, _, _) -> [])
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
               _ -> throwM ex
@@ -1587,10 +1587,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- For packages from a package index, pkgDir is in the tmp
             -- directory. We eagerly delete it if no other tasks
             -- require it, to reduce space usage in tmp (#3018).
-            TTIndex{} -> do
+            TTRemote{} -> do
                 let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
                 when (null remaining) $ removeDirRecur pkgDir
-            _ -> return ()
+            TTFilePath{} -> return ()
 
         return mpkgid
 
@@ -1655,7 +1655,7 @@ checkExeStatus compiler platform distDir name = do
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
-checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
+checkForUnlistedFiles (TTFilePath lp _) preBuildTime pkgDir = do
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime
@@ -1668,7 +1668,7 @@ checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
         writeBuildCache pkgDir component $
             Map.unions (cache : newToCache)
     return warnings
-checkForUnlistedFiles TTIndex{} _ _ = return []
+checkForUnlistedFiles TTRemote{} _ _ = return []
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
@@ -2021,8 +2021,8 @@ finalComponentOptions lp =
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =
     case taskType task of
-        TTFiles lp _ -> lpComponents lp -- FIXME probably just want Local, maybe even just lpWanted
-        TTIndex{} -> Set.empty
+        TTFilePath lp _ -> lpComponents lp -- FIXME probably just want lpWanted
+        TTRemote{} -> Set.empty
 
 -- | Take the given list of package dependencies and the contents of the global
 -- package database, and construct a set of installed package IDs that:
@@ -2099,5 +2099,5 @@ addGlobalPackages deps globals0 =
     loop _ [] gids = gids
 
 ttPackageLocation :: TaskType -> Maybe PackageLocation
-ttPackageLocation (TTFiles lp i) = Nothing -- FIXME! Need to handle archive/repo
-ttPackageLocation (TTIndex _ _ pir) = Just $ PLHackage pir Nothing -- FIXME we should finally drop these weird types
+ttPackageLocation (TTFilePath lp i) = Nothing
+ttPackageLocation (TTRemote _ _ pkgloc) = Just pkgloc

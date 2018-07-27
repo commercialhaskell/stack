@@ -270,13 +270,13 @@ getLatestHackageVersion name =
 
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
-  => f PackageIdentifier
+  => f PackageLocation
   -> RIO env ()
 fetchPackages _ = undefined
 
 unpackPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
-  => FilePath -- ^ unpack directory
+  => Path Abs Dir -- ^ unpack directory
   -> PackageLocation
   -> RIO env ()
 unpackPackageLocation fp loc = do

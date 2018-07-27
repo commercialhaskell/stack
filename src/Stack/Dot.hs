@@ -207,13 +207,13 @@ createDepLoader :: Applicative m
 createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `Set.member` wiredInPackages)
       then case Map.lookup pkgName sourceMap of
-          Just (PSFiles lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
+          Just (PSFilePath lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
             where
               pkg = localPackageToPackage lp
-          Just (PSIndex _ flags ghcOptions loc) ->
+          Just (PSRemote _ flags ghcOptions loc ident) ->
               -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
-              let PackageIdentifierRevision name version _ = loc
-               in assert (pkgName == name) (loadPackageDeps pkgName version (PLHackage loc Nothing) flags ghcOptions)
+              let PackageIdentifier name version = ident
+               in assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of

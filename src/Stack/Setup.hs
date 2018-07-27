@@ -728,8 +728,8 @@ doCabalInstall wc installed wantedVersion = do
             " to replace " <>
             displayC installed
         let name = $(mkPackageName "Cabal")
-            suffix = "Cabal-" ++ displayC wantedVersion
-            dir = toFilePath tmpdir FP.</> suffix
+        suffix <- parseRelDir $ "Cabal-" ++ displayC wantedVersion
+        let dir = tmpdir </> suffix
         unpackPackageLocation dir $ PLHackage
           (PackageIdentifierRevision name wantedVersion CFILatest)
           Nothing
@@ -739,21 +739,22 @@ doCabalInstall wc installed wantedVersion = do
         let installRoot = toFilePath $ parent (parent compilerPath)
                                     </> $(mkRelDir "new-cabal")
                                     </> versionDir
-        withWorkingDir dir $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
+        withWorkingDir (toFilePath dir) $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
         platform <- view platformL
-        let setupExe = dir FP.</> case platform of
-                Platform _ Cabal.Windows -> "Setup.exe"
-                _                        -> "Setup"
+        let setupExe = dir </> case platform of
+                Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
+                _                        -> $(mkRelFile "Setup")
             dirArgument name' = concat [ "--"
                                        , name'
                                        , "dir="
                                        , installRoot FP.</> name'
                                        ]
             args = "configure" : map dirArgument (words "lib bin data doc")
-        withWorkingDir dir $ do
-          proc setupExe args runProcess_
-          proc setupExe ["build"] runProcess_
-          proc setupExe ["install"] runProcess_
+        withWorkingDir (toFilePath dir) $ mapM_ (\args' -> proc (toFilePath setupExe) args' runProcess_)
+          [ args
+          , ["build"]
+          , ["install"]
+          ]
         logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available

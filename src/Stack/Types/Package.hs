@@ -115,6 +115,9 @@ data Package =
           }
  deriving (Show,Typeable)
 
+packageIdent :: Package -> PackageIdentifier
+packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
+
 -- | The value for a map from dependency name. This contains both the
 -- version range and the type of dependency, and provides a semigroup
 -- instance.
@@ -226,20 +229,19 @@ type SourceMap = Map PackageName PackageSource
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-  = PSFiles LocalPackage InstallLocation
-  -- ^ Package which exist on the filesystem (as opposed to an index tarball)
-  | PSIndex InstallLocation (Map FlagName Bool) [Text] PackageIdentifierRevision
-  -- ^ Package which is in an index, and the files do not exist on the
-  -- filesystem yet.
+  = PSFilePath LocalPackage InstallLocation
+  -- ^ Package which exist on the filesystem
+  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocation PackageIdentifier -- FIXME consider using runOnce on the PackageIdentifier
+  -- ^ Package which is downloaded remotely.
     deriving Show
 
 piiVersion :: PackageSource -> Version
-piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
-piiVersion (PSIndex _ _ _ (PackageIdentifierRevision _ v _)) = v
+piiVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
+piiVersion (PSRemote _ _ _ _ (PackageIdentifier _ v)) = v
 
 piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSFiles _ loc) = loc
-piiLocation (PSIndex loc _ _ _) = loc
+piiLocation (PSFilePath _ loc) = loc
+piiLocation (PSRemote loc _ _ _ _) = loc
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
