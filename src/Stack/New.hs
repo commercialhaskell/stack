@@ -168,7 +168,7 @@ loadTemplate name logIt = do
       if exists
         then do logWarn "Tried to download the template but an error was found."
                 logWarn "Using cached local version. It may not be the most recent version though."
-        else throwM exception
+        else throwM (FailedToDownloadTemplate name exception)
 
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
