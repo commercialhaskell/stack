@@ -18,6 +18,7 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
+import           Control.Monad (void)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.List
@@ -155,11 +156,20 @@ loadTemplate name logIt = do
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
         logIt RemoteTemp
-        _ <-
-            catch
-                (redownload req path)
-                (throwM . FailedToDownloadTemplate name)
+        catch
+          (void $ redownload req path)
+          (useCachedVersionOrThrow path)
+
         loadLocalFile path
+    useCachedVersionOrThrow :: Path Abs File -> DownloadException -> RIO env ()
+    useCachedVersionOrThrow path exception = do
+      exists <- doesFileExist path
+
+      if exists
+        then do logWarn "Tried to download the template but an error was found."
+                logWarn "Using cached local version. It may not be the most recent version though."
+        else throwM (FailedToDownloadTemplate name exception)
+
     backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
 -- | Construct a URL for downloading from a repo.
@@ -328,7 +338,7 @@ instance Show NewException where
         "Failed to load download template " <> T.unpack (templateName name) <>
         " from " <>
         path
-    show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
+    show (FailedToDownloadTemplate name (RedownloadInvalidResponse _ _ resp)) =
         case getResponseStatusCode resp of
             404 ->
                 "That template doesn't exist. Run `stack templates' to discover available templates."
@@ -336,6 +346,10 @@ instance Show NewException where
                 "Failed to download template " <> T.unpack (templateName name) <>
                 ": unknown reason, status code was: " <>
                 show code
+
+    show (FailedToDownloadTemplate name (RedownloadHttpError httpError)) =
+          "There was an unexpected HTTP error while downloading template " <>
+          T.unpack (templateName name) <> ": " <> show httpError
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (MissingParameters name template missingKeys userConfigPath) =
