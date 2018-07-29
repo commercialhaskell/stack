@@ -42,4 +42,4 @@ withFakeHackage act = do
         threadDelay 2000000
         act
   where
-    withNetworkArgs = ["runghc", "--package", "network-simple"]
+    withNetworkArgs = ["runghc", "--package", "network"]
