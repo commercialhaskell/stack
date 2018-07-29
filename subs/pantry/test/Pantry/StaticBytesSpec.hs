@@ -3,7 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Stack.StaticBytesSpec (spec) where
 
-import Stack.StaticBytes
+import Pantry.StaticBytes
 import Stack.Prelude
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as VU

@@ -4,12 +4,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pantry
-  ( -- * Congiruation
+  ( -- * Configuration
     PantryConfig
   , HackageSecurityConfig (..)
   , defaultHackageSecurityConfig
   , HasPantryConfig (..)
   , withPantryConfig
+
+    -- ** Lenses
+  , hpackExecutableL
 
     -- * Types
   , StaticSHA256
@@ -560,3 +563,6 @@ getPackageLocationTreeKey
   => PackageLocation
   -> RIO env TreeKey
 getPackageLocationTreeKey = undefined
+
+hpackExecutableL :: HasPantryConfig env => SimpleGetter env HpackExecutable
+hpackExecutableL = pantryConfigL.to pcHpackExecutable

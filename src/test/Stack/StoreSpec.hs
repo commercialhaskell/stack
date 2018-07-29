@@ -9,6 +9,7 @@
 module Stack.StoreSpec where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import           Data.Containers (mapFromList, setFromList)
 import           Data.Sequences (fromList)
 import           Data.Store.Internal (StaticSize (..))
@@ -41,6 +42,9 @@ instance (Monad m, Serial m a, UV.Unbox a) => Serial m (UV.Vector a) where
 instance Monad m => Serial m BS.ByteString where
     series = fmap BS.pack series
 
+instance Monad m => Serial m ShortByteString where
+    series = fmap SBS.pack series
+
 instance (Monad m, Serial m a, Ord a) => Serial m (Set a) where
     series = fmap setFromList series
 
@@ -50,12 +54,6 @@ addMinAndMaxBounds :: forall a. (Bounded a, Eq a) => [a] -> [a]
 addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)
-
-$(do let ns = [ ''Int64, ''Word64, ''Word8
-              ]
-         f n = [d| instance Monad m => Serial m $(conT n) where
-                      series = generate (\_ -> addMinAndMaxBounds [0, 1]) |]
-     concat <$> mapM f ns)
 
 $(do let tys = [ ''InstalledCacheInner
                -- FIXME , ''PackageCache

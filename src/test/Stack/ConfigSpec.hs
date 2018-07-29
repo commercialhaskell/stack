@@ -83,9 +83,8 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner =
-          withRunner logLevel True False ColorAuto Nothing False $ \runner -> do
-            lc <- runRIO runner $ loadConfig mempty Nothing SYLDefault
-            inner lc
+          withRunner logLevel True False ColorAuto Nothing False $ \runner ->
+          runRIO runner $ loadConfig mempty Nothing SYLDefault inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
       loadConfig' $ const $ return ()
@@ -95,22 +94,23 @@ spec = beforeAll setup $ do
       -- TODO(danburton): more specific test for exception
       loadConfig' (const (return ())) `shouldThrow` anyException
 
+    let configOverrideHpack config = view hpackExecutableL config
+
     it "parses config option with-hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) hpackConfig
-      loadConfig' $ \lc -> do
-        let Config{..} = lcConfig lc
-        configOverrideHpack `shouldBe` HpackCommand "/usr/local/bin/hpack"
+      loadConfig' $ \lc ->
+        liftIO $ configOverrideHpack (lcConfig lc) `shouldBe`
+        HpackCommand "/usr/local/bin/hpack"
 
     it "parses config bundled hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
-      loadConfig' $ \lc -> do
-        let Config{..} = lcConfig lc
-        configOverrideHpack `shouldBe` HpackBundled
+      loadConfig' $ \lc ->
+        liftIO $ configOverrideHpack (lcConfig lc) `shouldBe` HpackBundled
 
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
-     loadConfig' $ \lc -> do
-      let BuildOpts{..} = configBuild $ lcConfig lc
+     loadConfig' $ \lc -> liftIO $ do
+      let BuildOpts{..} = configBuild  $ lcConfig lc
       boptsLibProfile `shouldBe` True
       boptsExeProfile `shouldBe` True
       boptsHaddock `shouldBe` True
@@ -137,15 +137,15 @@ spec = beforeAll setup $ do
       let childDir = "child"
       createDirectory childDir
       setCurrentDirectory childDir
-      loadConfig' $ \LoadConfig{..} -> do
-        bc <- liftIO (lcLoadBuildConfig Nothing)
+      loadConfig' $ \LoadConfig{..} -> liftIO $ do
+        bc <- lcLoadBuildConfig Nothing
         view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
       withSystemTempDir "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
-        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \LoadConfig{..} -> do
+        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
           BuildConfig{..} <- lcLoadBuildConfig Nothing
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
@@ -157,7 +157,7 @@ spec = beforeAll setup $ do
             yamlAbs = parentDir </> yamlRel
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
-        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \LoadConfig{..} -> do
+        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
             BuildConfig{..} <- lcLoadBuildConfig Nothing
             bcStackYaml `shouldBe` yamlAbs
 

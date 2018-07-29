@@ -72,7 +72,7 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "haskell2010-1.1.2.0-05c8dd51009e08c6371c82972d40f55a"
-            packageIdent <- parsePackageIdentifier "haskell2010-1.1.2.0"
+            packageIdent <- parsePackageIdentifierThrowing "haskell2010-1.1.2.0"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
@@ -105,7 +105,7 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "ghc-7.10.1-325809317787a897b7a97d646ceaa3a3"
-            pkgIdent <- parsePackageIdentifier "ghc-7.10.1"
+            pkgIdent <- parsePackageIdentifierThrowing "ghc-7.10.1"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.1.0-e29cdbe82692341ebb7ce6e2798294f9"
                 , "base-4.8.0.0-1b689eb8d72c4d4cc88f445839c1f01a"
@@ -148,7 +148,7 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
-            pkgId <- parsePackageIdentifier "hmatrix-0.16.1.5"
+            pkgId <- parsePackageIdentifierThrowing"hmatrix-0.16.1.5"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-918c7ac27f65a87103264a9f51652d63"
@@ -189,7 +189,7 @@ spec = do
              .| conduitDumpPackage
              .| CL.consume
           ghcPkgId <- parseGhcPkgId "ghc-boot-0.0.0.0"
-          pkgId <- parsePackageIdentifier "ghc-boot-0.0.0.0"
+          pkgId <- parsePackageIdentifierThrowing"ghc-boot-0.0.0.0"
           depends <- mapM parseGhcPkgId
             [ "base-4.9.0.0"
             , "binary-0.7.5.0"
