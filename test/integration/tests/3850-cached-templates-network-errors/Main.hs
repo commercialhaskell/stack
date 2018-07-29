@@ -1,9 +1,9 @@
 import StackTest
 import Control.Monad (unless)
 import Data.List (isInfixOf)
-import Data.Maybe (maybe)
+import Data.Maybe (fromMaybe)
 import System.Directory
-import System.Environment (getEnv, setEnv)
+import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 
 main :: IO ()
@@ -17,12 +17,13 @@ main = do
       originalHttpProxy <- lookupEnv "HTTPS_PROXY"
       stack arguments
       removeDirectoryRecursive "tmp"
-      setEnv "HTTPS_PROXY" "http:/sdsgsfgslfgsjflgkjs" -- make https requests fail
+      setEnv "HTTPS_PROXY" "http://sdsgsfgslfgsjflgkjs" -- make https requests fail
       stackCheckStderr arguments $ \stderr ->
         unless ("Using cached local version" `isInfixOf` stderr) 
         (error "stack didn't load the cached template")
 
-      setEnv "HTTP_PROXY" (fromMaybe "" originalHttpProxy)
+      removeDirectoryRecursive "tmp"
+      setEnv "HTTPS_PROXY" (fromMaybe "" originalHttpProxy)
 
     -- this template has a `stack.yaml` file
     -- so `stack new` does not have to `stack init`
