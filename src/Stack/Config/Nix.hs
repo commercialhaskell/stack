@@ -55,23 +55,28 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
 
 nixCompiler :: CompilerVersion a -> Either StringException T.Text
 nixCompiler compilerVersion =
-  let -- These are the latest minor versions for each respective major version available in nixpkgs
-      fixMinor "8.2" = "8.2.1"
-      fixMinor "8.0" = "8.0.2"
-      fixMinor "7.10" = "7.10.3"
-      fixMinor "7.8" = "7.8.4"
-      fixMinor "7.6" = "7.6.3"
-      fixMinor "7.4" = "7.4.2"
-      fixMinor "7.2" = "7.2.2"
-      fixMinor "6.12" = "6.12.3"
-      fixMinor "6.10" = "6.10.4"
-      fixMinor v = v
-      nixCompilerFromVersion v = T.append (T.pack "haskell.compiler.ghc")
-                                          (T.filter (/= '.')
-                                             (fixMinor (versionText v)))
-  in case compilerVersion of
-       GhcVersion v -> Right $ nixCompilerFromVersion v
-       _ -> Left $ stringException "Only GHC is supported by stack --nix"
+  case compilerVersion of
+    GhcVersion version ->
+      case T.split (== '.') (versionText version) of
+        x : y : minor ->
+          Right $
+          case minor of
+            [] ->
+              -- The minor version is not specified. Select the latest minor
+              -- version in Nixpkgs corresponding to the requested major
+              -- version.
+              let major = T.concat [x, y] in
+              "(let compilers = builtins.filter \
+              \(name: builtins.match \
+              \\"ghc" <> major <> "[[:digit:]]*\" name != null) \
+              \(lib.attrNames haskell.compiler); in \
+              \if compilers == [] \
+              \then abort \"No compiler found for GHC "
+              <> versionText version <> "\"\
+              \else haskell.compiler.${builtins.head compilers})"
+            _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
+        _ -> Left $ stringException "GHC major version not specified"
+    _ -> Left $ stringException "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

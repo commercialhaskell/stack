@@ -84,6 +84,8 @@ Other enhancements:
 * It is possible to specify the Hackage base URL to upload packages to, instead
   of the default of `https://hackage.haskell.org/`, by using `hackage-base-url`
   configuration option.
+* When using Nix, if a specific minor version of GHC is not requested, the
+  latest minor version in the given major branch will be used automatically.
 
 Bug fixes:
 
