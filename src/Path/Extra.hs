@@ -14,6 +14,7 @@ module Path.Extra
   ,pathToByteString
   ,pathToLazyByteString
   ,pathToText
+  ,removePathForcibly
   ,tryGetModificationTime
   ) where
 
@@ -28,6 +29,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified System.Directory as D
 import qualified System.FilePath as FP
 
 -- | Convert to FilePath but don't add a trailing slash.
@@ -122,3 +124,14 @@ pathToText = T.pack . toFilePath
 
 tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
 tryGetModificationTime = liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
+
+-- Copied from path-io
+liftD :: MonadIO m
+  => (FilePath -> IO a) -- ^ Original action
+  -> Path b t          -- ^ 'Path' argument
+  -> m a               -- ^ Lifted action
+liftD m = liftIO . m . toFilePath
+{-# INLINE liftD #-}
+
+removePathForcibly :: MonadIO m => Path b Dir -> m ()
+removePathForcibly = liftD D.removePathForcibly

@@ -59,7 +59,7 @@ import           Distribution.System            (OS (Windows),
 import qualified Distribution.Text as C
 import           Path
 import           Path.CheckInstall
-import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
+import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile, removePathForcibly)
 import           Path.IO hiding (findExecutable, makeAbsolute, withSystemTempDir)
 import qualified RIO
 import           Stack.Build.Cache
@@ -1575,7 +1575,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- require it, to reduce space usage in tmp (#3018).
             TTIndex{} -> do
                 let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
-                when (null remaining) $ removeDirRecur pkgDir
+                when (null remaining) $ removePathForcibly pkgDir
             _ -> return ()
 
         return mpkgid

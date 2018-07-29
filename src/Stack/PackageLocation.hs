@@ -64,10 +64,10 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
 
     exists <- doesDirExist dir
     unless exists $ do
-        liftIO $ ignoringAbsence (removeDirRecur dir)
+        liftIO $ ignoringAbsence (removePathForcibly dir)
 
         let dirTmp = root </> dirRelTmp
-        liftIO $ ignoringAbsence (removeDirRecur dirTmp)
+        liftIO $ ignoringAbsence (removePathForcibly dirTmp)
 
         urlExists <- liftIO $ Dir.doesFileExist $ T.unpack url
         file <-
@@ -141,7 +141,7 @@ resolveSinglePackageLocation projRoot (PLArchive (Archive url subdir msha)) = do
         ([dir'], []) -> resolveDir dir' subdir
         (dirs, files) -> liftIO $ do
             ignoringAbsence (removeFile fileDownload)
-            ignoringAbsence (removeDirRecur dir)
+            ignoringAbsence (removePathForcibly dir)
             throwIO $ UnexpectedArchiveContents dirs files
 resolveSinglePackageLocation projRoot (PLRepo (Repo url commit repoType' subdir)) =
     cloneRepo projRoot url commit repoType' >>= flip resolveDir subdir
@@ -200,7 +200,7 @@ cloneRepo projRoot url commit repoType' = do
 
     exists <- doesDirExist dir
     unless exists $ do
-        liftIO $ ignoringAbsence (removeDirRecur dir)
+        liftIO $ ignoringAbsence (removePathForcibly dir)
 
         let cloneAndExtract commandName cloneArgs resetCommand =
               withWorkingDir (toFilePath root) $ do

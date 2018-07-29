@@ -43,7 +43,7 @@ stageContainerImageArtifacts mProjectRoot imageNames = do
         (\(idx,opts) ->
               do imageDir <-
                      imageStagingDir (fromMaybeProjectRoot mProjectRoot) idx
-                 liftIO (ignoringAbsence (removeDirRecur imageDir))
+                 liftIO (ignoringAbsence (removePathForcibly imageDir))
                  ensureDir imageDir
                  stageExesInDir opts imageDir
                  syncAddContentToDir opts imageDir)

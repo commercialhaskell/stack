@@ -30,7 +30,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra (toFilePathNoTrailingSep, removePathForcibly)
 import           Path.IO
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
@@ -55,7 +55,7 @@ import           Web.Browser (openBrowser)
 deleteHpcReports :: HasEnvConfig env => RIO env ()
 deleteHpcReports = do
     hpcDir <- hpcReportDir
-    liftIO $ ignoringAbsence (removeDirRecur hpcDir)
+    liftIO $ ignoringAbsence (removePathForcibly hpcDir)
 
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.

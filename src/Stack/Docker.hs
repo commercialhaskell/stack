@@ -44,7 +44,7 @@ import           Data.Version (showVersion)
 import           GHC.Exts (sortWith)
 import           Lens.Micro (set)
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra (toFilePathNoTrailingSep, removePathForcibly)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
 import           Stack.Config (getInContainer)
@@ -836,7 +836,7 @@ removeDirectoryContents path excludeDirs excludeFiles =
           (do (lsd,lsf) <- listDir path
               forM_ lsd
                     (\d -> unless (dirname d `elem` excludeDirs)
-                                  (removeDirRecur d))
+                                  (removePathForcibly d))
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
                                   (removeFile f)))
