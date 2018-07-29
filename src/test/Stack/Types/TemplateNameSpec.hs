@@ -18,8 +18,8 @@ spec =
         pathOf "bitbucket:user/name"  `shouldBe` (RepoPath $ RepoTemplatePath Bitbucket "user" "name.hsfiles")
         pathOf "gitlab:user/name"     `shouldBe` (RepoPath $ RepoTemplatePath Gitlab    "user" "name.hsfiles")
 
-        pathOf "http://www.com/file"  `shouldBe` (UrlPath "http://www.com/file")
-        pathOf "https://www.com/file" `shouldBe` (UrlPath "https://www.com/file")
+        pathOf "http://www.com/file"  `shouldBe` UrlPath "http://www.com/file"
+        pathOf "https://www.com/file" `shouldBe` UrlPath "https://www.com/file"
 
         pathOf "name"                 `shouldBe` (RelPath $ Path "name.hsfiles")
         pathOf "name.hsfile"          `shouldBe` (RelPath $ Path "name.hsfile.hsfiles")
