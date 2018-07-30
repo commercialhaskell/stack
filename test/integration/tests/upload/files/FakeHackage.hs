@@ -18,7 +18,7 @@ main =
 serve :: IO ()
 serve = do
     let hints = defaultHints {addrFlags = [AI_PASSIVE], addrSocketType = Stream}
-    (addr:_) <- getAddrInfo Nothing Nothing (Just "12415")
+    (addr:_) <- getAddrInfo (Just hints) Nothing (Just "12415")
     sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
     setSocketOption sock ReuseAddr 1
     bind sock (addrAddress addr)
