@@ -553,7 +553,7 @@ completePackageLocation
 completePackageLocation orig@(PLHackage _ (Just _)) = pure orig
 completePackageLocation (PLHackage pir Nothing) = do
   logDebug $ "Completing package location information from " <> display pir
-  (treeKey, _tree) <- getHackageTarball pir -- FIXME perhaps optimize with a function that just gets the TreeKey, not the Tree
+  treeKey <- getHackageTarballKey pir
   pure $ PLHackage pir (Just treeKey)
 
 completeSnapshotLocation
@@ -621,7 +621,8 @@ getPackageLocationTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env TreeKey
-getPackageLocationTreeKey = undefined
+getPackageLocationTreeKey (PLHackage _ (Just treeKey)) = pure treeKey
+getPackageLocationTreeKey (PLHackage pir Nothing) = getHackageTarballKey pir
 
 hpackExecutableL :: HasPantryConfig env => SimpleGetter env HpackExecutable
 hpackExecutableL = pantryConfigL.to pcHpackExecutable

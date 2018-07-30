@@ -30,6 +30,7 @@ module Pantry.Storage
   , loadTreeById
   , storeHackageTree
   , loadHackageTree
+  , loadHackageTreeKey
   , storeArchiveCache
   , loadArchiveCache
     -- avoid warnings
@@ -463,6 +464,32 @@ storeHackageTree name version cabal tid = do
     , HackageCabalCabal ==. cabal
     ]
     [HackageCabalTree =. Just tid]
+
+loadHackageTreeKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> StaticSHA256
+  -> ReaderT SqlBackend (RIO env) (Maybe TreeKey)
+loadHackageTreeKey name ver sha = do
+  res <- rawSql
+    "SELECT treeblob.hash, treeblob.size\n\
+    \FROM blob as treeblob, blob as cabalblob, package_name, version, hackage_cabal, tree\n\
+    \WHERE package_name.name=?\n\
+    \AND   version.version=?\n\
+    \AND   cabalblob.hash=?\n\
+    \AND   hackage_cabal.name=package_name.id\n\
+    \AND   hackage_cabal.version=version.id\n\
+    \AND   hackage_cabal.cabal=cabalblob.id\n\
+    \AND   hackage_cabal.tree=tree.id\n\
+    \AND   tree.key=treeblob.id"
+    [ toPersistValue $ PackageNameP name
+    , toPersistValue $ VersionP ver
+    , toPersistValue sha
+    ]
+  case res of
+    [] -> pure Nothing
+    (Single treesha, Single size):_ -> pure $ Just $ TreeKey $ BlobKey treesha size
 
 loadHackageTree
   :: (HasPantryConfig env, HasLogFunc env)

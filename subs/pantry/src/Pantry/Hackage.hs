@@ -7,6 +7,7 @@ module Pantry.Hackage
   ( updateHackageIndex
   , hackageIndexTarballL
   , getHackageTarball
+  , getHackageTarballKey
   , getHackageCabalFile
   ) where
 
@@ -325,6 +326,17 @@ withCachedTree name ver bid inner = do
       (tid, treekey, tree) <- inner
       withStorage $ storeHackageTree name ver bid tid
       pure (treekey, tree)
+
+getHackageTarballKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageIdentifierRevision
+  -> RIO env TreeKey
+getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
+  mres <- withStorage $ loadHackageTreeKey name ver sha
+  case mres of
+    Nothing -> fst <$> getHackageTarball pir
+    Just key -> pure key
+getHackageTarballKey pir = fst <$> getHackageTarball pir
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env)
