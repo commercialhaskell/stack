@@ -44,7 +44,7 @@ main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
                (renderSnapName snap)
                fp
       logInfo "Decoding suceeded"
-      sd1 <- completeSD sdOrig
+      sd1 <- completeSnapshot Nothing sdOrig
       logInfo "Completing suceeded"
       let bs = Yaml.encode sd1
       writeFileBinary "tmp" bs
@@ -53,8 +53,6 @@ main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
       when (sd1 /= sd2) $ error $ "mismatch on " ++ show snap
       createDirectoryIfMissing True (takeDirectory destFile)
       withSinkFileCautious destFile $ \sink -> runConduit $ yield bs .| sink
-
-  completeSD = pure -- FIXME
 
     {-
   sd <- loadResolver $ ResolverStackage $ LTS 12 0

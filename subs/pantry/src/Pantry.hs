@@ -36,9 +36,6 @@ module Pantry
   , TreeKey (..)
   , BlobKey (..)
   , HpackExecutable (..)
-  , SnapshotLocation (..)
-  , Snapshot (..)
-  , WantedCompiler (..)
 
     -- ** Raw package locations
   , RawPackageLocation
@@ -49,6 +46,13 @@ module Pantry
   , mkRawPackageLocationOrPath
   , completePackageLocation
   , resolveDirWithRel
+
+    -- ** Snapshots
+  , SnapshotLocation (..)
+  , Snapshot (..)
+  , WantedCompiler (..)
+  , completeSnapshot
+  , completeSnapshotLocation
 
     -- ** Cabal helpers
   , parsePackageIdentifier
@@ -510,7 +514,9 @@ unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
 
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
-mkRawPackageLocation = undefined
+mkRawPackageLocation (PLHackage pir mtree) = RPLHackage pir mtree
+mkRawPackageLocation (PLArchive archive pm) = RPLArchive archive (OSPackageMetadata pm)
+mkRawPackageLocation (PLRepo repo pm) = RPLRepo repo (OSPackageMetadata pm)
 
 -- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
 mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
@@ -546,7 +552,32 @@ completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env PackageLocation
-completePackageLocation = undefined
+completePackageLocation orig@(PLHackage _ (Just _)) = pure orig
+completePackageLocation (PLHackage pir Nothing) = do
+  logInfo $ "Completing package location information from " <> display pir -- FIXME switch to Debug
+  (treeKey, _tree) <- getHackageTarball pir
+  pure $ PLHackage pir (Just treeKey)
+
+completeSnapshotLocation
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotLocation
+  -> RIO env SnapshotLocation
+completeSnapshotLocation (SLCompiler wc) = pure $ SLCompiler wc
+
+-- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
+completeSnapshot
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
+  -> Snapshot
+  -> RIO env Snapshot
+completeSnapshot mdir snapshot = do
+  parent' <- completeSnapshotLocation $ snapshotParent snapshot
+  pls <- mapM (unRawPackageLocation mdir) (snapshotLocations snapshot)
+     >>= mapM completePackageLocation . concat
+  pure snapshot
+    { snapshotParent = parent'
+    , snapshotLocations = map mkRawPackageLocation pls
+    }
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent
