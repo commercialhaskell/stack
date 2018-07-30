@@ -16,7 +16,6 @@ module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
     , snapshotDefVC
-    , sdRawPathName
     , ExeName (..)
     , LoadedSnapshot (..)
     , loadedSnapshotVC
@@ -25,12 +24,12 @@ module Stack.Types.BuildPlan
     , fromCabalModuleName
     , ModuleInfo (..)
     , moduleInfoVC
-    , setCompilerVersion
-    , sdWantedCompilerVersion
+    , sdGlobalHints
     ) where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import           Data.Aeson (ToJSON (..), (.=), object)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
@@ -55,70 +54,23 @@ import           Stack.Types.VersionIntervals
 -- of this additional information by package name, and later in the
 -- snapshot load step we will resolve the contents of tarballs and
 -- repos, figure out package names, and assigned values appropriately.
-data SnapshotDef = SnapshotDef
-    { sdParent :: !(Either (CompilerVersion 'CVWanted) SnapshotDef)
-    -- ^ The snapshot to extend from. This is either a specific
-    -- compiler, or a @SnapshotDef@ which gives us more information
-    -- (like packages). Ultimately, we'll end up with a
-    -- @CompilerVersion@.
-    , sdResolver        :: !LoadedResolver
-    -- ^ The resolver that provides this definition.
+data SnapshotDef = SnapshotDef -- FIXME temporary
+    { sdResolver        :: !LoadedResolver
     , sdResolverName    :: !Text
-    -- ^ A user-friendly way of referring to this resolver.
-    , sdLocations :: ![PackageLocation]
-    -- ^ Where to grab all of the packages from.
-    , sdDropPackages :: !(Set PackageName)
-    -- ^ Packages present in the parent which should not be included
-    -- here.
-    , sdFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Flag values to override from the defaults
-    , sdHidden :: !(Map PackageName Bool)
-    -- ^ Packages which should be hidden when registering. This will
-    -- affect, for example, the import parser in the script
-    -- command. We use a 'Map' instead of just a 'Set' to allow
-    -- overriding the hidden settings in a parent snapshot.
-    , sdGhcOptions :: !(Map PackageName [Text])
-    -- ^ GHC options per package
-    , sdGlobalHints :: !(Map PackageName (Maybe Version))
-    -- ^ Hints about which packages are available globally. When
-    -- actually building code, we trust the package database provided
-    -- by GHC itself, since it may be different based on platform or
-    -- GHC install. However, when we want to check the compatibility
-    -- of a snapshot with some codebase without installing GHC (e.g.,
-    -- during stack init), we would use this field.
+    -- ^ The resolver that provides this definition.
+    , sdSnapshots       :: ![Snapshot]
+    , sdWantedCompilerVersion :: !(CompilerVersion 'CVWanted)
+    , sdUniqueHash :: !StaticSHA256
     }
     deriving (Show, Eq, Data, Generic, Typeable)
 instance Store SnapshotDef
 instance NFData SnapshotDef
 
+sdGlobalHints :: SnapshotDef -> Map PackageName (Maybe Version)
+sdGlobalHints = Map.unions . map snapshotGlobalHints . sdSnapshots
+
 snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v3" "gBM1t4bS4RJIpakJJJ8-77UGceQ="
-
--- | A relative file path including a unique string for the given
--- snapshot.
-sdRawPathName :: SnapshotDef -> String
-sdRawPathName sd =
-    T.unpack $ go $ sdResolver sd
-  where
-    go (ResolverStackage name) = renderSnapName name
-    go (ResolverCompiler version) = compilerVersionText version
-    go (ResolverCustom _ hash) = "custom-" <> sdResolverName sd <> "-" <> trimmedSnapshotHash hash
-
--- | Modify the wanted compiler version in this snapshot. This is used
--- when overriding via the `compiler` value in a custom snapshot or
--- stack.yaml file. We do _not_ need to modify the snapshot's hash for
--- this: all binary caches of a snapshot are stored in a filepath that
--- encodes the actual compiler version in addition to the
--- hash. Therefore, modifications here will not lead to any invalid
--- data.
-setCompilerVersion :: CompilerVersion 'CVWanted -> SnapshotDef -> SnapshotDef
-setCompilerVersion cv =
-    go
-  where
-    go sd =
-      case sdParent sd of
-        Left _ -> sd { sdParent = Left cv }
-        Right sd' -> sd { sdParent = Right $ go sd' }
+snapshotDefVC = storeVersionConfig "sd-v3" "MpkgNx8qOHakJTSePR1czDElNiU="
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -230,7 +182,3 @@ instance Monoid ModuleInfo where
 
 moduleInfoVC :: VersionConfig ModuleInfo
 moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="
-
--- | Determined the desired compiler version for this 'SnapshotDef'.
-sdWantedCompilerVersion :: SnapshotDef -> CompilerVersion 'CVWanted
-sdWantedCompilerVersion = either id sdWantedCompilerVersion . sdParent

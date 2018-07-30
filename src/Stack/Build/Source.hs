@@ -20,7 +20,7 @@ import              Crypto.Hash (Digest, SHA256(..))
 import              Crypto.Hash.Conduit (sinkHash)
 import qualified    Data.ByteArray as Mem (convert)
 import qualified    Data.ByteString as S
-import              Data.Conduit (ZipSink (..))
+import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
 import              Data.List
 import qualified    Data.Map as Map

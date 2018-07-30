@@ -48,12 +48,17 @@ module Pantry.Types
   , RawPackageLocationOrPath (..)
   , RelFilePath (..)
   , CabalString (..)
+  , toCabalStringMap
+  , unCabalStringMap
   , parsePackageIdentifierRevision
   , PantryException (..)
   , PackageLocationOrPath (..)
   , ResolvedDir (..)
   , resolvedAbsolute
   , HpackExecutable (..)
+  , WantedCompiler (..)
+  , SnapshotLocation (..)
+  , Snapshot (..)
   ) where
 
 import RIO
@@ -63,6 +68,8 @@ import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
 import qualified RIO.Map as Map
+import qualified Data.Map.Strict as Map (mapKeysMonotonic)
+import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
 import Data.Aeson.Extended
@@ -206,11 +213,14 @@ instance Show BlobKey where
 instance Display BlobKey where
   display (BlobKey sha size) = display sha <> "," <> display size
 
-instance ToJSON BlobKey where
-  toJSON (BlobKey sha size') = object
+blobKeyPairs :: BlobKey -> [(Text, Value)]
+blobKeyPairs (BlobKey sha size') =
     [ "sha256" .= sha
     , "size" .= size'
     ]
+
+instance ToJSON BlobKey where
+  toJSON = object . blobKeyPairs
 instance FromJSON BlobKey where
   parseJSON = withObject "BlobKey" $ \o -> BlobKey
     <$> o .: "sha256"
@@ -274,7 +284,7 @@ instance Show PackageIdentifierRevision where
 
 instance Display PackageIdentifierRevision where
   display (PackageIdentifierRevision name version cfi) =
-    displayC name <> displayC version <> display cfi
+    displayC name <> "-" <> displayC version <> display cfi
 
 instance ToJSON PackageIdentifierRevision where
   toJSON = toJSON . utf8BuilderToText . display
@@ -326,6 +336,7 @@ data PantryException
   | MismatchedCabalName !(Path Abs File) !PackageName
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
+  | InvalidWantedCompiler !Text
 
   deriving Typeable
 instance Exception PantryException where
@@ -386,6 +397,7 @@ instance Display PantryException where
     fromString (toFilePath dir) <>
     ":\n" <>
     fold (intersperse "\n" (map (\x -> "- " <> fromString (toFilePath (filename x))) files))
+  display (InvalidWantedCompiler t) = "Invalid wanted compiler: " <> display t
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -638,6 +650,7 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
     <|> repo v
     <|> archiveObject v
     <|> github v
+    <|> fail ("Could not parse a RawPackageLocation from: " ++ show v)
     where
       http = withText "RawPackageLocation.RPLArchive (Text)" $ \t -> do
         loc <- parseJSON $ String t
@@ -698,6 +711,12 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
 newtype CabalString a = CabalString { unCabalString :: a }
   deriving (Show, Eq, Ord, Typeable)
 
+toCabalStringMap :: Map a v -> Map (CabalString a) v
+toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
+
+unCabalStringMap :: Map (CabalString a) v -> Map a v
+unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
+
 instance Distribution.Text.Text a => ToJSON (CabalString a) where
   toJSON = toJSON . Distribution.Text.display . unCabalString
 instance Distribution.Text.Text a => ToJSONKey (CabalString a) where
@@ -739,6 +758,115 @@ data HpackExecutable
     = HpackBundled
     | HpackCommand String
     deriving (Show, Read, Eq, Ord)
+
+data WantedCompiler
+  = WCGhc !Version
+  | WCGhcjs
+      !Version -- GHCJS version
+      !Version -- GHC version
+ deriving (Show, Eq, Ord, Data, Generic)
+instance NFData WantedCompiler
+instance Store WantedCompiler
+instance Display WantedCompiler where
+  display (WCGhc vghc) = "ghc-" <> displayC vghc
+  display (WCGhcjs vghcjs vghc) = "ghcjs-" <> displayC vghcjs <> "_ghc-" <> displayC vghc
+instance ToJSON WantedCompiler where
+  toJSON = toJSON . utf8BuilderToText . display
+instance FromJSON WantedCompiler where
+  parseJSON = withText "WantedCompiler" $ either (fail . show) pure . parseWantedCompiler
+
+parseWantedCompiler :: Text -> Either PantryException WantedCompiler
+parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
+  case T.stripPrefix "ghcjs-" t0 of
+    Just t1 -> parseGhcjs t1
+    Nothing -> T.stripPrefix "ghc-" t0 >>= parseGhc
+  where
+    parseGhcjs = undefined
+    parseGhc = fmap WCGhc . parseVersion . T.unpack
+
+data SnapshotLocation
+  = SLCompiler !WantedCompiler
+  | SLUrl !Text !(Maybe BlobKey) !(Maybe WantedCompiler)
+  | SLFilePath !RelFilePath !(Maybe WantedCompiler)
+  deriving (Show, Eq, Data, Ord, Generic)
+instance Store SnapshotLocation
+instance NFData SnapshotLocation
+newtype MakeSnapshotLocation = MakeSnapshotLocation (Maybe WantedCompiler -> SnapshotLocation)
+instance FromJSON MakeSnapshotLocation where
+  parseJSON = undefined
+
+data Snapshot = Snapshot
+  { snapshotParent :: !SnapshotLocation
+  -- ^ The snapshot to extend from. This is either a specific
+  -- compiler, or a @SnapshotLocation@ which gives us more information
+  -- (like packages). Ultimately, we'll end up with a
+  -- @CompilerVersion@.
+  , snapshotName :: !Text
+  -- ^ A user-friendly way of referring to this resolver.
+  , snapshotLocations :: ![RawPackageLocation]
+  -- ^ Where to grab all of the packages from.
+  , snapshotDropPackages :: !(Set PackageName)
+  -- ^ Packages present in the parent which should not be included
+  -- here.
+  , snapshotFlags :: !(Map PackageName (Map FlagName Bool))
+  -- ^ Flag values to override from the defaults
+  , snapshotHidden :: !(Map PackageName Bool)
+  -- ^ Packages which should be hidden when registering. This will
+  -- affect, for example, the import parser in the script
+  -- command. We use a 'Map' instead of just a 'Set' to allow
+  -- overriding the hidden settings in a parent snapshot.
+  , snapshotGhcOptions :: !(Map PackageName [Text])
+  -- ^ GHC options per package
+  , snapshotGlobalHints :: !(Map PackageName (Maybe Version))
+  -- ^ Hints about which packages are available globally. When
+  -- actually building code, we trust the package database provided
+  -- by GHC itself, since it may be different based on platform or
+  -- GHC install. However, when we want to check the compatibility
+  -- of a snapshot with some codebase without installing GHC (e.g.,
+  -- during stack init), we would use this field.
+  }
+  deriving (Show, Eq, Data, Generic)
+instance Store Snapshot
+instance NFData Snapshot
+instance ToJSON Snapshot where
+  toJSON snap = object $ concat
+    [ case snapshotParent snap of
+        SLCompiler compiler -> ["compiler" .= compiler]
+        SLUrl url mblob mcompiler -> concat
+          [ pure $ "resolver" .= concat
+              [ ["url" .= url]
+              , maybe [] blobKeyPairs mblob
+              ]
+          , case mcompiler of
+              Nothing -> []
+              Just compiler -> ["compiler" .= compiler]
+          ]
+    , ["name" .= snapshotName snap]
+    , ["packages" .= snapshotLocations snap]
+    , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
+    , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
+    , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
+    , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
+    , if Map.null (snapshotGlobalHints snap) then [] else ["global-hints" .= fmap (fmap CabalString) (toCabalStringMap (snapshotGlobalHints snap))]
+    ]
+instance FromJSON (WithJSONWarnings Snapshot) where
+  parseJSON = withObjectWarnings "Snapshot" $ \o -> do
+    mcompiler <- o ..:? "compiler"
+    mresolver <- o ..:? "resolver"
+    snapshotParent <-
+      case (mcompiler, mresolver) of
+        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
+        (Just compiler, Nothing) -> pure $ SLCompiler compiler
+        (mcompiler, Just (MakeSnapshotLocation f)) -> pure $ f mcompiler
+
+    snapshotName <- o ..: "name"
+    snapshotLocations <- jsonSubWarningsT (o ..:? "packages" ..!= [])
+    snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
+    snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
+    snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
+    snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)
+    pure Snapshot {..}
 
 -- FIXME ORPHANS remove
 

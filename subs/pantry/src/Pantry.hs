@@ -36,6 +36,9 @@ module Pantry
   , TreeKey (..)
   , BlobKey (..)
   , HpackExecutable (..)
+  , SnapshotLocation (..)
+  , Snapshot (..)
+  , WantedCompiler (..)
 
     -- ** Raw package locations
   , RawPackageLocation
@@ -496,12 +499,6 @@ loadPackageLocation
 loadPackageLocation (PLHackage pir mtree) =
   case mtree of
     Nothing -> snd <$> getHackageTarball pir
-
-toCabalStringMap :: Map a v -> Map (CabalString a) v
-toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
-
-unCabalStringMap :: Map (CabalString a) v -> Map a v
-unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
 
 -- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
 unRawPackageLocation

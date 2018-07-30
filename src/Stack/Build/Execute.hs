@@ -33,7 +33,7 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
-import           Data.Conduit
+import           Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed

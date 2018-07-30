@@ -599,7 +599,7 @@ loadBuildConfig mproject maresolver mcompiler = do
             }
 
     sd0 <- runRIO config $ loadResolver $ projectResolver project
-    let sd = maybe id setCompilerVersion (projectCompiler project) sd0
+    let sd = maybe id (error "FIXME setCompilerVersion") (projectCompiler project) sd0
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 

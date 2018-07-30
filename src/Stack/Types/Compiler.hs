@@ -73,7 +73,7 @@ parseCompilerVersion t
     | otherwise
         = Nothing
 
-compilerVersionText :: CompilerVersion a -> T.Text
+compilerVersionText :: CompilerVersion a -> T.Text -- FIXME remove, should be in pantry only
 compilerVersionText (GhcVersion vghc) =
     "ghc-" <> displayC vghc
 compilerVersionText (GhcjsVersion vghcjs vghc) =

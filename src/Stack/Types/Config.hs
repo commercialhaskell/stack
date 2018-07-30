@@ -207,6 +207,7 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Pantry.StaticSHA256
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Constants
@@ -1221,7 +1222,7 @@ platformSnapAndCompilerRel
 platformSnapAndCompilerRel = do
     sd <- view snapshotDefL
     platform <- platformGhcRelDir
-    name <- parseRelDir $ sdRawPathName sd
+    name <- parseRelDir $ T.unpack $ staticSHA256ToText $ sdUniqueHash sd
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1323,7 +1324,7 @@ configLoadedSnapshotCache
 configLoadedSnapshotCache sd gis = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ sdRawPathName sd ++ ".cache"
+    file <- parseRelFile $ T.unpack (staticSHA256ToText $ sdUniqueHash sd) ++ ".cache"
     gis' <- parseRelDir $
           case gis of
             GISSnapshotHints -> "__snapshot_hints__"

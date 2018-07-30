@@ -3,10 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 module Stack.Prelude
-  ( withSourceFile
-  , withSinkFile
-  , withSinkFileCautious
-  , withSystemTempDir
+  ( withSystemTempDir
   , withKeepSystemTempDir
   , sinkProcessStderrStdout
   , sinkProcessStdout
@@ -52,36 +49,6 @@ import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
-
--- | Get a source for a file. Unlike @sourceFile@, doesn't require
--- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
--- usage, you can't accidentally use @WriteMode@ instead of
--- @ReadMode@.
-withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
-withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
-
--- | Same idea as 'withSourceFile', see comments there.
-withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
-withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
-
--- | Like 'withSinkFile', but ensures that the file is atomically
--- moved after all contents are written.
-withSinkFileCautious
-  :: MonadUnliftIO m
-  => FilePath
-  -> (ConduitM ByteString o m () -> m a)
-  -> m a
-withSinkFileCautious fp inner =
-    withRunInIO $ \run -> bracket acquire cleanup $ \(tmpFP, h) ->
-      run (inner $ sinkHandle h) <* (IO.hClose h *> Dir.renameFile tmpFP fp)
-  where
-    acquire = IO.openBinaryTempFile (FP.takeDirectory fp) (FP.takeFileName fp FP.<.> "tmp")
-    cleanup (tmpFP, h) = do
-        IO.hClose h
-        Dir.removeFile tmpFP `catch` \e ->
-            if isDoesNotExistError e
-                then return ()
-                else throwIO e
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a

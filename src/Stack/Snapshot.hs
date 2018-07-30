@@ -143,126 +143,14 @@ loadResolver
   :: forall env. HasConfig env
   => Resolver
   -> RIO env SnapshotDef
-loadResolver (ResolverStackage name) = do
-    stackage <- view stackRootL
-    file' <- parseRelFile $ T.unpack file
-    cachePath <- (buildPlanCacheDir stackage </>) <$> parseRelFile (T.unpack (renderSnapName name <> ".cache"))
-    let fp = buildPlanDir stackage </> file'
-        tryDecode = tryAny $ $(versionedDecodeOrLoad snapshotDefVC) cachePath $ liftIO $ do
-          evalue <- decodeFileEither $ toFilePath fp
-          case evalue of
-            Left e -> throwIO e
-            Right value ->
-              case parseEither parseStackageSnapshot value of
-                Left s -> throwIO $ InvalidStackageException name s
-                Right x -> return x
-    logDebug $ "Decoding build plan from: " <> fromString (toFilePath fp)
-    eres <- tryDecode
-    case eres of
-        Right sd -> return sd
-        Left e -> do
-            logDebug $
-              "Decoding Stackage snapshot definition from file failed: " <>
-              displayShow e
-            ensureDir (parent fp)
-            url <- buildBuildPlanUrl name file
-            req <- parseRequest $ T.unpack url
-            logSticky $ "Downloading " <> RIO.display name <> " build plan ..."
-            logDebug $ "Downloading build plan from: " <> RIO.display url
-            wasDownloaded <- redownload req fp
-            if wasDownloaded
-              then logStickyDone $ "Downloaded " <> RIO.display name <> " build plan."
-              else logStickyDone $ "Skipped download of " <> RIO.display name <> " because its the stored entity tag matches the server version"
-            tryDecode >>= either throwM return
-
-  where
-    file = renderSnapName name <> ".yaml"
-
-    buildBuildPlanUrl :: (MonadReader env m, HasConfig env) => SnapName -> Text -> m Text
-    buildBuildPlanUrl snapName file' = do
-        urls <- view $ configL.to configUrls
-        return $
-            case snapName of
-                LTS _ _ -> urlsLtsBuildPlans urls <> "/" <> file'
-                Nightly _ -> urlsNightlyBuildPlans urls <> "/" <> file'
-
-    parseStackageSnapshot = withObject "StackageSnapshotDef" $ \o -> do
-        Object si <- o .: "system-info"
-        ghcVersion <- fmap unCabalString <$> (si .:? "ghc-version")
-        compilerVersion <- si .:? "compiler-version"
-        compilerVersion' <-
-            case (ghcVersion, compilerVersion) of
-                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
-                (Just ghc, _) -> return (GhcVersion ghc)
-                (_, Just compiler) -> return compiler
-                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
-        let sdParent = Left compilerVersion'
-        sdGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (si .: "core-packages")
-
-        packages <- o .: "packages"
-        (Endo mkLocs, sdFlags, sdHidden) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages
-        let sdLocations = mkLocs []
-
-        let sdGhcOptions = Map.empty -- Stackage snapshots do not allow setting GHC options
-
-        -- Not dropping any packages in a Stackage snapshot
-        let sdDropPackages = Set.empty
-
-        let sdResolver = ResolverStackage name
-            sdResolverName = renderSnapName name
-
-        return SnapshotDef {..}
-      where
-        goPkg
-          :: CabalString PackageName
-          -> Value
-          -> Parser
-               ( Endo [PackageLocation]
-               , Map PackageName (Map FlagName Bool)
-               , Map PackageName Bool
-               )
-        goPkg (CabalString name') = withObject "StackagePackageDef" $ \o -> do
-            CabalString version <- o .: "version"
-            mcabalFileInfo <- o .:? "cabal-file-info"
-            mcabalFileInfo' <- forM mcabalFileInfo $ \o' -> do
-                msize <- Just <$> o' .: "size"
-                cfiHashes <- o' .: "hashes"
-                hash' <-
-                  case HashMap.lookup ("SHA256" :: Text) cfiHashes of
-                    Nothing -> fail "Could not find SHA256"
-                    Just shaText ->
-                      case mkStaticSHA256FromText shaText of
-                        Left e -> fail $ "Invalid SHA256: " ++ show e
-                        Right x -> return x
-                return $ CFIHash hash' msize
-
-            Object constraints <- o .: "constraints"
-
-            flags <- constraints .: "flags"
-            let flags' = Map.singleton name' $ unCabalStringMap flags
-
-            hide <- constraints .:? "hide" .!= False
-            let hide' = if hide then Map.singleton name' True else Map.empty
-
-            let location = PLHackage (PackageIdentifierRevision
-                  name'
-                  version
-                  (fromMaybe CFILatest mcabalFileInfo'))
-                  Nothing -- FIXME get the pantry key from Stackage? Or just support it in the new format?
-
-            return (Endo (location:), flags', hide')
 loadResolver (ResolverCompiler compiler) = return SnapshotDef
-    { sdParent = Left compiler
-    , sdResolver = ResolverCompiler compiler
+    { sdResolver = ResolverCompiler compiler
     , sdResolverName = compilerVersionText compiler
-    , sdLocations = []
-    , sdDropPackages = Set.empty
-    , sdFlags = Map.empty
-    , sdHidden = Map.empty
-    , sdGhcOptions = Map.empty
-    , sdGlobalHints = Map.empty
+    , sdSnapshots = []
+    , sdWantedCompilerVersion = compiler
+    , sdUniqueHash = undefined
     }
-loadResolver (ResolverCustom url loc) = do
+loadResolver (ResolverCustom url loc) = do -- FIXME move this logic into Pantry
   logDebug $ "Loading " <> RIO.display url <> " build plan from " <> displayShow loc
   case loc of
     Left req -> download' req >>= load . toFilePath
@@ -283,11 +171,13 @@ loadResolver (ResolverCustom url loc) = do
 
     load :: FilePath -> RIO env SnapshotDef
     load fp = do
-      WithJSONWarnings (sd0, mparentResolver, mcompiler, rawLocations) warnings <-
+      WithJSONWarnings snapshot warnings <-
         liftIO (decodeFileEither fp) >>= either
-          (throwM . CustomResolverException url loc)
-          (either (throwM . CustomResolverException url loc . AesonException) return . parseEither parseCustom)
+          (throwM . CustomResolverException url loc) pure
+
       logJSONWarnings (T.unpack url) warnings
+      error $ show (snapshot :: Snapshot)
+    {-
       -- The fp above may just be the download location for a URL,
       -- which we don't want to use. Instead, look back at loc from
       -- above.
@@ -335,31 +225,7 @@ loadResolver (ResolverCustom url loc) = do
         , sdResolver = ResolverCustom url hash'
         , sdLocations = locations
         }
-
-    -- | Note that the 'sdParent', 'sdResolver', and 'sdLocations' fields returned
-    -- here are bogus, and need to be replaced with information only
-    -- available after further processing.
-    parseCustom :: Value
-                -> Parser
-                     (WithJSONWarnings
-                       ( SnapshotDef
-                       , Maybe (ResolverWith ())
-                       , Maybe (CompilerVersion 'CVWanted)
-                       , [RawPackageLocation]
-                       )
-                     )
-    parseCustom = withObjectWarnings "CustomSnapshot" $ \o -> (,,,)
-        <$> (SnapshotDef (Left (error "loadResolver")) (ResolverStackage (LTS 0 0))
-            <$> (o ..: "name")
-            <*> pure [] -- filled in later
-            <*> (Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty))
-            <*> ((unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty))
-            <*> (unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty))
-            <*> (unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty))
-            <*> (unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)))
-        <*> (o ..:? "resolver")
-        <*> (o ..:? "compiler")
-        <*> jsonSubWarningsT (o ..:? "packages" ..!= [])
+    -}
 
     combineHash :: SnapshotHash -> SnapshotHash -> SnapshotHash
     combineHash x y = snapshotHashFromBS (snapshotHashToBS x <> snapshotHashToBS y)
@@ -375,7 +241,8 @@ loadSnapshot
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler root =
+loadSnapshot mcompiler root = undefined
+{-
     start
   where
     start (snapshotDefFixes -> sd) = do
@@ -433,6 +300,7 @@ loadSnapshot mcompiler root =
         -- the two snapshots' packages together.
         , lsPackages = Map.union snapshot (Map.map (fmap fst) locals)
         }
+-}
 
 -- | Given information on a 'LoadedSnapshot' and a given set of
 -- additional packages and configuration values, calculates the new
@@ -697,25 +565,6 @@ findPackage platform compilerVersion (gpd, loc, localLoc) = do
     assert (name == name') $ put (m', allFlags', allHide', allOptions')
   where
     PackageIdentifier name _version = C.package $ C.packageDescription gpd
-
--- | Some hard-coded fixes for build plans, only for hysterical raisins.
-snapshotDefFixes :: SnapshotDef -> SnapshotDef
-snapshotDefFixes sd | isOldStackage (sdResolver sd) = sd
-    { sdFlags = Map.unionWith Map.union overrides $ sdFlags sd
-    }
-  where
-    overrides = Map.fromList
-      [ ($(mkPackageName "persistent-sqlite"), Map.singleton $(mkFlagName "systemlib") False)
-      , ($(mkPackageName "yaml"), Map.singleton $(mkFlagName "system-libyaml") False)
-      ]
-
-    -- Only apply this hack to older Stackage snapshots. In
-    -- particular, nightly-2018-03-13 did not contain these two
-    -- packages.
-    isOldStackage (ResolverStackage (LTS major _)) = major < 11
-    isOldStackage (ResolverStackage (Nightly (toGregorian -> (year, _, _)))) = year < 2018
-    isOldStackage _ = False
-snapshotDefFixes sd = sd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
 -- creating a 'PackageLocationOrPath'.

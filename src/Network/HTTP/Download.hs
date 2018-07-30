@@ -26,7 +26,7 @@ module Network.HTTP.Download
 import           Stack.Prelude
 import           Stack.Types.Runner
 import qualified Data.ByteString.Lazy        as L
-import           Data.Conduit                (yield)
+import           Conduit                     (yield, withSinkFileCautious, withSourceFile)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
