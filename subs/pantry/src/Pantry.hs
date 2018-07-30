@@ -90,19 +90,17 @@ module Pantry
   ) where
 
 import RIO
-import RIO.FilePath (takeDirectory)
 import qualified RIO.Map as Map
 import qualified RIO.ByteString as B
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath
-import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, parent, toFilePath, Dir, mkRelFile, (</>), filename)
+import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename)
 import Path.Find (findFiles)
 import Path.IO (resolveDir, doesFileExist)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
@@ -412,13 +410,13 @@ findOrGenerateCabalFile
     -> RIO env (Path Abs File)
 findOrGenerateCabalFile pkgDir = do
     hpack pkgDir
-    findCabalFile
+    findCabalFile1
   where
-    findCabalFile :: RIO env (Path Abs File)
-    findCabalFile = findCabalFile' >>= either throwIO return
+    findCabalFile1 :: RIO env (Path Abs File)
+    findCabalFile1 = findCabalFile2 >>= either throwIO return
 
-    findCabalFile' :: RIO env (Either PantryException (Path Abs File))
-    findCabalFile' = do
+    findCabalFile2 :: RIO env (Either PantryException (Path Abs File))
+    findCabalFile2 = do
         files <- liftIO $ findFiles
             pkgDir
             (flip hasExtension "cabal" . toFilePath)
@@ -554,8 +552,8 @@ completePackageLocation
   -> RIO env PackageLocation
 completePackageLocation orig@(PLHackage _ (Just _)) = pure orig
 completePackageLocation (PLHackage pir Nothing) = do
-  logInfo $ "Completing package location information from " <> display pir -- FIXME switch to Debug
-  (treeKey, _tree) <- getHackageTarball pir
+  logDebug $ "Completing package location information from " <> display pir
+  (treeKey, _tree) <- getHackageTarball pir -- FIXME perhaps optimize with a function that just gets the TreeKey, not the Tree
   pure $ PLHackage pir (Just treeKey)
 
 completeSnapshotLocation
@@ -573,7 +571,7 @@ completeSnapshot
 completeSnapshot mdir snapshot = do
   parent' <- completeSnapshotLocation $ snapshotParent snapshot
   pls <- mapM (unRawPackageLocation mdir) (snapshotLocations snapshot)
-     >>= mapM completePackageLocation . concat
+     >>= mapM completePackageLocation . concat -- FIXME consider parallelizing this work
   pure snapshot
     { snapshotParent = parent'
     , snapshotLocations = map mkRawPackageLocation pls

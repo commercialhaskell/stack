@@ -48,7 +48,8 @@ main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
       logInfo "Completing suceeded"
       let bs = Yaml.encode sd1
       writeFileBinary "tmp" bs
-      WithJSONWarnings sd2 [] <- Yaml.decodeThrow bs
+      WithJSONWarnings sd2 warnings <- Yaml.decodeThrow bs
+      unless (null warnings) $ error $ unlines $ map show warnings
       logInfo "Decoding new ByteString succeeded"
       when (sd1 /= sd2) $ error $ "mismatch on " ++ show snap
       createDirectoryIfMissing True (takeDirectory destFile)

@@ -112,18 +112,19 @@ initStorage
   => Path Abs File -- ^ storage file
   -> (Storage -> RIO env a)
   -> RIO env  a
-initStorage fp inner = withSqliteConn (fromString $ toFilePath fp) $ \conn -> do
-  migrates <- runSqlConn (runMigrationSilent migrateAll) conn
+initStorage fp inner = do
+  pool <- createSqlitePool (fromString $ toFilePath fp) 1
+  migrates <- runSqlPool (runMigrationSilent migrateAll) pool
   forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
-  inner (Storage conn)
+  inner (Storage pool)
 
 withStorage
   :: (HasPantryConfig env, HasLogFunc env)
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withStorage action = do
-  Storage conn <- view $ pantryConfigL.to pcStorage
-  runSqlConn action conn
+  Storage pool <- view $ pantryConfigL.to pcStorage
+  runSqlPool action pool
 
 getNameId
   :: (HasPantryConfig env, HasLogFunc env)

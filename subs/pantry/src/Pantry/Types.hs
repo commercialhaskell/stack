@@ -88,11 +88,12 @@ import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import qualified Data.Text.Read
 import Path (Path, Abs, Dir, File, parseAbsDir, toFilePath, filename)
+import Data.Pool (Pool)
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
 
-newtype Storage = Storage SqlBackend
+newtype Storage = Storage (Pool SqlBackend)
 
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
@@ -669,7 +670,7 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
 
       hackageObject = withObjectWarnings "RawPackageLocation.RPLHackage" $ \o -> RPLHackage
         <$> o ..: "hackage"
-        <*> o ..:? "pantry-key"
+        <*> o ..:? "pantry-tree"
 
       optionalSubdirs o =
         (OSSubdirs <$> o ..: "subdirs") <|>
