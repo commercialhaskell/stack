@@ -68,7 +68,7 @@ import              Network.HTTP.StackClient (getResponseBody, getResponseStatus
 import              Network.HTTP.Download
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
-import              Path.Extra (toFilePathNoTrailingSep)
+import              Path.Extra (toFilePathNoTrailingSep, removePathForcibly)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
@@ -849,12 +849,12 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
     tempDir <- tempInstallDir programsDir tool
-    liftIO $ ignoringAbsence (removeDirRecur tempDir)
+    liftIO $ ignoringAbsence (removePathForcibly tempDir)
     ensureDir tempDir
     unmarkInstalled programsDir tool
     installer si file at tempDir dir
     markInstalled programsDir tool
-    liftIO $ ignoringAbsence (removeDirRecur tempDir)
+    liftIO $ ignoringAbsence (removePathForcibly tempDir)
     return tool
 
 downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
@@ -1183,8 +1183,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
             logDebug $ "ziptool: " <> fromString zipTool
             logDebug $ "tar: " <> fromString tarTool
             return $ do
-                liftIO $ ignoringAbsence (removeDirRecur destDir)
-                liftIO $ ignoringAbsence (removeDirRecur unpackDir)
+                liftIO $ ignoringAbsence (removePathForcibly destDir)
+                liftIO $ ignoringAbsence (removePathForcibly unpackDir)
                 withProcessContext menv $ withWorkingDir (toFilePath destDir) $ readProcessNull tarTool ["xf", toFilePath archiveFile]
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
@@ -1417,7 +1417,7 @@ installMsys2Windows :: HasConfig env
                   -> RIO env ()
 installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
-    when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
+    when exists $ liftIO (D.removePathForcibly $ toFilePath destDir) `catchIO` \e -> do
         logError $
             "Could not delete existing msys directory: " <>
             fromString (toFilePath destDir)
@@ -1471,7 +1471,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
     withRunInIO $ \run -> withTempDir (parent destDir) tmpName $ \tmpDir -> run $ do
-        liftIO $ ignoringAbsence (removeDirRecur destDir)
+        liftIO $ ignoringAbsence (removePathForcibly destDir)
         run7z tmpDir archiveFile
         run7z tmpDir (tmpDir </> tarFile)
         absSrcDir <- case msrcDir of

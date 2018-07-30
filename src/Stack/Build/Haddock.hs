@@ -269,11 +269,11 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                 | otherwise -> return ()
       where
         doCopy = do
-            ignoringAbsence (removeDirRecur destHtmlAbsDir)
+            ignoringAbsence (removePathForcibly destHtmlAbsDir)
             ensureDir destHtmlAbsDir
             onException
                 (copyDirRecur' (parent srcInterfaceAbsFile) destHtmlAbsDir)
-                (ignoringAbsence (removeDirRecur destHtmlAbsDir))
+                (ignoringAbsence (removePathForcibly destHtmlAbsDir))
         destHtmlAbsDir = parent destInterfaceAbsFile
 
 -- | Find first DumpPackage matching the GhcPkgId
