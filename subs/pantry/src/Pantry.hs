@@ -571,11 +571,44 @@ completeSnapshot
 completeSnapshot mdir snapshot = do
   parent' <- completeSnapshotLocation $ snapshotParent snapshot
   pls <- mapM (unRawPackageLocation mdir) (snapshotLocations snapshot)
-     >>= mapM completePackageLocation . concat -- FIXME consider parallelizing this work
+     >>= traverseConcurrentlyWith 16 completePackageLocation . concat
   pure snapshot
     { snapshotParent = parent'
     , snapshotLocations = map mkRawPackageLocation pls
     }
+
+-- | Like 'traverse', but does things on
+-- up to N separate threads at once.
+traverseConcurrentlyWith
+  :: (MonadUnliftIO m, Traversable t)
+  => Int -- ^ concurrent workers
+  -> (a -> m b) -- ^ action to perform
+  -> t a -- ^ input values
+  -> m (t b)
+traverseConcurrentlyWith count f t0 = do
+  (queue, t1) <- atomically $ do
+    queueDList <- newTVar id
+    t1 <- for t0 $ \x -> do
+      res <- newEmptyTMVar
+      modifyTVar queueDList (. ((x, res):))
+      pure $ atomically $ takeTMVar res
+    dlist <- readTVar queueDList
+    queue <- newTVar $ dlist []
+    pure (queue, t1)
+
+  replicateConcurrently_ count $
+    fix $ \loop -> join $ atomically $ do
+      toProcess <- readTVar queue
+      case toProcess of
+        [] -> pure (pure ())
+        ((x, res):rest) -> do
+          writeTVar queue rest
+          pure $ do
+            y <- f x
+            atomically $ putTMVar res y
+            loop
+  sequence t1
+
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent
