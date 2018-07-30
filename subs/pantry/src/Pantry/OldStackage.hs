@@ -8,6 +8,7 @@ module Pantry.OldStackage
 
 import Pantry.Types
 import Pantry.StaticSHA256
+import Pantry.Storage
 import RIO
 import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither)
@@ -20,16 +21,23 @@ import Data.Monoid (Endo (..))
 import Data.Yaml (decodeFileThrow)
 
 parseOldStackage
-  :: Either (Int, Int) Day -- ^ LTS or nightly
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Either (Int, Int) Day -- ^ LTS or nightly
   -> Text -- ^ rendered name
   -> FilePath
   -> RIO env Snapshot
-parseOldStackage snapName name fp = do
+parseOldStackage snapName renderedSnapName fp = do
   value <- decodeFileThrow fp
-  case parseEither (parseStackageSnapshot name) value of
+  case parseEither (parseStackageSnapshot renderedSnapName) value of
     Left s -> error $ show (fp, s)
-    Right x -> pure $ snapshotDefFixes snapName x
+    Right x -> do
+      locs <- mapM applyCrlfHack $ snapshotLocations x
+      pure $ snapshotDefFixes snapName x { snapshotLocations = locs }
   where
+    applyCrlfHack (RPLHackage (PackageIdentifierRevision name version (CFIHash sha (Just size))) mtree) = do
+      BlobKey sha' size' <- withStorage $ checkCrlfHack $ BlobKey sha size
+      pure (RPLHackage (PackageIdentifierRevision name version (CFIHash sha' (Just size'))) mtree)
+    applyCrlfHack x = pure x
 
 parseStackageSnapshot :: Text -> Value -> Parser Snapshot
 parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do

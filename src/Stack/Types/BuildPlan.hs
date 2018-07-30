@@ -58,7 +58,7 @@ data SnapshotDef = SnapshotDef -- FIXME temporary
     { sdResolver        :: !LoadedResolver
     , sdResolverName    :: !Text
     -- ^ The resolver that provides this definition.
-    , sdSnapshots       :: ![Snapshot]
+    , sdSnapshots       :: ![(Snapshot, [PackageLocation])]
     , sdWantedCompilerVersion :: !(CompilerVersion 'CVWanted)
     , sdUniqueHash :: !StaticSHA256
     }
@@ -67,7 +67,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 sdGlobalHints :: SnapshotDef -> Map PackageName (Maybe Version)
-sdGlobalHints = Map.unions . map snapshotGlobalHints . sdSnapshots
+sdGlobalHints = Map.unions . map (snapshotGlobalHints . fst) . sdSnapshots
 
 snapshotDefVC :: VersionConfig SnapshotDef
 snapshotDefVC = storeVersionConfig "sd-v3" "MpkgNx8qOHakJTSePR1czDElNiU="

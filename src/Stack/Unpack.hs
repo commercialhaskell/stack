@@ -87,7 +87,7 @@ unpackPackages mSnapshotDef dest input = do
 
     toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocation, PackageIdentifier))
     toLocSnapshot sd name =
-        go $ sdLocations sd
+        go $ concatMap snd $ sdSnapshots sd
       where
         go [] = pure $ Left $ "Package does not appear in snapshot: " ++ displayC name
         go (loc:locs) = do

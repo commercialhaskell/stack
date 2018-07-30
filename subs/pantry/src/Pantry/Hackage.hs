@@ -220,7 +220,9 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
       -- FIXME let's convert all old snapshots, correct the
       -- hashes, and drop this hack!
       let cr = 13
-      when (cr `B.elem` bs) $ void $ storeBlob $ B.filter (/= cr) bs
+      when (cr `B.elem` bs) $ do
+        (stripped, _) <- storeBlob $ B.filter (/= cr) bs
+        storeCrlfHack stripped blobTableId
 
     breakSlash x
         | T.null z = Nothing

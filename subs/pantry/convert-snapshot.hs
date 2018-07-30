@@ -25,6 +25,7 @@ snapshots = do
 
 main :: IO ()
 main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
+  _ <- updateHackageIndex Nothing
   runConduitRes $ snapshots .| mapM_C (lift . go)
   where
   go (snap, fp) = do

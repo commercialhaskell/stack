@@ -58,9 +58,8 @@ import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text ((<?>))
 import qualified Data.Attoparsec.Text as P
 import           Data.Char (isSpace)
-import           Data.Conduit
+import           Conduit
 import           Data.Conduit.Attoparsec
-import           Data.Conduit.Text (decodeUtf8)
 import           Data.List (intercalate)
 import           Data.Text (pack)
 import           Stack.Constants
@@ -120,7 +119,7 @@ getInterpreterArgs file = do
     parseFile src =
          runConduit
        $ src
-      .| decodeUtf8
+      .| decodeUtf8C
       .| sinkParserEither (interpreterArgsParser isLiterate stackProgName)
 
     isLiterate = takeExtension file == ".lhs"

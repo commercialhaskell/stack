@@ -15,7 +15,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
-import Stack.Prelude
+import Stack.Prelude hiding (Snapshot (..))
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L

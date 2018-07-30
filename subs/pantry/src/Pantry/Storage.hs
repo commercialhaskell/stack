@@ -33,6 +33,8 @@ module Pantry.Storage
   , loadHackageTreeKey
   , storeArchiveCache
   , loadArchiveCache
+  , storeCrlfHack
+  , checkCrlfHack
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
@@ -106,6 +108,11 @@ TreeEntryS sql=tree_entry
     path SfpId
     blob BlobTableId
     type FileType
+
+CrlfHack
+    stripped BlobTableId
+    original BlobTableId
+    UniqueCrlfHack stripped
 |]
 
 initStorage
@@ -343,7 +350,7 @@ storeHackageTarballInfo
 storeHackageTarballInfo name version sha size = do
   nameid <- getNameId name
   versionid <- getVersionId version
-  insert_ HackageTarball
+  void $ insertBy HackageTarball
     { hackageTarballName = nameid
     , hackageTarballVersion = versionid
     , hackageTarballHash = sha
@@ -545,3 +552,36 @@ loadArchiveCache url subdir = map go <$> selectList
   [Desc ArchiveCacheTime]
   where
     go (Entity _ ac) = (archiveCacheSha ac, archiveCacheSize ac, archiveCacheTree ac)
+
+-- Back in the days of all-cabal-hashes, we had a few cabal files that
+-- had CRLF/DOS-style line endings in them. The Git version ended up
+-- stripping out those CRLFs. Now, the hashes in those old Stackage
+-- snapshots don't match up to any hash in the 01-index.tar file. This
+-- table lets us undo that mistake, but mapping back from the stripped
+-- version to the original. This is used by the Pantry.OldStackage
+-- module. Once we convert all snapshots and stop using the old
+-- format, this hack can disappear entirely.
+storeCrlfHack
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobTableId -- ^ stripped
+  -> BlobTableId -- ^ original
+  -> ReaderT SqlBackend (RIO env) ()
+storeCrlfHack stripped orig = void $ insertBy CrlfHack
+  { crlfHackStripped = stripped
+  , crlfHackOriginal = orig
+  }
+
+checkCrlfHack
+  :: (HasPantryConfig env, HasLogFunc env)
+  => BlobKey -- ^ from the Stackage snapshot
+  -> ReaderT SqlBackend (RIO env) BlobKey
+checkCrlfHack stripped = do
+  mstrippedId <- getBlobTableId stripped
+  strippedId <-
+    case mstrippedId of
+      Nothing -> error $ "checkCrlfHack: no ID found for " ++ show stripped
+      Just x -> pure x
+  ment <- getBy $ UniqueCrlfHack strippedId
+  case ment of
+    Nothing -> pure stripped
+    Just (Entity _ ch) -> getBlobKey $ crlfHackOriginal ch
