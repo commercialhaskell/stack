@@ -588,7 +588,7 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    sd <- undefined -- runRIO config $ loadResolver $ projectResolver project
+    sd <- runRIO config $ loadResolver $ projectResolver project
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
