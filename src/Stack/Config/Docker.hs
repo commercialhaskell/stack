@@ -26,20 +26,22 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
     let dockerEnable =
             fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
         dockerImage =
-            let mresolver =
+            let mresolver = undefined
+                    {-
                     case maresolver of
-                        Just (ARResolver resolver) ->
-                            Just (void resolver)
+                        Just (ARResolver resolver) -> Just resolver
                         Just aresolver ->
                             impureThrow
                                 (ResolverNotSupportedException $
                                  show aresolver)
-                        Nothing ->
-                            fmap (void . projectResolver) mproject
+                        Nothing -> fmap projectResolver mproject
+                    -}
                 defaultTag =
                     case mresolver of
                         Nothing -> ""
                         Just resolver ->
+                            error "FIXME need some logic for figuring out we're using an LTS now"
+                            {-
                             case resolver of
                                 ResolverStackage n@(LTS _ _) ->
                                     ":" ++ T.unpack (renderSnapName n)
@@ -47,6 +49,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                                     impureThrow
                                         (ResolverNotSupportedException $
                                          show resolver)
+                            -}
             in case getFirst dockerMonoidRepoOrImage of
                    Nothing -> "fpco/stack-build" ++ defaultTag
                    Just (DockerMonoidImage image) -> image

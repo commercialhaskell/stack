@@ -389,7 +389,7 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedDir
+    when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedPath
                                       { resolvedRelative = RelFilePath "this-is-not-used" -- FIXME ugly hack
                                       , resolvedAbsoluteHack = toFilePath pkgDir
                                       })
@@ -434,7 +434,7 @@ checkPackageInExtractedTarball pkgDir = do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
-buildExtractedTarball :: HasEnvConfig env => ResolvedDir -> RIO env ()
+buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
   envConfig <- view envConfigL
   localPackageToBuild <- readLocalPackage $ resolvedAbsolute pkgDir

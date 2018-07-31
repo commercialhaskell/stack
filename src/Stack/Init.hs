@@ -349,8 +349,9 @@ getDefaultResolver
        --   , Extra dependencies
        --   , Src packages actually considered)
 getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
-    sd <- maybe selectSnapResolver (makeConcreteResolver (Just root) >=> loadResolver) mresolver
+    sd <- undefined -- maybe selectSnapResolver (makeConcreteResolver (Just root) >=> loadResolver) mresolver
     getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd
+    {- FIXME
     where
         root = parent stackYaml
         -- TODO support selecting best across regular and custom snapshots
@@ -362,6 +363,7 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot whichCmd snaps)
                 _ -> return s
+    -}
 
 getWorkingResolverPlan
     :: (HasConfig env, HasGHCVariant env)

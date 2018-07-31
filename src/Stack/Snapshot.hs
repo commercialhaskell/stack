@@ -64,6 +64,8 @@ import           Stack.Types.Resolver
 import qualified System.Directory as Dir
 import qualified System.FilePath as FilePath
 
+loadSnapshot = undefined
+
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocationOrPath !PError
   | PackageDefinedTwice !PackageName !PackageLocationOrPath !PackageLocationOrPath
@@ -141,15 +143,43 @@ instance Show SnapshotException where
 -- | Convert a 'Resolver' into a 'SnapshotDef'
 loadResolver
   :: forall env. HasConfig env
-  => Resolver
+  => SnapshotLocation
   -> RIO env SnapshotDef
-loadResolver (ResolverCompiler compiler) = return SnapshotDef
-    { sdResolver = ResolverCompiler compiler
-    , sdResolverName = compilerVersionText compiler
-    , sdSnapshots = []
+loadResolver sl0 = do
+  (compiler, snapshots) <- loop sl0
+  pure SnapshotDef
+    { sdResolver = sl0
+    , sdResolverName =
+        case snapshots of
+          snapshot:_ -> snapshotName snapshot
+          [] -> utf8BuilderToText $ RIO.display compiler
+    , sdSnapshots = snapshots
     , sdWantedCompilerVersion = compiler
     , sdUniqueHash = undefined
     }
+  where
+    loop :: SnapshotLocation -> RIO env (WantedCompiler, [Snapshot])
+    loop sl = do
+      esnap <- loadPantrySnapshot sl
+      case esnap of
+        Left wc -> pure (wc, [])
+        Right (snapshot, mcompiler) -> do
+          (compiler, snapshots) <- loop $ snapshotParent snapshot
+          pure (fromMaybe compiler mcompiler, snapshot : snapshots)
+    {- FIXME
+loadResolver mdir0 snapLoc = do
+  (snapshot, loadPackages, mfile, mcompiler) <- loadPantrySnapshot mdir0 snapLoc
+  packages <- loadPackages
+  sd <- loadResvoler (parent <$> mfile) (snapshotParent snapshot)
+  pure sd
+    { sdResolver = snapLoc
+    , sdResolverName = snapshotName snapshot
+    , sdSnapshots = (snapshot, packages) : sdSnapshots sd
+    , sdWantedCompilerVersion = fromMaybe (sdWantedCompilerVersion sd) mcompiler
+    , sdUniqueHash = undefined
+    }
+    -}
+    {- FIXME
 loadResolver (ResolverCustom url loc) = do -- FIXME move this logic into Pantry
   logDebug $ "Loading " <> RIO.display url <> " build plan from " <> displayShow loc
   case loc of
@@ -237,7 +267,7 @@ loadResolver (ResolverCustom url loc) = do -- FIXME move this logic into Pantry
 loadSnapshot
   :: forall env.
      (HasConfig env, HasGHCVariant env)
-  => Maybe (CompilerVersion 'CVActual) -- ^ installed GHC we should query; if none provided, use the global hints
+  => Maybe (ActualCompiler) -- ^ installed GHC we should query; if none provided, use the global hints
   -> Path Abs Dir -- ^ project root, used for checking out necessary files
   -> SnapshotDef
   -> RIO env LoadedSnapshot
@@ -300,6 +330,7 @@ loadSnapshot mcompiler root = undefined
         -- the two snapshots' packages together.
         , lsPackages = Map.union snapshot (Map.map (fmap fst) locals)
         }
+-}
 -}
 
 -- | Given information on a 'LoadedSnapshot' and a given set of
@@ -413,7 +444,7 @@ calculatePackagePromotion
 recalculate :: forall env.
                (HasConfig env, HasGHCVariant env)
             => Path Abs Dir -- ^ root
-            -> CompilerVersion 'CVActual
+            -> ActualCompiler
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
@@ -486,7 +517,7 @@ checkDepsMet available m
 -- information in the global package database.
 loadCompiler :: forall env.
                 HasConfig env
-             => CompilerVersion 'CVActual
+             => ActualCompiler
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
   m <- ghcPkgDump (whichCompiler cv) []
@@ -540,7 +571,7 @@ type FindPackageS localLocation =
 findPackage :: forall m localLocation.
                MonadThrow m
             => Platform
-            -> CompilerVersion 'CVActual
+            -> ActualCompiler
             -> (GenericPackageDescription, PackageLocationOrPath, localLocation)
             -> StateT (FindPackageS localLocation) m ()
 findPackage platform compilerVersion (gpd, loc, localLoc) = do
@@ -637,7 +668,7 @@ splitUnmetDeps extra =
 -- | Calculate a 'LoadedPackageInfo' from the given 'GenericPackageDescription'
 calculate :: GenericPackageDescription
           -> Platform
-          -> CompilerVersion 'CVActual
+          -> ActualCompiler
           -> loc
           -> Map FlagName Bool
           -> Bool -- ^ hidden?

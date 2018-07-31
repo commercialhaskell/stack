@@ -116,7 +116,7 @@ data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
     , soptsUseSystem :: !Bool
     -- ^ Should we use a system compiler installation, if available?
-    , soptsWantedCompiler :: !(CompilerVersion 'CVWanted)
+    , soptsWantedCompiler :: !WantedCompiler
     , soptsCompilerCheck :: !VersionCheck
     , soptsStackYaml :: !(Maybe (Path Abs File))
     -- ^ If we got the desired GHC version from that file
@@ -142,7 +142,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownCompilerVersion (Set.Set Text) (CompilerVersion 'CVWanted) (Set.Set (CompilerVersion 'CVActual))
+                    | UnknownCompilerVersion (Set.Set Text) WantedCompiler (Set.Set (CompilerVersion 'CVActual))
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed SomeException (Path Abs File)
                     | WantedMustBeGHC
@@ -860,7 +860,7 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
 downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
-                           -> CompilerVersion 'CVWanted
+                           -> WantedCompiler
                            -> VersionCheck
                            -> Maybe String
                            -> RIO env Tool
@@ -921,7 +921,7 @@ downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = d
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
                       -> VersionCheck
-                      -> CompilerVersion 'CVWanted
+                      -> WantedCompiler
                       -> (k -> CompilerVersion 'CVActual)
                       -> Map k a
                       -> m (k, a)
@@ -940,7 +940,7 @@ downloadAndInstallPossibleCompilers
     :: (HasGHCVariant env, HasConfig env)
     => [CompilerBuild]
     -> SetupInfo
-    -> CompilerVersion 'CVWanted
+    -> WantedCompiler
     -> VersionCheck
     -> Maybe String
     -> RIO env (Tool, CompilerBuild)

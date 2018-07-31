@@ -26,7 +26,7 @@ module Pantry
   , RepoType (..)
   , RelFilePath (..)
   , PackageLocationOrPath (..)
-  , ResolvedDir (..)
+  , ResolvedPath (..)
   , resolvedAbsolute
   , PackageIdentifierRevision (..)
   , PackageName
@@ -48,11 +48,19 @@ module Pantry
   , resolveDirWithRel
 
     -- ** Snapshots
+  , UnresolvedSnapshotLocation
+  , resolveSnapshotLocation
+  , unresolveSnapshotLocation
   , SnapshotLocation (..)
   , Snapshot (..)
   , WantedCompiler (..)
+  , parseWantedCompiler
   , completeSnapshot
   , completeSnapshotLocation
+  , loadPantrySnapshot
+  , parseSnapshotLocation
+  , ltsSnapshotLocation
+  , nightlySnapshotLocation
 
     -- ** Cabal helpers
   , parsePackageIdentifier
@@ -110,6 +118,8 @@ import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import RIO.Process
+import qualified Data.Yaml as Yaml
+import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 
 withPantryConfig
   :: HasLogFunc env
@@ -502,20 +512,6 @@ loadPackageLocation (PLHackage pir mtree) =
   case mtree of
     Nothing -> snd <$> getHackageTarball pir
 
--- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
-unRawPackageLocation
-  :: MonadIO m
-  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
-  -> RawPackageLocation
-  -> m [PackageLocation]
-unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
-
--- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
-mkRawPackageLocation :: PackageLocation -> RawPackageLocation
-mkRawPackageLocation (PLHackage pir mtree) = RPLHackage pir mtree
-mkRawPackageLocation (PLArchive archive pm) = RPLArchive archive (OSPackageMetadata pm)
-mkRawPackageLocation (PLRepo repo pm) = RPLRepo repo (OSPackageMetadata pm)
-
 -- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
 mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
 mkRawPackageLocationOrPath (PLRemote loc) = RPLRemote (mkRawPackageLocation loc)
@@ -537,10 +533,10 @@ resolveDirWithRel
   :: MonadIO m
   => Path Abs Dir -- ^ root directory to be relative to
   -> RelFilePath
-  -> m ResolvedDir
+  -> m (ResolvedPath Dir)
 resolveDirWithRel dir (RelFilePath fp) = do
   absolute <- resolveDir dir (T.unpack fp)
-  pure ResolvedDir
+  pure ResolvedPath
     { resolvedRelative = RelFilePath fp
     , resolvedAbsoluteHack = toFilePath absolute
     }
@@ -570,11 +566,10 @@ completeSnapshot
   -> RIO env Snapshot
 completeSnapshot mdir snapshot = do
   parent' <- completeSnapshotLocation $ snapshotParent snapshot
-  pls <- mapM (unRawPackageLocation mdir) (snapshotLocations snapshot)
-     >>= traverseConcurrentlyWith 16 completePackageLocation . concat
+  pls <- traverseConcurrentlyWith 16 completePackageLocation $ snapshotLocations snapshot
   pure snapshot
     { snapshotParent = parent'
-    , snapshotLocations = map mkRawPackageLocation pls
+    , snapshotLocations = pls
     }
 
 -- | Like 'traverse', but does things on
@@ -609,6 +604,36 @@ traverseConcurrentlyWith count f t0 = do
             loop
   sequence t1
 
+loadPantrySnapshot
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotLocation
+  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler))
+loadPantrySnapshot (SLCompiler compiler) = pure $ Left compiler
+loadPantrySnapshot sl@(SLUrl url mblob mcompiler) =
+  handleAny (throwIO . InvalidSnapshot sl) $ do
+    bs <- loadFromURL url mblob
+    value <- Yaml.decodeThrow bs
+    snapshot <- warningsParserHelper value (parseSnapshot Nothing)
+    pure $ Right (snapshot, mcompiler)
+loadPantrySnapshot sl@(SLFilePath fp mcompiler) =
+  handleAny (throwIO . InvalidSnapshot sl) $ do
+    value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
+    snapshot <- warningsParserHelper value (parseSnapshot Nothing)
+    pure $ Right (snapshot, mcompiler)
+
+loadFromURL
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text -- ^ url
+  -> Maybe BlobKey
+  -> RIO env ByteString
+loadFromURL = undefined
+
+warningsParserHelper
+  :: HasLogFunc env
+  => Value
+  -> (Value -> Yaml.Parser (WithJSONWarnings (IO a)))
+  -> RIO env a
+warningsParserHelper = undefined
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent

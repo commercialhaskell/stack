@@ -153,7 +153,7 @@ findGhcPkgVersion wc pkgDbs name = do
 
 unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
-                    -> CompilerVersion 'CVActual
+                    -> ActualCompiler
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
                     -> PackageIdentifier
@@ -167,7 +167,7 @@ unregisterGhcPkgId wc cv pkgDb gid ident = do
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = "unregister" : "--user" : "--force" :
         (case cv of
-            GhcVersion v | v < $(mkVersion "7.9") ->
+            ACGhc v | v < $(mkVersion "7.9") ->
                 [displayC ident]
             _ -> ["--ipid", ghcPkgIdString gid])
 

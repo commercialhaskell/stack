@@ -84,7 +84,7 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver (Just root) newResolver
     -- Check that the snapshot actually exists
     void $ loadResolver concreteResolver
-    return (Yaml.toJSON concreteResolver)
+    return (Yaml.toJSON $ unresolveSnapshotLocation concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
     return (Yaml.Bool bool')
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') =

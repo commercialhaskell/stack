@@ -43,6 +43,8 @@ module Pantry.Types
   , parseVersion
   , displayC
   , RawPackageLocation (..)
+  , mkRawPackageLocation
+  , unRawPackageLocation
   , OptionalSubdirs (..)
   , ArchiveLocation (..)
   , RawPackageLocationOrPath (..)
@@ -53,12 +55,20 @@ module Pantry.Types
   , parsePackageIdentifierRevision
   , PantryException (..)
   , PackageLocationOrPath (..)
-  , ResolvedDir (..)
+  , ResolvedPath (..)
   , resolvedAbsolute
   , HpackExecutable (..)
   , WantedCompiler (..)
+  , UnresolvedSnapshotLocation
+  , resolveSnapshotLocation
+  , unresolveSnapshotLocation
+  , ltsSnapshotLocation
+  , nightlySnapshotLocation
   , SnapshotLocation (..)
+  , parseSnapshotLocation
+  , parseSnapshot
   , Snapshot (..)
+  , parseWantedCompiler
   ) where
 
 import RIO
@@ -67,11 +77,12 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
+import RIO.Time (toGregorian, Day)
 import qualified RIO.Map as Map
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
-import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText)
+import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
 import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
@@ -86,8 +97,10 @@ import qualified Distribution.Text
 import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
-import qualified Data.Text.Read
-import Path (Path, Abs, Dir, File, parseAbsDir, toFilePath, filename)
+import Data.Text.Read (decimal)
+import Path (Abs, Dir, File, parseAbsDir, toFilePath, filename)
+import Path.Internal (Path (..)) -- FIXME don't import this
+import Path.IO (resolveFile)
 import Data.Pool (Pool)
 
 newtype Revision = Revision Word
@@ -117,23 +130,23 @@ data PantryConfig = PantryConfig
 
 -- | A directory which was loaded up relative and has been resolved
 -- against the config file it came from.
-data ResolvedDir = ResolvedDir
+data ResolvedPath t = ResolvedPath
   { resolvedRelative :: !RelFilePath
   -- ^ Original value parsed from a config file.
   , resolvedAbsoluteHack :: !FilePath -- FIXME when we ditch store, use this !(Path Abs Dir)
   }
-  deriving (Show, Eq, Data, Generic)
-instance NFData ResolvedDir
-instance Store ResolvedDir
+  deriving (Show, Eq, Data, Generic, Ord)
+instance NFData (ResolvedPath t)
+instance Store (ResolvedPath t)
 
 -- FIXME get rid of this ugly hack!
-resolvedAbsolute :: ResolvedDir -> Path Abs Dir
-resolvedAbsolute = either impureThrow id . parseAbsDir . resolvedAbsoluteHack
+resolvedAbsolute :: ResolvedPath t -> Path Abs t
+resolvedAbsolute = Path . resolvedAbsoluteHack
 
 -- | Either a remote package location or a local package directory.
 data PackageLocationOrPath
   = PLRemote !PackageLocation
-  | PLFilePath !ResolvedDir
+  | PLFilePath !(ResolvedPath Dir)
   deriving (Show, Eq, Data, Generic)
 instance NFData PackageLocationOrPath
 instance Store PackageLocationOrPath
@@ -309,12 +322,12 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
           case T.stripPrefix "," sizeT of
             Nothing -> Just Nothing
             Just sizeT' ->
-              case Data.Text.Read.decimal sizeT' of
+              case decimal sizeT' of
                 Right (size', "") -> Just $ Just $ FileSize size'
                 _ -> Nothing
         pure $ CFIHash sha msize
       Just ("@rev", revT) ->
-        case Data.Text.Read.decimal revT of
+        case decimal revT of
           Right (rev, "") -> pure $ CFIRevision $ Revision rev
           _ -> Nothing
       Nothing -> pure CFILatest
@@ -338,6 +351,10 @@ data PantryException
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
   | InvalidWantedCompiler !Text
+  | InvalidSnapshotLocation !(Path Abs Dir) !Text
+  | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
+  | InvalidFilePathSnapshot !Text
+  | InvalidSnapshot !SnapshotLocation !SomeException
 
   deriving Typeable
 instance Exception PantryException where
@@ -399,6 +416,26 @@ instance Display PantryException where
     ":\n" <>
     fold (intersperse "\n" (map (\x -> "- " <> fromString (toFilePath (filename x))) files))
   display (InvalidWantedCompiler t) = "Invalid wanted compiler: " <> display t
+  display (InvalidSnapshotLocation dir t) =
+    "Invalid snapshot location " <>
+    displayShow t <>
+    " relative to directory " <>
+    displayShow (toFilePath dir)
+  display (InvalidOverrideCompiler x y) =
+    "Specified compiler for a resolver (" <>
+    display x <>
+    "), but also specified an override compiler (" <>
+    display y <>
+    ")"
+  display (InvalidFilePathSnapshot t) =
+    "Specified snapshot as file path with " <>
+    displayShow t <>
+    ", but not reading from a local file"
+  display (InvalidSnapshot loc e) =
+    "Exception while reading snapshot from " <>
+    display loc <>
+    ":\n" <>
+    displayShow e
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -708,6 +745,20 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
         archiveSize <- o ..:? "size"
         RPLArchive Archive {..} <$> optionalSubdirs o
 
+-- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
+unRawPackageLocation
+  :: MonadIO m
+  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
+  -> RawPackageLocation
+  -> m [PackageLocation]
+unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
+
+-- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
+mkRawPackageLocation :: PackageLocation -> RawPackageLocation
+mkRawPackageLocation (PLHackage pir mtree) = RPLHackage pir mtree
+mkRawPackageLocation (PLArchive archive pm) = RPLArchive archive (OSPackageMetadata pm)
+mkRawPackageLocation (PLRepo repo pm) = RPLRepo repo (OSPackageMetadata pm)
+
 -- | Newtype wrapper for easier JSON integration with Cabal types.
 newtype CabalString a = CabalString { unCabalString :: a }
   deriving (Show, Eq, Ord, Typeable)
@@ -785,16 +836,137 @@ parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
     parseGhcjs = undefined
     parseGhc = fmap WCGhc . parseVersion . T.unpack
 
+data UnresolvedSnapshotLocation
+  = USLCompiler !WantedCompiler
+  | USLUrl !Text !(Maybe BlobKey)
+  | USLFilePath !RelFilePath
+  deriving (Show, Eq, Ord, Data, Typeable, Generic)
+instance ToJSON UnresolvedSnapshotLocation where
+  toJSON (USLCompiler c) = object ["compiler" .= c]
+  toJSON (USLUrl t mblob) = object $ concat
+    [ ["url" .= t]
+    , maybe [] (\blob -> ["blob" .= blob]) mblob
+    ]
+  toJSON (USLFilePath fp) = object ["filepath" .= fp]
+instance FromJSON (WithJSONWarnings UnresolvedSnapshotLocation) where
+  parseJSON v = text v <|> obj v
+    where
+      text = withText "UnresolvedSnapshotLocation (Text)" $ pure . noJSONWarnings . parseSnapshotLocation
+
+      obj = withObjectWarnings "UnresolvedSnapshotLocation (Object)" $ \o ->
+        (USLCompiler <$> o ..: "compiler") <|>
+        (USLUrl <$> o ..: "url" <*> o ..:? "blob") <|>
+        (USLFilePath <$> o ..: "filepath")
+
+resolveSnapshotLocation
+  :: UnresolvedSnapshotLocation
+  -> Maybe (Path Abs Dir)
+  -> Maybe WantedCompiler
+  -> IO SnapshotLocation
+resolveSnapshotLocation (USLCompiler compiler) _ Nothing = pure $ SLCompiler compiler
+resolveSnapshotLocation (USLCompiler compiler1) _ (Just compiler2) = throwIO $ InvalidOverrideCompiler compiler1 compiler2
+resolveSnapshotLocation (USLUrl url mblob) _ mcompiler = pure $ SLUrl url mblob mcompiler
+resolveSnapshotLocation (USLFilePath (RelFilePath t)) Nothing _mcompiler = throwIO $ InvalidFilePathSnapshot t
+resolveSnapshotLocation (USLFilePath rfp@(RelFilePath t)) (Just dir) mcompiler = do
+  abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
+  pure $ SLFilePath
+            ResolvedPath
+              { resolvedRelative = rfp
+              , resolvedAbsoluteHack = toFilePath abs'
+              }
+            mcompiler
+
+unresolveSnapshotLocation
+  :: SnapshotLocation
+  -> (UnresolvedSnapshotLocation, Maybe WantedCompiler)
+unresolveSnapshotLocation (SLCompiler compiler) = (USLCompiler compiler, Nothing)
+unresolveSnapshotLocation (SLUrl url mblob mcompiler) = (USLUrl url mblob, mcompiler)
+unresolveSnapshotLocation (SLFilePath fp mcompiler) = (USLFilePath $ resolvedRelative fp, mcompiler)
+
+instance Display UnresolvedSnapshotLocation where
+  display (USLCompiler compiler) = display compiler
+  display (USLUrl url Nothing) = display url
+  display (USLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
+  display (USLFilePath (RelFilePath t)) = display t
+
+instance Display SnapshotLocation where
+  display sl =
+    let (usl, mcompiler) = unresolveSnapshotLocation sl
+     in display usl <>
+        (case mcompiler of
+           Nothing -> mempty
+           Just compiler -> ", override compiler: " <> display compiler)
+
+parseSnapshotLocation :: Text -> UnresolvedSnapshotLocation
+parseSnapshotLocation t0 = fromMaybe parsePath $
+  (either (const Nothing) (Just . USLCompiler) (parseWantedCompiler t0)) <|>
+  parseLts <|>
+  parseNightly <|>
+  parseGithub <|>
+  parseUrl
+  where
+    parseLts = do
+      t1 <- T.stripPrefix "lts-" t0
+      Right (x, t2) <- Just $ decimal t1
+      t3 <- T.stripPrefix "." t2
+      Right (y, "") <- Just $ decimal t3
+      Just $ fst $ ltsSnapshotLocation x y
+    parseNightly = do
+      t1 <- T.stripPrefix "nightly-" t0
+      date <- readMaybe (T.unpack t1)
+      Just $ fst $ nightlySnapshotLocation date
+
+    parseGithub = do
+      t1 <- T.stripPrefix "github:" t0
+      let (user, t2) = T.break (== '/') t1
+      t3 <- T.stripPrefix "/" t2
+      let (repo, t4) = T.break (== ':') t3
+      path <- T.stripPrefix ":" t4
+      Just $ fst $ githubSnapshotLocation user repo path
+
+    parseUrl = parseRequest (T.unpack t0) $> USLUrl t0 Nothing
+
+    parsePath = USLFilePath $ RelFilePath t0
+
+githubSnapshotLocation :: Text -> Text -> Text -> (UnresolvedSnapshotLocation, SnapshotLocation)
+githubSnapshotLocation user repo path =
+  let url = T.concat
+        [ "https://raw.githubusercontent.com/"
+        , user
+        , "/"
+        , repo
+        , "/master/"
+        , path
+        ]
+   in (USLUrl url Nothing, SLUrl url Nothing Nothing)
+
+defUser :: Text
+defUser = "commercialhaskell"
+
+defRepo :: Text
+defRepo = "stack-templates"
+
+ltsSnapshotLocation :: Int -> Int -> (UnresolvedSnapshotLocation, SnapshotLocation)
+ltsSnapshotLocation x y =
+  githubSnapshotLocation defUser defRepo $
+  utf8BuilderToText $
+  "lts/" <> display x <> "/" <> display y <> ".yaml"
+
+nightlySnapshotLocation :: Day -> (UnresolvedSnapshotLocation, SnapshotLocation)
+nightlySnapshotLocation date =
+  githubSnapshotLocation defUser defRepo $
+  utf8BuilderToText $
+  "nightly/" <> display year <> "/" <> display month <> "/" <> display day <> ".yaml"
+  where
+    (year, month, day) = toGregorian date
+
 data SnapshotLocation
   = SLCompiler !WantedCompiler
   | SLUrl !Text !(Maybe BlobKey) !(Maybe WantedCompiler)
-  | SLFilePath !RelFilePath !(Maybe WantedCompiler)
+  | SLFilePath !(ResolvedPath File) !(Maybe WantedCompiler)
   deriving (Show, Eq, Data, Ord, Generic)
 instance Store SnapshotLocation
 instance NFData SnapshotLocation
-newtype MakeSnapshotLocation = MakeSnapshotLocation (Maybe WantedCompiler -> SnapshotLocation)
-instance FromJSON MakeSnapshotLocation where
-  parseJSON = undefined
 
 data Snapshot = Snapshot
   { snapshotParent :: !SnapshotLocation
@@ -804,7 +976,7 @@ data Snapshot = Snapshot
   -- @CompilerVersion@.
   , snapshotName :: !Text
   -- ^ A user-friendly way of referring to this resolver.
-  , snapshotLocations :: ![RawPackageLocation]
+  , snapshotLocations :: ![PackageLocation]
   -- ^ Where to grab all of the packages from.
   , snapshotDropPackages :: !(Set PackageName)
   -- ^ Packages present in the parent which should not be included
@@ -843,30 +1015,34 @@ instance ToJSON Snapshot where
               Just compiler -> ["compiler" .= compiler]
           ]
     , ["name" .= snapshotName snap]
-    , ["packages" .= snapshotLocations snap]
+    , ["packages" .= map mkRawPackageLocation (snapshotLocations snap)]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
     , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
     , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
     , if Map.null (snapshotGlobalHints snap) then [] else ["global-hints" .= fmap (fmap CabalString) (toCabalStringMap (snapshotGlobalHints snap))]
     ]
-instance FromJSON (WithJSONWarnings Snapshot) where
-  parseJSON = withObjectWarnings "Snapshot" $ \o -> do
-    mcompiler <- o ..:? "compiler"
-    mresolver <- o ..:? "resolver"
-    snapshotParent <-
-      case (mcompiler, mresolver) of
-        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
-        (Just compiler, Nothing) -> pure $ SLCompiler compiler
-        (mcompiler, Just (MakeSnapshotLocation f)) -> pure $ f mcompiler
 
-    snapshotName <- o ..: "name"
-    snapshotLocations <- jsonSubWarningsT (o ..:? "packages" ..!= [])
-    snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
-    snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
-    snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
-    snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
-    snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)
+parseSnapshot :: Maybe (Path Abs Dir) -> Value -> Parser (WithJSONWarnings (IO Snapshot))
+parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
+  mcompiler <- o ..:? "compiler"
+  mresolver <- jsonSubWarningsT $ o ..:? "resolver"
+  iosnapshotParent <-
+    case (mcompiler, mresolver) of
+      (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
+      (Just compiler, Nothing) -> pure $ pure $ SLCompiler compiler
+      (_, Just usl) -> pure $ resolveSnapshotLocation usl mdir mcompiler
+
+  snapshotName <- o ..: "name"
+  rawLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
+  snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
+  snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
+  snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
+  snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+  snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)
+  pure $ do
+    snapshotLocations <- fmap concat $ mapM (unRawPackageLocation mdir) rawLocs
+    snapshotParent <- iosnapshotParent
     pure Snapshot {..}
 
 -- FIXME ORPHANS remove
@@ -920,3 +1096,6 @@ instance Store PackageIdentifierRevision where
        VarSize f -> f cfi)
   peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
   poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
+
+deriving instance Data Dir
+deriving instance Data File

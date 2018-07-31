@@ -58,8 +58,8 @@ data SnapshotDef = SnapshotDef -- FIXME temporary
     { sdResolver        :: !LoadedResolver
     , sdResolverName    :: !Text
     -- ^ The resolver that provides this definition.
-    , sdSnapshots       :: ![(Snapshot, [PackageLocation])]
-    , sdWantedCompilerVersion :: !(CompilerVersion 'CVWanted)
+    , sdSnapshots       :: ![Snapshot]
+    , sdWantedCompilerVersion :: !WantedCompiler
     , sdUniqueHash :: !StaticSHA256
     }
     deriving (Show, Eq, Data, Generic, Typeable)
@@ -67,7 +67,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 sdGlobalHints :: SnapshotDef -> Map PackageName (Maybe Version)
-sdGlobalHints = Map.unions . map (snapshotGlobalHints . fst) . sdSnapshots
+sdGlobalHints = Map.unions . map snapshotGlobalHints . sdSnapshots
 
 snapshotDefVC :: VersionConfig SnapshotDef
 snapshotDefVC = storeVersionConfig "sd-v3" "MpkgNx8qOHakJTSePR1czDElNiU="
@@ -83,7 +83,7 @@ newtype ExeName = ExeName { unExeName :: Text }
 -- a snapshot may not depend upon a local or project, and all
 -- dependencies must be satisfied.
 data LoadedSnapshot = LoadedSnapshot
-  { lsCompilerVersion :: !(CompilerVersion 'CVActual)
+  { lsCompilerVersion :: !ActualCompiler
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
   , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocationOrPath))
   -- ^ Snapshots themselves may not have a filepath in them, but once

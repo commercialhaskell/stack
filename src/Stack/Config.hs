@@ -166,8 +166,8 @@ makeConcreteResolver
     :: HasConfig env
     => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
     -> AbstractResolver
-    -> RIO env Resolver
-makeConcreteResolver root (ARResolver r) = parseCustomLocation root r
+    -> RIO env SnapshotLocation
+makeConcreteResolver root (ARResolver r) = liftIO $ resolveSnapshotLocation r root Nothing
 makeConcreteResolver root ar = do
     snapshots <- getSnapshots
     r <-
@@ -177,31 +177,29 @@ makeConcreteResolver root ar = do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
-                ProjectAndConfigMonoid project _ <-
-                    loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
+                iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
+                ProjectAndConfigMonoid project _ <- liftIO iopc
                 return $ projectResolver project
-            ARLatestNightly -> return $ ResolverStackage $ Nightly $ snapshotsNightly snapshots
+            ARLatestNightly -> return $ snd $ nightlySnapshotLocation $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ ResolverStackage $ LTS x y
+                    Just y -> return $ snd $ ltsSnapshotLocation x y
             ARLatestLTS
                 | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ ResolverStackage $ LTS x y
-    logInfo $ "Selected resolver: " <> display (resolverRawName r)
+                     in return $ snd $ ltsSnapshotLocation x y
+    logInfo $ "Selected resolver: " <> display r
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: HasConfig env => RIO env (ResolverWith a)
+getLatestResolver :: HasConfig env => RIO env SnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
-    let mlts = do
-            (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
-            return (LTS x y)
-        snap = fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
-    return (ResolverStackage snap)
+    let mlts = uncurry ltsSnapshotLocation <$>
+               listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
+    pure $ snd $ fromMaybe (nightlySnapshotLocation (snapshotsNightly snapshots)) mlts
 
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
@@ -507,7 +505,7 @@ loadConfig configArgs mresolver mstackYaml inner =
 -- values.
 loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
                 -> Maybe AbstractResolver -- override resolver
-                -> Maybe (CompilerVersion 'CVWanted) -- override compiler
+                -> Maybe WantedCompiler -- override compiler
                 -> RIO Config BuildConfig
 loadBuildConfig mproject maresolver mcompiler = do
     config <- ask
@@ -521,15 +519,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     -- paths). We consider the current working directory to be the
     -- correct base. Let's calculate the mresolver first.
     mresolver <- forM maresolver $ \aresolver -> do
-      -- For display purposes only
-      let name =
-            case aresolver of
-              ARResolver resolver -> resolverRawName resolver
-              ARLatestNightly -> "nightly"
-              ARLatestLTS -> "lts"
-              ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
-              ARGlobal -> "global"
-      logDebug ("Using resolver: " <> display name <> " specified on command line")
+      logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
 
       -- In order to resolve custom snapshots, we need a base
       -- directory to deal with relative paths. For the case of
@@ -563,13 +553,14 @@ loadBuildConfig mproject maresolver mcompiler = do
             exists <- doesFileExist dest
             if exists
                then do
-                   ProjectAndConfigMonoid project _ <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
+                   iopc <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
+                   ProjectAndConfigMonoid project _ <- liftIO iopc
                    when (view terminalL config) $
                        case maresolver of
                            Nothing ->
                                logDebug $
                                  "Using resolver: " <>
-                                 display (resolverRawName (projectResolver project)) <>
+                                 display (projectResolver project) <>
                                  " from implicit global project's config file: " <>
                                  fromString dest'
                            Just _ -> return ()
@@ -594,12 +585,10 @@ loadBuildConfig mproject maresolver mcompiler = do
                            , "outside of a real project.\n" ]
                    return (p, dest)
     let project = project'
-            { projectCompiler = mcompiler <|> projectCompiler project'
-            , projectResolver = fromMaybe (projectResolver project') mresolver
+            { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    sd0 <- runRIO config $ loadResolver $ projectResolver project
-    let sd = maybe id (error "FIXME setCompilerVersion") (projectCompiler project) sd0
+    sd <- undefined -- runRIO config $ loadResolver $ projectResolver project
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -607,10 +596,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       dir <- resolveDirWithRel (parent stackYamlFP) fp
       (dir,) <$> runOnce (parseSingleCabalFile True dir)
 
-    deps <-
-      fmap concat $
-      forM (projectDependencies project) $
-      unRawPackageLocationOrPath (parent stackYamlFP)
+    let deps = projectDependencies project
 
     return BuildConfig
         { bcConfig = config
@@ -632,11 +618,11 @@ loadBuildConfig mproject maresolver mcompiler = do
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do
-                logInfo ("Using resolver: " <> display (resolverRawName resolver) <> " specified on command line")
+                logInfo ("Using resolver: " <> display resolver <> " specified on command line")
                 return resolver
             Nothing -> do
                 r'' <- getLatestResolver
-                logInfo ("Using latest snapshot resolver: " <> display (resolverRawName r''))
+                logInfo ("Using latest snapshot resolver: " <> display r'')
                 return r''
       return Project
         { projectUserMsg = Nothing
@@ -644,7 +630,6 @@ loadBuildConfig mproject maresolver mcompiler = do
         , projectDependencies = []
         , projectFlags = mempty
         , projectResolver = r
-        , projectCompiler = Nothing
         , projectExtraPackageDBs = []
         }
 
@@ -873,7 +858,8 @@ loadProjectConfig mstackYaml = do
             return (LCSNoConfig mparentDir)
   where
     load fp = do
-        ProjectAndConfigMonoid project config <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
+        iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
+        ProjectAndConfigMonoid project config <- liftIO iopc
         return (project, fp, config)
 
 -- | Get the location of the default stack configuration file.
@@ -921,7 +907,7 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> return $ T.unpack $ resolverRawName r
+      ARResolver r -> undefined -- return $ T.unpack $ resolverRawName r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
   -- This takeWhile is an ugly hack. We don't actually need this
   -- path for anything useful. But if we take the raw value for

@@ -19,7 +19,7 @@ abstractResolverOptsParser hide =
          help "Override resolver in project file" <>
          hideMods hide)
 
-compilerOptsParser :: Bool -> Parser (CompilerVersion 'CVWanted)
+compilerOptsParser :: Bool -> Parser WantedCompiler
 compilerOptsParser hide =
     option readCompilerVersion
         (long "compiler" <>
@@ -27,9 +27,9 @@ compilerOptsParser hide =
          help "Use the specified compiler" <>
          hideMods hide)
 
-readCompilerVersion :: ReadM (CompilerVersion 'CVWanted)
+readCompilerVersion :: ReadM WantedCompiler
 readCompilerVersion = do
     s <- readerAsk
-    case parseCompilerVersion (T.pack s) of
-        Nothing -> readerError $ "Failed to parse compiler: " ++ s
-        Just x -> return x
+    case parseWantedCompiler (T.pack s) of
+        Left{} -> readerError $ "Failed to parse compiler: " ++ s
+        Right x -> return x

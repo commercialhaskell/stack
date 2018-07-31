@@ -83,8 +83,8 @@ import           RIO.Process                     (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion 'CVActual, Arch)) -- found
-        (CompilerVersion 'CVWanted, Arch) -- expected
+        (Maybe (ActualCompiler, Arch)) -- found
+        (WantedCompiler, Arch) -- expected
         GHCVariant -- expected
         CompilerBuild -- expected
         VersionCheck
@@ -157,7 +157,7 @@ instance Show StackBuildException where
                     MatchMinor -> "minor version match with "
                     MatchExact -> "exact version "
                     NewerMinor -> "minor version match or newer with "
-                , compilerVersionString expected
+                , T.unpack $ utf8BuilderToText $ display expected
                 , " ("
                 , C.display earch
                 , ghcVariantSuffix ghcVariant

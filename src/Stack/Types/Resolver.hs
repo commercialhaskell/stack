@@ -16,15 +16,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Stack.Types.Resolver
+module Stack.Types.Resolver -- FIXME clean up more, just need the abstract stuff probably
   (Resolver
-  ,IsLoaded(..)
   ,LoadedResolver
-  ,ResolverWith(..)
-  ,parseResolverText
   ,AbstractResolver(..)
   ,readAbstractResolver
-  ,resolverRawName
   ,SnapName(..)
   ,Snapshots (..)
   ,renderSnapName
@@ -34,7 +30,6 @@ module Stack.Types.Resolver
   ,snapshotHashToBS
   ,snapshotHashFromBS
   ,snapshotHashFromDigest
-  ,parseCustomLocation
   ) where
 
 import           Crypto.Hash as Hash (hash, Digest, SHA256)
@@ -58,54 +53,10 @@ import           Stack.Prelude
 import           Stack.Types.Compiler
 import qualified System.FilePath as FP
 
-data IsLoaded = Loaded | NotLoaded
+type Resolver = SnapshotLocation -- FIXME remove
+type LoadedResolver = SnapshotLocation -- FIXME remove
 
-type LoadedResolver = ResolverWith SnapshotHash
-type Resolver = ResolverWith (Either Request FilePath)
-
--- TODO: once GHC 8.0 is the lowest version we support, make these into
--- actual haddock comments...
-
--- | How we resolve which dependencies to install given a set of packages.
-data ResolverWith customContents
-    = ResolverStackage !SnapName
-    -- ^ Use an official snapshot from the Stackage project, either an
-    -- LTS Haskell or Stackage Nightly.
-
-    | ResolverCompiler !(CompilerVersion 'CVWanted)
-    -- ^ Require a specific compiler version, but otherwise provide no
-    -- build plan. Intended for use cases where end user wishes to
-    -- specify all upstream dependencies manually, such as using a
-    -- dependency solver.
-
-    | ResolverCustom !Text !customContents
-    -- ^ A custom resolver based on the given location (as a raw URL
-    -- or filepath). If @customContents@ is a @Either Request
-    -- FilePath@, it represents the parsed location value (with
-    -- filepaths resolved relative to the directory containing the
-    -- file referring to the custom snapshot). Once it has been loaded
-    -- from disk, it will be replaced with a @SnapshotHash@ value,
-    -- which is used to store cached files.
-    deriving (Generic, Typeable, Show, Data, Eq, Functor, Foldable, Traversable)
-instance Store LoadedResolver
-instance NFData LoadedResolver
-
-instance ToJSON (ResolverWith a) where
-    toJSON x = case x of
-        ResolverStackage name -> toJSON $ renderSnapName name
-        ResolverCompiler version -> toJSON $ compilerVersionText version
-        ResolverCustom loc _ -> toJSON loc
-instance a ~ () => FromJSON (ResolverWith a) where
-    parseJSON = withText "ResolverWith ()" $ return . parseResolverText
-
--- | Convert a Resolver into its @Text@ representation for human
--- presentation. When possible, you should prefer @sdResolverName@, as
--- it will handle the human-friendly name inside a custom snapshot.
-resolverRawName :: ResolverWith a -> Text
-resolverRawName (ResolverStackage name) = renderSnapName name
-resolverRawName (ResolverCompiler v) = compilerVersionText v
-resolverRawName (ResolverCustom loc _ ) = "custom: " <> loc
-
+    {-
 parseCustomLocation
   :: MonadThrow m
   => Maybe (Path Abs Dir) -- ^ directory config value was read from
@@ -133,6 +84,7 @@ parseResolverText t
     | Right x <- parseSnapName t = ResolverStackage x
     | Just v <- parseCompilerVersion t = ResolverCompiler v
     | otherwise = ResolverCustom t ()
+    -}
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
@@ -140,9 +92,18 @@ data AbstractResolver
     = ARLatestNightly
     | ARLatestLTS
     | ARLatestLTSMajor !Int
-    | ARResolver !(ResolverWith ())
+    | ARResolver !UnresolvedSnapshotLocation
     | ARGlobal
-    deriving Show
+
+instance Show AbstractResolver where
+  show = T.unpack . utf8BuilderToText . display
+
+instance Display AbstractResolver where
+  display ARLatestNightly = "nightly"
+  display ARLatestLTS = "lts"
+  display (ARLatestLTSMajor x) = "lts-" <> display x
+  display (ARResolver usl) = display usl
+  display ARGlobal = "global"
 
 readAbstractResolver :: ReadM AbstractResolver
 readAbstractResolver = do
@@ -153,7 +114,7 @@ readAbstractResolver = do
         "lts" -> return ARLatestLTS
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
             return $ ARLatestLTSMajor x'
-        _ -> return $ ARResolver $ parseResolverText $ T.pack s
+        _ -> return $ ARResolver $ parseSnapshotLocation $ T.pack s
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName

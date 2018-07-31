@@ -428,7 +428,7 @@ data GlobalOpts = GlobalOpts
     , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
-    , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
+    , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
@@ -452,7 +452,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
-    , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
+    , globalMonoidCompiler     :: !(First WantedCompiler) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
@@ -490,7 +490,7 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![(ResolvedDir, IO LocalPackageView)]
+    , bcPackages :: ![(ResolvedPath Dir, IO LocalPackageView)]
       -- ^ Local packages
     , bcDependencies :: ![PackageLocationOrPath]
       -- ^ Extra dependencies specified in configuration.
@@ -529,7 +529,7 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
-    ,envConfigCompilerVersion :: !(CompilerVersion 'CVActual)
+    ,envConfigCompilerVersion :: !ActualCompiler
     -- ^ The actual version of the compiler to be used, as opposed to
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
@@ -548,7 +548,7 @@ data LocalPackages = LocalPackages
 -- | A view of a local package needed for resolving components
 data LocalPackageView = LocalPackageView
     { lpvCabalFP    :: !(Path Abs File)
-    , lpvResolvedDir :: !ResolvedDir
+    , lpvResolvedDir :: !(ResolvedPath Dir)
     , lpvGPD        :: !GenericPackageDescription
     }
 
@@ -587,7 +587,7 @@ lpvVersion lpv =
 data LoadConfig = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe (CompilerVersion 'CVWanted) -> IO BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe WantedCompiler -> IO BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
@@ -602,30 +602,30 @@ data Project = Project
     , projectPackages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![RawPackageLocationOrPath]
+    , projectDependencies :: ![PackageLocationOrPath]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
-    , projectResolver :: !Resolver
+    , projectResolver :: !SnapshotLocation
     -- ^ How we resolve which @SnapshotDef@ to use
-    , projectCompiler :: !(Maybe (CompilerVersion 'CVWanted))
-    -- ^ When specified, overrides which compiler to use
     , projectExtraPackageDBs :: ![FilePath]
     }
   deriving Show
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver compiler extraPackageDBs) = object $ concat
+    toJSON (Project userMsg packages extraDeps flags resolver extraPackageDBs) = object $ concat
       [ maybe [] (\cv -> ["compiler" .= cv]) compiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= extraDeps]
+      , if null extraDeps then [] else ["extra-deps" .= map mkRawPackageLocationOrPath extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
-      , ["resolver" .= resolver]
+      , ["resolver" .= usl]
       ]
+      where
+        (usl, compiler) = unresolveSnapshotLocation resolver
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -1290,8 +1290,8 @@ compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (
 compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
-        GhcVersion version -> displayC version
-        GhcjsVersion {} -> compilerVersionString compilerVersion
+        ACGhc version -> displayC version
+        ACGhcjs {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1337,7 +1337,7 @@ configLoadedSnapshotCache sd gis = do
 data GlobalInfoSource
   = GISSnapshotHints
   -- ^ Accept the hints in the snapshot definition
-  | GISCompiler (CompilerVersion 'CVActual)
+  | GISCompiler ActualCompiler
   -- ^ Look up the actual information in the installed compiler
 
 -- | Suffix applied to an installation root to get the bin dir
@@ -1423,7 +1423,7 @@ getCompilerPath wc = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings ProjectAndConfigMonoid)
+parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO ProjectAndConfigMonoid))
 parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         packages <- o ..:? "packages" ..!= [RelFilePath "."]
@@ -1433,23 +1433,23 @@ parseProjectAndConfigMonoid rootDir =
                   $ unCabalStringMap
                     (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
-        resolver <- (o ..: "resolver")
-                >>= either (fail . show) return
-                  . parseCustomLocation (Just rootDir)
-        compiler <- o ..:? "compiler"
+        resolver <- jsonSubWarnings (o ..: "resolver")
+        mcompiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
-        let project = Project
-                { projectUserMsg = msg
-                , projectResolver = resolver
-                , projectCompiler = compiler
-                , projectExtraPackageDBs = extraPackageDBs
-                , projectPackages = packages
-                , projectDependencies = deps
-                , projectFlags = flags
-                }
-        return $ ProjectAndConfigMonoid project config
+        return $ do
+          deps' <- mapM (unRawPackageLocationOrPath rootDir) deps
+          resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
+          let project = Project
+                  { projectUserMsg = msg
+                  , projectResolver = resolver'
+                  , projectExtraPackageDBs = extraPackageDBs
+                  , projectPackages = packages
+                  , projectDependencies = concat deps'
+                  , projectFlags = flags
+                  }
+          pure $ ProjectAndConfigMonoid project config
 
 -- | A software control system.
 data SCM = Git
@@ -1576,7 +1576,7 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-    , siGHCJSs :: Map Text (Map (CompilerVersion 'CVActual) DownloadInfo)
+    , siGHCJSs :: Map Text (Map ActualCompiler DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -1853,13 +1853,13 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => Getting r s (CompilerVersion 'CVWanted)
+wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfig s => Lens' s (CompilerVersion 'CVActual)
+actualCompilerVersionL :: HasEnvConfig s => Lens' s ActualCompiler
 actualCompilerVersionL = envConfigL.lens
     envConfigCompilerVersion
     (\x y -> x { envConfigCompilerVersion = y })
@@ -1922,7 +1922,7 @@ loadedSnapshotL = envConfigL.lens
     envConfigLoadedSnapshot
     (\x y -> x { envConfigLoadedSnapshot = y })
 
-whichCompilerL :: Getting r (CompilerVersion a) WhichCompiler
+whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler
 
 envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO ProcessContext)

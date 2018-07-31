@@ -998,13 +998,13 @@ flagMap = M.fromList . map pair
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: Map FlagName Bool
-    , rcCompilerVersion :: CompilerVersion 'CVActual
+    , rcCompilerVersion :: ActualCompiler
     , rcOS :: OS
     , rcArch :: Arch
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: CompilerVersion 'CVActual -- ^ Compiler version
+mkResolveConditions :: ActualCompiler -- ^ Compiler version
                     -> Platform -- ^ installation target platform
                     -> Map FlagName Bool -- ^ enabled flags
                     -> ResolveConditions
@@ -1049,9 +1049,9 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                       -- False.
                     Impl flavor range ->
                       case (flavor, rcCompilerVersion rc) of
-                        (GHC, GhcVersion vghc) -> vghc `withinRange` range
-                        (GHC, GhcjsVersion _ vghc) -> vghc `withinRange` range
-                        (GHCJS, GhcjsVersion vghcjs _) ->
+                        (GHC, ACGhc vghc) -> vghc `withinRange` range
+                        (GHC, ACGhcjs _ vghc) -> vghc `withinRange` range
+                        (GHCJS, ACGhcjs vghcjs _) ->
                           vghcjs `withinRange` range
                         _ -> False
 
@@ -1397,7 +1397,7 @@ cabalFilePackageId fp = do
 parseSingleCabalFile -- FIXME rename and add docs
   :: forall env. HasConfig env
   => Bool -- ^ print warnings?
-  -> ResolvedDir
+  -> ResolvedPath Dir
   -> RIO env LocalPackageView -- FIXME kill off LocalPackageView? It's kinda worthless, right?
 parseSingleCabalFile printWarnings dir = do
   (gpd, cabalfp) <- parseCabalFilePath (resolvedAbsolute dir) printWarnings

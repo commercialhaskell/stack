@@ -52,7 +52,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: CompilerVersion a -> Either StringException T.Text
+nixCompiler :: WantedCompiler -> Either StringException T.Text
 nixCompiler compilerVersion =
   let -- These are the latest minor versions for each respective major version available in nixpkgs
       fixMinor "8.2" = "8.2.1"
@@ -69,8 +69,8 @@ nixCompiler compilerVersion =
                                           (T.filter (/= '.')
                                              (fixMinor (displayC v)))
   in case compilerVersion of
-       GhcVersion v -> Right $ nixCompilerFromVersion v
-       _ -> Left $ stringException "Only GHC is supported by stack --nix"
+       WCGhc v -> Right $ nixCompilerFromVersion v
+       WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

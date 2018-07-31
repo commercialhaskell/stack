@@ -380,6 +380,7 @@ selectBestSnapshot root gpds snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
+    undefined {- FIXME
     F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverStackage) snaps)
     where
         go mold mnew = do
@@ -416,6 +417,7 @@ selectBestSnapshot root gpds snaps = do
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+    -}
 
 showItems :: Show a => [a] -> Text
 showItems items = T.concat (map formatItem items)
