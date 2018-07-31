@@ -13,9 +13,12 @@ module Stack.Types.Compiler
   , getGhcVersion
   , whichCompiler
   , compilerExeName
+  , compilerVersionText
   , compilerVersionString
   , parseCompilerVersion
   , haddockExeName
+  , isWantedCompiler
+  , wantedToActual
   ) where
 
 import           Data.Aeson

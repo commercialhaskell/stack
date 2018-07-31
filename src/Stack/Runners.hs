@@ -28,7 +28,6 @@ import           Stack.Config
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
-import           Stack.Types.Compiler (CompilerVersion, CVType (..))
 import           Stack.Types.Config
 import           Stack.Types.Runner
 import           System.Environment (getEnvironment)
@@ -39,7 +38,7 @@ import           Stack.Dot
 -- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts
                     -> LoadConfig
-                    -> IO (CompilerVersion 'CVWanted)
+                    -> IO WantedCompiler
 loadCompilerVersion go lc =
     view wantedCompilerVersionL <$> lcLoadBuildConfig lc (globalCompiler go)
 

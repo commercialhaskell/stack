@@ -35,7 +35,7 @@ import           RIO.Process (processContextL, exec)
 reexecWithOptionalShell
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
+    -> IO WantedCompiler
     -> IO ()
     -> RIO env ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
@@ -59,7 +59,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 runShellAndExit
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
+    -> IO WantedCompiler
     -> RIO env (String, [String])
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do

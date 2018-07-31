@@ -75,11 +75,6 @@ initProject whichCmd currDir initOpts mresolver = do
     (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
                                                           mresolver bundle
 
-    -- Kind of inefficient, since we've already parsed this value. But
-    -- better to reparse in this one case than carry the unneeded data
-    -- around everywhere in the codebase.
-    resolver <- parseCustomLocation (Just (parent dest)) (void (sdResolver sd))
-
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
             | dupPkgs /= [] =
@@ -113,15 +108,14 @@ initProject whichCmd currDir initOpts mresolver = do
         gpds = Map.elems $ fmap snd rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
-      (mkRawPackageLocationOrPath . PLRemote) <$> completePackageLocation (PLHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+      PLRemote <$> completePackageLocation (PLHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = (RelFilePath . T.pack) <$> pkgs
             , projectDependencies = deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
-            , projectResolver = resolver
-            , projectCompiler = Nothing
+            , projectResolver = sdResolver sd
             , projectExtraPackageDBs = []
             }
 
@@ -435,7 +429,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
         BuildPlanCheckPartial f e -> do
             shouldUseSolver <- case (resolver, initOpts) of
                 (_, InitOpts { useSolver = True }) -> return True
-                (ResolverCompiler _, _) -> do
+                (SLCompiler _, _) -> do
                     logInfo "Using solver because a compiler resolver was specified."
                     return True
                 _ -> return False

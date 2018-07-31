@@ -144,7 +144,7 @@ gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
 
 gpdPackageDeps
     :: GenericPackageDescription
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Platform
     -> Map FlagName Bool
     -> Map PackageName VersionRange
@@ -192,7 +192,7 @@ removeSrcPkgDefaultFlags gpds flags =
 -- Returns the plan which produces least number of dep errors
 selectPackageBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> GenericPackageDescription
     -> (Map PackageName (Map FlagName Bool), DepErrors)
@@ -231,7 +231,7 @@ selectPackageBuildPlan platform compiler pool gpd =
 -- constraints can be satisfied against a given build plan or pool of packages.
 checkPackageBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> Map FlagName Bool
     -> GenericPackageDescription
@@ -285,7 +285,7 @@ combineDepError (DepError a x) (DepError b y) =
 -- will be chosen automatically.
 checkBundleBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> [GenericPackageDescription]
@@ -309,7 +309,7 @@ data BuildPlanCheck =
       BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
     | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
-                            (CompilerVersion 'CVActual)
+                            ActualCompiler
 
 -- | Compare 'BuildPlanCheck', where GT means a better plan.
 compareBuildPlanCheck :: BuildPlanCheck -> BuildPlanCheck -> Ordering
@@ -339,7 +339,7 @@ checkSnapBuildPlan
     -> [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
-    -> Maybe (CompilerVersion 'CVActual)
+    -> Maybe ActualCompiler
     -> RIO env BuildPlanCheck
 checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
@@ -449,7 +449,7 @@ showMapPackages mp = showItems $ Map.keys mp
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)
     -> DepErrors
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Text
 showCompilerErrors flags errs compiler =
     T.concat

@@ -1155,7 +1155,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                             mlogFile
                             bss
                   where
-                    runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
+                    runAndOutput :: ActualCompiler -> RIO env ()
                     runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case outputType of
                         OTLogFile _ h ->
                             proc (toFilePath exeName) fullArgs
@@ -1171,7 +1171,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         :: HasCallStack
                         => ExcludeTHLoading
                         -> LogLevel
-                        -> CompilerVersion 'CVActual
+                        -> ActualCompiler
                         -> Utf8Builder
                         -> ConduitM S.ByteString Void (RIO env) ()
                     outputSink excludeTH level compilerVer prefix =
@@ -1515,7 +1515,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             actualCompiler <- view actualCompilerVersionL
             let quickjump =
                   case actualCompiler of
-                    GhcVersion ghcVer
+                    ACGhc ghcVer
                       | ghcVer >= $(mkVersion "8.4") -> ["--haddock-option=--quickjump"]
                     _ -> []
 
@@ -1874,7 +1874,7 @@ mungeBuildOutput :: forall m. MonadIO m
                  => ExcludeTHLoading       -- ^ exclude TH loading?
                  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
                  -> Path Abs Dir           -- ^ package's root directory
-                 -> CompilerVersion 'CVActual -- ^ compiler we're building with
+                 -> ActualCompiler         -- ^ compiler we're building with
                  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     CT.lines

@@ -142,7 +142,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownCompilerVersion (Set.Set Text) WantedCompiler (Set.Set (CompilerVersion 'CVActual))
+                    | UnknownCompilerVersion (Set.Set Text) WantedCompiler (Set.Set ActualCompiler)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed SomeException (Path Abs File)
                     | WantedMustBeGHC
@@ -166,7 +166,7 @@ instance Show SetupException where
         intercalate ", " tools
     show (UnknownCompilerVersion oskeys wanted known) = concat
         [ "No setup information found for "
-        , compilerVersionString wanted
+        , T.unpack $ utf8BuilderToText $ RIO.display wanted
         , " on your platform.\nThis probably means a GHC bindist has not yet been added for OS key '"
         , T.unpack (T.intercalate "', '" (sort $ Set.toList oskeys))
         , "'.\nSupported versions: "
@@ -217,7 +217,7 @@ setupEnv mResolveMissingGHC = do
     let stackYaml = bcStackYaml bconfig
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
-    wc <- view $ wantedCompilerVersionL.whichCompilerL
+    wc <- view $ wantedCompilerVersionL.to wantedToActual.whichCompilerL
     let sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC config
             , soptsUseSystem = configSystemGHC config
@@ -378,8 +378,8 @@ ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
                -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
 ensureCompiler sopts = do
-    let wc = whichCompiler (soptsWantedCompiler sopts)
-    when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
+    let wc = whichCompiler (wantedToActual (soptsWantedCompiler sopts))
+    when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < $(mkVersion "7.8")) $ do
         logWarn "Stack will almost certainly fail with GHC below version 7.8"
         logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
@@ -445,7 +445,7 @@ ensureCompiler sopts = do
                             ghcBuilds <- getGhcBuilds
                             forM ghcBuilds $ \ghcBuild -> do
                                 ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
-                                return (getInstalledTool installed ghcPkgName (isWanted . GhcVersion), ghcBuild)
+                                return (getInstalledTool installed ghcPkgName (isWanted . ACGhc), ghcBuild)
                         Ghcjs -> return [(getInstalledGhcjs installed isWanted, CompilerBuildStandard)]
             let existingCompilers = concatMap
                     (\(installedCompiler, compilerBuild) ->
@@ -761,7 +761,7 @@ doCabalInstall wc installed wantedVersion = do
 getSystemCompiler
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
-  -> RIO env (Maybe (CompilerVersion 'CVActual, Arch))
+  -> RIO env (Maybe (ActualCompiler, Arch))
 getSystemCompiler wc = do
     let exeName = case wc of
             Ghc -> "ghc"
@@ -777,7 +777,7 @@ getSystemCompiler wc = do
                     arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)
             case (wc, minfo) of
-                (Ghc, Just (version, arch)) -> return (Just (GhcVersion version, arch))
+                (Ghc, Just (version, arch)) -> return (Just (ACGhc version, arch))
                 (Ghcjs, Just (_, arch)) -> do
                     eversion <- tryAny $ getCompilerVersion Ghcjs
                     case eversion of
@@ -826,7 +826,7 @@ getInstalledTool installed name goodVersion =
     goodPackage _ = Nothing
 
 getInstalledGhcjs :: [Tool]
-                  -> (CompilerVersion 'CVActual -> Bool)
+                  -> (ActualCompiler -> Bool)
                   -> Maybe Tool
 getInstalledGhcjs installed goodVersion =
     if null available
@@ -864,7 +864,7 @@ downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
                            -> VersionCheck
                            -> Maybe String
                            -> RIO env Tool
-downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindistURL = do
+downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
@@ -872,7 +872,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
                 GHCCustom _ -> return ()
                 _ -> throwM RequireCustomGHCVariant
             case wanted of
-                GhcVersion version ->
+                WCGhc version ->
                     return (version, GHCDownloadInfo mempty mempty DownloadInfo
                              { downloadInfoUrl = T.pack bindistURL
                              , downloadInfoContentLength = Nothing
@@ -885,7 +885,7 @@ downloadAndInstallCompiler ghcBuild si wanted@GhcVersion{} versionCheck mbindist
             ghcKey <- getGhcKey ghcBuild
             case Map.lookup ghcKey $ siGHCs si of
                 Nothing -> throwM $ UnknownOSKey ghcKey
-                Just pairs_ -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs_
+                Just pairs_ -> getWantedCompilerInfo ghcKey versionCheck wanted ACGhc pairs_
     config <- view configL
     let installer =
             case configPlatform config of
@@ -922,7 +922,7 @@ getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
                       -> VersionCheck
                       -> WantedCompiler
-                      -> (k -> CompilerVersion 'CVActual)
+                      -> (k -> ActualCompiler)
                       -> Map k a
                       -> m (k, a)
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
@@ -1222,7 +1222,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
       logStickyDone "Installed GHCJS."
 
 ensureGhcjsBooted :: HasConfig env
-                  => CompilerVersion 'CVActual -> Bool -> [String]
+                  => ActualCompiler -> Bool -> [String]
                   -> RIO env ()
 ensureGhcjsBooted cv shouldBoot bootOpts = do
     eres <- try $ sinkProcessStdout "ghcjs" [] (return ())
@@ -1245,7 +1245,7 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
                 -- installed with an older version and not yet booted.
                 stackYamlExists <- doesFileExist stackYaml
                 ghcjsVersion <- case cv of
-                        GhcjsVersion version _ -> return version
+                        ACGhcjs version _ -> return version
                         _ -> error "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else
@@ -1679,7 +1679,7 @@ removeHaskellEnvVars =
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars
     :: (HasProcessContext env, HasPlatform env, HasLogFunc env)
-    => CompilerVersion 'CVActual
+    => ActualCompiler
     -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")

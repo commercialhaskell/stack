@@ -58,7 +58,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.Resolver
 import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -252,15 +251,15 @@ getCabalConfig dir constraintType constraints = do
 
 setupCompiler
     :: (HasConfig env, HasGHCVariant env)
-    => CompilerVersion 'CVWanted
+    => WantedCompiler
     -> RIO env (Maybe ExtraDirs)
 setupCompiler compiler = do
-    let msg = Just $ T.concat
-          [ "Compiler version (" <> compilerVersionText compiler <> ") "
-          , "required by your resolver specification cannot be found.\n\n"
-          , "Please use '--install-ghc' command line switch to automatically "
-          , "install the compiler or '--system-ghc' to use a suitable "
-          , "compiler available on your PATH." ]
+    let msg = Just $ utf8BuilderToText $
+          "Compiler version (" <> RIO.display compiler <> ") " <>
+          "required by your resolver specification cannot be found.\n\n" <>
+          "Please use '--install-ghc' command line switch to automatically " <>
+          "install the compiler or '--system-ghc' to use a suitable " <>
+          "compiler available on your PATH."
 
     config <- view configL
     (dirs, _, _) <- ensureCompiler SetupOpts
@@ -285,8 +284,8 @@ setupCompiler compiler = do
 -- has the desired GHC on the PATH.
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
-    => CompilerVersion 'CVWanted
-    -> (CompilerVersion 'CVActual -> RIO env a)
+    => WantedCompiler
+    -> (ActualCompiler -> RIO env a)
     -> RIO env a
 setupCabalEnv compiler inner = do
   mpaths <- setupCompiler compiler
@@ -311,7 +310,7 @@ setupCabalEnv compiler inner = do
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
-    mver <- getSystemCompiler (whichCompiler compiler)
+    mver <- getSystemCompiler (whichCompiler (wantedToActual compiler))
     version <- case mver of
         Just (version, _) -> do
             logInfo $ "Using compiler: " <> RIO.display version
@@ -469,11 +468,11 @@ solveResolverSpec stackYaml cabalDirs
 -- for that resolver.
 getResolverConstraints
     :: (HasConfig env, HasGHCVariant env)
-    => Maybe (CompilerVersion 'CVActual) -- ^ actually installed compiler
+    => Maybe ActualCompiler -- ^ actually installed compiler
     -> Path Abs File
     -> SnapshotDef
     -> RIO env
-         (CompilerVersion 'CVActual,
+         (ActualCompiler,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints mcompilerVersion stackYaml sd = do
     ls <- loadSnapshot mcompilerVersion (parent stackYaml) sd
@@ -682,14 +681,14 @@ solveExtraDeps modStackYaml = do
 
         changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
-                  || any (/= void resolver) (fmap void mOldResolver)
+                  || any (/= resolver) mOldResolver
 
     if changed then do
         logInfo ""
         logInfo $ "The following changes will be made to "
                    <> fromString relStackYaml <> ":"
 
-        printResolver (fmap void mOldResolver) (void resolver)
+        printResolver mOldResolver resolver
 
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
@@ -715,9 +714,9 @@ solveExtraDeps modStackYaml = do
                 when (res /= oldRes) $ do
                     logInfo $
                         "* Resolver changes from " <>
-                        RIO.display (resolverRawName oldRes) <>
+                        RIO.display oldRes <>
                         " to " <>
-                        RIO.display (resolverRawName res)
+                        RIO.display res
 
         printFlags fl msg = do
             unless (Map.null fl) $ do
@@ -733,7 +732,7 @@ solveExtraDeps modStackYaml = do
 
         writeStackYaml
           :: Path Abs File
-          -> ResolverWith SnapshotHash
+          -> SnapshotLocation
           -> Map PackageName Version
           -> Map PackageName (Map FlagName Bool)
           -> RIO env ()
@@ -742,11 +741,13 @@ solveExtraDeps modStackYaml = do
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
             -- Check input file and show warnings
             _ <- loadConfigYaml (parseProjectAndConfigMonoid (parent path)) path
-            let obj' =
+            let (usl, mcompiler) = unresolveSnapshotLocation res
+                obj' =
                     HashMap.insert "extra-deps"
                         (toJSON $ map (CabalString . uncurry PackageIdentifier) $ Map.toList deps)
                   $ HashMap.insert ("flags" :: Text) (toJSON $ toCabalStringMap $ toCabalStringMap <$> fl)
-                  $ HashMap.insert ("resolver" :: Text) (toJSON res) obj
+                  $ maybe id (HashMap.insert "compiler" . toJSON) mcompiler
+                  $ HashMap.insert ("resolver" :: Text) (toJSON usl) obj
             liftIO $ Yaml.encodeFile fp obj'
 
         giveUpMsg = concat
@@ -776,10 +777,9 @@ checkSnapBuildPlanActual
 checkSnapBuildPlanActual root gpds flags sd = do
     let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
         runner =
-          case sdResolver sd of
-            ResolverStackage _ -> ($ Nothing)
-            ResolverCompiler _ -> forNonSnapshot
-            ResolverCustom _ _ -> forNonSnapshot
+          if Map.null $ sdGlobalHints sd
+            then forNonSnapshot
+            else ($ Nothing)
 
     runner $ checkSnapBuildPlan root gpds flags sd
 
