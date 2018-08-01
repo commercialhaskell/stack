@@ -53,6 +53,7 @@ module Pantry.Types
   , toCabalStringMap
   , unCabalStringMap
   , parsePackageIdentifierRevision
+  , Mismatch (..)
   , PantryException (..)
   , PackageLocationOrPath (..)
   , ResolvedPath (..)
@@ -97,6 +98,7 @@ import qualified Distribution.Text
 import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
+import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
 import Path (Abs, Dir, File, parseAbsDir, toFilePath, filename)
 import Path.Internal (Path (..)) -- FIXME don't import this
@@ -338,6 +340,11 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
       let (x, y) = T.break (== ':') t'
        in (x, ) <$> T.stripPrefix ":" y
 
+data Mismatch a = Mismatch
+  { mismatchExpected :: !a
+  , mismatchActual :: !a
+  }
+
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
@@ -355,6 +362,8 @@ data PantryException
   | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
   | InvalidFilePathSnapshot !Text
   | InvalidSnapshot !SnapshotLocation !SomeException
+  | Non200ResponseStatus !Status
+  | InvalidBlobKey !(Mismatch BlobKey)
 
   deriving Typeable
 instance Exception PantryException where
@@ -436,6 +445,14 @@ instance Display PantryException where
     display loc <>
     ":\n" <>
     displayShow e
+  display (Non200ResponseStatus status) =
+    "Unexpected non-200 HTTP status code: " <>
+    displayShow (statusCode status)
+  display (InvalidBlobKey Mismatch{..}) =
+    "Invalid blob key found, expected: " <>
+    display mismatchExpected <>
+    ", actual: " <>
+    display mismatchActual
 
 data FileType = FTNormal | FTExecutable
   deriving Show

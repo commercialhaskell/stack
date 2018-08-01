@@ -16,6 +16,8 @@ module Pantry.Storage
   , loadBlobById
   , loadBlobBySHA
   , getBlobKey
+  , loadURLBlob
+  , storeURLBlob
   , clearHackageRevisions
   , storeHackageRevision
   , loadHackagePackageVersions
@@ -63,6 +65,11 @@ BlobTable sql=blob
     size FileSize
     contents ByteString
     UniqueBlobHash hash
+UrlBlobTable sql=url_blob
+    url Text
+    blob BlobTableId
+    time UTCTime
+    UniqueUrlTime url time
 Name sql=package_name
     name PackageNameP
     UniquePackageName name
@@ -221,6 +228,36 @@ getBlobTableId (BlobKey sha size) = do
   res <- rawSql "SELECT id FROM blob WHERE hash=? AND size=?"
            [toPersistValue sha, toPersistValue size]
   pure $ listToMaybe $ map unSingle res
+
+loadURLBlob
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text
+  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
+loadURLBlob url = do
+  ment <- rawSql
+    "SELECT blob.contents\n\
+    \FROM blob, url_blob\n\
+    \WHERE url=?\
+    \  AND url_blob.blob=blob.id\n\
+    \ ORDER BY url_blob.time DESC"
+    [toPersistValue url]
+  case ment of
+    [] -> pure Nothing
+    (Single bs) : _ -> pure $ Just $ blobTableContents bs
+
+storeURLBlob
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text
+  -> ByteString
+  -> ReaderT SqlBackend (RIO env) ()
+storeURLBlob url blob = do
+  (blobId, _) <- storeBlob blob
+  now <- getCurrentTime
+  insert_ UrlBlobTable
+        { urlBlobTableUrl = url
+        , urlBlobTableBlob = blobId
+        , urlBlobTableTime = now
+        }
 
 clearHackageRevisions
   :: (HasPantryConfig env, HasLogFunc env)
