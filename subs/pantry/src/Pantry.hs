@@ -127,6 +127,8 @@ import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Network.HTTP.StackClient
 import Network.HTTP.Types (ok200)
+import qualified Distribution.Text
+import Distribution.Types.VersionRange (withinRange)
 
 withPantryConfig
   :: HasLogFunc env
@@ -278,7 +280,15 @@ getPackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getPackageVersions = withStorage . loadHackagePackageVersions
+getPackageVersions name = withStorage $ do
+  mpreferred <- loadPreferredVersion name
+  let predicate :: Version -> Map Revision BlobKey -> Bool
+      predicate = fromMaybe (\_ _ -> True) $ do
+        preferredT1 <- mpreferred
+        preferredT2 <- T.stripPrefix (displayC name) preferredT1
+        vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
+        Just $ \v _ -> withinRange v vr
+  Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 -- | Returns the latest version of the given package available from
 -- Hackage.

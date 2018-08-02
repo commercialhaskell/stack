@@ -37,6 +37,8 @@ module Pantry.Storage
   , loadArchiveCache
   , storeCrlfHack
   , checkCrlfHack
+  , storePreferredVersion
+  , loadPreferredVersion
 
     -- avoid warnings
   , BlobTableId
@@ -90,10 +92,15 @@ HackageCabal
     cabal BlobTableId
     tree TreeSId Maybe
     UniqueHackage name version revision
+PreferredVersions
+    name NameId
+    preferred Text
+    UniquePreferred name
 CacheUpdate
     time UTCTime
     size FileSize
     hash StaticSHA256
+
 ArchiveCache
     time UTCTime
     url Text
@@ -623,3 +630,26 @@ checkCrlfHack stripped = do
   case ment of
     Nothing -> pure stripped
     Just (Entity _ ch) -> getBlobKey $ crlfHackOriginal ch
+
+storePreferredVersion
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Text
+  -> ReaderT SqlBackend (RIO env) ()
+storePreferredVersion name p = do
+  nameid <- getNameId name
+  ment <- getBy $ UniquePreferred nameid
+  case ment of
+    Nothing -> insert_ PreferredVersions
+      { preferredVersionsName = nameid
+      , preferredVersionsPreferred = p
+      }
+    Just (Entity pid _) -> update pid [PreferredVersionsPreferred =. p]
+
+loadPreferredVersion
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> ReaderT SqlBackend (RIO env) (Maybe Text)
+loadPreferredVersion name = do
+  nameid <- getNameId name
+  fmap (preferredVersionsPreferred . entityVal) <$> getBy (UniquePreferred nameid)

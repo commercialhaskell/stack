@@ -194,6 +194,14 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
                   lift $ lift $
                   logSticky $ "Processed " <> display count' <> " cabal files"
             | otherwise -> pure ()
+      | FTNormal <- fileType fi
+      , Right path <- decodeUtf8' $ filePath fi
+      , (nameT, "/preferred-versions") <- T.break (== '/') path
+      , Just name <- parsePackageName $ T.unpack nameT = do
+          lbs <- sinkLazy
+          case decodeUtf8' $ BL.toStrict lbs of
+            Left _ -> pure () -- maybe warning
+            Right p -> lift $ storePreferredVersion name p
       | otherwise = pure ()
 
     addJSON name version lbs =

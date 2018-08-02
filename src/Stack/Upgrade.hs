@@ -222,14 +222,12 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
       Nothing -> do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
-        versions0 <- getPackageVersions "stack"
-        let versions
-                = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ Map.keys versions0
+        mversion <- getLatestHackageVersion "stack"
+        pir@(PackageIdentifierRevision _ version _) <-
+          case mversion of
+            Nothing -> throwString "No stack found in package indices"
+            Just version -> pure version
 
-        when (null versions) (throwString "No stack found in package indices")
-
-        let version = Data.List.maximum versions
         if version <= mkVersion' Paths.version
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
@@ -237,12 +235,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ displayC version
                 let dir = tmp </> suffix
-                unpackPackageLocation dir $ PLHackage
-                  (PackageIdentifierRevision
-                    $(mkPackageName "stack")
-                    version
-                    CFILatest) -- accept latest cabal revision
-                  Nothing
+                unpackPackageLocation dir $ PLHackage pir Nothing
                 pure $ Just dir
 
     forM_ mdir $ \dir ->
