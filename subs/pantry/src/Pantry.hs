@@ -100,6 +100,7 @@ module Pantry
 import RIO
 import qualified RIO.Map as Map
 import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as LB
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath
@@ -123,6 +124,8 @@ import RIO.Process
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Monoid (Endo (..))
+import Network.HTTP.StackClient
+import Network.HTTP.Types (ok200)
 
 withPantryConfig
   :: HasLogFunc env
@@ -662,7 +665,38 @@ loadFromURL
   => Text -- ^ url
   -> Maybe BlobKey
   -> RIO env ByteString
-loadFromURL = undefined
+loadFromURL url Nothing = do
+  mcached <- withStorage $ loadURLBlob url
+  case mcached of
+    Just bs -> return bs
+    Nothing -> loadWithCheck url $ \_ -> return ()
+loadFromURL url (Just bkey@(BlobKey sha size)) = do
+  mcached <- withStorage $ loadBlob bkey
+  case mcached of
+    Just bs -> return bs
+    Nothing -> loadWithCheck url $ \bs -> do
+      let blobSha = mkStaticSHA256FromBytes bs
+          blobSize = FileSize $ fromIntegral $ B.length bs
+      when (blobSha /= sha || blobSize /= size) $
+        throwIO $ InvalidBlobKey Mismatch
+          { mismatchExpected = bkey
+          , mismatchActual = BlobKey blobSha blobSize
+          }
+
+loadWithCheck
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Text -- ^ url
+  -> (ByteString -> RIO env ()) -- ^ function to check downloaded blob
+  -> RIO env ByteString
+loadWithCheck url checkResponseBody = do
+  req <- parseRequest $ T.unpack url
+  res <- httpLbs req
+  let statusCode = responseStatus res
+  when (statusCode /= ok200) $ throwIO (Non200ResponseStatus statusCode)
+  let bs = LB.toStrict $ getResponseBody res
+  checkResponseBody bs
+  withStorage $ storeURLBlob url bs
+  return bs
 
 warningsParserHelper
   :: HasLogFunc env
