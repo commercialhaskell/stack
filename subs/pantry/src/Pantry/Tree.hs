@@ -5,6 +5,10 @@
 module Pantry.Tree
   ( unpackTree
   , findCabalFile
+  , checkTreeKey
+  , checkPackageMetadata
+  , loadPackageIdentFromTree
+  , rawParseGPD
   ) where
 
 import RIO
@@ -16,6 +20,10 @@ import Pantry.Types
 import RIO.FilePath ((</>), takeDirectory)
 import RIO.Directory (createDirectoryIfMissing)
 import Path (Path, Abs, Dir, toFilePath)
+import Distribution.Parsec.Common (PWarning (..), showPos)
+import Distribution.PackageDescription (packageDescription, package, GenericPackageDescription)
+import Distribution.PackageDescription.Parsec
+import Path (File)
 
 #if !WINDOWS
 import System.Posix.Files (setFileMode)
@@ -54,3 +62,73 @@ findCabalFile loc (TreeMap m) = do
     [] -> throwM $ TreeWithoutCabalFile loc
     [(key, te)] -> pure (key, te)
     xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
+
+-- | A helper function that performs the basic character encoding
+-- necessary.
+rawParseGPD
+  :: MonadThrow m
+  => Either PackageLocation (Path Abs File)
+  -> ByteString
+  -> m ([PWarning], GenericPackageDescription)
+rawParseGPD loc bs =
+    case eres of
+      Left (mversion, errs) -> throwM $ InvalidCabalFile loc mversion errs warnings
+      Right gpkg -> return (warnings, gpkg)
+  where
+    (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
+
+-- | Returns the cabal blob key
+loadPackageIdentFromTree
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> Tree
+  -> RIO env (BlobKey, PackageIdentifier)
+loadPackageIdentFromTree pl tree = do -- FIXME store this in a table to avoid the slow Cabal file parser
+  (sfp, TreeEntry cabalBlobKey _) <- findCabalFile pl tree
+  mbs <- withStorage $ loadBlob cabalBlobKey
+  bs <-
+    case mbs of
+      Nothing -> error $ "Cabal file not loaded for " ++ show pl
+      Just bs -> pure bs
+  (_warnings, gpd) <- rawParseGPD (Left pl) bs
+  let ident@(PackageIdentifier name _) = package $ packageDescription $ gpd
+  when (unSafeFilePath sfp /= displayC name <> ".cabal") $
+    throwIO $ WrongCabalFileName pl sfp name
+  pure (cabalBlobKey, ident)
+
+-- ensure name, version, etc are correct
+checkPackageMetadata
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> PackageMetadata
+  -> RIO env (TreeKey, Tree)
+  -> RIO env (TreeKey, Tree)
+checkPackageMetadata pl pm inner = do
+  (treeKey, tree) <- checkTreeKey pl (pmTree pm) inner
+  -- even if we aren't given a name and version, still load this to
+  -- force the check of the cabal file name being accurate
+  (cabalBlobKey, ident@(PackageIdentifier name version))
+    <- loadPackageIdentFromTree pl tree
+  let err = throwIO $ MismatchedPackageMetadata pl pm cabalBlobKey ident
+  for_ (pmName pm) $ \name' -> when (name /= name') err
+  for_ (pmVersion pm) $ \version' -> when (version /= version') err
+  for_ (pmCabal pm) $ \cabal' -> when (cabalBlobKey /= cabal') err
+  pure (treeKey, tree)
+
+checkTreeKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> Maybe TreeKey
+  -> RIO env (TreeKey, Tree)
+  -> RIO env (TreeKey, Tree)
+checkTreeKey _ Nothing inner = inner
+checkTreeKey pl (Just expectedTreeKey) inner = do
+  mtree <- withStorage $ loadTree expectedTreeKey
+  case mtree of
+    Just tree -> pure (expectedTreeKey, tree)
+    Nothing -> do
+      res@(actualTreeKey, _) <- inner
+      -- FIXME do we need to store the tree now?
+      when (actualTreeKey /= expectedTreeKey) $
+          throwIO $ TreeKeyMismatch pl expectedTreeKey actualTreeKey
+      pure res

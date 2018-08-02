@@ -368,20 +368,6 @@ readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXM
         ((M.insert pir gpd m1, m2), gpd)
     -}
 
--- | A helper function that performs the basic character encoding
--- necessary.
-rawParseGPD
-  :: MonadThrow m
-  => Either PackageLocation (Path Abs File)
-  -> ByteString
-  -> m ([PWarning], GenericPackageDescription)
-rawParseGPD loc bs =
-    case eres of
-      Left (mversion, errs) -> throwM $ InvalidCabalFile loc mversion errs warnings
-      Right gpkg -> return (warnings, gpkg)
-  where
-    (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
-
 -- | Same as 'parseCabalFileRemote', but takes a
 -- 'PackageLocationOrPath'. Never prints warnings, see
 -- 'parseCabalFilePath' for that.

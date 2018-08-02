@@ -37,9 +37,7 @@ module Pantry.Storage
   , loadArchiveCache
   , storeCrlfHack
   , checkCrlfHack
-  , checkTreeKey
-  , checkPackageMetadata
-  , loadPackageIdentFromTree
+
     -- avoid warnings
   , BlobTableId
   , HackageCabalId
@@ -625,49 +623,3 @@ checkCrlfHack stripped = do
   case ment of
     Nothing -> pure stripped
     Just (Entity _ ch) -> getBlobKey $ crlfHackOriginal ch
-
-checkTreeKey
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
-  -> Maybe TreeKey
-  -> RIO env (TreeKey, Tree)
-  -> RIO env (TreeKey, Tree)
-checkTreeKey _ Nothing inner = inner
-checkTreeKey pl (Just expectedTreeKey) inner = do
-  mtree <- withStorage $ loadTree expectedTreeKey
-  case mtree of
-    Just tree -> pure (expectedTreeKey, tree)
-    Nothing -> do
-      res@(actualTreeKey, _) <- inner
-      -- FIXME do we need to store the tree now?
-      when (actualTreeKey /= expectedTreeKey) $
-          throwIO $ TreeKeyMismatch pl expectedTreeKey actualTreeKey
-      pure res
-
--- ensure name, version, etc are correct
-checkPackageMetadata
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
-  -> PackageMetadata
-  -> RIO env (TreeKey, Tree)
-  -> RIO env (TreeKey, Tree)
-checkPackageMetadata pl pm inner = do
-  (treeKey, tree) <- checkTreeKey pl (pmTree pm) inner
-  -- even if we aren't given a name and version, still load this to
-  -- force the check of the cabal file name being accurate
-  (cabalBlobKey, ident@(PackageIdentifier name version))
-    <- loadPackageIdentFromTree pl tree
-  let err = throwIO $ MismatchedPackageMetadata pl pm cabalBlobKey ident
-  for_ (pmName pm) $ \name' -> when (name /= name') err
-  for_ (pmVersion pm) $ \version' -> when (version /= version') err
-  for_ (pmCabal pm) $ \cabal' -> when (cabalBlobKey /= cabal') err
-  pure (treeKey, tree)
-
--- | Returns the cabal blob key
-loadPackageIdentFromTree
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
-  -> Tree
-  -> RIO env (BlobKey, PackageIdentifier)
-loadPackageIdentFromTree pl tree = undefined
-  -- FIXME ensure that the cabal file name match the package name

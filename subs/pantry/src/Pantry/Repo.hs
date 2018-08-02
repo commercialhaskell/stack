@@ -9,6 +9,7 @@ module Pantry.Repo -- FIXME needs to be implemented!
 
 import Pantry.Types
 import Pantry.Storage
+import Pantry.Tree
 import RIO
 
 fetchRepos

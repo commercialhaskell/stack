@@ -387,6 +387,7 @@ data PantryException
   | Non200ResponseStatus !Status
   | InvalidBlobKey !(Mismatch BlobKey)
   | Couldn'tParseSnapshot !SnapshotLocation !String
+  | WrongCabalFileName !PackageLocation !SafeFilePath !PackageName
 
   deriving Typeable
 instance Exception PantryException where
@@ -486,6 +487,11 @@ instance Display PantryException where
     display mismatchActual
   display (Couldn'tParseSnapshot sl e) =
     "Couldn't parse snapshot from " <> display sl <> ": " <> fromString e
+  display (WrongCabalFileName pl sfp name) =
+    "Wrong cabal file name for package " <> display pl <>
+    "\nCabal file is named " <> display sfp <>
+    ", but package name is " <> displayC name
+    -- FIXME include the issue link relevant to why we care about this
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -506,7 +512,7 @@ data TreeEntry = TreeEntry !BlobKey !FileType
   deriving Show
 
 newtype SafeFilePath = SafeFilePath Text
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Display)
 
 instance PersistField SafeFilePath where
   toPersistValue = toPersistValue . unSafeFilePath

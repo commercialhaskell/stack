@@ -13,6 +13,7 @@ import RIO
 import RIO.FilePath (normalise, takeDirectory, (</>))
 import Pantry.StaticSHA256
 import Pantry.Storage
+import Pantry.Tree
 import Pantry.Types
 import qualified RIO.Text as T
 import qualified RIO.List as List

@@ -24,6 +24,7 @@ import qualified RIO.ByteString.Lazy as BL
 import Pantry.Archive
 import Pantry.Types hiding (FileType (..))
 import Pantry.Storage
+import Pantry.Tree
 import Pantry.StaticSHA256
 import Network.URI (parseURI)
 import Network.HTTP.Client.TLS (getGlobalManager)
@@ -396,17 +397,3 @@ getHackageTarball pir@(PackageIdentifierRevision name ver cfi) mtreeKey = checkT
         let tree' = TreeMap $ Map.insert key (TreeEntry cabalFileKey ft) m
         (tid, treeKey) <- withStorage $ storeTree tree'
         pure (tid, treeKey, tree')
-
-findCabalFile
-  :: MonadThrow m
-  => PackageLocation -- ^ for exceptions
-  -> Tree
-  -> m (SafeFilePath, TreeEntry)
-findCabalFile loc (TreeMap m) = do
-  let isCabalFile (sfp, _) =
-        let txt = unSafeFilePath sfp
-         in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
-  case filter isCabalFile $ Map.toList m of
-    [] -> throwM $ TreeWithoutCabalFile loc
-    [(key, te)] -> pure (key, te)
-    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
