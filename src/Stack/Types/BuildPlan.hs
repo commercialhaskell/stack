@@ -103,6 +103,56 @@ data LoadedSnapshot = LoadedSnapshot
 instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
+{-
+
+MSS 2018-08-02: There's a big refactoring laid out in
+https://github.com/commercialhaskell/stack/issues/3922. While working
+on the pantry refactoring, I think I found a straightforward way to
+approach implementing this (though there will still be a lot of code
+churn involved). I don't want to lose the idea, but I also don't want
+to include this change in the pantry work, so writing a note here.
+
+Right now, we eagerly load up all packages in a snapshot the first
+time we use it. This was necessary for build tool dependencies in the
+past, but not anymore
+(https://github.com/commercialhaskell/stack/pull/4132). Therefore:
+let's delete the @LoadedSnapshot@ data type entirely!
+
+Once you start down this path, you'll get to a point of not using the
+@calculatePackagePromotion@ stuff as much. This is good! Delete that
+function too!
+
+Instead, we have a @SnapshotLocation@, which can be turned into a
+@Snapshot@ via @loadPantrySnapshot@. We want to traverse that
+@Snapshot@ and all of its parent @Snapshot@s and come up with a few
+pieces of information:
+
+* The wanted compiler version
+
+* A @type SourceMap = Map PackageName PackageSource@
+
+We'll want to augment that @SourceMap@ with information from the
+@stack.yaml@ file, namely: extra-deps and local packages. We'll also
+need to extend it with command line parameters, such as if a user runs
+@stack build acme-missiles-0.3@.
+
+There will be a lot of information in @PackageSource@ taken from these
+various sources, but it will contain information on where the package
+is from, flags, GHC options, and so on, whether it's a dependency or
+part of the project, etc.
+
+It will be easy to see if a package is _immutable_ or not: everything
+but local file paths are immutable. Awesome.
+
+In ConstructPlan, when figuring out dependencies of a package, we'll
+use a simple rule: if the package and all of its dependencies are
+immutable, we stick it in the precompiled cache, with a hash based on
+the full transitive set of dependencies and their
+configuration. Otherwise, we don't cache.
+
+
+-}
+
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
 loadedSnapshotVC = storeVersionConfig "ls-v6" "6VbBiQDCXP-6Hu36CzyfOr8NQYE="
 
