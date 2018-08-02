@@ -475,7 +475,7 @@ getResolverConstraints
          (ActualCompiler,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints mcompilerVersion stackYaml sd = do
-    ls <- loadSnapshot mcompilerVersion (parent stackYaml) sd
+    ls <- loadSnapshot mcompilerVersion sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)

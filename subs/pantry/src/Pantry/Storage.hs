@@ -634,12 +634,15 @@ checkTreeKey
   -> RIO env (TreeKey, Tree)
 checkTreeKey _ Nothing inner = inner
 checkTreeKey pl (Just expectedTreeKey) inner = do
-  undefined
-
-    {-
-        for_ mtreeKey $ \expectedKey -> when (treeKey /= expectedKey) $
-          throwIO $ TreeKeyMismatch (PLHackage pir mtreeKey) expectedKey treeKey
-    -}
+  mtree <- withStorage $ loadTree expectedTreeKey
+  case mtree of
+    Just tree -> pure (expectedTreeKey, tree)
+    Nothing -> do
+      res@(actualTreeKey, _) <- inner
+      -- FIXME do we need to store the tree now?
+      when (actualTreeKey /= expectedTreeKey) $
+          throwIO $ TreeKeyMismatch pl expectedTreeKey actualTreeKey
+      pure res
 
 -- ensure name, version, etc are correct
 checkPackageMetadata

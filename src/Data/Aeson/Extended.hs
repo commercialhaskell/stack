@@ -166,10 +166,13 @@ data JSONWarning = JSONUnrecognizedFields String [Text]
                  | JSONGeneralWarning !Text
     deriving Eq
 instance Show JSONWarning where
-    show (JSONUnrecognizedFields obj [field]) =
-        "Unrecognized field in " <> obj <> ": " <> T.unpack field
-    show (JSONUnrecognizedFields obj fields) =
-        "Unrecognized fields in " <> obj <> ": " <> T.unpack (T.intercalate ", " fields)
-    show (JSONGeneralWarning t) = T.unpack t
+  show = T.unpack . utf8BuilderToText . display
+instance Display JSONWarning where
+  display (JSONUnrecognizedFields obj [field]) =
+    "Unrecognized field in " <> fromString obj <> ": " <> display field
+  display (JSONUnrecognizedFields obj fields) =
+    "Unrecognized fields in " <> fromString obj <> ": " <> display (T.intercalate ", " fields)
+  display (JSONGeneralWarning t) = display t
+
 instance IsString JSONWarning where
   fromString = JSONGeneralWarning . T.pack

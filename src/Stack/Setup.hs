@@ -263,7 +263,6 @@ setupEnv mResolveMissingGHC = do
 
     ls <- runRIO bcPath $ loadSnapshot
       (Just compilerVer)
-      (view projectRootL bc)
       (bcSnapshotDef bc)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc

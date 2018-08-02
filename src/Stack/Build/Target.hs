@@ -526,7 +526,7 @@ parseTargets needTargets boptscli = do
           ]
 
     calculatePackagePromotion
-      root ls0 (Map.elems allLocals)
+      ls0 (Map.elems allLocals)
       flags hides options drops
 
   let ls = LoadedSnapshot

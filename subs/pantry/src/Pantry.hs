@@ -123,6 +123,7 @@ import qualified Hpack.Config as Hpack
 import RIO.Process
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Network.HTTP.StackClient
 import Network.HTTP.Types (ok200)
@@ -646,19 +647,20 @@ traverseConcurrentlyWith count f t0 = do
 loadPantrySnapshot
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler))
+  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler, StaticSHA256))
 loadPantrySnapshot (SLCompiler compiler) = pure $ Left compiler
 loadPantrySnapshot sl@(SLUrl url mblob mcompiler) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url mblob
     value <- Yaml.decodeThrow bs
-    snapshot <- warningsParserHelper value (parseSnapshot Nothing)
-    pure $ Right (snapshot, mcompiler)
+    snapshot <- warningsParserHelper sl value (parseSnapshot Nothing)
+    pure $ Right (snapshot, mcompiler, mkStaticSHA256FromBytes bs)
 loadPantrySnapshot sl@(SLFilePath fp mcompiler) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    snapshot <- warningsParserHelper value (parseSnapshot Nothing)
-    pure $ Right (snapshot, mcompiler)
+    sha <- mkStaticSHA256FromFile $ toFilePath $ resolvedAbsolute fp
+    snapshot <- warningsParserHelper sl value (parseSnapshot Nothing)
+    pure $ Right (snapshot, mcompiler, sha)
 
 loadFromURL
   :: (HasPantryConfig env, HasLogFunc env)
@@ -700,10 +702,18 @@ loadWithCheck url checkResponseBody = do
 
 warningsParserHelper
   :: HasLogFunc env
-  => Value
+  => SnapshotLocation
+  -> Value
   -> (Value -> Yaml.Parser (WithJSONWarnings (IO a)))
   -> RIO env a
-warningsParserHelper = undefined
+warningsParserHelper sl val f =
+  case parseEither f val of
+    Left e -> throwIO $ Couldn'tParseSnapshot sl e
+    Right (WithJSONWarnings x ws) -> do
+      unless (null ws) $ do
+        logWarn $ "Warnings when parsing snapshot " <> display sl
+        for_ ws $ logWarn . display
+      liftIO x
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent

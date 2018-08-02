@@ -386,6 +386,7 @@ data PantryException
       !PackageIdentifier
   | Non200ResponseStatus !Status
   | InvalidBlobKey !(Mismatch BlobKey)
+  | Couldn'tParseSnapshot !SnapshotLocation !String
 
   deriving Typeable
 instance Exception PantryException where
@@ -483,6 +484,8 @@ instance Display PantryException where
     display mismatchExpected <>
     ", actual: " <>
     display mismatchActual
+  display (Couldn'tParseSnapshot sl e) =
+    "Couldn't parse snapshot from " <> display sl <> ": " <> fromString e
 
 data FileType = FTNormal | FTExecutable
   deriving Show

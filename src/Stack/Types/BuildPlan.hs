@@ -25,11 +25,12 @@ module Stack.Types.BuildPlan
     , ModuleInfo (..)
     , moduleInfoVC
     , sdGlobalHints
+    , sdSnapshots
+    , sdResolverName
     ) where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Data.Aeson (ToJSON (..), (.=), object)
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
@@ -40,7 +41,6 @@ import           Pantry
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Resolver
 import           Stack.Types.VersionIntervals
 
 -- | A definition of a snapshot. This could be a Stackage snapshot or
@@ -55,10 +55,8 @@ import           Stack.Types.VersionIntervals
 -- snapshot load step we will resolve the contents of tarballs and
 -- repos, figure out package names, and assigned values appropriately.
 data SnapshotDef = SnapshotDef -- FIXME temporary
-    { sdResolver        :: !LoadedResolver
-    , sdResolverName    :: !Text
-    -- ^ The resolver that provides this definition.
-    , sdSnapshots       :: ![Snapshot]
+    { sdResolver        :: !SnapshotLocation
+    , sdSnapshot        :: !(Maybe (Snapshot, SnapshotDef))
     , sdWantedCompilerVersion :: !WantedCompiler
     , sdUniqueHash :: !StaticSHA256
     }
@@ -66,8 +64,20 @@ data SnapshotDef = SnapshotDef -- FIXME temporary
 instance Store SnapshotDef
 instance NFData SnapshotDef
 
+sdResolverName :: SnapshotDef -> Text
+sdResolverName sd =
+  case sdSnapshot sd of
+    Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
+    Just (snapshot, _) -> snapshotName snapshot
+
 sdGlobalHints :: SnapshotDef -> Map PackageName (Maybe Version)
 sdGlobalHints = Map.unions . map snapshotGlobalHints . sdSnapshots
+
+sdSnapshots :: SnapshotDef -> [Snapshot]
+sdSnapshots sd =
+  case sdSnapshot sd of
+    Nothing -> []
+    Just (snap, sd') -> snap : sdSnapshots sd'
 
 snapshotDefVC :: VersionConfig SnapshotDef
 snapshotDefVC = storeVersionConfig "sd-v3" "MpkgNx8qOHakJTSePR1czDElNiU="
@@ -94,7 +104,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "onyC94ATlh8WmpG_DktKl-g12BU="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "6VbBiQDCXP-6Hu36CzyfOr8NQYE="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

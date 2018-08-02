@@ -45,6 +45,8 @@ import qualified Distribution.Version as C
 import           Network.HTTP.StackClient (Request)
 import           Network.HTTP.Download
 import qualified RIO
+import qualified RIO.ByteString.Lazy as BL
+import           Data.ByteString.Builder (toLazyByteString)
 import           Network.URI (isURI)
 import           Pantry.StaticSHA256
 import           Path
@@ -63,8 +65,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 import qualified System.Directory as Dir
 import qualified System.FilePath as FilePath
-
-loadSnapshot = undefined
 
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocationOrPath !PError
@@ -145,137 +145,44 @@ loadResolver
   :: forall env. HasConfig env
   => SnapshotLocation
   -> RIO env SnapshotDef
-loadResolver sl0 = do
-  (compiler, snapshots) <- loop sl0
+loadResolver sl = do
+  esnap <- loadPantrySnapshot sl
+  (compiler, msnap, uniqueHash) <-
+    case esnap of
+      Left compiler -> pure (compiler, Nothing, mkUniqueHash compiler)
+      Right (snap, mcompiler, sha) -> do
+        sd <- loadResolver $ snapshotParent snap
+        pure
+          ( fromMaybe (sdWantedCompilerVersion sd) mcompiler
+          , Just (snap, sd)
+          , combineHashes sha $ sdUniqueHash sd
+          )
   pure SnapshotDef
-    { sdResolver = sl0
-    , sdResolverName =
-        case snapshots of
-          snapshot:_ -> snapshotName snapshot
-          [] -> utf8BuilderToText $ RIO.display compiler
-    , sdSnapshots = snapshots
+    { sdResolver = sl
+    , sdSnapshot = msnap
     , sdWantedCompilerVersion = compiler
-    , sdUniqueHash = undefined
+    , sdUniqueHash = uniqueHash
     }
+
   where
-    loop :: SnapshotLocation -> RIO env (WantedCompiler, [Snapshot])
-    loop sl = do
-      esnap <- loadPantrySnapshot sl
-      case esnap of
-        Left wc -> pure (wc, [])
-        Right (snapshot, mcompiler) -> do
-          (compiler, snapshots) <- loop $ snapshotParent snapshot
-          pure (fromMaybe compiler mcompiler, snapshot : snapshots)
-    {- FIXME
-loadResolver mdir0 snapLoc = do
-  (snapshot, loadPackages, mfile, mcompiler) <- loadPantrySnapshot mdir0 snapLoc
-  packages <- loadPackages
-  sd <- loadResvoler (parent <$> mfile) (snapshotParent snapshot)
-  pure sd
-    { sdResolver = snapLoc
-    , sdResolverName = snapshotName snapshot
-    , sdSnapshots = (snapshot, packages) : sdSnapshots sd
-    , sdWantedCompilerVersion = fromMaybe (sdWantedCompilerVersion sd) mcompiler
-    , sdUniqueHash = undefined
-    }
-    -}
-    {- FIXME
-loadResolver (ResolverCustom url loc) = do -- FIXME move this logic into Pantry
-  logDebug $ "Loading " <> RIO.display url <> " build plan from " <> displayShow loc
-  case loc of
-    Left req -> download' req >>= load . toFilePath
-    Right fp -> load fp
-  where
-    download' :: Request -> RIO env (Path Abs File)
-    download' req = do
-      let urlHash = T.unpack $ trimmedSnapshotHash $ snapshotHashFromBS $ encodeUtf8 url
-      hashFP <- parseRelFile $ urlHash ++ ".yaml"
-      customPlanDir <- getCustomPlanDir
-      let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
-      void (download req cacheFP :: RIO env Bool)
-      return cacheFP
 
-    getCustomPlanDir = do
-        root <- view stackRootL
-        return $ root </> $(mkRelDir "custom-plan")
+    mkUniqueHash :: WantedCompiler -> StaticSHA256
+    mkUniqueHash = mkStaticSHA256FromBytes . BL.toStrict . toLazyByteString . getUtf8Builder . RIO.display
 
-    load :: FilePath -> RIO env SnapshotDef
-    load fp = do
-      WithJSONWarnings snapshot warnings <-
-        liftIO (decodeFileEither fp) >>= either
-          (throwM . CustomResolverException url loc) pure
-
-      logJSONWarnings (T.unpack url) warnings
-      error $ show (snapshot :: Snapshot)
-    {-
-      -- The fp above may just be the download location for a URL,
-      -- which we don't want to use. Instead, look back at loc from
-      -- above.
-      mdir <-
-        case loc of
-          Left _ -> return Nothing
-          Right fp' -> Just . parent <$> liftIO (Dir.canonicalizePath fp' >>= parseAbsFile)
-
-      -- Deal with the dual nature of the compiler key, which either
-      -- means "use this compiler" or "override the compiler in the
-      -- resolver"
-      (parentResolver, overrideCompiler) <-
-        case (mparentResolver, mcompiler) of
-          (Nothing, Nothing) -> throwM $ NeedResolverOrCompiler url
-          (Just parentResolver, Nothing) -> return (parentResolver, id)
-          (Nothing, Just compiler) -> return (ResolverCompiler compiler, id)
-          (Just parentResolver, Just compiler) -> return
-            ( parentResolver
-            , setCompilerVersion compiler
-            )
-
-      parentResolver' <- parseCustomLocation mdir parentResolver
-
-      -- Calculate the hash of the current file, and then combine it
-      -- with parent hashes if necessary below.
-      rawHash :: SnapshotHash <- snapshotHashFromDigest <$> hashFile fp :: RIO env SnapshotHash
-
-      (parent', hash') <-
-        case parentResolver' of
-          ResolverCompiler cv -> return (Left cv, rawHash) -- just a small optimization
-          _ -> do
-            parent' :: SnapshotDef <- loadResolver (parentResolver' :: Resolver) :: RIO env SnapshotDef
-            let hash' :: SnapshotHash
-                hash' = combineHash rawHash $
-                  case sdResolver parent' of
-                    ResolverStackage snapName -> snapNameToHash snapName
-                    ResolverCustom _ parentHash -> parentHash
-                    ResolverCompiler _ -> error "loadResolver: Received ResolverCompiler in impossible location"
-            return (Right parent', hash')
-
-      locations <- fold <$> mapM (unRawPackageLocation mdir) rawLocations
-
-      return $ overrideCompiler sd0
-        { sdParent = parent'
-        , sdResolver = ResolverCustom url hash'
-        , sdLocations = locations
-        }
-    -}
-
-    combineHash :: SnapshotHash -> SnapshotHash -> SnapshotHash
-    combineHash x y = snapshotHashFromBS (snapshotHashToBS x <> snapshotHashToBS y)
-
-    snapNameToHash :: SnapName -> SnapshotHash
-    snapNameToHash = snapshotHashFromBS . encodeUtf8 . renderSnapName
+    combineHashes :: StaticSHA256 -> StaticSHA256 -> StaticSHA256
+    combineHashes x y = mkStaticSHA256FromBytes (staticSHA256ToRaw x <> staticSHA256ToRaw y)
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot
   :: forall env.
      (HasConfig env, HasGHCVariant env)
-  => Maybe (ActualCompiler) -- ^ installed GHC we should query; if none provided, use the global hints
-  -> Path Abs Dir -- ^ project root, used for checking out necessary files
+  => Maybe ActualCompiler -- ^ installed GHC we should query; if none provided, use the global hints
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler root = undefined
-{-
+loadSnapshot mcompiler =
     start
   where
-    start (snapshotDefFixes -> sd) = do
+    start sd = do
       path <- configLoadedSnapshotCache
         sd
         (maybe GISSnapshotHints GISCompiler mcompiler)
@@ -283,45 +190,29 @@ loadSnapshot mcompiler root = undefined
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
-      logInfo "Loading a snapshot from a SnapshotDef"
-      ls0 <-
-        case sdParent sd of
-          Left cv ->
-            case mcompiler of
-              Nothing -> return LoadedSnapshot
-                { lsCompilerVersion = wantedToActual cv
-                , lsGlobals = fromGlobalHints $ sdGlobalHints sd
-                , lsPackages = Map.empty
-                }
-              Just cv' -> loadCompiler cv'
-          Right sd' -> start sd'
+      logInfo $ "Loading a snapshot from a SnapshotDef: " <> RIO.display (sdResolverName sd)
+      case sdSnapshot sd of
+        Nothing ->
+          case mcompiler of
+            Nothing -> return LoadedSnapshot
+              { lsCompilerVersion = wantedToActual $ sdWantedCompilerVersion sd
+              , lsGlobals = fromGlobalHints $ sdGlobalHints sd
+              , lsPackages = Map.empty
+              }
+            Just cv' -> loadCompiler cv'
+        Just (snapshot, sd') -> start sd' >>= inner2 snapshot
 
+    inner2 snap ls0 = do
       gpds <-
-        (forM (sdLocations sd) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc)
-        `onException` do
-          logError "Unable to load cabal files for snapshot"
-          case sdResolver sd of
-            ResolverStackage name -> do
-              stackRoot <- view stackRootL
-              file <- parseRelFile $ T.unpack $ renderSnapName name <> ".yaml"
-              let fp = buildPlanDir stackRoot </> file
-              liftIO $ ignoringAbsence $ removeFile fp
-              logError ""
-              logError "----"
-              logError $ "Deleting cached snapshot file: " <> fromString (toFilePath fp)
-              logError "Recommendation: try running again. If this fails again, open an upstream issue at:"
-              logError $
-                case name of
-                  LTS _ _ -> "https://github.com/fpco/lts-haskell/issues/new"
-                  Nightly _ -> "https://github.com/fpco/stackage-nightly/issues/new"
-              logError "----"
-              logError ""
-            _ -> return ()
+        (forM (snapshotLocations snap) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc)
 
       (globals, snapshot, locals) <-
-        calculatePackagePromotion root ls0
+        calculatePackagePromotion ls0
         (map (\(x, y) -> (x, y, ())) gpds)
-        (sdFlags sd) (sdHidden sd) (sdGhcOptions sd) (sdDropPackages sd)
+        (snapshotFlags snap)
+        (snapshotHidden snap)
+        (snapshotGhcOptions snap)
+        (snapshotDropPackages snap)
 
       return LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0
@@ -330,8 +221,6 @@ loadSnapshot mcompiler root = undefined
         -- the two snapshots' packages together.
         , lsPackages = Map.union snapshot (Map.map (fmap fst) locals)
         }
--}
--}
 
 -- | Given information on a 'LoadedSnapshot' and a given set of
 -- additional packages and configuration values, calculates the new
@@ -342,8 +231,7 @@ loadSnapshot mcompiler root = undefined
 calculatePackagePromotion
   :: forall env localLocation.
      (HasConfig env, HasGHCVariant env)
-  => Path Abs Dir -- ^ project root
-  -> LoadedSnapshot
+  => LoadedSnapshot
   -> [(GenericPackageDescription, PackageLocationOrPath, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
   -> Map PackageName Bool -- ^ overrides whether a package should be registered hidden
@@ -355,7 +243,7 @@ calculatePackagePromotion
        , Map PackageName (LoadedPackageInfo (PackageLocationOrPath, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
-  root (LoadedSnapshot compilerVersion globals0 parentPackages0)
+  (LoadedSnapshot compilerVersion globals0 parentPackages0)
   gpds flags0 hides0 options0 drops0 = do
 
       platform <- view platformL
@@ -417,7 +305,7 @@ calculatePackagePromotion
 
       -- ... so recalculate based on new values
       upgraded <- fmap Map.fromList
-                $ mapM (recalculate root compilerVersion flags hide ghcOptions)
+                $ mapM (recalculate compilerVersion flags hide ghcOptions)
                 $ Map.toList allToUpgrade
 
       -- Could be nice to check snapshot early... but disabling
@@ -443,14 +331,13 @@ calculatePackagePromotion
 -- hide values, and GHC options.
 recalculate :: forall env.
                (HasConfig env, HasGHCVariant env)
-            => Path Abs Dir -- ^ root
-            -> ActualCompiler
+            => ActualCompiler
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
             -> (PackageName, LoadedPackageInfo PackageLocationOrPath)
             -> RIO env (PackageName, LoadedPackageInfo PackageLocationOrPath)
-recalculate root compilerVersion allFlags allHide allOptions (name, lpi0) = do
+recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
   case Map.lookup name allFlags of
