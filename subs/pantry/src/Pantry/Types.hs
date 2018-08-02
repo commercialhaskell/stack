@@ -1004,7 +1004,7 @@ defUser :: Text
 defUser = "commercialhaskell"
 
 defRepo :: Text
-defRepo = "stack-templates"
+defRepo = "stackage-snapshots"
 
 ltsSnapshotLocation :: Int -> Int -> (UnresolvedSnapshotLocation, SnapshotLocation)
 ltsSnapshotLocation x y =
