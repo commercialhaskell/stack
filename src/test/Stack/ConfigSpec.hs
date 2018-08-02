@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell  #-}
 module Stack.ConfigSpec where
 
+import Control.Arrow
 import Data.Aeson.Extended
 import Data.Yaml
 import Path
@@ -165,7 +166,7 @@ spec = beforeAll setup $ do
     it "is parseable" $ \_ -> do
         curDir <- getCurrentDir
         let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
-            parsed = parseEither (parseConfigMonoid curDir) <$> decodeEither defaultConfigYaml
+            parsed = parseEither (parseConfigMonoid curDir) <$> left show (decodeEither' defaultConfigYaml)
         case parsed of
             Right (Right _) -> return () :: IO ()
             _ -> fail "Failed to parse default config yaml"

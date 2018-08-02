@@ -5,7 +5,7 @@ module Stack.Types.BuildPlanSpec where
 import           Data.Aeson.Extended (WithJSONWarnings(..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
-import           Data.Yaml (decode)
+import           Data.Yaml (decodeThrow)
 import           Stack.Types.BuildPlan
 import           Test.Hspec
 
@@ -15,7 +15,7 @@ spec =
     describe "Archive" $ do
       describe "github" $ do
         let decode' :: ByteString -> Maybe (WithJSONWarnings (PackageLocation Subdirs))
-            decode' = decode
+            decode' = decodeThrow
 
         it "'github' and 'commit' keys" $ do
           let contents :: ByteString

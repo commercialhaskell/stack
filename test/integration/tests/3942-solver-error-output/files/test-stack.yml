@@ -1,10 +1,10 @@
-resolver: lts-11.6
+resolver: lts-11.19
 
 packages:
-- location:
-    git: https://github.com/cjdev/cloudseeder.git
-    commit: c7068f25c41bcc0b4bdfc9b38ee5b05b5caefae5
+- location: ./one-deps
   extra-dep: true
+
+extra-deps: []
 
 flags: {}
 

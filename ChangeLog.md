@@ -51,6 +51,10 @@ Behavior changes:
 * `stack upload` signs the package by default, as documented. `--no-signature`
   turns the signing off.
   [#3739](https://github.com/commercialhaskell/stack/issues/3739)
+* In case there is a network connectivity issue while trying to
+  download a template, stack will check whether that template had
+  been downloaded before. In that case, the cached version will be
+  used. See [#3850](https://github.com/commercialhaskell/stack/issues/3739).
 
 Other enhancements:
 
