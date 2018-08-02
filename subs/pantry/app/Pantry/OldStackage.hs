@@ -34,9 +34,9 @@ parseOldStackage snapName renderedSnapName fp = do
       locs <- mapM applyCrlfHack $ snapshotLocations x
       pure $ snapshotDefFixes snapName x { snapshotLocations = locs }
   where
-    applyCrlfHack (RPLHackage (PackageIdentifierRevision name version (CFIHash sha (Just size))) mtree) = do
+    applyCrlfHack (PLHackage (PackageIdentifierRevision name version (CFIHash sha (Just size))) mtree) = do
       BlobKey sha' size' <- withStorage $ checkCrlfHack $ BlobKey sha size
-      pure (RPLHackage (PackageIdentifierRevision name version (CFIHash sha' (Just size'))) mtree)
+      pure (PLHackage (PackageIdentifierRevision name version (CFIHash sha' (Just size'))) mtree)
     applyCrlfHack x = pure x
 
 parseStackageSnapshot :: Text -> Value -> Parser Snapshot
@@ -62,7 +62,7 @@ parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do
       :: CabalString PackageName
       -> Value
       -> Parser
-           ( Endo [RawPackageLocation]
+           ( Endo [PackageLocation]
            , Map PackageName (Map FlagName Bool)
            , Map PackageName Bool
            )
@@ -89,7 +89,7 @@ parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do
         hide <- constraints .:? "hide" .!= False
         let hide' = if hide then Map.singleton name' True else Map.empty
 
-        let location = RPLHackage (PackageIdentifierRevision
+        let location = PLHackage (PackageIdentifierRevision
               name'
               version
               (fromMaybe CFILatest mcabalFileInfo'))

@@ -68,11 +68,12 @@ library:
   - Pantry.Tree
   - Path.Find
 
-executables:
-  convert-old-stackage:
-    source-dirs: app/
-    main: convert-old-stackage.hs
-    dependencies:
-    - pantry
-    other-modules:
-    - Pantry.OldStackage
+# Oops, that's a mistake, forgot it depends on all of stack too.
+#executables:
+#  convert-old-stackage:
+#    source-dirs: app/
+#    main: convert-old-stackage.hs
+#    dependencies:
+#    - pantry
+#    other-modules:
+#    - Pantry.OldStackage
