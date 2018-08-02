@@ -1,0 +1,19 @@
+name:    curator
+version: 2.0.0.0
+
+dependencies:
+- base
+- rio
+- pantry
+- Cabal
+- yaml
+
+library:
+  source-dirs: src
+
+executables:
+  curator:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - curator

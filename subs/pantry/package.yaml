@@ -1,0 +1,78 @@
+name: pantry
+version: 0.1.0.0
+
+dependencies:
+- base
+- rio
+- aeson
+- text
+- unordered-containers
+- containers
+- path
+- transformers
+- generic-deriving
+- unliftio
+- http-conduit
+- http-client-tls
+- http-types
+- http-client
+- conduit
+- bytestring
+- network-uri
+- hackage-security
+- primitive
+- vector
+- memory
+- store
+- cryptonite
+- cryptonite-conduit
+- persistent
+- persistent-sqlite
+- persistent-template
+- resource-pool
+- Cabal
+- path-io
+- rio-orphans
+- conduit-extra
+- tar-conduit
+- time
+- unix-compat
+- hpack
+- yaml
+
+when:
+- condition: os(windows)
+  then:
+    cpp-options: -DWINDOWS
+  else:
+    dependencies:
+    - unix
+
+library:
+  source-dirs:
+  - src/
+  - ../../src/ # FIXME Temporary
+  exposed-modules:
+  - Pantry
+  # FIXME make these exports unnecessary
+  - Pantry.Types
+  - Pantry.StaticSHA256
+  - Pantry.Storage
+  - Data.Aeson.Extended
+  other-modules:
+  - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  - Network.HTTP.StackClient
+  - Pantry.Archive
+  - Pantry.Hackage
+  - Pantry.StaticBytes
+  - Pantry.Tree
+  - Path.Find
+
+executables:
+  convert-old-stackage:
+    source-dirs: app/
+    main: convert-old-stackage.hs
+    dependencies:
+    - pantry
+    other-modules:
+    - Pantry.OldStackage
