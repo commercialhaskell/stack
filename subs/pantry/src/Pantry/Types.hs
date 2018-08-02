@@ -69,6 +69,7 @@ module Pantry.Types
   , parseSnapshot
   , Snapshot (..)
   , parseWantedCompiler
+  , PackageMetadata (..)
   ) where
 
 import RIO
@@ -177,6 +178,18 @@ data Archive = Archive
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store Archive
 instance NFData Archive
+
+-- | A package archive, could be from a URL or a local file
+-- path. Local file path archives are assumed to be unchanging
+-- over time, and so are allowed in custom snapshots.
+data RawArchive = RawArchive
+  { raLocation :: !RawArchiveLocation
+  , raHash :: !(Maybe StaticSHA256)
+  , raSize :: !(Maybe FileSize)
+  }
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance Store RawArchive
+instance NFData RawArchive
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -355,6 +368,15 @@ data PantryException
   | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
   | InvalidFilePathSnapshot !Text
   | InvalidSnapshot !SnapshotLocation !SomeException
+  | TreeKeyMismatch
+      !PackageLocation
+      !TreeKey -- expected
+      !TreeKey -- actual
+  | MismatchedPackageMetadata
+      !PackageLocation
+      !PackageMetadata
+      !BlobKey -- cabal file found
+      !PackageIdentifier
 
   deriving Typeable
 instance Exception PantryException where
@@ -436,6 +458,14 @@ instance Display PantryException where
     display loc <>
     ":\n" <>
     displayShow e
+  display (TreeKeyMismatch loc expected actual) =
+    "Tree key mismatch when getting " <> display loc <>
+    "\nExpected: " <> display expected <>
+    "\nActual:   " <> display actual
+  display (MismatchedPackageMetadata loc pm foundCabal foundIdent) =
+    "Mismatched package metadata for " <> display loc <>
+    "\nFound: " <> displayC foundIdent <> " with cabal file " <>
+    display foundCabal <> "\nExpected: " <> display pm
 
 data FileType = FTNormal | FTExecutable
   deriving Show
@@ -587,6 +617,15 @@ data PackageMetadata = PackageMetadata
 instance Store PackageMetadata
 instance NFData PackageMetadata
 
+instance Display PackageMetadata where
+  display pm = fold $ intersperse ", " $ catMaybes
+    [ (\name -> "name == " <> displayC name) <$> pmName pm
+    , (\version -> "version == " <> displayC version) <$> pmVersion pm
+    , (\tree -> "tree == " <> display tree) <$> pmTree pm
+    , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
+    , (\subdir -> "subdir == " <> display subdir) <$> pmSubdir pm
+    ]
+
 osNoInfo :: OptionalSubdirs
 osNoInfo = OSPackageMetadata $ PackageMetadata Nothing Nothing Nothing Nothing Nothing
 
@@ -596,24 +635,35 @@ newtype RelFilePath = RelFilePath Text
 
 data ArchiveLocation
   = ALUrl !Text
-  | ALFilePath !RelFilePath
-  -- ^ relative to the configuration file it came from
+  | ALFilePath !(ResolvedPath File)
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
 instance Store ArchiveLocation
 instance NFData ArchiveLocation
-instance ToJSON ArchiveLocation where
-  toJSON (ALUrl url) = object ["url" .= url]
-  toJSON (ALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
-instance FromJSON ArchiveLocation where
+
+instance Display ArchiveLocation where
+  display (ALUrl url) = display url
+  display (ALFilePath resolved) = fromString $ toFilePath $ resolvedAbsolute resolved
+
+data RawArchiveLocation
+  = RALUrl !Text
+  | RALFilePath !RelFilePath
+  -- ^ relative to the configuration file it came from
+  deriving (Show, Eq, Ord, Generic, Data, Typeable)
+instance Store RawArchiveLocation
+instance NFData RawArchiveLocation
+instance ToJSON RawArchiveLocation where
+  toJSON (RALUrl url) = object ["url" .= url]
+  toJSON (RALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
+instance FromJSON RawArchiveLocation where
   parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
     where
       asObjectUrl = withObject "ArchiveLocation (URL object)" $ \o ->
-        ALUrl <$> ((o .: "url") >>= validateUrl)
+        RALUrl <$> ((o .: "url") >>= validateUrl)
       asObjectFilePath = withObject "ArchiveLocation (FilePath object)" $ \o ->
-        ALFilePath <$> ((o .: "url") >>= validateFilePath)
+        RALFilePath <$> ((o .: "url") >>= validateFilePath)
 
       asText = withText "ArchiveLocation (Text)" $ \t ->
-        (ALUrl <$> validateUrl t) <|> (ALFilePath <$> validateFilePath t)
+        (RALUrl <$> validateUrl t) <|> (RALFilePath <$> validateFilePath t)
 
       validateUrl t =
         case parseRequest $ T.unpack t of
@@ -642,7 +692,7 @@ instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
 -- specification. Does /not/ allow local filepaths.
 data RawPackageLocation
   = RPLHackage !PackageIdentifierRevision !(Maybe TreeKey)
-  | RPLArchive !Archive !OptionalSubdirs
+  | RPLArchive !RawArchive !OptionalSubdirs
   | RPLRepo !Repo !OptionalSubdirs
   deriving (Show, Eq, Data, Generic)
 instance Store RawPackageLocation
@@ -652,7 +702,7 @@ instance ToJSON RawPackageLocation where
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
-  toJSON (RPLArchive (Archive loc msha msize) os) = object $ concat
+  toJSON (RPLArchive (RawArchive loc msha msize) os) = object $ concat
     [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
@@ -693,10 +743,10 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
       http = withText "RawPackageLocation.RPLArchive (Text)" $ \t -> do
         loc <- parseJSON $ String t
         pure $ noJSONWarnings $ RPLArchive
-          Archive
-            { archiveLocation = loc
-            , archiveHash = Nothing
-            , archiveSize = Nothing
+          RawArchive
+            { raLocation = loc
+            , raHash = Nothing
+            , raSize = Nothing
             }
           osNoInfo
 
@@ -726,24 +776,24 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
         RPLRepo Repo {..} <$> optionalSubdirs o
 
       archiveObject = withObjectWarnings "RawPackageLocation.RPLArchive" $ \o -> do
-        archiveLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
-        archiveHash <- o ..:? "sha256"
-        archiveSize <- o ..:? "size"
-        RPLArchive Archive {..} <$> optionalSubdirs o
+        raLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        raHash <- o ..:? "sha256"
+        raSize <- o ..:? "size"
+        RPLArchive RawArchive {..} <$> optionalSubdirs o
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let archiveLocation = ALUrl $ T.concat
+        let raLocation = RALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
               , commit
               , ".tar.gz"
               ]
-        archiveHash <- o ..:? "sha256"
-        archiveSize <- o ..:? "size"
-        RPLArchive Archive {..} <$> optionalSubdirs o
+        raHash <- o ..:? "sha256"
+        raSize <- o ..:? "size"
+        RPLArchive RawArchive {..} <$> optionalSubdirs o
 
 -- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
 unRawPackageLocation
@@ -756,7 +806,17 @@ unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
 mkRawPackageLocation (PLHackage pir mtree) = RPLHackage pir mtree
-mkRawPackageLocation (PLArchive archive pm) = RPLArchive archive (OSPackageMetadata pm)
+mkRawPackageLocation (PLArchive archive pm) =
+  RPLArchive
+    RawArchive
+      { raLocation =
+          case archiveLocation archive of
+            ALUrl url -> RALUrl url
+            ALFilePath resolved -> RALFilePath $ resolvedRelative resolved
+      , raHash = archiveHash archive
+      , raSize = archiveSize archive
+      }
+    (OSPackageMetadata pm)
 mkRawPackageLocation (PLRepo repo pm) = RPLRepo repo (OSPackageMetadata pm)
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.

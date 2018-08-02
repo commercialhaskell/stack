@@ -336,15 +336,16 @@ getHackageTarballKey
 getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
   mres <- withStorage $ loadHackageTreeKey name ver sha
   case mres of
-    Nothing -> fst <$> getHackageTarball pir
+    Nothing -> fst <$> getHackageTarball pir Nothing
     Just key -> pure key
-getHackageTarballKey pir = fst <$> getHackageTarball pir
+getHackageTarballKey pir = fst <$> getHackageTarball pir Nothing
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
+  -> Maybe TreeKey
   -> RIO env (TreeKey, Tree)
-getHackageTarball pir@(PackageIdentifierRevision name ver cfi) = do
+getHackageTarball pir@(PackageIdentifierRevision name ver cfi) mtreeKey = checkTreeKey (PLHackage pir mtreeKey) mtreeKey $ do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
   withCachedTree name ver cabalFile $ do
@@ -374,7 +375,19 @@ getHackageTarball pir@(PackageIdentifierRevision name ver cfi) = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    (treeKey, tree) <- getArchive url "" (Just sha) (Just size)
+    (treeKey, tree) <- getArchive
+      Archive
+        { archiveLocation = ALUrl url
+        , archiveHash = Just sha
+        , archiveSize = Just size
+        }
+      PackageMetadata
+        { pmName = Just name
+        , pmVersion = Just ver
+        , pmTree = mtreeKey -- can probably leave this off, we do the testing here
+        , pmCabal = Nothing -- cabal file in the tarball may be different!
+        , pmSubdir = Nothing -- no subdirs on Hackage
+        }
 
     (key, TreeEntry _origkey ft) <- findCabalFile (PLHackage pir (Just treeKey)) tree
 

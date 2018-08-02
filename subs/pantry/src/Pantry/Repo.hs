@@ -1,5 +1,41 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+module Pantry.Repo -- FIXME needs to be implemented!
+  ( fetchRepos
+  , getRepo
+  , getRepoKey
+  ) where
 
+import Pantry.Types
+import Pantry.Storage
+import RIO
 
+fetchRepos
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [(Repo, PackageMetadata)]
+  -> RIO env ()
+fetchRepos pairs = do
+  -- FIXME be more efficient, group together shared archives
+  for_ pairs $ uncurry getRepo
+
+getRepoKey
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> PackageMetadata
+  -> RIO env TreeKey
+getRepoKey repo pm = fst <$> getRepo repo pm -- potential optimization
+
+getRepo
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> PackageMetadata
+  -> RIO env (TreeKey, Tree)
+getRepo repo pm =
+  checkPackageMetadata (PLRepo repo pm) pm $
+  undefined
+
+    {-
 cloneRepo
     :: HasConfig env
     => Path Abs Dir -- ^ project root
@@ -51,3 +87,5 @@ cloneRepo projRoot url commit repoType' = do
             RepoHg  -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"]
 
     return dir
+
+    -}

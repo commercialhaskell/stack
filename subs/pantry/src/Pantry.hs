@@ -103,6 +103,8 @@ import qualified RIO.ByteString as B
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath
+import Pantry.Archive
+import Pantry.Repo
 import Pantry.StaticSHA256
 import Pantry.Storage
 import Pantry.Tree
@@ -120,6 +122,7 @@ import qualified Hpack.Config as Hpack
 import RIO.Process
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import Data.Monoid (Endo (..))
 
 withPantryConfig
   :: HasLogFunc env
@@ -286,11 +289,33 @@ getLatestHackageVersion name =
       (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m
       pure $ PackageIdentifierRevision name version $ CFIHash sha $ Just size
 
+fetchTreeKeys
+  :: (HasPantryConfig env, HasLogFunc env, Foldable f)
+  => f TreeKey
+  -> RIO env ()
+fetchTreeKeys _ =
+  logWarn "Network caching not yet implemented!" -- FIXME
+
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
   => f PackageLocation
   -> RIO env ()
-fetchPackages _ = undefined
+fetchPackages pls = do
+    fetchTreeKeys $ mapMaybe getTreeKey $ toList pls
+    for_ hackages $ uncurry getHackageTarball
+    fetchArchives archives
+    fetchRepos repos
+  where
+    s x = Endo (x:)
+    run (Endo f) = f []
+    (hackagesE, archivesE, reposE) = foldMap go pls
+    hackages = run hackagesE
+    archives = run archivesE
+    repos = run reposE
+
+    go (PLHackage pir mtree) = (s (pir, mtree), mempty, mempty)
+    go (PLArchive archive pm) = (mempty, s (archive, pm), mempty)
+    go (PLRepo repo pm) = (mempty, mempty, s (repo, pm))
 
 unpackPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
@@ -508,9 +533,9 @@ loadPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env Tree
-loadPackageLocation (PLHackage pir mtree) =
-  case mtree of
-    Nothing -> snd <$> getHackageTarball pir
+loadPackageLocation (PLHackage pir mtree) = snd <$> getHackageTarball pir mtree
+loadPackageLocation (PLArchive archive pm) = snd <$> getArchive archive pm
+loadPackageLocation (PLRepo repo pm) = snd <$> getRepo repo pm
 
 -- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
 mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
@@ -551,6 +576,18 @@ completePackageLocation (PLHackage pir Nothing) = do
   logDebug $ "Completing package location information from " <> display pir
   treeKey <- getHackageTarballKey pir
   pure $ PLHackage pir (Just treeKey)
+    {- FIXME WIP
+completePackageLocation pl@(PLArchive archive pm) = do
+  treeKey <- getPackageLocationTreeKey pl
+  (cabal, name, version) <-
+    case (pmCabal pm, pmName pm, pmVersion pm) of
+      (Just x, Just y, Just z) -> pure (x, y, z)
+      _ -> do
+        tree <- loadPackageLocation pl
+        (cabal, PackageIdentifier name version) <- loadPackageIdentFromTree tree
+        pure (cabal, name, version)
+  pure
+    -}
 
 completeSnapshotLocation
   :: (HasPantryConfig env, HasLogFunc env)
@@ -561,10 +598,9 @@ completeSnapshotLocation (SLCompiler wc) = pure $ SLCompiler wc
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
 completeSnapshot
   :: (HasPantryConfig env, HasLogFunc env)
-  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
-  -> Snapshot
+  => Snapshot
   -> RIO env Snapshot
-completeSnapshot mdir snapshot = do
+completeSnapshot snapshot = do
   parent' <- completeSnapshotLocation $ snapshotParent snapshot
   pls <- traverseConcurrentlyWith 16 completePackageLocation $ snapshotLocations snapshot
   pure snapshot
@@ -641,13 +677,27 @@ getPackageLocationIdent
   => PackageLocation
   -> RIO env PackageIdentifier
 getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
+getPackageLocationIdent pl = do
+  tree <- loadPackageLocation pl
+  snd <$> loadPackageIdentFromTree pl tree
 
 getPackageLocationTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env TreeKey
-getPackageLocationTreeKey (PLHackage _ (Just treeKey)) = pure treeKey
-getPackageLocationTreeKey (PLHackage pir Nothing) = getHackageTarballKey pir
+getPackageLocationTreeKey pl =
+  case getTreeKey pl of
+    Just treeKey -> pure treeKey
+    Nothing ->
+      case pl of
+        PLHackage pir _ -> getHackageTarballKey pir
+        PLArchive archive pm -> getArchiveKey archive pm
+        PLRepo repo pm -> getRepoKey repo pm
 
 hpackExecutableL :: HasPantryConfig env => SimpleGetter env HpackExecutable
 hpackExecutableL = pantryConfigL.to pcHpackExecutable
+
+getTreeKey :: PackageLocation -> Maybe TreeKey
+getTreeKey (PLHackage _ mtree) = mtree
+getTreeKey (PLArchive _ pm) = pmTree pm
+getTreeKey (PLRepo _ pm) = pmTree pm

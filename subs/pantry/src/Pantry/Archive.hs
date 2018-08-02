@@ -1,9 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- | Logic for loading up trees from HTTPS archives.
 module Pantry.Archive
   ( getArchive
+  , getArchiveKey
+  , fetchArchives
   ) where
 
 import RIO
@@ -17,6 +20,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import Data.Bits ((.&.))
+import Path (toFilePath)
 
 import Conduit
 import Crypto.Hash.Conduit
@@ -25,58 +29,103 @@ import qualified Data.Conduit.Tar as Tar
 import Network.HTTP.Client (parseUrlThrow)
 import Network.HTTP.Simple (httpSink)
 
-getArchive
+fetchArchives
   :: (HasPantryConfig env, HasLogFunc env)
-  => Text -- ^ URL
-  -> Text -- ^ subdir, besides the single-dir stripping logic
-  -> Maybe StaticSHA256 -- ^ hash of the raw file
-  -> Maybe FileSize -- ^ size of the raw file
-  -> RIO env (TreeKey, Tree)
--- FIXME add caching in DB
-getArchive url subdir msha msize = withCache $ withSystemTempFile "archive" $ \fp hout -> do
-  req <- parseUrlThrow $ T.unpack url
-  logDebug $ "Downloading archive from " <> display url
-  (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
-    <$> ZipSink (checkSha msha)
-    <*> ZipSink (checkSize $ (\(FileSize w) -> w) <$> msize)
-    <*> ZipSink (sinkHandle hout)
-  hClose hout
+  => [(Archive, PackageMetadata)]
+  -> RIO env ()
+fetchArchives pairs = do
+  -- FIXME be more efficient, group together shared archives
+  for_ pairs $ uncurry getArchive
 
-  (tid, key, tree) <- parseArchive url fp subdir
-  pure (tid, sha, FileSize size, key, tree)
+getArchiveKey
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Archive
+  -> PackageMetadata
+  -> RIO env TreeKey
+getArchiveKey archive pm = fst <$> getArchive archive pm -- potential optimization
+
+getArchive
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Archive
+  -> PackageMetadata
+  -> RIO env (TreeKey, Tree)
+getArchive archive pm =
+  checkPackageMetadata (PLArchive archive pm) pm $
+  withCache $
+  withArchiveLoc loc $ \fp sha size -> do
+    (tid, key, tree) <- parseArchive loc fp subdir
+    pure (tid, sha, size, key, tree)
   where
+    pl = PLArchive archive pm
+    msha = archiveHash archive
+    msize = archiveSize archive
+    subdir = fromMaybe "" $ pmSubdir pm
+    loc = archiveLocation archive
+
+    withArchiveLoc (ALFilePath resolved) f = do
+      let fp = toFilePath $ resolvedAbsolute resolved
+      (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
+        size <- hFileSize h
+        sha <- runConduit (sourceHandle h .| sinkHash)
+        pure (mkStaticSHA256FromDigest sha, FileSize $ fromIntegral size)
+      f fp sha size
+    withArchiveLoc (ALUrl url) f =
+      withSystemTempFile "archive" $ \fp hout -> do
+        req <- parseUrlThrow $ T.unpack url
+        logDebug $ "Downloading archive from " <> display url
+        (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
+          <$> ZipSink (checkSha url msha)
+          <*> ZipSink (checkSize url $ (\(FileSize w) -> w) <$> msize)
+          <*> ZipSink (sinkHandle hout)
+        hClose hout
+        f fp sha (FileSize size)
+
+    withCache
+      :: RIO env (TreeSId, StaticSHA256, FileSize, TreeKey, Tree)
+      -> RIO env (TreeKey, Tree)
     withCache inner =
       let loop [] = do
             (tid, sha, size, treeKey, tree) <- inner
-            (treeKey, tree) <$ withStorage (storeArchiveCache url subdir sha size tid)
+            case loc of
+              ALUrl url -> withStorage $ storeArchiveCache url subdir sha size tid
+              ALFilePath _ -> pure ()
+            pure (treeKey, tree)
           loop ((sha, size, tid):rest) =
             case msha of
               Nothing -> do
                 case msize of
                   Just size' | size /= size' -> loop rest
                   _ -> do
-                    logWarn $ "Using archive from " <> display url <> "without a specified cryptographic hash"
-                    logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
-                    logWarn "For security and reproducibility, please add a hash and file size to your configuration"
+                    case loc of
+                      ALUrl url -> do
+                        logWarn $ "Using archive from " <> display url <> "without a specified cryptographic hash"
+                        logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
+                        logWarn "For security and reproducibility, please add a hash and file size to your configuration"
+                      ALFilePath _ -> pure ()
                     withStorage $ loadTreeById tid
               Just sha'
                 | sha == sha' ->
                     case msize of
                       Nothing -> do
-                        logWarn $ "Archive from " <> display url <> " does not specify a size"
-                        logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
+                        case loc of
+                          ALUrl url -> do
+                            logWarn $ "Archive from " <> display url <> " does not specify a size"
+                            logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
+                          ALFilePath _ -> pure ()
                         withStorage $ loadTreeById tid
                       Just size'
                         | size == size' -> withStorage $ loadTreeById tid
                         | otherwise -> do
 
-                            logWarn $ "Archive from " <> display url <> " has a matching hash but mismatched size"
+                            logWarn $ "Archive from " <> display loc <> " has a matching hash but mismatched size"
                             logWarn "Please verify that your configuration provides the correct size"
                             loop rest
                 | otherwise -> loop rest
-       in withStorage (loadArchiveCache url subdir) >>= loop
+       in case loc of
+            ALUrl url -> withStorage (loadArchiveCache url subdir) >>= loop
+            ALFilePath _ -> loop []
 
-    checkSha mexpected = do
+    checkSha url mexpected = do
       actual <- mkStaticSHA256FromDigest <$> sinkHash
       for_ mexpected $ \expected -> unless (actual == expected) $ error $ concat
         [ "Invalid SHA256 downloading from "
@@ -87,7 +136,7 @@ getArchive url subdir msha msize = withCache $ withSystemTempFile "archive" $ \f
         , show actual
         ]
       pure actual
-    checkSize mexpected =
+    checkSize url mexpected =
       loop 0
       where
         loop accum = do
@@ -194,12 +243,12 @@ data SimpleEntry = SimpleEntry
 
 parseArchive
   :: (HasPantryConfig env, HasLogFunc env)
-  => Text -- ^ URL, for error output
+  => ArchiveLocation
   -> FilePath -- ^ file holding the archive
   -> Text -- ^ subdir, besides the single-dir stripping logic
   -> RIO env (TreeSId, TreeKey, Tree)
-parseArchive url fp subdir = do
-  let getFiles [] = error $ "Unable to determine archive type of: " ++ T.unpack url
+parseArchive loc fp subdir = do
+  let getFiles [] = error $ T.unpack $ utf8BuilderToText $ "Unable to determine archive type of: " <> display loc
       getFiles (at:ats) = do
         eres <- tryAny $ foldArchive fp at id $ \m me -> pure $ m . (me:)
         case eres of
@@ -228,7 +277,7 @@ parseArchive url fp subdir = do
 
   case traverse toSimple files of
     Left e ->
-      error $ "Unsupported tarball from " ++ T.unpack url ++ ": " ++ e
+      error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
           files3 = takeSubdir subdir files2
@@ -237,7 +286,7 @@ parseArchive url fp subdir = do
               Nothing -> Left $ "Not a safe file path: " ++ T.unpack fp
               Just sfp -> Right (sfp, a)
       case traverse toSafe files3 of
-        Left e -> error $ "Unsupported tarball from " ++ T.unpack url ++ ": " ++ e
+        Left e -> error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
         Right safeFiles -> do
           let toSave = Set.fromList $ map (seSource . snd) safeFiles
           blobs <-
