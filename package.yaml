@@ -270,6 +270,7 @@ library:
   other-modules:
   - Pantry.Archive
   - Pantry.Hackage
+  - Pantry.Repo
   - Pantry.StaticBytes
   - Pantry.StaticSHA256
   - Pantry.Storage
