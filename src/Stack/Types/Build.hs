@@ -342,9 +342,9 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
   in "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
        (False, Nothing) -> error "Invariant violated: unexpected case in showBuildError"
-       (False, Just taskProvides') -> "package " ++ dropQuotes (show taskProvides')
+       (False, Just taskProvides') -> "package " ++ dropQuotes (displayC taskProvides')
        (True, Nothing) -> "simple Setup.hs"
-       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (show taskProvides')
+       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (displayC taskProvides')
      ) ++
      " using:\n      " ++ fullCmd ++ "\n" ++
      "    Process exited with code: " ++ show exitCode ++
