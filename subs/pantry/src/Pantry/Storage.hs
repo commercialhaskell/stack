@@ -246,7 +246,7 @@ loadURLBlob url = do
     [toPersistValue url]
   case ment of
     [] -> pure Nothing
-    (Single bs) : _ -> pure $ Just $ blobTableContents bs
+    (Single bs) : _ -> pure $ Just bs
 
 storeURLBlob
   :: (HasPantryConfig env, HasLogFunc env)
