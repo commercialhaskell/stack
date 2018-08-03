@@ -28,17 +28,12 @@ import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo
 
 import qualified Path.IO
 
-import qualified System.IO as IO
-import qualified System.Directory as Dir
-import qualified System.FilePath as FP
 import           System.IO.Echo (withoutInputEcho)
-import           System.IO.Error (isDoesNotExistError)
 
 #ifdef WINDOWS
 import           System.Win32 (isMinTTYHandle, withHandleToHANDLE)
 #endif
 
-import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)

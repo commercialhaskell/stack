@@ -48,6 +48,10 @@ module Pantry.Storage
   , SfpId
   , TreeSId
   , TreeEntrySId
+  , CrlfHackId
+  , ArchiveCacheId
+  , PreferredVersionsId
+  , UrlBlobTableId
   ) where
 
 import RIO
@@ -476,9 +480,9 @@ loadTreeByEnt
   -> ReaderT SqlBackend (RIO env) Tree
 loadTreeByEnt (Entity tid t) = do
   case (treeSTarball t, treeSCabal t, treeSSubdir t) of
-    (Just tarball, Just cabal, Just subdir) -> do
-      tarballkey <- getBlobKey tarball
-      cabalkey <- getBlobKey cabal
+    (Just _tarball, Just _cabal, Just _subdir) -> do
+      --tarballkey <- getBlobKey tarball
+      --cabalkey <- getBlobKey cabal
       error "we don't support TreeTarball yet"
       {-
       pure $ TreeTarball PackageTarball

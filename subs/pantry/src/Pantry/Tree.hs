@@ -20,7 +20,7 @@ import Pantry.Types
 import RIO.FilePath ((</>), takeDirectory)
 import RIO.Directory (createDirectoryIfMissing)
 import Path (Path, Abs, Dir, toFilePath)
-import Distribution.Parsec.Common (PWarning (..), showPos)
+import Distribution.Parsec.Common (PWarning (..))
 import Distribution.PackageDescription (packageDescription, package, GenericPackageDescription)
 import Distribution.PackageDescription.Parsec
 import Path (File)

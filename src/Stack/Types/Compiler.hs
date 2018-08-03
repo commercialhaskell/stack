@@ -58,10 +58,6 @@ instance FromJSONKey ActualCompiler where
             Nothing -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
             Just parsed -> return parsed
 
-actualToWanted :: ActualCompiler -> WantedCompiler
-actualToWanted (ACGhc x) = WCGhc x
-actualToWanted (ACGhcjs x y) = WCGhcjs x y
-
 wantedToActual :: WantedCompiler -> ActualCompiler
 wantedToActual (WCGhc x) = ACGhc x
 wantedToActual (WCGhcjs x y) = ACGhcjs x y

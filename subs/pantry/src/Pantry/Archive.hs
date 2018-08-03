@@ -7,6 +7,7 @@ module Pantry.Archive
   ( getArchive
   , getArchiveKey
   , fetchArchives
+  , withArchiveLoc
   ) where
 
 import RIO
@@ -18,10 +19,12 @@ import Pantry.Types
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import Data.Bits ((.&.))
 import Path (toFilePath)
+import qualified Codec.Archive.Zip as Zip
 
 import Conduit
 import Crypto.Hash.Conduit
@@ -53,33 +56,14 @@ getArchive
 getArchive archive pm =
   checkPackageMetadata (PLArchive archive pm) pm $
   withCache $
-  withArchiveLoc loc $ \fp sha size -> do
+  withArchiveLoc archive $ \fp sha size -> do
     (tid, key, tree) <- parseArchive loc fp subdir
     pure (tid, sha, size, key, tree)
   where
-    pl = PLArchive archive pm
     msha = archiveHash archive
     msize = archiveSize archive
-    subdir = fromMaybe "" $ pmSubdir pm
+    subdir = pmSubdir pm
     loc = archiveLocation archive
-
-    withArchiveLoc (ALFilePath resolved) f = do
-      let fp = toFilePath $ resolvedAbsolute resolved
-      (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
-        size <- hFileSize h
-        sha <- runConduit (sourceHandle h .| sinkHash)
-        pure (mkStaticSHA256FromDigest sha, FileSize $ fromIntegral size)
-      f fp sha size
-    withArchiveLoc (ALUrl url) f =
-      withSystemTempFile "archive" $ \fp hout -> do
-        req <- parseUrlThrow $ T.unpack url
-        logDebug $ "Downloading archive from " <> display url
-        (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
-          <$> ZipSink (checkSha url msha)
-          <*> ZipSink (checkSize url $ (\(FileSize w) -> w) <$> msize)
-          <*> ZipSink (sinkHandle hout)
-        hClose hout
-        f fp sha (FileSize size)
 
     withCache
       :: RIO env (TreeSId, StaticSHA256, FileSize, TreeKey, Tree)
@@ -126,7 +110,34 @@ getArchive archive pm =
             ALUrl url -> withStorage (loadArchiveCache url subdir) >>= loop
             ALFilePath _ -> loop []
 
-    checkSha url mexpected = do
+withArchiveLoc
+  :: HasLogFunc env
+  => Archive
+  -> (FilePath -> StaticSHA256 -> FileSize -> RIO env a)
+  -> RIO env a
+withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
+  let fp = toFilePath $ resolvedAbsolute resolved
+  (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
+    size <- FileSize . fromIntegral <$> hFileSize h
+    for_ msize $ \size' -> when (size /= size') $ error $ "Mismatched local archive size: " ++ show (resolved, size, size')
+
+    sha <- mkStaticSHA256FromDigest <$> runConduit (sourceHandle h .| sinkHash)
+    for_ msha $ \sha' -> when (sha /= sha') $ error $ "Mismatched local archive sha: " ++ show (resolved, sha, sha')
+
+    pure (sha, size)
+  f fp sha size
+withArchiveLoc (Archive (ALUrl url) msha msize) f =
+  withSystemTempFile "archive" $ \fp hout -> do
+    req <- parseUrlThrow $ T.unpack url
+    logDebug $ "Downloading archive from " <> display url
+    (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
+      <$> ZipSink (checkSha msha)
+      <*> ZipSink (checkSize $ (\(FileSize w) -> w) <$> msize)
+      <*> ZipSink (sinkHandle hout)
+    hClose hout
+    f fp sha (FileSize size)
+  where
+    checkSha mexpected = do
       actual <- mkStaticSHA256FromDigest <$> sinkHash
       for_ mexpected $ \expected -> unless (actual == expected) $ error $ concat
         [ "Invalid SHA256 downloading from "
@@ -137,7 +148,7 @@ getArchive archive pm =
         , show actual
         ]
       pure actual
-    checkSize url mexpected =
+    checkSize mexpected =
       loop 0
       where
         loop accum = do
@@ -199,10 +210,15 @@ foldArchive fp ATTarGz accum f =
   withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar accum f
 foldArchive fp ATTar accum f =
   withSourceFile fp $ \src -> runConduit $ src .| foldTar accum f
-foldArchive fp ATZip accum f = undefined
-  -- We're entering lazy I/O land thanks to zip-archive. We'll do a
-  -- first pass through to get all the files, determine renamings and
-  -- so on, and then a second pass to grab the blobs we need.
+foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
+  -- We're entering lazy I/O land thanks to zip-archive.
+  lbs <- BL.hGetContents h
+  let go accum entry = do
+        let me = MetaEntry (Zip.eRelativePath entry) met
+            met = METNormal -- FIXME determine this correctly
+        -- FIXME check crc32
+        runConduit $ sourceLazy (Zip.fromEntry entry) .| f accum me
+  foldM go accum0 (Zip.zEntries $ Zip.toArchive lbs)
 
 foldTar
   :: (HasPantryConfig env, HasLogFunc env)
@@ -282,9 +298,9 @@ parseArchive loc fp subdir = do
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
           files3 = takeSubdir subdir files2
-          toSafe (fp, a) =
-            case mkSafeFilePath fp of
-              Nothing -> Left $ "Not a safe file path: " ++ T.unpack fp
+          toSafe (fp', a) =
+            case mkSafeFilePath fp' of
+              Nothing -> Left $ "Not a safe file path: " ++ T.unpack fp'
               Just sfp -> Right (sfp, a)
       case traverse toSafe files3 of
         Left e -> error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e

@@ -8,7 +8,6 @@ module Pantry.Repo -- FIXME needs to be implemented!
   ) where
 
 import Pantry.Types
-import Pantry.Storage
 import Pantry.Tree
 import RIO
 

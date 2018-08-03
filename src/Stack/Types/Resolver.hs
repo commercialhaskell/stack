@@ -34,7 +34,7 @@ module Stack.Types.Resolver -- FIXME clean up more, just need the abstract stuff
 
 import           Crypto.Hash as Hash (hash, Digest, SHA256)
 import           Data.Aeson.Extended
-                 (ToJSON, toJSON, FromJSON, parseJSON,
+                 (FromJSON, parseJSON,
                   withObject, (.:), withText)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64.URL as B64URL
@@ -44,14 +44,10 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
-import           Network.HTTP.StackClient (Request, parseUrlThrow)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
 import           Pantry.StaticSHA256
-import           Path
 import           Stack.Prelude
-import           Stack.Types.Compiler
-import qualified System.FilePath as FP
 
 type Resolver = SnapshotLocation -- FIXME remove
 type LoadedResolver = SnapshotLocation -- FIXME remove

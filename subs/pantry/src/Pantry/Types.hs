@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- FIXME REMOVE!
 module Pantry.Types
   ( PantryConfig (..)
   , HackageSecurityConfig (..)
@@ -57,7 +58,6 @@ module Pantry.Types
   , PantryException (..)
   , PackageLocationOrPath (..)
   , ResolvedPath (..)
-  , resolvedAbsolute
   , HpackExecutable (..)
   , WantedCompiler (..)
   , UnresolvedSnapshotLocation
@@ -81,6 +81,7 @@ import RIO.Char (isSpace)
 import RIO.List (intersperse)
 import RIO.Time (toGregorian, Day)
 import qualified RIO.Map as Map
+import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
@@ -101,7 +102,7 @@ import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Abs, Dir, File, parseAbsDir, toFilePath, filename)
+import Path (Abs, Dir, File, toFilePath, filename)
 import Path.Internal (Path (..)) -- FIXME don't import this
 import Path.IO (resolveFile)
 import Data.Pool (Pool)
@@ -136,15 +137,11 @@ data PantryConfig = PantryConfig
 data ResolvedPath t = ResolvedPath
   { resolvedRelative :: !RelFilePath
   -- ^ Original value parsed from a config file.
-  , resolvedAbsoluteHack :: !FilePath -- FIXME when we ditch store, use this !(Path Abs Dir)
+  , resolvedAbsolute :: !(Path Abs t)
   }
   deriving (Show, Eq, Data, Generic, Ord)
 instance NFData (ResolvedPath t)
-instance Store (ResolvedPath t)
-
--- FIXME get rid of this ugly hack!
-resolvedAbsolute :: ResolvedPath t -> Path Abs t
-resolvedAbsolute = Path . resolvedAbsoluteHack
+instance (Generic t, Store t) => Store (ResolvedPath t)
 
 -- | Either a remote package location or a local package directory.
 data PackageLocationOrPath
@@ -156,6 +153,7 @@ instance Store PackageLocationOrPath
 
 instance Display PackageLocationOrPath where
   display (PLRemote loc) = display loc
+  display (PLFilePath fp) = fromString $ toFilePath $ resolvedAbsolute fp
 
 -- | Location for remote packages (i.e., not local file paths).
 data PackageLocation
@@ -168,6 +166,17 @@ instance Store PackageLocation
 
 instance Display PackageLocation where
   display (PLHackage pir _tree) = display pir <> " (from Hackage)"
+  display (PLArchive archive pm) =
+    "Archive from " <> display (archiveLocation archive) <>
+    (if T.null $ pmSubdir pm
+       then mempty
+       else " in subdir " <> display (pmSubdir pm))
+  display (PLRepo repo pm) =
+    "Repo from " <> display (repoUrl repo) <>
+    ", commit " <> display (repoCommit repo) <>
+    (if T.null $ pmSubdir pm
+       then mempty
+       else " in subdir " <> display (pmSubdir pm))
 
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
@@ -240,7 +249,7 @@ instance NFData BlobKey
 instance Show BlobKey where
   show = T.unpack . utf8BuilderToText . display
 instance Display BlobKey where
-  display (BlobKey sha size) = display sha <> "," <> display size
+  display (BlobKey sha size') = display sha <> "," <> display size'
 
 blobKeyPairs :: BlobKey -> [(Text, Value)]
 blobKeyPairs (BlobKey sha size') =
@@ -429,6 +438,10 @@ instance Display PantryException where
           fromString msg <>
           "\n")
       warnings
+  display (TreeWithoutCabalFile pl) = "No cabal file found for " <> display pl
+  display (TreeWithMultipleCabalFiles pl sfps) =
+    "Multiple cabal files found for " <> display pl <> ": " <>
+    fold (intersperse ", " (map display sfps))
   display (MismatchedCabalName fp name) =
     "cabal file path " <>
     fromString (toFilePath fp) <>
@@ -626,7 +639,7 @@ displayC :: (IsString str, Distribution.Text.Text a) => a -> str
 displayC = fromString . Distribution.Text.display
 
 data OptionalSubdirs
-  = OSSubdirs ![Text]
+  = OSSubdirs !Text ![Text] -- non-empty list
   | OSPackageMetadata !PackageMetadata
   deriving (Show, Eq, Data, Generic)
 instance NFData OptionalSubdirs
@@ -637,7 +650,7 @@ data PackageMetadata = PackageMetadata
   , pmVersion :: !(Maybe Version)
   , pmTree :: !(Maybe TreeKey)
   , pmCabal :: !(Maybe BlobKey)
-  , pmSubdir :: !(Maybe Text) -- subdir
+  , pmSubdir :: !Text
   }
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
 instance Store PackageMetadata
@@ -649,11 +662,13 @@ instance Display PackageMetadata where
     , (\version -> "version == " <> displayC version) <$> pmVersion pm
     , (\tree -> "tree == " <> display tree) <$> pmTree pm
     , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
-    , (\subdir -> "subdir == " <> display subdir) <$> pmSubdir pm
+    , if T.null $ pmSubdir pm
+        then Nothing
+        else Just ("subdir == " <> display (pmSubdir pm))
     ]
 
 osNoInfo :: OptionalSubdirs
-osNoInfo = OSPackageMetadata $ PackageMetadata Nothing Nothing Nothing Nothing Nothing
+osNoInfo = OSPackageMetadata $ PackageMetadata Nothing Nothing Nothing Nothing T.empty
 
 -- | File path relative to the configuration file it was parsed from
 newtype RelFilePath = RelFilePath Text
@@ -747,13 +762,15 @@ instance ToJSON RawPackageLocation where
           RepoHg  -> "hg"
 
 osToPairs :: OptionalSubdirs -> [(Text, Value)]
-osToPairs (OSSubdirs subdirs) = [("subdirs" .= subdirs)]
-osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal msubdir)) = concat
+osToPairs (OSSubdirs x xs) = [("subdirs" .= (x:xs))]
+osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal subdir)) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
-  , maybe [] (\subdir -> ["subdir" .= subdir]) msubdir
+  , if T.null subdir
+      then []
+      else ["subdir" .= subdir]
   ]
 
 instance FromJSON (WithJSONWarnings RawPackageLocation) where
@@ -785,14 +802,21 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
         <$> o ..: "hackage"
         <*> o ..:? "pantry-tree"
 
+      optionalSubdirs :: Object -> WarningParser OptionalSubdirs
       optionalSubdirs o =
-        (OSSubdirs <$> o ..: "subdirs") <|>
-        (OSPackageMetadata <$> (PackageMetadata
+        -- if subdirs exists, it needs to be valid
+        case HM.lookup "subdirs" o of
+          Just v' -> do
+            subdirs <- lift $ parseJSON v'
+            case subdirs of
+              [] -> fail "Invalid empty subdirs"
+              x:xs -> pure $ OSSubdirs x xs
+          Nothing -> OSPackageMetadata <$> (PackageMetadata
             <$> (fmap unCabalString <$> (o ..:? "name"))
             <*> (fmap unCabalString <$> (o ..:? "version"))
             <*> o ..:? "pantry-tree"
             <*> o ..:? "cabal-file"
-            <*> o ..:? "subdir"))
+            <*> o ..:? "subdir" ..!= T.empty)
 
       repo = withObjectWarnings "RawPackageLocation.RPLRepo" $ \o -> do
         (repoType, repoUrl) <-
@@ -827,7 +851,28 @@ unRawPackageLocation
   => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
   -> RawPackageLocation
   -> m [PackageLocation]
-unRawPackageLocation _dir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
+unRawPackageLocation _mdir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
+unRawPackageLocation mdir (RPLArchive ra os) = do
+  loc <-
+    case raLocation ra of
+      RALUrl url -> pure $ ALUrl url
+      RALFilePath rel@(RelFilePath t) -> do
+        abs' <-
+          case mdir of
+            Nothing -> error $ "Cannot resolve relative archive path with URL-based config: " ++ show t
+            Just dir -> resolveFile dir $ T.unpack t
+        pure $ ALFilePath $ ResolvedPath rel abs'
+  let archive = Archive
+        { archiveLocation = loc
+        , archiveHash = raHash ra
+        , archiveSize = raSize ra
+        }
+  pure $ map (PLArchive archive) $ osToPms os
+unRawPackageLocation _mdir (RPLRepo repo os) = pure $ map (PLRepo repo) $ osToPms os
+
+osToPms :: OptionalSubdirs -> [PackageMetadata]
+osToPms (OSSubdirs x xs) = map (PackageMetadata Nothing Nothing Nothing Nothing) (x:xs)
+osToPms (OSPackageMetadata pm) = [pm]
 
 -- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
 mkRawPackageLocation :: PackageLocation -> RawPackageLocation
@@ -958,7 +1003,7 @@ resolveSnapshotLocation (USLFilePath rfp@(RelFilePath t)) (Just dir) mcompiler =
   pure $ SLFilePath
             ResolvedPath
               { resolvedRelative = rfp
-              , resolvedAbsoluteHack = toFilePath abs'
+              , resolvedAbsolute = abs'
               }
             mcompiler
 
@@ -1100,6 +1145,12 @@ instance ToJSON Snapshot where
               Nothing -> []
               Just compiler -> ["compiler" .= compiler]
           ]
+        SLFilePath resolved mcompiler -> concat
+          [ pure $ "resolver" .= object ["filepath" .= resolvedRelative resolved]
+          , case mcompiler of
+              Nothing -> []
+              Just compiler -> ["compiler" .= compiler]
+          ]
     , ["name" .= snapshotName snap]
     , ["packages" .= map mkRawPackageLocation (snapshotLocations snap)]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
@@ -1183,5 +1234,17 @@ instance Store PackageIdentifierRevision where
   peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
   poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
 
+deriving instance Data Abs
 deriving instance Data Dir
 deriving instance Data File
+deriving instance (Data a, Data t) => Data (Path a t)
+
+deriving instance Generic Abs
+deriving instance Generic Dir
+deriving instance Generic File
+deriving instance (Generic a, Generic t) => Generic (Path a t)
+
+instance Store Abs
+instance Store Dir
+instance Store File
+instance (Generic a, Generic t, Store a, Store t) => Store (Path a t)

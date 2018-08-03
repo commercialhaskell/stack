@@ -27,7 +27,6 @@ module Pantry
   , RelFilePath (..)
   , PackageLocationOrPath (..)
   , ResolvedPath (..)
-  , resolvedAbsolute
   , PackageIdentifierRevision (..)
   , PackageName
   , Version
@@ -45,7 +44,6 @@ module Pantry
   , mkRawPackageLocation
   , mkRawPackageLocationOrPath
   , completePackageLocation
-  , resolveDirWithRel
 
     -- ** Snapshots
   , UnresolvedSnapshotLocation
@@ -116,7 +114,6 @@ import Path.Find (findFiles)
 import Path.IO (resolveDir, doesFileExist)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
-import Distribution.PackageDescription.Parsec
 import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
@@ -337,7 +334,7 @@ unpackPackageLocation
   -> PackageLocation
   -> RIO env ()
 unpackPackageLocation fp loc = do
-  tree <- loadPackageLocation loc
+  (_, tree) <- loadPackageLocation loc
   unpackTree fp tree
 
 -- | Ignores all warnings
@@ -517,25 +514,27 @@ loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
   -> RIO env ByteString
-loadCabalFile (PLHackage pir mtree) = getHackageCabalFile pir
-{- FIXME this is relatively inefficient
-loadCabalFile loc = do
-  tree <- loadPackageLocation loc
-  mbs <- withStorage $ do
-    (_sfp, TreeEntry key _ft) <- findCabalFile loc tree
-    loadBlob key
+
+-- Just ignore the mtree for this. Safe assumption: someone who filled
+-- in the TreeKey also filled in the cabal file hash, and that's a
+-- more efficient lookup mechanism.
+loadCabalFile (PLHackage pir _mtree) = getHackageCabalFile pir
+
+loadCabalFile pl = do
+  (_, tree) <- loadPackageLocation pl
+  (_sfp, TreeEntry cabalBlobKey _ft) <- findCabalFile pl tree
+  mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
+    Nothing -> error $ "loadCabalFile, blob not found. FIXME In the future: maybe try downloading the archive again."
     Just bs -> pure bs
-    -- FIXME what to do on Nothing? perhaps download the PackageLocation again?
--}
 
 loadPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocation
-  -> RIO env Tree
-loadPackageLocation (PLHackage pir mtree) = snd <$> getHackageTarball pir mtree
-loadPackageLocation (PLArchive archive pm) = snd <$> getArchive archive pm
-loadPackageLocation (PLRepo repo pm) = snd <$> getRepo repo pm
+  -> RIO env (TreeKey, Tree)
+loadPackageLocation (PLHackage pir mtree) = getHackageTarball pir mtree
+loadPackageLocation (PLArchive archive pm) = getArchive archive pm
+loadPackageLocation (PLRepo repo pm) = getRepo repo pm
 
 -- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
 mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
@@ -550,21 +549,9 @@ unRawPackageLocationOrPath
   -> m [PackageLocationOrPath]
 unRawPackageLocationOrPath dir (RPLRemote rpl) =
   map PLRemote <$> unRawPackageLocation (Just dir) rpl
-unRawPackageLocationOrPath dir (RPLFilePath fp) = do
-  rfp <- resolveDirWithRel dir fp
-  pure [PLFilePath rfp]
-
-resolveDirWithRel
-  :: MonadIO m
-  => Path Abs Dir -- ^ root directory to be relative to
-  -> RelFilePath
-  -> m (ResolvedPath Dir)
-resolveDirWithRel dir (RelFilePath fp) = do
-  absolute <- resolveDir dir (T.unpack fp)
-  pure ResolvedPath
-    { resolvedRelative = RelFilePath fp
-    , resolvedAbsoluteHack = toFilePath absolute
-    }
+unRawPackageLocationOrPath dir (RPLFilePath rel@(RelFilePath fp)) = do
+  absolute <- resolveDir dir $ T.unpack fp
+  pure [PLFilePath $ ResolvedPath rel absolute]
 
 -- | Fill in optional fields in a 'PackageLocation' for more reproducible builds.
 completePackageLocation
@@ -576,24 +563,53 @@ completePackageLocation (PLHackage pir Nothing) = do
   logDebug $ "Completing package location information from " <> display pir
   treeKey <- getHackageTarballKey pir
   pure $ PLHackage pir (Just treeKey)
-    {- FIXME WIP
-completePackageLocation pl@(PLArchive archive pm) = do
-  treeKey <- getPackageLocationTreeKey pl
-  (cabal, name, version) <-
-    case (pmCabal pm, pmName pm, pmVersion pm) of
-      (Just x, Just y, Just z) -> pure (x, y, z)
-      _ -> do
-        tree <- loadPackageLocation pl
-        (cabal, PackageIdentifier name version) <- loadPackageIdentFromTree tree
-        pure (cabal, name, version)
-  pure
-    -}
+completePackageLocation pl@(PLArchive archive pm) =
+  PLArchive <$> completeArchive archive <*> completePM pl pm
+completePackageLocation pl@(PLRepo repo pm) =
+  PLRepo repo <$> completePM pl pm
+
+completeArchive
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Archive
+  -> RIO env Archive
+completeArchive a@(Archive _ (Just _) (Just _)) = pure a
+completeArchive a@(Archive loc _ _) =
+  withArchiveLoc a $ \_fp sha size ->
+  pure $ Archive loc (Just sha) (Just size)
+
+completePM
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageLocation
+  -> PackageMetadata
+  -> RIO env PackageMetadata
+completePM plOrig pm
+  | isCompletePM pm = pure pm
+  | otherwise = do
+      (treeKey, tree) <- loadPackageLocation plOrig
+      (cabalBlobKey, PackageIdentifier name version) <- loadPackageIdentFromTree plOrig tree
+      -- FIXME confirm that no values _changed_
+      pure PackageMetadata
+        { pmName = Just name
+        , pmVersion = Just version
+        , pmTree = Just treeKey
+        , pmCabal = Just cabalBlobKey
+        , pmSubdir = pmSubdir pm
+        }
+  where
+    isCompletePM (PackageMetadata (Just _) (Just _) (Just _) (Just _) _) = True
+    isCompletePM _ = False
 
 completeSnapshotLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
   -> RIO env SnapshotLocation
-completeSnapshotLocation (SLCompiler wc) = pure $ SLCompiler wc
+completeSnapshotLocation sl@SLCompiler{} = pure sl
+completeSnapshotLocation sl@SLFilePath{} = pure sl
+completeSnapshotLocation sl@(SLUrl _ (Just _) _) = pure sl
+completeSnapshotLocation (SLUrl url Nothing mcompiler) = do
+  bs <- loadFromURL url Nothing
+  let blobKey = BlobKey (mkStaticSHA256FromBytes bs) (FileSize $ fromIntegral $ B.length bs)
+  pure $ SLUrl url (Just blobKey) mcompiler
 
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
 completeSnapshot
@@ -718,7 +734,7 @@ getPackageLocationIdent
   -> RIO env PackageIdentifier
 getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
 getPackageLocationIdent pl = do
-  tree <- loadPackageLocation pl
+  (_, tree) <- loadPackageLocation pl
   snd <$> loadPackageIdentFromTree pl tree
 
 getPackageLocationTreeKey
