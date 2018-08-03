@@ -1423,8 +1423,7 @@ parseProjectAndConfigMonoid rootDir =
         packages <- o ..:? "packages" ..!= [RelFilePath "."]
         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
         flags' <- o ..:? "flags" ..!= mempty
-        let flags = fmap unCabalStringMap
-                  $ unCabalStringMap
+        let flags = unCabalStringMap <$> unCabalStringMap
                     (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
         resolver <- jsonSubWarnings (o ..: "resolver")

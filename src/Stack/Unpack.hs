@@ -37,11 +37,11 @@ unpackPackages
 unpackPackages mSnapshotDef dest input = do
     let (errs1, (names, pirs1)) =
           fmap partitionEithers $ partitionEithers $ map parse input
-    (errs2, locs2) <- fmap partitionEithers $ traverse toLoc names
+    (errs2, locs2) <- partitionEithers <$> traverse toLoc names
     case errs1 ++ errs2 of
       [] -> pure ()
       errs -> throwM $ CouldNotParsePackageSelectors errs
-    locs <- fmap Map.fromList $ mapM
+    locs <- Map.fromList <$> mapM
           (\(pir, ident) -> do
               suffix <- parseRelDir $ displayC ident
               pure (pir, dest </> suffix)

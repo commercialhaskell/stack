@@ -1388,7 +1388,7 @@ cabalFilePackageId -- FIXME remove and use the caching logic in pantry
     :: (MonadIO m, MonadThrow m)
     => Path Abs File -> m PackageIdentifier
 cabalFilePackageId fp = do
-    (D.package . D.packageDescription) <$> liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
+    D.package . D.packageDescription <$> liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
 
 parseSingleCabalFile -- FIXME rename and add docs
   :: forall env. HasConfig env

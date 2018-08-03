@@ -188,7 +188,7 @@ loadSnapshot mcompiler =
 
     inner2 snap ls0 = do
       gpds <-
-        (forM (snapshotLocations snap) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc)
+        forM (snapshotLocations snap) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc
 
       (globals, snapshot, locals) <-
         calculatePackagePromotion ls0

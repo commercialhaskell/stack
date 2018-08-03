@@ -226,7 +226,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps bconfig =
-        elem $(mkPackageName "base")
+        $(mkPackageName "base") `elem`
         [n | (PLRemote (PLHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx

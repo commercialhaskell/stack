@@ -1,10 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
@@ -19,7 +16,7 @@ import           Stack.Prelude
 import qualified Data.Text as T
 
 -- | A parse fail.
-data PackageIdentifierParseFail
+newtype PackageIdentifierParseFail
   = PackageIdentifierParseFail Text
   deriving (Typeable)
 instance Show PackageIdentifierParseFail where

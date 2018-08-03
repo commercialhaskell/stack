@@ -112,7 +112,7 @@ initProject whichCmd currDir initOpts mresolver = do
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
-            , projectPackages = (RelFilePath . T.pack) <$> pkgs
+            , projectPackages = RelFilePath . T.pack <$> pkgs
             , projectDependencies = deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = sdResolver sd
