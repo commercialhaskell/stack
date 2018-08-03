@@ -130,6 +130,8 @@ data PantryConfig = PantryConfig
        )
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
   -}
+  , pcConnectionCount :: !Int
+  -- ^ concurrently open downloads
   }
 
 -- | A directory which was loaded up relative and has been resolved
@@ -233,6 +235,14 @@ data HackageSecurityConfig = HackageSecurityConfig
   , hscKeyThreshold :: !Int
   , hscDownloadPrefix :: !Text
   }
+  deriving Show
+instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
+  parseJSON = withObjectWarnings "HackageSecurityConfig" $ \o' -> do
+    hscDownloadPrefix <- o' ..: "download-prefix"
+    Object o <- o' ..: "hackage-security"
+    hscKeyIds <- o ..: "keyids"
+    hscKeyThreshold <- o ..: "key-threshold"
+    pure HackageSecurityConfig {..}
 
 class HasPantryConfig env where
   pantryConfigL :: Lens' env PantryConfig

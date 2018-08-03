@@ -34,7 +34,6 @@ module Stack.Package
   ,parseSingleCabalFile)
   where
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as CL8
 import           Data.List (isSuffixOf, isPrefixOf, unzip)
 import           Data.Maybe (maybe)
@@ -52,7 +51,6 @@ import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parsec
 import qualified Distribution.PackageDescription.Parsec as D
-import           Distribution.Parsec.Common (PWarning (..), showPos)
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
@@ -64,11 +62,9 @@ import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
-import qualified Hpack
 import qualified Hpack.Config as Hpack
 import           Path as FL
 import           Path.Extra
-import           Path.Find
 import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
 import           Stack.Constants

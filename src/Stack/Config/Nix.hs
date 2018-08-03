@@ -15,7 +15,6 @@ import qualified Data.Text.IO as TIO
 import Distribution.System (OS (..))
 import Stack.Constants
 import Stack.Types.Nix
-import Stack.Types.Compiler
 import Stack.Types.Runner
 import System.Directory (doesFileExist)
 

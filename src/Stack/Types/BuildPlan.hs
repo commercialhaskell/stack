@@ -154,7 +154,7 @@ configuration. Otherwise, we don't cache.
 -}
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "6VbBiQDCXP-6Hu36CzyfOr8NQYE="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "PWbqdxi3OwjVS9L_NZw_br2hMeA="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

@@ -290,12 +290,12 @@ instance Show StackBuildException where
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
         T.unpack (renderPkgComponents xs) ++
         "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
-    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName testName) =
+    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
         missingExeError isSimpleBuildType $ concat
             [ "Test suite executable \""
             , exeName
             , " not found for "
-            , pkgName
+            , pkgName'
             , ":test:"
             , testName
             ]

@@ -132,9 +132,10 @@ withPantryConfig
   => Path Abs Dir -- ^ pantry root
   -> HackageSecurityConfig
   -> HpackExecutable
+  -> Int -- ^ connection count
   -> (PantryConfig -> RIO env a)
   -> RIO env a
-withPantryConfig root hsc he inner = do
+withPantryConfig root hsc he count inner = do
   env <- ask
   -- Silence persistent's logging output, which is really noisy
   runRIO (mempty :: LogFunc) $ initStorage (root </> $(mkRelFile "pantry.sqlite3")) $ \storage -> runRIO env $ do
@@ -145,6 +146,7 @@ withPantryConfig root hsc he inner = do
       , pcRootDir = root
       , pcStorage = storage
       , pcUpdateRef = ur
+      , pcConnectionCount = count
       }
 
 defaultHackageSecurityConfig :: HackageSecurityConfig
@@ -313,7 +315,8 @@ fetchPackages
   -> RIO env ()
 fetchPackages pls = do
     fetchTreeKeys $ mapMaybe getTreeKey $ toList pls
-    for_ hackages $ uncurry getHackageTarball
+    traverseConcurrently_ (void . uncurry getHackageTarball) hackages
+    -- FIXME in the future, be concurrent in these as well
     fetchArchives archives
     fetchRepos repos
   where
@@ -618,11 +621,49 @@ completeSnapshot
   -> RIO env Snapshot
 completeSnapshot snapshot = do
   parent' <- completeSnapshotLocation $ snapshotParent snapshot
-  pls <- traverseConcurrentlyWith 16 completePackageLocation $ snapshotLocations snapshot
+  pls <- traverseConcurrently completePackageLocation $ snapshotLocations snapshot
   pure snapshot
     { snapshotParent = parent'
     , snapshotLocations = pls
     }
+
+traverseConcurrently_
+  :: (Foldable f, HasPantryConfig env)
+  => (a -> RIO env ()) -- ^ action to perform
+  -> f a -- ^ input values
+  -> RIO env ()
+traverseConcurrently_ f t0 = do
+  cnt <- view $ pantryConfigL.to pcConnectionCount
+  traverseConcurrentlyWith_ cnt f t0
+
+traverseConcurrentlyWith_
+  :: (MonadUnliftIO m, Foldable f)
+  => Int -- ^ concurrent workers
+  -> (a -> m ()) -- ^ action to perform
+  -> f a -- ^ input values
+  -> m ()
+traverseConcurrentlyWith_ count f t0 = do
+  queue <- newTVarIO $ toList t0
+
+  replicateConcurrently_ count $
+    fix $ \loop -> join $ atomically $ do
+      toProcess <- readTVar queue
+      case toProcess of
+        [] -> pure (pure ())
+        (x:rest) -> do
+          writeTVar queue rest
+          pure $ do
+            f x
+            loop
+
+traverseConcurrently
+  :: (HasPantryConfig env, Traversable t)
+  => (a -> RIO env b) -- ^ action to perform
+  -> t a -- ^ input values
+  -> RIO env (t b)
+traverseConcurrently f t0 = do
+  cnt <- view $ pantryConfigL.to pcConnectionCount
+  traverseConcurrentlyWith cnt f t0
 
 -- | Like 'traverse', but does things on
 -- up to N separate threads at once.

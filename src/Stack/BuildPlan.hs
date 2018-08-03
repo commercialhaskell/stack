@@ -335,13 +335,12 @@ instance Show BuildPlanCheck where
 -- the packages.
 checkSnapBuildPlan
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ project root, used for checking out necessary files
-    -> [GenericPackageDescription]
+    => [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
     -> Maybe ActualCompiler
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
+checkSnapBuildPlan gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
     rs <- loadSnapshot mactualCompiler snapshotDef
 
@@ -372,16 +371,16 @@ checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ project root, used for checking out necessary files
-    -> [GenericPackageDescription]
+    => [GenericPackageDescription]
     -> NonEmpty SnapName
     -> RIO env (SnapshotDef, BuildPlanCheck)
-selectBestSnapshot root gpds snaps = do
+selectBestSnapshot gpds snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
-    undefined {- FIXME
-    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverStackage) snaps)
+    let resolverStackage (LTS x y) = ltsSnapshotLocation x y
+        resolverStackage (Nightly d) = nightlySnapshotLocation d
+    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . snd . resolverStackage) snaps)
     where
         go mold mnew = do
             old@(_snap, bpc) <- mold
@@ -390,7 +389,7 @@ selectBestSnapshot root gpds snaps = do
                 _ -> fmap (betterSnap old) mnew
 
         getResult snap = do
-            result <- checkSnapBuildPlan root gpds Nothing snap
+            result <- checkSnapBuildPlan gpds Nothing snap
               -- We know that we're only dealing with ResolverStackage
               -- here, where we can rely on the global package hints.
               -- Therefore, we don't use an actual compiler. For more
@@ -417,7 +416,6 @@ selectBestSnapshot root gpds snaps = do
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
-    -}
 
 showItems :: Show a => [a] -> Text
 showItems items = T.concat (map formatItem items)

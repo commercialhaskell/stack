@@ -67,7 +67,7 @@ ghcPkgDescribe
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", displayC pkgName]
+ghcPkgDescribe pkgName' = ghcPkgCmdArgs ["describe", "--simple-output", displayC pkgName']
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs

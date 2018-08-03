@@ -68,7 +68,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry (HasPantryConfig (..), withPantryConfig, defaultHackageSecurityConfig, PackageLocation)
+import           Pantry.StaticSHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -82,8 +82,6 @@ import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.Package (parseSingleCabalFile)
 import           Stack.Snapshot
-import           Stack.Types.BuildPlan
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -351,7 +349,6 @@ configFromConfigMonoid
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
-         clIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
@@ -363,13 +360,21 @@ configFromConfigMonoid
      configRunner' <- view runnerL
      let configRunner = set processContextL origEnv configRunner'
 
+     case getFirst configMonoidIgnoreRevisionMismatch of
+       Nothing -> pure ()
+       Just _ -> logWarn "You configured the ignore-revision-mismatch setting, but it is no longer used by Stack"
+
+     hsc <-
+       case getFirst configMonoidPackageIndices of
+         Nothing -> pure defaultHackageSecurityConfig
+         Just [hsc] -> pure hsc
+         Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
      withPantryConfig
        (configStackRoot </> $(mkRelDir "pantry"))
-       (case getFirst configMonoidPackageIndices of
-          Nothing -> defaultHackageSecurityConfig
-       )
+       hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
-       $ \configPantryConfig -> inner Config {..}
+       clConnectionCount
+       (\configPantryConfig -> inner Config {..})
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
@@ -592,9 +597,10 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    packages <- for (projectPackages project) $ \fp -> do
-      dir <- resolveDirWithRel (parent stackYamlFP) fp
-      (dir,) <$> runOnce (parseSingleCabalFile True dir)
+    packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
+      abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
+      let resolved = ResolvedPath fp abs'
+      (resolved,) <$> runOnce (parseSingleCabalFile True resolved)
 
     let deps = projectDependencies project
 
@@ -642,7 +648,6 @@ getLocalPackages = do
     case mcached of
         Just cached -> return cached
         Nothing -> do
-            root <- view projectRootL
             bc <- view buildConfigL
 
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
@@ -907,7 +912,7 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> undefined -- return $ T.unpack $ resolverRawName r
+      ARResolver r -> pure $ T.unpack $ staticSHA256ToText $ mkStaticSHA256FromBytes $ encodeUtf8 $ utf8BuilderToText $ display r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
   -- This takeWhile is an ugly hack. We don't actually need this
   -- path for anything useful. But if we take the raw value for

@@ -252,7 +252,6 @@ library:
   - Stack.Types.Package
   - Stack.Types.PackageDump
   - Stack.Types.PackageIdentifier
-  - Stack.Types.PackageIndex
   - Stack.Types.PackageName
   - Stack.Types.Resolver
   - Stack.Types.Runner

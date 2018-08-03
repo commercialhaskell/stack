@@ -85,12 +85,7 @@ module Stack.Types.Config
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
-  -- ** PackageIndex, IndexName & IndexLocation
 
-  -- Re-exports
-  ,PackageIndex(..)
-  ,IndexName(..)
-  ,indexNameText
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
   ,ProjectAndConfigMonoid(..)
@@ -218,7 +213,6 @@ import           Stack.Types.Docker
 import           Stack.Types.Image
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
-import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
@@ -649,7 +643,7 @@ data ConfigMonoid =
     -- ^ Deprecated in favour of 'urlsMonoidLatestSnapshot'
     , configMonoidUrls               :: !UrlsMonoid
     -- ^ See: 'configUrls
-    , configMonoidPackageIndices     :: !(First [PackageIndex])
+    , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
     -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'

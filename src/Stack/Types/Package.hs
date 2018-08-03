@@ -12,7 +12,6 @@ module Stack.Types.Package where
 import           Stack.Prelude
 import qualified Data.ByteString as S
 import qualified RIO.Text as T
-import           Data.List
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Data.Store.Version (VersionConfig)
@@ -23,7 +22,6 @@ import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           Path as FL
 import           Stack.Types.BuildPlan (ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config

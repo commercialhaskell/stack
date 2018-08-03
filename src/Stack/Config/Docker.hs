@@ -22,11 +22,11 @@ dockerOptsFromMonoid
     -> Maybe AbstractResolver
     -> DockerOptsMonoid
     -> m DockerOpts
-dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
+dockerOptsFromMonoid _mproject stackRoot _maresolver DockerOptsMonoid{..} = do
     let dockerEnable =
             fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
         dockerImage =
-            let mresolver = undefined
+            let mresolver = undefined -- FIXME
                     {-
                     case maresolver of
                         Just (ARResolver resolver) -> Just resolver
@@ -39,7 +39,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                 defaultTag =
                     case mresolver of
                         Nothing -> ""
-                        Just resolver ->
+                        Just _resolver ->
                             error "FIXME need some logic for figuring out we're using an LTS now"
                             {-
                             case resolver of

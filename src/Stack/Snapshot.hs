@@ -23,19 +23,13 @@ module Stack.Snapshot
 
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
-import           Crypto.Hash.Conduit (hashFile)
-import           Data.Aeson (withObject, (.!=), (.:), (.:?), Value (Object))
-import           Data.Aeson.Extended (WithJSONWarnings(..), logJSONWarnings, (..!=), (..:?), withObjectWarnings, (..:), jsonSubWarningsT)
-import           Data.Aeson.Types (Parser, parseEither)
 import           Data.Store.VersionTagged
 import qualified Data.Conduit.List as CL
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Data.Time (toGregorian)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Yaml (decodeFileEither, ParseException (AesonException))
+import           Data.Yaml (ParseException (AesonException))
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
@@ -43,28 +37,18 @@ import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
 import           Network.HTTP.StackClient (Request)
-import           Network.HTTP.Download
 import qualified RIO
 import qualified RIO.ByteString.Lazy as BL
 import           Data.ByteString.Builder (toLazyByteString)
-import           Network.URI (isURI)
 import           Pantry.StaticSHA256
-import           Path
-import           Path.IO
-import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.Types.BuildPlan
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageName
 import           Stack.Types.VersionIntervals
 import           Stack.Types.Config
-import           Stack.Types.Urls
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
-import qualified System.Directory as Dir
-import qualified System.FilePath as FilePath
 
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocationOrPath !PError

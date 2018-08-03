@@ -7,7 +7,6 @@ import           Options.Applicative
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Options.Utils
 import           Stack.Prelude
-import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 
 -- | Parser for the resolver

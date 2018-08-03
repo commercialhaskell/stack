@@ -35,7 +35,6 @@ module Stack.Build.Cache
 
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
-import           Control.Monad.Trans.Maybe
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
@@ -48,9 +47,6 @@ import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
-import           Pantry (PackageLocation (..), Archive (..), Repo (..))
-import           Pantry.StaticSHA256
 import           Path
 import           Path.IO
 import           Stack.Constants.Config
