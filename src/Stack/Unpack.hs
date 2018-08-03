@@ -106,25 +106,3 @@ unpackPackages mSnapshotDef dest input = do
                     Left _ -> Left s
       where
         t = T.pack s
-
-{- FIXME
--- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: HasCabalLoader env
-                => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
-                -> [PackageIdentifierRevision]
-                -> Set PackageName
-                -> RIO env [ResolvedPackage]
-resolvePackages mSnapshotDef idents0 names0 = do
-    eres <- go
-    case eres of
-        Left _ -> do
-            updateAllIndices
-            go >>= either throwM return
-        Right x -> return x
-  where
-    go = r <$> getUses00Index <*> resolvePackagesAllowMissing mSnapshotDef idents0 names0
-    r uses00Index (missingNames, missingIdents, idents)
-      | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
-      | not $ HashSet.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents "" uses00Index
-      | otherwise                    = Right idents
--}

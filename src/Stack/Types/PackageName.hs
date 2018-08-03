@@ -39,20 +39,6 @@ instance Show PackageNameParseFail where
     show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
     show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
 
-    {- FIXME
-instance FromJSON PackageName where
-  parseJSON j =
-    do s <- parseJSON j
-       case parsePackageNameFromString s of
-         Nothing ->
-           fail ("Couldn't parse package name: " ++ s)
-         Just ver -> return ver
-
-instance FromJSONKey PackageName where
-  fromJSONKey = FromJSONKeyTextParser $ \k ->
-    either (fail . show) return $ parsePackageName k
-    -}
-
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
 mkPackageName s =

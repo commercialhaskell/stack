@@ -13,71 +13,26 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Stack.Types.Resolver -- FIXME clean up more, just need the abstract stuff probably
-  (Resolver
-  ,LoadedResolver
-  ,AbstractResolver(..)
+module Stack.Types.Resolver
+  (AbstractResolver(..)
   ,readAbstractResolver
   ,SnapName(..)
   ,Snapshots (..)
   ,renderSnapName
   ,parseSnapName
-  ,SnapshotHash
-  ,trimmedSnapshotHash
-  ,snapshotHashToBS
-  ,snapshotHashFromBS
-  ,snapshotHashFromDigest
   ) where
 
-import           Crypto.Hash as Hash (hash, Digest, SHA256)
 import           Data.Aeson.Extended
                  (FromJSON, parseJSON,
                   withObject, (.:), withText)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
 import           Data.Text.Read (decimal)
 import           Data.Time (Day)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
-import           Pantry.StaticSHA256
 import           Stack.Prelude
-
-type Resolver = SnapshotLocation -- FIXME remove
-type LoadedResolver = SnapshotLocation -- FIXME remove
-
-    {-
-parseCustomLocation
-  :: MonadThrow m
-  => Maybe (Path Abs Dir) -- ^ directory config value was read from
-  -> ResolverWith () -- could technically be any type parameter, restricting to help with type safety
-  -> m Resolver
-parseCustomLocation mdir (ResolverCustom t ()) =
-  ResolverCustom t <$> case parseUrlThrow $ T.unpack t of
-    Nothing -> Right <$> do
-      dir <-
-        case mdir of
-          Nothing -> throwM $ FilepathInDownloadedSnapshot t
-          Just x -> return x
-      let rel =
-              T.unpack
-            $ fromMaybe t
-            $ T.stripPrefix "file://" t <|> T.stripPrefix "file:" t
-      return $ toFilePath dir FP.</> rel
-    Just req -> return $ Left req
-parseCustomLocation _ (ResolverStackage name) = return $ ResolverStackage name
-parseCustomLocation _ (ResolverCompiler cv) = return $ ResolverCompiler cv
-
--- | Parse a @Resolver@ from a @Text@
-parseResolverText :: Text -> ResolverWith ()
-parseResolverText t
-    | Right x <- parseSnapName t = ResolverStackage x
-    | Just v <- parseCompilerVersion t = ResolverCompiler v
-    | otherwise = ResolverCustom t ()
-    -}
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
@@ -188,25 +143,3 @@ instance FromJSON Snapshots where
                 Left e -> fail $ show e
                 Right (LTS x y) -> return $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"
-
-newtype SnapshotHash = SnapshotHash { unSnapshotHash :: StaticSHA256 }
-    deriving (Generic, Typeable, Show, Data, Eq)
-instance Store SnapshotHash
-instance NFData SnapshotHash
-
--- | Return the first 12 characters of the hash as a B64URL-encoded
--- string.
-trimmedSnapshotHash :: SnapshotHash -> Text
-trimmedSnapshotHash = decodeUtf8 . B.take 12 . B64URL.encode . staticSHA256ToRaw . unSnapshotHash
-
--- | Return the raw bytes in the hash
-snapshotHashToBS :: SnapshotHash -> ByteString
-snapshotHashToBS = staticSHA256ToRaw . unSnapshotHash
-
--- | Create a new SnapshotHash by SHA256 hashing the given contents
-snapshotHashFromBS :: ByteString -> SnapshotHash
-snapshotHashFromBS = snapshotHashFromDigest . Hash.hash
-
--- | Create a new SnapshotHash from the given digest
-snapshotHashFromDigest :: Digest SHA256 -> SnapshotHash
-snapshotHashFromDigest = SnapshotHash . mkStaticSHA256FromDigest

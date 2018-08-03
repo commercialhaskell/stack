@@ -173,7 +173,6 @@ makeConcreteResolver root ar mcompiler = do
         case ar of
             ARResolver r -> assert False $ makeConcreteResolver root (ARResolver r) mcompiler
             ARGlobal -> do
-                -- FIXME use mcompiler
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
@@ -627,7 +626,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                 LCSNoConfig _ -> False
         }
   where
-    getEmptyProject :: Maybe Resolver -> RIO Config Project
+    getEmptyProject :: Maybe SnapshotLocation -> RIO Config Project
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do

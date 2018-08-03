@@ -175,7 +175,7 @@ displayTask task =
     ", source=" <>
     (case taskType task of
         TTFilePath lp _ -> fromString $ toFilePath $ parent $ lpCabalFile lp
-        TTRemote{} -> "remote package") <> -- FIXME provide more information on PackageLocation?
+        TTRemote _ _ pl -> RIO.display pl) <>
     (if Set.null missing
         then ""
         else ", after: " <>

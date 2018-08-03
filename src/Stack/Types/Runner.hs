@@ -20,7 +20,6 @@ module Stack.Types.Runner
     , withRunner
     ) where
 
-import           Distribution.PackageDescription (GenericPackageDescription)
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
@@ -36,18 +35,6 @@ data Runner = Runner
   , runnerLogFunc    :: !LogFunc
   , runnerTermWidth  :: !Int
   , runnerProcessContext :: !ProcessContext
-  , runnerParsedCabalFiles :: !(IORef -- FIXME remove
-      ( Map PackageIdentifierRevision GenericPackageDescription
-      , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
-      ))
-  -- ^ Cache of previously parsed cabal files.
-  --
-  -- TODO: This is really an ugly hack to avoid spamming the user with
-  -- warnings when we parse cabal files multiple times and bypass
-  -- performance issues. Ideally: we would just design the system such
-  -- that it only ever parses a cabal file once. But for now, this is
-  -- a decent workaround. See:
-  -- <https://github.com/commercialhaskell/stack/issues/3591>.
   }
 
 class (HasProcessContext env, HasLogFunc env) => HasRunner env where
@@ -90,7 +77,6 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
-  ref <- newIORef mempty
   menv <- mkDefaultProcessContext
   logOptions0 <- logOptionsHandle stderr False
   let logOptions
@@ -106,7 +92,6 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     , runnerUseColor = useColor
     , runnerLogFunc = logFunc
     , runnerTermWidth = termWidth
-    , runnerParsedCabalFiles = ref
     , runnerProcessContext = menv
     }
   where clipWidth w

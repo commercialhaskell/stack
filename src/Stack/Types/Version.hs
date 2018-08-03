@@ -54,21 +54,6 @@ instance Show VersionParseFail where
 -- | A Package upgrade; Latest or a specific version.
 data UpgradeTo = Specific Version | Latest deriving (Show)
 
-{- FIXME
-instance ToJSON Version where
-  toJSON = toJSON . versionText
-instance FromJSON Version where
-  parseJSON j =
-    do s <- parseJSON j
-       case parseVersionFromString s of
-         Nothing ->
-           fail ("Couldn't parse package version: " ++ s)
-         Just ver -> return ver
-instance FromJSONKey Version where
-  fromJSONKey = FromJSONKeyTextParser $ \k ->
-    either (fail . show) return $ parseVersion k
--}
-
 newtype IntersectingVersionRange =
     IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }
     deriving Show
