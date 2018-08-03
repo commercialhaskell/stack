@@ -24,7 +24,6 @@ import qualified Data.Traversable as T
 import           Distribution.Text (display)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
-import           Pantry
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -33,7 +32,8 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
-import           Stack.Prelude hiding (Display (..))
+import           Stack.Prelude hiding (Display (..), pkgName)
+import qualified Stack.Prelude (pkgName)
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -117,7 +117,7 @@ createDependencyGraph dotOpts = do
                                                    sourceMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
-  let globalDumpMap = Map.fromList $ map (\dp -> (pkgName (dpPackageIdent dp), dp)) globalDump
+  let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions

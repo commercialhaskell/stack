@@ -164,30 +164,37 @@ makeConcreteResolver
     :: HasConfig env
     => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
     -> AbstractResolver
+    -> Maybe WantedCompiler
     -> RIO env SnapshotLocation
-makeConcreteResolver root (ARResolver r) = liftIO $ resolveSnapshotLocation r root Nothing
-makeConcreteResolver root ar = do
+makeConcreteResolver root (ARResolver r) mcompiler = liftIO $ resolveSnapshotLocation r root mcompiler
+makeConcreteResolver root ar mcompiler = do
     snapshots <- getSnapshots
     r <-
         case ar of
-            ARResolver r -> assert False $ makeConcreteResolver root $ ARResolver r
+            ARResolver r -> assert False $ makeConcreteResolver root (ARResolver r) mcompiler
             ARGlobal -> do
+                -- FIXME use mcompiler
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
                 iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 ProjectAndConfigMonoid project _ <- liftIO iopc
-                return $ projectResolver project
-            ARLatestNightly -> return $ snd $ nightlySnapshotLocation $ snapshotsNightly snapshots
+                return $
+                  case (projectResolver project, mcompiler) of
+                    (res, Nothing) -> res
+                    (SLCompiler _, Just compiler) -> SLCompiler compiler -- kinda weird, maybe warn the user?
+                    (SLUrl url mblob _, Just compiler) -> SLUrl url mblob (Just compiler)
+                    (SLFilePath resolved _, Just compiler) -> SLFilePath resolved (Just compiler)
+            ARLatestNightly -> return $ snd $ nightlySnapshotLocation mcompiler $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ snd $ ltsSnapshotLocation x y
+                    Just y -> return $ snd $ ltsSnapshotLocation mcompiler x y
             ARLatestLTS
                 | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ snd $ ltsSnapshotLocation x y
+                     in return $ snd $ ltsSnapshotLocation mcompiler x y
     logInfo $ "Selected resolver: " <> display r
     return r
 
@@ -195,9 +202,9 @@ makeConcreteResolver root ar = do
 getLatestResolver :: HasConfig env => RIO env SnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
-    let mlts = uncurry ltsSnapshotLocation <$>
+    let mlts = uncurry (ltsSnapshotLocation Nothing) <$>
                listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
-    pure $ snd $ fromMaybe (nightlySnapshotLocation (snapshotsNightly snapshots)) mlts
+    pure $ snd $ fromMaybe (nightlySnapshotLocation Nothing (snapshotsNightly snapshots)) mlts
 
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
@@ -538,7 +545,7 @@ loadBuildConfig mproject maresolver mcompiler = do
           LCSNoConfig parentDir -> return parentDir
           LCSProject _ -> resolveDir' "."
           LCSNoProject -> resolveDir' "."
-      makeConcreteResolver (Just base) aresolver
+      makeConcreteResolver (Just base) aresolver mcompiler
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do

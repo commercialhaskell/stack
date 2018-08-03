@@ -42,5 +42,5 @@ listTargets =
                           toNameAndComponent
                           (Map.toList rawLocals))))
   where
-    toNameAndComponent (pkgName,view') =
-        map (pkgName, ) (Set.toList (lpvComponents view'))
+    toNameAndComponent (pkgName',view') =
+        map (pkgName', ) (Set.toList (lpvComponents view'))

@@ -378,8 +378,8 @@ selectBestSnapshot gpds snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
-    let resolverStackage (LTS x y) = ltsSnapshotLocation x y
-        resolverStackage (Nightly d) = nightlySnapshotLocation d
+    let resolverStackage (LTS x y) = ltsSnapshotLocation Nothing x y
+        resolverStackage (Nightly d) = nightlySnapshotLocation Nothing d
     F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . snd . resolverStackage) snaps)
     where
         go mold mnew = do

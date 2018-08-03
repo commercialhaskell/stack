@@ -665,7 +665,7 @@ uninstallCmd _ go = withConfigAndLock go $
 unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
 unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
 unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
-    mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
+    mSnapshotDef <- mapM (\ares -> makeConcreteResolver Nothing ares Nothing >>= loadResolver) (globalResolver go)
     dstPath' <- resolveDir' $ T.unpack dstPath
     unpackPackages mSnapshotDef dstPath' names
 

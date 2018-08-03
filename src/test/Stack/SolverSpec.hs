@@ -41,6 +41,6 @@ spec =
       [ ($(mkFlagName "aeson-compat"), False)
       ]
   where
-    successfulExample input pkgName pkgVersion flags =
+    successfulExample input pkgName' pkgVersion' flags =
       it ("parses " ++ unpack input) $
-        parseCabalOutputLine input `shouldBe` Right (pkgName, (pkgVersion, Map.fromList flags))
+        parseCabalOutputLine input `shouldBe` Right (pkgName', (pkgVersion', Map.fromList flags))

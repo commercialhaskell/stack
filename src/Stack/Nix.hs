@@ -25,7 +25,6 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Runner
-import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)

@@ -4,7 +4,7 @@
 {-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import           Data.Conduit
+import           Conduit
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map

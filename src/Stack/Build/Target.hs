@@ -74,7 +74,7 @@ import           Stack.Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
+import           Distribution.PackageDescription (GenericPackageDescription)
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
@@ -204,7 +204,7 @@ data ResolveResult = ResolveResult
   , rrRaw :: !RawInput
   , rrComponent :: !(Maybe NamedComponent)
   -- ^ Was a concrete component specified?
-  , rrAddedDep :: !(Maybe Version)
+  , rrAddedDep :: !(Maybe PackageLocation)
   -- ^ Only if we're adding this as a dependency
   , rrPackageType :: !PackageType
   }
@@ -328,13 +328,18 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrAddedDep = Nothing
               , rrPackageType = Dependency
               }
-            Just (PackageIdentifierRevision _name version cfi) -> Right ResolveResult
+            Just pir -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just version -- FIXME retain cabal hash info?
+              , rrAddedDep = Just $ PLHackage pir Nothing
               , rrPackageType = Dependency
               }
+
+    -- Note that we use CFILatest below, even though it's
+    -- non-reproducible, to avoid user confusion. In any event,
+    -- reproducible builds should be done by updating your config
+    -- files!
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
@@ -347,7 +352,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLRemote (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi) mtree)) -> Right ResolveResult
+            Just (PLRemote (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi) _mtree)) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -357,7 +362,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                         -- version we have
                         then Nothing
                         -- OK, we'll override it
-                        else Just version
+                        else Just $ PLHackage (PackageIdentifierRevision name version CFILatest) Nothing
                   , rrPackageType = Dependency
                   }
             -- The package was coming from something besides the
@@ -374,7 +379,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just version
+              , rrAddedDep = Just $ PLHackage (PackageIdentifierRevision name version CFILatest) Nothing
               , rrPackageType = Dependency
               }
 
@@ -384,7 +389,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           [ Map.mapWithKey
               (\name' lpi -> PLRemote $ PLHackage
                   (PackageIdentifierRevision name' (lpiVersion lpi) CFILatest)
-                  Nothing) -- FIXME better to use rev0 for reproducibility
+                  Nothing)
               globals
           , Map.map lpiLocation snap
           , Map.map snd deps
@@ -412,11 +417,8 @@ combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
         Nothing -> return Map.empty
-        Just version -> do
-          return $ Map.singleton (rrName result)
-                 $ PLHackage
-                     (PackageIdentifierRevision (rrName result) version CFILatest)
-                     Nothing
+        Just pl -> do
+          return $ Map.singleton (rrName result) pl
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -484,8 +486,6 @@ parseTargets needTargets boptscli = do
           ["The project contains no local packages (packages not marked with 'extra-dep')"]
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
-
-  root <- view projectRootL
 
   let dropMaybeKey (Nothing, _) = Map.empty
       dropMaybeKey (Just key, value) = Map.singleton key value

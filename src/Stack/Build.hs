@@ -218,8 +218,8 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     exesToBuild :: Map Text (NonEmpty PackageName)
     exesToBuild =
         collect
-            [ (exe,pkgName)
-            | (pkgName,task) <- Map.toList (planTasks plan)
+            [ (exe,pkgName')
+            | (pkgName',task) <- Map.toList (planTasks plan)
             , TTFilePath lp _ <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
@@ -276,7 +276,6 @@ loadPackage
 loadPackage loc flags ghcOptions = do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
-  root <- view projectRootL
   let pkgConfig = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False

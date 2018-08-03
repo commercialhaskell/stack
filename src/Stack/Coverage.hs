@@ -58,10 +58,10 @@ deleteHpcReports = do
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
 updateTixFile :: HasEnvConfig env => PackageName -> Path Abs File -> String -> RIO env ()
-updateTixFile pkgName tixSrc testName = do
+updateTixFile pkgName' tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
-        tixDest <- tixFilePath pkgName testName
+        tixDest <- tixFilePath pkgName' testName
         liftIO $ ignoringAbsence (removeFile tixDest)
         ensureDir (parent tixDest)
         -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
@@ -79,17 +79,17 @@ updateTixFile pkgName tixSrc testName = do
 
 -- | Get the directory used for hpc reports for the given pkgId.
 hpcPkgPath :: HasEnvConfig env => PackageName -> RIO env (Path Abs Dir)
-hpcPkgPath pkgName = do
+hpcPkgPath pkgName' = do
     outputDir <- hpcReportDir
-    pkgNameRel <- parseRelDir (displayC pkgName)
+    pkgNameRel <- parseRelDir (displayC pkgName')
     return (outputDir </> pkgNameRel)
 
 -- | Get the tix file location, given the name of the file (without extension), and the package
 -- identifier string.
 tixFilePath :: HasEnvConfig env
             => PackageName -> String -> RIO env (Path Abs File)
-tixFilePath pkgName testName = do
-    pkgPath <- hpcPkgPath pkgName
+tixFilePath pkgName' testName = do
+    pkgPath <- hpcPkgPath pkgName'
     tixRel <- parseRelFile (testName ++ "/" ++ testName ++ ".tix")
     return (pkgPath </> tixRel)
 
@@ -100,7 +100,7 @@ generateHpcReport pkgDir package tests = do
     compilerVersion <- view actualCompilerVersionL
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
-    let pkgName = displayC (packageName package)
+    let pkgName' = displayC (packageName package)
         pkgId = displayC (packageIdentifier package)
         ghcVersion = getGhcVersion compilerVersion
         hasLibrary =
@@ -127,7 +127,7 @@ generateHpcReport pkgDir package tests = do
                 Right includeNames -> return $ Right $ Just $ map T.unpack includeNames
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath (packageName package) (T.unpack testName)
-        let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
+        let report = "coverage report for " <> pkgName' <> "'s test-suite \"" <> testName <> "\""
             reportDir = parent tixSrc
         case eincludeName of
             Left err -> generateHpcErrorReport reportDir (RIO.display (sanitize (T.unpack err)))

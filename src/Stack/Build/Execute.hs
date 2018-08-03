@@ -983,7 +983,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             case taskType of
                 TTFilePath lp _ | lpWanted lp ->
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
-                TTRemote{} -> return ()
+                _ -> return ()
 
             withBinaryFile fp WriteMode $ \h -> inner $ OTLogFile logPath h
 
@@ -1451,7 +1451,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
                         -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
-                    TTRemote{} -> return Nothing
+                    _ -> return Nothing
                 -- NOTE: once
                 -- https://github.com/commercialhaskell/stack/issues/2649
                 -- is resolved, we will want to partition the warnings
@@ -2099,5 +2099,5 @@ addGlobalPackages deps globals0 =
     loop _ [] gids = gids
 
 ttPackageLocation :: TaskType -> Maybe PackageLocation
-ttPackageLocation (TTFilePath lp i) = Nothing
+ttPackageLocation TTFilePath{} = Nothing
 ttPackageLocation (TTRemote _ _ pkgloc) = Just pkgloc

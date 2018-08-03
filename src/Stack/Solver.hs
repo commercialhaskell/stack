@@ -350,8 +350,7 @@ mergeConstraints = Map.mergeWithKey
 -- dependencies.
 solveResolverSpec
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs File  -- ^ stack.yaml file location
-    -> [Path Abs Dir] -- ^ package dirs containing cabal files
+    => [Path Abs Dir] -- ^ package dirs containing cabal files
     -> ( SnapshotDef
        , ConstraintSpec
        , ConstraintSpec) -- ^ ( resolver
@@ -362,12 +361,12 @@ solveResolverSpec
        -- ^ (Conflicting packages
        --    (resulting src package specs, external dependency specs))
 
-solveResolverSpec stackYaml cabalDirs
+solveResolverSpec cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
   logInfo $ "Using resolver: " <> RIO.display (sdResolverName sd)
   let wantedCompilerVersion = sdWantedCompilerVersion sd
   setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
-    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) stackYaml sd
+    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -469,12 +468,11 @@ solveResolverSpec stackYaml cabalDirs
 getResolverConstraints
     :: (HasConfig env, HasGHCVariant env)
     => Maybe ActualCompiler -- ^ actually installed compiler
-    -> Path Abs File
     -> SnapshotDef
     -> RIO env
          (ActualCompiler,
           Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints mcompilerVersion stackYaml sd = do
+getResolverConstraints mcompilerVersion sd = do
     ls <- loadSnapshot mcompilerVersion sd
     return (lsCompilerVersion ls, lsConstraints ls)
   where
@@ -646,14 +644,13 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkSnapBuildPlanActual (parent stackYaml) gpds (Just oldSrcFlags) sd
+    resolverResult <- checkSnapBuildPlanActual gpds (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
         BuildPlanCheckPartial {} ->
             either (const Nothing) Just <$>
-            solveResolverSpec stackYaml cabalDirs
-                              (sd, srcConstraints, extraConstraints)
+            solveResolverSpec cabalDirs (sd, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
         BuildPlanCheckFail {} ->
@@ -769,19 +766,18 @@ solveExtraDeps modStackYaml = do
 -- not force the installation of a bunch of GHC versions.
 checkSnapBuildPlanActual
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ project root, used for checking out necessary files
-    -> [C.GenericPackageDescription]
+    => [C.GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
     -> RIO env BuildPlanCheck
-checkSnapBuildPlanActual root gpds flags sd = do
+checkSnapBuildPlanActual gpds flags sd = do
     let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
         runner =
           if Map.null $ sdGlobalHints sd
             then forNonSnapshot
             else ($ Nothing)
 
-    runner $ checkSnapBuildPlan root gpds flags sd
+    runner $ checkSnapBuildPlan gpds flags sd
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

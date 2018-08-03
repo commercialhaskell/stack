@@ -81,7 +81,7 @@ cfgCmdSetValue
     => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
-    concreteResolver <- makeConcreteResolver (Just root) newResolver
+    concreteResolver <- makeConcreteResolver (Just root) newResolver Nothing
     -- Check that the snapshot actually exists
     void $ loadResolver concreteResolver
     return (Yaml.toJSON $ unresolveSnapshotLocation concreteResolver)

@@ -12,7 +12,6 @@ import Stack.Config.Nix
 import Stack.Constants
 import Stack.Options.NixParser
 import Stack.Prelude
-import Stack.Types.Compiler
 import Stack.Types.Config
 import Stack.Types.Nix
 import Stack.Types.Runner
@@ -101,5 +100,5 @@ spec = beforeAll setup $ do
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \lc -> do
         nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
         v <- parseVersionThrowing "7.10.3"
-        ghc <- either throwIO return $ nixCompiler (GhcVersion v)
+        ghc <- either throwIO return $ nixCompiler (WCGhc v)
         ghc `shouldBe` "haskell.compiler.ghc7103"

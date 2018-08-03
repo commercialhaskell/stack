@@ -13,8 +13,6 @@ module Stack.Upgrade
     ) where
 
 import           Stack.Prelude               hiding (force, Display (..))
-import qualified Data.List
-import qualified Data.Map                    as Map
 import qualified Data.Text as T
 import           Distribution.Version        (mkVersion')
 import           Lens.Micro                  (set)
@@ -29,8 +27,6 @@ import           Stack.DefaultColorWhen (defaultColorWhen)
 #endif
 import           Stack.PrettyPrint
 import           Stack.Setup
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Exit                 (ExitCode (ExitSuccess))

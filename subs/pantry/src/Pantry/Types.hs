@@ -1051,11 +1051,11 @@ parseSnapshotLocation t0 = fromMaybe parsePath $
       Right (x, t2) <- Just $ decimal t1
       t3 <- T.stripPrefix "." t2
       Right (y, "") <- Just $ decimal t3
-      Just $ fst $ ltsSnapshotLocation x y
+      Just $ fst $ ltsSnapshotLocation Nothing x y
     parseNightly = do
       t1 <- T.stripPrefix "nightly-" t0
       date <- readMaybe (T.unpack t1)
-      Just $ fst $ nightlySnapshotLocation date
+      Just $ fst $ nightlySnapshotLocation Nothing date
 
     parseGithub = do
       t1 <- T.stripPrefix "github:" t0
@@ -1063,14 +1063,14 @@ parseSnapshotLocation t0 = fromMaybe parsePath $
       t3 <- T.stripPrefix "/" t2
       let (repo, t4) = T.break (== ':') t3
       path <- T.stripPrefix ":" t4
-      Just $ fst $ githubSnapshotLocation user repo path
+      Just $ fst $ githubSnapshotLocation Nothing user repo path
 
     parseUrl = parseRequest (T.unpack t0) $> USLUrl t0 Nothing
 
     parsePath = USLFilePath $ RelFilePath t0
 
-githubSnapshotLocation :: Text -> Text -> Text -> (UnresolvedSnapshotLocation, SnapshotLocation)
-githubSnapshotLocation user repo path =
+githubSnapshotLocation :: Maybe WantedCompiler -> Text -> Text -> Text -> (UnresolvedSnapshotLocation, SnapshotLocation)
+githubSnapshotLocation mcompiler user repo path =
   let url = T.concat
         [ "https://raw.githubusercontent.com/"
         , user
@@ -1079,7 +1079,7 @@ githubSnapshotLocation user repo path =
         , "/master/"
         , path
         ]
-   in (USLUrl url Nothing, SLUrl url Nothing Nothing)
+   in (USLUrl url Nothing, SLUrl url Nothing mcompiler)
 
 defUser :: Text
 defUser = "commercialhaskell"
@@ -1087,15 +1087,15 @@ defUser = "commercialhaskell"
 defRepo :: Text
 defRepo = "stackage-snapshots"
 
-ltsSnapshotLocation :: Int -> Int -> (UnresolvedSnapshotLocation, SnapshotLocation)
-ltsSnapshotLocation x y =
-  githubSnapshotLocation defUser defRepo $
+ltsSnapshotLocation :: Maybe WantedCompiler -> Int -> Int -> (UnresolvedSnapshotLocation, SnapshotLocation)
+ltsSnapshotLocation mcompiler x y =
+  githubSnapshotLocation mcompiler defUser defRepo $
   utf8BuilderToText $
   "lts/" <> display x <> "/" <> display y <> ".yaml"
 
-nightlySnapshotLocation :: Day -> (UnresolvedSnapshotLocation, SnapshotLocation)
-nightlySnapshotLocation date =
-  githubSnapshotLocation defUser defRepo $
+nightlySnapshotLocation :: Maybe WantedCompiler -> Day -> (UnresolvedSnapshotLocation, SnapshotLocation)
+nightlySnapshotLocation mcompiler date =
+  githubSnapshotLocation mcompiler defUser defRepo $
   utf8BuilderToText $
   "nightly/" <> display year <> "/" <> display month <> "/" <> display day <> ".yaml"
   where

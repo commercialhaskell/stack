@@ -7,7 +7,6 @@ import qualified Data.Text           as T
 import           Stack.Build.Target
 import           Stack.Prelude
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Test.Hspec
