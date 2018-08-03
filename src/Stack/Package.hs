@@ -1482,7 +1482,7 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
+                r <- liftIO $ Hpack.hpackResult $ Hpack.setProgramName "stack" $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
                 forM_ (Hpack.resultWarnings r) prettyWarnS
                 let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
                 case Hpack.resultStatus r of
