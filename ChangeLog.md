@@ -1,9 +1,11 @@
 # Changelog
 
 
-## Unreleased changes
+## v1.9.0 (release candidate)
 
 Release notes:
+
+* We will be deleting the Ubuntu, Debian, CentOS, Fedora, and Arch package repos from `download.fpcomplete.com` soon.  These have been deprecated for over a year and have not received new releases, but were left in place for compatibility with older scripts.
 
 Major changes:
 
