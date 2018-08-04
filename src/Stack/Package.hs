@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -1483,13 +1482,7 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-#if MIN_VERSION_hpack(0,26,0)
-                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
-#elif MIN_VERSION_hpack(0,23,0)
-                r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
-#else
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
-#endif
+                r <- liftIO $ Hpack.hpackResult $ Hpack.setProgramName "stack" $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
                 forM_ (Hpack.resultWarnings r) prettyWarnS
                 let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
                 case Hpack.resultStatus r of
