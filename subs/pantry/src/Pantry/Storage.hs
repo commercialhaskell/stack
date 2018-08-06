@@ -66,6 +66,7 @@ import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
+import Data.Pool (destroyAllResources)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -142,10 +143,13 @@ initStorage
   -> RIO env a
 initStorage fp inner = do
   ensureDir $ parent fp
-  pool <- createSqlitePool (fromString $ toFilePath fp) 1
-  migrates <- runSqlPool (runMigrationSilent migrateAll) pool
-  forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
-  inner (Storage pool)
+  bracket
+    (createSqlitePool (fromString $ toFilePath fp) 1)
+    (liftIO . destroyAllResources) $ \pool -> do
+
+    migrates <- runSqlPool (runMigrationSilent migrateAll) pool
+    forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
+    inner (Storage pool)
 
 withStorage
   :: (HasPantryConfig env, HasLogFunc env)
