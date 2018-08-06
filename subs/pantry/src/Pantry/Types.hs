@@ -569,7 +569,7 @@ newtype Tree
   = TreeMap (Map SafeFilePath TreeEntry)
   -- FIXME in the future, consider allowing more lax parsing
   -- See: https://www.fpcomplete.com/blog/2018/07/pantry-part-2-trees-keys
-  -- | TreeTarball !PackageTarball
+  -- TreeTarball !PackageTarball
   deriving Show
 
 renderTree :: Tree -> ByteString
