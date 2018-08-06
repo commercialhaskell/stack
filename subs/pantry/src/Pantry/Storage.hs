@@ -64,7 +64,8 @@ import RIO.Orphans ()
 import Pantry.StaticSHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
-import Path (Path, Abs, File, toFilePath)
+import Path (Path, Abs, File, toFilePath, parent)
+import Path.IO (ensureDir)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -138,8 +139,9 @@ initStorage
   :: HasLogFunc env
   => Path Abs File -- ^ storage file
   -> (Storage -> RIO env a)
-  -> RIO env  a
+  -> RIO env a
 initStorage fp inner = do
+  ensureDir $ parent fp
   pool <- createSqlitePool (fromString $ toFilePath fp) 1
   migrates <- runSqlPool (runMigrationSilent migrateAll) pool
   forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
