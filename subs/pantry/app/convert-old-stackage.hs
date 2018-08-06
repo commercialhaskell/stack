@@ -11,6 +11,7 @@ import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended
 import qualified RIO.Text as T
 import Data.Text.Read (decimal)
+import Path (parseAbsDir)
 
 data SnapName
     = LTS !Int !Int
@@ -46,15 +47,35 @@ snapshots = do
       Just (snap, fp)
 
 data App = App
+  { appSimpleApp :: !SimpleApp
+  , appPantryConfig :: !PantryConfig
+  }
+
+simpleAppL :: Lens' App SimpleApp
+simpleAppL = lens appSimpleApp (\x y -> x { appSimpleApp = y })
 
 instance HasLogFunc App where
-  logFuncL = undefined
+  logFuncL = simpleAppL.logFuncL
 instance HasPantryConfig App where
-  pantryConfigL = undefined
+  pantryConfigL = lens appPantryConfig (\x y -> x { appPantryConfig = y })
 
 run :: RIO App a -> IO a
-run f = do
-  runRIO App f
+run f = runSimpleApp $ do
+  sa <- ask
+  stack <- getAppUserDataDirectory "stack"
+  root <- parseAbsDir $ stack </> "pantry"
+  withPantryConfig
+    root
+    defaultHackageSecurityConfig
+    HpackBundled
+    8
+    $ \pc ->
+      runRIO
+        App
+          { appSimpleApp = sa
+          , appPantryConfig = pc
+          }
+        f
 
 main :: IO ()
 main = run $ do
