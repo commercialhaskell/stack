@@ -1,17 +1,39 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-import Stack.Prelude
-import Stack.Types.Resolver
-import Stack.Types.Runner
-import Stack.Runners
-import Stack.Options.GlobalParser
+import RIO
+import Pantry
 import Conduit
 import Pantry.OldStackage
 import RIO.FilePath
-import RIO.Time (toGregorian)
+import RIO.Time (Day, toGregorian)
 import RIO.Directory
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended
+import qualified RIO.Text as T
+import Data.Text.Read (decimal)
+
+data SnapName
+    = LTS !Int !Int
+    | Nightly !Day
+    deriving (Show, Eq)
+
+renderSnapName :: SnapName -> Text
+renderSnapName (LTS x y) = T.pack $ concat ["lts-", show x, ".", show y]
+renderSnapName (Nightly d) = T.pack $ "nightly-" ++ show d
+
+parseSnapName :: Text -> Maybe SnapName
+parseSnapName t0 =
+    lts <|> nightly
+  where
+    lts = do
+        t1 <- T.stripPrefix "lts-" t0
+        Right (x, t2) <- Just $ decimal t1
+        t3 <- T.stripPrefix "." t2
+        Right (y, "") <- Just $ decimal t3
+        return $ LTS x y
+    nightly = do
+        t1 <- T.stripPrefix "nightly-" t0
+        Nightly <$> readMaybe (T.unpack t1)
 
 snapshots :: MonadResource m => ConduitT i (SnapName, FilePath) m ()
 snapshots = do
@@ -23,8 +45,19 @@ snapshots = do
       snap <- parseSnapName $ fromString name
       Just (snap, fp)
 
+data App = App
+
+instance HasLogFunc App where
+  logFuncL = undefined
+instance HasPantryConfig App where
+  pantryConfigL = undefined
+
+run :: RIO App a -> IO a
+run f = do
+  runRIO App f
+
 main :: IO ()
-main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
+main = run $ do
   _ <- updateHackageIndex Nothing
   runConduitRes $ snapshots .| mapM_C (lift . go)
   where
@@ -45,14 +78,18 @@ main = withConfigAndLock (globalOptsFromMonoid True ColorAuto mempty) $ do
                (renderSnapName snap)
                fp
       logInfo "Decoding suceeded"
-      sd1 <- completeSnapshot Nothing sdOrig
+      sd1 <- completeSnapshot sdOrig
       logInfo "Completing suceeded"
       let bs = Yaml.encode sd1
+      {- FIXME
       writeFileBinary "tmp" bs
-      WithJSONWarnings sd2 warnings <- Yaml.decodeThrow bs
+      sd2 <- loadPantry
+      WithJSONWarnings iosd2 warnings <- Yaml.decodeThrow bs
+      sd2 <- liftIO iosd2
       unless (null warnings) $ error $ unlines $ map show warnings
       logInfo "Decoding new ByteString succeeded"
       when (sd1 /= sd2) $ error $ "mismatch on " ++ show snap
+      -}
       createDirectoryIfMissing True (takeDirectory destFile)
       withSinkFileCautious destFile $ \sink -> runConduit $ yield bs .| sink
 
