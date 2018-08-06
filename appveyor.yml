@@ -15,6 +15,7 @@ clone_folder: "c:\\stack"
 environment:
   global:
     STACK_ROOT: "c:\\sr"
+    TMP: "c:\\tmp"
 
 test_script:
 - stack setup > nul
