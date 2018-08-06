@@ -37,10 +37,10 @@ data WhichCompiler
 -- Note that despite having this datatype, stack isn't in a hurry to
 -- support compilers other than GHC.
 data ActualCompiler
-    = ACGhc {-# UNPACK #-} !Version
+    = ACGhc !Version
     | ACGhcjs
-        {-# UNPACK #-} !Version -- GHCJS version
-        {-# UNPACK #-} !Version -- GHC version
+        !Version -- GHCJS version
+        !Version -- GHC version
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store ActualCompiler
 instance NFData ActualCompiler
