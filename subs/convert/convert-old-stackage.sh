@@ -9,6 +9,8 @@ do
     if [[ ! -d "$d" ]]
     then
         git clone https://github.com/commercialhaskell/$d
+    else
+        (cd "$d" && git pull || echo "Git pull failed, ignoring")
     fi
 done
 
