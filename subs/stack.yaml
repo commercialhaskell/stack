@@ -1,0 +1,4 @@
+resolver: lts-12.0
+packages:
+- pantry
+- curator
