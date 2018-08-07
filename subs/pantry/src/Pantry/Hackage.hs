@@ -393,7 +393,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
       PackageMetadata
         { pmName = Just name
         , pmVersion = Just ver
-        , pmTree = mtreeKey -- can probably leave this off, we do the testing here
+        , pmTree = Nothing -- with a revision cabal file will differ giving a different tree
         , pmCabal = Nothing -- cabal file in the tarball may be different!
         , pmSubdir = T.empty -- no subdirs on Hackage
         }
