@@ -580,7 +580,7 @@ renderTree = BL.toStrict . toLazyByteString . go
 
     goEntry sfp (TreeEntry (BlobKey sha (FileSize size')) ft) =
       netstring (unSafeFilePath sfp) <>
-      netstring (staticSHA256ToText sha) <>
+      byteString (staticSHA256ToRaw sha) <>
       netword size' <>
       (case ft of
          FTNormal -> "N"
