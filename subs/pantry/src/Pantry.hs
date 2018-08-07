@@ -36,13 +36,13 @@ module Pantry
   , BlobKey (..)
   , HpackExecutable (..)
 
-    -- ** Raw package locations
-  , RawPackageLocation
-  , RawPackageLocationOrPath (..)
-  , unRawPackageLocation
-  , unRawPackageLocationOrPath
-  , mkRawPackageLocation
-  , mkRawPackageLocationOrPath
+    -- ** Unresolved package locations
+  , UnresolvedPackageLocation
+  , UnresolvedPackageLocationOrPath (..)
+  , resolvePackageLocation
+  , resolvePackageLocationOrPath
+  , mkUnresolvedPackageLocation
+  , mkUnresolvedPackageLocationOrPath
   , completePackageLocation
 
     -- ** Snapshots
@@ -552,20 +552,20 @@ loadPackageLocation (PLHackage pir mtree) = getHackageTarball pir mtree
 loadPackageLocation (PLArchive archive pm) = getArchive archive pm
 loadPackageLocation (PLRepo repo pm) = getRepo repo pm
 
--- | Convert a 'PackageLocationOrPath' into a 'RawPackageLocationOrPath'.
-mkRawPackageLocationOrPath :: PackageLocationOrPath -> RawPackageLocationOrPath
-mkRawPackageLocationOrPath (PLRemote loc) = RPLRemote (mkRawPackageLocation loc)
-mkRawPackageLocationOrPath (PLFilePath fp) = RPLFilePath $ resolvedRelative fp
+-- | Convert a 'PackageLocationOrPath' into a 'UnresolvedPackageLocationOrPath'.
+mkUnresolvedPackageLocationOrPath :: PackageLocationOrPath -> UnresolvedPackageLocationOrPath
+mkUnresolvedPackageLocationOrPath (PLRemote loc) = UPLRemote (mkUnresolvedPackageLocation loc)
+mkUnresolvedPackageLocationOrPath (PLFilePath fp) = UPLFilePath $ resolvedRelative fp
 
--- | Convert a 'RawPackageLocationOrPath' into a list of 'PackageLocationOrPath's.
-unRawPackageLocationOrPath
+-- | Convert an 'UnresolvedPackageLocationOrPath' into a list of 'PackageLocationOrPath's.
+resolvePackageLocationOrPath
   :: MonadIO m
   => Path Abs Dir -- ^ directory containing configuration file, to be used for resolving relative file paths
-  -> RawPackageLocationOrPath
+  -> UnresolvedPackageLocationOrPath
   -> m [PackageLocationOrPath]
-unRawPackageLocationOrPath dir (RPLRemote rpl) =
-  map PLRemote <$> unRawPackageLocation (Just dir) rpl
-unRawPackageLocationOrPath dir (RPLFilePath rel@(RelFilePath fp)) = do
+resolvePackageLocationOrPath dir (UPLRemote rpl) =
+  map PLRemote <$> resolvePackageLocation (Just dir) rpl
+resolvePackageLocationOrPath dir (UPLFilePath rel@(RelFilePath fp)) = do
   absolute <- resolveDir dir $ T.unpack fp
   pure [PLFilePath $ ResolvedPath rel absolute]
 

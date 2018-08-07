@@ -613,7 +613,7 @@ instance ToJSON Project where
       [ maybe [] (\cv -> ["compiler" .= cv]) compiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= map mkRawPackageLocationOrPath extraDeps]
+      , if null extraDeps then [] else ["extra-deps" .= map mkUnresolvedPackageLocationOrPath extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
       , ["resolver" .= usl]
@@ -1432,7 +1432,7 @@ parseProjectAndConfigMonoid rootDir =
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         return $ do
-          deps' <- mapM (unRawPackageLocationOrPath rootDir) deps
+          deps' <- mapM (resolvePackageLocationOrPath rootDir) deps
           resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
           let project = Project
                   { projectUserMsg = msg
