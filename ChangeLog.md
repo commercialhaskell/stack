@@ -15,6 +15,22 @@ Major changes:
       must be specified in `extra-deps`.
     * The `extra-dep` key in `packages` is no longer supported; please
       move any such specifications to `extra-deps`.
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+## v1.9.0 (release candidate)
+
+Release notes:
+
+* We will be deleting the Ubuntu, Debian, CentOS, Fedora, and Arch package repos from `download.fpcomplete.com` soon.  These have been deprecated for over a year and have not received new releases, but were left in place for compatibility with older scripts.
+
+Major changes:
+
 * `GHCJS` support is being downgraded to 'experimental'. At time of writing the upcoming release is 1.8. A warning notifying the user of the experimental status of `GHCJS` will be incorporated into 1.8.
 
 Behavior changes:
@@ -96,6 +112,8 @@ Other enhancements:
 * It is possible to specify the Hackage base URL to upload packages to, instead
   of the default of `https://hackage.haskell.org/`, by using `hackage-base-url`
   configuration option.
+* When using Nix, if a specific minor version of GHC is not requested, the
+  latest minor version in the given major branch will be used automatically.
 
 Bug fixes:
 

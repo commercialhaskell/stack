@@ -1,5 +1,5 @@
 name: stack
-version: '1.8.0'
+version: '1.10.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -61,7 +61,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hpack >= 0.29
+- hpack >= 0.29.6
 - hpc
 - http-client
 - http-client-tls

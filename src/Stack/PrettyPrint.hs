@@ -151,31 +151,33 @@ debugBracket msg f = do
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x
 
+--   The following syles do not affect the colour of the background.
+
 -- | Style an 'AnsiDoc' as an error. Should be used sparingly, not to style
 --   entire long messages. For example, it's used to style the "Error:"
 --   label for an error message, not the entire message.
 styleError :: AnsiDoc -> AnsiDoc
-styleError = dullred . ondullblack
+styleError = dullred
 
 -- | Style an 'AnsiDoc' as a warning. Should be used sparingly, not to style
 --   entire long messages. For example, it's used to style the "Warning:"
 --   label for an error message, not the entire message.
 styleWarning :: AnsiDoc -> AnsiDoc
-styleWarning = yellow . ondullblack
+styleWarning = dullyellow
 
 -- | Style an 'AnsiDoc' in a way to emphasize that it is a particularly good
 --   thing.
 styleGood :: AnsiDoc -> AnsiDoc
-styleGood = green . ondullblack
+styleGood = green
 
 -- | Style an 'AnsiDoc' as a shell command, i.e. when suggesting something
 --   to the user that should be typed in directly as written.
 styleShell :: AnsiDoc -> AnsiDoc
-styleShell = magenta . ondullblack
+styleShell = magenta
 
 -- | Style an 'AnsiDoc' as a filename. See 'styleDir' for directories.
 styleFile :: AnsiDoc -> AnsiDoc
-styleFile = bold . white . ondullblack
+styleFile = dullcyan
 
 -- | Style an 'AsciDoc' as a URL.  For now using the same style as files.
 styleUrl :: AnsiDoc -> AnsiDoc
@@ -183,25 +185,25 @@ styleUrl = styleFile
 
 -- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
 styleDir :: AnsiDoc -> AnsiDoc
-styleDir = bold . blue . ondullblack
+styleDir = bold . blue
 
 -- | Style used to highlight part of a recommended course of action.
 styleRecommendation :: AnsiDoc -> AnsiDoc
-styleRecommendation = bold . green . ondullblack
+styleRecommendation = bold . green
 
 -- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
 --   a current thing. For example, could be used when talking about the
 --   current package we're processing when outputting the name of it.
 styleCurrent :: AnsiDoc -> AnsiDoc
-styleCurrent = yellow . ondullblack
+styleCurrent = dullyellow
 
 -- TODO: figure out how to describe this
 styleTarget :: AnsiDoc -> AnsiDoc
-styleTarget = cyan . ondullblack
+styleTarget = cyan
 
 -- | Style an 'AnsiDoc' as a module name
 styleModule :: AnsiDoc -> AnsiDoc
-styleModule = magenta . ondullblack -- TODO: what color should this be?
+styleModule = magenta -- TODO: what color should this be?
 
 instance Display (Path b File) where
     display = styleFile . fromString . toFilePath

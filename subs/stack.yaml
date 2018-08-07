@@ -2,3 +2,6 @@ resolver: lts-12.0
 packages:
 - pantry
 - curator
+extra-deps:
+- infer-license-0.2.0@rev:0
+- hpack-0.29.6@rev:0

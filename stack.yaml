@@ -18,7 +18,7 @@ flags:
     supported-build: true
 extra-deps:
 - infer-license-0.2.0@rev:0
-- hpack-0.29.5@rev:0
+- hpack-0.29.6@rev:0
 - githash-0.1.0.1@rev:0
 
 ghc-options:
