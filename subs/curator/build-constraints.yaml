@@ -3648,7 +3648,6 @@ packages:
         - temporary
         - attoparsec
         - cereal
-        - iobaseNewick
         - ChasingBottoms
         - Decimal
         - Diff
@@ -4019,6 +4018,26 @@ packages:
         - simple-sendfile
         - control-monad-free
         - prelude-extras
+        - DRBG
+        - concurrent-extra
+        - crypto-api-tests
+        - crypto-cipher-tests
+        - easytest
+        - generic-arbitrary
+        - hspec-attoparsec
+        - hspec-contrib
+        - hspec-meta
+        - knob
+        - microspec
+        - nanospec
+        - numhask-test
+        - pretty-hex
+        - raw-strings-qq
+        - simple-reflect
+        - string-qq
+        - temporary-rc
+        - test-framework-smallcheck
+        - microspec
 
 # end of packages
 
