@@ -204,7 +204,7 @@ data ResolveResult = ResolveResult
   , rrRaw :: !RawInput
   , rrComponent :: !(Maybe NamedComponent)
   -- ^ Was a concrete component specified?
-  , rrAddedDep :: !(Maybe PackageLocation)
+  , rrAddedDep :: !(Maybe PackageLocationImmutable)
   -- ^ Only if we're adding this as a dependency
   , rrPackageType :: !PackageType
   }
@@ -214,8 +214,8 @@ data ResolveResult = ResolveResult
 resolveRawTarget
   :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-  -> Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- ^ snapshot
-  -> Map PackageName (GenericPackageDescription, PackageLocationOrPath) -- ^ local deps
+  -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
+  -> Map PackageName (GenericPackageDescription, PackageLocation) -- ^ local deps
   -> Map PackageName LocalPackageView -- ^ project packages
   -> (RawInput, RawTarget)
   -> RIO env (Either Text ResolveResult)
@@ -332,7 +332,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just $ PLHackage pir Nothing
+              , rrAddedDep = Just $ PLIHackage pir Nothing
               , rrPackageType = Dependency
               }
 
@@ -352,7 +352,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLRemote (PLHackage (PackageIdentifierRevision _name versionLoc _mcfi) _mtree)) -> Right ResolveResult
+            Just (PLImmutable (PLIHackage (PackageIdentifierRevision _name versionLoc _mcfi) _mtree)) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -362,7 +362,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                         -- version we have
                         then Nothing
                         -- OK, we'll override it
-                        else Just $ PLHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                        else Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
                   , rrPackageType = Dependency
                   }
             -- The package was coming from something besides the
@@ -379,15 +379,15 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just $ PLHackage (PackageIdentifierRevision name version CFILatest) Nothing
+              , rrAddedDep = Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
               , rrPackageType = Dependency
               }
 
       where
-        allLocs :: Map PackageName PackageLocationOrPath
+        allLocs :: Map PackageName PackageLocation
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> PLRemote $ PLHackage
+              (\name' lpi -> PLImmutable $ PLIHackage
                   (PackageIdentifierRevision name' (lpiVersion lpi) CFILatest)
                   Nothing)
               globals
@@ -412,7 +412,7 @@ data PackageType = ProjectPackage | Dependency
 combineResolveResults
   :: forall env. HasLogFunc env
   => [ResolveResult]
-  -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocation)
+  -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocationImmutable)
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
@@ -449,7 +449,7 @@ parseTargets
     -> BuildOptsCLI
     -> RIO env
          ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
-         , Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- all local deps
+         , Map PackageName (LoadedPackageInfo PackageLocation) -- all local deps
          , Map PackageName Target
          )
 parseTargets needTargets boptscli = do
@@ -505,17 +505,17 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseCabalFileRemote loc
-      return (name, (gpd, PLRemote loc, Nothing))
+      gpd <- parseCabalFileImmutable loc
+      return (name, (gpd, PLImmutable loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
     -- command line
-    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocationOrPath, Maybe LocalPackageView)
+    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe LocalPackageView)
         allLocals = Map.unions
           [ -- project packages
             Map.map
-              (\lpv -> (lpvGPD lpv, PLFilePath $ lpvResolvedDir lpv, Just lpv))
+              (\lpv -> (lpvGPD lpv, PLMutable $ lpvResolvedDir lpv, Just lpv))
               (lpProject lp)
           , -- added deps take precendence over local deps
             addedDeps'

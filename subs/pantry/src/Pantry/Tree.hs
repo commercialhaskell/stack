@@ -51,7 +51,7 @@ unpackTree (toFilePath -> dir) (TreeMap m) = do
 
 findCabalFile
   :: MonadThrow m
-  => PackageLocation -- ^ for exceptions
+  => PackageLocationImmutable -- ^ for exceptions
   -> Tree
   -> m (SafeFilePath, TreeEntry)
 findCabalFile loc (TreeMap m) = do
@@ -67,7 +67,7 @@ findCabalFile loc (TreeMap m) = do
 -- necessary.
 rawParseGPD
   :: MonadThrow m
-  => Either PackageLocation (Path Abs File)
+  => Either PackageLocationImmutable (Path Abs File)
   -> ByteString
   -> m ([PWarning], GenericPackageDescription)
 rawParseGPD loc bs =
@@ -80,7 +80,7 @@ rawParseGPD loc bs =
 -- | Returns the cabal blob key
 loadPackageIdentFromTree
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> Tree
   -> RIO env (BlobKey, PackageIdentifier)
 loadPackageIdentFromTree pl tree = do -- FIXME store this in a table to avoid the slow Cabal file parser
@@ -99,7 +99,7 @@ loadPackageIdentFromTree pl tree = do -- FIXME store this in a table to avoid th
 -- ensure name, version, etc are correct
 checkPackageMetadata
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> PackageMetadata
   -> RIO env (TreeKey, Tree)
   -> RIO env (TreeKey, Tree)
@@ -117,7 +117,7 @@ checkPackageMetadata pl pm inner = do
 
 checkTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> Maybe TreeKey
   -> RIO env (TreeKey, Tree)
   -> RIO env (TreeKey, Tree)

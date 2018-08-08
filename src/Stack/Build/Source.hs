@@ -88,10 +88,10 @@ loadSourceMapFull needTargets boptsCli = do
           let configOpts = getGhcOptions bconfig boptsCli n False False
           case lpiLocation lpi of
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
-            PLRemote pkgloc -> do
+            PLImmutable pkgloc -> do
               ident <- getPackageLocationIdent pkgloc
               return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
-            PLFilePath dir -> do
+            PLMutable dir -> do
               lpv <- parseSingleCabalFile True dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFilePath lp' loc
@@ -315,7 +315,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- ^ local deps
+               -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ local deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do

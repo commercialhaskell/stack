@@ -200,7 +200,7 @@ createDepLoader :: Applicative m
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> PackageLocation ->
+                -> (PackageName -> Version -> PackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)

@@ -54,7 +54,7 @@ getArchive
   -> PackageMetadata
   -> RIO env (TreeKey, Tree)
 getArchive archive pm =
-  checkPackageMetadata (PLArchive archive pm) pm $
+  checkPackageMetadata (PLIArchive archive pm) pm $
   withCache $
   withArchiveLoc archive $ \fp sha size -> do
     (tid, key, tree) <- parseArchive loc fp subdir

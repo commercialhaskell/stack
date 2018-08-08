@@ -125,7 +125,7 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
 data Ctx = Ctx
     { ls             :: !LoadedSnapshot
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocation -> Map FlagName Bool -> [Text] -> M Package)
+    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -172,7 +172,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageLocation -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
+              -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -227,7 +227,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
   where
     hasBaseInDeps bconfig =
         $(mkPackageName "base") `elem`
-        [n | (PLRemote (PLHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
+        [n | (PLImmutable (PLIHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx
         { ls = ls0
@@ -403,7 +403,7 @@ addDep treatAsDep' name = do
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
                               (PackageIdentifier name (installedVersion installed))
-                              (PLHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
+                              (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
@@ -426,7 +426,7 @@ tellExecutables (PSFilePath lp _)
 tellExecutables (PSRemote loc flags _ghcOptions pkgloc ident) =
     tellExecutablesUpstream ident pkgloc loc flags
 
-tellExecutablesUpstream :: PackageIdentifier -> PackageLocation -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream :: PackageIdentifier -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream (PackageIdentifier name _) pkgloc loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do

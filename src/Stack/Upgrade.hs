@@ -231,7 +231,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ displayC version
                 let dir = tmp </> suffix
-                unpackPackageLocation dir $ PLHackage pir Nothing
+                unpackPackageLocation dir $ PLIHackage pir Nothing
                 pure $ Just dir
 
     forM_ mdir $ \dir ->

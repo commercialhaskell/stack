@@ -2098,6 +2098,6 @@ addGlobalPackages deps globals0 =
     -- and return our results
     loop _ [] gids = gids
 
-ttPackageLocation :: TaskType -> Maybe PackageLocation
+ttPackageLocation :: TaskType -> Maybe PackageLocationImmutable
 ttPackageLocation TTFilePath{} = Nothing
 ttPackageLocation (TTRemote _ _ pkgloc) = Just pkgloc
