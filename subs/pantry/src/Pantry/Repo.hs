@@ -32,7 +32,7 @@ getRepo
   -> PackageMetadata
   -> RIO env (TreeKey, Tree)
 getRepo repo pm =
-  checkPackageMetadata (PLRepo repo pm) pm $
+  checkPackageMetadata (PLIRepo repo pm) pm $
   undefined
 
     {-

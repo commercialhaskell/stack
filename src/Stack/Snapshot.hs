@@ -51,8 +51,8 @@ import           Stack.Types.Compiler
 import           Stack.Types.Resolver
 
 data SnapshotException
-  = InvalidCabalFileInSnapshot !PackageLocationOrPath !PError
-  | PackageDefinedTwice !PackageName !PackageLocationOrPath !PackageLocationOrPath
+  = InvalidCabalFileInSnapshot !PackageLocation !PError
+  | PackageDefinedTwice !PackageName !PackageLocation !PackageLocation
   | UnmetDeps !(Map PackageName (Map PackageName (VersionIntervals, Maybe Version)))
   | FilepathInCustomSnapshot !Text
   | NeedResolverOrCompiler !Text
@@ -188,7 +188,7 @@ loadSnapshot mcompiler =
 
     inner2 snap ls0 = do
       gpds <-
-        forM (snapshotLocations snap) $ \loc -> (, PLRemote loc) <$> parseCabalFileRemote loc
+        forM (snapshotLocations snap) $ \loc -> (, PLImmutable loc) <$> parseCabalFileImmutable loc
 
       (globals, snapshot, locals) <-
         calculatePackagePromotion ls0
@@ -216,15 +216,15 @@ calculatePackagePromotion
   :: forall env localLocation.
      (HasConfig env, HasGHCVariant env)
   => LoadedSnapshot
-  -> [(GenericPackageDescription, PackageLocationOrPath, localLocation)] -- ^ packages we want to add on top of this snapshot
+  -> [(GenericPackageDescription, PackageLocation, localLocation)] -- ^ packages we want to add on top of this snapshot
   -> Map PackageName (Map FlagName Bool) -- ^ flags
   -> Map PackageName Bool -- ^ overrides whether a package should be registered hidden
   -> Map PackageName [Text] -- ^ GHC options
   -> Set PackageName -- ^ packages in the snapshot to drop
   -> RIO env
        ( Map PackageName (LoadedPackageInfo GhcPkgId) -- new globals
-       , Map PackageName (LoadedPackageInfo PackageLocationOrPath) -- new snapshot
-       , Map PackageName (LoadedPackageInfo (PackageLocationOrPath, Maybe localLocation)) -- new locals
+       , Map PackageName (LoadedPackageInfo PackageLocation) -- new snapshot
+       , Map PackageName (LoadedPackageInfo (PackageLocation, Maybe localLocation)) -- new locals
        )
 calculatePackagePromotion
   (LoadedSnapshot compilerVersion globals0 parentPackages0)
@@ -270,7 +270,7 @@ calculatePackagePromotion
           (globals3, noLongerGlobals2) = splitUnmetDeps Map.empty globals2
 
           -- Put together the two split out groups of packages
-          noLongerGlobals3 :: Map PackageName (LoadedPackageInfo PackageLocationOrPath)
+          noLongerGlobals3 :: Map PackageName (LoadedPackageInfo PackageLocation)
           noLongerGlobals3 = Map.mapWithKey globalToSnapshot (Map.union noLongerGlobals1 noLongerGlobals2)
 
           -- Now do the same thing with parent packages: take out the
@@ -319,8 +319,8 @@ recalculate :: forall env.
             -> Map PackageName (Map FlagName Bool)
             -> Map PackageName Bool -- ^ hide?
             -> Map PackageName [Text] -- ^ GHC options
-            -> (PackageName, LoadedPackageInfo PackageLocationOrPath)
-            -> RIO env (PackageName, LoadedPackageInfo PackageLocationOrPath)
+            -> (PackageName, LoadedPackageInfo PackageLocation)
+            -> RIO env (PackageName, LoadedPackageInfo PackageLocation)
 recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
   let hide = fromMaybe (lpiHide lpi0) (Map.lookup name allHide)
       options = fromMaybe (lpiGhcOptions lpi0) (Map.lookup name allOptions)
@@ -429,13 +429,13 @@ loadCompiler cv = do
                 }
 
 type FindPackageS localLocation =
-    ( Map PackageName (LoadedPackageInfo (PackageLocationOrPath, localLocation))
+    ( Map PackageName (LoadedPackageInfo (PackageLocation, localLocation))
     , Map PackageName (Map FlagName Bool) -- flags
     , Map PackageName Bool -- hide
     , Map PackageName [Text] -- ghc options
     )
 
--- | Find the package at the given 'PackageLocationOrPath', grab any flags,
+-- | Find the package at the given 'PackageLocation', grab any flags,
 -- hidden state, and GHC options from the 'StateT' (removing them from
 -- the 'StateT'), and add the newly found package to the contained
 -- 'Map'.
@@ -443,7 +443,7 @@ findPackage :: forall m localLocation.
                MonadThrow m
             => Platform
             -> ActualCompiler
-            -> (GenericPackageDescription, PackageLocationOrPath, localLocation)
+            -> (GenericPackageDescription, PackageLocation, localLocation)
             -> StateT (FindPackageS localLocation) m ()
 findPackage platform compilerVersion (gpd, loc, localLoc) = do
     (m, allFlags, allHide, allOptions) <- get
@@ -469,10 +469,10 @@ findPackage platform compilerVersion (gpd, loc, localLoc) = do
     PackageIdentifier name _version = C.package $ C.packageDescription gpd
 
 -- | Convert a global 'LoadedPackageInfo' to a snapshot one by
--- creating a 'PackageLocationOrPath'.
-globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocationOrPath
+-- creating a 'PackageLocation'.
+globalToSnapshot :: PackageName -> LoadedPackageInfo loc -> LoadedPackageInfo PackageLocation
 globalToSnapshot name lpi = lpi
-    { lpiLocation = PLRemote (PLHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest) Nothing)
+    { lpiLocation = PLImmutable (PLIHackage (PackageIdentifierRevision name (lpiVersion lpi) CFILatest) Nothing)
     }
 
 -- | Split the packages into those which have their dependencies met,

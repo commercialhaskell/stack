@@ -486,7 +486,7 @@ data BuildConfig = BuildConfig
       -- ^ The variant of GHC used to select a GHC bindist.
     , bcPackages :: ![(ResolvedPath Dir, IO LocalPackageView)]
       -- ^ Local packages
-    , bcDependencies :: ![PackageLocationOrPath]
+    , bcDependencies :: ![PackageLocation]
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -536,7 +536,7 @@ data EnvConfig = EnvConfig
 
 data LocalPackages = LocalPackages
   { lpProject :: !(Map PackageName LocalPackageView)
-  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocationOrPath))
+  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocation))
   }
 
 -- | A view of a local package needed for resolving components
@@ -596,7 +596,7 @@ data Project = Project
     , projectPackages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![PackageLocationOrPath]
+    , projectDependencies :: ![PackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
@@ -613,7 +613,7 @@ instance ToJSON Project where
       [ maybe [] (\cv -> ["compiler" .= cv]) compiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= map mkRawPackageLocationOrPath extraDeps]
+      , if null extraDeps then [] else ["extra-deps" .= map mkUnresolvedPackageLocation extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
       , ["resolver" .= usl]
@@ -985,7 +985,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocationOrPath])]
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1432,7 +1432,7 @@ parseProjectAndConfigMonoid rootDir =
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         return $ do
-          deps' <- mapM (unRawPackageLocationOrPath rootDir) deps
+          deps' <- mapM (resolvePackageLocation rootDir) deps
           resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
           let project = Project
                   { projectUserMsg = msg

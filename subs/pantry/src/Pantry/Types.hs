@@ -35,6 +35,7 @@ module Pantry.Types
   , parseTree
   -- , PackageTarball (..)
   , PackageLocation (..)
+  , PackageLocationImmutable (..)
   , Archive (..)
   , Repo (..)
   , RepoType (..)
@@ -43,12 +44,12 @@ module Pantry.Types
   , parseFlagName
   , parseVersion
   , displayC
-  , RawPackageLocation (..)
-  , mkRawPackageLocation
-  , unRawPackageLocation
+  , UnresolvedPackageLocationImmutable (..)
+  , mkUnresolvedPackageLocationImmutable
+  , resolvePackageLocationImmutable
   , OptionalSubdirs (..)
   , ArchiveLocation (..)
-  , RawPackageLocationOrPath (..)
+  , UnresolvedPackageLocation (..)
   , RelFilePath (..)
   , CabalString (..)
   , toCabalStringMap
@@ -56,7 +57,6 @@ module Pantry.Types
   , parsePackageIdentifierRevision
   , Mismatch (..)
   , PantryException (..)
-  , PackageLocationOrPath (..)
   , ResolvedPath (..)
   , HpackExecutable (..)
   , WantedCompiler (..)
@@ -146,35 +146,36 @@ data ResolvedPath t = ResolvedPath
 instance NFData (ResolvedPath t)
 instance (Generic t, Store t) => Store (ResolvedPath t)
 
--- | Either a remote package location or a local package directory.
-data PackageLocationOrPath
-  = PLRemote !PackageLocation
-  | PLFilePath !(ResolvedPath Dir)
-  deriving (Show, Eq, Data, Generic)
-instance NFData PackageLocationOrPath
-instance Store PackageLocationOrPath
-
-instance Display PackageLocationOrPath where
-  display (PLRemote loc) = display loc
-  display (PLFilePath fp) = fromString $ toFilePath $ resolvedAbsolute fp
-
--- | Location for remote packages (i.e., not local file paths).
+-- | Either an immutable package location or a local package directory which is
+-- a subject to change.
 data PackageLocation
-  = PLHackage !PackageIdentifierRevision !(Maybe TreeKey)
-  | PLArchive !Archive !PackageMetadata
-  | PLRepo    !Repo !PackageMetadata
-  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+  = PLImmutable !PackageLocationImmutable
+  | PLMutable !(ResolvedPath Dir)
+  deriving (Show, Eq, Data, Generic)
 instance NFData PackageLocation
 instance Store PackageLocation
 
 instance Display PackageLocation where
-  display (PLHackage pir _tree) = display pir <> " (from Hackage)"
-  display (PLArchive archive pm) =
+  display (PLImmutable loc) = display loc
+  display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
+
+-- | Location for remote packages or archives assumed to be immutable.
+data PackageLocationImmutable
+  = PLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  | PLIArchive !Archive !PackageMetadata
+  | PLIRepo    !Repo !PackageMetadata
+  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+instance NFData PackageLocationImmutable
+instance Store PackageLocationImmutable
+
+instance Display PackageLocationImmutable where
+  display (PLIHackage pir _tree) = display pir <> " (from Hackage)"
+  display (PLIArchive archive pm) =
     "Archive from " <> display (archiveLocation archive) <>
     (if T.null $ pmSubdir pm
        then mempty
        else " in subdir " <> display (pmSubdir pm))
-  display (PLRepo repo pm) =
+  display (PLIRepo repo pm) =
     "Repo from " <> display (repoUrl repo) <>
     ", commit " <> display (repoCommit repo) <>
     (if T.null $ pmSubdir pm
@@ -196,14 +197,14 @@ instance NFData Archive
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
 -- over time, and so are allowed in custom snapshots.
-data RawArchive = RawArchive
-  { raLocation :: !RawArchiveLocation
-  , raHash :: !(Maybe StaticSHA256)
-  , raSize :: !(Maybe FileSize)
+data UnresolvedArchive = UnresolvedArchive
+  { uaLocation :: !UnresolvedArchiveLocation
+  , uaHash :: !(Maybe StaticSHA256)
+  , uaSize :: !(Maybe FileSize)
   }
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store RawArchive
-instance NFData RawArchive
+instance Store UnresolvedArchive
+instance NFData UnresolvedArchive
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -381,12 +382,12 @@ data Mismatch a = Mismatch
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
-      !(Either PackageLocation (Path Abs File))
+      !(Either PackageLocationImmutable (Path Abs File))
       !(Maybe Version)
       ![PError]
       ![PWarning]
-  | TreeWithoutCabalFile !PackageLocation
-  | TreeWithMultipleCabalFiles !PackageLocation ![SafeFilePath]
+  | TreeWithoutCabalFile !PackageLocationImmutable
+  | TreeWithMultipleCabalFiles !PackageLocationImmutable ![SafeFilePath]
   | MismatchedCabalName !(Path Abs File) !PackageName
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
@@ -396,18 +397,18 @@ data PantryException
   | InvalidFilePathSnapshot !Text
   | InvalidSnapshot !SnapshotLocation !SomeException
   | TreeKeyMismatch
-      !PackageLocation
+      !PackageLocationImmutable
       !TreeKey -- expected
       !TreeKey -- actual
   | MismatchedPackageMetadata
-      !PackageLocation
+      !PackageLocationImmutable
       !PackageMetadata
       !BlobKey -- cabal file found
       !PackageIdentifier
   | Non200ResponseStatus !Status
   | InvalidBlobKey !(Mismatch BlobKey)
   | Couldn'tParseSnapshot !SnapshotLocation !String
-  | WrongCabalFileName !PackageLocation !SafeFilePath !PackageName
+  | WrongCabalFileName !PackageLocationImmutable !SafeFilePath !PackageName
 
   deriving Typeable
 instance Exception PantryException where
@@ -699,17 +700,17 @@ instance Display ArchiveLocation where
   display (ALUrl url) = display url
   display (ALFilePath resolved) = fromString $ toFilePath $ resolvedAbsolute resolved
 
-data RawArchiveLocation
+data UnresolvedArchiveLocation
   = RALUrl !Text
   | RALFilePath !RelFilePath
   -- ^ relative to the configuration file it came from
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
-instance Store RawArchiveLocation
-instance NFData RawArchiveLocation
-instance ToJSON RawArchiveLocation where
+instance Store UnresolvedArchiveLocation
+instance NFData UnresolvedArchiveLocation
+instance ToJSON UnresolvedArchiveLocation where
   toJSON (RALUrl url) = object ["url" .= url]
   toJSON (RALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
-instance FromJSON RawArchiveLocation where
+instance FromJSON UnresolvedArchiveLocation where
   parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
     where
       asObjectUrl = withObject "ArchiveLocation (URL object)" $ \o ->
@@ -730,40 +731,40 @@ instance FromJSON RawArchiveLocation where
           then pure (RelFilePath t)
           else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
--- | A raw package location /or/ a file path to a directory containing a package.
-data RawPackageLocationOrPath
-  = RPLRemote !RawPackageLocation
-  | RPLFilePath !RelFilePath
+-- | An unresolved package location /or/ a file path to a directory containing a package.
+data UnresolvedPackageLocation
+  = UPLImmutable !UnresolvedPackageLocationImmutable
+  | UPLMutable !RelFilePath
   deriving Show
-instance ToJSON RawPackageLocationOrPath where
-  toJSON (RPLRemote rpl) = toJSON rpl
-  toJSON (RPLFilePath (RelFilePath fp)) = toJSON fp
-instance FromJSON (WithJSONWarnings RawPackageLocationOrPath) where
+instance ToJSON UnresolvedPackageLocation where
+  toJSON (UPLImmutable rpl) = toJSON rpl
+  toJSON (UPLMutable (RelFilePath fp)) = toJSON fp
+instance FromJSON (WithJSONWarnings UnresolvedPackageLocation) where
   parseJSON v =
-    (fmap RPLRemote <$> parseJSON v) <|>
-    ((noJSONWarnings . RPLFilePath . RelFilePath) <$> parseJSON v)
+    (fmap UPLImmutable <$> parseJSON v) <|>
+    ((noJSONWarnings . UPLMutable . RelFilePath) <$> parseJSON v)
 
--- | The raw representation of packages allowed in a snapshot
--- specification. Does /not/ allow local filepaths.
-data RawPackageLocation
-  = RPLHackage !PackageIdentifierRevision !(Maybe TreeKey)
-  | RPLArchive !RawArchive !OptionalSubdirs
-  | RPLRepo !Repo !OptionalSubdirs
+-- | The unresolved representation of packages allowed in a snapshot
+-- specification.
+data UnresolvedPackageLocationImmutable
+  = UPLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  | UPLIArchive !UnresolvedArchive !OptionalSubdirs
+  | UPLIRepo !Repo !OptionalSubdirs
   deriving (Show, Eq, Data, Generic)
-instance Store RawPackageLocation
-instance NFData RawPackageLocation
-instance ToJSON RawPackageLocation where
-  toJSON (RPLHackage pir mtree) = object $ concat
+instance Store UnresolvedPackageLocationImmutable
+instance NFData UnresolvedPackageLocationImmutable
+instance ToJSON UnresolvedPackageLocationImmutable where
+  toJSON (UPLIHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
-  toJSON (RPLArchive (RawArchive loc msha msize) os) = object $ concat
+  toJSON (UPLIArchive (UnresolvedArchive loc msha msize) os) = object $ concat
     [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
     , osToPairs os
     ]
-  toJSON (RPLRepo (Repo url commit typ) os) = object $ concat
+  toJSON (UPLIRepo (Repo url commit typ) os) = object $ concat
     [ [ urlKey .= url
       , "commit" .= commit
       ]
@@ -787,7 +788,7 @@ osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal subdir
       else ["subdir" .= subdir]
   ]
 
-instance FromJSON (WithJSONWarnings RawPackageLocation) where
+instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
   parseJSON v
       = http v
     <|> hackageText v
@@ -795,24 +796,24 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
     <|> repo v
     <|> archiveObject v
     <|> github v
-    <|> fail ("Could not parse a RawPackageLocation from: " ++ show v)
+    <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
     where
-      http = withText "RawPackageLocation.RPLArchive (Text)" $ \t -> do
+      http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t -> do
         loc <- parseJSON $ String t
-        pure $ noJSONWarnings $ RPLArchive
-          RawArchive
-            { raLocation = loc
-            , raHash = Nothing
-            , raSize = Nothing
+        pure $ noJSONWarnings $ UPLIArchive
+          UnresolvedArchive
+            { uaLocation = loc
+            , uaHash = Nothing
+            , uaSize = Nothing
             }
           osNoInfo
 
-      hackageText = withText "RawPackageLocation.RPLHackage (Text)" $ \t ->
+      hackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
           Left e -> fail $ show e
-          Right pir -> pure $ noJSONWarnings $ RPLHackage pir Nothing
+          Right pir -> pure $ noJSONWarnings $ UPLIHackage pir Nothing
 
-      hackageObject = withObjectWarnings "RawPackageLocation.RPLHackage" $ \o -> RPLHackage
+      hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> UPLIHackage
         <$> o ..: "hackage"
         <*> o ..:? "pantry-tree"
 
@@ -832,43 +833,43 @@ instance FromJSON (WithJSONWarnings RawPackageLocation) where
             <*> o ..:? "cabal-file"
             <*> o ..:? "subdir" ..!= T.empty)
 
-      repo = withObjectWarnings "RawPackageLocation.RPLRepo" $ \o -> do
+      repo = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIRepo" $ \o -> do
         (repoType, repoUrl) <-
           ((RepoGit, ) <$> o ..: "git") <|>
           ((RepoHg, ) <$> o ..: "hg")
         repoCommit <- o ..: "commit"
-        RPLRepo Repo {..} <$> optionalSubdirs o
+        UPLIRepo Repo {..} <$> optionalSubdirs o
 
-      archiveObject = withObjectWarnings "RawPackageLocation.RPLArchive" $ \o -> do
-        raLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
-        raHash <- o ..:? "sha256"
-        raSize <- o ..:? "size"
-        RPLArchive RawArchive {..} <$> optionalSubdirs o
+      archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
+        uaLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        uaHash <- o ..:? "sha256"
+        uaSize <- o ..:? "size"
+        UPLIArchive UnresolvedArchive {..} <$> optionalSubdirs o
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let raLocation = RALUrl $ T.concat
+        let uaLocation = RALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
               , commit
               , ".tar.gz"
               ]
-        raHash <- o ..:? "sha256"
-        raSize <- o ..:? "size"
-        RPLArchive RawArchive {..} <$> optionalSubdirs o
+        uaHash <- o ..:? "sha256"
+        uaSize <- o ..:? "size"
+        UPLIArchive UnresolvedArchive {..} <$> optionalSubdirs o
 
--- | Convert a 'RawPackageLocation' into a list of 'PackageLocation's.
-unRawPackageLocation
+-- | Convert a 'UnresolvedPackageLocationImmutable' into a list of 'PackageLocation's.
+resolvePackageLocationImmutable
   :: MonadIO m
   => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
-  -> RawPackageLocation
-  -> m [PackageLocation]
-unRawPackageLocation _mdir (RPLHackage pir mtree) = pure [PLHackage pir mtree]
-unRawPackageLocation mdir (RPLArchive ra os) = do
+  -> UnresolvedPackageLocationImmutable
+  -> m [PackageLocationImmutable]
+resolvePackageLocationImmutable _mdir (UPLIHackage pir mtree) = pure [PLIHackage pir mtree]
+resolvePackageLocationImmutable mdir (UPLIArchive ra os) = do
   loc <-
-    case raLocation ra of
+    case uaLocation ra of
       RALUrl url -> pure $ ALUrl url
       RALFilePath rel@(RelFilePath t) -> do
         abs' <-
@@ -878,31 +879,31 @@ unRawPackageLocation mdir (RPLArchive ra os) = do
         pure $ ALFilePath $ ResolvedPath rel abs'
   let archive = Archive
         { archiveLocation = loc
-        , archiveHash = raHash ra
-        , archiveSize = raSize ra
+        , archiveHash = uaHash ra
+        , archiveSize = uaSize ra
         }
-  pure $ map (PLArchive archive) $ osToPms os
-unRawPackageLocation _mdir (RPLRepo repo os) = pure $ map (PLRepo repo) $ osToPms os
+  pure $ map (PLIArchive archive) $ osToPms os
+resolvePackageLocationImmutable _mdir (UPLIRepo repo os) = pure $ map (PLIRepo repo) $ osToPms os
 
 osToPms :: OptionalSubdirs -> [PackageMetadata]
 osToPms (OSSubdirs x xs) = map (PackageMetadata Nothing Nothing Nothing Nothing) (x:xs)
 osToPms (OSPackageMetadata pm) = [pm]
 
--- | Convert a 'PackageLocation' into a 'RawPackageLocation'.
-mkRawPackageLocation :: PackageLocation -> RawPackageLocation
-mkRawPackageLocation (PLHackage pir mtree) = RPLHackage pir mtree
-mkRawPackageLocation (PLArchive archive pm) =
-  RPLArchive
-    RawArchive
-      { raLocation =
+-- | Convert a 'PackageLocationImmutable' into a 'UnresolvedPackageLocationImmutable'.
+mkUnresolvedPackageLocationImmutable :: PackageLocationImmutable -> UnresolvedPackageLocationImmutable
+mkUnresolvedPackageLocationImmutable (PLIHackage pir mtree) = UPLIHackage pir mtree
+mkUnresolvedPackageLocationImmutable (PLIArchive archive pm) =
+  UPLIArchive
+    UnresolvedArchive
+      { uaLocation =
           case archiveLocation archive of
             ALUrl url -> RALUrl url
             ALFilePath resolved -> RALFilePath $ resolvedRelative resolved
-      , raHash = archiveHash archive
-      , raSize = archiveSize archive
+      , uaHash = archiveHash archive
+      , uaSize = archiveSize archive
       }
     (OSPackageMetadata pm)
-mkRawPackageLocation (PLRepo repo pm) = RPLRepo repo (OSPackageMetadata pm)
+mkUnresolvedPackageLocationImmutable (PLIRepo repo pm) = UPLIRepo repo (OSPackageMetadata pm)
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.
 newtype CabalString a = CabalString { unCabalString :: a }
@@ -1124,7 +1125,7 @@ data Snapshot = Snapshot
   -- @CompilerVersion@.
   , snapshotName :: !Text
   -- ^ A user-friendly way of referring to this resolver.
-  , snapshotLocations :: ![PackageLocation]
+  , snapshotLocations :: ![PackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   , snapshotDropPackages :: !(Set PackageName)
   -- ^ Packages present in the parent which should not be included
@@ -1169,7 +1170,7 @@ instance ToJSON Snapshot where
               Just compiler -> ["compiler" .= compiler]
           ]
     , ["name" .= snapshotName snap]
-    , ["packages" .= map mkRawPackageLocation (snapshotLocations snap)]
+    , ["packages" .= map mkUnresolvedPackageLocationImmutable (snapshotLocations snap)]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
     , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
@@ -1188,14 +1189,14 @@ parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
       (_, Just usl) -> pure $ resolveSnapshotLocation usl mdir mcompiler
 
   snapshotName <- o ..: "name"
-  rawLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
+  unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
   snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
   snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
   snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
   snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
   snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)
   pure $ do
-    snapshotLocations <- fmap concat $ mapM (unRawPackageLocation mdir) rawLocs
+    snapshotLocations <- fmap concat $ mapM (resolvePackageLocationImmutable mdir) unresolvedLocs
     snapshotParent <- iosnapshotParent
     pure Snapshot {..}
 

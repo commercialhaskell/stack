@@ -269,7 +269,7 @@ mkBaseConfigOpts boptsCli = do
 -- | Provide a function for loading package information from the package index
 loadPackage
   :: HasEnvConfig env
-  => PackageLocation
+  => PackageLocationImmutable
   -> Map FlagName Bool
   -> [Text]
   -> RIO env Package
@@ -284,7 +284,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }
-  resolvePackage pkgConfig <$> parseCabalFileRemote loc
+  resolvePackage pkgConfig <$> parseCabalFileImmutable loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

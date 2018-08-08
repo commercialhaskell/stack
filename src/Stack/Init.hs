@@ -108,7 +108,7 @@ initProject whichCmd currDir initOpts mresolver = do
         gpds = Map.elems $ fmap snd rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
-      PLRemote <$> completePackageLocation (PLHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+      PLImmutable <$> completePackageLocation (PLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg

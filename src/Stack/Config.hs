@@ -664,7 +664,7 @@ getLocalPackages = do
               pure (name, (gpd, plp))
 
             checkDuplicateNames $
-              map (second (PLFilePath . lpvResolvedDir)) packages ++
+              map (second (PLMutable . lpvResolvedDir)) packages ++
               map (second snd) deps
 
             return LocalPackages
@@ -674,7 +674,7 @@ getLocalPackages = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocationOrPath)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocation)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

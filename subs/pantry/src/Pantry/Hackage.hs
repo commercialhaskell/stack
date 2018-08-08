@@ -354,7 +354,7 @@ getHackageTarball
   => PackageIdentifierRevision
   -> Maybe TreeKey
   -> RIO env (TreeKey, Tree)
-getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = checkTreeKey (PLHackage pir mtreeKey) mtreeKey $ do
+getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = checkTreeKey (PLIHackage pir mtreeKey) mtreeKey $ do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
   withCachedTree name ver cabalFile $ do
@@ -398,7 +398,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
         , pmSubdir = T.empty -- no subdirs on Hackage
         }
 
-    (key, TreeEntry _origkey ft) <- findCabalFile (PLHackage pir (Just treeKey)) tree
+    (key, TreeEntry _origkey ft) <- findCabalFile (PLIHackage pir (Just treeKey)) tree
 
     case tree of
       TreeMap m -> do

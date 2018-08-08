@@ -249,7 +249,7 @@ checkTestSuccess dir =
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: HasEnvConfig env
-                     => PackageLocation
+                     => PackageLocationImmutable
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Path Abs File)
@@ -297,7 +297,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
                       => BaseConfigOpts
-                      -> PackageLocation
+                      -> PackageLocationImmutable
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
@@ -331,7 +331,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = d
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: forall env. HasEnvConfig env
-                     => PackageLocation -- ^ target package
+                     => PackageLocationImmutable -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe PrecompiledCache)
