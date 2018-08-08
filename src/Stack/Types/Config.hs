@@ -88,6 +88,7 @@ module Stack.Types.Config
 
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
+  ,Curator(..)
   ,ProjectAndConfigMonoid(..)
   ,parseProjectAndConfigMonoid
   -- ** PvpBounds
@@ -504,6 +505,7 @@ data BuildConfig = BuildConfig
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
+    , bcCurator :: !(Maybe Curator)
     }
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
@@ -604,12 +606,16 @@ data Project = Project
     , projectResolver :: !SnapshotLocation
     -- ^ How we resolve which @SnapshotDef@ to use
     , projectExtraPackageDBs :: ![FilePath]
+    , projectCurator :: !(Maybe Curator)
+    -- ^ Extra configuration intended exclusively for usage by the
+    -- curator tool. In other words, this is /not/ part of the
+    -- documented and exposed Stack API. SUBJECT TO CHANGE.
     }
   deriving Show
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver extraPackageDBs) = object $ concat
+    toJSON (Project userMsg packages extraDeps flags resolver extraPackageDBs mcurator) = object $ concat
       [ maybe [] (\cv -> ["compiler" .= cv]) compiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
@@ -617,9 +623,31 @@ instance ToJSON Project where
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
       , ["resolver" .= usl]
+      , maybe [] (\c -> ["curator" .= c]) mcurator
       ]
       where
         (usl, compiler) = unresolveSnapshotLocation resolver
+
+-- | Extra configuration intended exclusively for usage by the
+-- curator tool. In other words, this is /not/ part of the
+-- documented and exposed Stack API. SUBJECT TO CHANGE.
+data Curator = Curator
+  { curatorSkipTest :: !(Set PackageName)
+  , curatorSkipBenchmark :: !(Set PackageName)
+  , curatorSkipHaddock :: !(Set PackageName)
+  }
+  deriving Show
+instance ToJSON Curator where
+  toJSON c = object
+    [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
+    , "skip-bench" .= Set.map CabalString (curatorSkipBenchmark c)
+    , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
+    ]
+instance FromJSON (WithJSONWarnings Curator) where
+  parseJSON = withObjectWarnings "Curator" $ \o -> Curator
+    <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
+    <*> fmap (Set.map unCabalString) (o ..:? "skip-bench" ..!= mempty)
+    <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -1431,6 +1459,7 @@ parseProjectAndConfigMonoid rootDir =
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
+        mcurator <- jsonSubWarningsT (o ..:? "curator")
         return $ do
           deps' <- mapM (resolvePackageLocation rootDir) deps
           resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
@@ -1441,6 +1470,7 @@ parseProjectAndConfigMonoid rootDir =
                   , projectPackages = packages
                   , projectDependencies = concat deps'
                   , projectFlags = flags
+                  , projectCurator = mcurator
                   }
           pure $ ProjectAndConfigMonoid project config
 

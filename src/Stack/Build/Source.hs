@@ -185,15 +185,16 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
+    mcurator <- view $ buildConfigL.to bcCurator
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
                 Just (TargetAll _packageType) ->
                     ( packageExes pkg
-                    , if boptsTests bopts
+                    , if boptsTests bopts && maybe True (Set.notMember name . curatorSkipTest) mcurator
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
-                    , if boptsBenchmarks bopts
+                    , if boptsBenchmarks bopts && maybe True (Set.notMember name . curatorSkipBenchmark) mcurator
                         then packageBenchmarks pkg
                         else Set.empty
                     )

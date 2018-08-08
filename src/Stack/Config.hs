@@ -624,6 +624,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                 LCSNoProject -> True
                 LCSProject _ -> False
                 LCSNoConfig _ -> False
+        , bcCurator = projectCurator project
         }
   where
     getEmptyProject :: Maybe SnapshotLocation -> RIO Config Project
@@ -643,6 +644,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         , projectFlags = mempty
         , projectResolver = r
         , projectExtraPackageDBs = []
+        , projectCurator = Nothing
         }
 
 -- | Get packages from EnvConfig, downloading and cloning as necessary.

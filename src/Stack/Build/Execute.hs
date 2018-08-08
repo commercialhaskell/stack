@@ -1260,11 +1260,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
   where
     pname = pkgName taskProvides
     shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
-    doHaddock package = shouldHaddockPackage' &&
+    doHaddock mcurator package
+                      = shouldHaddockPackage' &&
                         not isFinalBuild &&
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
-                        packageHasExposedModules package
+                        packageHasExposedModules package &&
+                        -- Special help for the curator tool to avoid haddocks that are known to fail
+                        maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
 
     buildingFinals = isFinalBuild || taskAllInOne
     enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -1487,7 +1490,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
               _ -> throwM ex
         postBuildCheck True
 
-        when (doHaddock package) $ do
+        mcurator <- view $ buildConfigL.to bcCurator
+        when (doHaddock mcurator package) $ do
             announce "haddock"
             sourceFlag <- if not (boptsHaddockHyperlinkSource eeBuildOpts) then return [] else do
                 -- See #2429 for why the temp dir is used

@@ -117,6 +117,7 @@ initProject whichCmd currDir initOpts mresolver = do
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = sdResolver sd
             , projectExtraPackageDBs = []
+            , projectCurator = Nothing
             }
 
         makeRelDir dir =
