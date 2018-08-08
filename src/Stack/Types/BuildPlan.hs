@@ -91,7 +91,7 @@ newtype ExeName = ExeName { unExeName :: Text }
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !ActualCompiler
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocationOrPath))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
   -- ^ Snapshots themselves may not have a filepath in them, but once
   -- we start adding in local configuration it's possible.
   }
@@ -150,7 +150,7 @@ configuration. Otherwise, we don't cache.
 -}
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "PWbqdxi3OwjVS9L_NZw_br2hMeA="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "7BcCWNHwk_2JZXi8E1mTe84y0Cc="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

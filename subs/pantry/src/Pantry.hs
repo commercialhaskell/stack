@@ -25,7 +25,7 @@ module Pantry
   , Repo (..)
   , RepoType (..)
   , RelFilePath (..)
-  , PackageLocationOrPath (..)
+  , PackageLocationImmutable (..)
   , ResolvedPath (..)
   , PackageIdentifierRevision (..)
   , PackageName
@@ -38,11 +38,11 @@ module Pantry
 
     -- ** Unresolved package locations
   , UnresolvedPackageLocation
-  , UnresolvedPackageLocationOrPath (..)
+  , UnresolvedPackageLocationImmutable (..)
   , resolvePackageLocation
-  , resolvePackageLocationOrPath
+  , resolvePackageLocationImmutable
   , mkUnresolvedPackageLocation
-  , mkUnresolvedPackageLocationOrPath
+  , mkUnresolvedPackageLocationImmutable
   , completePackageLocation
 
     -- ** Snapshots
@@ -78,7 +78,7 @@ module Pantry
 
     -- * Package location
   , parseCabalFile
-  , parseCabalFileRemote
+  , parseCabalFileImmutable
   , parseCabalFilePath
   , getPackageLocationIdent
   , getPackageLocationTreeKey
@@ -311,7 +311,7 @@ fetchTreeKeys _ =
 
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
-  => f PackageLocation
+  => f PackageLocationImmutable
   -> RIO env ()
 fetchPackages pls = do
     fetchTreeKeys $ mapMaybe getTreeKey $ toList pls
@@ -327,14 +327,14 @@ fetchPackages pls = do
     archives = run archivesE
     repos = run reposE
 
-    go (PLHackage pir mtree) = (s (pir, mtree), mempty, mempty)
-    go (PLArchive archive pm) = (mempty, s (archive, pm), mempty)
-    go (PLRepo repo pm) = (mempty, mempty, s (repo, pm))
+    go (PLIHackage pir mtree) = (s (pir, mtree), mempty, mempty)
+    go (PLIArchive archive pm) = (mempty, s (archive, pm), mempty)
+    go (PLIRepo repo pm) = (mempty, mempty, s (repo, pm))
 
 unpackPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => Path Abs Dir -- ^ unpack directory
-  -> PackageLocation
+  -> PackageLocationImmutable
   -> RIO env ()
 unpackPackageLocation fp loc = do
   (_, tree) <- loadPackageLocation loc
@@ -343,11 +343,11 @@ unpackPackageLocation fp loc = do
 -- | Ignores all warnings
 --
 -- FIXME! Something to support hpack
-parseCabalFileRemote
+parseCabalFileImmutable
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> RIO env GenericPackageDescription
-parseCabalFileRemote loc = do
+parseCabalFileImmutable loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
@@ -392,14 +392,14 @@ readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXM
     -}
 
 -- | Same as 'parseCabalFileRemote', but takes a
--- 'PackageLocationOrPath'. Never prints warnings, see
+-- 'PackageLocation'. Never prints warnings, see
 -- 'parseCabalFilePath' for that.
 parseCabalFile
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationOrPath
+  => PackageLocation
   -> RIO env GenericPackageDescription
-parseCabalFile (PLRemote loc) = parseCabalFileRemote loc
-parseCabalFile (PLFilePath rfp) = fst <$> parseCabalFilePath (resolvedAbsolute rfp) False
+parseCabalFile (PLImmutable loc) = parseCabalFileImmutable loc
+parseCabalFile (PLMutable rfp) = fst <$> parseCabalFilePath (resolvedAbsolute rfp) False
 
 -- | Read the raw, unresolved package information from a file.
 parseCabalFilePath
@@ -528,13 +528,13 @@ gpdVersion = pkgVersion . gpdPackageIdentifier
 
 loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> RIO env ByteString
 
 -- Just ignore the mtree for this. Safe assumption: someone who filled
 -- in the TreeKey also filled in the cabal file hash, and that's a
 -- more efficient lookup mechanism.
-loadCabalFile (PLHackage pir _mtree) = getHackageCabalFile pir
+loadCabalFile (PLIHackage pir _mtree) = getHackageCabalFile pir
 
 loadCabalFile pl = do
   (_, tree) <- loadPackageLocation pl
@@ -546,43 +546,43 @@ loadCabalFile pl = do
 
 loadPackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> RIO env (TreeKey, Tree)
-loadPackageLocation (PLHackage pir mtree) = getHackageTarball pir mtree
-loadPackageLocation (PLArchive archive pm) = getArchive archive pm
-loadPackageLocation (PLRepo repo pm) = getRepo repo pm
+loadPackageLocation (PLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackageLocation (PLIArchive archive pm) = getArchive archive pm
+loadPackageLocation (PLIRepo repo pm) = getRepo repo pm
 
--- | Convert a 'PackageLocationOrPath' into a 'UnresolvedPackageLocationOrPath'.
-mkUnresolvedPackageLocationOrPath :: PackageLocationOrPath -> UnresolvedPackageLocationOrPath
-mkUnresolvedPackageLocationOrPath (PLRemote loc) = UPLRemote (mkUnresolvedPackageLocation loc)
-mkUnresolvedPackageLocationOrPath (PLFilePath fp) = UPLFilePath $ resolvedRelative fp
+-- | Convert a 'PackageLocation' into a 'UnresolvedPackageLocation'.
+mkUnresolvedPackageLocation :: PackageLocation -> UnresolvedPackageLocation
+mkUnresolvedPackageLocation (PLImmutable loc) = UPLImmutable (mkUnresolvedPackageLocationImmutable loc)
+mkUnresolvedPackageLocation (PLMutable fp) = UPLMutable $ resolvedRelative fp
 
--- | Convert an 'UnresolvedPackageLocationOrPath' into a list of 'PackageLocationOrPath's.
-resolvePackageLocationOrPath
+-- | Convert an 'UnresolvedPackageLocation' into a list of 'PackageLocation's.
+resolvePackageLocation
   :: MonadIO m
   => Path Abs Dir -- ^ directory containing configuration file, to be used for resolving relative file paths
-  -> UnresolvedPackageLocationOrPath
-  -> m [PackageLocationOrPath]
-resolvePackageLocationOrPath dir (UPLRemote rpl) =
-  map PLRemote <$> resolvePackageLocation (Just dir) rpl
-resolvePackageLocationOrPath dir (UPLFilePath rel@(RelFilePath fp)) = do
+  -> UnresolvedPackageLocation
+  -> m [PackageLocation]
+resolvePackageLocation dir (UPLImmutable rpl) =
+  map PLImmutable <$> resolvePackageLocationImmutable (Just dir) rpl
+resolvePackageLocation dir (UPLMutable rel@(RelFilePath fp)) = do
   absolute <- resolveDir dir $ T.unpack fp
-  pure [PLFilePath $ ResolvedPath rel absolute]
+  pure [PLMutable $ ResolvedPath rel absolute]
 
--- | Fill in optional fields in a 'PackageLocation' for more reproducible builds.
+-- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
 completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
-  -> RIO env PackageLocation
-completePackageLocation orig@(PLHackage _ (Just _)) = pure orig
-completePackageLocation (PLHackage pir Nothing) = do
+  => PackageLocationImmutable
+  -> RIO env PackageLocationImmutable
+completePackageLocation orig@(PLIHackage _ (Just _)) = pure orig
+completePackageLocation (PLIHackage pir Nothing) = do
   logDebug $ "Completing package location information from " <> display pir
   treeKey <- getHackageTarballKey pir
-  pure $ PLHackage pir (Just treeKey)
-completePackageLocation pl@(PLArchive archive pm) =
-  PLArchive <$> completeArchive archive <*> completePM pl pm
-completePackageLocation pl@(PLRepo repo pm) =
-  PLRepo repo <$> completePM pl pm
+  pure $ PLIHackage pir (Just treeKey)
+completePackageLocation pl@(PLIArchive archive pm) =
+  PLIArchive <$> completeArchive archive <*> completePM pl pm
+completePackageLocation pl@(PLIRepo repo pm) =
+  PLIRepo repo <$> completePM pl pm
 
 completeArchive
   :: (HasPantryConfig env, HasLogFunc env)
@@ -595,7 +595,7 @@ completeArchive a@(Archive loc _ _) =
 
 completePM
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> PackageMetadata
   -> RIO env PackageMetadata
 completePM plOrig pm
@@ -784,30 +784,30 @@ warningsParserHelper sl val f =
 -- | Get the name of the package at the given location.
 getPackageLocationIdent
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> RIO env PackageIdentifier
-getPackageLocationIdent (PLHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
-getPackageLocationIdent pl = do
-  (_, tree) <- loadPackageLocation pl
-  snd <$> loadPackageIdentFromTree pl tree
+getPackageLocationIdent (PLIHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
+getPackageLocationIdent pli = do
+  (_, tree) <- loadPackageLocation pli
+  snd <$> loadPackageIdentFromTree pli tree
 
 getPackageLocationTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocation
+  => PackageLocationImmutable
   -> RIO env TreeKey
 getPackageLocationTreeKey pl =
   case getTreeKey pl of
     Just treeKey -> pure treeKey
     Nothing ->
       case pl of
-        PLHackage pir _ -> getHackageTarballKey pir
-        PLArchive archive pm -> getArchiveKey archive pm
-        PLRepo repo pm -> getRepoKey repo pm
+        PLIHackage pir _ -> getHackageTarballKey pir
+        PLIArchive archive pm -> getArchiveKey archive pm
+        PLIRepo repo pm -> getRepoKey repo pm
 
 hpackExecutableL :: HasPantryConfig env => SimpleGetter env HpackExecutable
 hpackExecutableL = pantryConfigL.to pcHpackExecutable
 
-getTreeKey :: PackageLocation -> Maybe TreeKey
-getTreeKey (PLHackage _ mtree) = mtree
-getTreeKey (PLArchive _ pm) = pmTree pm
-getTreeKey (PLRepo _ pm) = pmTree pm
+getTreeKey :: PackageLocationImmutable -> Maybe TreeKey
+getTreeKey (PLIHackage _ mtree) = mtree
+getTreeKey (PLIArchive _ pm) = pmTree pm
+getTreeKey (PLIRepo _ pm) = pmTree pm

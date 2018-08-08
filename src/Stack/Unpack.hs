@@ -47,7 +47,7 @@ unpackPackages mSnapshotDef dest input = do
               pure (pir, dest </> suffix)
           )
           (map (\pir@(PackageIdentifierRevision name ver _) ->
-                  (PLHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
+                  (PLIHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
            locs2)
 
     alreadyUnpacked <- filterM doesDirExist $ Map.elems locs
@@ -65,7 +65,7 @@ unpackPackages mSnapshotDef dest input = do
   where
     toLoc = maybe toLocNoSnapshot toLocSnapshot mSnapshotDef
 
-    toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocation, PackageIdentifier))
+    toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
     toLocNoSnapshot name = do
       mver1 <- getLatestHackageVersion name
       mver <-
@@ -81,11 +81,11 @@ unpackPackages mSnapshotDef dest input = do
           -- consider updating the index
           Nothing -> Left $ "Could not find package " ++ displayC name
           Just pir@(PackageIdentifierRevision _ ver _) -> Right
-            ( PLHackage pir Nothing
+            ( PLIHackage pir Nothing
             , PackageIdentifier name ver
             )
 
-    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocation, PackageIdentifier))
+    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
     toLocSnapshot sd name =
         go $ concatMap snapshotLocations $ sdSnapshots sd
       where

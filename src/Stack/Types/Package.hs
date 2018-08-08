@@ -228,7 +228,7 @@ type SourceMap = Map PackageName PackageSource
 data PackageSource
   = PSFilePath LocalPackage InstallLocation
   -- ^ Package which exist on the filesystem
-  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocation PackageIdentifier -- FIXME consider using runOnce on the PackageIdentifier
+  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocationImmutable PackageIdentifier -- FIXME consider using runOnce on the PackageIdentifier
   -- ^ Package which is downloaded remotely.
     deriving Show
 
