@@ -8,7 +8,8 @@
 module Stack.Constants
     (buildPlanDir
     ,buildPlanCacheDir
-    ,haskellModuleExts
+    ,haskellFileExts
+    ,haskellPreprocessorExts
     ,stackDotYaml
     ,stackWorkEnvVar
     ,stackRootEnvVar
@@ -43,10 +44,6 @@ import           Path as FL
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.PackageName
-
--- | Extensions for anything that can be a Haskell module.
-haskellModuleExts :: [Text]
-haskellModuleExts = haskellFileExts ++ haskellPreprocessorExts
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]

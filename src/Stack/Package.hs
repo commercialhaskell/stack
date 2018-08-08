@@ -867,7 +867,6 @@ resolveComponentFiles component build names = do
             component
             (dirs ++ [dir])
             names
-            haskellModuleExts
     cfiles <- buildOtherSources build
     return (modules, files <> cfiles, warnings)
 
@@ -1066,16 +1065,15 @@ resolveFilesAndDeps
     :: NamedComponent       -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
-    -> [Text]               -- ^ Extensions.
     -> RIO Ctx (Map ModuleName (Path Abs File),Set DotCabalPath,[PackageWarning])
-resolveFilesAndDeps component dirs names0 exts = do
+resolveFilesAndDeps component dirs names0 = do
     (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
     warnings <- liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
     return (foundModules, dotCabalPaths, warnings)
   where
     loop [] _ = return (S.empty, M.empty, [])
     loop names doneModules0 = do
-        resolved <- resolveFiles dirs names exts
+        resolved <- resolveFiles dirs names
         let foundFiles = mapMaybe snd resolved
             foundModules = mapMaybe toResolvedModule resolved
             missingModules = mapMaybe toMissingModule resolved
@@ -1223,19 +1221,17 @@ parseDumpHI dumpHIPath = do
 resolveFiles
     :: [Path Abs Dir] -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
-    -> [Text] -- ^ Extensions.
     -> RIO Ctx [(DotCabalDescriptor, Maybe DotCabalPath)]
-resolveFiles dirs names exts =
-    forM names (\name -> liftM (name, ) (findCandidate dirs exts name))
+resolveFiles dirs names =
+    forM names (\name -> liftM (name, ) (findCandidate dirs name))
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
 findCandidate
     :: [Path Abs Dir]
-    -> [Text]
     -> DotCabalDescriptor
     -> RIO Ctx (Maybe DotCabalPath)
-findCandidate dirs exts name = do
+findCandidate dirs name = do
     pkg <- asks ctxFile >>= parsePackageNameFromFilePath
     candidates <- liftIO makeNameCandidates
     case candidates of
@@ -1266,13 +1262,22 @@ findCandidate dirs exts name = do
             DotCabalMain fp -> resolveCandidate dir fp
             DotCabalFile fp -> resolveCandidate dir fp
             DotCabalCFile fp -> resolveCandidate dir fp
-            DotCabalModule mn ->
-                liftM concat
-                $ mapM
-                  ((\ ext ->
-                     resolveCandidate dir (Cabal.toFilePath mn ++ "." ++ ext))
-                   . T.unpack)
-                   exts
+            DotCabalModule mn -> do
+              let perExt ext =
+                     resolveCandidate dir (Cabal.toFilePath mn ++ "." ++ T.unpack ext)
+              withHaskellExts <- mapM perExt haskellFileExts
+              withPPExts <- mapM perExt haskellPreprocessorExts
+              pure $
+                case (concat withHaskellExts, concat withPPExts) of
+                  -- If we have exactly 1 Haskell extension and exactly
+                  -- 1 preprocessor extension, assume the former file is
+                  -- generated from the latter
+                  --
+                  -- See https://github.com/commercialhaskell/stack/issues/4076
+                  ([_], [y]) -> [y]
+
+                  -- Otherwise, return everything
+                  (xs, ys) -> xs ++ ys
     resolveCandidate
         :: (MonadIO m, MonadThrow m)
         => Path Abs Dir -> FilePath.FilePath -> m [Path Abs File]
