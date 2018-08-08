@@ -46,39 +46,8 @@ snapshots = do
       snap <- parseSnapName $ fromString name
       Just (snap, fp)
 
-data App = App
-  { appSimpleApp :: !SimpleApp
-  , appPantryConfig :: !PantryConfig
-  }
-
-simpleAppL :: Lens' App SimpleApp
-simpleAppL = lens appSimpleApp (\x y -> x { appSimpleApp = y })
-
-instance HasLogFunc App where
-  logFuncL = simpleAppL.logFuncL
-instance HasPantryConfig App where
-  pantryConfigL = lens appPantryConfig (\x y -> x { appPantryConfig = y })
-
-run :: RIO App a -> IO a
-run f = runSimpleApp $ do
-  sa <- ask
-  stack <- getAppUserDataDirectory "stack"
-  root <- parseAbsDir $ stack </> "pantry"
-  withPantryConfig
-    root
-    defaultHackageSecurityConfig
-    HpackBundled
-    8
-    $ \pc ->
-      runRIO
-        App
-          { appSimpleApp = sa
-          , appPantryConfig = pc
-          }
-        f
-
 main :: IO ()
-main = run $ do
+main = runPantryApp $ do
   _ <- updateHackageIndex Nothing
   runConduitRes $ snapshots .| mapM_C (lift . go)
   where

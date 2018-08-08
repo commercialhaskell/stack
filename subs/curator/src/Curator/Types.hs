@@ -40,6 +40,7 @@ data PackageConstraints = PackageConstraints
   , pcBenchmarks :: !ComponentAction
   , pcHaddock :: !ComponentAction
   , pcNonParallelBuild :: !Bool
+  , pcHide :: !Bool
   }
   deriving Show
 
@@ -64,6 +65,9 @@ instance ToJSON PackageConstraints where
         x -> ["haddock" .= x]
     , if pcNonParallelBuild pc
         then ["non-parallel-build" .= True]
+        else []
+    , if pcHide pc
+        then ["hide" .= True]
         else []
     ]
 

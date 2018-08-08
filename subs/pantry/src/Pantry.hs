@@ -88,6 +88,10 @@ module Pantry
   , hackageIndexTarballL
   , getLatestHackageVersion
 
+    -- * Convenience
+  , PantryApp
+  , runPantryApp
+
     -- * FIXME legacy from Stack, to be updated
   , loadFromIndex
   , getPackageVersions
@@ -109,7 +113,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename)
+import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir)
 import Path.Find (findFiles)
 import Path.IO (resolveDir, doesFileExist)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
@@ -118,6 +122,7 @@ import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import RIO.Process
+import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
@@ -126,6 +131,7 @@ import Network.HTTP.StackClient
 import Network.HTTP.Types (ok200)
 import qualified Distribution.Text
 import Distribution.Types.VersionRange (withinRange)
+import qualified RIO.FilePath
 
 withPantryConfig
   :: HasLogFunc env
@@ -811,3 +817,37 @@ getTreeKey :: PackageLocation -> Maybe TreeKey
 getTreeKey (PLHackage _ mtree) = mtree
 getTreeKey (PLArchive _ pm) = pmTree pm
 getTreeKey (PLRepo _ pm) = pmTree pm
+
+data PantryApp = PantryApp
+  { paSimpleApp :: !SimpleApp
+  , paPantryConfig :: !PantryConfig
+  }
+
+simpleAppL :: Lens' PantryApp SimpleApp
+simpleAppL = lens paSimpleApp (\x y -> x { paSimpleApp = y })
+
+instance HasLogFunc PantryApp where
+  logFuncL = simpleAppL.logFuncL
+instance HasPantryConfig PantryApp where
+  pantryConfigL = lens paPantryConfig (\x y -> x { paPantryConfig = y })
+instance HasProcessContext PantryApp where
+  processContextL = simpleAppL.processContextL
+
+runPantryApp :: MonadIO m => RIO PantryApp a -> m a
+runPantryApp f = runSimpleApp $ do
+  sa <- ask
+  stack <- getAppUserDataDirectory "stack"
+  root <- parseAbsDir $ stack RIO.FilePath.</> "pantry"
+  withPantryConfig
+    root
+    defaultHackageSecurityConfig
+    HpackBundled
+    8
+    $ \pc ->
+      runRIO
+        PantryApp
+          { paSimpleApp = sa
+          , paPantryConfig = pc
+          }
+        f
+

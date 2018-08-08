@@ -5,7 +5,7 @@
 -- | Deal with the @build-constraints.yaml@ format used by
 -- @commercialhaskell/stackage@.
 module Curator.StackageConstraints
-  ( loadSC
+  ( loadStackageConstraints
   ) where
 
 import Pantry
@@ -123,8 +123,8 @@ convertPackages =
 
     combine (a, x) (b, y) = (a <> b, x <> y)
 
-loadSC :: FilePath -> RIO env Constraints
-loadSC = decodeFileThrow >=> convert
+loadStackageConstraints :: FilePath -> RIO env Constraints
+loadStackageConstraints = decodeFileThrow >=> convert
 
 convert :: SC -> RIO env Constraints
 convert sc0 = do
@@ -160,6 +160,7 @@ convert sc0 = do
           , scSkippedBenchmarks = Set.delete name $ scSkippedBenchmarks sc1
           , scExpectedHaddockFailures = Set.delete name $ scExpectedHaddockFailures sc1
           , scSkippedHaddocks = Set.delete name $ scSkippedHaddocks sc1
+          , scHide = Set.delete name $ scHide sc1
           }
         res = do
           tests <-
@@ -202,4 +203,5 @@ convert sc0 = do
             , pcTests = tests
             , pcBenchmarks = benchmarks
             , pcHaddock = haddock
+            , pcHide = Set.member name $ scHide sc1
             }
