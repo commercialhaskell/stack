@@ -55,7 +55,7 @@ displayWithColor
 displayWithColor x = do
     useAnsi <- view useColorL
     termWidth <- view $ runnerL.to runnerTermWidth
-    return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
+    (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 

@@ -26,7 +26,8 @@ module Text.PrettyPrint.Leijen.Extended
   -- See "System.Console.ANSI" for 'SGR' values to use beyond the colors
   -- provided.
   AnsiDoc, AnsiAnn(..), HasAnsiAnn(..),
-  hDisplayAnsi, displayAnsi, displayPlain, renderDefault,
+  -- hDisplayAnsi,
+  displayAnsi, displayPlain, renderDefault,
 
   -- ** Color combinators
   black, red, green, yellow, blue, magenta, cyan, white,
@@ -125,6 +126,7 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
 import Stack.Prelude hiding (Display (..))
+import Stack.Types.Runner (HasRunner)
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
@@ -178,8 +180,13 @@ instance HasAnsiAnn AnsiAnn where
 instance HasAnsiAnn () where
     getAnsiAnn _ = mempty
 
-displayPlain :: Display a => Int -> a -> T.Text
-displayPlain w = LT.toStrict . displayAnsiSimple . renderDefault w . fmap (const mempty) . display
+displayPlain
+    :: (Display a, HasRunner env, HasLogFunc env, MonadReader env m,
+        HasCallStack)
+    => Int -> a -> m T.Text
+displayPlain w x = do
+    t <- (displayAnsiSimple . renderDefault w . fmap (const mempty) . display) x
+    return $ LT.toStrict t
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
@@ -187,18 +194,27 @@ displayPlain w = LT.toStrict . displayAnsiSimple . renderDefault w . fmap (const
 renderDefault :: Int -> Doc a -> SimpleDoc a
 renderDefault = renderPretty 1
 
-displayAnsi :: (Display a, HasAnsiAnn (Ann a)) => Int -> a -> T.Text
-displayAnsi w = LT.toStrict . displayAnsiSimple . renderDefault w . toAnsiDoc . display
+displayAnsi
+    :: (Display a, HasAnsiAnn (Ann a), HasRunner env, HasLogFunc env,
+        MonadReader env m, HasCallStack)
+    => Int -> a -> m T.Text
+displayAnsi w x = do
+    t <- (displayAnsiSimple . renderDefault w . toAnsiDoc . display) x
+    return $ LT.toStrict t
 
+{-
 hDisplayAnsi
     :: (Display a, HasAnsiAnn (Ann a), MonadIO m)
     => Handle -> Int -> a -> m ()
 hDisplayAnsi h w x = liftIO $ do
     useAnsi <- hSupportsANSI h
     T.hPutStr h $ if useAnsi then displayAnsi w x else displayPlain w x
+-}
 
-displayAnsiSimple :: SimpleDoc AnsiAnn -> LT.Text
-displayAnsiSimple doc =
+displayAnsiSimple
+    :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
+    => SimpleDoc AnsiAnn -> m LT.Text
+displayAnsiSimple doc = return $
      LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc
   where
     go (AnsiAnn sgrs) inner = do
