@@ -3774,7 +3774,6 @@ packages:
         - haskell-tools-builtin-refactorings
         - heap
         - hex
-        - hfsevents
         - hierarchical-clustering
         - hmatrix
         - hmatrix-gsl
@@ -3931,7 +3930,6 @@ packages:
         - th-lift-instances
         - th-utilities
         - threads
-        - tiempo
         - time-locale-compat
         - time-units
         - tls-session-manager
@@ -3983,6 +3981,44 @@ packages:
         - yesod-persistent
         - zlib
         - zlib-bindings
+        - EdisonAPI
+        - fmlist
+        - mono-traversable-instances
+        - dlist-instances
+        - skein
+        - tuple-th
+        - crypto-numbers
+        - data-default-instances-containers
+        - data-default-instances-dlist
+        - data-default-instances-old-locale
+        - STMonadTrans
+        - easy-file
+        - BiobaseNewick
+        - ForestStructures
+        - hfsevents
+        - minisat-solver
+        - portable-lines
+        - hxt-regex-xmlschema
+        - data-dword
+        - data-bword
+        - data-endian
+        - data-serializer
+        - data-textual
+        - text-printer
+        - text-latin1
+        - data-checked
+        - type-hint
+        - pipes-group
+        - readable
+        - wcwidth
+        - language-haskell-extract
+        - Boolean
+        - NumInstances
+        - http-date
+        - http2
+        - simple-sendfile
+        - control-monad-free
+        - prelude-extras
 
 # end of packages
 
@@ -4142,7 +4178,7 @@ configure-args:
 
 # Used for packages that cannot be built on Linux
 skipped-builds:
-    - hfsevents
+    # - hfsevents # disabled temporarily since I'm testing on OS X
     - lzma-clib
     - Win32
     - Win32-notify
