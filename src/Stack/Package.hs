@@ -1294,9 +1294,9 @@ warnMultiple
 warnMultiple name candidate rest =
     -- TODO: figure out how to style 'name' and the dispOne stuff
     prettyWarnL
-        [ flow "There were multiple candidates for the Cabal entry \""
+        [ flow "There were multiple candidates for the Cabal entry"
         , fromString . showName $ name
-        , line <> bulletedList (map dispOne rest)
+        , line <> bulletedList (map dispOne (candidate:rest))
         , line <> flow "picking:"
         , dispOne candidate
         ]
