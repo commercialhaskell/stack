@@ -7,6 +7,8 @@ dependencies:
 - pantry
 - Cabal
 - yaml
+- path
+- path-io
 
 library:
   source-dirs: src

@@ -34,12 +34,12 @@ getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
 getFlags pc
   | Map.null (pcFlags pc) = Nothing
   | otherwise = Just (pcFlags pc)
-  
+
 toLoc
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> PackageConstraints
-  -> RIO env (Maybe PackageLocation)
+  -> RIO env (Maybe PackageLocationImmutable)
 toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
@@ -72,7 +72,7 @@ toLoc name pc =
             case viewer revs of
               Nothing -> error $ "Impossible! No revisions found for " ++ show (name, version)
               Just (BlobKey sha size, _) -> pure $ CFIHash sha $ Just size
-          pure $ Just $ PLHackage (PackageIdentifierRevision name version cfi) Nothing
+          pure $ Just $ PLIHackage (PackageIdentifierRevision name version cfi) Nothing
 
 getGlobalHints
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
