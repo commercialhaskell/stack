@@ -1,26 +1,46 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 import Curator
-import Data.Yaml (encodeFile)
-import Path.IO (resolveFile')
+import Data.Yaml (encodeFile, decodeFileThrow)
+import Path.IO (resolveFile', resolveDir')
 
 main :: IO ()
 main = runPantryApp $ do
   -- each of these should be separate commands
 
+  -- update Hackage index
+  do
+    updateHackageIndex $ Just "Running snapshot curator tool"
+
   -- write constraints
-  constraints <- loadStackageConstraints "build-constraints.yaml"
-  liftIO $ encodeFile "constraints.yaml" constraints
+  do
+    logInfo "Writing constraints.yaml"
+    loadStackageConstraints "build-constraints.yaml" >>= liftIO . encodeFile "constraints.yaml"
 
   -- create snapshot
-  makeSnapshot constraints "my-test-snapshot" >>=
-    liftIO . encodeFile "snapshot-incomplete.yaml"
+  do
+    logInfo "Writing snapshot-incomplete.yaml"
+    decodeFileThrow "constraints.yaml" >>= \constraints ->
+      makeSnapshot constraints "my-test-snapshot" >>=
+      liftIO . encodeFile "snapshot-incomplete.yaml"
 
   -- complete snapshot
-  let raw = "snapshot-incomplete.yaml"
-  abs' <- resolveFile' raw
-  let resolved = ResolvedPath (RelFilePath (fromString raw)) abs'
-  loadPantrySnapshot (SLFilePath resolved Nothing) >>=
-    either (\x -> error $ "should not happen: " ++ show x) (\(x, _, _) -> pure x) >>=
-    completeSnapshot >>=
-      liftIO . encodeFile "snapshot.yaml"
+  do
+    logInfo "Writing snapshot.yaml"
+    incomplete <- loadPantrySnapshotFile "snapshot-incomplete.yaml"
+    complete <- completeSnapshot incomplete
+    liftIO $ encodeFile "snapshot.yaml" complete
+  
+  do
+    logInfo "Unpacking files"
+    snapshot <- loadPantrySnapshotFile "snapshot.yaml"
+    constraints <- decodeFileThrow "constraints.yaml"
+    dest <- resolveDir' "unpack-dir"
+    unpackSnapshot constraints snapshot dest
+
+loadPantrySnapshotFile fp = do
+  abs' <- resolveFile' fp
+  eres <- loadPantrySnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs') Nothing
+  case eres of
+    Left x -> error $ "should not happen: " ++ show (fp, x)
+    Right (x, _, _) -> pure x

@@ -94,6 +94,7 @@ import Pantry.StaticSHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import Distribution.Types.PackageName (PackageName)
+import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
@@ -641,6 +642,9 @@ parsePackageName = Distribution.Text.simpleParse
 parseVersion :: String -> Maybe Version
 parseVersion = Distribution.Text.simpleParse
 
+parseVersionRange :: String -> Maybe VersionRange
+parseVersionRange = Distribution.Text.simpleParse
+
 parseFlagName :: String -> Maybe FlagName
 parseFlagName = Distribution.Text.simpleParse
 
@@ -940,6 +944,9 @@ instance IsCabalString PackageName where
 instance IsCabalString Version where
   cabalStringName _ = "version"
   cabalStringParser = parseVersion
+instance IsCabalString VersionRange where
+  cabalStringName _ = "version range"
+  cabalStringParser = parseVersionRange
 instance IsCabalString PackageIdentifier where
   cabalStringName _ = "package identifier"
   cabalStringParser = parsePackageIdentifier

@@ -63,11 +63,15 @@ toLoc name pc =
               Just range -> Map.filterWithKey (\v _ -> v `withinRange` range) versions
       case Map.maxViewWithKey versions' of
         Nothing -> pure Nothing -- argument could be made for erroring out...
-        Just ((version, _), _) -> do
-          let cfi =
+        Just ((version, revs), _) -> do
+          let viewer =
                 case revisions of
-                  NoRevisions -> CFIRevision $ Revision 0
-                  UseRevisions -> CFILatest
+                  NoRevisions -> Map.minView
+                  UseRevisions -> Map.maxView
+          cfi <-
+            case viewer revs of
+              Nothing -> error $ "Impossible! No revisions found for " ++ show (name, version)
+              Just (BlobKey sha size, _) -> pure $ CFIHash sha $ Just size
           pure $ Just $ PLHackage (PackageIdentifierRevision name version cfi) Nothing
 
 getGlobalHints

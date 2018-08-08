@@ -10,6 +10,8 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Curator
 
 executables:
   curator:

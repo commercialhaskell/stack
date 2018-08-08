@@ -30,6 +30,10 @@ instance ToJSON Constraints where
     [ "ghc-version" .= CabalString (consGhcVersion c)
     , "packages" .= toCabalStringMap (consPackages c)
     ]
+instance FromJSON Constraints where
+  parseJSON = withObject "Constraints" $ \o -> Constraints
+    <$> fmap unCabalString (o .: "ghc-version")
+    <*> fmap unCabalStringMap (o .: "packages")
 
 data PackageConstraints = PackageConstraints
   { pcMaintainers :: !(Set Maintainer)
@@ -70,12 +74,34 @@ instance ToJSON PackageConstraints where
         then ["hide" .= True]
         else []
     ]
+instance FromJSON PackageConstraints where
+  parseJSON = withObject "PackageConstraints" $ \o -> PackageConstraints
+    <$> o .:? "maintainers" .!= mempty
+    <*> o .: "source"
+    <*> fmap unCabalStringMap (o .:? "flags" .!= mempty)
+    <*> o .:? "skip-build" .!= False
+    <*> o .:? "tests" .!= CAExpectSuccess
+    <*> o .:? "benchmarks" .!= CAExpectSuccess
+    <*> o .:? "haddock" .!= CAExpectSuccess
+    <*> o .:? "non-parallel-build" .!= False
+    <*> o .:? "hide" .!= False
 
 data PackageSource
   = PSHackage !HackageSource
   deriving Show
 instance ToJSON PackageSource where
   toJSON (PSHackage hs) = object $ ("type" .= ("hackage" :: Text)) : hsToPairs hs
+instance FromJSON PackageSource where
+  parseJSON = withObject "PackageSource" $ \o -> do
+    typ <- o .: "type"
+    case typ :: Text of
+      "hackage" -> PSHackage <$> hackage o
+      _ -> fail $ "Invalid type: " ++ show typ
+    where
+      hackage o = HackageSource
+        <$> fmap (fmap unCabalString) (o .:? "range")
+        <*> fmap (fmap unCabalString) (o .:? "required-latest")
+        <*> o .:? "revisions" .!= NoRevisions
 
 data HackageSource = HackageSource
   { hsRange :: !(Maybe VersionRange)
@@ -103,6 +129,13 @@ instance ToJSON ComponentAction where
   toJSON CAExpectSuccess = toJSON ("expect-success" :: Text)
   toJSON CAExpectFailure = toJSON ("expect-failure" :: Text)
   toJSON CASkip = toJSON ("skip" :: Text)
+instance FromJSON ComponentAction where
+  parseJSON = withText "ComponentAction" $ \t ->
+    case t of
+      "expect-success" -> pure CAExpectSuccess
+      "expect-failure" -> pure CAExpectFailure
+      "skip" -> pure CASkip
+      _ -> fail $ "Invalid component action: " ++ show t
 
 data Revisions
   = UseRevisions
@@ -112,3 +145,9 @@ data Revisions
 instance ToJSON Revisions where
   toJSON UseRevisions = toJSON ("use-revisions" :: Text)
   toJSON NoRevisions = toJSON ("no-revisions" :: Text)
+instance FromJSON Revisions where
+  parseJSON = withText "Revisions" $ \t ->
+    case t of
+      "use-revisions" -> pure UseRevisions
+      "no-revisions" -> pure NoRevisions
+      _ -> fail $ "Invalid revisions: " ++ show t
