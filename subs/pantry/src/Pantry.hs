@@ -96,6 +96,7 @@ module Pantry
     -- * FIXME legacy from Stack, to be updated
   , loadFromIndex
   , getPackageVersions
+  , UsePreferredVersions (..)
   , fetchPackages
   , unpackPackageLocation
   ) where
@@ -281,13 +282,21 @@ typoCorrectionCandidates name' =
     $ cache
 -}
 
+-- | Should we pay attention to Hackage's preferred versions?
+data UsePreferredVersions = YesPreferredVersions | NoPreferredVersions
+  deriving Show
+
 -- | Returns the versions of the package available on Hackage.
 getPackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => UsePreferredVersions
+  -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getPackageVersions name = withStorage $ do
-  mpreferred <- loadPreferredVersion name
+getPackageVersions usePreferred name = withStorage $ do
+  mpreferred <-
+    case usePreferred of
+      YesPreferredVersions -> loadPreferredVersion name
+      NoPreferredVersions -> pure Nothing
   let predicate :: Version -> Map Revision BlobKey -> Bool
       predicate = fromMaybe (\_ _ -> True) $ do
         preferredT1 <- mpreferred
@@ -297,13 +306,13 @@ getPackageVersions name = withStorage $ do
   Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 -- | Returns the latest version of the given package available from
--- Hackage.
+-- Hackage. Uses preferred versions to ignore packages.
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
   -> RIO env (Maybe PackageIdentifierRevision)
 getLatestHackageVersion name =
-  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getPackageVersions name
+  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getPackageVersions YesPreferredVersions name
   where
     go (version, m) = do
       (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m

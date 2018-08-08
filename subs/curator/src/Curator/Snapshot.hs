@@ -43,7 +43,8 @@ toLoc
 toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
-      versions <- getPackageVersions name
+      versions <- getPackageVersions NoPreferredVersions name -- don't follow the preferred versions on Hackage, give curators more control
+      when (Map.null versions) $ error $ "Package not found on Hackage: " ++ displayC name
       for_ mrequiredLatest $ \required ->
         case Map.maxViewWithKey versions of
           Nothing -> error $ "No versions found for " ++ displayC name
@@ -62,7 +63,7 @@ toLoc name pc =
               Nothing -> versions
               Just range -> Map.filterWithKey (\v _ -> v `withinRange` range) versions
       case Map.maxViewWithKey versions' of
-        Nothing -> pure Nothing -- argument could be made for erroring out...
+        Nothing -> pure Nothing -- argument could be made for erroring out, but currently used by curators to mean "don't include this"...
         Just ((version, revs), _) -> do
           let viewer =
                 case revisions of
