@@ -865,7 +865,7 @@ resolveComponentFiles component build names = do
     (modules,files,warnings) <-
         resolveFilesAndDeps
             component
-            (dirs ++ [dir])
+            (if null dirs then [dir] else dirs)
             names
     cfiles <- buildOtherSources build
     return (modules, files <> cfiles, warnings)

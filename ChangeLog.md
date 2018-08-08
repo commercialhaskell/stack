@@ -25,6 +25,10 @@ Bug fixes:
 * Ignore duplicate files for a single module when a Haskell module was
   generated from a preprocessor file. See
   [#4076](https://github.com/commercialhaskell/stack/issues/4076).
+* Only track down components in current directory if there are no
+  hs-source-dirs found. This eliminates a number of false-positive
+  warnings, similar to
+  [#4076](https://github.com/commercialhaskell/stack/issues/4076).
 
 
 ## v1.9.0 (release candidate)
