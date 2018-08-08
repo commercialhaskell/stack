@@ -112,7 +112,7 @@ packages:
         - state-codes
 
     "Sebastian Mihai Ardelean <ardeleanasm@gmail.com> @ardeleanasm":
-        - qchas < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
+        - qchas
 
     "Patrick Pelletier <code@funwithsoftware.org> @ppelleti":
         - mercury-api
@@ -503,7 +503,7 @@ packages:
         - blaze-html
         - blaze-markup
         - stylish-haskell < 0 # via aeson-1.4.0.0
-        # - profiteur # js-jquery 3.3
+        # profiteur # aeson-1.4.0.0
         - psqueues
         - websockets
         - websockets-snap
@@ -520,7 +520,7 @@ packages:
         - hourglass-orphans
         - wai-slack-middleware
         - sysinfo
-        - xmonad-extras < 0 # https://github.com/commercialhaskell/stackage/issues/3724
+        - xmonad-extras
         - shelly
         - persistent-redis < 0 # GHC 8.4 via hedis
 
@@ -744,6 +744,7 @@ packages:
         - asciidiagram
 
     "Patrick Brisbin @pbrisbin":
+        - bugsnag-haskell
         - gravatar
         - load-env
         # - yesod-auth-oauth2 # via hoauth2
@@ -839,7 +840,7 @@ packages:
         - bench
         - dhall
         - dhall-bash
-        # - dhall-json # yaml-0.9.0 commercialhaskell/stackage#3823
+        - dhall-json
         # - dhall-nix # deriving-compat via hnix
         - dhall-text
 
@@ -1218,9 +1219,9 @@ packages:
         - servant-cassava
 
     "Alexandr Ruchkin <voidex@live.com> @mvoidex":
-        - hformat < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
-        - simple-log < 0 # DependencyFailed (PackageName "hformat")
-        - text-region < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
+        - hformat
+        - simple-log
+        - text-region
 
     "Aleksey Kliger <aleksey@lambdageek.org> @lambdageek":
         - unbound-generics
@@ -1249,7 +1250,7 @@ packages:
         - darcs
         # - idris # aeson https://github.com/idris-lang/Idris-dev/issues/4493
         - libffi
-        - xmonad-contrib < 0 # DependencyFailed (PackageName "xmonad")
+        - xmonad-contrib
         - cairo
         - glib
         - gio
@@ -1376,7 +1377,7 @@ packages:
         - github
         - insert-ordered-containers
         - integer-logarithms
-        - JuicyPixels-scale-dct < 0 # JuicyPixels 3.3 commercialhaskell/stackage#3818
+        - JuicyPixels-scale-dct
         - kleene
         - lattices
         - microstache
@@ -1709,7 +1710,6 @@ packages:
         - gloss # @benl23x5
         - gloss-rendering # @benl23x5
         - gpolyline # @fegu
-        - monad-memo # @EduardSergeev
         - postgresql-simple-migration # @ameingast
         - statestack # @diagrams
 
@@ -2143,6 +2143,7 @@ packages:
         - servant-checked-exceptions-core
         # - servant-rawm # https://github.com/cdepillabout/servant-rawm/issues/4
         - servant-static-th
+        - termonad
         - world-peace
         - xml-html-qq
         - xml-indexed-cursor
@@ -2241,6 +2242,7 @@ packages:
         - SafeSemaphore
         - streamproc
         - titlecase
+        - xmonad
 
     "Mark Fine <mark.fine@gmail.com> @markfine":
         - postgresql-schema
@@ -2491,6 +2493,7 @@ packages:
         - wss-client
         - network-messagepack-rpc
         - network-messagepack-rpc-websocket
+        - unicode-show
 
     "Hans-Christian Esperer <hc@hcesperer.org> @hce":
         - avwx
@@ -2524,12 +2527,11 @@ packages:
 
     "Takayuki Muranushi <muranushi@gmail.com> @nushio3":
         - binary-search
-        - unicode-show
 
     "Jason Shipman <jasonpshipman@gmail.com> @jship":
-        - logging-effect-extra < 0 # GHC 8.4 via base-4.11.0.0
-        - logging-effect-extra-file < 0 # GHC 8.4 via base-4.11.0.0
-        - logging-effect-extra-handler < 0 # GHC 8.4 via base-4.11.0.0
+        - logging-effect-extra
+        - logging-effect-extra-file
+        - logging-effect-extra-handler
         - overhang
         - tao
         - tao-example
@@ -2571,7 +2573,7 @@ packages:
     "Ozgun Ataman ozgun.ataman@soostone.com @ozataman":
         - string-conv
         - rng-utils
-        - ua-parser < 0 # via aeson-1.3.1.0
+        - ua-parser
         - hs-GeoIP
         - retry
         - katip < 0 # via aeson-1.3.1.0
@@ -2734,6 +2736,7 @@ packages:
         - gi-gtk-hs
         - gi-gtksource
         - gi-javascriptcore
+        - gi-vte
         # - gi-webkit2 # GHC 8.4
 
     "Brandon Simmons <brandon.m.simmons@gmail.com> @jberryman":
@@ -2766,9 +2769,10 @@ packages:
     "Henri Verroken <henriverroken@gmail.com> @hverr":
         - bordacount
         - cache
-        - haskey-btree
         - haskey
+        - haskey-btree
         - haskey-mtl
+        - intset-imperative
         - lxd-client < 0 # GHC 8.4 via http-media
         - lxd-client-config
         - xxhash-ffi
@@ -3112,7 +3116,7 @@ packages:
 
     "Hardy Jones <jones3.hardy@gmail.com> @joneshf":
         # - katip-rollbar # async 2.2
-        - rollbar-hs < 0 # aeson
+        - rollbar-hs
         - servant-ruby
         - wai-middleware-rollbar < 0 # aeson
 
@@ -3290,6 +3294,8 @@ packages:
 
     "Douglas Burke <dburke.gw@gmail.com> @DougBurke":
         - swish
+        - hvega
+        - ihaskell-hvega
 
     "Adam Flott <adam@adamflott.com> @adamflott":
         - milena
@@ -3532,6 +3538,9 @@ packages:
     "Daniel Gorin <jcpetruzza@gmail.com> @jcpetruzza":
         - barbies
 
+    "Eduard Sergeev <eduard.sergeev@gmail.com> @EduardSergeev":
+        - monad-memo
+
     # If you stop maintaining a package you can move it here.
     # It will then be disabled if it starts causing problems.
     # See https://github.com/fpco/stackage/issues/1056
@@ -3585,7 +3594,6 @@ packages:
         - crackNum < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
         - prim-array < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
         - quickcheck-classes < 0 # DependencyFailed (PackageName "prim-array")
-        - xmonad < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
         - xxhash < 0 # BuildFailureException Process exited with ExitFailure 1: ./Setup build
         - Unique < 0 # GHC 8.4 via base-4.11.0.0
         - ghc-compact < 0 # GHC 8.4 via base-4.11.1.0
@@ -3609,22 +3617,6 @@ packages:
         # https://github.com/fpco/stackage/issues/3566
         - network < 2.7
 
-        # needed by statistics, in turn needed by criterion
-        # https://github.com/commercialhaskell/stackage/issues/3781
-        - base-orphans < 0.8
-
-        # can't unconstrain until base-orphans is unconstrained
-        # https://github.com/commercialhaskell/stackage/issues/3787
-        - semigroupoids < 5.3
-
-        # needed by foldl, in turn needed by many others (mono-traversable,
-        # turtle, etc.)
-        # https://github.com/commercialhaskell/stackage/issues/3828
-        - mwc-random < 0.14
-
-        # https://github.com/commercialhaskell/stackage/issues/3856
-        - dhall < 1.16
-
         # https://github.com/commercialhaskell/stackage/issues/3858
         - focus < 0.2
         - stm-containers < 1
@@ -3632,6 +3624,365 @@ packages:
 
         # https://github.com/commercialhaskell/stackage/issues/3863
         - vty < 5.23
+
+        # https://github.com/commercialhaskell/stackage/issues/3868
+        - brick < 0.39
+
+        # https://github.com/commercialhaskell/stackage/issues/3878
+        - microspec < 0.2
+
+        # https://github.com/commercialhaskell/stackage/issues/3884
+        - pretty-show < 1.8
+
+    "Added as dependencies":
+        - random
+        - QuickCheck
+        - quickcheck-io
+        - fingertree-psqueue
+        - test-framework
+        - test-framework-hunit
+        - test-framework-quickcheck2
+        - Glob
+        - data-binary-ieee754
+        - data-memocombinators
+        - temporary
+        - attoparsec
+        - cereal
+        - iobaseNewick
+        - ChasingBottoms
+        - Decimal
+        - Diff
+        - EdisonCore
+        - HDBC
+        - HDBC-session
+        - HTTP
+        - HsOpenSSL
+        - ListLike
+        - MemoTrie
+        - Only
+        - PSQueue
+        - ParsecTools
+        - RSA
+        - SegmentTree
+        - X11
+        - alsa-mixer
+        - ansi-terminal
+        - appar
+        - asn1-encoding
+        - asn1-parse
+        - asn1-types
+        - authenticate
+        - auto-update
+        - base-compat
+        - base-orphans
+        - base64-bytestring
+        - base64-string
+        - bimap
+        - binary-parser
+        - bindings-DSL
+        - bitarray
+        - blaze-builder
+        - blaze-svg
+        - blaze-textual
+        - buffer-builder
+        - byteable
+        - bytestring-builder
+        - bytestring-strict-builder
+        - bytestring-tree-builder
+        - bzlib
+        - call-stack
+        - casing
+        - cereal-text
+        - cereal-vector
+        - checkers
+        - chunked-data
+        - cipher-aes128
+        - cipher-blowfish
+        - cipher-camellia
+        - cipher-des
+        - classy-prelude
+        - classy-prelude-conduit
+        - clientsession
+        - cmark-gfm
+        - colour
+        - composition-prelude
+        - conduit
+        - config-ini
+        - configurator
+        - contravariant-extras
+        - control-monad-omega
+        - convertible
+        - cookie
+        - cpphs
+        - crypto-api
+        - crypto-cipher-types
+        - crypto-pubkey
+        - crypto-random
+        - cryptohash-cryptoapi
+        - cryptohash-sha256
+        - cryptohash-sha512
+        - css-text
+        - csv
+        - data-clist
+        - data-default
+        - data-default-class
+        - data-hash
+        - data-inttrie
+        - data-lens-light
+        - data-msgpack-types
+        - data-reify
+        - deepseq-generics
+        - deque
+        - direct-sqlite
+        - discount
+        - dlist
+        - double-conversion
+        - ed25519
+        - either-unwrap
+        - enclosed-exceptions
+        - entropy
+        - enummapset
+        - equivalence
+        - erf
+        - errors
+        - exception-mtl
+        - exception-transformers
+        - expiring-cache-map
+        - extensible-exceptions
+        - fail
+        - fast-logger
+        - file-embed
+        - file-embed-lzma
+        - filemanip
+        - fingertree
+        - fingertree-psqueue
+        - geniplate-mirror
+        - ghc-paths
+        - ghc-prof
+        - gi-gdk
+        - gi-gdkpixbuf
+        - gi-pango
+        - groom
+        - groups
+        - hackage-security
+        - haskell-gi-overloading
+        - haskell-lexer
+        - haskell-lsp-types
+        - haskell-src
+        - haskell-src-exts
+        - haskell-src-meta
+        - haskell-tools-builtin-refactorings
+        - heap
+        - hex
+        - hfsevents
+        - hierarchical-clustering
+        - hmatrix
+        - hmatrix-gsl
+        - hmatrix-special
+        - hoopl
+        - hostname
+        - hourglass
+        - hpqtypes
+        - hscolour
+        - hslogger
+        - hsp
+        - hspec-core
+        - hspec-discover
+        - hspec-expectations
+        - hspec-smallcheck
+        - html
+        - html-conduit
+        - html-entities
+        - http-client-openssl
+        - http-client-tls
+        - http-reverse-proxy
+        - http-types
+        - hw-mquery
+        - hw-string-parse
+        - hxt
+        - hxt-charproperties
+        - hxt-http
+        - hxt-unicode
+        - iconv
+        - ieee754
+        - infer-license
+        - inspection-testing
+        - io-streams-haproxy
+        - ip
+        - ixset-typed
+        - json
+        - largeword
+        - libxml-sax
+        - lifted-async
+        - lifted-base
+        - loch-th
+        - lockfree-queue
+        - logging-facade
+        - lrucache
+        - lz4
+        - lzma
+        - mainland-pretty
+        - managed
+        - math-functions
+        - mersenne-random-pure64
+        - microbench
+        - mime-types
+        - mmap
+        - mmorph
+        - mockery
+        - monad-control
+        - monad-logger
+        - monad-loops
+        - monads-tf
+        - monoid-transformer
+        - mstate
+        - mwc-random
+        - names-th
+        - nettle
+        - network-info
+        - network-ip
+        - network-uri
+        - newtype
+        - nicify-lib
+        - old-locale
+        - old-time
+        - operational
+        - optional-args
+        - options
+        - optparse-applicative
+        - parallel
+        - path-pieces
+        - pcg-random
+        - persistable-record
+        - pipes-bytestring
+        - placeholders
+        - poll
+        - polyparse
+        - postgresql-libpq
+        - postgresql-simple
+        - prettyprinter-convert-ansi-wl-pprint
+        - primes
+        - primitive
+        - process-extras
+        - product-isomorphic
+        - project-template
+        - protobuf
+        - pureMD5
+        - quickcheck-instances
+        - quickcheck-simple
+        - random-shuffle
+        - ratio-int
+        - rdtsc
+        - ref-fd
+        - regex-pcre-builtin
+        - regex-tdfa-text
+        - relational-schemas
+        - resolv
+        - resource-pool
+        - resourcet
+        - rio
+        - rio-orphans
+        - safecopy
+        - sandi
+        - scientific
+        - securemem
+        - servant-client-core
+        - servant-swagger-ui-core
+        - setenv
+        - shakespeare
+        - shell-escape
+        - silently
+        - singleton-nats
+        - skylighting-core
+        - snap-core
+        - special-values
+        - splice
+        - split
+        - sql-words
+        - srcloc
+        - stateref
+        - statistics
+        - stm-delay
+        - storable-complex
+        - storable-endian
+        - storable-tuple
+        - store-core
+        - strict
+        - stringbuilder
+        - stringsearch
+        - sundown
+        - syb
+        - symbol
+        - system-fileio
+        - system-filepath
+        - tabular
+        - tar
+        - tasty-hedgehog
+        - tasty-kat
+        - tasty-th
+        - test-framework-th
+        - text-builder
+        - text-icu
+        - text-postgresql
+        - text-short
+        - text-zipper
+        - tf-random
+        - th-extras
+        - th-lift-instances
+        - th-utilities
+        - threads
+        - tiempo
+        - time-locale-compat
+        - time-units
+        - tls-session-manager
+        - transformers-base
+        - type-fun
+        - uglymemo
+        - unbounded-delays
+        - unix-compat
+        - unix-time
+        - utf8-light
+        - utf8-string
+        - uuid-types
+        - vault
+        - vector
+        - vector-algorithms
+        - vector-binary-instances
+        - vector-builder
+        - vector-space
+        - vector-th-unbox
+        - vivid-osc
+        - vivid-supercollider
+        - wai
+        - wai-app-static
+        - wai-conduit
+        - wai-eventsource
+        - wai-extra
+        - wai-handler-launch
+        - wai-logger
+        - wai-session
+        - warp
+        - wizards
+        - word-wrap
+        - word8
+        - x509
+        - x509-store
+        - x509-system
+        - x509-validation
+        - xml
+        - xml-conduit
+        - xml-conduit-writer
+        - xml-hamlet
+        - xml-types
+        - xss-sanitize
+        - xxhash
+        - yeshql-core
+        - yeshql-hdbc
+        - yesod-core
+        - yesod-form
+        - yesod-persistent
+        - zlib
+        - zlib-bindings
 
 # end of packages
 
@@ -3651,9 +4002,6 @@ package-flags:
         tcp: true
         simplelocalnet: true
         p2p: true
-
-    logfloat:
-        splitbase: true
 
     curl:
         new-base: true
@@ -3686,12 +4034,6 @@ package-flags:
 
     time-locale-compat:
         old-locale: false
-
-    th-data-compat:
-        template-haskell-210: false
-        template-haskell-212: true
-    th-reify-compat:
-        template-haskell-210: false
 
     HsOpenSSL:
         fast-bignum: false
@@ -3727,7 +4069,7 @@ package-flags:
         containers: true
 
     mintty:
-        win32-2-5: true
+        win32-2-5-3: true
 
     cassava:
         bytestring--lt-0_10_4: false
@@ -3801,6 +4143,7 @@ configure-args:
 # Used for packages that cannot be built on Linux
 skipped-builds:
     - hfsevents
+    - lzma-clib
     - Win32
     - Win32-notify
 
@@ -3833,7 +4176,6 @@ skipped-tests:
     - makefile # GHC 8.2
     - next-ref # hspec 2.3
     - partial-order # HUnit 1.6
-    - rakuten # servant 0.14
     - superbuffer # QuickCheck-2.11.3
     - tar # QuickCheck-2.11.3, tasty-quickcheck, base-4.11.1
     - text # QuickCheck-2.11.3
@@ -3995,6 +4337,7 @@ expected-test-failures:
     - zeromq4-patterns
     - zip
     - unagi-chan
+    - network-attoparsec
 
     # Requires running servers, accounts, or a specific
     # environment. These shouldn't be re-enabled unless we know a fix
@@ -4115,7 +4458,6 @@ expected-test-failures:
     - shikensu # https://github.com/icidasset/shikensu/issues/5
     - unicode-show # https://github.com/nushio3/unicode-show/issues/2
     - xml-picklers # https://github.com/Philonous/xml-picklers/issues/5
-    - xmonad # 0.12 https://github.com/xmonad/xmonad/issues/36
     - bitx-bitcoin # https://github.com/tebello-thejane/bitx.hs/issues/4
     - http-link-header # https://github.com/myfreeweb/http-link-header/issues/7
     - courier # https://github.com/hargettp/courier/issues/19
@@ -4149,7 +4491,6 @@ expected-test-failures:
     - wai-middleware-content-type # 0.4.1 - https://github.com/athanclark/wai-middleware-content-type/issues/2
     - xmlgen # https://github.com/skogsbaer/xmlgen/issues/6
     - yesod-auth-basic # https://github.com/creichert/yesod-auth-basic/issues/1
-    - monad-memo # https://github.com/EduardSergeev/monad-memo/issues/3
     - perf # https://github.com/fpco/stackage/pull/2859
     - haskell-tools-builtin-refactorings
     - squeal-postgresql # https://github.com/fpco/stackage/issues/3180
@@ -4220,7 +4561,6 @@ expected-benchmark-failures:
     - raaz # https://github.com/raaz-crypto/raaz/issues/338
     - http2
     - xxhash # https://github.com/christian-marie/xxhash/issues/4
-    - monad-memo # https://github.com/EduardSergeev/monad-memo/issues/3
     - cmark-gfm # https://github.com/kivikakk/cmark-gfm-hs/issues/5
     - lz4 # https://github.com/fpco/stackage/issues/3510
     - hledger # https://github.com/fpco/stackage/issues/3573
@@ -4258,6 +4598,7 @@ expected-haddock-failures:
 # For packages with haddock issues
 skipped-haddocks:
 - approximate
+- invertible
 - sparkle # Java function failures tweag/sparkle#144
 # end of skipped-haddocks
 
@@ -4272,24 +4613,23 @@ skipped-benchmarks:
     # These can periodically be checked for updates;
     # just remove these lines and run `stackage-curator check'
     # to verify.
-    - avers # criterion 1.3
-    - binary-parsers # criterion 1.2
-    - cryptohash-sha512 # criterion 1.2
-    - heist # criterion 1.3
+    - binary-parsers # criterion 1.5
+    - cryptohash-sha512 # criterion 1.5
     - hw-rankselect # via criterion-1.5.0.0
     - identicon # via criterion-1.5.0.0
     - pandoc-types # via criterion-1.5.0.0
     - pipes # optparse-applicative 0.13
     - skylighting-core # via criterion-1.5.0.0
     - snap-server # via criterion-1.5.0.0
-    - splitmix # criterion 1.3
-    - superbuffer # criterion 1.3
-    - text-builder # criterion 1.1 https://github.com/commercialhaskell/stackage/issues/3668
+    - superbuffer # criterion 1.5
+    - text-builder # criterion 1.5 https://github.com/commercialhaskell/stackage/issues/3668
     - ttrie # criterion-plus and th-pprint
-    - tz # criterion 1.3
-    - unicode-transforms # criterion 1.3
-    - universum # criterion 1.2 https://github.com/fpco/stackage/issues/3100
-    - unordered-containers # criterion 1.2
+    - tz # criterion 1.5
+    - unicode-transforms # path-io
+    - unordered-containers # criterion 1.5
+    - hw-prim # criterion 1.5, https://github.com/commercialhaskell/stackage/issues/3880
+    - hw-rankselect-base # criterion 1.5, https://github.com/commercialhaskell/stackage/issues/3880
+    - hw-balancedparens # criterion 1.5, https://github.com/commercialhaskell/stackage/issues/3880
 
     # ghc 8.4 outdated dependencies
     - buffer-builder # ghc 8.4 via json-builder build failure

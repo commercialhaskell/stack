@@ -2,3 +2,4 @@ constraints.yaml
 curator.cabal
 snapshot-incomplete.yaml
 snapshot.yaml
+unpack-dir/

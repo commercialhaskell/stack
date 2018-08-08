@@ -35,6 +35,7 @@ module Pantry
   , TreeKey (..)
   , BlobKey (..)
   , HpackExecutable (..)
+  , PackageMetadata (..)
 
     -- ** Raw package locations
   , RawPackageLocation

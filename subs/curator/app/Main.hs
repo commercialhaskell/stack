@@ -3,6 +3,7 @@
 import Curator
 import Data.Yaml (encodeFile, decodeFileThrow)
 import Path.IO (resolveFile', resolveDir')
+import RIO.Process
 
 main :: IO ()
 main = runPantryApp $ do
@@ -30,13 +31,20 @@ main = runPantryApp $ do
     incomplete <- loadPantrySnapshotFile "snapshot-incomplete.yaml"
     complete <- completeSnapshot incomplete
     liftIO $ encodeFile "snapshot.yaml" complete
-  
+
   do
     logInfo "Unpacking files"
     snapshot <- loadPantrySnapshotFile "snapshot.yaml"
     constraints <- decodeFileThrow "constraints.yaml"
     dest <- resolveDir' "unpack-dir"
     unpackSnapshot constraints snapshot dest
+
+  do
+    logInfo "Building"
+    withWorkingDir "unpack-dir" $ proc 
+      "stack"
+      (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
+      runProcess_
 
 loadPantrySnapshotFile fp = do
   abs' <- resolveFile' fp
