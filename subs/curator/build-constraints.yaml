@@ -1979,7 +1979,7 @@ packages:
         - hapistrano
         - inflections
         - stache
-        - scalendar
+        - scalendar < 1.2 # typo in cabal file, how did this work before?!?
 
     "Sergey Alirzaev <zl29ah@gmail.com> @l29ah":
         - monad-peel
