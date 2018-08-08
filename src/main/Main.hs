@@ -58,6 +58,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
 import           Stack.DefaultColorWhen (defaultColorWhen)
+import           Stack.DefaultStyles (defaultStyles)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -89,6 +90,7 @@ import           Stack.Options.Utils
 import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.PrettyPrint
+import qualified Stack.PrettyPrint as PP (style)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -190,7 +192,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal defColorWhen globalMonoid
+      let global = globalOptsFromMonoid isTerminal defColorWhen defaultStyles globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -659,7 +661,7 @@ uninstallCmd _ go = withConfigAndLock go $
       [ flow "stack does not manage installations in global locations."
       , flow "The only global mutation stack performs is executable copying."
       , flow "For the default executable destination, please run"
-      , styleShell "stack path --local-bin"
+      , PP.style Shell "stack path --local-bin"
       ]
 
 -- | Unpack packages to the filesystem
@@ -689,7 +691,7 @@ uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
 uploadCmd (SDistOpts [] _ _ _ _ _ _) go =
     withConfigAndLock go . prettyErrorL $
         [ flow "To upload the current package, please run"
-        , styleShell "stack upload ."
+        , PP.style Shell "stack upload ."
         , flow "(with the period at the end)"
         ]
 uploadCmd sdistOpts go = do
@@ -702,9 +704,9 @@ uploadCmd sdistOpts go = do
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
     withBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
-            let invalidList = bulletedList $ map (styleFile . fromString) invalid
+            let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
-                [ styleShell "stack upload"
+                [ PP.style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories."
                 , flow "Can't find:"
                 , line <> invalidList
@@ -712,7 +714,7 @@ uploadCmd sdistOpts go = do
             liftIO exitFailure
         when (null files && null dirs) $ do
             prettyErrorL
-                [ styleShell "stack upload"
+                [ PP.style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
             liftIO exitFailure
@@ -761,7 +763,7 @@ sdistCmd sdistOpts go =
                 when (null dirs) $ do
                     stackYaml <- view stackYamlL
                     prettyErrorL
-                        [ styleShell "stack sdist"
+                        [ PP.style Shell "stack sdist"
                         , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
                         , flow "However, the configuration at"
                         , display stackYaml

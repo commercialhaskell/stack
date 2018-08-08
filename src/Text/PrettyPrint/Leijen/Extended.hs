@@ -25,18 +25,9 @@ module Text.PrettyPrint.Leijen.Extended
   --
   -- See "System.Console.ANSI" for 'SGR' values to use beyond the colors
   -- provided.
-  AnsiDoc, AnsiAnn(..), HasAnsiAnn(..),
+  StyleDoc, StyleAnn(..), HasStyleAnn(..),
   -- hDisplayAnsi,
   displayAnsi, displayPlain, renderDefault,
-
-  -- ** Color combinators
-  black, red, green, yellow, blue, magenta, cyan, white,
-  dullblack, dullred, dullgreen, dullyellow, dullblue, dullmagenta, dullcyan, dullwhite,
-  onblack, onred, ongreen, onyellow, onblue, onmagenta, oncyan, onwhite,
-  ondullblack, ondullred, ondullgreen, ondullyellow, ondullblue, ondullmagenta, ondullcyan, ondullwhite,
-
-  -- ** Intensity combinators
-  bold, faint, normal,
 
   -- * Selective re-exports from "Text.PrettyPrint.Annotated.Leijen"
   --
@@ -103,7 +94,7 @@ module Text.PrettyPrint.Leijen.Extended
   -- @
 
   -- ** Semantic annotations
-  annotate, noAnnotate,
+  annotate, noAnnotate, styleAnn
 
   -- ** Rendering
   -- Original entirely omitted:
@@ -120,14 +111,15 @@ module Text.PrettyPrint.Leijen.Extended
   ) where
 
 import Control.Monad.Reader (runReader, local)
+import Data.Array.IArray ((!))
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
 import Stack.Prelude hiding (Display (..))
-import Stack.Types.Runner (HasRunner)
-import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
+import Stack.Types.PrettyPrint (Style, Styles)
+import Stack.Types.Runner (HasRunner, stylesL)
+import System.Console.ANSI (ConsoleLayer (..), SGR (..), setSGRCode)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 
@@ -150,7 +142,7 @@ instance Monoid (Doc a) where
 
 class Display a where
     type Ann a
-    type Ann a = AnsiAnn
+    type Ann a = StyleAnn
     display :: a -> Doc (Ann a)
     default display :: Show a => a -> Doc (Ann a)
     display = fromString . show
@@ -159,26 +151,46 @@ instance Display (Doc a) where
     type Ann (Doc a) = a
     display = id
 
-
 --------------------------------------------------------------------------------
--- Ansi Doc
+-- Style Doc
 
-type AnsiDoc = Doc AnsiAnn
+-- |A style annotation.
+newtype StyleAnn = StyleAnn (Maybe Style)
+    deriving (Eq, Show, Semigroup)
 
+instance Monoid StyleAnn where
+    mempty = StyleAnn Nothing
+    mappend = (<>)
+
+class HasStyleAnn a where
+    getStyleAnn :: a -> StyleAnn
+    toStyleDoc :: Doc a -> StyleDoc
+    toStyleDoc = fmap getStyleAnn
+
+instance HasStyleAnn StyleAnn where
+    getStyleAnn = id
+    toStyleDoc = id
+
+-- |A document annotated by a style
+type StyleDoc = Doc StyleAnn
+
+-- |An ANSI code(s) annotation.
 newtype AnsiAnn = AnsiAnn [SGR]
     deriving (Eq, Show, Semigroup, Monoid)
 
-class HasAnsiAnn a where
-    getAnsiAnn :: a -> AnsiAnn
-    toAnsiDoc :: Doc a -> AnsiDoc
-    toAnsiDoc = fmap getAnsiAnn
-
-instance HasAnsiAnn AnsiAnn where
-    getAnsiAnn = id
-    toAnsiDoc = id
-
-instance HasAnsiAnn () where
-    getAnsiAnn _ = mempty
+-- |Convert a 'SimpleDoc' annotated with 'StyleAnn' to one annotated with
+-- 'AnsiAnn', by reference to a 'Styles'.
+toAnsiDoc :: Styles -> SimpleDoc StyleAnn -> SimpleDoc AnsiAnn
+toAnsiDoc styles = go
+  where
+    go SEmpty        = SEmpty
+    go (SChar c d)   = SChar c (go d)
+    go (SText l s d) = SText l s (go d)
+    go (SLine i d)   = SLine i (go d)
+    go (SAnnotStart (StyleAnn (Just s)) d) =
+        SAnnotStart (AnsiAnn (snd $ styles ! s)) (go d)
+    go (SAnnotStart (StyleAnn Nothing) d) = SAnnotStart (AnsiAnn []) (go d)
+    go (SAnnotStop d) = SAnnotStop (go d)
 
 displayPlain
     :: (Display a, HasRunner env, HasLogFunc env, MonadReader env m,
@@ -195,31 +207,38 @@ renderDefault :: Int -> Doc a -> SimpleDoc a
 renderDefault = renderPretty 1
 
 displayAnsi
-    :: (Display a, HasAnsiAnn (Ann a), HasRunner env, HasLogFunc env,
+    :: (Display a, HasStyleAnn (Ann a), HasRunner env, HasLogFunc env,
         MonadReader env m, HasCallStack)
     => Int -> a -> m T.Text
 displayAnsi w x = do
-    t <- (displayAnsiSimple . renderDefault w . toAnsiDoc . display) x
+    t <- (displayAnsiSimple . renderDefault w . toStyleDoc . display) x
     return $ LT.toStrict t
 
-{-
+{- Not used --------------------------------------------------------------------
+
 hDisplayAnsi
     :: (Display a, HasAnsiAnn (Ann a), MonadIO m)
     => Handle -> Int -> a -> m ()
 hDisplayAnsi h w x = liftIO $ do
     useAnsi <- hSupportsANSI h
     T.hPutStr h $ if useAnsi then displayAnsi w x else displayPlain w x
+
 -}
 
 displayAnsiSimple
     :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
-    => SimpleDoc AnsiAnn -> m LT.Text
-displayAnsiSimple doc = return $
-     LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc
+    => SimpleDoc StyleAnn -> m LT.Text
+displayAnsiSimple doc = do
+    styles <- view stylesL
+    let doc' = toAnsiDoc styles doc
+    return $
+        LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc'
   where
     go (AnsiAnn sgrs) inner = do
         old <- ask
-        let sgrs' = mapMaybe (\sgr -> if sgr == Reset then Nothing else Just (getSGRTag sgr, sgr)) sgrs
+        let sgrs' = mapMaybe (\sgr -> if sgr == Reset
+                                        then Nothing
+                                        else Just (getSGRTag sgr, sgr)) sgrs
             new = if Reset `elem` sgrs
                       then M.fromList sgrs'
                       else foldl' (\mp (tag, sgr) -> M.insert tag sgr mp) old sgrs'
@@ -266,6 +285,8 @@ displayDecoratedWrap f doc = do
             Nothing -> error "Invariant violated by input to displayDecoratedWrap: no matching SAnnotStop for SAnnotStart."
     go (SAnnotStop x) = return (Just x, mempty)
 
+{- Not used --------------------------------------------------------------------
+
 -- Foreground color combinators
 
 black, red, green, yellow, blue, magenta, cyan, white,
@@ -292,8 +313,12 @@ colorFunctions color =
     , ansiAnn [SetColor Background Dull color]
     )
 
-ansiAnn :: [SGR] -> Doc AnsiAnn -> Doc AnsiAnn
-ansiAnn = annotate . AnsiAnn
+-}
+
+styleAnn :: Style -> Doc StyleAnn -> Doc StyleAnn
+styleAnn = annotate . StyleAnn . Just
+
+{- Not used --------------------------------------------------------------------
 
 -- Intensity combinators
 
@@ -301,6 +326,8 @@ bold, faint, normal :: Doc AnsiAnn -> Doc AnsiAnn
 bold = ansiAnn [SetConsoleIntensity BoldIntensity]
 faint = ansiAnn [SetConsoleIntensity FaintIntensity]
 normal = ansiAnn [SetConsoleIntensity NormalIntensity]
+
+-}
 
 -- | Tags for each field of state in SGR (Select Graphics Rendition).
 --

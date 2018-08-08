@@ -803,11 +803,11 @@ checkForDuplicateModules pkgs = do
       filter (\(_, mp) -> M.size mp > 1) $
       M.toList $
       unionModuleMaps (map ghciPkgModules pkgs)
-    prettyDuplicate :: (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent))) -> AnsiDoc
+    prettyDuplicate :: (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent))) -> StyleDoc
     prettyDuplicate (mn, mp) =
-      styleError (display mn) <+> "found at the following paths" <> line <>
+      style Error (display mn) <+> "found at the following paths" <> line <>
       bulletedList (map fileDuplicate (M.toList mp))
-    fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> AnsiDoc
+    fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> StyleDoc
     fileDuplicate (fp, comps) =
       display fp <+> parens (fillSep (punctuate "," (map display (S.toList comps))))
 
@@ -822,10 +822,10 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
   unless (null nonLocalTargets) $
     prettyWarnL
       [ flow "Some targets"
-      , parens $ fillSep $ punctuate "," $ map (styleGood . display) nonLocalTargets
+      , parens $ fillSep $ punctuate "," $ map (style Good . display) nonLocalTargets
       , flow "are not local packages, and so cannot be directly loaded."
       , flow "In future versions of stack, this might be supported - see"
-      , styleUrl "https://github.com/commercialhaskell/stack/issues/1441"
+      , style Url "https://github.com/commercialhaskell/stack/issues/1441"
       , "."
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
@@ -838,7 +838,7 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
           , bulletedList
               [ fillSep
                   [ flow "If you want to start a different project configuration than" <+> display stackYaml <> ", then you can use"
-                  , styleShell "stack init"
+                  , style Shell "stack init"
                   , flow "to create a new stack.yaml for the packages in the current directory."
                   , line
                   ]
