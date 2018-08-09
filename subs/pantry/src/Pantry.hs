@@ -45,6 +45,7 @@ module Pantry
   , mkUnresolvedPackageLocation
   , mkUnresolvedPackageLocationImmutable
   , completePackageLocation
+  , loadPackageLocation
 
     -- ** Snapshots
   , UnresolvedSnapshotLocation

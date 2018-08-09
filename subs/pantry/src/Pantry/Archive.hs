@@ -22,7 +22,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
 
@@ -215,10 +215,21 @@ foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
   lbs <- BL.hGetContents h
   let go accum entry = do
         let me = MetaEntry (Zip.eRelativePath entry) met
-            met = METNormal -- FIXME determine this correctly
+            met = fromMaybe METNormal $ do
+              let modes = shiftR (Zip.eExternalFileAttributes entry) 16
+              guard $ Zip.eVersionMadeBy entry .&. 0xFF00 == 0x0300
+              guard $ modes /= 0
+              Just $
+                if (modes .&. 0o100) == 0
+                  then METNormal
+                  else METExecutable
         -- FIXME check crc32
         runConduit $ sourceLazy (Zip.fromEntry entry) .| f accum me
-  foldM go accum0 (Zip.zEntries $ Zip.toArchive lbs)
+      isDir entry =
+        case reverse $ Zip.eRelativePath entry of
+          '/':_ -> True
+          _ -> False
+  foldM go accum0 (filter (not . isDir) $ Zip.zEntries $ Zip.toArchive lbs)
 
 foldTar
   :: (HasPantryConfig env, HasLogFunc env)
@@ -300,7 +311,7 @@ parseArchive loc fp subdir = do
           files3 = takeSubdir subdir files2
           toSafe (fp', a) =
             case mkSafeFilePath fp' of
-              Nothing -> Left $ "Not a safe file path: " ++ T.unpack fp'
+              Nothing -> Left $ "Not a safe file path: " ++ show fp'
               Just sfp -> Right (sfp, a)
       case traverse toSafe files3 of
         Left e -> error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
