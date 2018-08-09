@@ -11,7 +11,7 @@ main =
         else do
             safeNew "1234a-4b-b4-abc-12b34"
             doesExist "./1234a-4b-b4-abc-12b34/stack.yaml"
-            safeNew "1234-abc"
+            stackErr ["new", "1234-abc"]
             doesNotExist "./1234-abc/stack.yaml"
             doesNotExist "./1234-abc"
             stackErr ["new", "1-abc"]
