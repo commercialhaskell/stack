@@ -116,7 +116,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir)
+import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent)
 import Path.Find (findFiles)
 import Path.IO (resolveDir, doesFileExist)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
@@ -742,7 +742,7 @@ loadPantrySnapshot sl@(SLFilePath fp mcompiler) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     sha <- mkStaticSHA256FromFile $ toFilePath $ resolvedAbsolute fp
-    snapshot <- warningsParserHelper sl value (parseSnapshot Nothing)
+    snapshot <- warningsParserHelper sl value $ parseSnapshot $ Just $ parent $ resolvedAbsolute fp
     pure $ Right (snapshot, mcompiler, sha)
 
 loadFromURL
