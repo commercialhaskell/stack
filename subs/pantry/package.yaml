@@ -60,13 +60,13 @@ library:
   - Pantry.StaticSHA256
   - Pantry.Storage
   - Data.Aeson.Extended
+  - Pantry.StaticBytes
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
   - Network.HTTP.StackClient
   - Pantry.Archive
   - Pantry.Hackage
   - Pantry.Repo
-  - Pantry.StaticBytes
   - Pantry.Tree
   - Path.Find
 
@@ -78,3 +78,12 @@ executables:
     - pantry
     other-modules:
     - Pantry.OldStackage
+
+tests:
+  spec:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - pantry
+    - hspec
+    - exceptions

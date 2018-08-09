@@ -1,21 +1,29 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Types.BuildPlanSpec where
+module Pantry.BuildPlanSpec where
 
 import           Data.Aeson.Extended (WithJSONWarnings(..))
-import           Data.ByteString (ByteString)
+import           RIO
 import qualified Data.ByteString.Char8 as S8
 import           Data.Yaml (decodeThrow)
-import           Stack.Types.BuildPlan
+import           Pantry
 import           Test.Hspec
+import           Control.Monad.Catch (MonadThrow)
 
 spec :: Spec
 spec =
   describe "PackageLocation" $ do
     describe "Archive" $ do
       describe "github" $ do
-        let decode' :: ByteString -> Maybe (WithJSONWarnings (PackageLocation Subdirs))
+        let decode' :: MonadThrow m => ByteString -> m (WithJSONWarnings UnresolvedPackageLocationImmutable)
             decode' = decodeThrow
+
+            decode'' :: ByteString -> IO [PackageLocationImmutable]
+            decode'' bs = do
+              WithJSONWarnings unresolved warnings <- decode' bs
+              unless (null warnings) $ error $ show warnings
+              resolvePackageLocationImmutable Nothing unresolved
 
         it "'github' and 'commit' keys" $ do
           let contents :: ByteString
@@ -25,14 +33,23 @@ spec =
                     [ "github: oink/town"
                     , "commit: abc123"
                     ])
-          let expected :: PackageLocation Subdirs
+          let expected :: PackageLocationImmutable
               expected =
-                PLArchive Archive
-                  { archiveUrl = "https://github.com/oink/town/archive/abc123.tar.gz"
-                  , archiveSubdirs = DefaultSubdirs
-                  , archiveHash = Nothing
-                  }
-          decode' contents `shouldBe` Just (WithJSONWarnings expected [])
+                PLIArchive
+                  Archive
+                    { archiveLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
+                    , archiveHash = Nothing
+                    , archiveSize = Nothing
+                    }
+                  PackageMetadata
+                    { pmName = Nothing
+                    , pmVersion = Nothing
+                    , pmTree = Nothing
+                    , pmCabal = Nothing
+                    , pmSubdir = ""
+                    }
+          actual <- decode'' contents
+          actual `shouldBe` [expected]
 
         it "'github', 'commit', and 'subdirs' keys" $ do
           let contents :: ByteString
@@ -44,14 +61,23 @@ spec =
                     , "subdirs:"
                     , "  - foo"
                     ])
-          let expected :: PackageLocation Subdirs
+          let expected :: PackageLocationImmutable
               expected =
-                PLArchive Archive
-                  { archiveUrl = "https://github.com/oink/town/archive/abc123.tar.gz"
-                  , archiveSubdirs = ExplicitSubdirs ["foo"]
-                  , archiveHash = Nothing
-                  }
-          decode' contents `shouldBe` Just (WithJSONWarnings expected [])
+                PLIArchive
+                  Archive
+                    { archiveLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
+                    , archiveHash = Nothing
+                    , archiveSize = Nothing
+                    }
+                  PackageMetadata
+                    { pmName = Nothing
+                    , pmVersion = Nothing
+                    , pmTree = Nothing
+                    , pmCabal = Nothing
+                    , pmSubdir = "foo"
+                    }
+          actual <- decode'' contents
+          actual `shouldBe` [expected]
 
         it "does not parse GitHub repo with no slash" $ do
           let contents :: ByteString
