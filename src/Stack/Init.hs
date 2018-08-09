@@ -395,7 +395,7 @@ getWorkingResolverPlan whichCmd initOpts bundle sd = do
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
-                          logWarn $ display $ indent $ showItems ignored
+                          logWarn $ display $ indent $ showItems $ map displayC ignored
                         else
                           logWarn $ "*** Ignoring package: "
                                  <> displayC

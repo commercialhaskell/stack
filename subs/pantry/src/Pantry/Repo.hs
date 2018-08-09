@@ -10,7 +10,6 @@ module Pantry.Repo -- FIXME needs to be implemented!
 import Pantry.Types
 import Pantry.Archive
 import Pantry.Tree
-import Conduit
 import RIO
 import Path.IO (resolveFile')
 import RIO.FilePath ((</>))
@@ -78,9 +77,9 @@ getRepo' repo@(Repo url commit repoType') pm =
     created <- doesDirectoryExist dir
     unless created $ error $ "Failed to clone repo: " ++ show repo -- FIXME exception
 
-    void $ withWorkingDir dir $ do
-      proc commandName resetArgs readProcess_
-      proc commandName archiveArgs readProcess_
+    withWorkingDir dir $ do
+      void $ proc commandName resetArgs readProcess_
+      void $ proc commandName archiveArgs readProcess_
     abs' <- resolveFile' tarball
     getArchive
       Archive

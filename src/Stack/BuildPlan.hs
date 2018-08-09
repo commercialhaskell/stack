@@ -417,12 +417,12 @@ selectBestSnapshot gpds snaps = do
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-showItems :: Show a => [a] -> Text
+showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)
     where
         formatItem item = T.concat
             [ "    - "
-            , T.pack $ show item
+            , T.pack item
             , "\n"
             ]
 
@@ -442,7 +442,7 @@ showPackageFlags pkg fl =
         formatFlags (f, v) = show f ++ " = " ++ show v
 
 showMapPackages :: Map PackageName a -> Text
-showMapPackages mp = showItems $ Map.keys mp
+showMapPackages mp = showItems $ map displayC $ Map.keys mp
 
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)

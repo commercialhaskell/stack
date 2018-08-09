@@ -136,7 +136,7 @@ cabalSolver cabalfps constraintType
 
             when (any isNothing mPkgNames) $ do
                   logInfo $ "*** Only some package names could be parsed: " <>
-                      mconcat (intersperse ", " (map displayShow pkgNames))
+                      mconcat (intersperse ", " (map displayC pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
                        <> T.intercalate ", " (parseConflictingPkgs msg)
@@ -540,7 +540,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
 
     let normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
-            | (normalizeString . show . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
+            | (normalizeString . displayC . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
             | otherwise = Nothing
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
