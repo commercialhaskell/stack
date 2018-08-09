@@ -1060,7 +1060,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
             styleError (displayC name) <+>
-            align (flow $ "dependency cycle detected: " ++ intercalate (", ") (map displayC names))
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map displayC names))
       where
         goodRange = styleGood (fromString (Cabal.display range))
         latestApplicable mversion =

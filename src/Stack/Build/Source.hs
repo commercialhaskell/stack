@@ -287,7 +287,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                       in Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
         newBuildCaches =
-            (M.fromList . map (\(c, (_, cache)) -> (c, cache)))
+            M.fromList . map (\(c, (_, cache)) -> (c, cache))
             <$> checkCacheResults
 
     return LocalPackage
