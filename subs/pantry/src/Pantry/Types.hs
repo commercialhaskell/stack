@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- FIXME REMOVE!
 module Pantry.Types
   ( PantryConfig (..)
@@ -519,7 +521,7 @@ instance Display PantryException where
     -- FIXME include the issue link relevant to why we care about this
 
 data FileType = FTNormal | FTExecutable
-  deriving Show
+  deriving (Show, Eq, Enum, Bounded)
 instance PersistField FileType where
   toPersistValue FTNormal = PersistInt64 1
   toPersistValue FTExecutable = PersistInt64 2
@@ -534,7 +536,7 @@ instance PersistFieldSql FileType where
   sqlType _ = SqlInt32
 
 data TreeEntry = TreeEntry !BlobKey !FileType
-  deriving Show
+  deriving (Show, Eq)
 
 newtype SafeFilePath = SafeFilePath Text
   deriving (Show, Eq, Ord, Display)
@@ -572,7 +574,7 @@ newtype Tree
   -- FIXME in the future, consider allowing more lax parsing
   -- See: https://www.fpcomplete.com/blog/2018/07/pantry-part-2-trees-keys
   -- TreeTarball !PackageTarball
-  deriving Show
+  deriving (Show, Eq)
 
 renderTree :: Tree -> ByteString
 renderTree = BL.toStrict . toLazyByteString . go
@@ -604,7 +606,51 @@ parseTree bs1 = do
   Just tree
 
 parseTree' :: ByteString -> Maybe Tree
-parseTree' = undefined
+parseTree' bs0 = do
+  entriesBS <- B.stripPrefix "map:" bs0
+  TreeMap <$> loop Map.empty entriesBS
+  where
+    loop !m bs1
+      | B.null bs1 = pure m
+      | otherwise = do
+          (sfpBS, bs2) <- takeNetstring bs1
+          sfp <-
+            case decodeUtf8' sfpBS of
+              Left _ -> Nothing
+              Right sfpT -> mkSafeFilePath sfpT
+          (sha, bs3) <- takeSha bs2
+          (size', bs4) <- takeNetword bs3
+          (typeW, bs5) <- B.uncons bs4
+          ft <-
+            case typeW of
+              78 -> Just FTNormal -- 'N'
+              88 -> Just FTExecutable -- 'X'
+              _ -> Nothing
+          let entry = TreeEntry (BlobKey sha (FileSize (fromIntegral size'))) ft
+          loop (Map.insert sfp entry m) bs5
+
+    takeNetstring bs1 = do
+      (size', bs2) <- takeNetword bs1
+      guard $ B.length bs2 >= size'
+      Just $ B.splitAt size' bs2
+
+    takeSha bs = do
+      let (x, y) = B.splitAt 32 bs
+      x' <- either (const Nothing) Just (mkStaticSHA256FromRaw x)
+      Just (x', y)
+
+    takeNetword =
+      go 0
+      where
+        go !accum bs = do
+          (next, rest) <- B.uncons bs
+          if
+            | next == 58 -> pure (accum, rest) -- ':'
+            | next >= 48 && next <= 57 ->
+                go
+                  (accum * 10 + fromIntegral (next - 48))
+                  rest
+            | otherwise -> Nothing
 
     {-
 data PackageTarball = PackageTarball
