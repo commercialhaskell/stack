@@ -83,7 +83,7 @@ getArchive archive pm =
                   _ -> do
                     case loc of
                       ALUrl url -> do
-                        logWarn $ "Using archive from " <> display url <> "without a specified cryptographic hash"
+                        logWarn $ "Using archive from " <> display url <> " without a specified cryptographic hash"
                         logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
                         logWarn "For security and reproducibility, please add a hash and file size to your configuration"
                       ALFilePath _ -> pure ()
