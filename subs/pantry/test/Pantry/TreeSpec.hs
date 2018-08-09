@@ -27,7 +27,7 @@ spec = do
           pm
       tarPL = mkArchive tarURL
       zipPL = mkArchive zipURL
-      repoPL =
+      gitPL =
           PLIRepo
             Repo
               { repoUrl = "https://github.com/snoyberg/file-embed.git"
@@ -35,12 +35,24 @@ spec = do
               , repoType = RepoGit
               }
             pm
+      hgPL =
+          PLIRepo
+            Repo
+              { repoUrl = "https://bitbucket.org/snoyberg/file-embed"
+              , repoCommit = "6d8126e7a4821788a0275fa7c2c4a0083e14d690"
+              , repoType = RepoHg
+              }
+            pm
 
   it "zip and tar.gz archives match" $ asIO $ runPantryApp $ do
     pair1 <- loadPackageLocation tarPL
     pair2 <- loadPackageLocation zipPL
     liftIO $ pair2 `shouldBe` pair1
-  it "archive and repo match" $ asIO $ runPantryApp $ do
+  it "archive and Git repo match" $ asIO $ runPantryApp $ do
     pair1 <- loadPackageLocation tarPL
-    pair2 <- loadPackageLocation repoPL
+    pair2 <- loadPackageLocation gitPL
+    liftIO $ pair2 `shouldBe` pair1
+  it "archive and Hg repo match" $ asIO $ runPantryApp $ do
+    pair1 <- loadPackageLocation tarPL
+    pair2 <- loadPackageLocation hgPL
     liftIO $ pair2 `shouldBe` pair1

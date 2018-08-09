@@ -53,38 +53,44 @@ getRepo' repo@(Repo url commit repoType') pm =
   \tmpdir -> withWorkingDir tmpdir $ do
     let suffix = "cloned"
         dir = tmpdir </> suffix
+        tarball = tmpdir </> "foo.tar"
 
-    let (commandName, cloneArgs) =
+    let (commandName, cloneArgs, archiveArgs) =
           case repoType' of
-            RepoGit -> ("git", ["--recursive"])
-            RepoHg -> ("hg", [])
+            RepoGit ->
+              ( "git"
+              , ["--recursive"]
+              , ["archive", "-o", tarball, "HEAD"]
+              )
+            RepoHg ->
+              ( "hg"
+              , []
+              , ["archive", tarball, "-X", ".hg_archival.txt"]
+              )
 
     logInfo $ "Cloning " <> display commit <> " from " <> display url
-    proc
+    void $ proc
       commandName
       ("clone" : cloneArgs ++ [T.unpack url, suffix])
-      runProcess_
+      readProcess_
     created <- doesDirectoryExist dir
     unless created $ error $ "Failed to clone repo: " ++ show repo -- FIXME exception
 
-    let tarball = tmpdir </> "foo.tar"
-    withWorkingDir dir $ do
-      case repoType' of
-        RepoGit -> proc commandName ["archive", "-o", tarball, "HEAD", "--", T.unpack $ pmSubdir pm] runProcess_
-      abs' <- resolveFile' tarball
-      getArchive
-        Archive
-          { archiveLocation = ALFilePath $ ResolvedPath
-              { resolvedRelative = RelFilePath $ T.pack tarball
-              , resolvedAbsolute = abs'
-              }
-          , archiveHash = Nothing
-          , archiveSize = Nothing
-          }
-        PackageMetadata
-          { pmName = Nothing
-          , pmVersion = Nothing
-          , pmTree = Nothing
-          , pmCabal = Nothing
-          , pmSubdir = ""
-          }
+    void $ withWorkingDir dir $ proc commandName archiveArgs readProcess_
+    abs' <- resolveFile' tarball
+    getArchive
+      Archive
+        { archiveLocation = ALFilePath $ ResolvedPath
+            { resolvedRelative = RelFilePath $ T.pack tarball
+            , resolvedAbsolute = abs'
+            }
+        , archiveHash = Nothing
+        , archiveSize = Nothing
+        }
+      PackageMetadata
+        { pmName = Nothing
+        , pmVersion = Nothing
+        , pmTree = Nothing
+        , pmCabal = Nothing
+        , pmSubdir = pmSubdir pm
+        }
