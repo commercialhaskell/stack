@@ -739,16 +739,19 @@ checkDirtiness ps installed package present wanted = do
                 maybe False configCacheHaddock moldOpts
             , configCachePkgSrc = toCachePkgSrc ps
             }
-    let mreason =
-            case moldOpts of
-                Nothing -> Just "old configure information not found"
-                Just oldOpts
-                    | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
-                    | True <- psForceDirty ps -> Just "--force-dirty specified"
-                    | Just files <- psDirty ps -> Just $ "local file changes: " <>
-                                                         addEllipsis (T.pack $ unwords $ Set.toList files)
-                    | otherwise -> Nothing
         config = view configL ctx
+    mreason <-
+      case moldOpts of
+        Nothing -> pure $ Just "old configure information not found"
+        Just oldOpts
+          | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> pure $ Just reason
+          | True <- psForceDirty ps -> pure $ Just "--force-dirty specified"
+          | otherwise -> do
+              dirty <- psDirty ps
+              pure $
+                case dirty of
+                  Just files -> Just $ "local file changes: " <> addEllipsis (T.pack $ unwords $ Set.toList files)
+                  Nothing -> Nothing
     case mreason of
         Nothing -> return False
         Just reason -> do
@@ -825,9 +828,9 @@ psForceDirty :: PackageSource -> Bool
 psForceDirty (PSFiles lp _) = lpForceDirty lp
 psForceDirty PSIndex{} = False
 
-psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSFiles lp _) = lpDirtyFiles lp
-psDirty PSIndex{} = Nothing -- files never change in an upstream package
+psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
+psDirty (PSFiles lp _) = runIOThunk $ lpDirtyFiles lp
+psDirty PSIndex{} = pure Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
 psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:

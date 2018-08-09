@@ -14,6 +14,7 @@ import qualified Data.ByteString as S
 import           Data.List
 import qualified Data.Map as M
 import qualified Data.Set as Set
+import           Data.IORef.RunOnce
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
@@ -296,21 +297,32 @@ data LocalPackage = LocalPackage
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
     , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(Maybe (Set FilePath))
+    , lpDirtyFiles    :: !(IOThunk (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(Map NamedComponent (Map FilePath FileCacheInfo))
+    , lpNewBuildCaches :: !(IOThunk (Map NamedComponent (Map FilePath FileCacheInfo)))
     -- ^ current state of the files
-    , lpComponentFiles :: !(Map NamedComponent (Set (Path Abs File)))
+    , lpComponentFiles :: !(IOThunk (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
     , lpLocation      :: !(PackageLocation FilePath)
     -- ^ Where this source code came from
     }
     deriving Show
 
-lpFiles :: LocalPackage -> Set.Set (Path Abs File)
-lpFiles = Set.unions . M.elems . lpComponentFiles
+newtype IOThunk a = IOThunk (IO a)
+  deriving (Functor, Applicative, Monad)
+instance Show (IOThunk a) where
+  show _ = "<<IOThunk>>"
+
+runIOThunk :: MonadIO m => IOThunk a -> m a
+runIOThunk (IOThunk m) = liftIO m
+
+mkIOThunk :: MonadUnliftIO m => m a -> m (IOThunk a)
+mkIOThunk m = IOThunk <$> runOnce m
+
+lpFiles :: MonadIO m => LocalPackage -> m (Set.Set (Path Abs File))
+lpFiles = runIOThunk . fmap (Set.unions . M.elems) . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local

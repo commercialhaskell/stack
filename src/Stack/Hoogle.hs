@@ -73,7 +73,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                            go)
                       (\lk ->
                             Stack.Build.build
-                                (const (return ()))
+                                Nothing
                                 lk
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
@@ -126,7 +126,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                       go
                       (\lk ->
                             Stack.Build.build
-                                (const (return ()))
+                                Nothing
                                 lk
                                 defaultBuildOptsCLI
                                 { boptsCLITargets = [ packageIdentifierText

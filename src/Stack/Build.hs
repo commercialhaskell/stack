@@ -71,11 +71,11 @@ import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getCons
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
 build :: HasEnvConfig env
-      => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
+      => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
       -> BuildOptsCLI
       -> RIO env ()
-build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
+build msetLocalFiles mbuildLk boptsCli = fixCodePage $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
@@ -84,16 +84,16 @@ build setLocalFiles mbuildLk boptsCli = fixCodePage $ do
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
-    liftIO $ setLocalFiles
-           $ Set.insert stackYaml
-           $ Set.unions
-             -- The `locals` value above only contains local project
-             -- packages, not local dependencies. This will get _all_
-             -- of the local files we're interested in
-             -- watching. Arguably, we should not bother watching repo
-             -- and archive files, since those shouldn't
-             -- change. That's a possible optimization to consider.
-             [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
+    for_ msetLocalFiles $ \setLocalFiles -> liftIO $ do
+      files <- sequence
+        -- The `locals` value above only contains local project
+        -- packages, not local dependencies. This will get _all_
+        -- of the local files we're interested in
+        -- watching. Arguably, we should not bother watching repo
+        -- and archive files, since those shouldn't
+        -- change. That's a possible optimization to consider.
+        [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
+      setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled

@@ -1424,8 +1424,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTFiles lp _ -> do -- FIXME should this only be for local packages?
                 when enableTests $ unsetTestSuccess pkgDir
+                caches <- runIOThunk $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
-                      (Map.toList $ lpNewBuildCaches lp)
+                      (Map.toList caches)
             TTIndex{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
@@ -1642,15 +1643,16 @@ checkExeStatus compiler platform distDir name = do
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
+    caches <- runIOThunk $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime
             (lpPackage lp)
             (lpCabalFile lp)
             (lpComponents lp)
-            (lpNewBuildCaches lp)
+            caches
     forM_ (M.toList addBuildCache) $ \(component, newToCache) -> do
-        let cache = Map.findWithDefault Map.empty component (lpNewBuildCaches lp)
+        let cache = Map.findWithDefault Map.empty component caches
         writeBuildCache pkgDir component $
             Map.unions (cache : newToCache)
     return warnings
