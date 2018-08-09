@@ -184,7 +184,14 @@ loadSnapshot mcompiler =
               , lsPackages = Map.empty
               }
             Just cv' -> loadCompiler cv'
-        Just (snapshot, sd') -> start sd' >>= inner2 snapshot
+        Just (snapshot, sd') -> do
+          ls0 <- start sd'
+          inner2 snapshot ls0
+            { lsGlobals =
+                if Map.null (lsGlobals ls0)
+                  then fromGlobalHints (sdGlobalHints sd)
+                  else lsGlobals ls0
+            }
 
     inner2 snap ls0 = do
       gpds <-
