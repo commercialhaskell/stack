@@ -84,7 +84,7 @@ scriptCmd opts go' = do
                 then logDebug "All packages already installed"
                 else do
                     logDebug "Missing packages, performing installation"
-                    Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                    Stack.Build.build Nothing lk defaultBuildOptsCLI
                         { boptsCLITargets = map displayC $ Set.toList targetsSet
                         }
 

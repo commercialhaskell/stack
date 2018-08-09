@@ -20,6 +20,11 @@ Behavior changes:
 
 Other enhancements:
 
+* Defer loading up of files for local packages. This allows us to get
+  plan construction errors much faster, and avoid some unnecessary
+  work when only building a subset of packages. This is especially
+  useful for the curator use case.
+
 Bug fixes:
 
 * Ignore duplicate files for a single module when a Haskell module was

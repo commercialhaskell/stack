@@ -320,7 +320,7 @@ buildDepsAndInitialSteps GhciOpts{..} targets0 = do
     -- If necessary, do the build, for local packagee targets, only do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
-        eres <- tryAny $ build (const (return ())) Nothing defaultBuildOptsCLI
+        eres <- tryAny $ build Nothing Nothing defaultBuildOptsCLI
             { boptsCLITargets = targets
             , boptsCLIInitialBuildSteps = True
             , boptsCLIFlags = ghciFlags

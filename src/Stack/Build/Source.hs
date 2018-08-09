@@ -266,21 +266,29 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    (componentFiles,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
+    componentFiles <- mkIOThunk $ fst <$> getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
 
-    checkCacheResults <- forM (Map.toList componentFiles) $ \(component, files) -> do
+    checkCacheResults <- mkIOThunk $ do
+      componentFiles' <- runIOThunk componentFiles
+      forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (lpvRoot lpv) component
         checkCacheResult <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (Set.toList files)
         return (component, checkCacheResult)
 
-    let allDirtyFiles =
-            Set.unions $
-                map (\(_, (dirtyFiles, _)) -> dirtyFiles) checkCacheResults
+    let dirtyFiles = do
+          checkCacheResults' <- checkCacheResults
+          let allDirtyFiles = Set.unions $ map (\(_, (x, _)) -> x) checkCacheResults'
+          pure $
+            if not (Set.null allDirtyFiles)
+                then let tryStripPrefix y =
+                          fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
+                      in Just $ Set.map tryStripPrefix allDirtyFiles
+                else Nothing
         newBuildCaches =
-            M.fromList $
-                map (\(c, (_, cache)) -> (c, cache)) checkCacheResults
+            (M.fromList . map (\(c, (_, cache)) -> (c, cache)))
+            <$> checkCacheResults
 
     return LocalPackage
         { lpPackage = pkg
@@ -289,12 +297,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         , lpTestBench = btpkg
         , lpComponentFiles = componentFiles
         , lpForceDirty = boptsForceDirty bopts
-        , lpDirtyFiles =
-            if not (Set.null allDirtyFiles)
-                then let tryStripPrefix y =
-                          fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
-                      in Just $ Set.map tryStripPrefix allDirtyFiles
-                else Nothing
+        , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = lpvCabalFP lpv
         , lpWanted = isWanted

@@ -307,9 +307,9 @@ readLocalPackage pkgDir = do
         , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
         , lpForceDirty = False
-        , lpDirtyFiles = Nothing
-        , lpNewBuildCaches = Map.empty
-        , lpComponentFiles = Map.empty
+        , lpDirtyFiles = pure Nothing
+        , lpNewBuildCaches = pure Map.empty
+        , lpComponentFiles = pure Map.empty
         , lpComponents = Set.empty
         , lpUnbuildable = Set.empty
         }
@@ -461,7 +461,7 @@ buildExtractedTarball pkgDir = do
                      }
         }
   local adjustEnvForBuild $
-    build (const (return ())) Nothing defaultBuildOptsCLI
+    build Nothing Nothing defaultBuildOptsCLI
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
