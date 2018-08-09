@@ -46,10 +46,10 @@ spec = do
               case mkSafeFilePath combined of
                 Nothing -> error $ "Incorrect SafeFilePath in test suite: " ++ show pieces
                 Just sfp -> pure sfp
-            sfpComponent = Gen.text (Range.linear 1 100) Gen.alphaNum
+            sfpComponent = Gen.text (Range.linear 1 15) Gen.alphaNum
             entry = TreeEntry
               <$> genBlobKey
               <*> Gen.choice (map pure [minBound..maxBound])
-         in TreeMap <$> Gen.map (Range.linear 1 100) ((,) <$> sfp <*> entry)
+         in TreeMap <$> Gen.map (Range.linear 1 20) ((,) <$> sfp <*> entry)
       let bs = renderTree tree
       liftIO $ parseTree bs `shouldBe` Just tree
