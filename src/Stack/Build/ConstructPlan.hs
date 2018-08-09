@@ -624,7 +624,13 @@ addPackageDeps treatAsDep package = do
                 let bd =
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
-                            _ -> Couldn'tResolveItsDependencies (packageVersion package)
+                            DependencyCycleDetected names -> BDDependencyCycleDetected names
+                            -- ultimately we won't show any
+                            -- information on this to the user, we'll
+                            -- allow the dependency failures alone to
+                            -- display to avoid spamming the user too
+                            -- much
+                            DependencyPlanFailures _ _  -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicableVersionAndRev
                 return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
@@ -918,6 +924,7 @@ data BadDependency
     | DependencyMismatch Version
     | HasNoLibrary
     -- ^ See description of 'DepType'
+    | BDDependencyCycleDetected ![PackageName]
     deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
@@ -1056,6 +1063,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
         HasNoLibrary -> Just $
             style Error (display name) <+>
             align (flow "is a library dependency, but the package provides no library")
+        BDDependencyCycleDetected names -> Just $
+            style Error (display name) <+>
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =
