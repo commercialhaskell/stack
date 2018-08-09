@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.2.1
+GHCVER=8.4.3
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -63,28 +63,28 @@ mirror () {
     echo "        $GHCVER:" >>stack-setup.yaml
     echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup.yaml
     echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup.yaml
-    echo "            sha1: $(sha1sum $destfn |cut -d' ' -f1)" >>stack-setup.yaml
+    echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup.yaml
+    echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup.yaml
+    echo "" >>stack-setup.yaml
     shift
   done
 }
 
-mirror i386-deb7-linux xz xz linux32
-mirror i386-deb8-linux xz xz linux32-nopie
-mirror x86_64-deb7-linux xz xz linux64
-mirror x86_64-deb8-linux xz xz linux64-nopie
-#@@@ 32-bit centos6 doesn't seem to be available: mirror i386-centos67-linux xz xz linux32-gmp4
-mirror x86_64-centos67-linux xz xz linux64-gmp4
-mirror armv7-deb8-linux xz xz linux-armv7
-mirror aarch64-deb8-linux xz xz linux-aarch64 #@@@: move to after linux-armv7
+
+# NOTE: keep the 'mirror' commands in the same order as entries in
+# https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
+
+mirror i386-deb8-linux xz xz linux32 linux32-nopie
+mirror x86_64-deb8-linux xz xz linux64 linux64-nopie
+#mirror x86_64-centos67-linux xz xz linux64-gmp4 linux64-gmp4-nopie
+mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie linux64-ncurses6 linux64-ncurses6-nopie
+mirror x86_64-apple-darwin xz bz2 macosx
 mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
-mirror x86_64-apple-darwin xz bz2 macosx
-#@@@: add support for freebsd11 vs. freebsd10 to Stack (I think there may already be an issue for that?)
-#@@@: 32-bit freebsd not available: mirror i386-portbld-freebsd xz xz freebsd32
-mirror x86_64-portbld10_3-freebsd xz xz freebsd64
-mirror x86_64-portbld11-freebsd xz xz freebsd64-11
-mirror x86_64-openbsd60-openbsd xz xz openbsd64
+#mirror x86_64-portbld-freebsd xz xz freebsd64-11
+#mirror aarch64-deb8-linux xz xz linux-aarch64
 
 set +x
 echo
-echo "DONE!  See 'stack-setup.yaml' for 'stack setup' metadata."
+echo "DONE!  See 'stack-setup.yaml' for 'stack setup' to add to"
+echo "  https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml"
