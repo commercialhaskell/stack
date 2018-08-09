@@ -338,7 +338,7 @@ stripCommonPrefix pairs@((firstFP, _):_) = fromMaybe pairs $ do
   let firstDir = takeWhile (/= '/') firstFP
   guard $ not $ null firstDir
   let strip (fp, a) = (, a) <$> List.stripPrefix (firstDir ++ "/") fp
-  traverse strip pairs
+  stripCommonPrefix <$> traverse strip pairs
 
 takeSubdir :: Text -> [(FilePath, a)] -> [(Text, a)]
 takeSubdir subdir = mapMaybe $ \(fp, a) -> do

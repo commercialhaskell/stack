@@ -1,6 +1,9 @@
 name: pantry
 version: 0.1.0.0
 
+extra-source-files:
+- attic/package-0.1.2.3.tar.gz
+
 dependencies:
 - base
 - rio
