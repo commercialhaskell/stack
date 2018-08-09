@@ -55,16 +55,18 @@ getRepo' repo@(Repo url commit repoType') pm =
         dir = tmpdir </> suffix
         tarball = tmpdir </> "foo.tar"
 
-    let (commandName, cloneArgs, archiveArgs) =
+    let (commandName, cloneArgs, resetArgs, archiveArgs) =
           case repoType' of
             RepoGit ->
               ( "git"
               , ["--recursive"]
+              , ["reset", "--hard", T.unpack commit]
               , ["archive", "-o", tarball, "HEAD"]
               )
             RepoHg ->
               ( "hg"
               , []
+              , ["update", "-C", T.unpack commit]
               , ["archive", tarball, "-X", ".hg_archival.txt"]
               )
 
@@ -76,7 +78,9 @@ getRepo' repo@(Repo url commit repoType') pm =
     created <- doesDirectoryExist dir
     unless created $ error $ "Failed to clone repo: " ++ show repo -- FIXME exception
 
-    void $ withWorkingDir dir $ proc commandName archiveArgs readProcess_
+    void $ withWorkingDir dir $ do
+      proc commandName resetArgs readProcess_
+      proc commandName archiveArgs readProcess_
     abs' <- resolveFile' tarball
     getArchive
       Archive
