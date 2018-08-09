@@ -16,10 +16,10 @@ spec =
   describe "PackageLocation" $ do
     describe "Archive" $ do
       describe "github" $ do
-        let decode' :: MonadThrow m => ByteString -> m (WithJSONWarnings UnresolvedPackageLocationImmutable)
+        let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings UnresolvedPackageLocationImmutable)
             decode' = decodeThrow
 
-            decode'' :: ByteString -> IO [PackageLocationImmutable]
+            decode'' :: HasCallStack => ByteString -> IO [PackageLocationImmutable]
             decode'' bs = do
               WithJSONWarnings unresolved warnings <- decode' bs
               unless (null warnings) $ error $ show warnings

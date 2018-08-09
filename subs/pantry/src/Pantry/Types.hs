@@ -822,6 +822,7 @@ instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
         -- if subdirs exists, it needs to be valid
         case HM.lookup "subdirs" o of
           Just v' -> do
+            tellJSONField "subdirs"
             subdirs <- lift $ parseJSON v'
             case subdirs of
               [] -> fail "Invalid empty subdirs"
