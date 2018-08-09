@@ -1,3 +1,26 @@
+{- stack script
+    --resolver lts-11.19
+    --install-ghc
+    --package Cabal
+    --package aeson
+    --package bytestring
+    --package case-insensitive
+    --package conduit
+    --package conduit-combinators
+    --package cryptohash
+    --package directory
+    --package extra
+    --package http-conduit
+    --package http-types
+    --package mime-types
+    --package process
+    --package resourcet
+    --package shake
+    --package tar
+    --package text
+    --package zip-archive
+    --package zlib
+-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -24,6 +47,7 @@ import System.Process
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
+import Crypto.Hash (Digest, SHA256 (..), digestToHexByteString, hash)
 import Data.Aeson
 import qualified Data.CaseInsensitive as CI
 import Data.Conduit
@@ -46,8 +70,8 @@ main =
                      , shakeChange = ChangeModtimeAndDigestInput }
         options $
         \flags args -> do
-            -- 'stack list-dependencies' just ensures that 'stack.cabal' is generated from hpack
-            _ <- readProcess "stack" ["list-dependencies"] ""
+            -- 'stack build --dry-run' just ensures that 'stack.cabal' is generated from hpack
+            _ <- readProcess "stack" ["build", "--dry-run"] ""
             gStackPackageDescription <-
                 packageDescription <$> readGenericPackageDescription silent "stack.cabal"
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
@@ -64,6 +88,7 @@ main =
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
                 gBuildArgs = []
+                gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags
             -- Need to get paths after options since the '--arch' argument can effect them.
             projectRoot' <- getStackPath global0 "project-root"
@@ -113,6 +138,9 @@ options =
             (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
             "\"ARG1 ARG2 ...\"")
         "Additional arguments to pass to 'stack build'."
+    , Option "" [certificateNameOptName]
+        (ReqArg (\v -> Right $ \g -> g{gCertificateName = Just v}) "NAME")
+        "Certificate name for code signing on Windows"
     ]
 
 -- | Shake rules.
@@ -144,9 +172,10 @@ rules global@Global{..} args = do
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
             mUploadLabel =
-                if takeExtension srcFile == ascExt
-                    then fmap (++ " (GPG signature)") gUploadLabel
-                    else gUploadLabel
+                case takeExtension srcFile of
+                    e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
+                      | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
+                      | otherwise -> gUploadLabel
         uploadToGithubRelease global srcFile mUploadLabel
         copyFileChanged srcFile out
 
@@ -161,7 +190,8 @@ rules global@Global{..} args = do
                     ["--local-bin-path=" ++ tmpDir]
                     c
             () <- cmd0 "install" gBuildArgs $ concat $ concat
-                [["--pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
+                [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
+                ,[" --haddock" | gTestHaddocks]]
             () <- cmd0 (Cwd "etc/scripts") "install" "cabal-install"
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
             () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests"
@@ -208,16 +238,19 @@ rules global@Global{..} args = do
                 -- Windows doesn't have or need a 'strip' command, so skip it.
                 -- Instead, we sign the executable
                 liftIO $ copyFile (releaseBinDir </> binaryName </> stackExeFileName) out
-                actionOnException
-                    (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
-                        ["sign"
-                        ,"/v"
-                        ,"/d", synopsis gStackPackageDescription
-                        ,"/du", homepage gStackPackageDescription
-                        ,"/n", "FP Complete, Corporation"
-                        ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
-                        ,out])
-                    (removeFile out)
+                case gCertificateName of
+                    Nothing -> return ()
+                    Just certName ->
+                        actionOnException
+                            (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
+                                ["sign"
+                                ,"/v"
+                                ,"/d", synopsis gStackPackageDescription
+                                ,"/du", homepage gStackPackageDescription
+                                ,"/n", certName
+                                ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
+                                ,out])
+                            (removeFile out)
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
@@ -232,6 +265,13 @@ rules global@Global{..} args = do
             [ "-u", gGpgKey
             , dropExtension out ]
 
+    releaseDir </> "*" <.> sha256Ext %> \out -> do
+        need [out -<.> ""]
+        bs <- liftIO $ do
+            _ <- tryJust (guard . isDoesNotExistError) (removeFile out)
+            S8.readFile (dropExtension out)
+        writeFileChanged out (S8.unpack (digestToHexByteString (hash bs :: Digest SHA256)) ++ "\n")
+
     releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
         alwaysRerun
         actionOnException
@@ -240,8 +280,9 @@ rules global@Global{..} args = do
                 ["--local-bin-path=" ++ takeDirectory out]
                 "install"
                 gBuildArgs
-                "--pedantic")
-            (removeFile out)
+                "--pedantic"
+                "--flag stack:integration-tests")
+            (tryJust (guard . isDoesNotExistError) (removeFile out))
 
     debDistroRules ubuntuDistro ubuntuVersions
     rpmDistroRules centosDistro centosVersions
@@ -392,8 +433,8 @@ rules global@Global{..} args = do
     releaseBinDir = releaseDir </> "bin"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
-    binaryPkgFileNames = binaryPkgArchiveFileNames ++ binaryPkgSignatureFileNames
-    binaryPkgSignatureFileNames = map (<.> ascExt) binaryPkgArchiveFileNames
+    binaryPkgFileNames =
+        concatMap (\x -> [x, x <.> ascExt, x <.> sha256Ext]) binaryPkgArchiveFileNames
     binaryPkgArchiveFileNames =
         case platformOS of
             Windows -> [binaryPkgZipFileName, binaryPkgTarGzFileName]
@@ -447,14 +488,15 @@ rules global@Global{..} args = do
     gzExt = ".gz"
     tarExt = ".tar"
     ascExt = ".asc"
+    sha256Ext = ".sha256"
     uploadExt = ".upload"
     debExt = ".deb"
     rpmExt = ".rpm"
 
-
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
 uploadToGithubRelease global@Global{..} file mUploadLabel = do
+    -- TODO: consider using https://github.com/tfausak/github-release
     need [file]
     putNormal $ "Uploading to Github: " ++ file
     GithubRelease{..} <- getGithubRelease
@@ -593,6 +635,10 @@ buildArgsOptName = "build-args"
 staticOptName :: String
 staticOptName = "static"
 
+-- | @--certificate-name@ command-line option name.
+certificateNameOptName :: String
+certificateNameOptName = "certificate-name"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
@@ -644,7 +690,9 @@ data Global = Global
     , gHomeDir :: !FilePath
     , gArch :: !Arch
     , gBinarySuffix :: !String
-    , gUploadLabel :: (Maybe String)
+    , gUploadLabel :: !(Maybe String)
     , gTestHaddocks :: !Bool
-    , gBuildArgs :: [String] }
+    , gBuildArgs :: [String]
+    , gCertificateName :: !(Maybe String)
+    }
     deriving (Show)

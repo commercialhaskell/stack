@@ -9,7 +9,7 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xe
     apk update
-    apk add alpine-sdk linux-headers musl-dev gmp-dev zlib-dev git rsync gnupg xz
+    apk add alpine-sdk linux-headers musl-dev gmp-dev zlib-dev git rsync gnupg xz unzip
     apk --no-cache add --repository http://dl-cdn.alpinelinux.org/alpine/edge/community ghc ghc-dev cabal
     if ! which stack; then
       curl -sSL https://www.stackage.org/stack/linux-x86_64-static \

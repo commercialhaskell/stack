@@ -542,6 +542,10 @@ install_64bit_gmp4_linked_binary() {
   install_from_bindist "linux-x86_64-gmp4.tar.gz"
 }
 
+install_64bit_gmp4_linked_binary() {
+  install_from_bindist "linux-x86_64-gmp4"
+}
+
 install_64bit_osx_binary() {
   install_from_bindist "osx-x86_64.tar.gz"
 }
