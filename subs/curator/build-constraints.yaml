@@ -4342,6 +4342,18 @@ skipped-tests:
 
     # Uses Cabal's "library internal" stanza feature
     - s3-signer
+
+    # Due to cycles, which are actually just limitations in Stack right now.
+    - call-stack
+    - HUnit
+    - criterion
+    - hspec
+    - foundation
+    - attoparsec
+    - case-insensitive
+    - nanospec
+    - scientific
+    - vector-binary-instances
 # end of skipped-tests
 
 # Tests which we should build and run, but which are expected to fail. We
@@ -4760,6 +4772,16 @@ skipped-benchmarks:
     # @phadej
     - dlist-nonempty # criterion-1.3
     - splitmix # criterion-1.3
+
+    # Due to cycles, which are actually just limitations in Stack right now.
+    - criterion
+    - foundation
+    - hspec
+    - attoparsec
+    - case-insensitive
+    - nanospec
+    - scientific
+    - vector-binary-instances
 
 # end of skipped-benchmarks
 
