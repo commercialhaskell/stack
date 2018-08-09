@@ -11,6 +11,7 @@ import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import RIO.List (intercalate)
+import RIO.Process (HasProcessContext)
 import Path ((</>), parseRelDir)
 import Path.IO (doesDirExist)
 
@@ -29,7 +30,7 @@ instance Show UnpackException where
 
 -- | Intended to work for the command line command.
 unpackPackages
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
   -> Path Abs Dir -- ^ destination
   -> [String] -- ^ names or identifiers
