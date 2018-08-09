@@ -12,14 +12,15 @@ import System.IO.Error
 import System.Process
 import System.Exit
 import System.Info (arch, os)
+import GHC.Stack (HasCallStack)
 
-run' :: FilePath -> [String] -> IO ExitCode
+run' :: HasCallStack => FilePath -> [String] -> IO ExitCode
 run' cmd args = do
     logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Nothing, Nothing, Nothing, ph) <- createProcess (proc cmd args)
     waitForProcess ph
 
-run :: FilePath -> [String] -> IO ()
+run :: HasCallStack => FilePath -> [String] -> IO ()
 run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
@@ -27,17 +28,17 @@ run cmd args = do
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
-stack' :: [String] -> IO ExitCode
+stack' :: HasCallStack => [String] -> IO ExitCode
 stack' args = do
     stackEnv <- stackExe
     run' stackEnv args
 
-stack :: [String] -> IO ()
+stack :: HasCallStack => [String] -> IO ()
 stack args = do
     ec <- stack' args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
-stackErr :: [String] -> IO ()
+stackErr :: HasCallStack => [String] -> IO ()
 stackErr args = do
     ec <- stack' args
     when (ec == ExitSuccess) $ error "stack was supposed to fail, but didn't"
@@ -213,6 +214,13 @@ defaultResolverArg = "--resolver=lts-11.19"
 -- | Remove a file and ignore any warnings about missing files.
 removeFileIgnore :: FilePath -> IO ()
 removeFileIgnore fp = removeFile fp `catch` \e ->
+  if isDoesNotExistError e
+    then return ()
+    else throwIO e
+
+-- | Remove a directory and ignore any warnings about missing files.
+removeDirIgnore :: FilePath -> IO ()
+removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e

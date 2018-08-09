@@ -4,9 +4,11 @@ import System.Directory
 main :: IO ()
 main = do
   -- init
+  removeFileIgnore "stack.yaml"
   stack ["init", defaultResolverArg]
 
   -- place to throw some exes
+  removeDirIgnore "binny"
   createDirectory "binny"
 
   -- check assumptions on exec and the build flags and clean
