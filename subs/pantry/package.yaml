@@ -87,3 +87,4 @@ tests:
     - pantry
     - hspec
     - exceptions
+    - hedgehog

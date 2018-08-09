@@ -983,7 +983,12 @@ parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
     Just t1 -> parseGhcjs t1
     Nothing -> T.stripPrefix "ghc-" t0 >>= parseGhc
   where
-    parseGhcjs = undefined
+    parseGhcjs t1 = do
+      let (ghcjsVT, t2) = T.break (== '_') t1
+      ghcjsV <- parseVersion $ T.unpack ghcjsVT
+      ghcVT <- T.stripPrefix "_ghc-" t2
+      ghcV <- parseVersion $ T.unpack ghcVT
+      pure $ WCGhcjs ghcjsV ghcV
     parseGhc = fmap WCGhc . parseVersion . T.unpack
 
 data UnresolvedSnapshotLocation
