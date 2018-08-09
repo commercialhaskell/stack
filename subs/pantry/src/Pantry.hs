@@ -327,7 +327,7 @@ fetchTreeKeys _ =
   logWarn "Network caching not yet implemented!" -- FIXME
 
 fetchPackages
-  :: (HasPantryConfig env, HasLogFunc env, Foldable f)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env, Foldable f)
   => f PackageLocationImmutable
   -> RIO env ()
 fetchPackages pls = do
@@ -349,7 +349,7 @@ fetchPackages pls = do
     go (PLIRepo repo pm) = (mempty, mempty, s (repo, pm))
 
 unpackPackageLocation
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Path Abs Dir -- ^ unpack directory
   -> PackageLocationImmutable
   -> RIO env ()
@@ -361,7 +361,7 @@ unpackPackageLocation fp loc = do
 --
 -- FIXME! Something to support hpack
 parseCabalFileImmutable
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
 parseCabalFileImmutable loc = do
@@ -544,7 +544,7 @@ gpdVersion :: GenericPackageDescription -> Version
 gpdVersion = pkgVersion . gpdPackageIdentifier
 
 loadCabalFile
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env ByteString
 
@@ -562,7 +562,7 @@ loadCabalFile pl = do
     Just bs -> pure bs
 
 loadPackageLocation
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env (TreeKey, Tree)
 loadPackageLocation (PLIHackage pir mtree) = getHackageTarball pir mtree
@@ -588,7 +588,7 @@ resolvePackageLocation dir (UPLMutable rel@(RelFilePath fp)) = do
 
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
 completePackageLocation
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env PackageLocationImmutable
 completePackageLocation orig@(PLIHackage _ (Just _)) = pure orig
@@ -611,7 +611,7 @@ completeArchive a@(Archive loc _ _) =
   pure $ Archive loc (Just sha) (Just size)
 
 completePM
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> PackageMetadata
   -> RIO env PackageMetadata
@@ -646,7 +646,7 @@ completeSnapshotLocation (SLUrl url Nothing mcompiler) = do
 
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
 completeSnapshot
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Snapshot
   -> RIO env Snapshot
 completeSnapshot snapshot = do
@@ -800,7 +800,7 @@ warningsParserHelper sl val f =
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env PackageIdentifier
 getPackageLocationIdent (PLIHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
@@ -809,7 +809,7 @@ getPackageLocationIdent pli = do
   snd <$> loadPackageIdentFromTree pli tree
 
 getPackageLocationTreeKey
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env TreeKey
 getPackageLocationTreeKey pl =

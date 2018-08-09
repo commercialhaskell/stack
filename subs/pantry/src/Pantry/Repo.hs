@@ -8,11 +8,18 @@ module Pantry.Repo -- FIXME needs to be implemented!
   ) where
 
 import Pantry.Types
+import Pantry.Archive
 import Pantry.Tree
+import Conduit
 import RIO
+import Path.IO (resolveFile')
+import RIO.FilePath ((</>))
+import RIO.Directory (doesDirectoryExist)
+import RIO.Process
+import qualified RIO.Text as T
 
 fetchRepos
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => [(Repo, PackageMetadata)]
   -> RIO env ()
 fetchRepos pairs = do
@@ -20,72 +27,64 @@ fetchRepos pairs = do
   for_ pairs $ uncurry getRepo
 
 getRepoKey
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
   -> PackageMetadata
   -> RIO env TreeKey
 getRepoKey repo pm = fst <$> getRepo repo pm -- potential optimization
 
 getRepo
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
   -> PackageMetadata
   -> RIO env (TreeKey, Tree)
 getRepo repo pm =
   checkPackageMetadata (PLIRepo repo pm) pm $
-  undefined
+  -- FIXME withCache $
+  getRepo' repo pm
 
-    {-
-cloneRepo
-    :: HasConfig env
-    => Path Abs Dir -- ^ project root
-    -> Text -- ^ URL
-    -> Text -- ^ commit
-    -> RepoType
-    -> RIO env (Path Abs Dir)
-cloneRepo projRoot url commit repoType' = do
-    workDir <- view workDirL
-    let nameBeforeHashing = case repoType' of
-            RepoGit -> T.unwords [url, commit]
-            RepoHg -> T.unwords [url, commit, "hg"]
-        -- TODO: dedupe with code for snapshot hash?
-        name = T.unpack $ decodeUtf8 $ S.take 12 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $ encodeUtf8 nameBeforeHashing
-        root = projRoot </> workDir </> $(mkRelDir "downloaded")
+getRepo'
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Repo
+  -> PackageMetadata
+  -> RIO env (TreeKey, Tree)
+getRepo' repo@(Repo url commit repoType') pm =
+  withSystemTempDirectory "get-repo" $
+  \tmpdir -> withWorkingDir tmpdir $ do
+    let suffix = "cloned"
+        dir = tmpdir </> suffix
 
-    dirRel <- parseRelDir name
-    let dir = root </> dirRel
+    let (commandName, cloneArgs) =
+          case repoType' of
+            RepoGit -> ("git", ["--recursive"])
+            RepoHg -> ("hg", [])
 
-    exists <- doesDirExist dir
-    unless exists $ do
-        liftIO $ ignoringAbsence (removeDirRecur dir)
+    logInfo $ "Cloning " <> display commit <> " from " <> display url
+    proc
+      commandName
+      ("clone" : cloneArgs ++ [T.unpack url, suffix])
+      runProcess_
+    created <- doesDirectoryExist dir
+    unless created $ error $ "Failed to clone repo: " ++ show repo -- FIXME exception
 
-        let cloneAndExtract commandName cloneArgs resetCommand =
-              withWorkingDir (toFilePath root) $ do
-                ensureDir root
-                logInfo $ "Cloning " <> display commit <> " from " <> display url
-                proc commandName
-                       ("clone" :
-                        cloneArgs ++
-                        [ T.unpack url
-                        , toFilePathNoTrailingSep dir
-                        ]) runProcess_
-                created <- doesDirExist dir
-                unless created $ throwM $ FailedToCloneRepo commandName
-                withWorkingDir (toFilePath dir) $ readProcessNull commandName
-                    (resetCommand ++ [T.unpack commit, "--"])
-                    `catchAny` \case
-                        ex -> do
-                            logInfo $
-                              "Please ensure that commit " <>
-                              display commit <>
-                              " exists within " <>
-                              display url
-                            throwM ex
-
-        case repoType' of
-            RepoGit -> cloneAndExtract "git" ["--recursive"] ["--git-dir=.git", "reset", "--hard"]
-            RepoHg  -> cloneAndExtract "hg"  []              ["--repository", ".", "update", "-C"]
-
-    return dir
-
-    -}
+    let tarball = tmpdir </> "foo.tar"
+    withWorkingDir dir $ do
+      case repoType' of
+        RepoGit -> proc commandName ["archive", "-o", tarball, "HEAD", "--", T.unpack $ pmSubdir pm] runProcess_
+      abs' <- resolveFile' tarball
+      getArchive
+        Archive
+          { archiveLocation = ALFilePath $ ResolvedPath
+              { resolvedRelative = RelFilePath $ T.pack tarball
+              , resolvedAbsolute = abs'
+              }
+          , archiveHash = Nothing
+          , archiveSize = Nothing
+          }
+        PackageMetadata
+          { pmName = Nothing
+          , pmVersion = Nothing
+          , pmTree = Nothing
+          , pmCabal = Nothing
+          , pmSubdir = ""
+          }
