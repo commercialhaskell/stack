@@ -1,4 +1,4 @@
-image: registry.gitlab.fpcomplete.com/fpco/default-build-image:1954
+image: registry.gitlab.fpcomplete.com/fpco/default-build-image:4116
 
 cache:
   key: "$CI_BUILD_NAME"
