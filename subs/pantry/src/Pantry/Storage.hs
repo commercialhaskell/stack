@@ -144,12 +144,16 @@ initStorage
 initStorage fp inner = do
   ensureDir $ parent fp
   bracket
-    (createSqlitePool (fromString $ toFilePath fp) 1)
+    (createSqlitePoolFromInfo sqinfo 1)
     (liftIO . destroyAllResources) $ \pool -> do
 
     migrates <- runSqlPool (runMigrationSilent migrateAll) pool
     forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
     inner (Storage pool)
+  where
+    sqinfo = set walEnabled False
+           $ set fkEnabled True
+           $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
 
 withStorage
   :: (HasPantryConfig env, HasLogFunc env)
