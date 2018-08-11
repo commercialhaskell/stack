@@ -192,7 +192,7 @@ rules global@Global{..} args = do
             () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
                 ,[" --haddock" | gTestHaddocks]]
-            () <- cmd0 (Cwd "etc/scripts") "install" "cabal-install"
+            () <- cmd0  "install" "cabal-install"
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
             () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests"
             return ()
