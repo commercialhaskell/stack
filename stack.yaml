@@ -18,6 +18,8 @@ flags:
     supported-build: true
 extra-deps:
 - Cabal-2.2.0.1@rev:0
+- cabal-install-2.2.0.0@rev:1
+- resolv-0.1.1.1@rev:0
 - infer-license-0.2.0@rev:0
 - hpack-0.29.6@rev:0
 - http-api-data-0.3.8.1@rev:0
