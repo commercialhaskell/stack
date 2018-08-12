@@ -15,6 +15,10 @@ Other enhancements:
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.
+* New command `stack ls stack-colors` lists the styles and the associated 'ANSI'
+  control character sequences that stack uses to color some of its output. This
+  addition is a precursor to allowing a stack user to redefine the default
+  styles. See `stack ls stack-colors --help` for more information.
 
 Bug fixes:
 

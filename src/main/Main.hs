@@ -308,7 +308,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     pathCmd
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots and dependencies)"
+                    "List command. (Supports snapshots, dependencies and stack's styles)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
