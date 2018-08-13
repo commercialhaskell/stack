@@ -904,6 +904,8 @@ withSingleContext :: forall env a. HasEnvConfig env
                   -> (  Package                                -- Package info
                      -> Path Abs File                          -- Cabal file path
                      -> Path Abs Dir                           -- Package root directory file path
+                     -- Note that the `Path Abs Dir` argument is redundant with the `Path Abs File`
+                     -- argument, but we provide both to avoid recalculating `parent` of the `File`.
                      -> (ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
                      -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
@@ -939,7 +941,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     withPackage inner =
         case taskType of
-            TTFilePath lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp) -- TODO remove this third argument, it's redundant with the second
+            TTFilePath lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
             TTRemote package _ pkgloc -> do
                 suffix <- parseRelDir $ displayC $ packageIdent package
                 let dir = eeTempDir </> suffix
