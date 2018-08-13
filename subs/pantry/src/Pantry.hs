@@ -591,9 +591,18 @@ completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env PackageLocationImmutable
-completePackageLocation orig@(PLIHackage _ (Just _)) = pure orig
-completePackageLocation (PLIHackage pir Nothing) = do
-  logDebug $ "Completing package location information from " <> display pir
+completePackageLocation orig@(PLIHackage (PackageIdentifierRevision _ _ CFIHash{}) (Just _)) = pure orig
+completePackageLocation (PLIHackage pir0@(PackageIdentifierRevision name version cfi0) Nothing) = do
+  logDebug $ "Completing package location information from " <> display pir0
+  pir <-
+    case cfi0 of
+      CFIHash{} -> pure pir0
+      _ -> do
+        bs <- getHackageCabalFile pir0
+        let cfi = CFIHash (mkStaticSHA256FromBytes bs) (Just (FileSize (fromIntegral (B.length bs))))
+            pir = PackageIdentifierRevision name version cfi
+        logDebug $ "Added in cabal file hash: " <> display pir
+        pure pir
   treeKey <- getHackageTarballKey pir
   pure $ PLIHackage pir (Just treeKey)
 completePackageLocation pl@(PLIArchive archive pm) =
