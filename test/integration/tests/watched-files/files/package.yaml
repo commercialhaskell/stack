@@ -1,0 +1,9 @@
+name: watched-files
+dependencies:
+- base
+- bytestring
+- file-embed
+
+executables:
+  watched:
+    main: Main.hs
