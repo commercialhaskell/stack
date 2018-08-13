@@ -932,7 +932,7 @@ pprintExceptions
     -> Path Abs Dir
     -> ParentMap
     -> Set PackageName
-    -> AnsiDoc
+    -> StyleDoc
 pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
@@ -943,7 +943,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
       , line <> line
       ] ++
       (if not onlyHasDependencyMismatches then [] else
-         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> toAnsiDoc (display (defaultUserConfigPath stackRoot)) <+> "to ignore all version constraints and build anyway.")
+         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> toStyleDoc (display (defaultUserConfigPath stackRoot)) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
       ) ++
@@ -962,9 +962,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
           ]
       | otherwise =
          [ "  *" <+> align
-           (styleRecommendation (flow "Recommended action:") <+>
+           (style Recommendation (flow "Recommended action:") <+>
             flow "try adding the following to your extra-deps in" <+>
-            toAnsiDoc (display stackYaml) <> ":")
+            toStyleDoc (display stackYaml) <> ":")
          , line <> line
          , vsep (map pprintExtra (Map.toList extras))
          , line
@@ -1005,7 +1005,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (styleError . displayC) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (style Error . displayC) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -1019,18 +1019,18 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     Just (target:path) -> line <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [styleTarget . displayC $ target] ++
+                            [style Target . displayC $ target] ++
                             map displayC path ++
                             [pkgIdent]
               where
-                pkgName = styleCurrent . displayC $ packageName pkg
-                pkgIdent = styleCurrent . displayC $ packageIdentifier pkg
+                pkgName = style Current . displayC $ packageName pkg
+                pkgIdent = style Current . displayC $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `Set.member` wiredInPackages =
-            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (styleCurrent . displayC $ name)
-        | otherwise = Just $ flow "Unknown package:" <+> (styleCurrent . displayC $ name)
+            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . displayC $ name)
+        | otherwise = Just $ flow "Unknown package:" <+> (style Current . displayC $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -1040,7 +1040,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            styleError (displayC name) <+>
+            style Error (displayC name) <+>
             align ((if range == Cabal.anyVersion
                       then flow "needed"
                       else flow "must match" <+> goodRange) <> "," <> softline <>
@@ -1048,7 +1048,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            (styleError . displayC) (PackageIdentifier name version) <+>
+            (style Error . displayC) (PackageIdentifier name version) <+>
             align (flow "from stack configuration does not match" <+> goodRange <+>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
@@ -1056,13 +1056,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
         HasNoLibrary -> Just $
-            styleError (displayC name) <+>
+            style Error (displayC name) <+>
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
-            styleError (displayC name) <+>
+            style Error (displayC name) <+>
             align (flow $ "dependency cycle detected: " ++ intercalate ", " (map displayC names))
       where
-        goodRange = styleGood (fromString (Cabal.display range))
+        goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =
             case mlatestApplicable of
                 Nothing
@@ -1073,7 +1073,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     | Just laVer == mversion -> softline <>
                         flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        flow "(latest matching version is" <+> styleGood (displayC laVer) <> ")"
+                        flow "(latest matching version is" <+> style Good (displayC laVer) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'

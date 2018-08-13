@@ -71,6 +71,7 @@ import           Stack.Constants.Config
 import           Pantry
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
+import qualified Stack.PrettyPrint as PP (Style (Module))
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
@@ -745,9 +746,9 @@ resolveGlobFiles =
                       then do
                           prettyWarnL
                               [ flow "Wildcard does not match any files:"
-                              , styleFile $ fromString glob
+                              , style File $ fromString glob
                               , line <> flow "in directory:"
-                              , styleDir $ fromString dir
+                              , style Dir $ fromString dir
                               ]
                           return []
                       else throwIO e)
@@ -789,7 +790,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
     when (null matches) $
         prettyWarnL
             [ flow "filepath wildcard"
-            , "'" <> styleFile (fromString filepath) <> "'"
+            , "'" <> style File (fromString filepath) <> "'"
             , flow "does not match any files."
             ]
     return matches
@@ -1192,9 +1193,9 @@ parseDumpHI dumpHIPath = do
         when (isNothing mresolved) $
             prettyWarnL
                 [ flow "addDependentFile path (Template Haskell) listed in"
-                , styleFile $ fromString dumpHIPath
+                , style File $ fromString dumpHIPath
                 , flow "does not exist:"
-                , styleFile $ fromString x
+                , style File $ fromString x
                 ]
         return mresolved
     return (moduleDeps, thDepsResolved)
@@ -1320,7 +1321,7 @@ logPossibilities dirs mn = do
     possibilities <- liftM concat (makePossibilities mn)
     unless (null possibilities) $ prettyWarnL
         [ flow "Unable to find a known candidate for the Cabal entry"
-        , (styleModule . fromString $ D.display mn) <> ","
+        , (style PP.Module . fromString $ D.display mn) <> ","
         , flow "but did find:"
         , line <> bulletedList (map display possibilities)
         , flow "If you are using a custom preprocessor for this module"
@@ -1368,7 +1369,7 @@ resolveOrWarn subject resolver path =
            , flow "listed in"
            , maybe (display file) display (stripProperPrefix cwd file)
            , flow "file does not exist:"
-           , styleDir . fromString $ path
+           , style Dir . fromString $ path
            ]
      return result
 

@@ -1,4 +1,4 @@
-image: registry.gitlab.fpcomplete.com/fpco/default-build-image:1954
+image: registry.gitlab.fpcomplete.com/fpco/default-build-image:4116
 
 cache:
   key: "$CI_BUILD_NAME"
@@ -19,8 +19,7 @@ build:
     - stable
   script: &build
     - export PATH=$HOME/.local/bin:$PATH
-    - (cd etc/scripts && stack --install-ghc install --pedantic)
-    - stack-release-script check
+    - stack etc/scripts/release.hs check
 
 manual_build:
   stage: build

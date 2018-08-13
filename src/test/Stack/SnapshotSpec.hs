@@ -5,6 +5,7 @@ module Stack.SnapshotSpec (spec) where
 
 import Stack.Prelude
 import Stack.Snapshot (loadGlobalHints)
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Types.PackageName
 import Stack.Types.Runner (withRunner, ColorWhen (ColorNever))
 import Stack.Types.Version
@@ -20,7 +21,7 @@ spec = do
           hPut h "this should be ignored"
           hClose h :: IO ()
           abs' <- resolveFile' fp
-          withRunner LevelError False False ColorNever Nothing False $ \runner ->
+          withRunner LevelError False False ColorNever defaultStyles Nothing False $ \runner ->
             runRIO runner $ inner abs'
     it' "unknown compiler" $ \fp -> do
       mmap <- loadGlobalHints fp $ WCGhc $(mkVersion "0.0.0.0.0.0.0")

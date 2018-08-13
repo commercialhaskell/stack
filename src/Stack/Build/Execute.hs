@@ -1464,7 +1464,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       "- In" <+>
                       fromString (T.unpack (renderComponent comp)) <>
                       ":" <> line <>
-                      indent 4 (mconcat $ intersperse line $ map (styleGood . fromString . C.display) modules)
+                      indent 4 (mconcat $ intersperse line $ map (style Good . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>

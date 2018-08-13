@@ -39,6 +39,8 @@ pages:
   - Maintainer guide:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
+    - Add GHC version: maintainers/ghc.md
+    - Upgrading msys: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
 
 markdown_extensions:

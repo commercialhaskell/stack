@@ -9,7 +9,7 @@ Vagrant.configure(2) do |config|
   config.ssh.shell = "/bin/sh"
   config.vm.provision "shell", inline: <<-SHELL
     set -xe
-    pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss awscli git gnupg
+    pkg install -y devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss awscli git gnupg1 unzip
     if ! which stack; then
       curl -sSL https://www.stackage.org/stack/freebsd-x86_64 \
         | tar xzvf - --strip-components=1 -C /usr/local/bin '*/stack'

@@ -39,6 +39,7 @@ dependencies:
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
+- array
 - async
 - attoparsec
 - base >=4.10 && < 5
@@ -61,7 +62,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hpack >= 0.29.6
+- hpack
 - hpc
 - http-client
 - http-client-tls
@@ -110,10 +111,10 @@ dependencies:
 - time
 - tls
 - transformers
-- typed-process >= 0.2.1.0
+- typed-process
 - unicode-transforms
 - unix-compat
-- unliftio >= 0.2.4.0
+- unliftio
 - unordered-containers
 - vector
 - yaml
@@ -124,7 +125,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32 >= 2.5.3.0
+    - Win32
   else:
     build-tools:
     - hsc2hs
@@ -137,11 +138,8 @@ library:
   - subs/pantry/src
   ghc-options:
   - -fwarn-identities
-  verbatim:
-    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
-    # Using 'verbatim' to support older hpack version.
-    autogen-modules: |
-      Paths_stack
+  generated-exposed-modules:
+  - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
@@ -160,7 +158,6 @@ library:
   - Path.CheckInstall
   - Path.Extra
   - Path.Find
-  - Paths_stack
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -181,6 +178,7 @@ library:
   - Stack.Constants.Config
   - Stack.Coverage
   - Stack.DefaultColorWhen
+  - Stack.DefaultStyles
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
@@ -253,6 +251,7 @@ library:
   - Stack.Types.PackageDump
   - Stack.Types.PackageIdentifier
   - Stack.Types.PackageName
+  - Stack.Types.PrettyPrint
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
@@ -286,14 +285,8 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    verbatim:
-      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
-      # Using 'verbatim' to support older hpack version.
-      autogen-modules: |
-          Build_stack,
-          Paths_stack
-    other-modules:
-    - Build_stack
+    generated-other-modules:
+    - Build_stack,
     - Paths_stack
     ghc-options:
     - -threaded

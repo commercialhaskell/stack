@@ -220,19 +220,19 @@ getCabalLbs pvpBounds mrev cabalfp = do
             prettyWarn $ vsep $ roundtripErrs ++
               [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
               , ""
-              ,  "Please see this GitHub issue for status:" <+> styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
+              ,  "Please see this GitHub issue for status:" <+> style Url "https://github.com/commercialhaskell/stack/issues/3549"
               , ""
               , fillSep
                 [ flow "If the issue is closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
-                , styleShell "stack upgrade"
+                , style Shell "stack upgrade"
                 , flow "for latest stable version or"
-                , styleShell "stack upgrade --git"
+                , style Shell "stack upgrade --git"
                 , flow "for the latest development version."
                 ]
               , ""
               , fillSep
                 [ flow "If the issue is fixed, but updating doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
-                , styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+                , style Url "https://github.com/commercialhaskell/stack/issues/new"
                 ]
               , ""
               , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
@@ -242,8 +242,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
         prettyWarn $ vsep $ roundtripErrs ++
           [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
           , bulletedList
-            [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
-            , styleUrl "https://github.com/haskell/cabal/issues/new"
+            [ style Url "https://github.com/commercialhaskell/stack/issues/new"
+            , style Url "https://github.com/haskell/cabal/issues/new"
             ]
           , flow $ "The parse error is: " ++ unlines (map show errs)
           , ""

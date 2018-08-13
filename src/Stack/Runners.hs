@@ -214,6 +214,7 @@ withRunnerGlobal GlobalOpts{..} = withRunner
   globalTimeInLog
   globalTerminal
   globalColorWhen
+  globalStyles
   globalTermWidth
   (isJust globalReExecVersion)
 
@@ -241,4 +242,3 @@ withBuildConfigDot opts go f = withBuildConfig go' f
         (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
         (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
         go
-

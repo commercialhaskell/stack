@@ -7,6 +7,7 @@ import Data.Maybe (fromJust)
 import Options.Applicative
 import Path
 import Prelude (writeFile)
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Config
 import Stack.Config.Nix
 import Stack.Constants
@@ -43,7 +44,7 @@ spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' :: ConfigMonoid -> (LoadConfig -> IO ()) -> IO ()
       loadConfig' cmdLineArgs inner =
-        withRunner LevelDebug True False ColorAuto Nothing False $ \runner ->
+        withRunner LevelDebug True False ColorAuto defaultStyles Nothing False $ \runner ->
         runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
       inTempDir test = do
         currentDirectory <- getCurrentDirectory

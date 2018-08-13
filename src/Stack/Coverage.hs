@@ -481,7 +481,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath :: (HasRunner env)
-                  => Text -> AnsiDoc -> RIO env ()
+                  => Text -> StyleDoc -> RIO env ()
 displayReportPath report reportPath =
      prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> reportPath
 
