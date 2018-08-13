@@ -620,5 +620,5 @@ loadGlobalHints dest wc =
         _ -> pure mres
 
     inner2 = liftIO
-           $ (Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap))
+           $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
          <$> decodeFileThrow (toFilePath dest)
