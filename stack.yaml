@@ -16,6 +16,9 @@ flags:
   stack:
     hide-dependency-versions: true
     supported-build: true
+  # https://github.com/haskell/cabal/issues/4883
+  cabal-install:
+    native-dns: false
 extra-deps:
 - Cabal-2.2.0.1@rev:0
 - cabal-install-2.2.0.0@rev:1
