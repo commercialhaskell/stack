@@ -1245,11 +1245,13 @@ parseDumpHI dumpHIPath = do
         thDeps =
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.
-            mapMaybe
-                (fmap TL.unpack .
-                  (TL.stripSuffix "\"" <=< TL.stripPrefix "\"") .
-                  TL.dropWhileEnd (== '\r') . TLE.decodeUtf8 . CL8.dropWhile (/= '"')) $
-            filter ("addDependentFile \"" `CL8.isPrefixOf`) dumpHI
+                  TL.unpack .
+                  -- Starting with GHC 8.4.3, there's a hash following
+                  -- the path. See
+                  -- https://github.com/yesodweb/yesod/issues/1551
+                  TLE.decodeUtf8 .
+                  CL8.takeWhile (/= '\"') <$>
+            mapMaybe (CL8.stripPrefix "addDependentFile \"") dumpHI
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
         when (isNothing mresolved) $
