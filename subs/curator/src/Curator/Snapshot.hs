@@ -8,8 +8,6 @@ import Curator.Types
 import Pantry
 import qualified RIO.Map as Map
 import Distribution.Types.VersionRange (withinRange)
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
 
 makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -17,7 +15,6 @@ makeSnapshot
   -> Text -- ^ name
   -> RIO env Snapshot
 makeSnapshot cons name = do
-  hints <- getGlobalHints $ consGhcVersion cons
   locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
   pure Snapshot
     { snapshotParent = SLCompiler $ WCGhc $ consGhcVersion cons
@@ -27,7 +24,6 @@ makeSnapshot cons name = do
     , snapshotFlags = Map.mapMaybe getFlags (consPackages cons)
     , snapshotHidden = Map.filter id (pcHide <$> consPackages cons)
     , snapshotGhcOptions = mempty
-    , snapshotGlobalHints = hints
     }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
@@ -74,19 +70,6 @@ toLoc name pc =
               Nothing -> error $ "Impossible! No revisions found for " ++ show (name, version)
               Just (BlobKey sha size, _) -> pure $ CFIHash sha $ Just size
           pure $ Just $ PLIHackage (PackageIdentifierRevision name version cfi) Nothing
-
-getGlobalHints
-  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Version -- ^ GHC version
-  -> RIO env (Map PackageName (Maybe Version))
-getGlobalHints version = do
-  let cmd = "ghc-pkg-" ++ displayC version
-  lbs <- proc cmd ["list", "--global", "--simple-output"] readProcessStdout_
-  text <- either throwIO pure $ decodeUtf8' $ BL.toStrict lbs
-  Map.fromList <$> for (T.words text) (\t ->
-    case parsePackageIdentifier $ T.unpack t of
-      Just (PackageIdentifier n v) -> pure (n, Just v)
-      Nothing -> error $ "Invalid package identifier for global hints: " ++ show t)
 
 traverseValidate
   :: (MonadUnliftIO m, Traversable t)

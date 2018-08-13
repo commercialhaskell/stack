@@ -19,6 +19,7 @@ module Stack.Snapshot
   ( loadResolver
   , loadSnapshot
   , calculatePackagePromotion
+  , loadGlobalHints
   ) where
 
 import           Stack.Prelude hiding (Display (..))
@@ -29,14 +30,15 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Yaml (ParseException (AesonException))
+import           Data.Yaml (ParseException (AesonException), decodeFileThrow)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import qualified Distribution.Version as C
-import           Network.HTTP.StackClient (Request)
+import           Network.HTTP.Download (download, redownload)
+import           Network.HTTP.StackClient (Request, parseRequest)
 import qualified RIO
 import qualified RIO.ByteString.Lazy as BL
 import           Data.ByteString.Builder (toLazyByteString)
@@ -49,6 +51,7 @@ import           Stack.Types.VersionIntervals
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.Resolver
+import           Stack.Types.Runner (HasRunner)
 
 data SnapshotException
   = InvalidCabalFileInSnapshot !PackageLocation !PError
@@ -178,20 +181,22 @@ loadSnapshot mcompiler =
       case sdSnapshot sd of
         Nothing ->
           case mcompiler of
-            Nothing -> return LoadedSnapshot
-              { lsCompilerVersion = wantedToActual $ sdWantedCompilerVersion sd
-              , lsGlobals = fromGlobalHints $ sdGlobalHints sd
-              , lsPackages = Map.empty
-              }
+            Nothing -> do
+              ghfp <- globalHintsFile
+              mglobalHints <- loadGlobalHints ghfp $ sdWantedCompilerVersion sd
+              globalHints <-
+                case mglobalHints of
+                  Just x -> pure x
+                  Nothing -> do
+                    logWarn $ "Unable to load global hints for " <> RIO.display (sdWantedCompilerVersion sd)
+                    pure mempty
+              return LoadedSnapshot
+                { lsCompilerVersion = wantedToActual $ sdWantedCompilerVersion sd
+                , lsGlobals = fromGlobalHints globalHints
+                , lsPackages = Map.empty
+                }
             Just cv' -> loadCompiler cv'
-        Just (snapshot, sd') -> do
-          ls0 <- start sd'
-          inner2 snapshot ls0
-            { lsGlobals =
-                if Map.null (lsGlobals ls0)
-                  then fromGlobalHints (sdGlobalHints sd)
-                  else lsGlobals ls0
-            }
+        Just (snapshot, sd') -> start sd' >>= inner2 snapshot
 
     inner2 snap ls0 = do
       gpds <-
@@ -341,12 +346,13 @@ recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"
       return res
 
-fromGlobalHints :: Map PackageName (Maybe Version) -> Map PackageName (LoadedPackageInfo GhcPkgId)
+fromGlobalHints
+  :: Map PackageName Version
+  -> Map PackageName (LoadedPackageInfo GhcPkgId)
 fromGlobalHints =
     Map.unions . map go . Map.toList
   where
-    go (_, Nothing) = Map.empty
-    go (name, Just ver) = Map.singleton name LoadedPackageInfo
+    go (name, ver) = Map.singleton name LoadedPackageInfo
       { lpiVersion = ver
       -- For global hint purposes, we only care about the
       -- version. All other fields are ignored when checking
@@ -581,3 +587,38 @@ calculate gpd platform compilerVersion loc flags hide options =
           (C.library pd)
       , lpiHide = hide
       }
+
+-- | Load the global hints from Github.
+loadGlobalHints
+  :: HasRunner env
+  => Path Abs File -- ^ local cached file location
+  -> WantedCompiler
+  -> RIO env (Maybe (Map PackageName Version))
+loadGlobalHints dest wc =
+    inner False
+  where
+    inner alreadyDownloaded = do
+      req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
+      downloaded <- download req dest
+      eres <- tryAny inner2
+      mres <-
+        case eres of
+          Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
+          Right x -> pure x
+      case mres of
+        Nothing | not alreadyDownloaded && not downloaded -> do
+          logInfo $
+            "Could not find local global hints for " <>
+            RIO.display wc <>
+            ", forcing a redownload"
+          x <- redownload req dest
+          if x
+            then inner True
+            else do
+              logInfo "Redownload didn't happen"
+              pure Nothing
+        _ -> pure mres
+
+    inner2 = liftIO
+           $ (Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap))
+         <$> decodeFileThrow (toFilePath dest)

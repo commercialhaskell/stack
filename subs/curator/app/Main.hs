@@ -11,7 +11,7 @@ main = runPantryApp $ do
 
   -- update Hackage index
   do
-    updateHackageIndex $ Just "Running snapshot curator tool"
+    void $ updateHackageIndex $ Just "Running snapshot curator tool"
 
   -- write constraints
   do
@@ -46,6 +46,7 @@ main = runPantryApp $ do
       (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
       runProcess_
 
+loadPantrySnapshotFile :: FilePath -> RIO PantryApp Snapshot
 loadPantrySnapshotFile fp = do
   abs' <- resolveFile' fp
   eres <- loadPantrySnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs') Nothing

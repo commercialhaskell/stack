@@ -380,14 +380,12 @@ rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
-    globalHints <- view globalHintsL
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
         , "compiler" .= object
             [ "wanted" .= wantedCompiler
             , "actual" .= actualCompiler
             ]
-        , "global-hints" .= toCabalStringMap ((fmap.fmap) CabalString globalHints)
         ]
   where
     localToPair lp =

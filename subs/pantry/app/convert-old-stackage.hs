@@ -8,10 +8,10 @@ import RIO.FilePath
 import RIO.Time (Day, toGregorian)
 import RIO.Directory
 import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended
+--import Data.Aeson.Extended
 import qualified RIO.Text as T
 import Data.Text.Read (decimal)
-import Path (parseAbsDir)
+--import Path (parseAbsDir)
 
 data SnapName
     = LTS !Int !Int

@@ -20,7 +20,6 @@ module Stack.Types.BuildPlan
     , fromCabalModuleName
     , ModuleInfo (..)
     , moduleInfoVC
-    , sdGlobalHints
     , sdSnapshots
     , sdResolverName
     ) where
@@ -65,9 +64,6 @@ sdResolverName sd =
   case sdSnapshot sd of
     Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
     Just (snapshot, _) -> snapshotName snapshot
-
-sdGlobalHints :: SnapshotDef -> Map PackageName (Maybe Version)
-sdGlobalHints = Map.unions . map snapshotGlobalHints . sdSnapshots
 
 sdSnapshots :: SnapshotDef -> [Snapshot]
 sdSnapshots sd =

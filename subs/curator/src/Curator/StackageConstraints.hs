@@ -14,7 +14,7 @@ import RIO
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
-import Distribution.Types.VersionRange (VersionRange, anyVersion, intersectVersionRanges, normaliseVersionRange)
+import Distribution.Types.VersionRange (VersionRange, intersectVersionRanges)
 import Data.Yaml
 import Distribution.Text (simpleParse)
 

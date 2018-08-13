@@ -6,6 +6,7 @@ module Curator.Unpack
   ) where
 
 import RIO
+import RIO.Process (HasProcessContext)
 import Pantry
 import Curator.Types
 import Path
@@ -16,7 +17,7 @@ import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 
 unpackSnapshot
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
   -> Snapshot
   -> Path Abs Dir

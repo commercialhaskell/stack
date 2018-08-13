@@ -15,7 +15,6 @@ module Stack.Solver
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
-    , checkSnapBuildPlanActual
     -- * Internal - for tests
     , parseCabalOutputLine
     ) where
@@ -644,7 +643,8 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    resolverResult <- checkSnapBuildPlanActual gpds (Just oldSrcFlags) sd
+    actualCompiler <- view actualCompilerVersionL
+    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (Just actualCompiler)
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
@@ -755,29 +755,6 @@ solveExtraDeps modStackYaml = do
             , "        - Add extra dependencies to guide solver.\n"
             , "        - Adjust resolver.\n"
             ]
-
--- | Same as 'checkSnapBuildPLan', but set up a real GHC if needed.
---
--- If we're using a Stackage snapshot, we can use the snapshot hints
--- to determine global library information. This will not be available
--- for custom and GHC resolvers, however. Therefore, we insist that it
--- be installed first. Fortunately, the standard `stack solver`
--- behavior only chooses Stackage snapshots, so the common case will
--- not force the installation of a bunch of GHC versions.
-checkSnapBuildPlanActual
-    :: (HasConfig env, HasGHCVariant env)
-    => [C.GenericPackageDescription]
-    -> Maybe (Map PackageName (Map FlagName Bool))
-    -> SnapshotDef
-    -> RIO env BuildPlanCheck
-checkSnapBuildPlanActual gpds flags sd = do
-    let forNonSnapshot inner = setupCabalEnv (sdWantedCompilerVersion sd) (inner . Just)
-        runner =
-          if Map.null $ sdGlobalHints sd
-            then forNonSnapshot
-            else ($ Nothing)
-
-    runner $ checkSnapBuildPlan gpds flags sd
 
 prettyPath
     :: forall r t m. (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

@@ -1022,6 +1022,12 @@ instance ToJSON WantedCompiler where
   toJSON = toJSON . utf8BuilderToText . display
 instance FromJSON WantedCompiler where
   parseJSON = withText "WantedCompiler" $ either (fail . show) pure . parseWantedCompiler
+instance FromJSONKey WantedCompiler where
+  fromJSONKey =
+    FromJSONKeyTextParser $ \t ->
+    case parseWantedCompiler t of
+      Left e -> fail $ "Invalid WantedComiler " ++ show t ++ ": " ++ show e
+      Right x -> pure x
 
 parseWantedCompiler :: Text -> Either PantryException WantedCompiler
 parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
@@ -1191,13 +1197,6 @@ data Snapshot = Snapshot
   -- overriding the hidden settings in a parent snapshot.
   , snapshotGhcOptions :: !(Map PackageName [Text])
   -- ^ GHC options per package
-  , snapshotGlobalHints :: !(Map PackageName (Maybe Version))
-  -- ^ Hints about which packages are available globally. When
-  -- actually building code, we trust the package database provided
-  -- by GHC itself, since it may be different based on platform or
-  -- GHC install. However, when we want to check the compatibility
-  -- of a snapshot with some codebase without installing GHC (e.g.,
-  -- during stack init), we would use this field.
   }
   deriving (Show, Eq, Data, Generic)
 instance Store Snapshot
@@ -1227,7 +1226,6 @@ instance ToJSON Snapshot where
     , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
     , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
-    , if Map.null (snapshotGlobalHints snap) then [] else ["global-hints" .= fmap (fmap CabalString) (toCabalStringMap (snapshotGlobalHints snap))]
     ]
 
 parseSnapshot :: Maybe (Path Abs Dir) -> Value -> Parser (WithJSONWarnings (IO Snapshot))
@@ -1246,7 +1244,6 @@ parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
   snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
   snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
   snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
-  snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (o ..:? "global-hints" ..!= Map.empty)
   pure $ do
     snapshotLocations <- fmap concat $ mapM (resolvePackageLocationImmutable mdir) unresolvedLocs
     snapshotParent <- iosnapshotParent

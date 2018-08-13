@@ -420,7 +420,7 @@ checkBundleResolver
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd initOpts bundle sd = do
-    result <- checkSnapBuildPlanActual gpds Nothing sd
+    result <- checkSnapBuildPlan gpds Nothing sd Nothing
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do

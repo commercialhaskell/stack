@@ -44,7 +44,6 @@ parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do
     Object si <- o .: "system-info"
     ghcVersion <- si .: "ghc-version"
     let snapshotParent = SLCompiler $ WCGhc $ unCabalString ghcVersion
-    snapshotGlobalHints <- unCabalStringMap . (fmap.fmap) unCabalString <$> (si .: "core-packages")
 
     packages <- o .: "packages"
     (Endo mkLocs, snapshotFlags', snapshotHidden) <- fmap mconcat $ mapM (uncurry goPkg) $ Map.toList packages

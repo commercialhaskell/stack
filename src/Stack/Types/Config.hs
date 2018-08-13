@@ -54,6 +54,7 @@ module Stack.Types.Config
   ,parseGHCVariant
   ,HasGHCVariant(..)
   ,snapshotsDir
+  ,globalHintsFile
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasEnvConfig(..)
@@ -159,7 +160,6 @@ module Stack.Types.Config
   ,whichCompilerL
   ,envOverrideSettingsL
   ,loadedSnapshotL
-  ,globalHintsL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -1194,6 +1194,12 @@ snapshotsDir = do
     platform <- platformGhcRelDir
     return $ root </> $(mkRelDir "snapshots") </> platform
 
+-- | Cached global hints file
+globalHintsFile :: (MonadReader env m, HasConfig env) => m (Path Abs File)
+globalHintsFile = do
+  root <- view stackRootL
+  pure $ root </> $(mkRelDir "global-hints") </> $(mkRelFile "global-hints.yaml")
+
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootDeps = do
@@ -1952,9 +1958,6 @@ envOverrideSettingsL :: HasConfig env => Lens' env (EnvSettings -> IO ProcessCon
 envOverrideSettingsL = configL.lens
     configProcessContextSettings
     (\x y -> x { configProcessContextSettings = y })
-
-globalHintsL :: HasBuildConfig s => Getting r s (Map PackageName (Maybe Version))
-globalHintsL = snapshotDefL.to sdGlobalHints
 
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool

@@ -390,11 +390,7 @@ selectBestSnapshot gpds snaps = do
 
         getResult snap = do
             result <- checkSnapBuildPlan gpds Nothing snap
-              -- We know that we're only dealing with ResolverStackage
-              -- here, where we can rely on the global package hints.
-              -- Therefore, we don't use an actual compiler. For more
-              -- info, see comments on
-              -- Stack.Solver.checkSnapBuildPlanActual.
+              -- Rely on global package hints.
               Nothing
             reportResult result snap
             return (snap, result)
