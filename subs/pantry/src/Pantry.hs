@@ -36,6 +36,7 @@ module Pantry
   , BlobKey (..)
   , HpackExecutable (..)
   , PackageMetadata (..)
+  , PantryException (..)
 
     -- ** Unresolved package locations
   , UnresolvedPackageLocation
@@ -367,8 +368,28 @@ parseCabalFileImmutable
 parseCabalFileImmutable loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
+  let foundCabalKey = BlobKey (mkStaticSHA256FromBytes bs) (FileSize (fromIntegral (B.length bs)))
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
-  pure gpd
+  let pm =
+        case loc of
+          PLIHackage (PackageIdentifierRevision name version cfi) mtree -> PackageMetadata
+            { pmName = Just name
+            , pmVersion = Just version
+            , pmSubdir = ""
+            , pmTree = mtree
+            , pmCabal =
+                case cfi of
+                  CFIHash sha (Just size) -> Just $ BlobKey sha size
+                  _ -> Nothing
+            }
+          PLIArchive _ pm' -> pm'
+          PLIRepo _ pm' -> pm'
+  let exc = MismatchedPackageMetadata loc pm foundCabalKey (gpdPackageIdentifier gpd)
+  maybe (throwIO exc) pure $ do
+    guard $ maybe True (== gpdPackageName gpd) (pmName pm)
+    guard $ maybe True (== gpdVersion gpd) (pmVersion pm)
+    guard $ maybe True (== foundCabalKey) (pmCabal pm)
+    pure gpd
 
     {- FIXME
   , runnerParsedCabalFiles :: !(IORef -- FIXME remove
@@ -592,7 +613,7 @@ completePackageLocation
   => PackageLocationImmutable
   -> RIO env PackageLocationImmutable
 completePackageLocation orig@(PLIHackage (PackageIdentifierRevision _ _ CFIHash{}) (Just _)) = pure orig
-completePackageLocation (PLIHackage pir0@(PackageIdentifierRevision name version cfi0) Nothing) = do
+completePackageLocation (PLIHackage pir0@(PackageIdentifierRevision name version cfi0) _) = do
   logDebug $ "Completing package location information from " <> display pir0
   pir <-
     case cfi0 of

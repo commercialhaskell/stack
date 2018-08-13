@@ -45,7 +45,7 @@ spec = do
               let combined = T.intercalate "/" pieces
               case mkSafeFilePath combined of
                 Nothing -> error $ "Incorrect SafeFilePath in test suite: " ++ show pieces
-                Just sfp -> pure sfp
+                Just sfp' -> pure sfp'
             sfpComponent = Gen.text (Range.linear 1 15) Gen.alphaNum
             entry = TreeEntry
               <$> genBlobKey
