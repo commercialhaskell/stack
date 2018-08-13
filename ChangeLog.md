@@ -34,6 +34,9 @@ Bug fixes:
   hs-source-dirs found. This eliminates a number of false-positive
   warnings, similar to
   [#4076](https://github.com/commercialhaskell/stack/issues/4076).
+* Handle a change in GHC's hi-dump format around `addDependentFile`,
+  which now includes a hash. See
+  [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
 
 
 ## v1.9.0 (release candidate)
