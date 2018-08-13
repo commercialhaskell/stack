@@ -196,7 +196,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                     , if boptsTests bopts
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
-                    , if boptsBenchmarks bopts
+                    , if boptsBenchmarks bopts || beoDisableRun (boptsBenchmarkOpts bopts)
                         then packageBenchmarks pkg
                         else Set.empty
                     )

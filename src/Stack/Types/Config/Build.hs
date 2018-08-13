@@ -400,7 +400,7 @@ hoMonoidAdditionalArgsName = "haddock-args"
 data BenchmarkOpts =
   BenchmarkOpts
     { beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
-    , beoDisableRun :: !Bool -- ^ Disable running of benchmarks
+    , beoDisableRun :: !Bool -- ^ Disable running of benchmarks, --no-run-benchmark
     } deriving (Eq,Show)
 
 defaultBenchmarkOpts :: BenchmarkOpts
