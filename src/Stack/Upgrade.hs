@@ -258,6 +258,6 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
         runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
-            build (const $ return ()) Nothing defaultBuildOptsCLI
+            build Nothing Nothing defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

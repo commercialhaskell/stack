@@ -641,9 +641,9 @@ buildCmd opts go = do
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     exitFailure
   case boptsCLIFileWatch opts of
-    FileWatchPoll -> fileWatchPoll stderr inner
-    FileWatch -> fileWatch stderr inner
-    NoFileWatch -> inner $ const $ return ()
+    FileWatchPoll -> fileWatchPoll stderr (inner . Just)
+    FileWatch -> fileWatch stderr (inner . Just)
+    NoFileWatch -> inner Nothing
   where
     inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
         Stack.Build.build setLocalFiles lk opts
@@ -818,7 +818,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
             withBuildConfigAndLock go $ \lk -> do
               let targets = concatMap words eoPackages
               unless (null targets) $
-                  Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                  Stack.Build.build Nothing lk defaultBuildOptsCLI
                       { boptsCLITargets = map T.pack targets
                       }
 
@@ -866,7 +866,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                                 firstExe = listToMaybe executables
           case exe of
               Just (CExe exe') -> do
-                Stack.Build.build (const (return ())) Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
+                Stack.Build.build Nothing Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
@@ -961,7 +961,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
         (\lk ->
               do when rebuild $
                      Stack.Build.build
-                         (const (return ()))
+                         Nothing
                          lk
                          defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts mProjectRoot images)

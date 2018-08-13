@@ -624,7 +624,13 @@ addPackageDeps treatAsDep package = do
                 let bd =
                         case e of
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
-                            _ -> Couldn'tResolveItsDependencies (packageVersion package)
+                            DependencyCycleDetected names -> BDDependencyCycleDetected names
+                            -- ultimately we won't show any
+                            -- information on this to the user, we'll
+                            -- allow the dependency failures alone to
+                            -- display to avoid spamming the user too
+                            -- much
+                            DependencyPlanFailures _ _  -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicableVersionAndRev
                 return $ Left (depname, (range, mlatestApplicable, bd))
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
@@ -739,16 +745,19 @@ checkDirtiness ps installed package present wanted = do
                 maybe False configCacheHaddock moldOpts
             , configCachePkgSrc = toCachePkgSrc ps
             }
-    let mreason =
-            case moldOpts of
-                Nothing -> Just "old configure information not found"
-                Just oldOpts
-                    | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
-                    | True <- psForceDirty ps -> Just "--force-dirty specified"
-                    | Just files <- psDirty ps -> Just $ "local file changes: " <>
-                                                         addEllipsis (T.pack $ unwords $ Set.toList files)
-                    | otherwise -> Nothing
         config = view configL ctx
+    mreason <-
+      case moldOpts of
+        Nothing -> pure $ Just "old configure information not found"
+        Just oldOpts
+          | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> pure $ Just reason
+          | True <- psForceDirty ps -> pure $ Just "--force-dirty specified"
+          | otherwise -> do
+              dirty <- psDirty ps
+              pure $
+                case dirty of
+                  Just files -> Just $ "local file changes: " <> addEllipsis (T.pack $ unwords $ Set.toList files)
+                  Nothing -> Nothing
     case mreason of
         Nothing -> return False
         Just reason -> do
@@ -825,9 +834,9 @@ psForceDirty :: PackageSource -> Bool
 psForceDirty (PSFiles lp _) = lpForceDirty lp
 psForceDirty PSIndex{} = False
 
-psDirty :: PackageSource -> Maybe (Set FilePath)
-psDirty (PSFiles lp _) = lpDirtyFiles lp
-psDirty PSIndex{} = Nothing -- files never change in an upstream package
+psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
+psDirty (PSFiles lp _) = runIOThunk $ lpDirtyFiles lp
+psDirty PSIndex{} = pure Nothing -- files never change in an upstream package
 
 psLocal :: PackageSource -> Bool
 psLocal (PSFiles _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
@@ -915,6 +924,7 @@ data BadDependency
     | DependencyMismatch Version
     | HasNoLibrary
     -- ^ See description of 'DepType'
+    | BDDependencyCycleDetected ![PackageName]
     deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
@@ -1053,6 +1063,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
         HasNoLibrary -> Just $
             style Error (display name) <+>
             align (flow "is a library dependency, but the package provides no library")
+        BDDependencyCycleDetected names -> Just $
+            style Error (display name) <+>
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =

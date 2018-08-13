@@ -11,7 +11,16 @@ Behavior changes:
 
 Other enhancements:
 
+* Defer loading up of files for local packages. This allows us to get
+  plan construction errors much faster, and avoid some unnecessary
+  work when only building a subset of packages. This is especially
+  useful for the curator use case.
+
 Bug fixes:
+
+* Handle a change in GHC's hi-dump format around `addDependentFile`,
+  which now includes a hash. See
+  [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
 
 
 ## v1.9.0 (release candidate)
