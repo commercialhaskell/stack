@@ -10,6 +10,7 @@ import Data.Yaml
 import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude
 import Stack.Types.Config
 import Stack.Types.Runner
@@ -84,7 +85,7 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner =
-          withRunner logLevel True False ColorAuto Nothing False $ \runner -> do
+          withRunner logLevel True False ColorAuto defaultStyles Nothing False $ \runner -> do
             lc <- runRIO runner $ loadConfig mempty Nothing SYLDefault
             inner lc
     -- TODO(danburton): make sure parent dirs also don't have config file

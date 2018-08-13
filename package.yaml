@@ -39,6 +39,7 @@ dependencies:
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
+- array
 - async
 - attoparsec
 - base >=4.10 && < 5
@@ -172,6 +173,7 @@ library:
   - Stack.Constants.Config
   - Stack.Coverage
   - Stack.DefaultColorWhen
+  - Stack.DefaultStyles
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
@@ -249,6 +251,7 @@ library:
   - Stack.Types.PackageIdentifier
   - Stack.Types.PackageIndex
   - Stack.Types.PackageName
+  - Stack.Types.PrettyPrint
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig

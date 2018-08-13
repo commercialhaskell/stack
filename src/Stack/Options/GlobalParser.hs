@@ -14,6 +14,7 @@ import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
+import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
@@ -61,8 +62,8 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: Bool -> ColorWhen -> GlobalOptsMonoid -> GlobalOpts
-globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = GlobalOpts
+globalOptsFromMonoid :: Bool -> ColorWhen -> Styles -> GlobalOptsMonoid -> GlobalOpts
+globalOptsFromMonoid defaultTerminal defaultColorWhen defaultStyles GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
@@ -72,6 +73,7 @@ globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = Glo
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst defaultColorWhen globalMonoidColorWhen
+    , globalStyles = defaultStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 

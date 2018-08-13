@@ -221,6 +221,7 @@ import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
+import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.TemplateName
@@ -438,6 +439,7 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
+    , globalStyles       :: !Styles -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
