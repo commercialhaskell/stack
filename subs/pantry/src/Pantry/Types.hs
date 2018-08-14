@@ -94,6 +94,7 @@ import Database.Persist
 import Database.Persist.Sql
 import Pantry.StaticSHA256
 import qualified Distribution.Compat.ReadP as Parse
+import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import Distribution.Types.PackageName (PackageName)
 import Distribution.Types.VersionRange (VersionRange)
@@ -102,7 +103,7 @@ import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as ModuleName
-import Distribution.Types.Version (Version)
+import Distribution.Types.Version (Version, mkVersion)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
@@ -422,21 +423,9 @@ instance Display PantryException where
   display (PackageIdentifierRevisionParseFail text) =
     "Invalid package identifier (with optional revision): " <>
     display text
-  display (InvalidCabalFile loc _mversion errs warnings) =
+  display (InvalidCabalFile loc mversion errs warnings) =
     "Unable to parse cabal file from package " <>
     either display (fromString . toFilePath) loc <>
-
-    {-
-
-     Not actually needed, the errors will indicate if a newer version exists.
-     Also, it seems that this is set to Just the version even if we support it.
-
-    , case mversion of
-        Nothing -> ""
-        Just version -> "\nRequires newer Cabal file parser version: " ++
-                        versionString version
-    -}
-
     "\n\n" <>
     foldMap
       (\(PError pos msg) ->
@@ -453,7 +442,17 @@ instance Display PantryException where
           ": " <>
           fromString msg <>
           "\n")
-      warnings
+      warnings <>
+
+    (case mversion of
+       Just version
+         | version > cabalSpecLatestVersion ->
+             "\n\nThe cabal file uses the cabal specification version " <>
+             displayC version <>
+             ", but we only support up to version " <>
+             displayC cabalSpecLatestVersion <>
+             ".\nRecommended action: upgrade your build tool (e.g., `stack upgrade`)."
+       _ -> mempty)
   display (TreeWithoutCabalFile pl) = "No cabal file found for " <> display pl
   display (TreeWithMultipleCabalFiles pl sfps) =
     "Multiple cabal files found for " <> display pl <> ": " <>
@@ -521,6 +520,16 @@ instance Display PantryException where
     "\nCabal file is named " <> display sfp <>
     ", but package name is " <> displayC name
     -- FIXME include the issue link relevant to why we care about this
+
+-- You'd really think there'd be a better way to do this in Cabal.
+cabalSpecLatestVersion :: Version
+cabalSpecLatestVersion =
+  case cabalSpecLatest of
+    CabalSpecOld -> error "this cannot happen"
+    CabalSpecV1_22 -> error "this cannot happen"
+    CabalSpecV1_24 -> error "this cannot happen"
+    CabalSpecV2_0 -> error "this cannot happen"
+    CabalSpecV2_2 -> mkVersion [2, 2]
 
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)
