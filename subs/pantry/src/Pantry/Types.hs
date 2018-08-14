@@ -62,7 +62,7 @@ module Pantry.Types
   , ResolvedPath (..)
   , HpackExecutable (..)
   , WantedCompiler (..)
-  , UnresolvedSnapshotLocation
+  , UnresolvedSnapshotLocation (..)
   , resolveSnapshotLocation
   , unresolveSnapshotLocation
   , ltsSnapshotLocation

@@ -26,7 +26,7 @@ import Text.Read (Read (..))
 data DockerOpts = DockerOpts
   {dockerEnable :: !Bool
     -- ^ Is using Docker enabled?
-  ,dockerImage :: !String
+  ,dockerImage :: !(Either SomeException String)
     -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
   ,dockerRegistryLogin :: !Bool
     -- ^ Does registry require login for pulls?

@@ -251,7 +251,7 @@ runContainerAndExit getCmdArgs
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
          muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
-         image = dockerImage docker
+     image <- either throwIO pure (dockerImage docker)
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           (logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
@@ -654,7 +654,7 @@ pull =
   do config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
-     pullImage docker (dockerImage docker)
+     either throwIO (pullImage docker) (dockerImage docker)
 
 -- | Pull Docker image from registry.
 pullImage :: (HasProcessContext env, HasLogFunc env)
