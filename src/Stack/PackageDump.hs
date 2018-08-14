@@ -35,8 +35,9 @@ import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.VersionTagged
-import qualified Data.Text as T
+import qualified RIO.Text as T
 import qualified Distribution.License as C
+import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.System as OS
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -286,7 +287,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
-    , dpExposedModules :: ![Text]
+    , dpExposedModules :: !(Set ModuleName)
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
@@ -380,7 +381,15 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
-                , dpExposedModules = T.words $ T.unwords exposedModules
+
+                -- Strip trailing commas from ghc package exposed-modules (looks buggy to me...).
+                -- Then try to parse the module names.
+                , dpExposedModules =
+                      Set.fromList
+                    $ mapMaybe (C.simpleParse . T.unpack . T.dropSuffix ",")
+                    $ T.words
+                    $ T.unwords exposedModules
+
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml

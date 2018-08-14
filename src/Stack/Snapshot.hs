@@ -436,7 +436,7 @@ loadCompiler cv = do
                 , lpiFlags = Map.empty
                 , lpiGhcOptions = []
                 , lpiPackageDeps = Map.unions $ map goDep $ dpDepends dp
-                , lpiExposedModules = Set.fromList $ map (fromString . T.unpack) $ dpExposedModules dp
+                , lpiExposedModules = dpExposedModules dp
                 , lpiHide = not $ dpIsExposed dp
                 }
 
