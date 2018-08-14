@@ -1,0 +1,17 @@
+resolver: lts-11.19
+name: snapshot-for-building-stack-with-ghc-8.2.2
+
+packages:
+- Cabal-2.2.0.1@rev:0
+- cabal-install-2.2.0.0@rev:1
+- resolv-0.1.1.1@rev:0
+- infer-license-0.2.0@rev:0
+- hpack-0.29.6@rev:0
+- http-api-data-0.3.8.1@rev:0
+- githash-0.1.0.1@rev:0
+- rio-orphans-0.1.1.0@sha256:15600084c56ef4e1f22ac2091d10fa6ed62f01f531d819c6a5a19492212a76c9
+
+flags:
+  cabal-install:
+    # https://github.com/haskell/cabal/issues/4883
+    native-dns: false
