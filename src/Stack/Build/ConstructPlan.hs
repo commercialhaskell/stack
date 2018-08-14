@@ -321,7 +321,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
       -- None of the above, keep it!
       | otherwise = Nothing
       where
-        name = displayC ident
+        name :: PackageName
+        name = pkgName ident
 
 -- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for
 -- running its tests and benchmarks.
