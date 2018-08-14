@@ -755,25 +755,14 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
-          -- FIXME Manny: would it make sense to copy over the entire pantry directory?
-          {-
-          forM_ clIndices $ \pkgIdx -> do
-            msrcIndex <- runRIO (set stackRootL origStackRoot config) $ do
-               srcIndex <- configPackageIndex (indexName pkgIdx)
-               exists <- doesFileExist srcIndex
-               return $ if exists
-                 then Just srcIndex
-                 else Nothing
-            case msrcIndex of
-              Nothing -> return ()
-              Just srcIndex ->
-                runRIO config $ do
-                  destIndex <- configPackageIndex (indexName pkgIdx)
-                  exists <- doesFileExist destIndex
-                  unless exists $ do
-                    ensureDir (parent destIndex)
-                    copyFile srcIndex destIndex
-          -}
+
+          let srcPantry = origStackRoot </> $(mkRelDir "pantry")
+          existsSrc <- doesDirExist srcPantry
+          when existsSrc $ do
+            runRIO config $ do
+              let destPantry = view stackRootL config </> $(mkRelDir "pantry")
+              existsDest <- doesDirExist destPantry
+              unless existsDest $ copyDirRecur srcPantry destPantry
     return True
   where
     updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do
