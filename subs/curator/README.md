@@ -24,6 +24,9 @@ things that still need to be handled to replace `stackage-curator`:
 * Ability to specify package locations from Git.
 * External, but: stackage-server needs to be updated to support the
   new snapshot format/location
+* No support for custom configure arguments from `build-constraints.yaml`. I'd
+  like to see if we can get rid of them entirely and instead just customize the
+  Docker build image.
 
 ## Basic workflow
 
