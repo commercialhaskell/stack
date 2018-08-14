@@ -6,6 +6,7 @@ import System.Info (os)
 main :: IO ()
 main = do
   -- install in relative path
+  removeDirIgnore "bin"
   createDirectory "bin"
   stack [defaultResolverArg, "--local-bin-path", "./bin", "install" , "happy"]
   doesExist ("./bin/happy" ++ exeExt)
@@ -23,6 +24,7 @@ main = do
 
   -- install in absolute path
   tmpDirectory <- fmap (</> "absolute-bin") getCurrentDirectory
+  removeDirIgnore tmpDirectory
   createDirectory tmpDirectory
   stack [defaultResolverArg, "--local-bin-path", tmpDirectory, "install", "happy" ]
   doesExist (tmpDirectory </> ("happy" ++ exeExt))
