@@ -14,7 +14,6 @@ module Stack.Types.Compiler
   , compilerExeName
   , compilerVersionText
   , compilerVersionString
-  , parseCompilerVersion
   , haddockExeName
   , isWantedCompiler
   , wantedToActual
@@ -45,41 +44,28 @@ data ActualCompiler
 instance Store ActualCompiler
 instance NFData ActualCompiler
 instance Display ActualCompiler where
-    display = display . compilerVersionText
+    display (ACGhc x) = display (WCGhc x)
+    display (ACGhcjs x y) = display (WCGhcjs x y)
 instance ToJSON ActualCompiler where
     toJSON = toJSON . compilerVersionText
 instance FromJSON ActualCompiler where
-    parseJSON (String t) = maybe (fail "Failed to parse compiler version") return (parseCompilerVersion t)
+    parseJSON (String t) = either (const $ fail "Failed to parse compiler version") return (parseActualCompiler t)
     parseJSON _ = fail "Invalid CompilerVersion, must be String"
 instance FromJSONKey ActualCompiler where
     fromJSONKey = FromJSONKeyTextParser $ \k ->
-        case parseCompilerVersion k of
-            Nothing -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
-            Just parsed -> return parsed
+        case parseActualCompiler k of
+            Left _ -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
+            Right parsed -> return parsed
 
 wantedToActual :: WantedCompiler -> ActualCompiler
 wantedToActual (WCGhc x) = ACGhc x
 wantedToActual (WCGhcjs x y) = ACGhcjs x y
 
--- FIXME remove
-parseCompilerVersion :: T.Text -> Maybe ActualCompiler
-parseCompilerVersion t
-    | Just t' <- T.stripPrefix "ghc-" t
-    , Just v <- parseVersion $ T.unpack t'
-        = Just (ACGhc v)
-    | Just t' <- T.stripPrefix "ghcjs-" t
-    , [tghcjs, tghc] <- T.splitOn "_ghc-" t'
-    , Just vghcjs <- parseVersion $ T.unpack tghcjs
-    , Just vghc <- parseVersion $ T.unpack tghc
-        = Just (ACGhcjs vghcjs vghc)
-    | otherwise
-        = Nothing
+parseActualCompiler :: T.Text -> Either PantryException ActualCompiler
+parseActualCompiler = fmap wantedToActual . parseWantedCompiler
 
-compilerVersionText :: ActualCompiler -> T.Text -- FIXME remove, should be in pantry only
-compilerVersionText (ACGhc vghc) =
-    "ghc-" <> displayC vghc
-compilerVersionText (ACGhcjs vghcjs vghc) =
-    "ghcjs-" <> displayC vghcjs <> "_ghc-" <> displayC vghc
+compilerVersionText :: ActualCompiler -> T.Text
+compilerVersionText = utf8BuilderToText . display
 
 compilerVersionString :: ActualCompiler -> String
 compilerVersionString = T.unpack . compilerVersionText

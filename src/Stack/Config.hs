@@ -80,7 +80,7 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Package (parseSingleCabalFile)
+import           Stack.Package (mkLocalPackageView)
 import           Stack.Snapshot
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -606,7 +606,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      (resolved,) <$> runOnce (parseSingleCabalFile True resolved)
+      (resolved,) <$> runOnce (mkLocalPackageView True resolved)
 
     let deps = projectDependencies project
 

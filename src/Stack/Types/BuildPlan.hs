@@ -16,8 +16,7 @@ module Stack.Types.BuildPlan
     , LoadedSnapshot (..)
     , loadedSnapshotVC
     , LoadedPackageInfo (..)
-    , ModuleName (..)
-    , fromCabalModuleName
+    , C.ModuleName
     , ModuleInfo (..)
     , moduleInfoVC
     , sdSnapshots
@@ -28,9 +27,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
-import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
+import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.Version as C
 import           Pantry
 import           Stack.Prelude
@@ -49,7 +47,7 @@ import           Stack.Types.VersionIntervals
 -- of this additional information by package name, and later in the
 -- snapshot load step we will resolve the contents of tarballs and
 -- repos, figure out package names, and assigned values appropriately.
-data SnapshotDef = SnapshotDef -- FIXME temporary
+data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/commercialhaskell/stack/issues/3922
     { sdResolver        :: !SnapshotLocation
     , sdSnapshot        :: !(Maybe (Snapshot, SnapshotDef))
     , sdWantedCompilerVersion :: !WantedCompiler
@@ -146,7 +144,7 @@ configuration. Otherwise, we don't cache.
 -}
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "7BcCWNHwk_2JZXi8E1mTe84y0Cc="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "pmaNGNwdLx9dgFqd2TiMcRhTQzQ="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -210,12 +208,6 @@ data Component = CompLibrary
     deriving (Generic, Show, Eq, Ord, Data, Typeable, Enum, Bounded)
 instance Store Component
 instance NFData Component
-
-newtype ModuleName = ModuleName { unModuleName :: ByteString }
-  deriving (Show, Eq, Ord, Generic, Store, NFData, Typeable, Data)
-
-fromCabalModuleName :: C.ModuleName -> ModuleName
-fromCabalModuleName = ModuleName . encodeUtf8 . T.intercalate "." . map T.pack . C.components
 
 newtype ModuleInfo = ModuleInfo
     { miModules      :: Map ModuleName (Set PackageName)

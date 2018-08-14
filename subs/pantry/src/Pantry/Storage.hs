@@ -58,7 +58,7 @@ import RIO
 import qualified RIO.ByteString as B
 import Pantry.Types
 import Database.Persist
-import Database.Persist.Sqlite -- FIXME allow PostgreSQL too
+import Database.Persist.Sqlite
 import Database.Persist.TH
 import RIO.Orphans ()
 import Pantry.StaticSHA256
@@ -306,8 +306,6 @@ storeHackageRevision name version key = do
     , hackageCabalCabal = key
     , hackageCabalTree = Nothing
     }
-
--- FIXME something to update the hackageCabalTree when we have it
 
 loadHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)

@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Pantry.Repo -- FIXME needs to be implemented!
+module Pantry.Repo
   ( fetchRepos
   , getRepo
   , getRepoKey

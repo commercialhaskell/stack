@@ -92,7 +92,7 @@ loadSourceMapFull needTargets boptsCli = do
               ident <- getPackageLocationIdent pkgloc
               return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
             PLMutable dir -> do
-              lpv <- parseSingleCabalFile True dir
+              lpv <- mkLocalPackageView True dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
               return $ PSFilePath lp' loc
     sourceMap' <- Map.unions <$> sequence

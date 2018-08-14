@@ -53,7 +53,7 @@ toolNameString (Tool ident) = displayC $ pkgName ident
 toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just cv@ACGhcjs{}) = Just (ToolGhcjs cv)
+parseToolText (parseWantedCompiler -> Right (WCGhcjs x y)) = Just (ToolGhcjs (ACGhcjs x y))
 parseToolText (parsePackageIdentifier . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 

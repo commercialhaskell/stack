@@ -21,10 +21,12 @@ import qualified Codec.Compression.GZip as GZip
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
+import qualified Distribution.PackageDescription as D
+import qualified Distribution.PackageDescription.Parsec as D
+import qualified Distribution.Verbosity as D
 import           Network.HTTP.Download
 import           Network.HTTP.StackClient (RequestBody (RequestBodyBS), setRequestMethod, setRequestBody, getResponseStatusCode, methodPut)
 import           Path
-import           Stack.Package
 import           Stack.Sig.GPG
 import           Stack.Types.Sig
 import qualified System.FilePath as FP
@@ -106,3 +108,11 @@ signPackage url pkg filePath = do
         (throwM (GPGSignException "unable to sign & upload package"))
     logInfo ("Signature uploaded to " <> fromString fullUrl)
     return sig
+
+-- | Extract the @PackageIdentifier@ given an exploded haskell package
+-- path.
+cabalFilePackageId
+    :: (MonadIO m, MonadThrow m)
+    => Path Abs File -> m PackageIdentifier
+cabalFilePackageId fp = do
+    D.package . D.packageDescription <$> liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)

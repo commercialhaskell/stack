@@ -100,6 +100,8 @@ import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
+import Distribution.ModuleName (ModuleName)
+import qualified Distribution.ModuleName as ModuleName
 import Distribution.Types.Version (Version)
 import Data.Store (Size (..), Store (..)) -- FIXME remove
 import Network.HTTP.Client (parseRequest)
@@ -1286,6 +1288,14 @@ instance Store FlagName where
       VarSize f -> f (displayC fname :: String)
   peek = peek >>= maybe (fail "Invalid flag name") pure . parseFlagName
   poke fname = poke (displayC fname :: String)
+instance Store ModuleName where
+  size =
+    VarSize $ \mname ->
+    case size of
+      ConstSize x -> x
+      VarSize f -> f $ ModuleName.components mname
+  peek = ModuleName.fromComponents <$> peek
+  poke = poke . ModuleName.components
 instance Store PackageIdentifierRevision where
   size =
     VarSize $ \(PackageIdentifierRevision name version cfi) ->

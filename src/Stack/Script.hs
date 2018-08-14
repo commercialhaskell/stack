@@ -26,6 +26,7 @@ import           Stack.Types.Config
 import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
 import           RIO.Process
+import qualified RIO.Text as T
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
@@ -146,7 +147,7 @@ getPackagesFromModuleInfo mi scriptFP = do
                                 [pn] -> return $ Set.singleton pn
                                 pns' -> throwString $ concat
                                     [ "Module "
-                                    , S8.unpack $ unModuleName mn
+                                    , displayC mn
                                     , " appears in multiple packages: "
                                     , unwords $ map displayC pns'
                                     ]
@@ -247,6 +248,8 @@ parseImports =
             Nothing -> Just
                 ( Set.empty
                 , Set.singleton
-                    $ ModuleName
+                    $ fromString
+                    $ T.unpack
+                    $ decodeUtf8With lenientDecode
                     $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
                 )

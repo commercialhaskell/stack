@@ -444,7 +444,7 @@ buildExtractedTarball pkgDir = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
   pathsToKeep <- filterM (fmap not . isPathToRemove . resolvedAbsolute . fst) allPackagePaths
-  getLPV <- runOnce $ parseSingleCabalFile True pkgDir
+  getLPV <- runOnce $ mkLocalPackageView True pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig

@@ -29,7 +29,6 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException (AesonException), decodeFileThrow)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.PackageDescription (GenericPackageDescription)
@@ -437,7 +436,7 @@ loadCompiler cv = do
                 , lpiFlags = Map.empty
                 , lpiGhcOptions = []
                 , lpiPackageDeps = Map.unions $ map goDep $ dpDepends dp
-                , lpiExposedModules = Set.fromList $ map (ModuleName . encodeUtf8) $ dpExposedModules dp
+                , lpiExposedModules = Set.fromList $ map (fromString . T.unpack) $ dpExposedModules dp
                 , lpiHide = not $ dpIsExposed dp
                 }
 
@@ -583,7 +582,7 @@ calculate gpd platform compilerVersion loc flags hide options =
                        $ packageDependencies pconfig pd
       , lpiExposedModules = maybe
           Set.empty
-          (Set.fromList . map fromCabalModuleName . C.exposedModules) -- FIXME remove fromCabalModuleName
+          (Set.fromList . C.exposedModules)
           (C.library pd)
       , lpiHide = hide
       }

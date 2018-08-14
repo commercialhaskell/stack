@@ -29,8 +29,7 @@ module Stack.Package
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageDependencies
-  ,cabalFilePackageId
-  ,parseSingleCabalFile)
+  ,mkLocalPackageView)
   where
 
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -49,7 +48,6 @@ import           Distribution.Package hiding (Package,PackageName,packageName,pa
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parsec
-import qualified Distribution.PackageDescription.Parsec as D
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
@@ -1389,20 +1387,13 @@ resolveDirOrWarn :: FilePath.FilePath
 resolveDirOrWarn = resolveOrWarn "Directory" f
   where f p x = liftIO (forgivingAbsence (resolveDir p x)) >>= rejectMissingDir
 
--- | Extract the @PackageIdentifier@ given an exploded haskell package
--- path.
-cabalFilePackageId -- FIXME remove and use the caching logic in pantry
-    :: (MonadIO m, MonadThrow m)
-    => Path Abs File -> m PackageIdentifier
-cabalFilePackageId fp = do
-    D.package . D.packageDescription <$> liftIO (D.readGenericPackageDescription D.silent $ toFilePath fp)
-
-parseSingleCabalFile -- FIXME rename and add docs
+-- | Create a 'LocalPackageView' from a directory containing a package.
+mkLocalPackageView
   :: forall env. HasConfig env
   => Bool -- ^ print warnings?
   -> ResolvedPath Dir
-  -> RIO env LocalPackageView -- FIXME kill off LocalPackageView? It's kinda worthless, right?
-parseSingleCabalFile printWarnings dir = do
+  -> RIO env LocalPackageView
+mkLocalPackageView printWarnings dir = do
   (gpd, cabalfp) <- parseCabalFilePath (resolvedAbsolute dir) printWarnings
   return LocalPackageView
     { lpvCabalFP = cabalfp
