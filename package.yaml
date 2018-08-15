@@ -299,7 +299,7 @@ executables:
       cpp-options: -DSUPPORTED_BUILD
 tests:
   stack-test:
-    main: Test.hs
+    main: Spec.hs
     source-dirs: src/test
     ghc-options:
     - -threaded
