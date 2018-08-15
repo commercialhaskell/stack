@@ -80,6 +80,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
+- pantry
 - path
 - path-io
 - persistent
@@ -91,10 +92,8 @@ dependencies:
 - project-template
 - regex-applicative-text
 - resourcet
-- resource-pool
 - retry
 - rio
-- rio-orphans
 - semigroups
 - split
 - stm
@@ -102,7 +101,6 @@ dependencies:
 - store-core
 - streaming-commons
 - tar
-- tar-conduit
 - template-haskell
 - temporary
 - text
@@ -133,16 +131,13 @@ when:
     - bindings-uname
     - unix
 library:
-  source-dirs:
-  - src/
-  - subs/pantry/src
+  source-dirs: src/
   ghc-options:
   - -fwarn-identities
   generated-exposed-modules:
   - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
-  - Data.Aeson.Extended
   - Data.Attoparsec.Args
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
@@ -264,18 +259,6 @@ library:
   - Text.PrettyPrint.Leijen.Extended
   - System.Process.PagerEditor
   - System.Terminal
-  - Pantry
-  other-modules:
-  - Pantry.Archive
-  - Pantry.Hackage
-  - Pantry.HTTP
-  - Pantry.Repo
-  - Pantry.StaticBytes
-  - Pantry.StaticSHA256
-  - Pantry.Storage
-  - Pantry.Tree
-  - Pantry.Types
-  - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
   - condition: 'os(windows)'
     then:

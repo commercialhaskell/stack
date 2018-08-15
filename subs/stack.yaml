@@ -1,7 +1,0 @@
-resolver: ../snapshot.yaml
-packages:
-- pantry
-- curator
-
-ghc-options:
-   "$locals": -fhide-source-paths

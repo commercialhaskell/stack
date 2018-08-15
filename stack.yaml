@@ -1,5 +1,10 @@
 resolver: snapshot.yaml
 
+packages:
+- .
+- subs/pantry
+- subs/curator
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full

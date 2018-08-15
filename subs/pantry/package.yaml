@@ -53,9 +53,7 @@ when:
     - unix
 
 library:
-  source-dirs:
-  - src/
-  - ../../src/ # FIXME Temporary
+  source-dirs: src/
   exposed-modules:
   - Pantry
   # FIXME make these exports unnecessary
