@@ -1010,7 +1010,6 @@ data ConfigException
   | BadStackRoot (Path Abs Dir)
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
   | UserDoesn'tOwnDirectory (Path Abs Dir)
-  | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
@@ -1107,13 +1106,6 @@ instance Show ConfigException where
         , "\nRetry with '--"
         , T.unpack configMonoidAllowDifferentUserName
         , "' to disable this precaution."
-        ]
-    show (FailedToCloneRepo commandName) = concat
-        [ "Failed to use "
-        , commandName
-        , " to clone the repo.  Please ensure that "
-        , commandName
-        , " is installed and available to stack on your PATH environment variable."
         ]
     show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
         [ "stack can only control the "
