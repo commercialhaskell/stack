@@ -800,7 +800,7 @@ getSetupInfo stackSetupYaml = do
     loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
         bs <-
             case parseUrlThrow urlOrFile of
-                Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLBS req
+                Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
                 Nothing -> liftIO $ S.readFile urlOrFile
         WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
         when (urlOrFile /= defaultSetupInfoYaml) $

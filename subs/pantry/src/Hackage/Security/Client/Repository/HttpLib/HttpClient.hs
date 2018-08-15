@@ -23,7 +23,6 @@ import Hackage.Security.Client hiding (Header)
 import Hackage.Security.Client.Repository.HttpLib
 import Hackage.Security.Util.Checked
 import qualified Hackage.Security.Util.Lens as Lens
-import RIO (MonadUnliftIO, withRunInIO)
 
 {-------------------------------------------------------------------------------
   Top-level API

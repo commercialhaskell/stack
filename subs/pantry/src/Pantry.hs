@@ -108,7 +108,6 @@ import RIO
 import Conduit
 import qualified RIO.Map as Map
 import qualified RIO.ByteString as B
-import qualified RIO.ByteString.Lazy as LB
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath

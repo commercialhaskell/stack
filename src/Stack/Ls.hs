@@ -24,8 +24,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
-import Network.HTTP.StackClient (httpJSON, getGlobalManager, addRequestHeader, getResponseBody, parseRequest,
-        setRequestManager, hAccept)
+import Network.HTTP.StackClient (httpJSON, addRequestHeader, getResponseBody, parseRequest, hAccept)
 import qualified Options.Applicative as OA
 import Options.Applicative ((<|>))
 import Path
@@ -208,11 +207,8 @@ handleRemote
     => LsCmdOpts -> m ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
-    mgr <- liftIO getGlobalManager
     isStdoutTerminal <- view terminalL
-    let req' =
-            setRequestManager mgr $
-            addRequestHeader hAccept "application/json" req
+    let req' = addRequestHeader hAccept "application/json" req
     result <- httpJSON req'
     let snapData = getResponseBody result
     case lsView lsOpts of
