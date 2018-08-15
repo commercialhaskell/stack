@@ -73,7 +73,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                            go)
                       (\lk ->
                             Stack.Build.build
-                                (const (return ()))
+                                Nothing
                                 lk
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
@@ -126,7 +126,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                       go
                       (\lk ->
                             Stack.Build.build
-                                (const (return ()))
+                                Nothing
                                 lk
                                 defaultBuildOptsCLI
                                 { boptsCLITargets = [ packageIdentifierText
@@ -164,7 +164,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
             Right hooglePath -> do
                 result <- withProcessContext menv
                         $ proc hooglePath ["--numeric-version"]
-                        $ tryAny . readProcessStdout_
+                        $ tryAny . fmap fst . readProcess_
                 let unexpectedResult got = Left $ T.concat
                         [ "'"
                         , T.pack hooglePath

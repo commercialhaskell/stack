@@ -39,7 +39,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Conduit.Zlib (ungzip)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Set as Set
 import           Data.Store.Version
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
@@ -51,7 +50,7 @@ import qualified Hackage.Security.Client.Repository.Remote as HS
 import qualified Hackage.Security.Client.Repository.HttpLib.HttpClient as HS
 import qualified Hackage.Security.Util.Path as HS
 import qualified Hackage.Security.Util.Pretty as HS
-import           Network.HTTP.Client.TLS (getGlobalManager)
+import           Network.HTTP.StackClient (getGlobalManager)
 import           Network.HTTP.Download
 import           Network.URI (parseURI)
 import           Path (toFilePath, parseAbsFile, mkRelDir, mkRelFile, (</>), parseRelDir)
@@ -380,12 +379,17 @@ deleteCache indexName' = do
 -- | Get the known versions for a given package from the package caches.
 --
 -- See 'getPackageCaches' for performance notes.
-getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (Set Version)
+getPackageVersions :: HasCabalLoader env => PackageName -> RIO env (HashMap Version (Maybe CabalHash))
 getPackageVersions pkgName = lookupPackageVersions pkgName <$> getPackageCaches
 
-lookupPackageVersions :: PackageName -> PackageCache index -> Set Version
+lookupPackageVersions :: PackageName -> PackageCache index -> HashMap Version (Maybe CabalHash)
 lookupPackageVersions pkgName (PackageCache m) =
-    maybe Set.empty (Set.fromList . HashMap.keys) $ HashMap.lookup pkgName m
+    maybe HashMap.empty (HashMap.map extractOrigRevHash) $ HashMap.lookup pkgName m
+  where
+    -- Extract the original cabal file hash (the first element of the one or two
+    -- element list currently representing the cabal file hashes).
+    extractOrigRevHash (_,_, neRevHashesAndOffsets) =
+      listToMaybe $ fst (NE.last neRevHashesAndOffsets)
 
 -- | Load the package caches, or create the caches if necessary.
 --

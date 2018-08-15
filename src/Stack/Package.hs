@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -31,7 +30,6 @@ module Stack.Package
   ,buildLogPath
   ,PackageException (..)
   ,resolvePackageDescription
-  ,packageDescTools
   ,packageDependencies
   ,cabalFilePackageId
   ,gpdPackageIdentifier
@@ -40,13 +38,14 @@ module Stack.Package
   where
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as C8
-import           Data.List (isSuffixOf, isPrefixOf)
+import qualified Data.ByteString.Lazy.Char8 as CL8
+import           Data.List (isSuffixOf, isPrefixOf, unzip)
 import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -64,6 +63,7 @@ import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
+import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
@@ -80,6 +80,7 @@ import           Stack.Fetch (loadFromIndex)
 import           Stack.PackageIndex (HasCabalLoader (..))
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
+import qualified Stack.PrettyPrint as PP (Style (Module))
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
@@ -157,7 +158,7 @@ readPackageUnresolvedDir dir printWarnings = do
       atomicModifyIORef' ref $ \(m1, m2) ->
         ((m1, M.insert dir ret m2), ret)
   where
-    toPretty :: String -> PWarning -> [Doc AnsiAnn]
+    toPretty :: String -> PWarning -> [Doc StyleAnn]
     toPretty src (PWarning _type pos msg) =
       [ flow "Cabal file warning in"
       , fromString src <> "@"
@@ -262,7 +263,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageLicense = licenseRaw pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
-    , packageTools = packageDescTools pkg
+    , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
@@ -275,10 +276,9 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
               Just lib
          in
           case mlib of
-            Nothing
-              | null extraLibNames -> NoLibraries
-              | otherwise -> error "Package has buildable sublibraries but no buildable libraries, I'm giving up"
+            Nothing -> NoLibraries
             Just _ -> HasLibraries foreignLibNames
+    , packageInternalLibraries = subLibNames
     , packageTests = M.fromList
       [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
           | t <- testSuites pkgNoMod
@@ -299,8 +299,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
+              let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
+              excludedInternals <- mapM parsePackageName internals
+              mungedInternals <- mapM (parsePackageName . toInternalPackageMungedName) internals
               componentsOpts <-
-                  generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentFiles
+                  generatePkgDescOpts sourceMap installedMap
+                  (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
+                  cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
@@ -324,6 +329,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
       $ filter (buildable . foreignLibBuildInfo)
       $ foreignLibs pkg
+
+    toInternalPackageMungedName
+      = T.pack . unMungedPackageName . computeCompatPackageName (pkgName pkgId)
+      . Just . Cabal.mkUnqualComponentName . T.unpack
 
     -- Gets all of the modules, files, build files, and data files that
     -- constitute the package. This is primarily used for dirtiness
@@ -354,17 +363,27 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = fromCabalPackageName (pkgName pkgId)
-    deps = M.filterWithKey (const . not . isMe) (M.union
-        (packageDependencies packageConfig pkg)
+
+    (unknownTools, knownTools) = packageDescTools pkg
+
+    deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
+        [ asLibrary <$> packageDependencies packageConfig pkg
         -- We include all custom-setup deps - if present - in the
         -- package deps themselves. Stack always works with the
         -- invariant that there will be a single installed package
         -- relating to a package name, and this applies at the setup
         -- dependency level as well.
-        (fromMaybe M.empty msetupDeps))
+        , asLibrary <$> fromMaybe M.empty msetupDeps
+        , knownTools
+        ])
     msetupDeps = fmap
         (M.fromList . map (depName &&& depRange) . setupDepends)
         (setupBuildInfo pkg)
+
+    asLibrary range = DepValue
+      { dvVersionRange = range
+      , dvType = AsLibrary
+      }
 
     -- Is the package dependency mentioned here me: either the package
     -- name itself, or the name of one of the sub libraries
@@ -411,6 +430,12 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                          []
                          (return . generate CLib . libBuildInfo)
                          (library pkg)
+                   , mapMaybe
+                         (\sublib -> do
+                            let maybeLib = CInternalLib . T.pack . Cabal.unUnqualComponentName <$> libName sublib
+                            flip generate  (libBuildInfo sublib) <$> maybeLib
+                          )
+                         (subLibraries pkg)
                    , fmap
                          (\exe ->
                                generate
@@ -662,17 +687,67 @@ packageDependencies pkgConfig pkg' =
 --
 -- This uses both the new 'buildToolDepends' and old 'buildTools'
 -- information.
-packageDescTools :: PackageDescription -> Map ExeName VersionRange
-packageDescTools =
-  M.fromList . concatMap tools . allBuildInfo'
+packageDescTools
+  :: PackageDescription
+  -> (Set ExeName, Map PackageName DepValue)
+packageDescTools pd =
+    (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
   where
-    tools bi = map go1 (buildTools bi) ++ map go2 (buildToolDepends bi)
+    (unknowns, knowns) = unzip $ map perBI $ allBuildInfo' pd
 
-    go1 :: Cabal.LegacyExeDependency -> (ExeName, VersionRange)
-    go1 (Cabal.LegacyExeDependency name range) = (ExeName $ T.pack name, range)
+    perBI :: BuildInfo -> ([ExeName], [(PackageName, DepValue)])
+    perBI bi =
+        (unknownTools, tools)
+      where
+        (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
 
-    go2 :: Cabal.ExeDependency -> (ExeName, VersionRange)
-    go2 (Cabal.ExeDependency _pkg name range) = (ExeName $ T.pack $ Cabal.unUnqualComponentName name, range)
+        tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
+
+        -- This is similar to desugarBuildTool from Cabal, however it
+        -- uses our own hard-coded map which drops tools shipped with
+        -- GHC (like hsc2hs), and includes some tools from Stackage.
+        go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
+        go1 (Cabal.LegacyExeDependency name range) =
+          case M.lookup name hardCodedMap of
+            Just pkgName -> Right $ Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
+            Nothing -> Left $ ExeName $ T.pack name
+
+        go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
+        go2 (Cabal.ExeDependency pkg _name range)
+          | pkg `S.member` preInstalledPackages = Nothing
+          | otherwise = Just
+              ( fromCabalPackageName pkg
+              , DepValue
+                  { dvVersionRange = range
+                  , dvType = AsBuildTool
+                  }
+              )
+
+-- | A hard-coded map for tool dependencies
+hardCodedMap :: Map String D.PackageName
+hardCodedMap = M.fromList
+  [ ("alex", Distribution.Package.mkPackageName "alex")
+  , ("happy", Distribution.Package.mkPackageName "happy")
+  , ("cpphs", Distribution.Package.mkPackageName "cpphs")
+  , ("greencard", Distribution.Package.mkPackageName "greencard")
+  , ("c2hs", Distribution.Package.mkPackageName "c2hs")
+  , ("hscolour", Distribution.Package.mkPackageName "hscolour")
+  , ("hspec-discover", Distribution.Package.mkPackageName "hspec-discover")
+  , ("hsx2hs", Distribution.Package.mkPackageName "hsx2hs")
+  , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
+  ]
+
+-- | Executable-only packages which come pre-installed with GHC and do
+-- not need to be built. Without this exception, we would either end
+-- up unnecessarily rebuilding these packages, or failing because the
+-- packages do not appear in the Stackage snapshot.
+preInstalledPackages :: Set D.PackageName
+preInstalledPackages = S.fromList
+  [ D.mkPackageName "hsc2hs"
+  , D.mkPackageName "haddock"
+  ]
 
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before
 -- 2.2, only includes buildable components.
@@ -698,7 +773,7 @@ packageDescModulesAndFiles
     :: PackageDescription
     -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
-    (libraryMods,libDotCabalFiles,libWarnings) <- -- FIXME add in sub libraries
+    (libraryMods,libDotCabalFiles,libWarnings) <-
         maybe
             (return (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
@@ -770,9 +845,9 @@ resolveGlobFiles =
                       then do
                           prettyWarnL
                               [ flow "Wildcard does not match any files:"
-                              , styleFile $ fromString glob
+                              , style File $ fromString glob
                               , line <> flow "in directory:"
-                              , styleDir $ fromString dir
+                              , style Dir $ fromString dir
                               ]
                           return []
                       else throwIO e)
@@ -814,7 +889,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
     when (null matches) $
         prettyWarnL
             [ flow "filepath wildcard"
-            , "'" <> styleFile (fromString filepath) <> "'"
+            , "'" <> style File (fromString filepath) <> "'"
             , flow "does not match any files."
             ]
     return matches
@@ -1196,35 +1271,53 @@ parseDumpHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
 parseDumpHI dumpHIPath = do
     dir <- asks (parent . ctxFile)
-    dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
+    dumpHI <- liftIO $ filterDumpHi <$> fmap CL8.lines (CL8.readFile dumpHIPath)
     let startModuleDeps =
-            dropWhile (not . ("module dependencies:" `C8.isPrefixOf`)) dumpHI
+            dropWhile (not . ("module dependencies:" `CL8.isPrefixOf`)) dumpHI
         moduleDeps =
             S.fromList $
-            mapMaybe (D.simpleParse . T.unpack . decodeUtf8) $
-            C8.words $
-            C8.concat $
-            C8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
-            takeWhile (" " `C8.isPrefixOf`) (drop 1 startModuleDeps)
+            mapMaybe (D.simpleParse . TL.unpack . TLE.decodeUtf8) $
+            CL8.words $
+            CL8.concat $
+            CL8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
+            takeWhile (" " `CL8.isPrefixOf`) (drop 1 startModuleDeps)
         thDeps =
             -- The dependent file path is surrounded by quotes but is not escaped.
             -- It can be an absolute or relative path.
-            mapMaybe
-                (fmap T.unpack .
-                  (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
-                  T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"')) $
-            filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
+                  TL.unpack .
+                  -- Starting with GHC 8.4.3, there's a hash following
+                  -- the path. See
+                  -- https://github.com/yesodweb/yesod/issues/1551
+                  TLE.decodeUtf8 .
+                  CL8.takeWhile (/= '\"') <$>
+            mapMaybe (CL8.stripPrefix "addDependentFile \"") dumpHI
     thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
         mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
         when (isNothing mresolved) $
             prettyWarnL
                 [ flow "addDependentFile path (Template Haskell) listed in"
-                , styleFile $ fromString dumpHIPath
+                , style File $ fromString dumpHIPath
                 , flow "does not exist:"
-                , styleFile $ fromString x
+                , style File $ fromString x
                 ]
         return mresolved
     return (moduleDeps, thDepsResolved)
+  where
+    -- | Filtering step fixing RAM usage upon a big dump-hi file. See
+    --   https://github.com/commercialhaskell/stack/issues/4027 It is
+    --   an optional step from a functionality stand-point.
+    filterDumpHi dumpHI =
+        let dl x xs = x ++ xs
+            isLineInteresting (acc, moduleDepsStarted) l
+                | moduleDepsStarted && " " `CL8.isPrefixOf` l =
+                    (acc . dl [l], True)
+                | "module dependencies:" `CL8.isPrefixOf` l =
+                    (acc . dl [l], True)
+                | "addDependentFile \"" `CL8.isPrefixOf` l =
+                    (acc . dl [l], False)
+                | otherwise = (acc, False)
+         in fst (foldl' isLineInteresting (dl [], False) dumpHI) []
+
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
@@ -1324,7 +1417,7 @@ logPossibilities dirs mn = do
     possibilities <- liftM concat (makePossibilities mn)
     unless (null possibilities) $ prettyWarnL
         [ flow "Unable to find a known candidate for the Cabal entry"
-        , (styleModule . fromString $ D.display mn) <> ","
+        , (style PP.Module . fromString $ D.display mn) <> ","
         , flow "but did find:"
         , line <> bulletedList (map display possibilities)
         , flow "If you are using a custom preprocessor for this module"
@@ -1392,15 +1485,9 @@ hpack pkgDir = do
         config <- view configL
         case configOverrideHpack config of
             HpackBundled -> do
-#if MIN_VERSION_hpack(0,26,0)
-                r <- liftIO $ Hpack.hpackResult $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
-#elif MIN_VERSION_hpack(0,23,0)
-                r <- liftIO $ Hpack.hpackResult Hpack.defaultRunOptions {Hpack.runOptionsConfigDir = Just (toFilePath pkgDir)} Hpack.NoForce
-#else
-                r <- liftIO $ Hpack.hpackResult (Just $ toFilePath pkgDir) Hpack.NoForce
-#endif
+                r <- liftIO $ Hpack.hpackResult $ Hpack.setProgramName "stack" $ Hpack.setTarget (toFilePath hpackFile) Hpack.defaultOptions
                 forM_ (Hpack.resultWarnings r) prettyWarnS
-                let cabalFile = styleFile . fromString . Hpack.resultCabalFile $ r
+                let cabalFile = style File . fromString . Hpack.resultCabalFile $ r
                 case Hpack.resultStatus r of
                     Hpack.Generated -> prettyDebugL
                         [flow "hpack generated a modified version of", cabalFile]
@@ -1451,7 +1538,7 @@ resolveOrWarn subject resolver path =
            , flow "listed in"
            , maybe (display file) display (stripProperPrefix cwd file)
            , flow "file does not exist:"
-           , styleDir . fromString $ path
+           , style Dir . fromString $ path
            ]
      return result
 

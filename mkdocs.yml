@@ -24,7 +24,7 @@ pages:
   - Build command: build_command.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
-  - GHCJS: ghcjs.md
+  - GHCJS (experimental): ghcjs.md
   - Nix integration: nix_integration.md
   - Non-standard project initialization: nonstandard_project_init.md
   - Shell auto-completion: shell_autocompletion.md
@@ -39,6 +39,8 @@ pages:
   - Maintainer guide:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
+    - Add GHC version: maintainers/ghc.md
+    - Upgrading msys: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
 
 markdown_extensions:

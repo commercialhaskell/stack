@@ -84,6 +84,8 @@ data SDistOpts = SDistOpts
   -- ^ The URL of the signature server
   , sdoptsBuildTarball :: Bool
   -- ^ Whether to build the tarball
+  , sdoptsTarPath :: Maybe FilePath
+  -- ^ Where to copy the tarball
   }
 
 newtype CheckException
@@ -221,19 +223,19 @@ getCabalLbs pvpBounds mrev cabalfp = do
             prettyWarn $ vsep $ roundtripErrs ++
               [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
               , ""
-              ,  "Please see this GitHub issue for status:" <+> styleUrl "https://github.com/commercialhaskell/stack/issues/3549"
+              ,  "Please see this GitHub issue for status:" <+> style Url "https://github.com/commercialhaskell/stack/issues/3549"
               , ""
               , fillSep
                 [ flow "If the issue is closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
-                , styleShell "stack upgrade"
+                , style Shell "stack upgrade"
                 , flow "for latest stable version or"
-                , styleShell "stack upgrade --git"
+                , style Shell "stack upgrade --git"
                 , flow "for the latest development version."
                 ]
               , ""
               , fillSep
                 [ flow "If the issue is fixed, but updating doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
-                , styleUrl "https://github.com/commercialhaskell/stack/issues/new"
+                , style Url "https://github.com/commercialhaskell/stack/issues/new"
                 ]
               , ""
               , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
@@ -243,8 +245,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
         prettyWarn $ vsep $ roundtripErrs ++
           [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
           , bulletedList
-            [ styleUrl "https://github.com/commercialhaskell/stack/issues/new"
-            , styleUrl "https://github.com/haskell/cabal/issues/new"
+            [ style Url "https://github.com/commercialhaskell/stack/issues/new"
+            , style Url "https://github.com/haskell/cabal/issues/new"
             ]
           , flow $ "The parse error is: " ++ unlines (map show errs)
           , ""
@@ -311,9 +313,9 @@ readLocalPackage pkgDir = do
         , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
         , lpForceDirty = False
-        , lpDirtyFiles = Nothing
-        , lpNewBuildCaches = Map.empty
-        , lpComponentFiles = Map.empty
+        , lpDirtyFiles = pure Nothing
+        , lpNewBuildCaches = pure Map.empty
+        , lpComponentFiles = pure Map.empty
         , lpComponents = Set.empty
         , lpUnbuildable = Set.empty
         , lpLocation = PLFilePath $ toFilePath pkgDir
@@ -330,7 +332,7 @@ getSDistFileList lp =
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
-            withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)
@@ -465,7 +467,7 @@ buildExtractedTarball pkgDir = do
                      }
         }
   local adjustEnvForBuild $
-    build (const (return ())) Nothing defaultBuildOptsCLI
+    build Nothing Nothing defaultBuildOptsCLI
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.

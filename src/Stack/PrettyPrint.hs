@@ -13,19 +13,16 @@ module Stack.PrettyPrint
     , prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
     , prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
       -- * Semantic styling functions
-      -- | These are preferred to styling or colors directly, so that we can
-      -- encourage consistency.
-    , styleWarning, styleError, styleGood
-    , styleShell, styleFile, styleUrl, styleDir, styleModule
-    , styleCurrent, styleTarget
-    , styleRecommendation
+      -- | These are used rather than applying colors or other styling directly,
+      -- to provide consistency.
+    , style
     , displayMilliseconds
       -- * Formatting utils
     , bulletedList
     , spacedBulletedList
     , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
-    , Display(..), AnsiDoc, AnsiAnn(..), HasAnsiAnn(..), Doc
+    , Display (..), StyleDoc, StyleAnn (..), HasStyleAnn(..), Doc
     , nest, line, linebreak, group, softline, softbreak
     , align, hang, indent, encloseSep
     , (<+>)
@@ -33,6 +30,8 @@ module Stack.PrettyPrint
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
     , indentAfterLabel, wordDocs, flow
+      -- * Re-exports from "Stack.Types.PrettyPrint"
+    , Style (..)
     ) where
 
 import qualified RIO
@@ -44,22 +43,30 @@ import qualified Distribution.Text as C (display)
 import           Stack.Types.NamedComponent
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
+import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
 import           Stack.Types.Version
-import           Text.PrettyPrint.Leijen.Extended
+import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
+                     HasStyleAnn (..), StyleAnn (..), StyleDoc, (<+>), align,
+                     angles, braces, brackets, cat,
+                     displayAnsi, displayPlain, dquotes, enclose, encloseSep,
+                     fill, fillBreak, fillCat, fillSep, group, hang, hcat, hsep,
+                     indent, line, linebreak,
+                     nest, parens, punctuate, sep, softbreak, softline, squotes,
+                     styleAnn, vcat, vsep)
 
 displayWithColor
-    :: (HasRunner env, Display a, HasAnsiAnn (Ann a),
+    :: (HasRunner env, Display a, HasStyleAnn (Ann a),
         MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
     useAnsi <- view useColorL
     termWidth <- view $ runnerL.to runnerTermWidth
-    return $ (if useAnsi then displayAnsi else displayPlain) termWidth x
+    (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: (HasRunner env, HasCallStack, Display b, HasAnsiAnn (Ann b),
+prettyWith :: (HasRunner env, HasCallStack, Display b, HasStyleAnn (Ann b),
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
 prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
@@ -69,26 +76,26 @@ prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
 
 prettyDebugWith, prettyInfoWith, prettyNoteWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
-  => (a -> Doc AnsiAnn) -> a -> m ()
+  => (a -> StyleDoc) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
 prettyInfoWith  = prettyWith LevelInfo
 prettyNoteWith f  = prettyWith LevelInfo
-                          ((line <>) . (styleGood "Note:" <+>) .
+                          ((line <>) . (style Good "Note:" <+>) .
                            indentAfterLabel . f)
 prettyWarnWith f  = prettyWith LevelWarn
-                          ((line <>) . (styleWarning "Warning:" <+>) .
+                          ((line <>) . (style Warning "Warning:" <+>) .
                            indentAfterLabel . f)
 prettyErrorWith f = prettyWith LevelError
-                          ((line <>) . (styleError   "Error:" <+>) .
+                          ((line <>) . (style Error   "Error:" <+>) .
                            indentAfterLabel . f)
 prettyWarnNoIndentWith f  = prettyWith LevelWarn
-                                  ((line <>) . (styleWarning "Warning:" <+>) . f)
-prettyErrorNoIndentWith f = prettyWith LevelWarn
-                                  ((line <>) . (styleError   "Error:" <+>) . f)
+                                  ((line <>) . (style Warning "Warning:" <+>) . f)
+prettyErrorNoIndentWith f = prettyWith LevelError
+                                  ((line <>) . (style Error   "Error:" <+>) . f)
 
 prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
-  => Doc AnsiAnn -> m ()
+  => StyleDoc -> m ()
 prettyDebug         = prettyDebugWith         id
 prettyInfo          = prettyInfoWith          id
 prettyNote          = prettyNoteWith          id
@@ -99,7 +106,7 @@ prettyErrorNoIndent = prettyErrorNoIndentWith id
 
 prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
   :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
-  => [Doc AnsiAnn] -> m ()
+  => [StyleDoc] -> m ()
 prettyDebugL         = prettyDebugWith         fillSep
 prettyInfoL          = prettyInfoWith          fillSep
 prettyNoteL          = prettyNoteWith          fillSep
@@ -137,7 +144,7 @@ flow :: String -> Doc a
 flow = fillSep . wordDocs
 
 debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
-                 MonadIO m, MonadUnliftIO m) => Doc AnsiAnn -> m a -> m a
+                 MonadIO m, MonadUnliftIO m) => StyleDoc -> m a -> m a
 debugBracket msg f = do
   let output = logDebug . RIO.display <=< displayWithColor
   output $ "Start: " <> msg
@@ -154,57 +161,9 @@ debugBracket msg f = do
   output $ "Finished in" <+> displayMilliseconds diff <> ":" <+> msg
   return x
 
--- | Style an 'AnsiDoc' as an error. Should be used sparingly, not to style
---   entire long messages. For example, it's used to style the "Error:"
---   label for an error message, not the entire message.
-styleError :: AnsiDoc -> AnsiDoc
-styleError = dullred
-
--- | Style an 'AnsiDoc' as a warning. Should be used sparingly, not to style
---   entire long messages. For example, it's used to style the "Warning:"
---   label for an error message, not the entire message.
-styleWarning :: AnsiDoc -> AnsiDoc
-styleWarning = yellow
-
--- | Style an 'AnsiDoc' in a way to emphasize that it is a particularly good
---   thing.
-styleGood :: AnsiDoc -> AnsiDoc
-styleGood = green
-
--- | Style an 'AnsiDoc' as a shell command, i.e. when suggesting something
---   to the user that should be typed in directly as written.
-styleShell :: AnsiDoc -> AnsiDoc
-styleShell = magenta
-
--- | Style an 'AnsiDoc' as a filename. See 'styleDir' for directories.
-styleFile :: AnsiDoc -> AnsiDoc
-styleFile = bold . white
-
--- | Style an 'AsciDoc' as a URL.  For now using the same style as files.
-styleUrl :: AnsiDoc -> AnsiDoc
-styleUrl = styleFile
-
--- | Style an 'AnsiDoc' as a directory name. See 'styleFile' for files.
-styleDir :: AnsiDoc -> AnsiDoc
-styleDir = bold . blue
-
--- | Style used to highlight part of a recommended course of action.
-styleRecommendation :: AnsiDoc -> AnsiDoc
-styleRecommendation = bold . green
-
--- | Style an 'AnsiDoc' in a way that emphasizes that it is related to
---   a current thing. For example, could be used when talking about the
---   current package we're processing when outputting the name of it.
-styleCurrent :: AnsiDoc -> AnsiDoc
-styleCurrent = yellow
-
--- TODO: figure out how to describe this
-styleTarget :: AnsiDoc -> AnsiDoc
-styleTarget = cyan
-
--- | Style an 'AnsiDoc' as a module name
-styleModule :: AnsiDoc -> AnsiDoc
-styleModule = magenta -- TODO: what color should this be?
+-- |Annotate a 'StyleDoc' with a 'Style'.
+style :: Style -> StyleDoc -> StyleDoc
+style = styleAnn
 
 instance Display PackageName where
     display = fromString . packageNameString
@@ -216,27 +175,27 @@ instance Display Version where
     display = fromString . versionString
 
 instance Display (Path b File) where
-    display = styleFile . fromString . toFilePath
+    display = style File . fromString . toFilePath
 
 instance Display (Path b Dir) where
-    display = styleDir . fromString . toFilePath
+    display = style Dir . fromString . toFilePath
 
 instance Display (PackageName, NamedComponent) where
-    display = cyan . fromString . T.unpack . renderPkgComponent
+    display = style PkgComponent . fromString . T.unpack . renderPkgComponent
 
 instance Display C.ModuleName where
     display = fromString . C.display
 
 -- Display milliseconds.
-displayMilliseconds :: Double -> AnsiDoc
-displayMilliseconds t = green $
+displayMilliseconds :: Double -> StyleDoc
+displayMilliseconds t = style Good $
     fromString (show (round (t * 1000) :: Int)) <> "ms"
 
--- | Display a bulleted list of 'AnsiDoc'.
-bulletedList :: [AnsiDoc] -> AnsiDoc
+-- | Display a bulleted list of 'StyleDoc'.
+bulletedList :: [StyleDoc] -> StyleDoc
 bulletedList = mconcat . intersperse line . map (("*" <+>) . align)
 
--- | Display a bulleted list of 'AnsiDoc' with a blank line between
+-- | Display a bulleted list of 'StyleDoc' with a blank line between
 -- each.
-spacedBulletedList :: [AnsiDoc] -> AnsiDoc
+spacedBulletedList :: [StyleDoc] -> StyleDoc
 spacedBulletedList = mconcat . intersperse (line <> line) . map (("*" <+>) . align)

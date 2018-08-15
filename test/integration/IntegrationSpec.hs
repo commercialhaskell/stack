@@ -97,8 +97,8 @@ test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ wit
 
     (ClosedStream, outSrc, errSrc, sph) <- streamingProcess cp
     (out, err, ec) <- runConcurrently $ (,,)
-        <$> Concurrently (outSrc $$ sinkLbs)
-        <*> Concurrently (errSrc $$ sinkLbs)
+        <$> Concurrently (outSrc `connect` sinkLbs)
+        <*> Concurrently (errSrc `connect` sinkLbs)
         <*> Concurrently (waitForStreamingProcess sph)
     when (ec /= ExitSuccess) $ throwIO $ TestFailure out err ec
   where
@@ -120,7 +120,7 @@ instance Exception TestFailure
 
 copyTree :: (FilePath -> Bool) -> FilePath -> FilePath -> IO ()
 copyTree toCopy src dst =
-    runResourceT (sourceDirectoryDeep False src $$ CL.mapM_ go)
+    runResourceT (sourceDirectoryDeep False src `connect` CL.mapM_ go)
         `catch` \(_ :: IOException) -> return ()
   where
     go srcfp = when (toCopy srcfp) $ liftIO $ do

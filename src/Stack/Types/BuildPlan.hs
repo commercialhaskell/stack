@@ -43,7 +43,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Distribution.ModuleName as C
 import qualified Distribution.Version as C
-import           Network.HTTP.Client (parseRequest)
+import           Network.HTTP.StackClient (parseRequest)
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.FlagName
@@ -310,7 +310,7 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v4" "a_ljrJRo8hA_-gcIDP9c6NXJ2pE="
+loadedSnapshotVC = storeVersionConfig "ls-v5" "CeSRWh1VU8v0__kwA__msbe6WlU="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
@@ -340,11 +340,6 @@ data LoadedPackageInfo loc = LoadedPackageInfo
     , lpiPackageDeps :: !(Map PackageName VersionIntervals)
     -- ^ All packages which must be built/copied/registered before
     -- this package.
-    , lpiProvidedExes :: !(Set ExeName)
-    -- ^ The names of executables provided by this package, for
-    -- performing build tool lookups.
-    , lpiNeededExes :: !(Map ExeName VersionIntervals)
-    -- ^ Executables needed by this package.
     , lpiExposedModules :: !(Set ModuleName)
     -- ^ Modules exposed by this package's library
     , lpiHide :: !Bool

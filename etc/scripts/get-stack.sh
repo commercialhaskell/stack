@@ -127,8 +127,15 @@ print_bindist_notice() {
 
 # Adds a 'sudo' prefix if sudo is available to execute the given command
 # If not, the given command is run as is
+# When requesting root permission, always show the command and never re-use cached credentials.
 sudocmd() {
-  $(command -v sudo) "$@"
+  if command -v sudo >/dev/null; then
+    echo "sudo $@"
+    # -k: Disable cached credentials.
+    sudo -k "$@"
+  else
+    "$@"
+  fi
 }
 
 # Install dependencies for distros that use Apt
@@ -535,6 +542,10 @@ install_64bit_gmp4_linked_binary() {
   install_from_bindist "linux-x86_64-gmp4.tar.gz"
 }
 
+install_64bit_gmp4_linked_binary() {
+  install_from_bindist "linux-x86_64-gmp4"
+}
+
 install_64bit_osx_binary() {
   install_from_bindist "osx-x86_64.tar.gz"
 }
@@ -561,7 +572,9 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  if ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
+  if dpkg-query -W "$@" > /dev/null; then
+    info "Already installed!"
+  elif ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
     die "Installing apt packages failed.  Please run 'apt-get update' and try again."
   fi
 }

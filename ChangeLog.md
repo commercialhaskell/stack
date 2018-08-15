@@ -11,7 +11,163 @@ Behavior changes:
 
 Other enhancements:
 
+* Defer loading up of files for local packages. This allows us to get
+  plan construction errors much faster, and avoid some unnecessary
+  work when only building a subset of packages. This is especially
+  useful for the curator use case.
+
 Bug fixes:
+
+* Handle a change in GHC's hi-dump format around `addDependentFile`,
+  which now includes a hash. See
+  [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
+
+
+## v1.9.0 (release candidate)
+
+Release notes:
+
+* We will be deleting the Ubuntu, Debian, CentOS, Fedora, and Arch package repos from `download.fpcomplete.com` soon.  These have been deprecated for over a year and have not received new releases, but were left in place for compatibility with older scripts.
+
+Major changes:
+
+* `GHCJS` support is being downgraded to 'experimental'. At time of writing the upcoming release is 1.8. A warning notifying the user of the experimental status of `GHCJS` will be incorporated into 1.8.
+
+Behavior changes:
+
+* `ghc-options` from `stack.yaml` are now appended to `ghc-options` from
+  `config.yaml`, whereas before they would be replaced.
+* `stack build` will now announce when sublibraries of a package are being
+  build, in the same way executables, tests, benchmarks and libraries are
+  announced
+* `stack sdist` will now announce the destination of the generated tarball,
+    regardless of whether or not it passed the sanity checks
+* The `--upgrade-cabal` option to `stack setup` has been
+  deprecated. This feature no longer works with GHC 8.2 and
+  later. Furthermore, the reason for this flag originally being
+  implemented was drastically lessened once Stack started using the
+  snapshot's `Cabal` library for custom setups. See:
+  [#4070](https://github.com/commercialhaskell/stack/issues/4070).
+* With the new namespaced template feature, `stack templates` is no
+  longer able to meaningfully display a list of all templates
+  available. Instead, the command will download and display a
+  [help file](https://github.com/commercialhaskell/stack-templates/blob/master/STACK_HELP.md)
+  with more information on how to discover templates. See:
+  [#4039](https://github.com/commercialhaskell/stack/issues/4039)
+* Build tools are now handled in a similar way to `cabal-install`. In
+  particular, for legacy `build-tools` fields, we use a hard-coded
+  list of build tools in place of looking up build tool packages in a
+  tool map. This both brings Stack's behavior closer into line with
+  `cabal-install`, avoids some bugs, and opens up some possible
+  optimizations/laziness. See:
+  [#4125](https://github.com/commercialhaskell/stack/issues/4125).
+* Mustache templating is not applied to large files (over 50kb) to
+  avoid performance degredation. See:
+  [#4133](https://github.com/commercialhaskell/stack/issues/4133).
+* `stack upload` signs the package by default, as documented. `--no-signature`
+  turns the signing off.
+  [#3739](https://github.com/commercialhaskell/stack/issues/3739)
+* In case there is a network connectivity issue while trying to
+  download a template, stack will check whether that template had
+  been downloaded before. In that case, the cached version will be
+  used. See [#3850](https://github.com/commercialhaskell/stack/issues/3739).
+
+Other enhancements:
+
+* On Windows before Windows 10, --color=never is the default on terminals that
+  can support ANSI color codes in output only by emulation
+* On Windows, recognise a 'mintty' (false) terminal as a terminal, by default
+* `stack build` issues a warning when `base` is explicitly listed in
+  `extra-deps` of `stack.yaml`
+* `stack build` suggests trying another GHC version should the build
+  plan end up requiring unattainable `base` version.
+* A new sub command `run` has been introduced to build and run a specified executable
+  similar to `cabal run`. If no executable is provided as the first argument, it
+  defaults to the first available executable in the project.
+* `stack build` missing dependency suggestions (on failure to construct a valid
+  build plan because of missing deps) are now printed with their latest
+  cabal file revision hash. See
+  [#4068](https://github.com/commercialhaskell/stack/pull/4068).
+* Added new `--tar-dir` option to `stack sdist`, that allows to copy
+  the resulting tarball to the specified directory.
+* Introduced the `--interleaved-output` command line option and
+  `build.interleaved-output` config value which causes multiple concurrent
+  builds to dump to stderr at the same time with a `packagename> ` prefix. See
+  [#3225](https://github.com/commercialhaskell/stack/issues/3225).
+* The default retry strategy has changed to exponential backoff.
+  This should help with
+  [#3510](https://github.com/commercialhaskell/stack/issues/3510).
+* [#4039](https://github.com/commercialhaskell/stack/issues/4039)
+  `stack new` now allows template names of the form `username/foo` to
+  download from a user other than `commercialstack` on Github, and can be prefixed
+  with the service `github:`, `gitlab:`, or `bitbucket:`.
+* Switch to `githash` to include some unmerged bugfixes in `gitrev`
+* [#3685](https://github.com/commercialhaskell/stack/issues/3685)
+  Suggestion to add `'allow-newer': true` now shows path to user config
+  file where this flag should be put into
+* `stack ghci` now asks which main target to load before doing the build,
+  rather than after
+* Bump to hpack 0.29.0
+* With GHC 8.4 and later, Haddock is given the `--quickjump` flag.
+* It is possible to specify the Hackage base URL to upload packages to, instead
+  of the default of `https://hackage.haskell.org/`, by using `hackage-base-url`
+  configuration option.
+* When using Nix, if a specific minor version of GHC is not requested, the
+  latest minor version in the given major branch will be used automatically.
+
+Bug fixes:
+
+* `stack ghci` now does not invalidate `.o` files on repeated runs,
+  meaning any modules compiled with `-fobject-code` will be cached
+  between ghci runs. See
+  [#4038](https://github.com/commercialhaskell/stack/pull/4038).
+* `~/.stack/config.yaml` and `stack.yaml` terminating by newline
+* The previous released caused a regression where some `stderr` from the
+  `ghc-pkg` command showed up in the terminal. This output is now silenced.
+* A regression in recompilation checking introduced in v1.7.1 has been fixed.
+  See [#4001](https://github.com/commercialhaskell/stack/issues/4001)
+* `stack ghci` on a package with internal libraries was erroneously looking
+  for a wrong package corresponding to the internal library and failing to
+  load any module. This has been fixed now and changes to the code in the
+  library and the sublibrary are properly tracked. See
+  [#3926](https://github.com/commercialhaskell/stack/issues/3926).
+* For packages with internal libraries not depended upon, `stack build` used
+  to fail the build process since the internal library was not built but it
+  was tried to be registered. This is now fixed by always building internal
+  libraries. See
+  [#3996](https://github.com/commercialhaskell/stack/issues/3996).
+* `--no-nix` was not respected under NixOS
+* Fix a regression which might use a lot of RAM. See
+  [#4027](https://github.com/commercialhaskell/stack/issues/4027).
+* Order of commandline arguments does not matter anymore.
+  See [#3959](https://github.com/commercialhaskell/stack/issues/3959)
+* When prompting users about saving their Hackage credentials on upload,
+  flush to stdout before waiting for the response so the prompt actually
+  displays. Also fixes a similar issue with ghci target selection prompt.
+* If `cabal` is not on PATH, running `stack solver` now prompts the user
+  to run `stack install cabal-install`
+* `stack build` now succeeds in building packages which contain sublibraries
+  which are dependencies of executables, tests or benchmarks but not of the
+  main library. See
+  [#3787](https://github.com/commercialhaskell/stack/issues/3959).
+* Sublibraries are now properly considered for coverage reports when the test
+  suite depends on the internal library. Before, stack was erroring when
+  trying to generate the coverage report, see
+  [#4105](https://github.com/commercialhaskell/stack/issues/4105).
+* Sublibraries are now added to the precompiled cache and recovered from there
+  when the snapshot gets updated. Previously, updating the snapshot when there
+  was a package with a sublibrary in the snapshot resulted in broken builds.
+  This is now fixed, see
+  [#4071](https://github.com/commercialhaskell/stack/issues/4071).
+* [#4114] Stack pretty prints error messages with proper `error` logging
+  level instead of `warning` now. This also fixes self-executing scripts
+  not piping plan construction errors from runhaskell to terminal (issue
+  #3942).
+* Fix invalid "While building Setup.hs" when Cabal calls fail. See:
+  [#3934](https://github.com/commercialhaskell/stack/issues/3934)
+* `stack upload` signs the package by default, as documented. `--no-signature`
+  turns the signing off.
+  [#3739](https://github.com/commercialhaskell/stack/issues/3739)
 
 
 ## v1.7.1

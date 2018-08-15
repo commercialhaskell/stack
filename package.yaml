@@ -1,5 +1,5 @@
 name: stack
-version: '1.7.2'
+version: '1.10.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -33,18 +33,20 @@ ghc-options:
 - -fwarn-tabs
 - -fwarn-incomplete-uni-patterns
 - -fwarn-incomplete-record-updates
+- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
 - Cabal
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
+- array
 - async
 - attoparsec
 - base >=4.10 && < 5
 - base64-bytestring
 - bytestring
 - conduit
-- conduit-extra >= 1.2.3.1
+- conduit-extra
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -106,10 +108,10 @@ dependencies:
 - time
 - tls
 - transformers
-- typed-process >= 0.2.1.0
+- typed-process
 - unicode-transforms
 - unix-compat
-- unliftio >= 0.2.4.0
+- unliftio
 - unordered-containers
 - vector
 - yaml
@@ -131,11 +133,8 @@ library:
   source-dirs: src/
   ghc-options:
   - -fwarn-identities
-  verbatim:
-    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
-    # Using 'verbatim' to support older hpack version.
-    autogen-modules: |
-      Paths_stack
+  generated-exposed-modules:
+  - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Aeson.Extended
@@ -143,6 +142,7 @@ library:
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
   - Data.IORef.RunOnce
+  - Data.Monoid.Map
   - Data.Store.VersionTagged
   - Network.HTTP.Download
   - Network.HTTP.Download.Verified
@@ -153,7 +153,6 @@ library:
   - Path.CheckInstall
   - Path.Extra
   - Path.Find
-  - Paths_stack
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -173,6 +172,8 @@ library:
   - Stack.Constants
   - Stack.Constants.Config
   - Stack.Coverage
+  - Stack.DefaultColorWhen
+  - Stack.DefaultStyles
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
@@ -250,6 +251,7 @@ library:
   - Stack.Types.PackageIdentifier
   - Stack.Types.PackageIndex
   - Stack.Types.PackageName
+  - Stack.Types.PrettyPrint
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
@@ -273,14 +275,8 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    verbatim:
-      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
-      # Using 'verbatim' to support older hpack version.
-      autogen-modules: |
-          Build_stack,
-          Paths_stack
-    other-modules:
-    - Build_stack
+    generated-other-modules:
+    - Build_stack,
     - Paths_stack
     ghc-options:
     - -threaded
@@ -295,7 +291,7 @@ executables:
     - condition: ! '!(flag(disable-git-info))'
       cpp-options: -DUSE_GIT_INFO
       dependencies:
-      - gitrev
+      - githash
       - optparse-simple
     - condition: flag(hide-dependency-versions)
       cpp-options: -DHIDE_DEP_VERSIONS
@@ -303,7 +299,7 @@ executables:
       cpp-options: -DSUPPORTED_BUILD
 tests:
   stack-test:
-    main: Test.hs
+    main: Spec.hs
     source-dirs: src/test
     ghc-options:
     - -threaded

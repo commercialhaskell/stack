@@ -64,13 +64,13 @@ import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Lens.Micro (set)
-import              Network.HTTP.Simple (getResponseBody, getResponseStatusCode)
+import              Network.HTTP.StackClient (getResponseBody, getResponseStatusCode)
 import              Network.HTTP.Download
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
-import              Prelude (getLine, putStr, putStrLn, until)
+import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
@@ -94,7 +94,6 @@ import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
 import              System.Exit (ExitCode (..), exitFailure)
-import              System.IO (stdout)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -578,7 +577,7 @@ getGhcBuilds = do
                 eldconfigOut
                   <- withModifyEnvVars sbinEnv
                    $ proc "ldconfig" ["-p"]
-                   $ tryAny . readProcessStdout_
+                   $ tryAny . fmap fst . readProcess_
                 let firstWords = case eldconfigOut of
                         Right ldconfigOut -> mapMaybe (listToMaybe . T.words) $
                             T.lines $ T.decodeUtf8With T.lenientDecode
@@ -685,7 +684,8 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
              -> UpgradeTo
              -> RIO env ()
 upgradeCabal wc upgradeTo = do
-    logInfo "Manipulating the global Cabal is only for debugging purposes"
+    logWarn "Using deprecated --upgrade-cabal feature, this is not recommended"
+    logWarn "Manipulating the global Cabal is only for debugging purposes"
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages Nothing mempty (Set.singleton name)
     installed <- getCabalPkgVer wc
@@ -718,6 +718,10 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> Version
                -> RIO env ()
 doCabalInstall wc installed wantedVersion = do
+    when (wantedVersion >= $(mkVersion "2.2")) $ do
+        logWarn "--upgrade-cabal will almost certainly fail for Cabal 2.2 or later"
+        logWarn "See: https://github.com/commercialhaskell/stack/issues/4070"
+        logWarn "Valiantly attempting to build it anyway, but I know this is doomed"
     withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
         logInfo $
             "Installing Cabal-" <>
@@ -765,7 +769,7 @@ getSystemCompiler wc = do
     exists <- doesExecutableExist exeName
     if exists
         then do
-            eres <- proc exeName ["--info"] $ tryAny . readProcessStdout_
+            eres <- proc exeName ["--info"] $ tryAny . fmap fst . readProcess_
             let minfo = do
                     Right lbs <- Just eres
                     pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
@@ -1107,7 +1111,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                     prettyError $
                         hang 2
                           ("Error encountered while" <+> step <+> "GHC with" <> line <>
-                           styleShell (fromString (unwords (cmd : args))) <> line <>
+                           style Shell (fromString (unwords (cmd : args))) <> line <>
                            -- TODO: Figure out how to insert \ in the appropriate spots
                            -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
                            "run in " <> display wd) <> line <> line <>
@@ -1350,14 +1354,14 @@ buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()
 buildInGhcjsEnv envConfig boptsCli = do
     runRIO (set (buildOptsL.buildOptsInstallExesL) True $
             set (buildOptsL.buildOptsHaddockL) False envConfig) $
-        build (\_ -> return ()) Nothing boptsCli
+        build Nothing Nothing boptsCli
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do
-    ebs <- proc "cabal" ["--numeric-version"] $ tryAny . readProcessStdout_
+    ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcess_
     case ebs of
         Left _ -> return Nothing
-        Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
+        Right (bs, _) -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
@@ -1647,7 +1651,7 @@ sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     eres <- withWorkingDir (toFilePath dir) $ proc exeName
         [ fp
         , "-no-user-package-db"
-        ] $ try . readProcessStdout_
+        ] $ try . readProcess_
     case eres of
         Left e -> throwIO $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
@@ -1703,7 +1707,7 @@ getUtf8EnvVars compilerVer =
                              Map.empty
                     else do
                         -- Get a list of known locales by running @locale -a@.
-                        elocales <- tryAny $ proc "locale" ["-a"] readProcessStdout_
+                        elocales <- tryAny $ fmap fst $ proc "locale" ["-a"] readProcess_
                         let
                             -- Filter the list to only include locales with UTF-8 encoding.
                             utf8Locales =
@@ -1989,7 +1993,7 @@ performPathChecking newFile = do
         | isPermissionError e -> do
             logWarn $ "Permission error when trying to copy: " <> displayShow e
             logWarn "Should I try to perform the file copy using sudo? This may fail"
-            toSudo <- prompt "Try using sudo? (y/n) "
+            toSudo <- promptBool "Try using sudo? (y/n) "
             when toSudo $ do
               let run cmd args = do
                     ec <- proc cmd args runProcess
@@ -2019,19 +2023,6 @@ performPathChecking newFile = do
               logInfo ""
               logInfo "sudo file copy worked!"
         | otherwise -> throwM e
-
-prompt :: MonadIO m => String -> m Bool
-prompt str =
-    liftIO go
-  where
-    go = do
-      putStr str
-      hFlush stdout
-      l <- getLine
-      case l of
-        'y':_ -> return True
-        'n':_ -> return False
-        _ -> putStrLn "Invalid entry, try again" >> go
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (StackReleaseInfo val) = do

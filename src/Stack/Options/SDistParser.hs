@@ -15,13 +15,14 @@ sdistOptsParser signDefault = SDistOpts <$>
   optional pvpBoundsOption <*>
   ignoreCheckSwitch <*>
   (if signDefault
-    then switch (long "no-signature" <> help "Do not sign & upload signatures")
+    then not <$> switch (long "no-signature" <> help "Do not sign & upload signatures")
     else switch (long "sign" <> help "Sign & upload signatures")) <*>
   strOption
   (long "sig-server" <> metavar "URL" <> showDefault <>
     value "https://sig.commercialhaskell.org" <>
     help "URL") <*>
-  buildPackageOption
+  buildPackageOption <*>
+  optional (strOption (long "tar-dir" <> help "If specified, copy all the tar to this dir"))
   where
     ignoreCheckSwitch =
       switch (long "ignore-check"

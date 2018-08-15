@@ -19,7 +19,7 @@ benchOptsParser hide0 = BenchmarkOptsMonoid
                                  help ("Forward BENCH_ARGS to the benchmark suite. " <>
                                        "Supports templates from `cabal bench`") <>
                                  hide))
-        <*> optionalFirst (switch (long "no-run-benchmarks" <>
+        <*> optionalFirst (flag' True (long "no-run-benchmarks" <>
                           help "Disable running of benchmarks. (Benchmarks will still be built.)" <>
                              hide))
    where hide = hideMods hide0

@@ -21,10 +21,8 @@ import qualified Codec.Compression.GZip as GZip
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as L
-import           Network.HTTP.Client (RequestBody (RequestBodyBS))
 import           Network.HTTP.Download
-import           Network.HTTP.Simple (setRequestMethod, setRequestBody, getResponseStatusCode)
-import           Network.HTTP.Types (methodPut)
+import           Network.HTTP.StackClient (RequestBody (RequestBodyBS), setRequestMethod, setRequestBody, getResponseStatusCode, methodPut)
 import           Path
 import           Stack.Package
 import           Stack.Sig.GPG

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "Should not be used!" >&2
+exit 1

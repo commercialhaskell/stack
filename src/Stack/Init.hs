@@ -185,6 +185,7 @@ renderStackYaml p ignoredPackages dupPackages =
         <> F.foldMap (goComment o) comments
         <> goOthers (o `HM.difference` HM.fromList comments)
         <> B.byteString footerHelp
+        <> "\n"
 
     goComment o (name, comment) =
         case (convert <$> HM.lookup name o) <|> nonPresentValue name of
@@ -261,7 +262,6 @@ renderStackYaml p ignoredPackages dupPackages =
         , "resolver: lts-3.5"
         , "resolver: nightly-2015-09-21"
         , "resolver: ghc-7.10.2"
-        , "resolver: ghcjs-0.1.0_ghc-7.10.2"
         , ""
         , "The location of a snapshot can be provided as a file or url. Stack assumes"
         , "a snapshot provided as a file might change, whereas a url resource does not."

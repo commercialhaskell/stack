@@ -51,8 +51,11 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
+import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Data.Monoid
+import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
@@ -62,9 +65,7 @@ import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
-import           Network.HTTP.Client (parseUrlThrow)
-import           Network.HTTP.StackClient (httpJSON)
-import           Network.HTTP.Simple (getResponseBody)
+import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -360,8 +361,8 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
-         configGhcOptionsByName = configMonoidGhcOptionsByName
-         configGhcOptionsByCat = configMonoidGhcOptionsByCat
+         configGhcOptionsByName = coerce configMonoidGhcOptionsByName
+         configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirst True configMonoidModifyCodePage
@@ -372,6 +373,7 @@ configFromConfigMonoid
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
+         configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
          clIgnoreRevisionMismatch = fromFirst False configMonoidIgnoreRevisionMismatch
 
      configAllowDifferentUser <-
@@ -964,4 +966,5 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
      ]

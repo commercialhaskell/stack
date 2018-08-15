@@ -427,7 +427,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.6`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-11.19`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -444,15 +444,15 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.6, let's change our
+Let's explore package sets a bit further. Instead of lts-11.19, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
-this is currently 2017-12-19 - please see the resolve from the link above to get the latest.
+this is currently 2018-07-25 - please see the resolve from the link above to get the latest.
 
 Then, Rerunning `stack build` will produce:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-Downloaded nightly-2017-12-19 build plan.
+Downloaded nightly-2018-07-31 build plan.
 # build output ...
 ```
 
@@ -460,8 +460,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.6 build
-Downloaded lts-11.6 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.19 build
+Downloaded lts-11.19 build plan.
 # build output ...
 ```
 
@@ -1548,18 +1548,37 @@ multiple templates to start a new project from:
 
 ```
 michael@d30748af6d3d:~$ stack templates
-chrisdone
-hakyll-template
-new-template
-simple
-yesod-minimal
-yesod-mongo
-yesod-mysql
-yesod-postgres
-yesod-postgres-fay
-yesod-simple
-yesod-sqlite
-michael@d30748af6d3d:~$ stack new my-yesod-project yesod-simple
+# Stack Templates
+
+The `stack new` command will create a new project based on a project template.
+Templates can be located on the local filesystem, on Github, or arbitrary URLs.
+For more information, please see the user guide:
+
+https://docs.haskellstack.org/en/stable/GUIDE/#templates
+
+There are many templates available, some simple examples:
+
+    stack new myproj # uses the default template
+    stack new myproj2 rio # uses the rio template
+    stack new website yesodweb/sqlite # Yesod server with SQLite DB
+
+For more information and other templates, please see the `stack-templates`
+Wiki:
+
+https://github.com/commercialhaskell/stack-templates/wiki
+
+Please feel free to add your own templates to the Wiki for discoverability.
+
+Want to improve this text? Send us a PR!
+
+https://github.com/commercialhaskell/stack-templates/edit/master/STACK_HELP.md
+```
+
+You can specify one of these templates following your project name
+in the `stack new` command:
+
+```
+michael@d30748af6d3d:~$ stack new my-yesod-project yesodweb/simple
 Downloading template "yesod-simple" to create project "my-yesod-project" in my-yesod-project/ ...
 Using the following authorship configuration:
 author-email: example@example.com
@@ -1574,13 +1593,42 @@ Selected resolver: lts-3.2
 Wrote project config to: /home/michael/my-yesod-project/stack.yaml
 ```
 
-Alternatively you can use your own templates by specifying the path:
+The default `stack-templates` repository is on [Github](https://github.com/commercialhaskell/stack-templates),
+under the user account `commercialstack`. You can download templates from a
+different Github user by prefixing the username and a slash:
+
+```
+stack new my-yesod-project yesodweb/simple
+```
+
+Then it would be downloaded from Github, user account `yesodweb`,
+repo `stack-templates`, and file `yesod-simple.hsfiles`.
+
+You can even download templates from a service other that Github, such as
+[Gitlab](https://gitlab.com) or [Bitbucket](https://bitbucket.com):
+
+```
+stack new my-project gitlab:user29/foo
+```
+
+That template would be downloaded from Gitlab, user account `user29`,
+repo `stack-templates`, and file `foo.hsfiles`.
+
+If you need more flexibility, you can specify the full URL of the template:
+
+```
+stack new my-project https://my-site.com/content/template9.hsfiles
+```
+
+(The `.hsfiles` extension is optional; it will be added if it's not specified.)
+
+Alternatively you can use a local template by specifying the path:
 
 ```
 stack new project ~/location/of/your/template.hsfiles
 ```
 
-As a starting point you can use [the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
+As a starting point for creating your own templates, you can use [the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
 An introduction into template-writing and a place for submitting official templates,
 you will find at [the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
@@ -1752,10 +1800,6 @@ users. Here's a quick rundown:
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.
-* `stack setup --upgrade-cabal` can install a newer version of the Cabal
-  library, used for performing actual builds. You shouldn't generally do this,
-  since new Cabal versions may introduce incompatibilities with package sets,
-  but it can be useful if you're trying to test a specific bugfix.
 * `stack ls snapshots` will list all the local snapshots by
   default. You can also view the remote snapshots using `stack ls
   snapshots remote`. It also supports option for viewing only lts

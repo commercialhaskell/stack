@@ -30,12 +30,8 @@ import           Data.Conduit                (yield)
 import qualified Data.Conduit.Binary         as CB
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
-import           Network.HTTP.Client         (Request, Response, path, checkResponse, parseUrlThrow, parseRequest)
-import           Network.HTTP.Client.Conduit (requestHeaders)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.StackClient    (httpJSON, httpLbs, httpLBS, withResponse)
-import           Network.HTTP.Simple         (getResponseBody, getResponseHeaders, getResponseStatusCode,
-                                              setRequestHeader)
+import           Network.HTTP.StackClient    (Request, Response, HttpException, httpJSON, httpLbs, httpLBS, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders, requestHeaders, getResponseBody, getResponseStatusCode)
 import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
@@ -89,7 +85,7 @@ redownload req0 dest = do
                         [("If-None-Match", L.toStrict etag)]
                     }
         req2 = req1 { checkResponse = \_ _ -> return () }
-    recoveringHttp drRetryPolicyDefault $ liftIO $
+    recoveringHttp drRetryPolicyDefault $ catchingHttpExceptions $ liftIO $
       withResponse req2 $ \res -> case getResponseStatusCode res of
         200 -> do
           createDirectoryIfMissing True $ takeDirectory destFilePath
@@ -108,9 +104,15 @@ redownload req0 dest = do
 
           return True
         304 -> return False
-        _ -> throwM $ RedownloadFailed req2 dest $ void res
+        _ -> throwM $ RedownloadInvalidResponse req2 dest $ void res
 
-data DownloadException = RedownloadFailed Request (Path Abs File) (Response ())
+  where
+    catchingHttpExceptions :: RIO env a -> RIO env a
+    catchingHttpExceptions action = catch action (throwM . RedownloadHttpError)
+
+data DownloadException = RedownloadInvalidResponse Request (Path Abs File) (Response ())
+                       | RedownloadHttpError HttpException
+                       
     deriving (Show, Typeable)
 instance Exception DownloadException
 

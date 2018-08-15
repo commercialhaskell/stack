@@ -1,8 +1,8 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
 
-# GHCJS
+# GHCJS (experimental)
 
-To use GHCJS with stack, place a GHCJS version in the [`compiler`](yaml_configuration.md#compiler) field of `stack.yaml`.  After this, all stack commands should work with GHCJS!  In particular:
+To use GHCJS with stack, place a GHCJS version in the [`compiler`](yaml_configuration.md#compiler) field of `stack.yaml`.  After this, some stack commands should work with GHCJS.  In particular:
 
 * `stack setup` will install GHCJS from source and boot it, which takes a long time.
 
@@ -21,7 +21,13 @@ then you may need to install a different version of `node`. See
 
 ## Example Configurations
 
-### Recent versions of GHCJS, repacked for stack
+### GHCJS repacked for snapsnots lts-8 and lts-9
+
+Please see the [ghcjs-stack-dist repository](https://github.com/matchwood/ghcjs-stack-dist) for `lts-8` and `lts-9` configurations and refer to the [README](https://github.com/matchwood/ghcjs-stack-dist/blob/master/README.md) for common issues.
+
+Support for `> lts-9` snapshots (`GHC 8.2` and above) is currently [work in progress](https://github.com/matchwood/ghcjs-stack-dist/issues/10).
+
+### GHCJS repacked for snapsnots < lts-8
 
 These versions of GHCJS were created by
 [Marcin Tolysz](https://github.com/tolysz), and were particularly crafted to
@@ -55,7 +61,7 @@ setup-info:
            url: http://ghcjs.tolysz.org/ghc-8.0-2017-02-05-lts-7.19-9007019.tar.gz
            sha1: d2cfc25f9cda32a25a87d9af68891b2186ee52f9
 ```
-The later can be generated via: https://github.com/tolysz/prepare-ghcjs
+The latter can be generated via: https://github.com/tolysz/prepare-ghcjs
 the former is a bit more manual. Those bundles are only tested against the latest `node-7.4.0`.
 
 In order to correctly boot and use ghcjs, one might need to install `alex` `happy` `hscolour` `hsc2hs` with the normal ghc.
@@ -64,6 +70,7 @@ Older resolvers:
 
 |resolver|ghcjs|url|sha1|
 |---|---|---|---|
+| lts-7.19 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2017-02-05-lts-7.19-9007019.tar.gz | d2cfc25f9cda32a25a87d9af68891b2186ee52f9 |
 | lts-7.15 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2017-01-11-lts-7.15-9007015.tar.gz | 30d34e9d704bdb799066387dfa1ba98b8884d932 |
 | lts-7.14 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2016-12-25-lts-7.14-9007014.tar.gz | 530c4ee5e19e2874e128431c7ad421e336df0303 |
 | lts-7.13 |0.2.1| http://ghcjs.tolysz.org/ghc-8.0-2016-12-18-lts-7.13-9007013.tar.gz | 0d2ebe0931b29adca7cb9d9b9f77d60095bfb864 |

@@ -3,10 +3,11 @@ module Network.HTTP.Download.VerifiedSpec where
 
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
-import           Network.HTTP.Client.Conduit
+import           Network.HTTP.StackClient
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO hiding (withSystemTempDir)
+import           Stack.DefaultStyles (defaultStyles)
 import           Stack.Prelude
 import           Stack.Types.Runner
 import           System.IO (writeFile, readFile)
@@ -66,7 +67,8 @@ spec = do
   let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
-    let run func = withRunner LevelError True True ColorNever Nothing False
+    let run func =
+          withRunner LevelError True True ColorNever defaultStyles Nothing False
                  $ \runner -> runRIO runner func
     -- Preconditions:
     -- * the exampleReq server is running

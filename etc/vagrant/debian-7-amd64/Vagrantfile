@@ -13,7 +13,7 @@ Vagrant.configure(2) do |config|
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates libtinfo-dev
+    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates libtinfo-dev unzip
     if ! which stack; then
       wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
       echo "deb http://download.fpcomplete.com/debian/$(lsb_release -cs) stable main" >/etc/apt/sources.list.d/fpco.list

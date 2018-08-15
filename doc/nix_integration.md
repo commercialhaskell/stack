@@ -186,9 +186,10 @@ Here is a commented configuration file, showing the default values:
 ```yaml
 nix:
 
-  # false by default. Must be present and set to `true` to enable Nix.
-  # You can set set it in your `$HOME/.stack/config.yaml` to enable
-  # Nix for all your projects without having to repeat it
+  # false by default. Must be present and set to `true` to enable Nix, except on
+  # NixOS where it is enabled by default (see #3938).  You can set set it in your
+  # `$HOME/.stack/config.yaml` to enable Nix for all your projects without having
+  # to repeat it
   # enable: true
 
   # true by default. Tells Nix whether to run in a pure shell or not.

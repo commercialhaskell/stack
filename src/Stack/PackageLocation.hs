@@ -28,7 +28,7 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Distribution.PackageDescription (GenericPackageDescription)
-import Network.HTTP.Client (parseUrlThrow)
+import Network.HTTP.StackClient (parseUrlThrow)
 import Network.HTTP.Download.Verified
 import Path
 import Path.Extra

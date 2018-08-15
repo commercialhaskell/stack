@@ -1,0 +1,11 @@
+resolver: lts-11.19
+
+packages:
+- location: ./one-deps
+  extra-dep: true
+
+extra-deps: []
+
+flags: {}
+
+extra-package-dbs: []

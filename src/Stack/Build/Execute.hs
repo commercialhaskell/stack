@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TupleSections         #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -875,6 +876,12 @@ announceTask task x = logInfo $
     ": " <>
     RIO.display x
 
+-- | How we deal with output from GHC, either dumping to a log file or the
+-- console (with some prefix).
+data OutputType
+  = OTLogFile !(Path Abs File) !Handle
+  | OTConsole !Utf8Builder
+
 -- | This sets up a context for executing build steps which need to run
 -- Cabal (via a compiled Setup.hs).  In particular it does the following:
 --
@@ -901,15 +908,14 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> (ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
                      -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
-                     -> Bool                                   -- Whether output should be directed to the console
-                     -> Maybe (Path Abs File, Handle)          -- Log file
+                     -> OutputType
                      -> RIO env a)
                   -> RIO env a
 withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
-    withLogFile pkgDir package $ \mlogFile ->
-    withCabal package pkgDir mlogFile $ \cabal ->
-    inner0 package cabalfp pkgDir cabal announce console mlogFile
+    withOutputType pkgDir package $ \outputType ->
+    withCabal package pkgDir outputType $ \cabal ->
+    inner0 package cabalfp pkgDir cabal announce outputType
   where
     announce = announceTask task
 
@@ -944,8 +950,16 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 let cabalfp = dir </> cabalfpRel
                 inner package cabalfp dir
 
-    withLogFile pkgDir package inner
-        | console = inner Nothing
+    withOutputType pkgDir package inner
+        -- If the user requested interleaved output, dump to the console with a
+        -- prefix.
+        | boptsInterleavedOutput eeBuildOpts = inner $ OTConsole $ RIO.display (packageName package) <> "> "
+
+        -- Not in interleaved mode. When building a single wanted package, dump
+        -- to the console with no prefix.
+        | console = inner $ OTConsole mempty
+
+        -- Neither condition applies, dump to a file.
         | otherwise = do
             logPath <- buildLogPath package msuffix
             ensureDir (parent logPath)
@@ -957,15 +971,15 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
-            withBinaryFile fp WriteMode $ \h -> inner (Just (logPath, h))
+            withBinaryFile fp WriteMode $ \h -> inner $ OTLogFile logPath h
 
     withCabal
         :: Package
         -> Path Abs Dir
-        -> Maybe (Path Abs File, Handle)
+        -> OutputType
         -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
-    withCabal package pkgDir mlogFile inner = do
+    withCabal package pkgDir outputType inner = do
         config <- view configL
 
         unless (configAllowDifferentUser config) $
@@ -1108,47 +1122,48 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 runExe exeName fullArgs = do
                     compilerVer <- view actualCompilerVersionL
                     runAndOutput compilerVer `catch` \ece -> do
-                        bss <-
-                            case mlogFile of
-                                Nothing -> return []
-                                Just (logFile, h) -> do
+                        (mlogFile, bss) <-
+                            case outputType of
+                                OTConsole _ -> return (Nothing, [])
+                                OTLogFile logFile h -> do
                                     liftIO $ hClose h
-                                    withSourceFile (toFilePath logFile) $ \src ->
+                                    fmap (Just logFile,) $ withSourceFile (toFilePath logFile) $ \src ->
                                            runConduit
                                          $ src
                                         .| CT.decodeUtf8Lenient
                                         .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                         .| CL.consume
-                        throwM $ SetupHsBuildFailure
+                        throwM $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
-                            (Just taskProvides)
+                            taskProvides
                             exeName
                             fullArgs
-                            (fmap fst mlogFile)
+                            mlogFile
                             bss
                   where
                     runAndOutput :: CompilerVersion 'CVActual -> RIO env ()
-                    runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case mlogFile of
-                        Just (_, h) ->
+                    runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case outputType of
+                        OTLogFile _ h ->
                             proc (toFilePath exeName) fullArgs
                           $ runProcess_
                           . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
-                        Nothing ->
+                        OTConsole prefix ->
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
-                                (outputSink KeepTHLoading LevelWarn compilerVer)
-                                (outputSink stripTHLoading LevelInfo compilerVer)
+                                (outputSink KeepTHLoading LevelWarn compilerVer prefix)
+                                (outputSink stripTHLoading LevelInfo compilerVer prefix)
                     outputSink
                         :: HasCallStack
                         => ExcludeTHLoading
                         -> LogLevel
                         -> CompilerVersion 'CVActual
+                        -> Utf8Builder
                         -> ConduitM S.ByteString Void (RIO env) ()
-                    outputSink excludeTH level compilerVer =
+                    outputSink excludeTH level compilerVer prefix =
                         CT.decodeUtf8Lenient
                         .| mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
-                        .| CL.mapM_ (logGeneric "" level . RIO.display)
+                        .| CL.mapM_ (logGeneric "" level . (prefix <>) . RIO.display)
                     -- If users want control, we should add a config option for this
                     makeAbsolute :: ConvertPathsToAbsolute
                     makeAbsolute = case stripTHLoading of
@@ -1245,20 +1260,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         result = T.intercalate " + " $ concat
             [ ["lib" | taskAllInOne && hasLib]
+            , ["internal-lib" | taskAllInOne && hasSubLib]
             , ["exe" | taskAllInOne && hasExe]
             , ["test" | enableTests]
             , ["bench" | enableBenchmarks]
             ]
-        (hasLib, hasExe) = case taskType of
+        (hasLib, hasSubLib, hasExe) = case taskType of
             TTFiles lp Local ->
-              let hasLibrary =
-                    case packageLibraries (lpPackage lp) of
+              let package = lpPackage lp
+                  hasLibrary =
+                    case packageLibraries package of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in (hasLibrary, not (Set.null (exesToBuild executableBuildStatuses lp)))
+                  hasSubLibrary = not . Set.null $ packageInternalLibraries package
+                  hasExecutables = not . Set.null $ exesToBuild executableBuildStatuses lp
+               in (hasLibrary, hasSubLibrary, hasExecutables)
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
-            _ -> (False, False)
+            _ -> (False, False, False)
 
     getPrecompiled cache =
         case taskLocation task of
@@ -1291,10 +1310,27 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         return $ if b then Just pc else Nothing
             _ -> return Nothing
 
-    copyPreCompiled (PrecompiledCache mlib exes) = do
+    copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask task "using precompiled package"
-        forM_ mlib $ \libpath -> do
+
+        -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
+        -- from their old snapshot to the new one. However, we must unregister any such library in the new
+        -- snapshot, in case it was built with different flags.
+        let
+          subLibNames = map T.unpack . Set.toList $ case taskType of
+            TTFiles lp _ -> packageInternalLibraries $ lpPackage lp
+            TTIndex p _ _ -> packageInternalLibraries p
+          (name, version) = toTuple taskProvides
+          mainLibName = packageNameString name
+          mainLibVersion = versionString version
+          pkgName = mainLibName ++ "-" ++ mainLibVersion
+          -- z-package-z-internal for internal lib internal of package package
+          toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
+          allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
+          allToRegister = maybeToList mlib ++ sublibs
+
+        unless (null allToRegister) $ do
             withMVar eeInstallLock $ \() -> do
                 -- We want to ignore the global and user databases.
                 -- Unfortunately, ghc-pkg doesn't take such arguments on the
@@ -1306,23 +1342,17 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  -- In case a build of the library with different flags already exists, unregister it
-                  -- before copying.
                   let ghcPkgExe = ghcPkgExeName wc
-                  catchAny
-                      (readProcessNull ghcPkgExe
-                          [ "unregister"
-                          , "--force"
-                          , packageIdentifierString taskProvides
-                          ])
+
+                  -- first unregister everything that needs to be unregistered
+                  forM_ allToUnregister $ \packageName -> catchAny
+                      (readProcessNull ghcPkgExe [ "unregister", "--force", packageName])
                       (const (return ()))
 
-                  void $ proc ghcPkgExe
-                      [ "register"
-                      , "--force"
-                      , libpath
-                      ]
-                      readProcess_
+                  -- now, register the cached conf files
+                  forM_ allToRegister $ \libpath ->
+                    proc ghcPkgExe [ "register", "--force", libpath] readProcess_
+
         liftIO $ forM_ exes $ \exe -> do
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
@@ -1347,7 +1377,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
     realConfigAndBuild cache allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
-        $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
+        $ \package cabalfp pkgDir cabal announce _outputType -> do
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
                  (logInfo
@@ -1394,8 +1424,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTFiles lp _ -> do -- FIXME should this only be for local packages?
                 when enableTests $ unsetTestSuccess pkgDir
+                caches <- runIOThunk $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
-                      (Map.toList $ lpNewBuildCaches lp)
+                      (Map.toList caches)
             TTIndex{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
@@ -1416,12 +1447,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       "- In" <+>
                       fromString (T.unpack (renderComponent comp)) <>
                       ":" <> line <>
-                      indent 4 (mconcat $ intersperse line $ map (styleGood . fromString . C.display) modules)
+                      indent 4 (mconcat $ intersperse line $ map (style Good . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         display cabalfp <> ":" <> line <>
-                        indent 4 (mconcat $ map showModuleWarning warnings) <>
+                        indent 4 (mconcat $ intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
@@ -1466,19 +1497,32 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
+
+            -- For GHC 8.4 and later, provide the --quickjump option.
+            actualCompiler <- view actualCompilerVersionL
+            let quickjump =
+                  case actualCompiler of
+                    GhcVersion ghcVer
+                      | ghcVer >= $(mkVersion "8.4") -> ["--haddock-option=--quickjump"]
+                    _ -> []
+
             cabal KeepTHLoading $ concat
                 [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
                 , [ "--haddock-option=" <> opt
                   | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
+                , quickjump
                 ]
 
         let hasLibrary =
               case packageLibraries package of
                 NoLibraries -> False
                 HasLibraries _ -> True
-            shouldCopy = not isFinalBuild && (hasLibrary || not (Set.null (packageExes package)))
+            packageHasComponentSet f = not $ Set.null $ f package
+            hasInternalLibrary = packageHasComponentSet packageInternalLibraries
+            hasExecutables = packageHasComponentSet packageExes
+            shouldCopy = not isFinalBuild && (hasLibrary || hasInternalLibrary || hasExecutables)
         when shouldCopy $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             eres <- try $ cabal KeepTHLoading ["copy"]
@@ -1497,15 +1541,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         ( bcoLocalDB eeBaseConfigOpts
                         , eeLocalDumpPkgs )
         let ident = PackageIdentifier (packageName package) (packageVersion package)
-        mpkgid <- case packageLibraries package of
+        -- only return the sublibs to cache them if we also cache the main lib (that is, if it exists)
+        (mpkgid, sublibsPkgIds) <- case packageLibraries package of
             HasLibraries _ -> do
+                sublibsPkgIds <- fmap catMaybes $
+                  forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
+                    -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
+                    let sublibName = T.concat ["z-", packageNameText $ packageName package, "-z-", sublib]
+                    case parsePackageName sublibName of
+                      Nothing -> return Nothing -- invalid lib, ignored
+                      Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
+
                 mpkgid <- loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-                    Just pkgid -> return $ Library ident pkgid Nothing
+                    Just pkgid -> return (Library ident pkgid Nothing, sublibsPkgIds)
             NoLibraries -> do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-                return $ Executable ident
+                return (Executable ident, []) -- don't return sublibs in this case
 
         case taskLocation task of
             Snap ->
@@ -1514,7 +1567,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (ttPackageLocation taskType)
                 (configCacheOpts cache)
                 (configCacheDeps cache)
-                mpkgid (packageExes package)
+                mpkgid sublibsPkgIds (packageExes package)
             _ -> return ()
 
         case taskType of
@@ -1590,15 +1643,16 @@ checkExeStatus compiler platform distDir name = do
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTFiles lp _) preBuildTime pkgDir = do
+    caches <- runIOThunk $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime
             (lpPackage lp)
             (lpCabalFile lp)
             (lpComponents lp)
-            (lpNewBuildCaches lp)
+            caches
     forM_ (M.toList addBuildCache) $ \(component, newToCache) -> do
-        let cache = Map.findWithDefault Map.empty component (lpNewBuildCaches lp)
+        let cache = Map.findWithDefault Map.empty component caches
         writeBuildCache pkgDir component $
             Map.unions (cache : newToCache)
     return warnings
@@ -1627,7 +1681,7 @@ singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
-    withSingleContext ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce _console mlogFile -> do
+    withSingleContext ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce outputType -> do
         config <- view configL
         let needHpc = toCoverage topts
 
@@ -1697,15 +1751,17 @@ singleTest topts testsToRun ac ee task installedMap = do
 
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
-                        when (isNothing mlogFile) $ do
+                        case outputType of
+                          OTConsole _ -> do
                             logStickyDone ""
                             liftIO $ hFlush stdout
                             liftIO $ hFlush stderr
+                          OTLogFile _ _ -> pure ()
 
                         let output setter =
-                                case mlogFile of
-                                    Nothing -> id
-                                    Just (_, h) -> setter (useHandleOpen h)
+                                case outputType of
+                                    OTConsole _ -> id
+                                    OTLogFile _ h -> setter (useHandleOpen h)
 
                         ec <- withWorkingDir (toFilePath pkgDir) $
                           proc (toFilePath exePath) args $ \pc0 -> do
@@ -1721,7 +1777,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                               waitExitCode p
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
-                        when (isNothing mlogFile) (logInfo "")
+                        case outputType of
+                          OTConsole _ -> logInfo ""
+                          OTLogFile _ _ -> pure ()
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
                         -- tidiness.
@@ -1752,16 +1810,18 @@ singleTest topts testsToRun ac ee task installedMap = do
                 generateHpcReport pkgDir package testsToRun'
 
             bs <- liftIO $
-                case mlogFile of
-                    Nothing -> return ""
-                    Just (logFile, h) -> do
+                case outputType of
+                    OTConsole _ -> return ""
+                    OTLogFile logFile h -> do
                         hClose h
                         S.readFile $ toFilePath logFile
 
             unless (Map.null errs) $ throwM $ TestSuiteFailure
                 (taskProvides task)
                 errs
-                (fmap fst mlogFile)
+                (case outputType of
+                   OTLogFile fp _ -> Just fp
+                   OTConsole _ -> Nothing)
                 bs
 
             setTestSuccess pkgDir
@@ -1777,7 +1837,7 @@ singleBench :: HasEnvConfig env
             -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-    withSingleContext ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
+    withSingleContext ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _outputType -> do
         let args = map T.unpack benchesToRun <> maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
@@ -1899,19 +1959,22 @@ extraBuildOptions wc bopts = do
       else
         return [optsFlag, baseOpts]
 
--- Library and executable build components.
+-- Library, internal and foreign libraries and executable build components.
 primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
 primaryComponentOptions executableBuildStatuses lp =
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      (case packageLibraries (lpPackage lp) of
+      (case packageLibraries package of
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
-           $ T.append "lib:" (packageNameText (packageName (lpPackage lp)))
+           $ T.append "lib:" (packageNameText (packageName package))
            : map (T.append "flib:") (Set.toList names)) ++
+      map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
+  where
+    package = lpPackage lp
 
 -- | History of this function:
 --

@@ -4,11 +4,13 @@
 {-# LANGUAGE TemplateHaskell  #-}
 module Stack.ConfigSpec where
 
+import Control.Arrow
 import Data.Aeson.Extended
 import Data.Yaml
 import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude
 import Stack.Types.Config
 import Stack.Types.Runner
@@ -83,7 +85,7 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner =
-          withRunner logLevel True False ColorAuto Nothing False $ \runner -> do
+          withRunner logLevel True False ColorAuto defaultStyles Nothing False $ \runner -> do
             lc <- runRIO runner $ loadConfig mempty Nothing SYLDefault
             inner lc
     -- TODO(danburton): make sure parent dirs also don't have config file
@@ -165,7 +167,7 @@ spec = beforeAll setup $ do
     it "is parseable" $ \_ -> do
         curDir <- getCurrentDir
         let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
-            parsed = parseEither (parseConfigMonoid curDir) <$> decodeEither defaultConfigYaml
+            parsed = parseEither (parseConfigMonoid curDir) <$> left show (decodeEither' defaultConfigYaml)
         case parsed of
             Right (Right _) -> return () :: IO ()
             _ -> fail "Failed to parse default config yaml"

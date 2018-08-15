@@ -15,6 +15,7 @@ module Stack.Types.Runner
     , HasRunner (..)
     , terminalL
     , useColorL
+    , stylesL
     , reExecL
     , ColorWhen (..)
     , withRunner
@@ -25,6 +26,7 @@ import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
 import           Stack.Types.PackageIdentifier (PackageIdentifierRevision)
+import           Stack.Types.PrettyPrint (Styles)
 import           System.Console.ANSI
 import           RIO.Process (HasProcessContext (..), ProcessContext, mkDefaultProcessContext)
 import           System.Terminal
@@ -34,6 +36,7 @@ data Runner = Runner
   { runnerReExec     :: !Bool
   , runnerTerminal   :: !Bool
   , runnerUseColor   :: !Bool
+  , runnerStyles     :: !Styles
   , runnerLogFunc    :: !LogFunc
   , runnerTermWidth  :: !Int
   , runnerProcessContext :: !ProcessContext
@@ -64,6 +67,9 @@ terminalL = runnerL.lens runnerTerminal (\x y -> x { runnerTerminal = y })
 useColorL :: HasRunner env => Lens' env Bool
 useColorL = runnerL.lens runnerUseColor (\x y -> x { runnerUseColor = y })
 
+stylesL :: HasRunner env => Lens' env Styles
+stylesL = runnerL.lens runnerStyles (\x y -> x { runnerStyles = y })
+
 reExecL :: HasRunner env => Lens' env Bool
 reExecL = runnerL.lens runnerReExec (\x y -> x { runnerReExec = y })
 
@@ -79,11 +85,12 @@ withRunner :: MonadUnliftIO m
            -> Bool -- ^ use time?
            -> Bool -- ^ terminal?
            -> ColorWhen
+           -> Styles
            -> Maybe Int -- ^ terminal width override
            -> Bool -- ^ reexec?
            -> (Runner -> m a)
            -> m a
-withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
+withRunner logLevel useTime terminal colorWhen styles widthOverride reExec inner = do
   useColor <- case colorWhen of
     ColorNever -> return False
     ColorAlways -> return True
@@ -105,6 +112,7 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
     { runnerReExec = reExec
     , runnerTerminal = terminal
     , runnerUseColor = useColor
+    , runnerStyles = styles
     , runnerLogFunc = logFunc
     , runnerTermWidth = termWidth
     , runnerParsedCabalFiles = ref
@@ -116,4 +124,4 @@ withRunner logLevel useTime terminal colorWhen widthOverride reExec inner = do
           | otherwise = w
 
 data ColorWhen = ColorNever | ColorAlways | ColorAuto
-    deriving (Show, Generic)
+    deriving (Eq, Show, Generic)

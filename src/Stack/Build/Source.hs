@@ -214,7 +214,9 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
                     case packageLibraries pkg of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in hasLibrary || not (Set.null nonLibComponents)
+               in hasLibrary
+               || not (Set.null nonLibComponents)
+               || not (Set.null $ packageInternalLibraries pkg)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
@@ -266,35 +268,38 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    (componentFiles,_) <- getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
+    componentFiles <- mkIOThunk $ fst <$> getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
 
-    checkCacheResults <- forM (Map.toList componentFiles) $ \(component, files) -> do
+    checkCacheResults <- mkIOThunk $ do
+      componentFiles' <- runIOThunk componentFiles
+      forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (lpvRoot lpv) component
         checkCacheResult <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (Set.toList files)
         return (component, checkCacheResult)
 
-    let allDirtyFiles =
-            Set.unions $
-                map (\(_, (dirtyFiles, _)) -> dirtyFiles) checkCacheResults
-        newBuildCaches =
-            M.fromList $
-                map (\(c, (_, cache)) -> (c, cache)) checkCacheResults
-
-    return LocalPackage
-        { lpPackage = pkg
-        , lpTestDeps = packageDeps testpkg
-        , lpBenchDeps = packageDeps benchpkg
-        , lpTestBench = btpkg
-        , lpComponentFiles = componentFiles
-        , lpForceDirty = boptsForceDirty bopts
-        , lpDirtyFiles =
+    let dirtyFiles = do
+          checkCacheResults' <- checkCacheResults
+          let allDirtyFiles = Set.unions $ map (\(_, (x, _)) -> x) checkCacheResults'
+          pure $
             if not (Set.null allDirtyFiles)
                 then let tryStripPrefix y =
                           fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
                       in Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
+        newBuildCaches =
+            M.fromList . map (\(c, (_, cache)) -> (c, cache))
+            <$> checkCacheResults
+
+    return LocalPackage
+        { lpPackage = pkg
+        , lpTestDeps = dvVersionRange <$> packageDeps testpkg
+        , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
+        , lpTestBench = btpkg
+        , lpComponentFiles = componentFiles
+        , lpForceDirty = boptsForceDirty bopts
+        , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
@@ -437,7 +442,8 @@ getPackageFilesForTargets
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
     (components',compFiles,otherFiles,warnings) <-
         getPackageFiles (packageFiles pkg) cabalFP
-    let components = M.keysSet components' `Set.union` nonLibComponents
+    let necessaryComponents = Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
+        components = necessaryComponents `Set.union` nonLibComponents
         componentsFiles =
             M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
                 M.filterWithKey (\component _ -> component `Set.member` components) compFiles

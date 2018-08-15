@@ -182,11 +182,14 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
+import           Data.Coerce (coerce)
 import           Data.List (stripPrefix)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
+import qualified Data.Monoid as Monoid
+import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
@@ -218,6 +221,7 @@ import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
+import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.TemplateName
@@ -335,6 +339,8 @@ data Config =
          -- command disallows this.
          ,configSaveHackageCreds    :: !Bool
          -- ^ Should we save Hackage credentials to a file?
+         ,configHackageBaseUrl      :: !Text
+         -- ^ Hackage base URL used when uploading packages
          ,configRunner              :: !Runner
          ,configCabalLoader         :: !CabalLoader
          }
@@ -401,6 +407,7 @@ data ExecOpts = ExecOpts
 
 data SpecialExecCmd
     = ExecCmd String
+    | ExecRun
     | ExecGhc
     | ExecRunGhc
     deriving (Show, Eq)
@@ -432,6 +439,7 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
+    , globalStyles       :: !Styles -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
@@ -738,10 +746,14 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptionsByName    :: !(Map PackageName [Text])
-    -- ^ See 'configGhcOptionsByName'
-    ,configMonoidGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
-    -- ^ See 'configGhcOptionsAll'
+    ,configMonoidGhcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
+    -- ^ See 'configGhcOptionsByName'. Uses 'Monoid.Dual' so that
+    -- options from the configs on the right come first, so that they
+    -- can be overridden.
+    ,configMonoidGhcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
+    -- ^ See 'configGhcOptionsAll'. Uses 'Monoid.Dual' so that options
+    -- from the configs on the right come first, so that they can be
+    -- overridden.
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
@@ -770,6 +782,8 @@ data ConfigMonoid =
     -- ^ See 'configDumpLogs'
     , configMonoidSaveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
+    , configMonoidHackageBaseUrl     :: !(First Text)
+    -- ^ See 'configHackageBaseUrl'
     , configMonoidIgnoreRevisionMismatch :: !(First Bool)
     -- ^ See 'configIgnoreRevisionMismatch'
     }
@@ -842,13 +856,13 @@ parseConfigMonoidObject rootDir obj = do
           return x
         (Nothing, Nothing) -> return []
 
-    let configMonoidGhcOptionsByCat = Map.fromList
+    let configMonoidGhcOptionsByCat = coerce $ Map.fromList
           [ (AGOEverything, optionsEverything)
           , (AGOLocals, Map.findWithDefault [] GOKLocals options)
           , (AGOTargets, Map.findWithDefault [] GOKTargets options)
           ]
 
-        configMonoidGhcOptionsByName = Map.fromList
+        configMonoidGhcOptionsByName = coerce $ Map.fromList
             [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
@@ -867,6 +881,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+    configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
     configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
 
     return ConfigMonoid {..}
@@ -1006,6 +1021,9 @@ configMonoidDumpLogsName = "dump-logs"
 
 configMonoidSaveHackageCredsName :: Text
 configMonoidSaveHackageCredsName = "save-hackage-creds"
+
+configMonoidHackageBaseUrlName :: Text
+configMonoidHackageBaseUrlName = "hackage-base-url"
 
 configMonoidIgnoreRevisionMismatchName :: Text
 configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"

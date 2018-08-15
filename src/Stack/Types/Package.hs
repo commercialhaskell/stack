@@ -14,6 +14,7 @@ import qualified Data.ByteString as S
 import           Data.List
 import qualified Data.Map as M
 import qualified Data.Set as Set
+import           Data.IORef.RunOnce
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
@@ -122,13 +123,14 @@ data Package =
           ,packageVersion :: !Version                     -- ^ Version of the package
           ,packageLicense :: !(Either SPDX.License License) -- ^ The license the package was released under.
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
-          ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
-          ,packageTools :: !(Map ExeName VersionRange)    -- ^ A build tool name.
+          ,packageDeps :: !(Map PackageName DepValue)     -- ^ Packages that the package depends on, both as libraries and build tools.
+          ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
+          ,packageInternalLibraries :: !(Set Text)        -- ^ names of internal libraries
           ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
@@ -139,6 +141,27 @@ data Package =
                                                           -- ^ If present: custom-setup dependencies
           }
  deriving (Show,Typeable)
+
+-- | The value for a map from dependency name. This contains both the
+-- version range and the type of dependency, and provides a semigroup
+-- instance.
+data DepValue = DepValue
+  { dvVersionRange :: !VersionRange
+  , dvType :: !DepType
+  }
+  deriving (Show,Typeable)
+instance Semigroup DepValue where
+  DepValue a x <> DepValue b y = DepValue (intersectVersionRanges a b) (x <> y)
+
+-- | Is this package being used as a library, or just as a build tool?
+-- If the former, we need to ensure that a library actually
+-- exists. See
+-- <https://github.com/commercialhaskell/stack/issues/2195>
+data DepType = AsLibrary | AsBuildTool
+  deriving (Show, Eq)
+instance Semigroup DepType where
+  AsLibrary <> _ = AsLibrary
+  AsBuildTool <> x = x
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =
@@ -274,21 +297,32 @@ data LocalPackage = LocalPackage
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
     , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(Maybe (Set FilePath))
+    , lpDirtyFiles    :: !(IOThunk (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(Map NamedComponent (Map FilePath FileCacheInfo))
+    , lpNewBuildCaches :: !(IOThunk (Map NamedComponent (Map FilePath FileCacheInfo)))
     -- ^ current state of the files
-    , lpComponentFiles :: !(Map NamedComponent (Set (Path Abs File)))
+    , lpComponentFiles :: !(IOThunk (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
     , lpLocation      :: !(PackageLocation FilePath)
     -- ^ Where this source code came from
     }
     deriving Show
 
-lpFiles :: LocalPackage -> Set.Set (Path Abs File)
-lpFiles = Set.unions . M.elems . lpComponentFiles
+newtype IOThunk a = IOThunk (IO a)
+  deriving (Functor, Applicative, Monad)
+instance Show (IOThunk a) where
+  show _ = "<<IOThunk>>"
+
+runIOThunk :: MonadIO m => IOThunk a -> m a
+runIOThunk (IOThunk m) = liftIO m
+
+mkIOThunk :: MonadUnliftIO m => m a -> m (IOThunk a)
+mkIOThunk m = IOThunk <$> runOnce m
+
+lpFiles :: MonadIO m => LocalPackage -> m (Set.Set (Path Abs File))
+lpFiles = runIOThunk . fmap (Set.unions . M.elems) . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
