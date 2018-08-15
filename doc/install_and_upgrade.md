@@ -104,7 +104,8 @@ Use the [generic Linux option](#linux).
 There is also a [Ubuntu
 package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
 for Ubuntu 16.10 and up, but the distribution's Stack version lags behind, so we
-recommend running `stack upgrade` after installing it. The
+recommend running `stack upgrade --binary-only` after installing it. For older stack
+versions which do not support `--binary-only`, just `stack upgrade` may work too. The
 version in Ubuntu 16.04 is too old to upgrade successfully, and so in that case
 stack should be installed from a [release
 tarball](https://github.com/commercialhaskell/stack/releases).
@@ -116,7 +117,8 @@ Use the [generic Linux option](#linux).
 There is also a [Debian
 package](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
 for Stretch and up, but the distribution's Stack version lags behind, so running
-`stack upgrade` is recommended after installing it.
+`stack upgrade --binary-only` is recommended after installing it. For older stack
+versions which do not support `--binary-only`, just `stack upgrade` may work too.
 
 ## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
 
