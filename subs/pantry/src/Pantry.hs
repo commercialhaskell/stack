@@ -119,8 +119,7 @@ import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
 import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent)
-import Path.Find (findFiles)
-import Path.IO (resolveDir, doesFileExist, resolveDir')
+import Path.IO (resolveDir, doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
@@ -503,10 +502,8 @@ findOrGenerateCabalFile pkgDir = do
 
     findCabalFile2 :: RIO env (Either PantryException (Path Abs File))
     findCabalFile2 = do
-        files <- liftIO $ findFiles
-            pkgDir
-            (flip hasExtension "cabal" . toFilePath)
-            (const False)
+        files <- filter (flip hasExtension "cabal" . toFilePath) . snd
+             <$> listDir pkgDir
         return $ case files of
             [] -> Left $ NoCabalFileFound pkgDir
             [x] -> Right x

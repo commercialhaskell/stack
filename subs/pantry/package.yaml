@@ -71,7 +71,6 @@ library:
   - Pantry.HTTP
   - Pantry.Repo
   - Pantry.Tree
-  - Path.Find
 
 executables:
   convert-old-stackage:
