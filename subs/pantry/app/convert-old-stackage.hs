@@ -4,14 +4,15 @@ import RIO
 import Pantry
 import Conduit
 import Pantry.OldStackage
+import Pantry.Types (parseSnapshot)
 import RIO.FilePath
 import RIO.Time (Day, toGregorian)
 import RIO.Directory
 import qualified Data.Yaml as Yaml
---import Data.Aeson.Extended
+import Data.Aeson.Extended
 import qualified RIO.Text as T
 import Data.Text.Read (decimal)
---import Path (parseAbsDir)
+import Data.Aeson.Types (parseEither)
 
 data SnapName
     = LTS !Int !Int
@@ -71,25 +72,15 @@ main = runPantryApp $ do
       sd1 <- completeSnapshot sdOrig
       logInfo "Completing suceeded"
       let bs = Yaml.encode sd1
-      {- FIXME
       writeFileBinary "tmp" bs
-      sd2 <- loadPantry
-      WithJSONWarnings iosd2 warnings <- Yaml.decodeThrow bs
-      sd2 <- liftIO iosd2
-      unless (null warnings) $ error $ unlines $ map show warnings
+      value <- Yaml.decodeThrow bs
+      sd2 <-
+        case parseEither (parseSnapshot Nothing) value of
+          Left e -> error $ show e
+          Right (WithJSONWarnings iosd2 ws)
+            | null ws -> liftIO iosd2
+            | otherwise -> error $ show ws
       logInfo "Decoding new ByteString succeeded"
       when (sd1 /= sd2) $ error $ "mismatch on " ++ show snap
-      -}
       createDirectoryIfMissing True (takeDirectory destFile)
       withSinkFileCautious destFile $ \sink -> runConduit $ yield bs .| sink
-
-    {-
-  sd <- loadResolver $ ResolverStackage $ LTS 12 0
-  
-  error $ show sd
-  {-
-  locs <- forM (sdLocations sd) completePackageLocation
-  let sd' = sd { sdLocations = locs }
-  error $ show sd'
-  -}
-    -}
