@@ -1,6 +1,17 @@
-name: pantry
-version: 0.1.0.0
-# FIXME add normal stuff, ChangeLog, README.md as well
+name:        pantry
+version:     0.1.0.0
+synopsis:    Content addressable Haskell package management
+description: Please see the README and documentation at <https://www.stackage.org/package/pantry>
+category:    Development
+author:      Michael Snoyman
+maintainer:  michael@snoyman.com
+copyright:   2018 FP Complete
+license:     MIT
+github:      commercialhaskell/pantry # TODO move to this repo!
+
+extra-source-files:
+- README.md
+- ChangeLog.md
 
 extra-source-files:
 - attic/package-0.1.2.3.tar.gz
