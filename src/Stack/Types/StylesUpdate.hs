@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
 
 module Stack.Types.StylesUpdate
   (
@@ -6,20 +7,42 @@ module Stack.Types.StylesUpdate
   , parseStylesUpdateFromString
   ) where
 
+import Data.Aeson.Extended (FromJSON (..), WithJSONWarnings, noJSONWarnings,
+         withText)
 import Data.Array.IArray (assocs)
 import Data.Colour.SRGB (Colour, sRGB24)
-import Data.Text as T (pack)
+import Data.Text as T (pack, unpack)
 import Data.Text (Text)
 import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude
 import Stack.Types.PrettyPrint (Style, StyleSpec)
 import System.Console.ANSI.Types (BlinkSpeed (..), Color (..),
-        ColorIntensity (..), ConsoleIntensity (..), ConsoleLayer (..), SGR (..),
-        Underlining (..))
+         ColorIntensity (..), ConsoleIntensity (..), ConsoleLayer (..),
+         SGR (..), Underlining (..))
 
 -- |Updates to 'Styles'
 newtype StylesUpdate = StylesUpdate { stylesUpdate :: [(Style, StyleSpec)] }
   deriving (Eq, Show)
+
+-- |The first styles update overrides the second one.
+instance Semigroup StylesUpdate where
+  -- See module "Data.IArray.Array" of package @array@: this depends on GHC's
+  -- implementation of '(//)' being such that the last value specified for a
+  -- duplicated index is used.
+  StylesUpdate s1 <> StylesUpdate s2 = StylesUpdate (s2 <> s1)
+
+instance Monoid StylesUpdate where
+  mempty = StylesUpdate []
+  mappend = (<>) -- This needs to be specified as, before package
+                 -- @base-4.11.0.0@ (GHC 8.4.2, March 2018), the default is
+                 -- 'mappend = (++)'.
+
+instance FromJSON StylesUpdate where
+  parseJSON = withText "StylesUpdate" $
+    return . parseStylesUpdateFromString . T.unpack
+
+instance FromJSON (WithJSONWarnings StylesUpdate) where
+  parseJSON v = noJSONWarnings <$> parseJSON v
 
 -- |Parse a string that is a colon-delimited sequence of key=value, where 'key'
 -- is a style name and 'value' is a semicolon-delimited list of 'ANSI' SGR

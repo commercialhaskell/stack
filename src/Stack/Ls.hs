@@ -15,7 +15,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
-import Data.Array.IArray (elems)
+import Data.Array.IArray ((//), elems)
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
@@ -32,11 +33,11 @@ import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
 import Stack.Dot
-import Stack.Runners (withBuildConfig, withBuildConfigDot)
+import Stack.Runners (loadConfigWithOpts, withBuildConfig, withBuildConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import Stack.Types.PrettyPrint (StyleSpec)
-import System.Console.ANSI (hSupportsANSI)
+import Stack.Types.StylesUpdate (StylesUpdate (..))
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
@@ -281,7 +282,7 @@ lsCmd lsOpts go =
                 Local -> withBuildConfig go (handleLocal lsOpts)
                 Remote -> withBuildConfig go (handleRemote lsOpts)
         LsDependencies depOpts -> listDependenciesCmd False depOpts go
-        LsStyles stylesOpts -> listStylesCmd stylesOpts go
+        LsStyles stylesOpts -> loadConfigWithOpts go (listStylesCmd stylesOpts)
 
 -- | List the dependencies
 listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
@@ -306,14 +307,11 @@ lsViewRemoteCmd =
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
 
 -- | List stack's output styles
-listStylesCmd :: ListStylesOpts -> GlobalOpts -> IO ()
-listStylesCmd opts go = do
+listStylesCmd :: ListStylesOpts -> LoadConfig -> IO ()
+listStylesCmd opts lc = do
     -- This is the same test as is used in Stack.Types.Runner.withRunner
-    useColor <- case globalColorWhen go of
-        ColorNever -> return False
-        ColorAlways -> return True
-        ColorAuto -> hSupportsANSI stdout
-    let styles = elems $ globalStyles go
+    let useColor = view useColorL lc
+        styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
         isComplex = not (coptBasic opts)
         showSGR = isComplex && coptSGR opts
         showExample = isComplex && coptExample opts && useColor

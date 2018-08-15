@@ -7,7 +7,6 @@ import Data.Maybe (fromJust)
 import Options.Applicative
 import Path
 import Prelude (writeFile)
-import Stack.DefaultStyles (defaultStyles)
 import Stack.Config
 import Stack.Config.Nix
 import Stack.Constants
@@ -44,7 +43,7 @@ setup = unsetEnv "STACK_YAML"
 spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' cmdLineArgs =
-        withRunner LevelDebug True False ColorAuto defaultStyles Nothing False $ \runner ->
+        withRunner LevelDebug True False ColorAuto mempty Nothing False $ \runner ->
         runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault
       inTempDir test = do
         currentDirectory <- getCurrentDirectory

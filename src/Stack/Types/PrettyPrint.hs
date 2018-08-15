@@ -14,6 +14,7 @@ module Stack.Types.PrettyPrint
 
 import Data.Array.IArray (Array)
 import Data.Ix (Ix)
+import Data.Text (Text)
 import Stack.Prelude
 import System.Console.ANSI.Types (SGR)
 
