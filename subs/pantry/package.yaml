@@ -45,14 +45,6 @@ dependencies:
 - yaml
 - zip-archive
 
-when:
-- condition: os(windows)
-  then:
-    cpp-options: -DWINDOWS
-  else:
-    dependencies:
-    - unix
-
 library:
   source-dirs: src/
   exposed-modules:

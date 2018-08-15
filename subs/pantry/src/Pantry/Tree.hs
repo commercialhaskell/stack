@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -18,16 +17,12 @@ import qualified RIO.ByteString as B
 import Pantry.Storage
 import Pantry.Types
 import RIO.FilePath ((</>), takeDirectory)
-import RIO.Directory (createDirectoryIfMissing)
+import RIO.Directory (createDirectoryIfMissing, setPermissions, getPermissions, setOwnerExecutable)
 import Path (Path, Abs, Dir, toFilePath)
 import Distribution.Parsec.Common (PWarning (..))
 import Distribution.PackageDescription (packageDescription, package, GenericPackageDescription)
 import Distribution.PackageDescription.Parsec
 import Path (File)
-
-#if !WINDOWS
-import System.Posix.Files (setFileMode)
-#endif
 
 unpackTree
   :: (HasPantryConfig env, HasLogFunc env)
@@ -43,11 +38,11 @@ unpackTree (toFilePath -> dir) (TreeMap m) = do
       Nothing -> error $ "Missing blob: " ++ show blobKey
       Just bs -> do
         B.writeFile dest bs
-#if !WINDOWS
         case ft of
           FTNormal -> pure ()
-          FTExecutable -> liftIO $ setFileMode dest 0o755
-#endif
+          FTExecutable -> liftIO $ do
+            perms <- getPermissions dest
+            setPermissions dest $ setOwnerExecutable True perms
 
 findCabalFile
   :: MonadThrow m
