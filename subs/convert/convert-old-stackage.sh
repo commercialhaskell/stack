@@ -14,4 +14,4 @@ do
     fi
 done
 
-stack build :convert-old-stackage --exec convert-old-stackage
+stack build --flag pantry:convert-old-stackage pantry:convert-old-stackage --exec convert-old-stackage
