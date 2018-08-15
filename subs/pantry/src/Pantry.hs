@@ -15,7 +15,7 @@ module Pantry
   , hpackExecutableL
 
     -- * Types
-  , StaticSHA256
+  , SHA256
   , CabalFileInfo (..)
   , Revision (..)
   , FileSize (..)
@@ -49,7 +49,7 @@ module Pantry
   , loadPackageLocation
 
     -- ** Snapshots
-  , UnresolvedSnapshotLocation
+  , UnresolvedSnapshotLocation (..)
   , resolveSnapshotLocation
   , unresolveSnapshotLocation
   , SnapshotLocation (..)
@@ -113,7 +113,7 @@ import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath
 import Pantry.Archive
 import Pantry.Repo
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
@@ -367,7 +367,7 @@ parseCabalFileImmutable
 parseCabalFileImmutable loc = do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
-  let foundCabalKey = BlobKey (mkStaticSHA256FromBytes bs) (FileSize (fromIntegral (B.length bs)))
+  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let pm =
         case loc of
@@ -617,7 +617,7 @@ completePackageLocation (PLIHackage pir0@(PackageIdentifierRevision name version
       CFIHash{} -> pure pir0
       _ -> do
         bs <- getHackageCabalFile pir0
-        let cfi = CFIHash (mkStaticSHA256FromBytes bs) (Just (FileSize (fromIntegral (B.length bs))))
+        let cfi = CFIHash (SHA256.hashBytes bs) (Just (FileSize (fromIntegral (B.length bs))))
             pir = PackageIdentifierRevision name version cfi
         logDebug $ "Added in cabal file hash: " <> display pir
         pure pir
@@ -668,7 +668,7 @@ completeSnapshotLocation sl@SLFilePath{} = pure sl
 completeSnapshotLocation sl@(SLUrl _ (Just _) _) = pure sl
 completeSnapshotLocation (SLUrl url Nothing mcompiler) = do
   bs <- loadFromURL url Nothing
-  let blobKey = BlobKey (mkStaticSHA256FromBytes bs) (FileSize $ fromIntegral $ B.length bs)
+  let blobKey = BlobKey (SHA256.hashBytes bs) (FileSize $ fromIntegral $ B.length bs)
   pure $ SLUrl url (Just blobKey) mcompiler
 
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
@@ -757,18 +757,18 @@ traverseConcurrentlyWith count f t0 = do
 loadPantrySnapshot
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler, StaticSHA256))
+  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler, SHA256))
 loadPantrySnapshot (SLCompiler compiler) = pure $ Left compiler
 loadPantrySnapshot sl@(SLUrl url mblob mcompiler) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url mblob
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelper sl value (parseSnapshot Nothing)
-    pure $ Right (snapshot, mcompiler, mkStaticSHA256FromBytes bs)
+    pure $ Right (snapshot, mcompiler, SHA256.hashBytes bs)
 loadPantrySnapshot sl@(SLFilePath fp mcompiler) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    sha <- mkStaticSHA256FromFile $ toFilePath $ resolvedAbsolute fp
+    sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
     snapshot <- warningsParserHelper sl value $ parseSnapshot $ Just $ parent $ resolvedAbsolute fp
     pure $ Right (snapshot, mcompiler, sha)
 

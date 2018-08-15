@@ -7,8 +7,8 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Pantry
-import Pantry.StaticSHA256
-import Pantry.Types (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafeFilePath)
+import qualified Pantry.SHA256 as SHA256
+import Pantry.Internal (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafeFilePath)
 import RIO
 import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
@@ -21,8 +21,8 @@ hh name p = it name $ do
 genBlobKey :: Gen BlobKey
 genBlobKey = BlobKey <$> genSha256 <*> (FileSize <$> (Gen.word (Range.linear 1 10000)))
 
-genSha256 :: Gen StaticSHA256
-genSha256 = mkStaticSHA256FromBytes <$> Gen.bytes (Range.linear 1 500)
+genSha256 :: Gen SHA256
+genSha256 = SHA256.hashBytes <$> Gen.bytes (Range.linear 1 500)
 
 spec :: Spec
 spec = do

@@ -11,7 +11,6 @@ import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Distribution.Version (simplifyVersionRange)
 import           Path
-import           Pantry.Types (UnresolvedSnapshotLocation (USLUrl))
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -113,6 +112,8 @@ instance Show StackDockerConfigException where
     show (InvalidDatabasePathException ex) = "Invalid database path: " ++ show ex
 
 -- | Parse an LTS major and minor number from a snapshot URL.
+--
+-- This might make more sense in pantry instead.
 parseLtsName :: Text -> Maybe (Int, Int)
 parseLtsName t0 = do
   t1 <- T.stripPrefix "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/" t0

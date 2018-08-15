@@ -14,7 +14,6 @@ module Pantry.Hackage
 import RIO
 import Data.Aeson
 import Conduit
-import Crypto.Hash.Conduit (sinkHash)
 import Data.Conduit.Tar
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
@@ -25,7 +24,7 @@ import Pantry.Archive
 import Pantry.Types hiding (FileType (..))
 import Pantry.Storage
 import Pantry.Tree
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import Network.URI (parseURI)
 import Data.Time (getCurrentTime)
 import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
@@ -119,7 +118,7 @@ updateHackageIndex mreason = gateUpdate $ do
         -- (by the tar spec) 1024 null bytes at the end, which will be
         -- mutated in the future by other updates.
         newSize :: Word <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
-        let sinkSHA256 len = mkStaticSHA256FromDigest <$> (takeCE (fromIntegral len) .| sinkHash)
+        let sinkSHA256 len = takeCE (fromIntegral len) .| SHA256.sinkHash
 
         case minfo of
           Nothing -> do
@@ -247,7 +246,7 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
         Just (name', version', filename)
 
 -- | Package download info from Hackage
-data PackageDownload = PackageDownload !StaticSHA256 !Word
+data PackageDownload = PackageDownload !SHA256 !Word
 instance FromJSON PackageDownload where
     parseJSON = withObject "PackageDownload" $ \o1 -> do
         o2 <- o1 .: "signed"
@@ -257,7 +256,7 @@ instance FromJSON PackageDownload where
         hashes <- o4 .: "hashes"
         sha256' <- hashes .: "sha256"
         sha256 <-
-          case mkStaticSHA256FromText sha256' of
+          case SHA256.fromHexText sha256' of
             Left e -> fail $ "Invalid sha256: " ++ show e
             Right x -> return x
         return $ PackageDownload sha256 len

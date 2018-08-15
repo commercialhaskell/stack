@@ -1,12 +1,15 @@
--- This module can (and perhaps should) be separate into its own
--- package, it's generally useful.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-module Pantry.StaticBytes
+-- | This is an unstable API, exposed only for testing. Relying on
+-- this may break your code! Caveat emptor.
+--
+-- This module can (and perhaps should) be separate into its own
+-- package, it's generally useful.
+module Pantry.Internal.StaticBytes
   ( Bytes8
   , Bytes16
   , Bytes32

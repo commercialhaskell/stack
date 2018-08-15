@@ -35,6 +35,7 @@ module Pantry.Types
   , Tree (..)
   , renderTree
   , parseTree
+  , SHA256
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -92,7 +93,8 @@ import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
 import Database.Persist.Sql
-import Pantry.StaticSHA256
+import Pantry.SHA256 (SHA256)
+import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
@@ -192,7 +194,7 @@ instance Display PackageLocationImmutable where
 -- over time, and so are allowed in custom snapshots.
 data Archive = Archive
   { archiveLocation :: !ArchiveLocation
-  , archiveHash :: !(Maybe StaticSHA256)
+  , archiveHash :: !(Maybe SHA256)
   , archiveSize :: !(Maybe FileSize)
   }
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
@@ -204,7 +206,7 @@ instance NFData Archive
 -- over time, and so are allowed in custom snapshots.
 data UnresolvedArchive = UnresolvedArchive
   { uaLocation :: !UnresolvedArchiveLocation
-  , uaHash :: !(Maybe StaticSHA256)
+  , uaHash :: !(Maybe SHA256)
   , uaSize :: !(Maybe FileSize)
   }
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
@@ -258,7 +260,7 @@ class HasPantryConfig env where
 newtype FileSize = FileSize Word
   deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, ToJSON, FromJSON)
 
-data BlobKey = BlobKey !StaticSHA256 !FileSize
+data BlobKey = BlobKey !SHA256 !FileSize
   deriving (Eq, Ord, Data, Typeable, Generic)
 instance Store BlobKey
 instance NFData BlobKey
@@ -310,7 +312,7 @@ data CabalFileInfo
   -- isn't reproducible at all, but the running assumption (not
   -- necessarily true) is that cabal file revisions do not change
   -- semantics of the build.
-  | CFIHash !StaticSHA256 !(Maybe FileSize)
+  | CFIHash !SHA256 !(Maybe FileSize)
   -- ^ Identify by contents of the cabal file itself. Only reason for
   -- @Maybe@ on @FileSize@ is for compatibility with input that
   -- doesn't include the file size.
@@ -358,7 +360,7 @@ parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionPars
     case splitColon cfiT of
       Just ("@sha256", shaSizeT) -> do
         let (shaT, sizeT) = T.break (== ',') shaSizeT
-        sha <- either (const Nothing) Just $ mkStaticSHA256FromText shaT
+        sha <- either (const Nothing) Just $ SHA256.fromHexText shaT
         msize <-
           case T.stripPrefix "," sizeT of
             Nothing -> Just Nothing
@@ -411,7 +413,7 @@ data PantryException
   | InvalidBlobKey !(Mismatch BlobKey)
   | Couldn'tParseSnapshot !SnapshotLocation !String
   | WrongCabalFileName !PackageLocationImmutable !SafeFilePath !PackageName
-  | DownloadInvalidSHA256 !Text !(Mismatch StaticSHA256)
+  | DownloadInvalidSHA256 !Text !(Mismatch SHA256)
   | DownloadInvalidSize !Text !(Mismatch FileSize)
   | DownloadTooLarge !Text !(Mismatch FileSize)
   -- ^ Different from 'DownloadInvalidSize' since 'mismatchActual' is
@@ -609,7 +611,7 @@ renderTree = BL.toStrict . toLazyByteString . go
 
     goEntry sfp (TreeEntry (BlobKey sha (FileSize size')) ft) =
       netstring (unSafeFilePath sfp) <>
-      byteString (staticSHA256ToRaw sha) <>
+      byteString (SHA256.toRaw sha) <>
       netword size' <>
       (case ft of
          FTNormal -> "N"
@@ -661,7 +663,7 @@ parseTree' bs0 = do
 
     takeSha bs = do
       let (x, y) = B.splitAt 32 bs
-      x' <- either (const Nothing) Just (mkStaticSHA256FromRaw x)
+      x' <- either (const Nothing) Just (SHA256.fromRaw x)
       Just (x', y)
 
     takeNetword =

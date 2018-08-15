@@ -51,6 +51,7 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
+import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
 import           Data.IORef.RunOnce (runOnce)
 import qualified Data.IntMap as IntMap
@@ -68,7 +69,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro (lens, set)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -920,7 +921,7 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> pure $ T.unpack $ staticSHA256ToText $ mkStaticSHA256FromBytes $ encodeUtf8 $ utf8BuilderToText $ display r
+      ARResolver r -> pure $ T.unpack $ SHA256.toHexText $ SHA256.hashLazyBytes $ toLazyByteString $ getUtf8Builder $ display r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
   -- This takeWhile is an ugly hack. We don't actually need this
   -- path for anything useful. But if we take the raw value for

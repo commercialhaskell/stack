@@ -8,7 +8,6 @@ module Pantry.HTTP
   ) where
 
 import           Conduit
-import           Crypto.Hash.Conduit
 import           Network.HTTP.Client          as Export (parseRequest)
 import           Network.HTTP.Client          as Export (parseUrlThrow)
 import           Network.HTTP.Client          as Export (BodyReader, HttpExceptionContent (StatusCodeException))
@@ -30,7 +29,7 @@ import           Network.HTTP.Types           as Export (Header, HeaderName,
                                                          hRange, ok200,
                                                          partialContent206,
                                                          statusCode)
-import           Pantry.StaticSHA256
+import qualified Pantry.SHA256                as SHA256
 import           Pantry.Types
 import           RIO
 import qualified RIO.ByteString               as B
@@ -58,10 +57,10 @@ httpSink req inner = HTTP.httpSink (setUserAgent req) inner
 httpSinkChecked
   :: MonadUnliftIO m
   => Text
-  -> Maybe StaticSHA256
+  -> Maybe SHA256
   -> Maybe FileSize
   -> ConduitT ByteString Void m a
-  -> m (StaticSHA256, FileSize, a)
+  -> m (SHA256, FileSize, a)
 httpSinkChecked url msha msize sink = do
     req <- liftIO $ parseUrlThrow $ T.unpack url
     httpSink req $ const $ getZipSink $ (,,)
@@ -70,7 +69,7 @@ httpSinkChecked url msha msize sink = do
       <*> ZipSink sink
   where
     checkSha mexpected = do
-      actual <- mkStaticSHA256FromDigest <$> sinkHash
+      actual <- SHA256.sinkHash
       for_ mexpected $ \expected -> unless (actual == expected) $
         throwIO $ DownloadInvalidSHA256 url Mismatch
           { mismatchExpected = expected

@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-module Pantry.StaticBytesSpec (spec) where
+module Pantry.Internal.StaticBytesSpec (spec) where
 
-import Pantry.StaticBytes
 import RIO
+import Pantry.Internal.StaticBytes
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Primitive as VP

@@ -12,7 +12,7 @@ module Pantry.Archive
 
 import RIO
 import RIO.FilePath (normalise, takeDirectory, (</>))
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
@@ -26,7 +26,6 @@ import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
 
 import Conduit
-import Crypto.Hash.Conduit
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Conduit.Tar as Tar
 import Pantry.HTTP
@@ -64,7 +63,7 @@ getArchive archive pm =
     loc = archiveLocation archive
 
     withCache
-      :: RIO env (TreeSId, StaticSHA256, FileSize, TreeKey, Tree)
+      :: RIO env (TreeSId, SHA256, FileSize, TreeKey, Tree)
       -> RIO env (TreeKey, Tree)
     withCache inner =
       let loop [] = do
@@ -111,7 +110,7 @@ getArchive archive pm =
 withArchiveLoc
   :: HasLogFunc env
   => Archive
-  -> (FilePath -> StaticSHA256 -> FileSize -> RIO env a)
+  -> (FilePath -> SHA256 -> FileSize -> RIO env a)
   -> RIO env a
 withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
   let fp = toFilePath $ resolvedAbsolute resolved
@@ -119,7 +118,7 @@ withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
     size <- FileSize . fromIntegral <$> hFileSize h
     for_ msize $ \size' -> when (size /= size') $ error $ "Mismatched local archive size: " ++ show (resolved, size, size')
 
-    sha <- mkStaticSHA256FromDigest <$> runConduit (sourceHandle h .| sinkHash)
+    sha <- runConduit (sourceHandle h .| SHA256.sinkHash)
     for_ msha $ \sha' -> when (sha /= sha') $ error $ "Mismatched local archive sha: " ++ show (resolved, sha, sha')
 
     pure (sha, size)

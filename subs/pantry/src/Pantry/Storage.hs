@@ -61,7 +61,7 @@ import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import RIO.Orphans ()
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
@@ -70,7 +70,7 @@ import Data.Pool (destroyAllResources)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
-    hash StaticSHA256
+    hash SHA256
     size FileSize
     contents ByteString
     UniqueBlobHash hash
@@ -88,7 +88,7 @@ VersionTable sql=version
 HackageTarball
     name NameId
     version VersionTableId
-    hash StaticSHA256
+    hash SHA256
     size FileSize
     UniqueHackageTarball name version
 HackageCabal
@@ -105,13 +105,13 @@ PreferredVersions
 CacheUpdate
     time UTCTime
     size FileSize
-    hash StaticSHA256
+    hash SHA256
 
 ArchiveCache
     time UTCTime
     url Text
     subdir Text
-    sha StaticSHA256
+    sha SHA256
     size FileSize
     tree TreeSId
 
@@ -186,7 +186,7 @@ storeBlob
   => ByteString
   -> ReaderT SqlBackend (RIO env) (BlobTableId, BlobKey)
 storeBlob bs = do
-  let sha = mkStaticSHA256FromBytes bs
+  let sha = SHA256.hashBytes bs
       size = FileSize $ fromIntegral $ B.length bs
   keys <- selectKeysList [BlobTableHash ==. sha] []
   key <-
@@ -217,7 +217,7 @@ loadBlob (BlobKey sha size) = do
 
 loadBlobBySHA
   :: (HasPantryConfig env, HasLogFunc env)
-  => StaticSHA256
+  => SHA256
   -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
 loadBlobBySHA sha = fmap (fmap (blobTableContents . entityVal)) $ getBy $ UniqueBlobHash sha
 
@@ -378,7 +378,7 @@ loadHackageCabalFile name version cfi = do
 
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
-  => ReaderT SqlBackend (RIO env) (Maybe (FileSize, StaticSHA256))
+  => ReaderT SqlBackend (RIO env) (Maybe (FileSize, SHA256))
 loadLatestCacheUpdate =
     fmap go <$> selectFirst [] [Desc CacheUpdateTime]
   where
@@ -387,7 +387,7 @@ loadLatestCacheUpdate =
 storeCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
   => FileSize
-  -> StaticSHA256
+  -> SHA256
   -> ReaderT SqlBackend (RIO env) ()
 storeCacheUpdate size hash' = do
   now <- getCurrentTime
@@ -401,7 +401,7 @@ storeHackageTarballInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> StaticSHA256
+  -> SHA256
   -> FileSize
   -> ReaderT SqlBackend (RIO env) ()
 storeHackageTarballInfo name version sha size = do
@@ -418,7 +418,7 @@ loadHackageTarballInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> ReaderT SqlBackend (RIO env) (Maybe (StaticSHA256, FileSize))
+  -> ReaderT SqlBackend (RIO env) (Maybe (SHA256, FileSize))
 loadHackageTarballInfo name version = do
   nameid <- getNameId name
   versionid <- getVersionId version
@@ -533,7 +533,7 @@ loadHackageTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> StaticSHA256
+  -> SHA256
   -> ReaderT SqlBackend (RIO env) (Maybe TreeKey)
 loadHackageTreeKey name ver sha = do
   res <- rawSql
@@ -582,7 +582,7 @@ storeArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
   => Text -- ^ URL
   -> Text -- ^ subdir
-  -> StaticSHA256
+  -> SHA256
   -> FileSize
   -> TreeSId
   -> ReaderT SqlBackend (RIO env) ()
@@ -601,7 +601,7 @@ loadArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
   => Text -- ^ URL
   -> Text -- ^ subdir
-  -> ReaderT SqlBackend (RIO env) [(StaticSHA256, FileSize, TreeSId)]
+  -> ReaderT SqlBackend (RIO env) [(SHA256, FileSize, TreeSId)]
 loadArchiveCache url subdir = map go <$> selectList
   [ ArchiveCacheUrl ==. url
   , ArchiveCacheSubdir ==. subdir

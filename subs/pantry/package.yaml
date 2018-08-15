@@ -60,6 +60,10 @@ library:
   - Pantry.SHA256
   - Data.Aeson.Extended
 
+  # For testing
+  - Pantry.Internal
+  - Pantry.Internal.StaticBytes
+
 flags:
   convert-old-stackage:
     description: Build the convert-old-stackage executable
