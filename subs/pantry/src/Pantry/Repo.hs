@@ -75,7 +75,7 @@ getRepo' repo@(Repo url commit repoType') pm =
       ("clone" : cloneArgs ++ [T.unpack url, suffix])
       readProcess_
     created <- doesDirectoryExist dir
-    unless created $ error $ "Failed to clone repo: " ++ show repo -- FIXME exception
+    unless created $ throwIO $ FailedToCloneRepo repo
 
     withWorkingDir dir $ do
       void $ proc commandName resetArgs readProcess_

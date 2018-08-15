@@ -120,9 +120,6 @@ Sfp sql=file_path
     UniqueSfp path
 TreeS sql=tree
     key BlobTableId
-    tarball BlobTableId Maybe
-    cabal BlobTableId Maybe
-    subdir Text Maybe
     UniqueTree key
 TreeEntryS sql=tree_entry
     tree TreeSId
@@ -364,17 +361,36 @@ loadHackageCabalFile name version cfi = do
       getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
     CFIHash sha msize -> do
       ment <- getBy $ UniqueBlobHash sha
-      pure $ do
-        Entity _ bt <- ment
-        case msize of
-          Nothing -> pure ()
-          Just size -> guard $ blobTableSize bt == size -- FIXME report an error if this mismatches?
-        -- FIXME also consider validating the ByteString length against blobTableSize
-        pure $ blobTableContents bt
+      case ment of
+        Nothing -> pure Nothing
+        Just (Entity btid bt) -> do
+          check1 <-
+            case msize of
+              Nothing -> pure True
+              Just size
+                | blobTableSize bt == size -> pure True
+                | otherwise -> lift $ do
+                    logError "loadHackageCabalFile: matching SHA256 but mismatched size detected"
+                    logError "This either means you have invalid configuration, or have somehow collided a SHA256"
+                    logError $ "Discovered trying to grab cabal file " <> display cfi
+                    logError $ "Found file size: " <> display size
+                    pure False
+          check2 <-
+            if blobTableSize bt == FileSize (fromIntegral (B.length (blobTableContents bt)))
+              then pure True
+              else lift $ do
+                logError "SQLite blob size does not match the actual contents"
+                logError $ "Row ID: " <> displayShow btid
+                logError $ "Actual size of contents: " <> display (B.length (blobTableContents bt))
+                logError $ "Value in size column:    " <> display (blobTableSize bt)
+                pure False
+          pure $ if check1 && check2 then Just (blobTableContents bt) else Nothing
   where
     withHackEnt = traverse $ \(Entity _ h) -> do
-      Just blob <- get $ hackageCabalCabal h
-      pure $ blobTableContents blob
+      mblob <- get $ hackageCabalCabal h
+      case mblob of
+        Nothing -> error $ "Unexpected Nothing getting hackageCabalCabal: " ++ show (hackageCabalCabal h)
+        Just blob -> pure $ blobTableContents blob
 
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
@@ -436,9 +452,6 @@ storeTree tree = do
     TreeMap m -> do
       etid <- insertBy TreeS
         { treeSKey = bid
-        , treeSTarball = Nothing
-        , treeSCabal = Nothing -- FIXME maybe fill in some data here?
-        , treeSSubdir = Nothing
         }
       case etid of
         Left (Entity tid _) -> pure (tid, TreeKey blobKey) -- already in database, assume it matches
@@ -477,7 +490,11 @@ loadTreeById
   => TreeSId
   -> ReaderT SqlBackend (RIO env) (TreeKey, Tree)
 loadTreeById tid = do
-  Just ts <- get tid
+  mts <- get tid
+  ts <-
+    case mts of
+      Nothing -> error $ "loadTreeById: invalid foreign key " ++ show tid
+      Just ts -> pure ts
   tree <- loadTreeByEnt $ Entity tid ts
   key <- getBlobKey $ treeSKey ts
   pure (TreeKey key, tree)
@@ -486,31 +503,18 @@ loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
   => Entity TreeS
   -> ReaderT SqlBackend (RIO env) Tree
-loadTreeByEnt (Entity tid t) = do
-  case (treeSTarball t, treeSCabal t, treeSSubdir t) of
-    (Just _tarball, Just _cabal, Just _subdir) -> do
-      --tarballkey <- getBlobKey tarball
-      --cabalkey <- getBlobKey cabal
-      error "we don't support TreeTarball yet"
-      {-
-      pure $ TreeTarball PackageTarball
-        { ptBlob = tarballkey
-        , ptCabal = cabalkey
-        , ptSubdir = T.unpack subdir
-        }
-      -}
-    (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
-      entries <- rawSql
-        "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
-        \FROM tree_entry, blob, file_path\n\
-        \WHERE tree_entry.tree=?\n\
-        \AND   tree_entry.blob=blob.id\n\
-        \AND   tree_entry.path=file_path.id"
-        [toPersistValue tid]
-      pure $ TreeMap $ Map.fromList $ map
-        (\(Single sfp, Single sha, Single size, Single ft) ->
-             (sfp, TreeEntry (BlobKey sha size) ft))
-        entries
+loadTreeByEnt (Entity tid _t) = do
+  entries <- rawSql
+    "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
+    \FROM tree_entry, blob, file_path\n\
+    \WHERE tree_entry.tree=?\n\
+    \AND   tree_entry.blob=blob.id\n\
+    \AND   tree_entry.path=file_path.id"
+    [toPersistValue tid]
+  pure $ TreeMap $ Map.fromList $ map
+    (\(Single sfp, Single sha, Single size, Single ft) ->
+         (sfp, TreeEntry (BlobKey sha size) ft))
+    entries
 
 storeHackageTree
   :: (HasPantryConfig env, HasLogFunc env)

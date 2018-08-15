@@ -113,13 +113,20 @@ withArchiveLoc
   -> (FilePath -> SHA256 -> FileSize -> RIO env a)
   -> RIO env a
 withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
-  let fp = toFilePath $ resolvedAbsolute resolved
+  let abs' = resolvedAbsolute resolved
+      fp = toFilePath abs'
   (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
     size <- FileSize . fromIntegral <$> hFileSize h
-    for_ msize $ \size' -> when (size /= size') $ error $ "Mismatched local archive size: " ++ show (resolved, size, size')
+    for_ msize $ \size' -> when (size /= size') $ throwIO $ LocalInvalidSize abs' Mismatch
+      { mismatchExpected = size'
+      , mismatchActual = size
+      }
 
     sha <- runConduit (sourceHandle h .| SHA256.sinkHash)
-    for_ msha $ \sha' -> when (sha /= sha') $ error $ "Mismatched local archive sha: " ++ show (resolved, sha, sha')
+    for_ msha $ \sha' -> when (sha /= sha') $ throwIO $ LocalInvalidSHA256 abs' Mismatch
+      { mismatchExpected = sha'
+      , mismatchActual = sha
+      }
 
     pure (sha, size)
   f fp sha size
@@ -152,16 +159,17 @@ data MetaEntry = MetaEntry
 
 foldArchive
   :: (HasPantryConfig env, HasLogFunc env)
-  => FilePath
+  => ArchiveLocation -- ^ for error reporting
+  -> FilePath
   -> ArchiveType
   -> a
   -> (a -> MetaEntry -> ConduitT ByteString Void (RIO env) a)
   -> RIO env a
-foldArchive fp ATTarGz accum f =
-  withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar accum f
-foldArchive fp ATTar accum f =
-  withSourceFile fp $ \src -> runConduit $ src .| foldTar accum f
-foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
+foldArchive loc fp ATTarGz accum f =
+  withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar loc accum f
+foldArchive loc fp ATTar accum f =
+  withSourceFile fp $ \src -> runConduit $ src .| foldTar loc accum f
+foldArchive _loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
   -- We're entering lazy I/O land thanks to zip-archive.
   lbs <- BL.hGetContents h
   let go accum entry = do
@@ -184,35 +192,39 @@ foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
 
 foldTar
   :: (HasPantryConfig env, HasLogFunc env)
-  => a
+  => ArchiveLocation -- ^ for exceptions
+  -> a
   -> (a -> MetaEntry -> ConduitT ByteString o (RIO env) a)
   -> ConduitT ByteString o (RIO env) a
-foldTar accum0 f = do
+foldTar loc accum0 f = do
   ref <- newIORef accum0
-  Tar.untar $ \fi -> for_ (toME fi) $ \me -> do
+  Tar.untar $ \fi -> toME fi >>= traverse_ (\me -> do
     accum <- readIORef ref
     accum' <- f accum me
-    writeIORef ref $! accum'
+    writeIORef ref $! accum')
   readIORef ref
   where
-    toME :: Tar.FileInfo -> Maybe MetaEntry
+    toME :: MonadIO m => Tar.FileInfo -> m (Maybe MetaEntry)
     toME fi = do
-      met <-
+      let exc = InvalidTarFileType loc (Tar.getFileInfoPath fi) (Tar.fileType fi)
+      mmet <-
         case Tar.fileType fi of
           Tar.FTSymbolicLink bs ->
             case decodeUtf8' bs of
-              Left e -> error $ "Need to handle this case better! " ++ show e
-              Right text -> Just $ METLink $ T.unpack text
-          Tar.FTNormal -> Just $
+              Left _ -> throwIO exc
+              Right text -> pure $ Just $ METLink $ T.unpack text
+          Tar.FTNormal -> pure $ Just $
             if Tar.fileMode fi .&. 0o100 /= 0
               then METExecutable
               else METNormal
-          Tar.FTDirectory -> Nothing
-          _ -> Nothing
-      Just MetaEntry
-        { mePath = Tar.getFileInfoPath fi
-        , meType = met
-        }
+          Tar.FTDirectory -> pure Nothing
+          _ -> throwIO exc
+      pure $
+        (\met -> MetaEntry
+          { mePath = Tar.getFileInfoPath fi
+          , meType = met
+          })
+        <$> mmet
 
 data SimpleEntry = SimpleEntry
   { seSource :: !FilePath
@@ -227,9 +239,9 @@ parseArchive
   -> Text -- ^ subdir, besides the single-dir stripping logic
   -> RIO env (TreeSId, TreeKey, Tree)
 parseArchive loc fp subdir = do
-  let getFiles [] = error $ T.unpack $ utf8BuilderToText $ "Unable to determine archive type of: " <> display loc
+  let getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
-        eres <- tryAny $ foldArchive fp at id $ \m me -> pure $ m . (me:)
+        eres <- tryAny $ foldArchive loc fp at id $ \m me -> pure $ m . (me:)
         case eres of
           Left e -> do
             logDebug $ "parseArchive of " <> display at <> ": " <> displayShow e
@@ -255,8 +267,7 @@ parseArchive loc fp subdir = do
                       METLink _ -> Left $ "Symbolic link dest cannot be a symbolic link, from " ++ mePath me ++ " to " ++ relDest
 
   case traverse toSimple files of
-    Left e ->
-      error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
+    Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
           files3 = takeSubdir subdir files2
@@ -265,11 +276,11 @@ parseArchive loc fp subdir = do
               Nothing -> Left $ "Not a safe file path: " ++ show fp'
               Just sfp -> Right (sfp, a)
       case traverse toSafe files3 of
-        Left e -> error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
+        Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
         Right safeFiles -> do
           let toSave = Set.fromList $ map (seSource . snd) safeFiles
           blobs <-
-            foldArchive fp at mempty $ \m me ->
+            foldArchive loc fp at mempty $ \m me ->
               if mePath me `Set.member` toSave
                 then do
                   bs <- mconcat <$> sinkList

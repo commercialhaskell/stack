@@ -77,6 +77,7 @@ module Pantry.Types
   ) where
 
 import RIO
+import qualified Data.Conduit.Tar as Tar
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
@@ -100,7 +101,7 @@ import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import Distribution.Types.PackageName (PackageName)
 import Distribution.Types.VersionRange (VersionRange)
-import Distribution.PackageDescription (FlagName)
+import Distribution.PackageDescription (FlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.ModuleName (ModuleName)
@@ -129,15 +130,10 @@ data PantryConfig = PantryConfig
   -- ^ Want to try updating the index once during a single run for missing
   -- package identifiers. We also want to ensure we only update once at a
   -- time. Start at @True@.
-  {- FIXME add this shortly
-  , pcParsedCabalFiles ::
-      !(IORef
-          ( Map PackageLocation GenericPackageDescription
-          , Map FilePath        GenericPackageDescription
-          )
-       )
+  , pcParsedCabalFilesImmutable :: !(IORef (Map PackageLocationImmutable GenericPackageDescription))
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
-  -}
+  , pcParsedCabalFilesMutable :: !(IORef (Map (Path Abs Dir) (GenericPackageDescription, Path Abs File)))
+  -- ^ Same
   , pcConnectionCount :: !Int
   -- ^ concurrently open downloads
   }
@@ -225,9 +221,20 @@ data Repo = Repo
     , repoCommit :: !Text
     , repoType :: !RepoType
     }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+    deriving (Generic, Eq, Ord, Data, Typeable)
 instance Store Repo
 instance NFData Repo
+instance Show Repo where
+  show = T.unpack . utf8BuilderToText . display
+instance Display Repo where
+  display (Repo url commit typ) =
+    (case typ of
+       RepoGit -> "Git"
+       RepoHg -> "Mercurial") <>
+    " repo at " <>
+    display url <>
+    ", commit " <>
+    display commit
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
@@ -418,6 +425,15 @@ data PantryException
   | DownloadTooLarge !Text !(Mismatch FileSize)
   -- ^ Different from 'DownloadInvalidSize' since 'mismatchActual' is
   -- a lower bound on the size from the server.
+  | LocalInvalidSHA256 !(Path Abs File) !(Mismatch SHA256)
+  | LocalInvalidSize !(Path Abs File) !(Mismatch FileSize)
+  | UnknownArchiveType !ArchiveLocation
+  | InvalidTarFileType !ArchiveLocation !FilePath !Tar.FileType
+  | UnsupportedTarball !ArchiveLocation !Text
+  | CabalFileInfoNotFound !PackageIdentifierRevision
+  | NoHackageCryptographicHash !PackageIdentifier
+  | FailedToCloneRepo !Repo
+  | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
 
   deriving Typeable
 instance Exception PantryException where
@@ -522,8 +538,8 @@ instance Display PantryException where
   display (WrongCabalFileName pl sfp name) =
     "Wrong cabal file name for package " <> display pl <>
     "\nCabal file is named " <> display sfp <>
-    ", but package name is " <> displayC name
-    -- FIXME include the issue link relevant to why we care about this
+    ", but package name is " <> displayC name <>
+    "\nFor more information, see:\n  - https://github.com/commercialhaskell/stack/issues/317\n  -https://github.com/commercialhaskell/stack/issues/895"
   display (DownloadInvalidSHA256 url Mismatch {..}) =
     "Mismatched SHA256 hash from " <> display url <>
     "\nExpected: " <> display mismatchExpected <>
@@ -536,6 +552,27 @@ instance Display PantryException where
     "Download from " <> display url <> " was too large.\n" <>
     "Expected: " <> display mismatchExpected <> ", stopped after receiving: " <>
     display mismatchActual
+  display (LocalInvalidSHA256 path Mismatch {..}) =
+    "Mismatched SHA256 hash from " <> fromString (toFilePath path) <>
+    "\nExpected: " <> display mismatchExpected <>
+    "\nActual:   " <> display mismatchActual
+  display (LocalInvalidSize path Mismatch {..}) =
+    "Mismatched file size from " <> fromString (toFilePath path) <>
+    "\nExpected: " <> display mismatchExpected <>
+    "\nActual:   " <> display mismatchActual
+  display (UnknownArchiveType loc) = "Unable to determine archive type of: " <> display loc
+  display (InvalidTarFileType loc fp x) =
+    "Unsupported tar filetype in archive " <> display loc <> " at file " <> fromString fp <> ": " <> displayShow x
+  display (UnsupportedTarball loc e) =
+    "Unsupported tarball from " <> display loc <> ": " <> display e
+  display (CabalFileInfoNotFound pir) = "Cabal file info not found for " <> display pir
+  display (NoHackageCryptographicHash ident) = "Not cryptographic hash found for Hackage package " <> displayC ident
+  display (FailedToCloneRepo repo) = "Failed to clone repo " <> display repo
+  display (TreeReferencesMissingBlob loc sfp key) =
+    "The package " <> display loc <>
+    " needs blob " <> display key <>
+    " for file path " <> display sfp <>
+    ", but the blob is not available"
 
 -- You'd really think there'd be a better way to do this in Cabal.
 cabalSpecLatestVersion :: Version
@@ -598,7 +635,7 @@ newtype TreeKey = TreeKey BlobKey
 
 newtype Tree
   = TreeMap (Map SafeFilePath TreeEntry)
-  -- FIXME in the future, consider allowing more lax parsing
+  -- In the future, consider allowing more lax parsing
   -- See: https://www.fpcomplete.com/blog/2018/07/pantry-part-2-trees-keys
   -- TreeTarball !PackageTarball
   deriving (Show, Eq)
@@ -948,7 +985,7 @@ resolvePackageLocationImmutable mdir (UPLIArchive ra os) = do
       RALFilePath rel@(RelFilePath t) -> do
         abs' <-
           case mdir of
-            Nothing -> error $ "Cannot resolve relative archive path with URL-based config: " ++ show t
+            Nothing -> throwIO $ InvalidFilePathSnapshot t
             Just dir -> resolveFile dir $ T.unpack t
         pure $ ALFilePath $ ResolvedPath rel abs'
   let archive = Archive

@@ -149,6 +149,8 @@ withPantryConfig root hsc he count inner = do
   -- Silence persistent's logging output, which is really noisy
   runRIO (mempty :: LogFunc) $ initStorage (root </> $(mkRelFile "pantry.sqlite3")) $ \storage -> runRIO env $ do
     ur <- newMVar True
+    ref1 <- newIORef mempty
+    ref2 <- newIORef mempty
     inner PantryConfig
       { pcHackageSecurity = hsc
       , pcHpackExecutable = he
@@ -156,6 +158,8 @@ withPantryConfig root hsc he count inner = do
       , pcStorage = storage
       , pcUpdateRef = ur
       , pcConnectionCount = count
+      , pcParsedCabalFilesImmutable = ref1
+      , pcParsedCabalFilesMutable = ref2
       }
 
 defaultHackageSecurityConfig :: HackageSecurityConfig
@@ -355,7 +359,7 @@ unpackPackageLocation
   -> RIO env ()
 unpackPackageLocation fp loc = do
   (_, tree) <- loadPackageLocation loc
-  unpackTree fp tree
+  unpackTree loc fp tree
 
 -- | Ignores all warnings
 --
@@ -364,7 +368,7 @@ parseCabalFileImmutable
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
-parseCabalFileImmutable loc = do
+parseCabalFileImmutable loc = withCache $ do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFile loc
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
@@ -389,44 +393,15 @@ parseCabalFileImmutable loc = do
     guard $ maybe True (== gpdVersion gpd) (pmVersion pm)
     guard $ maybe True (== foundCabalKey) (pmCabal pm)
     pure gpd
-
-    {- FIXME
-  , runnerParsedCabalFiles :: !(IORef -- FIXME remove
-      ( Map PackageIdentifierRevision GenericPackageDescription
-      , Map (Path Abs Dir)            (GenericPackageDescription, Path Abs File)
-      ))
-  -- ^ Cache of previously parsed cabal files.
-  --
-  -- TODO: This is really an ugly hack to avoid spamming the user with
-  -- warnings when we parse cabal files multiple times and bypass
-  -- performance issues. Ideally: we would just design the system such
-  -- that it only ever parses a cabal file once. But for now, this is
-  -- a decent workaround. See:
-  -- <https://github.com/commercialhaskell/stack/issues/3591>.
-
--- | Read the 'GenericPackageDescription' from the given
--- 'PackageIdentifierRevision'.
-readPackageUnresolvedIndex
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasRunner env)
-  => PackageIdentifierRevision
-  -> RIO env GenericPackageDescription
-readPackageUnresolvedIndex pir@(PackageIdentifierRevision pn v cfi) = do -- FIXME move to pantry
-  ref <- view $ runnerL.to runnerParsedCabalFiles
-  (m, _) <- readIORef ref
-  case M.lookup pir m of
-    Just gpd -> return gpd
-    Nothing -> do
-      ebs <- loadFromIndex pn v cfi
-      bs <-
-        case ebs of
-          Right bs -> pure bs
-      (_warnings, gpd) <- rawParseGPD (Left pir) bs
-      let foundPI = D.package $ D.packageDescription gpd
-          pi' = D.PackageIdentifier pn v
-      unless (pi' == foundPI) $ throwM $ MismatchedCabalIdentifier pir foundPI
-      atomicModifyIORef' ref $ \(m1, m2) ->
-        ((M.insert pir gpd m1, m2), gpd)
-    -}
+  where
+    withCache inner = do
+      ref <- view $ pantryConfigL.to pcParsedCabalFilesImmutable
+      m0 <- readIORef ref
+      case Map.lookup loc m0 of
+        Just x -> pure x
+        Nothing -> do
+          x <- inner
+          atomicModifyIORef' ref $ \m -> (Map.insert loc x m, x)
 
 -- | Same as 'parseCabalFileRemote', but takes a
 -- 'PackageLocation'. Never prints warnings, see
@@ -445,13 +420,11 @@ parseCabalFilePath
   -> Bool -- ^ print warnings?
   -> RIO env (GenericPackageDescription, Path Abs File)
 parseCabalFilePath dir printWarnings = do
-    {- FIXME caching
-  ref <- view $ runnerL.to runnerParsedCabalFiles
-  (_, m) <- readIORef ref
-  case Map.lookup dir m of
+  ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
+  m0 <- readIORef ref
+  case Map.lookup dir m0 of
     Just x -> return x
     Nothing -> do
-    -}
       cabalfp <- findOrGenerateCabalFile dir
       bs <- liftIO $ B.readFile $ toFilePath cabalfp
       (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
@@ -459,11 +432,7 @@ parseCabalFilePath dir printWarnings = do
         $ mapM_ (logWarn . toPretty cabalfp) warnings
       checkCabalFileName (gpdPackageName gpd) cabalfp
       let ret = (gpd, cabalfp)
-      pure ret
-    {- FIXME caching
-      atomicModifyIORef' ref $ \(m1, m2) ->
-        ((m1, M.insert dir ret m2), ret)
-    -}
+      atomicModifyIORef' ref $ \m -> (Map.insert dir ret m, ret)
   where
     toPretty :: Path Abs File -> PWarning -> Utf8Builder
     toPretty src (PWarning _type pos msg) =
@@ -573,10 +542,12 @@ loadCabalFile (PLIHackage pir _mtree) = getHackageCabalFile pir
 
 loadCabalFile pl = do
   (_, tree) <- loadPackageLocation pl
-  (_sfp, TreeEntry cabalBlobKey _ft) <- findCabalFile pl tree
+  (sfp, TreeEntry cabalBlobKey _ft) <- findCabalFile pl tree
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
-    Nothing -> error $ "loadCabalFile, blob not found. FIXME In the future: maybe try downloading the archive again."
+    Nothing -> do
+      -- TODO when we have pantry wire, try downloading
+      throwIO $ TreeReferencesMissingBlob pl sfp cabalBlobKey
     Just bs -> pure bs
 
 loadPackageLocation

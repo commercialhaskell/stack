@@ -223,8 +223,8 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
       -- characters stripped for compatibility with these older
       -- snapshots.
       --
-      -- FIXME let's convert all old snapshots, correct the
-      -- hashes, and drop this hack!
+      -- TODO: once we move over to the new curator tool completely,
+      -- we can drop this hack
       let cr = 13
       when (cr `B.elem` bs) $ do
         (stripped, _) <- storeBlob $ B.filter (/= cr) bs
@@ -270,11 +270,11 @@ getHackageCabalFile pir@(PackageIdentifierRevision _ _ (CFIHash sha msize)) = do
   case mbs of
     Just bs -> pure bs
     Nothing -> do
-      let msg = "Could not find cabal file info for " <> display pir
-      updated <- updateHackageIndex $ Just $ msg <> ", updating"
+      let exc = CabalFileInfoNotFound pir
+      updated <- updateHackageIndex $ Just $ display exc <> ", updating"
       mres' <- if updated then inner else pure Nothing
       case mres' of
-        Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME proper exception
+        Nothing -> throwIO exc
         Just res -> pure res
   where
     inner = do
@@ -299,11 +299,11 @@ resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
   case mres of
     Just res -> pure res
     Nothing -> do
-      let msg = "Could not find cabal file info for " <> display pir
-      updated <- updateHackageIndex $ Just $ msg <> ", updating"
+      let exc = CabalFileInfoNotFound pir
+      updated <- updateHackageIndex $ Just $ display exc <> ", updating"
       mres' <- if updated then inner else pure Nothing
       case mres' of
-        Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME proper exception
+        Nothing -> throwIO exc
         Just res -> pure res
   where
     inner = do
@@ -360,16 +360,14 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
       case mpair of
         Just pair -> pure pair
         Nothing -> do
-          let msg = "No cryptographic hash found for Hackage package " <>
-                    fromString (Distribution.Text.display name) <> "-" <>
-                    fromString (Distribution.Text.display ver)
-          updated <- updateHackageIndex $ Just $ msg <> ", updating"
+          let exc = NoHackageCryptographicHash $ PackageIdentifier name ver
+          updated <- updateHackageIndex $ Just $ display exc <> ", updating"
           mpair2 <-
             if updated
               then withStorage $ loadHackageTarballInfo name ver
               else pure Nothing
           case mpair2 of
-            Nothing -> error $ T.unpack $ utf8BuilderToText msg -- FIXME nicer exceptions, or return an Either
+            Nothing -> throwIO exc
             Just pair2 -> pure pair2
     pc <- view pantryConfigL
     let urlPrefix = hscDownloadPrefix $ pcHackageSecurity pc

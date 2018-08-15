@@ -9,6 +9,9 @@ copyright:   2018 FP Complete
 license:     MIT
 github:      commercialhaskell/pantry # TODO move to this repo!
 
+default-extensions:
+- MonadFailDesugaring
+
 extra-source-files:
 - README.md
 - ChangeLog.md

@@ -26,16 +26,19 @@ import Path (File)
 
 unpackTree
   :: (HasPantryConfig env, HasLogFunc env)
-  => Path Abs Dir -- ^ dest dir, will be created if necessary
+  => PackageLocationImmutable -- for exceptions
+  -> Path Abs Dir -- ^ dest dir, will be created if necessary
   -> Tree
   -> RIO env ()
-unpackTree (toFilePath -> dir) (TreeMap m) = do
+unpackTree loc (toFilePath -> dir) (TreeMap m) = do
   withStorage $ for_ (Map.toList m) $ \(sfp, TreeEntry blobKey ft) -> do
     let dest = dir </> T.unpack (unSafeFilePath sfp)
     createDirectoryIfMissing True $ takeDirectory dest
     mbs <- loadBlob blobKey
     case mbs of
-      Nothing -> error $ "Missing blob: " ++ show blobKey
+      Nothing -> do
+        -- TODO when we have pantry write stuff, try downloading
+        throwIO $ TreeReferencesMissingBlob loc sfp blobKey
       Just bs -> do
         B.writeFile dest bs
         case ft of
@@ -73,7 +76,7 @@ rawParseGPD loc bs =
     (warnings, eres) = runParseResult $ parseGenericPackageDescription bs
 
 -- | Returns the cabal blob key
-loadPackageIdentFromTree
+loadPackageIdentFromTree -- FIXME investigate overlap with loadCabalFile and parsing functions in Pantry module
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocationImmutable
   -> Tree
@@ -83,7 +86,7 @@ loadPackageIdentFromTree pl tree = do -- FIXME store this in a table to avoid th
   mbs <- withStorage $ loadBlob cabalBlobKey
   bs <-
     case mbs of
-      Nothing -> error $ "Cabal file not loaded for " ++ show pl
+      Nothing -> throwIO $ TreeReferencesMissingBlob pl sfp cabalBlobKey
       Just bs -> pure bs
   (_warnings, gpd) <- rawParseGPD (Left pl) bs
   let ident@(PackageIdentifier name _) = package $ packageDescription $ gpd
