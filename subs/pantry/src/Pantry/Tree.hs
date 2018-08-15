@@ -37,7 +37,7 @@ unpackTree loc (toFilePath -> dir) (TreeMap m) = do
     mbs <- loadBlob blobKey
     case mbs of
       Nothing -> do
-        -- TODO when we have pantry write stuff, try downloading
+        -- TODO when we have pantry wire stuff, try downloading
         throwIO $ TreeReferencesMissingBlob loc sfp blobKey
       Just bs -> do
         B.writeFile dest bs
@@ -126,7 +126,8 @@ checkTreeKey pl (Just expectedTreeKey) inner = do
     Just tree -> pure (expectedTreeKey, tree)
     Nothing -> do
       res@(actualTreeKey, _) <- inner
-      -- FIXME do we need to store the tree now?
+      -- We do not need to store the tree at this point, it's the
+      -- responsibility of inner to do that.
       when (actualTreeKey /= expectedTreeKey) $
           throwIO $ TreeKeyMismatch pl Mismatch
             { mismatchExpected = expectedTreeKey

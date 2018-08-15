@@ -41,7 +41,7 @@ import RIO
 import Data.Aeson
 import Database.Persist.Sql
 import Pantry.Internal.StaticBytes
-import Data.Store (Store) -- FIXME remove
+import Data.Store (Store)
 import Conduit
 import qualified RIO.Text as T
 

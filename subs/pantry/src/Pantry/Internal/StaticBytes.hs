@@ -26,7 +26,7 @@ module Pantry.Internal.StaticBytes
   ) where
 
 import RIO hiding (words)
-import Data.Store (Store) -- FIXME remove
+import Data.Store (Store)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.Vector.Primitive as VP
@@ -43,7 +43,7 @@ import Data.ByteArray
 
 newtype Bytes8 = Bytes8 Word64
   deriving (Eq, Ord, Generic, NFData, Hashable, Data, Store)
-instance Show Bytes8 where -- FIXME good enough?
+instance Show Bytes8 where
   show (Bytes8 w) = show (fromWordsD 8 [w] :: B.ByteString)
 data Bytes16 = Bytes16 !Bytes8 !Bytes8
   deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data, Store)

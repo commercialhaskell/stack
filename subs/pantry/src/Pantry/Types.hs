@@ -10,7 +10,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-} -- FIXME REMOVE!
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- TODO REMOVE!
 module Pantry.Types
   ( PantryConfig (..)
   , HackageSecurityConfig (..)
@@ -107,12 +107,12 @@ import qualified Distribution.Text
 import Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.Types.Version (Version, mkVersion)
-import Data.Store (Size (..), Store (..)) -- FIXME remove
+import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
 import Path (Abs, Dir, File, toFilePath, filename)
-import Path.Internal (Path (..)) -- FIXME don't import this
+import Path.Internal (Path (..)) -- TODO don't import this
 import Path.IO (resolveFile)
 import Data.Pool (Pool)
 
@@ -214,6 +214,17 @@ data RepoType = RepoGit | RepoHg
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store RepoType
 instance NFData RepoType
+instance PersistField RepoType where
+  toPersistValue RepoGit = toPersistValue (1 :: Int32)
+  toPersistValue RepoHg = toPersistValue (2 :: Int32)
+  fromPersistValue v = do
+    i <- fromPersistValue v
+    case i :: Int32 of
+      1 -> pure RepoGit
+      2 -> pure RepoHg
+      _ -> fail $ "Invalid RepoType: " ++ show i
+instance PersistFieldSql RepoType where
+  sqlType _ = SqlInt32
 
 -- | Information on packages stored in a source control repository.
 data Repo = Repo
@@ -434,6 +445,8 @@ data PantryException
   | NoHackageCryptographicHash !PackageIdentifier
   | FailedToCloneRepo !Repo
   | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
+  | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
+  | CRC32Mismatch !ArchiveLocation !FilePath (Mismatch Word32)
 
   deriving Typeable
 instance Exception PantryException where
@@ -573,6 +586,15 @@ instance Display PantryException where
     " needs blob " <> display key <>
     " for file path " <> display sfp <>
     ", but the blob is not available"
+  display (CompletePackageMetadataMismatch loc pm) =
+    "When completing package metadata for " <> display loc <>
+    ", some values changed in the new package metadata: " <>
+    display pm
+  display (CRC32Mismatch loc fp Mismatch {..}) =
+    "CRC32 mismatch in ZIP file from " <> display loc <>
+    " on internal file " <> fromString fp <>
+    "\n.Expected: " <> display mismatchExpected <>
+    "\n.Actual:   " <> display mismatchActual
 
 -- You'd really think there'd be a better way to do this in Cabal.
 cabalSpecLatestVersion :: Version
@@ -1020,11 +1042,13 @@ mkUnresolvedPackageLocationImmutable (PLIRepo repo pm) = UPLIRepo repo (OSPackag
 newtype CabalString a = CabalString { unCabalString :: a }
   deriving (Show, Eq, Ord, Typeable)
 
+-- I'd like to use coerce here, but can't due to roles. unsafeCoerce
+-- could work, but let's avoid unsafe code.
 toCabalStringMap :: Map a v -> Map (CabalString a) v
-toCabalStringMap = Map.mapKeysMonotonic CabalString -- FIXME why doesn't coerce work?
+toCabalStringMap = Map.mapKeysMonotonic CabalString
 
 unCabalStringMap :: Map (CabalString a) v -> Map a v
-unCabalStringMap = Map.mapKeysMonotonic unCabalString -- FIXME why doesn't coerce work?
+unCabalStringMap = Map.mapKeysMonotonic unCabalString
 
 instance Distribution.Text.Text a => ToJSON (CabalString a) where
   toJSON = toJSON . Distribution.Text.display . unCabalString
@@ -1313,7 +1337,7 @@ parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
     snapshotParent <- iosnapshotParent
     pure Snapshot {..}
 
--- FIXME ORPHANS remove
+-- TODO ORPHANS remove
 
 instance Store PackageIdentifier where
   size =

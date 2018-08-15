@@ -24,6 +24,7 @@ import qualified RIO.Set as Set
 import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
+import qualified Data.Digest.CRC32 as CRC32
 
 import Conduit
 import Data.Conduit.Zlib (ungzip)
@@ -35,7 +36,7 @@ fetchArchives
   => [(Archive, PackageMetadata)]
   -> RIO env ()
 fetchArchives pairs = do
-  -- FIXME be more efficient, group together shared archives
+  -- TODO be more efficient, group together shared archives
   for_ pairs $ uncurry getArchive
 
 getArchiveKey
@@ -169,7 +170,7 @@ foldArchive loc fp ATTarGz accum f =
   withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar loc accum f
 foldArchive loc fp ATTar accum f =
   withSourceFile fp $ \src -> runConduit $ src .| foldTar loc accum f
-foldArchive _loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
+foldArchive loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
   -- We're entering lazy I/O land thanks to zip-archive.
   lbs <- BL.hGetContents h
   let go accum entry = do
@@ -182,8 +183,15 @@ foldArchive _loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
                 if (modes .&. 0o100) == 0
                   then METNormal
                   else METExecutable
-        -- FIXME check crc32
-        runConduit $ sourceLazy (Zip.fromEntry entry) .| f accum me
+            lbs = Zip.fromEntry entry
+        let crcExpected = Zip.eCRC32 entry
+            crcActual = CRC32.crc32 lbs
+        when (crcExpected /= crcActual)
+          $ throwIO $ CRC32Mismatch loc (Zip.eRelativePath entry) Mismatch
+              { mismatchExpected = crcExpected
+              , mismatchActual = crcActual
+              }
+        runConduit $ sourceLazy lbs .| f accum me
       isDir entry =
         case reverse $ Zip.eRelativePath entry of
           '/':_ -> True

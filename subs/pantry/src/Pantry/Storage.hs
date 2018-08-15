@@ -30,11 +30,14 @@ module Pantry.Storage
   , storeTree
   , loadTree
   , loadTreeById
+  , getTreeSForKey
   , storeHackageTree
   , loadHackageTree
   , loadHackageTreeKey
   , storeArchiveCache
   , loadArchiveCache
+  , storeRepoCache
+  , loadRepoCache
   , storeCrlfHack
   , checkCrlfHack
   , storePreferredVersion
@@ -50,6 +53,7 @@ module Pantry.Storage
   , TreeEntrySId
   , CrlfHackId
   , ArchiveCacheId
+  , RepoCacheId
   , PreferredVersionsId
   , UrlBlobTableId
   ) where
@@ -113,6 +117,14 @@ ArchiveCache
     subdir Text
     sha SHA256
     size FileSize
+    tree TreeSId
+
+RepoCache
+    time UTCTime
+    url Text
+    type RepoType
+    commit Text
+    subdir Text
     tree TreeSId
 
 Sfp sql=file_path
@@ -475,15 +487,21 @@ loadTree
   :: (HasPantryConfig env, HasLogFunc env)
   => TreeKey
   -> ReaderT SqlBackend (RIO env) (Maybe Tree)
-loadTree (TreeKey key) = do
+loadTree key = do
+  ment <- getTreeSForKey key
+  case ment of
+    Nothing -> pure Nothing
+    Just ent -> Just <$> loadTreeByEnt ent
+
+getTreeSForKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => TreeKey
+  -> ReaderT SqlBackend (RIO env) (Maybe (Entity TreeS))
+getTreeSForKey (TreeKey key) = do
   mbid <- getBlobTableId key
   case mbid of
     Nothing -> pure Nothing
-    Just bid -> do
-      ment <- getBy $ UniqueTree bid
-      case ment of
-        Nothing -> pure Nothing
-        Just ent -> Just <$> loadTreeByEnt ent
+    Just bid -> getBy $ UniqueTree bid
 
 loadTreeById
   :: (HasPantryConfig env, HasLogFunc env)
@@ -613,6 +631,36 @@ loadArchiveCache url subdir = map go <$> selectList
   [Desc ArchiveCacheTime]
   where
     go (Entity _ ac) = (archiveCacheSha ac, archiveCacheSize ac, archiveCacheTree ac)
+
+storeRepoCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> Text -- ^ subdir
+  -> TreeSId
+  -> ReaderT SqlBackend (RIO env) ()
+storeRepoCache repo subdir tid = do
+  now <- getCurrentTime
+  insert_ RepoCache
+    { repoCacheTime = now
+    , repoCacheUrl = repoUrl repo
+    , repoCacheType = repoType repo
+    , repoCacheCommit = repoCommit repo
+    , repoCacheSubdir = subdir
+    , repoCacheTree = tid
+    }
+
+loadRepoCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> Text -- ^ subdir
+  -> ReaderT SqlBackend (RIO env) (Maybe TreeSId)
+loadRepoCache repo subdir = fmap (repoCacheTree . entityVal) <$> selectFirst
+  [ RepoCacheUrl ==. repoUrl repo
+  , RepoCacheType ==. repoType repo
+  , RepoCacheCommit ==. repoCommit repo
+  , RepoCacheSubdir ==. subdir
+  ]
+  [Desc RepoCacheTime]
 
 -- Back in the days of all-cabal-hashes, we had a few cabal files that
 -- had CRLF/DOS-style line endings in them. The Git version ended up

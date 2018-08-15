@@ -21,6 +21,7 @@ extra-source-files:
 
 dependencies:
 - base
+- digest
 - rio
 - aeson
 - text
@@ -41,7 +42,7 @@ dependencies:
 - primitive
 - vector
 - memory
-- store
+- store # TODO remove
 - cryptonite
 - cryptonite-conduit
 - persistent

@@ -26,6 +26,8 @@ __TODO__
 
 Content below needs to be updated.
 
+* Support for hpack in PackageLocationImmutable?
+
 ## Package definition
 
 Pantry defines the following concepts:

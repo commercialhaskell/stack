@@ -10,11 +10,13 @@ module Pantry.Repo
 import Pantry.Types
 import Pantry.Archive
 import Pantry.Tree
+import Pantry.Storage
 import RIO
 import Path.IO (resolveFile')
 import RIO.FilePath ((</>))
 import RIO.Directory (doesDirectoryExist)
 import RIO.Process
+import Database.Persist (Entity (..))
 import qualified RIO.Text as T
 
 fetchRepos
@@ -22,7 +24,7 @@ fetchRepos
   => [(Repo, PackageMetadata)]
   -> RIO env ()
 fetchRepos pairs = do
-  -- FIXME be more efficient, group together shared archives
+  -- TODO be more efficient, group together shared archives
   for_ pairs $ uncurry getRepo
 
 getRepoKey
@@ -39,8 +41,24 @@ getRepo
   -> RIO env (TreeKey, Tree)
 getRepo repo pm =
   checkPackageMetadata (PLIRepo repo pm) pm $
-  -- FIXME withCache $
+  withCache $
   getRepo' repo pm
+  where
+    withCache
+      :: RIO env (TreeKey, Tree)
+      -> RIO env (TreeKey, Tree)
+    withCache inner = do
+      mtid <- withStorage (loadRepoCache repo (pmSubdir pm))
+      case mtid of
+        Just tid -> withStorage $ loadTreeById tid
+        Nothing -> do
+          (treeKey, tree) <- inner
+          withStorage $ do
+            ment <- getTreeSForKey treeKey
+            case ment of
+              Nothing -> error $ "invariant violated, TreeS not found: " ++ show treeKey
+              Just (Entity tid _) -> storeRepoCache repo (pmSubdir pm) tid
+          pure (treeKey, tree)
 
 getRepo'
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)

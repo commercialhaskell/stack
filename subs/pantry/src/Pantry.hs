@@ -328,7 +328,7 @@ fetchTreeKeys
   => f TreeKey
   -> RIO env ()
 fetchTreeKeys _ =
-  logWarn "Network caching not yet implemented!" -- FIXME
+  logWarn "Network caching not yet implemented!" -- TODO pantry wire
 
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env, Foldable f)
@@ -337,7 +337,7 @@ fetchPackages
 fetchPackages pls = do
     fetchTreeKeys $ mapMaybe getTreeKey $ toList pls
     traverseConcurrently_ (void . uncurry getHackageTarball) hackages
-    -- FIXME in the future, be concurrent in these as well
+    -- TODO in the future, be concurrent in these as well
     fetchArchives archives
     fetchRepos repos
   where
@@ -363,7 +363,9 @@ unpackPackageLocation fp loc = do
 
 -- | Ignores all warnings
 --
--- FIXME! Something to support hpack
+-- Note that, for now, this will not allow support for hpack files in
+-- these package locations. Instead, all @PackageLocationImmutable@s
+-- will require a .cabal file.
 parseCabalFileImmutable
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
@@ -618,14 +620,25 @@ completePM plOrig pm
   | otherwise = do
       (treeKey, tree) <- loadPackageLocation plOrig
       (cabalBlobKey, PackageIdentifier name version) <- loadPackageIdentFromTree plOrig tree
-      -- FIXME confirm that no values _changed_
-      pure PackageMetadata
-        { pmName = Just name
-        , pmVersion = Just version
-        , pmTree = Just treeKey
-        , pmCabal = Just cabalBlobKey
-        , pmSubdir = pmSubdir pm
-        }
+      let pmNew = PackageMetadata
+            { pmName = Just name
+            , pmVersion = Just version
+            , pmTree = Just treeKey
+            , pmCabal = Just cabalBlobKey
+            , pmSubdir = pmSubdir pm
+            }
+
+          isSame _ Nothing = True
+          isSame x (Just y) = x == y
+
+          allSame =
+            isSame name (pmName pm) &&
+            isSame version (pmVersion pm) &&
+            isSame treeKey (pmTree pm) &&
+            isSame cabalBlobKey (pmCabal pm)
+      if allSame
+        then pure pmNew
+        else throwIO $ CompletePackageMetadataMismatch plOrig pmNew
   where
     isCompletePM (PackageMetadata (Just _) (Just _) (Just _) (Just _) _) = True
     isCompletePM _ = False
