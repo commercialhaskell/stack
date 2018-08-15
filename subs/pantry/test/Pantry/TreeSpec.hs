@@ -44,15 +44,15 @@ spec = do
               }
             pm
 
-  it "zip and tar.gz archives match" $ asIO $ runPantryApp $ do
+  it "zip and tar.gz archives match" $ asIO $ runPantryAppClean $ do
     pair1 <- loadPackageLocation tarPL
     pair2 <- loadPackageLocation zipPL
     liftIO $ pair2 `shouldBe` pair1
-  it "archive and Git repo match" $ asIO $ runPantryApp $ do
+  it "archive and Git repo match" $ asIO $ runPantryAppClean $ do
     pair1 <- loadPackageLocation tarPL
     pair2 <- loadPackageLocation gitPL
     liftIO $ pair2 `shouldBe` pair1
-  it "archive and Hg repo match" $ asIO $ runPantryApp $ do
+  it "archive and Hg repo match" $ asIO $ runPantryAppClean $ do
     pair1 <- loadPackageLocation tarPL
     pair2 <- loadPackageLocation hgPL
     liftIO $ pair2 `shouldBe` pair1

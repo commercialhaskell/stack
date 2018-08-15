@@ -18,7 +18,6 @@ import Pantry.Tree
 import Pantry.Types
 import qualified RIO.Text as T
 import qualified RIO.List as List
-import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -30,8 +29,7 @@ import Conduit
 import Crypto.Hash.Conduit
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Conduit.Tar as Tar
-import Network.HTTP.Client (parseUrlThrow)
-import Network.HTTP.Simple (httpSink)
+import Pantry.HTTP
 
 fetchArchives
   :: (HasPantryConfig env, HasLogFunc env)
@@ -128,56 +126,10 @@ withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
   f fp sha size
 withArchiveLoc (Archive (ALUrl url) msha msize) f =
   withSystemTempFile "archive" $ \fp hout -> do
-    req <- parseUrlThrow $ T.unpack url
     logDebug $ "Downloading archive from " <> display url
-    (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
-      <$> ZipSink (checkSha msha)
-      <*> ZipSink (checkSize $ (\(FileSize w) -> w) <$> msize)
-      <*> ZipSink (sinkHandle hout)
+    (sha, size, ()) <- httpSinkChecked url msha msize (sinkHandle hout)
     hClose hout
-    f fp sha (FileSize size)
-  where
-    checkSha mexpected = do
-      actual <- mkStaticSHA256FromDigest <$> sinkHash
-      for_ mexpected $ \expected -> unless (actual == expected) $ error $ concat
-        [ "Invalid SHA256 downloading from "
-        , T.unpack url
-        , ". Expected: "
-        , show expected
-        , ". Actual: "
-        , show actual
-        ]
-      pure actual
-    checkSize mexpected =
-      loop 0
-      where
-        loop accum = do
-          mbs <- await
-          case mbs of
-            Nothing ->
-              case mexpected of
-                Just expected | expected /= accum -> error $ concat
-                    [ "Invalid file size downloading from "
-                    , T.unpack url
-                    , ". Expected: "
-                    , show expected
-                    , ". Actual: "
-                    , show accum
-                    ]
-                _ -> pure accum
-            Just bs -> do
-              let accum' = accum + fromIntegral (B.length bs)
-              case mexpected of
-                Just expected
-                  | accum' > expected -> error $ concat
-                    [ "Invalid file size downloading from "
-                    , T.unpack url
-                    , ". Expected: "
-                    , show expected
-                    , ", but file is at least: "
-                    , show accum'
-                    ]
-                _ -> loop accum'
+    f fp sha size
 
 data ArchiveType = ATTarGz | ATTar | ATZip
   deriving (Enum, Bounded)

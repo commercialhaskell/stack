@@ -28,5 +28,6 @@ spec = do
         , pmCabal = Nothing
         , pmSubdir = ""
         }
-    let Just expected = parsePackageIdentifier "package-0.1.2.3"
-    liftIO $ ident `shouldBe` expected
+    case parsePackageIdentifier "package-0.1.2.3" of
+      Nothing -> error "should have parsed"
+      Just expected -> liftIO $ ident `shouldBe` expected

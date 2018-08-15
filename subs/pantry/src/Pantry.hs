@@ -94,6 +94,7 @@ module Pantry
     -- * Convenience
   , PantryApp
   , runPantryApp
+  , runPantryAppClean
 
     -- * FIXME legacy from Stack, to be updated
   , loadFromIndex
@@ -104,6 +105,7 @@ module Pantry
   ) where
 
 import RIO
+import Conduit
 import qualified RIO.Map as Map
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as LB
@@ -119,7 +121,7 @@ import Pantry.Types
 import Pantry.Hackage
 import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent)
 import Path.Find (findFiles)
-import Path.IO (resolveDir, doesFileExist)
+import Path.IO (resolveDir, doesFileExist, resolveDir')
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
@@ -131,8 +133,7 @@ import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
-import Network.HTTP.StackClient
-import Network.HTTP.Types (ok200)
+import Pantry.HTTP
 import qualified Distribution.Text
 import Distribution.Types.VersionRange (withinRange)
 import qualified RIO.FilePath
@@ -784,32 +785,25 @@ loadFromURL url Nothing = do
   mcached <- withStorage $ loadURLBlob url
   case mcached of
     Just bs -> return bs
-    Nothing -> loadWithCheck url $ \_ -> return ()
-loadFromURL url (Just bkey@(BlobKey sha size)) = do
+    Nothing -> loadWithCheck url Nothing
+loadFromURL url (Just bkey) = do
   mcached <- withStorage $ loadBlob bkey
   case mcached of
     Just bs -> return bs
-    Nothing -> loadWithCheck url $ \bs -> do
-      let blobSha = mkStaticSHA256FromBytes bs
-          blobSize = FileSize $ fromIntegral $ B.length bs
-      when (blobSha /= sha || blobSize /= size) $
-        throwIO $ InvalidBlobKey Mismatch
-          { mismatchExpected = bkey
-          , mismatchActual = BlobKey blobSha blobSize
-          }
+    Nothing -> loadWithCheck url (Just bkey)
 
 loadWithCheck
   :: (HasPantryConfig env, HasLogFunc env)
   => Text -- ^ url
-  -> (ByteString -> RIO env ()) -- ^ function to check downloaded blob
+  -> Maybe BlobKey
   -> RIO env ByteString
-loadWithCheck url checkResponseBody = do
-  req <- parseRequest $ T.unpack url
-  res <- httpLbs req
-  let statusCode = responseStatus res
-  when (statusCode /= ok200) $ throwIO (Non200ResponseStatus statusCode)
-  let bs = LB.toStrict $ getResponseBody res
-  checkResponseBody bs
+loadWithCheck url mblobkey = do
+  let (msha, msize) =
+        case mblobkey of
+          Nothing -> (Nothing, Nothing)
+          Just (BlobKey sha size) -> (Just sha, Just size)
+  (_, _, bss) <- httpSinkChecked url msha msize sinkList
+  let bs = B.concat bss
   withStorage $ storeURLBlob url bs
   return bs
 
@@ -879,6 +873,23 @@ runPantryApp f = runSimpleApp $ do
   sa <- ask
   stack <- getAppUserDataDirectory "stack"
   root <- parseAbsDir $ stack RIO.FilePath.</> "pantry"
+  withPantryConfig
+    root
+    defaultHackageSecurityConfig
+    HpackBundled
+    8
+    $ \pc ->
+      runRIO
+        PantryApp
+          { paSimpleApp = sa
+          , paPantryConfig = pc
+          }
+        f
+
+runPantryAppClean :: MonadIO m => RIO PantryApp a -> m a
+runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> runSimpleApp $ do
+  sa <- ask
+  root <- resolveDir' dir
   withPantryConfig
     root
     defaultHackageSecurityConfig

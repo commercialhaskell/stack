@@ -401,10 +401,7 @@ data PantryException
   | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
   | InvalidFilePathSnapshot !Text
   | InvalidSnapshot !SnapshotLocation !SomeException
-  | TreeKeyMismatch
-      !PackageLocationImmutable
-      !TreeKey -- expected
-      !TreeKey -- actual
+  | TreeKeyMismatch !PackageLocationImmutable !(Mismatch TreeKey)
   | MismatchedPackageMetadata
       !PackageLocationImmutable
       !PackageMetadata
@@ -414,6 +411,11 @@ data PantryException
   | InvalidBlobKey !(Mismatch BlobKey)
   | Couldn'tParseSnapshot !SnapshotLocation !String
   | WrongCabalFileName !PackageLocationImmutable !SafeFilePath !PackageName
+  | DownloadInvalidSHA256 !Text !(Mismatch StaticSHA256)
+  | DownloadInvalidSize !Text !(Mismatch FileSize)
+  | DownloadTooLarge !Text !(Mismatch FileSize)
+  -- ^ Different from 'DownloadInvalidSize' since 'mismatchActual' is
+  -- a lower bound on the size from the server.
 
   deriving Typeable
 instance Exception PantryException where
@@ -497,10 +499,10 @@ instance Display PantryException where
     display loc <>
     ":\n" <>
     displayShow e
-  display (TreeKeyMismatch loc expected actual) =
+  display (TreeKeyMismatch loc Mismatch {..}) =
     "Tree key mismatch when getting " <> display loc <>
-    "\nExpected: " <> display expected <>
-    "\nActual:   " <> display actual
+    "\nExpected: " <> display mismatchExpected <>
+    "\nActual:   " <> display mismatchActual
   display (MismatchedPackageMetadata loc pm foundCabal foundIdent) =
     "Mismatched package metadata for " <> display loc <>
     "\nFound: " <> displayC foundIdent <> " with cabal file " <>
@@ -520,6 +522,18 @@ instance Display PantryException where
     "\nCabal file is named " <> display sfp <>
     ", but package name is " <> displayC name
     -- FIXME include the issue link relevant to why we care about this
+  display (DownloadInvalidSHA256 url Mismatch {..}) =
+    "Mismatched SHA256 hash from " <> display url <>
+    "\nExpected: " <> display mismatchExpected <>
+    "\nActual:   " <> display mismatchActual
+  display (DownloadInvalidSize url Mismatch {..}) =
+    "Mismatched download size from " <> display url <>
+    "\nExpected: " <> display mismatchExpected <>
+    "\nActual:   " <> display mismatchActual
+  display (DownloadTooLarge url Mismatch {..}) =
+    "Download from " <> display url <> " was too large.\n" <>
+    "Expected: " <> display mismatchExpected <> ", stopped after receiving: " <>
+    display mismatchActual
 
 -- You'd really think there'd be a better way to do this in Cabal.
 cabalSpecLatestVersion :: Version

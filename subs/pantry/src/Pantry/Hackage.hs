@@ -27,7 +27,6 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.StaticSHA256
 import Network.URI (parseURI)
-import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Time (getCurrentTime)
 import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
 import qualified Distribution.Text
@@ -66,11 +65,10 @@ updateHackageIndex mreason = gateUpdate $ do
         case parseURI $ T.unpack url of
             Nothing -> throwString $ "Invalid Hackage Security base URL: " ++ T.unpack url
             Just x -> return x
-    manager <- liftIO getGlobalManager
     run <- askRunInIO
     let logTUF = run . logInfo . fromString . HS.pretty
         withRepo = HS.withRepository
-            (HS.makeHttpLib manager)
+            HS.httpLib
             [baseURI]
             HS.defaultRepoOpts
             HS.Cache

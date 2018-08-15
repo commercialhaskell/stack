@@ -1,10 +1,7 @@
-resolver: lts-12.0
+resolver: ../snapshot.yaml
 packages:
 - pantry
 - curator
-extra-deps:
-- infer-license-0.2.0@rev:0
-- hpack-0.29.6@rev:0
 
 ghc-options:
    "$locals": -fhide-source-paths

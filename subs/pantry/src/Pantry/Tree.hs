@@ -130,5 +130,8 @@ checkTreeKey pl (Just expectedTreeKey) inner = do
       res@(actualTreeKey, _) <- inner
       -- FIXME do we need to store the tree now?
       when (actualTreeKey /= expectedTreeKey) $
-          throwIO $ TreeKeyMismatch pl expectedTreeKey actualTreeKey
+          throwIO $ TreeKeyMismatch pl Mismatch
+            { mismatchExpected = expectedTreeKey
+            , mismatchActual = actualTreeKey
+            }
       pure res

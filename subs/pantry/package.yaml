@@ -66,9 +66,9 @@ library:
   - Pantry.StaticBytes
   other-modules:
   - Hackage.Security.Client.Repository.HttpLib.HttpClient
-  - Network.HTTP.StackClient
   - Pantry.Archive
   - Pantry.Hackage
+  - Pantry.HTTP
   - Pantry.Repo
   - Pantry.Tree
   - Path.Find
