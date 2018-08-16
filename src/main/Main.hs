@@ -64,6 +64,7 @@ import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.FileWatch
+import           Stack.Freeze
 import           Stack.Ghci
 import           Stack.Hoogle
 import           Stack.Ls
@@ -78,6 +79,7 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
+import           Stack.Options.FreezeParser
 
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
@@ -389,6 +391,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Run a Stack Script"
                   scriptCmd
                   scriptOptsParser
+      addCommand' "freeze"
+                  "Show project or snapshot with pinned dependencies if there are any such"
+                  freezeCmd
+                  freezeOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"
@@ -1004,6 +1010,10 @@ queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selecto
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
 hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
+
+freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
+freezeCmd freezeOpts go =
+  withBuildConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable

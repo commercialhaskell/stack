@@ -1214,23 +1214,8 @@ instance Store Snapshot
 instance NFData Snapshot
 instance ToJSON Snapshot where
   toJSON snap = object $ concat
-    [ case snapshotParent snap of
-        SLCompiler compiler -> ["compiler" .= compiler]
-        SLUrl url mblob mcompiler -> concat
-          [ pure $ "resolver" .= concat
-              [ ["url" .= url]
-              , maybe [] blobKeyPairs mblob
-              ]
-          , case mcompiler of
-              Nothing -> []
-              Just compiler -> ["compiler" .= compiler]
-          ]
-        SLFilePath resolved mcompiler -> concat
-          [ pure $ "resolver" .= object ["filepath" .= resolvedRelative resolved]
-          , case mcompiler of
-              Nothing -> []
-              Just compiler -> ["compiler" .= compiler]
-          ]
+    [ maybe [] (\cv -> ["compiler" .= cv]) compiler
+    , ["resolver" .= usl]
     , ["name" .= snapshotName snap]
     , ["packages" .= map mkUnresolvedPackageLocationImmutable (snapshotLocations snap)]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
@@ -1238,6 +1223,8 @@ instance ToJSON Snapshot where
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
     , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
     ]
+    where
+      (usl, compiler) = unresolveSnapshotLocation $ snapshotParent snap
 
 parseSnapshot :: Maybe (Path Abs Dir) -> Value -> Parser (WithJSONWarnings (IO Snapshot))
 parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do

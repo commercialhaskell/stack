@@ -15,6 +15,8 @@ Major changes:
       must be specified in `extra-deps`.
     * The `extra-dep` key in `packages` is no longer supported; please
       move any such specifications to `extra-deps`.
+* A new command, `stack freeze` has been added which outputs project
+  and snapshot definitions with dependencies pinned to their exact versions.
 
 Behavior changes:
 
