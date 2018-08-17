@@ -100,6 +100,8 @@ module Stack.Types.Config
   ,parsePvpBounds
   -- ** ColorWhen
   ,readColorWhen
+  -- ** Styles
+  ,readStyles
   -- ** SCM
   ,SCM(..)
   -- * Paths
@@ -224,6 +226,8 @@ import           Stack.Types.PackageName
 import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.StylesUpdate (StylesUpdate,
+                     parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
@@ -464,6 +468,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
+    , globalMonoidStyles       :: !(First StylesUpdate) -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     } deriving (Show, Generic)
@@ -487,6 +492,9 @@ readColorWhen = do
         "always" -> return ColorAlways
         "auto" -> return ColorAuto
         _ -> OA.readerError "Expected values of color option are 'never', 'always', or 'auto'."
+
+readStyles :: ReadM StylesUpdate
+readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from

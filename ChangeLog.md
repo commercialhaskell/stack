@@ -19,6 +19,9 @@ Other enhancements:
   control character sequences that stack uses to color some of its output. This
   addition is a precursor to allowing a stack user to redefine the default
   styles. See `stack ls stack-colors --help` for more information.
+* New global option `--stack-colors=STYLES` allows a stack user to redefine the
+  default styles that stack uses to color some of its output. See `stack --help`
+  for more information.
 
 Bug fixes:
 
