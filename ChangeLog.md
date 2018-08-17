@@ -15,6 +15,9 @@ Other enhancements:
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.
+* New global option `--stack-colors=STYLES` allows a stack user to redefine the
+  default styles that stack uses to color some of its output. See `stack --help`
+  for more information.
 
 Bug fixes:
 

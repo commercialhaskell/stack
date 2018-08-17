@@ -45,6 +45,7 @@ dependencies:
 - base >=4.10 && < 5
 - base64-bytestring
 - bytestring
+- colour
 - conduit
 - conduit-extra
 - containers
@@ -255,6 +256,7 @@ library:
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
+  - Stack.Types.StylesUpdate
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
