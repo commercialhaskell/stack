@@ -131,6 +131,8 @@ import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Pantry.HTTP
 import qualified Distribution.Text
 import Distribution.Types.VersionRange (withinRange)
@@ -597,12 +599,12 @@ resolvePackageLocation
   :: MonadIO m
   => Path Abs Dir -- ^ directory containing configuration file, to be used for resolving relative file paths
   -> UnresolvedPackageLocation
-  -> m [PackageLocation]
+  -> m (NonEmpty PackageLocation)
 resolvePackageLocation dir (UPLImmutable rpl) =
-  map PLImmutable <$> resolvePackageLocationImmutable (Just dir) rpl
+  NE.map PLImmutable <$> resolvePackageLocationImmutable (Just dir) rpl
 resolvePackageLocation dir (UPLMutable rel@(RelFilePath fp)) = do
   absolute <- resolveDir dir $ T.unpack fp
-  pure [PLMutable $ ResolvedPath rel absolute]
+  pure $ PLMutable (ResolvedPath rel absolute) :| []
 
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
 completePackageLocation
