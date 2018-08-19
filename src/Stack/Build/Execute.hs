@@ -1550,7 +1550,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 parentDir <- parent <$> parseRelDir src
                 destBaseDir <- (ddumpDir </>) <$> stripProperPrefix distDir parentDir
                 -- exclude .stack-work dir
-                when (not (".stack-work" `isInfixOf` (toFilePath destBaseDir))) $ do
+                unless (".stack-work" `isInfixOf` toFilePath destBaseDir) $ do
                   ensureDir destBaseDir
                   src' <- parseRelFile src
                   copyFile src' (destBaseDir </> filename src'))
