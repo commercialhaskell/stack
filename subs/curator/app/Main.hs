@@ -1,52 +1,81 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-import Curator
+import Curator hiding (Snapshot)
 import Data.Yaml (encodeFile, decodeFileThrow)
+import Options.Generic (ParseRecord, getRecord)
 import Path.IO (resolveFile', resolveDir')
 import RIO.Process
+import qualified Curator
+
+data CuratorOptions
+  = Update
+  | Constraints
+  | SnapshotIncomplete
+  | Snapshot
+  | Unpack
+  | Build
+  deriving (Eq, Show, Generic)
+
+instance ParseRecord CuratorOptions
 
 main :: IO ()
-main = runPantryApp $ do
-  -- each of these should be separate commands
+main = runPantryApp $
+  getRecord "curator" >>= \case
+    Update ->
+      update
+    Constraints ->
+      constraints
+    SnapshotIncomplete ->
+      snapshotIncomplete
+    Snapshot ->
+      snapshot
+    Unpack ->
+      unpackFiles
+    Build ->
+      build
 
-  -- update Hackage index
-  do
-    void $ updateHackageIndex $ Just "Running snapshot curator tool"
+update :: RIO PantryApp ()
+update = do
+  void $ updateHackageIndex $ Just "Updating hackage index"
 
-  -- write constraints
-  do
-    logInfo "Writing constraints.yaml"
-    loadStackageConstraints "build-constraints.yaml" >>= liftIO . encodeFile "constraints.yaml"
+constraints :: RIO PantryApp ()
+constraints = do
+  logInfo "Writing constraints.yaml"
+  loadStackageConstraints "build-constraints.yaml" >>= liftIO . encodeFile "constraints.yaml"
 
-  -- create snapshot
-  do
-    logInfo "Writing snapshot-incomplete.yaml"
-    decodeFileThrow "constraints.yaml" >>= \constraints ->
-      makeSnapshot constraints "my-test-snapshot" >>=
-      liftIO . encodeFile "snapshot-incomplete.yaml"
+snapshotIncomplete :: RIO PantryApp ()
+snapshotIncomplete = do
+  logInfo "Writing snapshot-incomplete.yaml"
+  decodeFileThrow "constraints.yaml" >>= \constraints ->
+    makeSnapshot constraints "my-test-snapshot-2" >>=
+    liftIO . encodeFile "snapshot-incomplete.yaml"
 
-  -- complete snapshot
-  do
-    logInfo "Writing snapshot.yaml"
-    incomplete <- loadPantrySnapshotFile "snapshot-incomplete.yaml"
-    complete <- completeSnapshot incomplete
-    liftIO $ encodeFile "snapshot.yaml" complete
+snapshot :: RIO PantryApp ()
+snapshot = do
+  logInfo "Writing snapshot.yaml"
+  incomplete <- loadPantrySnapshotFile "snapshot-incomplete.yaml"
+  complete <- completeSnapshot incomplete
+  liftIO $ encodeFile "snapshot.yaml" complete
 
-  do
-    logInfo "Unpacking files"
-    snapshot <- loadPantrySnapshotFile "snapshot.yaml"
-    constraints <- decodeFileThrow "constraints.yaml"
-    dest <- resolveDir' "unpack-dir"
-    unpackSnapshot constraints snapshot dest
+unpackFiles :: RIO PantryApp ()
+unpackFiles = do
+  logInfo "Unpacking files"
+  snapshot <- loadPantrySnapshotFile "snapshot.yaml"
+  constraints <- decodeFileThrow "constraints.yaml"
+  dest <- resolveDir' "unpack-dir"
+  unpackSnapshot constraints snapshot dest
 
-  do
-    logInfo "Building"
-    withWorkingDir "unpack-dir" $ proc 
-      "stack"
-      (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
-      runProcess_
+build :: RIO PantryApp ()
+build = do
+  logInfo "Building"
+  withWorkingDir "unpack-dir" $ proc
+    "stack"
+    (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
+    runProcess_
 
-loadPantrySnapshotFile :: FilePath -> RIO PantryApp Snapshot
+loadPantrySnapshotFile :: FilePath -> RIO PantryApp Curator.Snapshot
 loadPantrySnapshotFile fp = do
   abs' <- resolveFile' fp
   eres <- loadPantrySnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs') Nothing

@@ -9,6 +9,7 @@ dependencies:
 - yaml
 - path
 - path-io
+- optparse-generic
 
 library:
   source-dirs: src
