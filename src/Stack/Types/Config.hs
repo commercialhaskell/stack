@@ -223,7 +223,6 @@ import           Stack.Types.Nix
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
-import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.StylesUpdate (StylesUpdate,
@@ -443,7 +442,7 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
-    , globalStyles       :: !Styles -- ^ SGR (Ansi) codes for styles
+    , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
@@ -468,7 +467,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
-    , globalMonoidStyles       :: !(First StylesUpdate) -- ^ Stack's output styles
+    , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     } deriving (Show, Generic)
@@ -794,6 +793,7 @@ data ConfigMonoid =
     -- ^ See 'configHackageBaseUrl'
     , configMonoidIgnoreRevisionMismatch :: !(First Bool)
     -- ^ See 'configIgnoreRevisionMismatch'
+    , configMonoidStyles :: !StylesUpdate
     }
   deriving (Show, Generic)
 
@@ -891,6 +891,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
     configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
     configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
+    configMonoidStyles <- fromMaybe mempty <$> obj ..:? configMonoidStylesName
 
     return ConfigMonoid {..}
   where
@@ -1035,6 +1036,9 @@ configMonoidHackageBaseUrlName = "hackage-base-url"
 
 configMonoidIgnoreRevisionMismatchName :: Text
 configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
+
+configMonoidStylesName :: Text
+configMonoidStylesName = "stack-colors"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

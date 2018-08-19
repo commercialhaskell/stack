@@ -215,7 +215,7 @@ withRunnerGlobal GlobalOpts{..} = withRunner
   globalTimeInLog
   globalTerminal
   globalColorWhen
-  globalStyles
+  globalStylesUpdate
   globalTermWidth
   (isJust globalReExecVersion)
 

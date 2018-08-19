@@ -111,14 +111,16 @@ module Text.PrettyPrint.Leijen.Extended
   ) where
 
 import Control.Monad.Reader (runReader, local)
-import Data.Array.IArray ((!))
+import Data.Array.IArray ((!), (//))
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude hiding (Display (..))
 import Stack.Types.PrettyPrint (Style, Styles)
-import Stack.Types.Runner (HasRunner, stylesL)
+import Stack.Types.Runner (HasRunner, stylesUpdateL)
+import Stack.Types.StylesUpdate (StylesUpdate (..))
 import System.Console.ANSI (ConsoleLayer (..), SGR (..), setSGRCode)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
@@ -229,8 +231,9 @@ displayAnsiSimple
     :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
     => SimpleDoc StyleAnn -> m LT.Text
 displayAnsiSimple doc = do
-    styles <- view stylesL
-    let doc' = toAnsiDoc styles doc
+    update <- view stylesUpdateL
+    let styles = defaultStyles // stylesUpdate update
+        doc' = toAnsiDoc styles doc
     return $
         LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc'
   where

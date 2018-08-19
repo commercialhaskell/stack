@@ -7,7 +7,6 @@ import           Network.HTTP.StackClient
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO hiding (withSystemTempDir)
-import           Stack.DefaultStyles (defaultStyles)
 import           Stack.Prelude
 import           Stack.Types.Runner
 import           System.IO (writeFile, readFile)
@@ -68,7 +67,7 @@ spec = do
 
   describe "verifiedDownload" $ do
     let run func =
-          withRunner LevelError True True ColorNever defaultStyles Nothing False
+          withRunner LevelError True True ColorNever mempty Nothing False
                  $ \runner -> runRIO runner func
     -- Preconditions:
     -- * the exampleReq server is running
