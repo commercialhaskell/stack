@@ -48,8 +48,8 @@ constraints = do
 snapshotIncomplete :: RIO PantryApp ()
 snapshotIncomplete = do
   logInfo "Writing snapshot-incomplete.yaml"
-  decodeFileThrow "constraints.yaml" >>= \constraints ->
-    makeSnapshot constraints "my-test-snapshot-2" >>=
+  decodeFileThrow "constraints.yaml" >>= \constraints' ->
+    makeSnapshot constraints' "my-test-snapshot-2" >>=
     liftIO . encodeFile "snapshot-incomplete.yaml"
 
 snapshot :: RIO PantryApp ()
@@ -62,10 +62,10 @@ snapshot = do
 unpackFiles :: RIO PantryApp ()
 unpackFiles = do
   logInfo "Unpacking files"
-  snapshot <- loadPantrySnapshotFile "snapshot.yaml"
-  constraints <- decodeFileThrow "constraints.yaml"
+  snapshot' <- loadPantrySnapshotFile "snapshot.yaml"
+  constraints' <- decodeFileThrow "constraints.yaml"
   dest <- resolveDir' "unpack-dir"
-  unpackSnapshot constraints snapshot dest
+  unpackSnapshot constraints' snapshot' dest
 
 build :: RIO PantryApp ()
 build = do

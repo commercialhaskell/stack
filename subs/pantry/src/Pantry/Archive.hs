@@ -171,8 +171,6 @@ foldArchive loc fp ATTarGz accum f =
 foldArchive loc fp ATTar accum f =
   withSourceFile fp $ \src -> runConduit $ src .| foldTar loc accum f
 foldArchive loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
-  -- We're entering lazy I/O land thanks to zip-archive.
-  lbs <- BL.hGetContents h
   let go accum entry = do
         let me = MetaEntry (Zip.eRelativePath entry) met
             met = fromMaybe METNormal $ do
@@ -196,6 +194,8 @@ foldArchive loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
         case reverse $ Zip.eRelativePath entry of
           '/':_ -> True
           _ -> False
+  -- We're entering lazy I/O land thanks to zip-archive.
+  lbs <- BL.hGetContents h
   foldM go accum0 (filter (not . isDir) $ Zip.zEntries $ Zip.toArchive lbs)
 
 foldTar
