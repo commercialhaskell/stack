@@ -83,3 +83,4 @@ tests:
     - hspec
     - exceptions
     - hedgehog
+    - QuickCheck
