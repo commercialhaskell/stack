@@ -790,6 +790,9 @@ build:
 
   # Since 1.8
   interleaved-output: false
+
+  # Since 1.10
+  ddump-dir: ""
 ```
 
 The meanings of these settings correspond directly with the CLI flags of the

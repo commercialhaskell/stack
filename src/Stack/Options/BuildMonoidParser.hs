@@ -22,7 +22,7 @@ buildOptsMonoidParser hide0 =
     preFetch <*> keepGoing <*> keepTmpFiles <*> forceDirty <*>
     tests <*> testOptsParser hideBool <*> benches <*>
     benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents <*>
-    interleavedOutput
+    interleavedOutput <*> ddumpDir
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -173,3 +173,9 @@ buildOptsMonoidParser hide0 =
             "interleaved-output"
             "Print concurrent GHC output to the console with a prefix for the package name"
             hide
+    ddumpDir =
+        optionalFirst
+            (strOption
+                (long "ddump-dir" <>
+                 help "Specify output ddump-files" <>
+                 hide))
