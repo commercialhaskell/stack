@@ -75,6 +75,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsInterleavedOutput = fromFirst
           (boptsInterleavedOutput defaultBuildOpts)
           buildMonoidInterleavedOutput
+    , boptsDdumpDir = getFirst buildMonoidDdumpDir
     }
   where
     -- These options are not directly used in bopts, instead they

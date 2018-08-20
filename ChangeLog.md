@@ -31,6 +31,7 @@ Other enhancements:
   non-project-specific yaml configuration parameter, allows a stack user to
   redefine the default styles that stack uses to color some of its output. See
   `stack --help` for more information.
+* New build option `--ddump-dir`. (See [#4225](https://github.com/commercialhaskell/stack/issues/4225))
 
 Bug fixes:
 
