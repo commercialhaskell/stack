@@ -66,7 +66,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform, Arc
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
-import           Lens.Micro (lens, set)
+import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import qualified Pantry.SHA256 as SHA256
@@ -365,7 +365,11 @@ configFromConfigMonoid
      let configMaybeProject = mproject
 
      configRunner' <- view runnerL
-     let configRunner = set processContextL origEnv configRunner'
+
+     let stylesUpdate' = runnerStylesUpdate configRunner' <>
+           configMonoidStyles
+         configRunner = configRunner' & processContextL .~ origEnv &
+           stylesUpdateL .~ stylesUpdate'
 
      case getFirst configMonoidIgnoreRevisionMismatch of
        Nothing -> pure ()
@@ -953,5 +957,12 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
+     , "# The following parameter specifies stack's output styles; STYLES is a"
+     , "# colon-delimited sequence of key=value, where 'key' is a style name and"
+     , "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic"
+     , "# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\""
+     , "# to see the current sequence."
+     , "# stack-colors: STYLES"
      , ""
      ]

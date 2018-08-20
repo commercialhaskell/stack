@@ -15,6 +15,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
+import Data.Array.IArray ((//), elems)
+import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude hiding (Snapshot (..))
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
@@ -26,12 +28,16 @@ import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.StackClient (httpJSON, addRequestHeader, getResponseBody, parseRequest, hAccept)
 import qualified Options.Applicative as OA
-import Options.Applicative ((<|>))
+import Options.Applicative ((<|>), idm)
+import Options.Applicative.Builder.Extra (boolFlags)
 import Path
-import Stack.Runners (withBuildConfig, withBuildConfigDot)
-import Stack.Types.Config
 import Stack.Dot
+import Stack.Runners (loadConfigWithOpts, withBuildConfig, withBuildConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)
+import Stack.Types.Config
+import Stack.Types.PrettyPrint (StyleSpec)
+import Stack.Types.StylesUpdate (StylesUpdate (..))
+import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
 import System.IO (stderr, hPutStrLn)
@@ -49,6 +55,7 @@ data SnapshotType
 data LsCmds
     = LsSnapshot SnapshotOpts
     | LsDependencies ListDepsOpts
+    | LsStyles ListStylesOpts
 
 data SnapshotOpts = SnapshotOpts
     { soptViewType :: LsView
@@ -56,18 +63,46 @@ data SnapshotOpts = SnapshotOpts
     , soptNightlySnapView :: Bool
     } deriving (Eq, Show, Ord)
 
+data ListStylesOpts = ListStylesOpts
+    { coptBasic   :: Bool
+    , coptSGR     :: Bool
+    , coptExample :: Bool
+    } deriving (Eq, Ord, Show)
+
 newtype LsCmdOpts = LsCmdOpts
     { lsView :: LsCmds
     }
 
 lsParser :: OA.Parser LsCmdOpts
-lsParser = LsCmdOpts <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd)
+lsParser = LsCmdOpts <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd <> lsStylesCmd)
 
 lsCmdOptsParser :: OA.Parser LsCmds
 lsCmdOptsParser = LsSnapshot <$> lsViewSnapCmd
 
 lsDepOptsParser :: OA.Parser LsCmds
 lsDepOptsParser = LsDependencies <$> listDepsOptsParser
+
+lsStylesOptsParser :: OA.Parser LsCmds
+lsStylesOptsParser = LsStyles <$> listStylesOptsParser
+
+listStylesOptsParser :: OA.Parser ListStylesOpts
+listStylesOptsParser = ListStylesOpts
+    <$> boolFlags False
+                  "basic"
+                  "a basic report of the styles used. The default is a fuller \
+                  \one"
+                  idm
+    <*> boolFlags True
+                  "sgr"
+                  "the provision of the equivalent SGR instructions (provided \
+                  \by default). Flag ignored for a basic report"
+                  idm
+    <*> boolFlags True
+                  "example"
+                  "the provision of an example of the applied style (provided \
+                  \by default for colored output). Flag ignored for a basic \
+                  \report"
+                  idm
 
 lsViewSnapCmd :: OA.Parser SnapshotOpts
 lsViewSnapCmd =
@@ -92,6 +127,12 @@ lsDepsCmd =
     OA.command
         "dependencies"
         (OA.info lsDepOptsParser (OA.progDesc "View the dependencies"))
+
+lsStylesCmd :: OA.Mod OA.CommandFields LsCmds
+lsStylesCmd =
+    OA.command
+        "stack-colors"
+        (OA.info lsStylesOptsParser (OA.progDesc "View stack's output styles"))
 
 data Snapshot = Snapshot
     { snapId :: Text
@@ -201,6 +242,7 @@ handleLocal lsOpts = do
                     L.filter (L.isPrefixOf "night") snapData
                 _ -> liftIO $ displayLocalSnapshot isStdoutTerminal snapData
         LsDependencies _ -> return ()
+        LsStyles _ -> return ()
 
 handleRemote
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -224,6 +266,7 @@ handleRemote lsOpts = do
                     filterSnapshotData snapData Nightly
                 _ -> liftIO $ displaySnapshotData isStdoutTerminal snapData
         LsDependencies _ -> return ()
+        LsStyles _ -> return ()
   where
     urlInfo = "https://www.stackage.org/snapshots"
 
@@ -235,6 +278,7 @@ lsCmd lsOpts go =
                 Local -> withBuildConfig go (handleLocal lsOpts)
                 Remote -> withBuildConfig go (handleRemote lsOpts)
         LsDependencies depOpts -> listDependenciesCmd False depOpts go
+        LsStyles stylesOpts -> loadConfigWithOpts go (listStylesCmd stylesOpts)
 
 -- | List the dependencies
 listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
@@ -257,3 +301,28 @@ lsViewRemoteCmd =
     OA.command
         "remote"
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
+
+-- | List stack's output styles
+listStylesCmd :: ListStylesOpts -> LoadConfig -> IO ()
+listStylesCmd opts lc = do
+    -- This is the same test as is used in Stack.Types.Runner.withRunner
+    let useColor = view useColorL lc
+        styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
+        isComplex = not (coptBasic opts)
+        showSGR = isComplex && coptSGR opts
+        showExample = isComplex && coptExample opts && useColor
+        styleReports = L.map (styleReport showSGR showExample) styles
+    T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
+  where
+    styleReport :: Bool -> Bool -> StyleSpec -> Text
+    styleReport showSGR showExample (k, sgrs) = k <> "=" <> codes
+        <> (if showSGR then sgrsList else mempty)
+        <> (if showExample then example else mempty)
+      where
+        codes = T.intercalate ";" (L.map (fromString . show) $
+                    L.concatMap sgrToCode sgrs)
+        sgrsList = " [" <> T.intercalate ", " (L.map (fromString . show) sgrs)
+                   <> "]"
+        example = " " <> ansi <> "Example" <> reset
+        ansi = fromString $ setSGRCode sgrs
+        reset = fromString $ setSGRCode [Reset]

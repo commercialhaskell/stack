@@ -58,7 +58,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
 import           Stack.DefaultColorWhen (defaultColorWhen)
-import           Stack.DefaultStyles (defaultStyles)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -191,7 +190,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal defColorWhen defaultStyles globalMonoid
+      let global = globalOptsFromMonoid isTerminal defColorWhen globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -307,7 +306,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     pathCmd
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots and dependencies)"
+                    "List command. (Supports snapshots, dependencies and stack's styles)"
                     lsCmd
                     lsParser
         addCommand' "unpack"

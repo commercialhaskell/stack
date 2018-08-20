@@ -14,7 +14,6 @@ import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
@@ -44,6 +43,18 @@ globalOptsParser currentDir kind defLogLevel =
               \that do not support color codes, the default is 'never'; color \
               \may work on terminals that support color codes" <>
          hide)) <*>
+    option readStyles
+         (long "stack-colors" <>
+          metavar "STYLES" <>
+          value mempty <>
+          help "Specify stack's output styles; STYLES is a colon-delimited \
+               \sequence of key=value, where 'key' is a style name and 'value' \
+               \is a semicolon-delimited list of 'ANSI' SGR (Select Graphic \
+               \Rendition) control codes (in decimal). Use 'stack ls \
+               \stack-colors --basic' to see the current sequence. In shells \
+               \where a semicolon is a command separator, enclose STYLES in \
+               \quotes." <>
+          hide) <*>
     optionalFirst (option auto
         (long "terminal-width" <>
          metavar "INT" <>
@@ -62,8 +73,8 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: Bool -> ColorWhen -> Styles -> GlobalOptsMonoid -> GlobalOpts
-globalOptsFromMonoid defaultTerminal defaultColorWhen defaultStyles GlobalOptsMonoid{..} = GlobalOpts
+globalOptsFromMonoid :: Bool -> ColorWhen -> GlobalOptsMonoid -> GlobalOpts
+globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
@@ -73,7 +84,7 @@ globalOptsFromMonoid defaultTerminal defaultColorWhen defaultStyles GlobalOptsMo
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalColorWhen = fromFirst defaultColorWhen globalMonoidColorWhen
-    , globalStyles = defaultStyles
+    , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
 

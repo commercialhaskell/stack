@@ -24,6 +24,13 @@ Other enhancements:
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.
+* New command `stack ls stack-colors` lists the styles and the associated 'ANSI'
+  control character sequences that stack uses to color some of its output. See
+  `stack ls stack-colors --help` for more information.
+* New global option `--stack-colors=STYLES`, also available as a
+  non-project-specific yaml configuration parameter, allows a stack user to
+  redefine the default styles that stack uses to color some of its output. See
+  `stack --help` for more information.
 
 Bug fixes:
 
