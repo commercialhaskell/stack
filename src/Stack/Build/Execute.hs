@@ -1534,26 +1534,26 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             when hasLibrary $ cabal KeepTHLoading ["register"]
 
         -- copy ddump-* files
-        let enableDdumpDir = isJust $ boptsDdumpDir eeBuildOpts
-            ddumpPath      = maybe "" T.unpack $ boptsDdumpDir eeBuildOpts
-        when (buildingFinals && enableDdumpDir && not (null ddumpPath)) $ do
-          distDir <- distRelativeDir
-          ddumpDir <- parseRelDir ddumpPath
+        case T.unpack <$> boptsDdumpDir eeBuildOpts of
+          Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
+            distDir <- distRelativeDir
+            ddumpDir <- parseRelDir ddumpPath
 
-          logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpDir)
-          logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
+            logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpDir)
+            logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
 
-          runConduitRes
-            $ CF.sourceDirectoryDeep False (toFilePath distDir)
-           .| CL.filter (isInfixOf ".dump-")
-           .| CL.mapM_ (\src -> liftIO $ do
-                parentDir <- parent <$> parseRelDir src
-                destBaseDir <- (ddumpDir </>) <$> stripProperPrefix distDir parentDir
-                -- exclude .stack-work dir
-                unless (".stack-work" `isInfixOf` toFilePath destBaseDir) $ do
-                  ensureDir destBaseDir
-                  src' <- parseRelFile src
-                  copyFile src' (destBaseDir </> filename src'))
+            runConduitRes
+              $ CF.sourceDirectoryDeep False (toFilePath distDir)
+             .| CL.filter (isInfixOf ".dump-")
+             .| CL.mapM_ (\src -> liftIO $ do
+                  parentDir <- parent <$> parseRelDir src
+                  destBaseDir <- (ddumpDir </>) <$> stripProperPrefix distDir parentDir
+                  -- exclude .stack-work dir
+                  unless (".stack-work" `isInfixOf` toFilePath destBaseDir) $ do
+                    ensureDir destBaseDir
+                    src' <- parseRelFile src
+                    copyFile src' (destBaseDir </> filename src'))
+          _ -> pure ()
 
         let (installedPkgDb, installedDumpPkgsTVar) =
                 case taskLocation task of
