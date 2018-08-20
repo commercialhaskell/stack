@@ -92,6 +92,8 @@ import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
 import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Database.Persist
 import Database.Persist.Sql
 import Pantry.SHA256 (SHA256)
@@ -786,7 +788,7 @@ displayC :: (IsString str, Distribution.Text.Text a) => a -> str
 displayC = fromString . Distribution.Text.display
 
 data OptionalSubdirs
-  = OSSubdirs !Text ![Text] -- non-empty list
+  = OSSubdirs !(NonEmpty Text)
   | OSPackageMetadata !PackageMetadata
   deriving (Show, Eq, Data, Generic)
 instance NFData OptionalSubdirs
@@ -909,7 +911,7 @@ instance ToJSON UnresolvedPackageLocationImmutable where
           RepoHg  -> "hg"
 
 osToPairs :: OptionalSubdirs -> [(Text, Value)]
-osToPairs (OSSubdirs x xs) = [("subdirs" .= (x:xs))]
+osToPairs (OSSubdirs sds) = [("subdirs" .= sds)]
 osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal subdir)) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
@@ -956,9 +958,9 @@ instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
           Just v' -> do
             tellJSONField "subdirs"
             subdirs <- lift $ parseJSON v'
-            case subdirs of
-              [] -> fail "Invalid empty subdirs"
-              x:xs -> pure $ OSSubdirs x xs
+            case NE.nonEmpty subdirs of
+              Nothing -> fail "Invalid empty subdirs"
+              Just ne -> pure $ OSSubdirs ne
           Nothing -> OSPackageMetadata <$> (PackageMetadata
             <$> (fmap unCabalString <$> (o ..:? "name"))
             <*> (fmap unCabalString <$> (o ..:? "version"))
@@ -998,8 +1000,8 @@ resolvePackageLocationImmutable
   :: MonadIO m
   => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
   -> UnresolvedPackageLocationImmutable
-  -> m [PackageLocationImmutable]
-resolvePackageLocationImmutable _mdir (UPLIHackage pir mtree) = pure [PLIHackage pir mtree]
+  -> m (NonEmpty PackageLocationImmutable)
+resolvePackageLocationImmutable _mdir (UPLIHackage pir mtree) = pure $ PLIHackage pir mtree :| []
 resolvePackageLocationImmutable mdir (UPLIArchive ra os) = do
   loc <-
     case uaLocation ra of
@@ -1015,12 +1017,12 @@ resolvePackageLocationImmutable mdir (UPLIArchive ra os) = do
         , archiveHash = uaHash ra
         , archiveSize = uaSize ra
         }
-  pure $ map (PLIArchive archive) $ osToPms os
-resolvePackageLocationImmutable _mdir (UPLIRepo repo os) = pure $ map (PLIRepo repo) $ osToPms os
+  pure $ NE.map (PLIArchive archive) $ osToPms os
+resolvePackageLocationImmutable _mdir (UPLIRepo repo os) = pure $ NE.map (PLIRepo repo) $ osToPms os
 
-osToPms :: OptionalSubdirs -> [PackageMetadata]
-osToPms (OSSubdirs x xs) = map (PackageMetadata Nothing Nothing Nothing Nothing) (x:xs)
-osToPms (OSPackageMetadata pm) = [pm]
+osToPms :: OptionalSubdirs -> NonEmpty PackageMetadata
+osToPms (OSSubdirs ne) = NE.map (PackageMetadata Nothing Nothing Nothing Nothing) ne
+osToPms (OSPackageMetadata pm) = pm :| []
 
 -- | Convert a 'PackageLocationImmutable' into a 'UnresolvedPackageLocationImmutable'.
 mkUnresolvedPackageLocationImmutable :: PackageLocationImmutable -> UnresolvedPackageLocationImmutable
@@ -1333,7 +1335,8 @@ parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
   snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
   snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
   pure $ do
-    snapshotLocations <- fmap concat $ mapM (resolvePackageLocationImmutable mdir) unresolvedLocs
+    snapshotLocations <- fmap (concat . map NE.toList) $
+      traverse (resolvePackageLocationImmutable mdir) unresolvedLocs
     snapshotParent <- iosnapshotParent
     pure Snapshot {..}
 

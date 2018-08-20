@@ -7,6 +7,7 @@ import           Data.Aeson.Extended (WithJSONWarnings(..))
 import           RIO
 import qualified Data.ByteString.Char8 as S8
 import           Data.Yaml (decodeThrow)
+import           Data.List.NonEmpty (NonEmpty(..))
 import           Pantry
 import           Test.Hspec
 import           Control.Monad.Catch (MonadThrow)
@@ -19,7 +20,7 @@ spec =
         let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings UnresolvedPackageLocationImmutable)
             decode' = decodeThrow
 
-            decode'' :: HasCallStack => ByteString -> IO [PackageLocationImmutable]
+            decode'' :: HasCallStack => ByteString -> IO (NonEmpty PackageLocationImmutable)
             decode'' bs = do
               WithJSONWarnings unresolved warnings <- decode' bs
               unless (null warnings) $ error $ show warnings
@@ -49,7 +50,7 @@ spec =
                     , pmSubdir = ""
                     }
           actual <- decode'' contents
-          actual `shouldBe` [expected]
+          actual `shouldBe` (expected :| [])
 
         it "'github', 'commit', and 'subdirs' keys" $ do
           let contents :: ByteString
@@ -77,7 +78,7 @@ spec =
                     , pmSubdir = "foo"
                     }
           actual <- decode'' contents
-          actual `shouldBe` [expected]
+          actual `shouldBe` (expected :| [])
 
         it "does not parse GitHub repo with no slash" $ do
           let contents :: ByteString
