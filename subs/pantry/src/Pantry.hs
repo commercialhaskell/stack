@@ -133,6 +133,7 @@ import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Pantry.HTTP
 import qualified RIO.FilePath
+import Data.Char (isHexDigit)
 
 withPantryConfig
   :: HasLogFunc env
@@ -465,8 +466,11 @@ completePackageLocation (PLIHackage pir0@(PackageIdentifierRevision name version
   pure $ PLIHackage pir (Just treeKey)
 completePackageLocation pl@(PLIArchive archive pm) =
   PLIArchive <$> completeArchive archive <*> completePM pl pm
-completePackageLocation pl@(PLIRepo repo pm) =
+completePackageLocation pl@(PLIRepo repo pm) = do
+  unless (isSHA1 (repoCommit repo)) $ throwIO $ CannotCompleteRepoNonSHA1 repo
   PLIRepo repo <$> completePM pl pm
+  where
+    isSHA1 t = T.length t == 40 && T.all isHexDigit t
 
 completeArchive
   :: (HasPantryConfig env, HasLogFunc env)

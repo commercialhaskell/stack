@@ -450,6 +450,7 @@ data PantryException
   | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
   | CRC32Mismatch !ArchiveLocation !FilePath (Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
+  | CannotCompleteRepoNonSHA1 !Repo
 
   deriving Typeable
 instance Exception PantryException where
@@ -600,6 +601,9 @@ instance Display PantryException where
   display (UnknownHackagePackage pir fuzzy) =
     "Could not find " <> display pir <> " on Hackage" <>
     displayFuzzy fuzzy
+  display (CannotCompleteRepoNonSHA1 repo) =
+    "Cannot complete repo information for a non SHA1 commit due to non-reproducibility: " <>
+    display repo
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
