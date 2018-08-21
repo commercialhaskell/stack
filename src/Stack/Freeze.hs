@@ -15,7 +15,7 @@ import           Stack.Types.Config
 
 data FreezeMode = FreezeProject | FreezeSnapshot
 
-data FreezeOpts = FreezeOpts
+newtype FreezeOpts = FreezeOpts
     { freezeMode :: FreezeMode
     }
 
