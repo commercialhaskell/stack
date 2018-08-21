@@ -22,7 +22,6 @@ module Pantry.Storage
   , storeHackageRevision
   , loadHackagePackageVersions
   , loadHackagePackageVersion
-  , loadHackageCabalFile
   , loadLatestCacheUpdate
   , storeCacheUpdate
   , storeHackageTarballInfo
@@ -42,6 +41,7 @@ module Pantry.Storage
   , checkCrlfHack
   , storePreferredVersion
   , loadPreferredVersion
+  , sinkHackagePackageNames
 
     -- avoid warnings
   , BlobTableId
@@ -71,6 +71,8 @@ import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Data.Pool (destroyAllResources)
+import Conduit
+import Data.Acquire (with)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
@@ -227,8 +229,8 @@ loadBlob (BlobKey sha size) = do
 loadBlobBySHA
   :: (HasPantryConfig env, HasLogFunc env)
   => SHA256
-  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
-loadBlobBySHA sha = fmap (fmap (blobTableContents . entityVal)) $ getBy $ UniqueBlobHash sha
+  -> ReaderT SqlBackend (RIO env) (Maybe BlobTableId)
+loadBlobBySHA sha = listToMaybe <$> selectKeysList [BlobTableHash ==. sha] []
 
 loadBlobById
   :: (HasPantryConfig env, HasLogFunc env)
@@ -353,56 +355,6 @@ loadHackagePackageVersion name version = do
   where
     go (Single revision, Single sha, Single size, Single bid) =
       (revision, (bid, BlobKey sha size))
-
-loadHackageCabalFile
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
-  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
-loadHackageCabalFile name version cfi = do
-  nameid <- getNameId name
-  versionid <- getVersionId version
-  case cfi of
-    CFILatest -> selectFirst
-      [ HackageCabalName ==. nameid
-      , HackageCabalVersion ==. versionid
-      ]
-      [Desc HackageCabalRevision] >>= withHackEnt
-    CFIRevision rev ->
-      getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
-    CFIHash sha msize -> do
-      ment <- getBy $ UniqueBlobHash sha
-      case ment of
-        Nothing -> pure Nothing
-        Just (Entity btid bt) -> do
-          check1 <-
-            case msize of
-              Nothing -> pure True
-              Just size
-                | blobTableSize bt == size -> pure True
-                | otherwise -> lift $ do
-                    logError "loadHackageCabalFile: matching SHA256 but mismatched size detected"
-                    logError "This either means you have invalid configuration, or have somehow collided a SHA256"
-                    logError $ "Discovered trying to grab cabal file " <> display cfi
-                    logError $ "Found file size: " <> display size
-                    pure False
-          check2 <-
-            if blobTableSize bt == FileSize (fromIntegral (B.length (blobTableContents bt)))
-              then pure True
-              else lift $ do
-                logError "SQLite blob size does not match the actual contents"
-                logError $ "Row ID: " <> displayShow btid
-                logError $ "Actual size of contents: " <> display (B.length (blobTableContents bt))
-                logError $ "Value in size column:    " <> display (blobTableSize bt)
-                pure False
-          pure $ if check1 && check2 then Just (blobTableContents bt) else Nothing
-  where
-    withHackEnt = traverse $ \(Entity _ h) -> do
-      mblob <- get $ hackageCabalCabal h
-      case mblob of
-        Nothing -> error $ "Unexpected Nothing getting hackageCabalCabal: " ++ show (hackageCabalCabal h)
-        Just blob -> pure $ blobTableContents blob
 
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
@@ -717,3 +669,28 @@ loadPreferredVersion
 loadPreferredVersion name = do
   nameid <- getNameId name
   fmap (preferredVersionsPreferred . entityVal) <$> getBy (UniquePreferred nameid)
+
+sinkHackagePackageNames
+  :: (HasPantryConfig env, HasLogFunc env)
+  => (PackageName -> Bool)
+  -> ConduitT PackageName Void (ReaderT SqlBackend (RIO env)) a
+  -> ReaderT SqlBackend (RIO env) a
+sinkHackagePackageNames predicate sink = do
+  acqSrc <- selectSourceRes [] []
+  with acqSrc $ \src -> runConduit
+    $ src
+   .| concatMapMC go
+   .| sink
+  where
+    go (Entity nameid (Name (PackageNameP name)))
+      | predicate name = do
+          -- Make sure it's actually on Hackage. Would be much more
+          -- efficient with some raw SQL and an inner join, but we
+          -- don't have a Conduit version of rawSql.
+          onHackage <- checkOnHackage nameid
+          pure $ if onHackage then Just name else Nothing
+      | otherwise = pure Nothing
+
+    checkOnHackage nameid = do
+      cnt <- count [HackageCabalName ==. nameid]
+      pure $ cnt > 0

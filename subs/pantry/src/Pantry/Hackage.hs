@@ -9,6 +9,9 @@ module Pantry.Hackage
   , getHackageTarball
   , getHackageTarballKey
   , getHackageCabalFile
+  , getPackageVersions
+  , typoCorrectionCandidates
+  , UsePreferredVersions (..)
   ) where
 
 import RIO
@@ -31,6 +34,10 @@ import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
 import qualified Distribution.Text
 import Distribution.Types.PackageName (unPackageName)
 import System.IO (SeekMode (..))
+import qualified Data.List.NonEmpty as NE
+import Data.Text.Metrics (damerauLevenshtein)
+import Distribution.Types.Version (versionNumbers)
+import Distribution.Types.VersionRange (withinRange)
 
 import qualified Hackage.Security.Client as HS
 import qualified Hackage.Security.Client.Repository.Cache as HS
@@ -266,30 +273,20 @@ getHackageCabalFile
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
   -> RIO env ByteString
-getHackageCabalFile pir@(PackageIdentifierRevision _ _ (CFIHash sha msize)) = do
-  mbs <- inner
-  case mbs of
-    Just bs -> pure bs
-    Nothing -> do
-      let exc = CabalFileInfoNotFound pir
-      updated <- updateHackageIndex $ Just $ display exc <> ", updating"
-      mres' <- if updated then inner else pure Nothing
-      case mres' of
-        Nothing -> throwIO exc
-        Just res -> pure res
-  where
-    inner = do
-      mbs <- withStorage $ loadBlobBySHA sha
-      pure $
-        case mbs of
-          Nothing -> Nothing
-          Just bs
-            | maybe True (== FileSize (fromIntegral (B.length bs))) msize -> Just bs
-            | otherwise -> Nothing -- maybe check the SHA here, and then report the SHA256 collision
-
-getHackageCabalFile pir = do
+getHackageCabalFile pir@(PackageIdentifierRevision _ _ cfi) = do
   bid <- resolveCabalFileInfo pir
-  withStorage $ loadBlobById bid
+  bs <- withStorage $ loadBlobById bid
+  case cfi of
+    CFIHash sha msize -> do
+      let sizeMismatch =
+            case msize of
+              Nothing -> False
+              Just size -> FileSize (fromIntegral (B.length bs)) /= size
+          shaMismatch = sha /= SHA256.hashBytes bs
+      when (sizeMismatch || shaMismatch)
+        $ error $ "getHackageCabalFile: size or SHA mismatch for " ++ show (pir, bs)
+    _ -> pure ()
+  pure bs
 
 resolveCabalFileInfo
   :: (HasPantryConfig env, HasLogFunc env)
@@ -300,25 +297,94 @@ resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
   case mres of
     Just res -> pure res
     Nothing -> do
-      let exc = CabalFileInfoNotFound pir
-      updated <- updateHackageIndex $ Just $ display exc <> ", updating"
+      updated <- updateHackageIndex $ Just $ "Cabal file info not found for " <> display pir <> ", updating"
       mres' <- if updated then inner else pure Nothing
       case mres' of
-        Nothing -> throwIO exc
+        Nothing -> fuzzyLookupCandidates name ver >>= throwIO . UnknownHackagePackage pir
         Just res -> pure res
   where
-    inner = do
-      revs <- withStorage $ loadHackagePackageVersion name ver
-      pure $
-        case cfi of
-          CFIHash sha msize -> listToMaybe $ mapMaybe
-            (\(bid, BlobKey sha' size') ->
-               if sha' == sha && maybe True (== size') msize
-                 then Just bid
-                 else Nothing)
-            (Map.elems revs)
-          CFIRevision rev -> fst <$> Map.lookup rev revs
-          CFILatest -> (fst . fst) <$> Map.maxView revs
+    inner =
+      case cfi of
+        CFIHash sha _msize -> withStorage $ loadBlobBySHA sha
+        CFIRevision rev -> (fmap fst . Map.lookup rev) <$> withStorage (loadHackagePackageVersion name ver)
+        CFILatest -> (fmap (fst . fst) . Map.maxView) <$> withStorage (loadHackagePackageVersion name ver)
+
+-- | Given package identifier and package caches, return list of packages
+-- with the same name and the same two first version number components found
+-- in the caches.
+fuzzyLookupCandidates
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> Version
+  -> RIO env FuzzyResults
+fuzzyLookupCandidates name ver0 = do
+  m <- getPackageVersions YesPreferredVersions name
+  if Map.null m
+    then FRNameNotFound <$> typoCorrectionCandidates name
+    else
+      case Map.lookup ver0 m of
+        Nothing -> do
+          let withVers vers = pure $ FRVersionNotFound $ flip NE.map vers $ \(ver, revs) ->
+                case Map.maxView revs of
+                  Nothing -> error "fuzzyLookupCandidates: no revisions"
+                  Just (BlobKey sha size, _) -> PackageIdentifierRevision name ver (CFIHash sha (Just size))
+          case NE.nonEmpty $ filter (sameMajor . fst) $ Map.toList m of
+            Just vers -> withVers vers
+            Nothing ->
+              case NE.nonEmpty $ Map.toList m of
+                Nothing -> error "fuzzyLookupCandidates: no versions"
+                Just vers -> withVers vers
+        Just revisions ->
+          let pirs = map
+                (\(BlobKey sha size) -> PackageIdentifierRevision name ver0 (CFIHash sha (Just size)))
+                (Map.elems revisions)
+           in case NE.nonEmpty pirs of
+                Nothing -> error "fuzzyLookupCandidates: no revisions"
+                Just pirs' -> pure $ FRRevisionNotFound pirs'
+  where
+    sameMajor v = toMajorVersion v == toMajorVersion ver0
+
+toMajorVersion :: Version -> [Int]
+toMajorVersion v =
+  case versionNumbers v of
+    []    -> [0, 0]
+    [a]   -> [a, 0]
+    a:b:_ -> [a, b]
+
+-- | Try to come up with typo corrections for given package identifier using
+-- package caches. This should be called before giving up, i.e. when
+-- 'fuzzyLookupCandidates' cannot return anything.
+typoCorrectionCandidates
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName
+  -> RIO env [PackageName]
+typoCorrectionCandidates name1 =
+    withStorage $ sinkHackagePackageNames
+      (\name2 -> damerauLevenshtein (displayC name1) (displayC name2) < 4)
+      (takeC 10 .| sinkList)
+
+-- | Should we pay attention to Hackage's preferred versions?
+data UsePreferredVersions = YesPreferredVersions | NoPreferredVersions
+  deriving Show
+
+-- | Returns the versions of the package available on Hackage.
+getPackageVersions
+  :: (HasPantryConfig env, HasLogFunc env)
+  => UsePreferredVersions
+  -> PackageName -- ^ package name
+  -> RIO env (Map Version (Map Revision BlobKey))
+getPackageVersions usePreferred name = withStorage $ do
+  mpreferred <-
+    case usePreferred of
+      YesPreferredVersions -> loadPreferredVersion name
+      NoPreferredVersions -> pure Nothing
+  let predicate :: Version -> Map Revision BlobKey -> Bool
+      predicate = fromMaybe (\_ _ -> True) $ do
+        preferredT1 <- mpreferred
+        preferredT2 <- T.stripPrefix (displayC name) preferredT1
+        vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
+        Just $ \v _ -> withinRange v vr
+  Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env)

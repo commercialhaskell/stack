@@ -90,6 +90,7 @@ module Pantry
   , updateHackageIndex
   , hackageIndexTarballL
   , getLatestHackageVersion
+  , typoCorrectionCandidates
 
     -- * Convenience
   , PantryApp
@@ -97,7 +98,6 @@ module Pantry
   , runPantryAppClean
 
     -- * FIXME legacy from Stack, to be updated
-  , loadFromIndex
   , getPackageVersions
   , UsePreferredVersions (..)
   , fetchPackages
@@ -132,8 +132,6 @@ import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Pantry.HTTP
-import qualified Distribution.Text
-import Distribution.Types.VersionRange (withinRange)
 import qualified RIO.FilePath
 
 withPantryConfig
@@ -178,137 +176,6 @@ defaultHackageSecurityConfig = HackageSecurityConfig
   , hscKeyThreshold = 3
   , hscDownloadPrefix = "https://hackage.haskell.org/"
   }
-
-lookupPackageIdentifierExact
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
-  -> RIO env (Maybe ByteString)
-lookupPackageIdentifierExact name version cfi =
-  withStorage $ loadHackageCabalFile name version cfi
-
-loadFromIndex
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
-  -> RIO env (Either () ByteString)
-loadFromIndex name version cfi = do
-  mres <- lookupPackageIdentifierExact name version cfi
-  case mres of
-    Just bs -> return $ Right bs
-    -- Update the cache and try again
-    Nothing -> do
-      updated <- updateHackageIndex $ Just $
-                "Didn't see " <>
-                display (PackageIdentifierRevision name version cfi) <>
-                " in your package indices.\n" <>
-                "Updating and trying again."
-      if updated
-        then loadFromIndex name version cfi
-        else do
-            pure $ Left ()
-            {- FIXME
-            fuzzy <- fuzzyLookupCandidates name version cfi
-            let suggestions = case fuzzy of
-                    FRNameNotFound Nothing -> ""
-                    FRNameNotFound (Just cs) ->
-                          "Perhaps you meant " <> orSeparated cs <> "?"
-                    FRVersionNotFound cs -> "Possible candidates: " <>
-                      commaSeparated (NE.map packageIdentifierText cs)
-                      <> "."
-                    FRRevisionNotFound cs ->
-                      "The specified revision was not found.\nPossible candidates: " <>
-                      commaSeparated (NE.map (T.pack . packageIdentifierRevisionString) cs)
-                      <> "."
-            pure (False, Left $ UnknownPackageIdentifiers
-                                  (Set.singleton (name, version, cfi))
-                                  suggestions)
-
-orSeparated :: NonEmpty Text -> Text
-orSeparated xs
-  | NE.length xs == 1 = NE.head xs
-  | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
-  | otherwise = T.intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
-
-commaSeparated :: NonEmpty Text -> Text
-commaSeparated = fold . NE.intersperse ", "
-
-data FuzzyResults
-  = FRNameNotFound !(Maybe (NonEmpty Text))
-  | FRVersionNotFound !(NonEmpty (PackageName, Version))
-  | FRRevisionNotFound !(NonEmpty (PackageName, Version, CabalFileInfo))
-
--- | Given package identifier and package caches, return list of packages
--- with the same name and the same two first version number components found
--- in the caches.
-fuzzyLookupCandidates
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
-  -> RIO env FuzzyResults
-fuzzyLookupCandidates name ver _rev =
-  case Map.lookup name caches of
-    Nothing -> FRNameNotFound $ typoCorrectionCandidates name (PackageCache caches)
-    Just m ->
-      case Map.lookup ver m of
-        Nothing ->
-          case NE.nonEmpty $ filter sameMajor $ Map.keys m of
-            Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
-            Nothing ->
-              case NE.nonEmpty $ Map.keys m of
-                Nothing -> error "fuzzyLookupCandidates: no versions"
-                Just vers -> FRVersionNotFound $ NE.map (PackageIdentifier name) vers
-        Just (_index, _mpd, revisions) ->
-          let hashes = concatMap fst $ NE.toList revisions
-              pirs = map (PackageIdentifierRevision (PackageIdentifier name ver) . CFIHash Nothing) hashes
-           in case NE.nonEmpty pirs of
-                Nothing -> error "fuzzyLookupCandidates: no revisions"
-                Just pirs' -> FRRevisionNotFound pirs'
-  where
-    sameMajor v = toMajorVersion v == toMajorVersion ver
-
--- | Try to come up with typo corrections for given package identifier using
--- package caches. This should be called before giving up, i.e. when
--- 'fuzzyLookupCandidates' cannot return anything.
-typoCorrectionCandidates
-  :: PackageName
-  -> Maybe (NonEmpty Text)
-typoCorrectionCandidates name' =
-  let name = packageNameText name'
-  in  NE.nonEmpty
-    . take 10
-    . map snd
-    . filter (\(distance, _) -> distance < 4)
-    . map (\k -> (damerauLevenshtein name (packageNameText k), packageNameText k))
-    . Map.keys
-    $ cache
--}
-
--- | Should we pay attention to Hackage's preferred versions?
-data UsePreferredVersions = YesPreferredVersions | NoPreferredVersions
-  deriving Show
-
--- | Returns the versions of the package available on Hackage.
-getPackageVersions
-  :: (HasPantryConfig env, HasLogFunc env)
-  => UsePreferredVersions
-  -> PackageName -- ^ package name
-  -> RIO env (Map Version (Map Revision BlobKey))
-getPackageVersions usePreferred name = withStorage $ do
-  mpreferred <-
-    case usePreferred of
-      YesPreferredVersions -> loadPreferredVersion name
-      NoPreferredVersions -> pure Nothing
-  let predicate :: Version -> Map Revision BlobKey -> Bool
-      predicate = fromMaybe (\_ _ -> True) $ do
-        preferredT1 <- mpreferred
-        preferredT2 <- T.stripPrefix (displayC name) preferredT1
-        vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
-        Just $ \v _ -> withinRange v vr
-  Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 -- | Returns the latest version of the given package available from
 -- Hackage. Uses preferred versions to ignore packages.

@@ -59,6 +59,8 @@ dependencies:
 - hpack
 - yaml
 - zip-archive
+- text-metrics
+- resourcet
 
 library:
   source-dirs: src/

@@ -24,9 +24,9 @@ instance Show UnpackException where
     show (UnpackDirectoryAlreadyExists dirs) = unlines
         $ "Unable to unpack due to already present directories:"
         : map (("    " ++) . toFilePath) (Set.toList dirs)
-    show (CouldNotParsePackageSelectors strs) =
-        "The following package selectors are not valid package names or identifiers: " ++
-        intercalate ", " strs
+    show (CouldNotParsePackageSelectors strs) = unlines
+      $ "The following package selectors are not valid package names or identifiers:"
+      : map ("- " ++) strs
 
 -- | Intended to work for the command line command.
 unpackPackages
@@ -77,14 +77,21 @@ unpackPackages mSnapshotDef dest input = do
             if updated
               then getLatestHackageVersion name
               else pure Nothing
-      pure $
-        case mver of
-          -- consider updating the index
-          Nothing -> Left $ "Could not find package " ++ displayC name
-          Just pir@(PackageIdentifierRevision _ ver _) -> Right
-            ( PLIHackage pir Nothing
-            , PackageIdentifier name ver
-            )
+      case mver of
+        Nothing -> do
+          candidates <- typoCorrectionCandidates name
+          pure $ Left $ concat
+            [ "Could not find package "
+            , displayC name
+            , " on Hackage"
+            , if null candidates
+                then ""
+                else ". Perhaps you meant: " ++ intercalate ", " (map displayC candidates)
+            ]
+        Just pir@(PackageIdentifierRevision _ ver _) -> pure $ Right
+          ( PLIHackage pir Nothing
+          , PackageIdentifier name ver
+          )
 
     toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
     toLocSnapshot sd name =
@@ -104,6 +111,6 @@ unpackPackages mSnapshotDef dest input = do
             Nothing ->
                 case parsePackageIdentifierRevision t of
                     Right x -> Right $ Right x
-                    Left _ -> Left s
+                    Left _ -> Left $ "Could not parse as package name or identifier: " ++ s
       where
         t = T.pack s

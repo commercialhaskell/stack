@@ -60,6 +60,7 @@ module Pantry.Types
   , parsePackageIdentifierRevision
   , Mismatch (..)
   , PantryException (..)
+  , FuzzyResults (..)
   , ResolvedPath (..)
   , HpackExecutable (..)
   , WantedCompiler (..)
@@ -115,6 +116,8 @@ import Path (Abs, Dir, File, toFilePath, filename)
 import Path.Internal (Path (..)) -- TODO don't import this
 import Path.IO (resolveFile)
 import Data.Pool (Pool)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -301,7 +304,7 @@ instance FromJSON BlobKey where
     <$> o .: "sha256"
     <*> o .: "size"
 
-newtype PackageNameP = PackageNameP PackageName
+newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
 instance PersistField PackageNameP where
   toPersistValue (PackageNameP pn) = PersistText $ displayC pn
   fromPersistValue v = do
@@ -441,12 +444,12 @@ data PantryException
   | UnknownArchiveType !ArchiveLocation
   | InvalidTarFileType !ArchiveLocation !FilePath !Tar.FileType
   | UnsupportedTarball !ArchiveLocation !Text
-  | CabalFileInfoNotFound !PackageIdentifierRevision
   | NoHackageCryptographicHash !PackageIdentifier
   | FailedToCloneRepo !Repo
   | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
   | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
   | CRC32Mismatch !ArchiveLocation !FilePath (Mismatch Word32)
+  | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
 
   deriving Typeable
 instance Exception PantryException where
@@ -578,7 +581,6 @@ instance Display PantryException where
     "Unsupported tar filetype in archive " <> display loc <> " at file " <> fromString fp <> ": " <> displayShow x
   display (UnsupportedTarball loc e) =
     "Unsupported tarball from " <> display loc <> ": " <> display e
-  display (CabalFileInfoNotFound pir) = "Cabal file info not found for " <> display pir
   display (NoHackageCryptographicHash ident) = "Not cryptographic hash found for Hackage package " <> displayC ident
   display (FailedToCloneRepo repo) = "Failed to clone repo " <> display repo
   display (TreeReferencesMissingBlob loc sfp key) =
@@ -595,6 +597,40 @@ instance Display PantryException where
     " on internal file " <> fromString fp <>
     "\n.Expected: " <> display mismatchExpected <>
     "\n.Actual:   " <> display mismatchActual
+  display (UnknownHackagePackage pir fuzzy) =
+    "Could not find " <> display pir <> " on Hackage" <>
+    displayFuzzy fuzzy
+
+data FuzzyResults
+  = FRNameNotFound ![PackageName]
+  | FRVersionNotFound !(NonEmpty PackageIdentifierRevision)
+  | FRRevisionNotFound !(NonEmpty PackageIdentifierRevision)
+
+displayFuzzy :: FuzzyResults -> Utf8Builder
+displayFuzzy (FRNameNotFound names) =
+  case NE.nonEmpty names of
+    Nothing -> ""
+    Just names' ->
+      "\nPerhaps you meant " <>
+      orSeparated (NE.map displayC names') <>
+      "?"
+displayFuzzy (FRVersionNotFound pirs) =
+  "\nPossible candidates: " <>
+  commaSeparated (NE.map display pirs) <>
+  "."
+displayFuzzy (FRRevisionNotFound pirs) =
+  "The specified revision was not found.\nPossible candidates: " <>
+  commaSeparated (NE.map display pirs) <>
+  "."
+
+orSeparated :: NonEmpty Utf8Builder -> Utf8Builder
+orSeparated xs
+  | NE.length xs == 1 = NE.head xs
+  | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
+  | otherwise = fold (intersperse ", " (NE.init xs)) <> ", or " <> NE.last xs
+
+commaSeparated :: NonEmpty Utf8Builder -> Utf8Builder
+commaSeparated = fold . NE.intersperse ", "
 
 -- You'd really think there'd be a better way to do this in Cabal.
 cabalSpecLatestVersion :: Version
