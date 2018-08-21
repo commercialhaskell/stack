@@ -738,13 +738,11 @@ solveExtraDeps modStackYaml = do
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
             -- Check input file and show warnings
             _ <- loadConfigYaml (parseProjectAndConfigMonoid (parent path)) path
-            let (usl, mcompiler) = unresolveSnapshotLocation res
-                obj' =
+            let obj' =
                     HashMap.insert "extra-deps"
                         (toJSON $ map (CabalString . uncurry PackageIdentifier) $ Map.toList deps)
                   $ HashMap.insert ("flags" :: Text) (toJSON $ toCabalStringMap $ toCabalStringMap <$> fl)
-                  $ maybe id (HashMap.insert "compiler" . toJSON) mcompiler
-                  $ HashMap.insert ("resolver" :: Text) (toJSON usl) obj
+                  $ HashMap.insert ("resolver" :: Text) (toJSON res) obj
             liftIO $ Yaml.encodeFile fp obj'
 
         giveUpMsg = concat

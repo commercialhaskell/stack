@@ -51,7 +51,7 @@ data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/co
     { sdResolver        :: !SnapshotLocation
     , sdSnapshot        :: !(Maybe (Snapshot, SnapshotDef))
     , sdWantedCompilerVersion :: !WantedCompiler
-    , sdUniqueHash :: !StaticSHA256
+    , sdUniqueHash :: !SHA256
     }
     deriving (Show, Eq, Data, Generic, Typeable)
 instance Store SnapshotDef
@@ -144,7 +144,7 @@ configuration. Otherwise, we don't cache.
 -}
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
-loadedSnapshotVC = storeVersionConfig "ls-v6" "pmaNGNwdLx9dgFqd2TiMcRhTQzQ="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "ARoQclS4aNPX7uW8YMmM8-ZLrl0="
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

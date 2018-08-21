@@ -22,7 +22,6 @@ module Pantry.Storage
   , storeHackageRevision
   , loadHackagePackageVersions
   , loadHackagePackageVersion
-  , loadHackageCabalFile
   , loadLatestCacheUpdate
   , storeCacheUpdate
   , storeHackageTarballInfo
@@ -30,15 +29,19 @@ module Pantry.Storage
   , storeTree
   , loadTree
   , loadTreeById
+  , getTreeSForKey
   , storeHackageTree
   , loadHackageTree
   , loadHackageTreeKey
   , storeArchiveCache
   , loadArchiveCache
+  , storeRepoCache
+  , loadRepoCache
   , storeCrlfHack
   , checkCrlfHack
   , storePreferredVersion
   , loadPreferredVersion
+  , sinkHackagePackageNames
 
     -- avoid warnings
   , BlobTableId
@@ -50,6 +53,7 @@ module Pantry.Storage
   , TreeEntrySId
   , CrlfHackId
   , ArchiveCacheId
+  , RepoCacheId
   , PreferredVersionsId
   , UrlBlobTableId
   ) where
@@ -61,16 +65,18 @@ import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import RIO.Orphans ()
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Data.Pool (destroyAllResources)
+import Conduit
+import Data.Acquire (with)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 BlobTable sql=blob
-    hash StaticSHA256
+    hash SHA256
     size FileSize
     contents ByteString
     UniqueBlobHash hash
@@ -88,7 +94,7 @@ VersionTable sql=version
 HackageTarball
     name NameId
     version VersionTableId
-    hash StaticSHA256
+    hash SHA256
     size FileSize
     UniqueHackageTarball name version
 HackageCabal
@@ -105,14 +111,22 @@ PreferredVersions
 CacheUpdate
     time UTCTime
     size FileSize
-    hash StaticSHA256
+    hash SHA256
 
 ArchiveCache
     time UTCTime
     url Text
     subdir Text
-    sha StaticSHA256
+    sha SHA256
     size FileSize
+    tree TreeSId
+
+RepoCache
+    time UTCTime
+    url Text
+    type RepoType
+    commit Text
+    subdir Text
     tree TreeSId
 
 Sfp sql=file_path
@@ -120,9 +134,6 @@ Sfp sql=file_path
     UniqueSfp path
 TreeS sql=tree
     key BlobTableId
-    tarball BlobTableId Maybe
-    cabal BlobTableId Maybe
-    subdir Text Maybe
     UniqueTree key
 TreeEntryS sql=tree_entry
     tree TreeSId
@@ -186,7 +197,7 @@ storeBlob
   => ByteString
   -> ReaderT SqlBackend (RIO env) (BlobTableId, BlobKey)
 storeBlob bs = do
-  let sha = mkStaticSHA256FromBytes bs
+  let sha = SHA256.hashBytes bs
       size = FileSize $ fromIntegral $ B.length bs
   keys <- selectKeysList [BlobTableHash ==. sha] []
   key <-
@@ -217,9 +228,9 @@ loadBlob (BlobKey sha size) = do
 
 loadBlobBySHA
   :: (HasPantryConfig env, HasLogFunc env)
-  => StaticSHA256
-  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
-loadBlobBySHA sha = fmap (fmap (blobTableContents . entityVal)) $ getBy $ UniqueBlobHash sha
+  => SHA256
+  -> ReaderT SqlBackend (RIO env) (Maybe BlobTableId)
+loadBlobBySHA sha = listToMaybe <$> selectKeysList [BlobTableHash ==. sha] []
 
 loadBlobById
   :: (HasPantryConfig env, HasLogFunc env)
@@ -345,40 +356,9 @@ loadHackagePackageVersion name version = do
     go (Single revision, Single sha, Single size, Single bid) =
       (revision, (bid, BlobKey sha size))
 
-loadHackageCabalFile
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
-  -> Version
-  -> CabalFileInfo
-  -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
-loadHackageCabalFile name version cfi = do
-  nameid <- getNameId name
-  versionid <- getVersionId version
-  case cfi of
-    CFILatest -> selectFirst
-      [ HackageCabalName ==. nameid
-      , HackageCabalVersion ==. versionid
-      ]
-      [Desc HackageCabalRevision] >>= withHackEnt
-    CFIRevision rev ->
-      getBy (UniqueHackage nameid versionid rev) >>= withHackEnt
-    CFIHash sha msize -> do
-      ment <- getBy $ UniqueBlobHash sha
-      pure $ do
-        Entity _ bt <- ment
-        case msize of
-          Nothing -> pure ()
-          Just size -> guard $ blobTableSize bt == size -- FIXME report an error if this mismatches?
-        -- FIXME also consider validating the ByteString length against blobTableSize
-        pure $ blobTableContents bt
-  where
-    withHackEnt = traverse $ \(Entity _ h) -> do
-      Just blob <- get $ hackageCabalCabal h
-      pure $ blobTableContents blob
-
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
-  => ReaderT SqlBackend (RIO env) (Maybe (FileSize, StaticSHA256))
+  => ReaderT SqlBackend (RIO env) (Maybe (FileSize, SHA256))
 loadLatestCacheUpdate =
     fmap go <$> selectFirst [] [Desc CacheUpdateTime]
   where
@@ -387,7 +367,7 @@ loadLatestCacheUpdate =
 storeCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
   => FileSize
-  -> StaticSHA256
+  -> SHA256
   -> ReaderT SqlBackend (RIO env) ()
 storeCacheUpdate size hash' = do
   now <- getCurrentTime
@@ -401,7 +381,7 @@ storeHackageTarballInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> StaticSHA256
+  -> SHA256
   -> FileSize
   -> ReaderT SqlBackend (RIO env) ()
 storeHackageTarballInfo name version sha size = do
@@ -418,7 +398,7 @@ loadHackageTarballInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> ReaderT SqlBackend (RIO env) (Maybe (StaticSHA256, FileSize))
+  -> ReaderT SqlBackend (RIO env) (Maybe (SHA256, FileSize))
 loadHackageTarballInfo name version = do
   nameid <- getNameId name
   versionid <- getVersionId version
@@ -436,9 +416,6 @@ storeTree tree = do
     TreeMap m -> do
       etid <- insertBy TreeS
         { treeSKey = bid
-        , treeSTarball = Nothing
-        , treeSCabal = Nothing -- FIXME maybe fill in some data here?
-        , treeSSubdir = Nothing
         }
       case etid of
         Left (Entity tid _) -> pure (tid, TreeKey blobKey) -- already in database, assume it matches
@@ -462,22 +439,32 @@ loadTree
   :: (HasPantryConfig env, HasLogFunc env)
   => TreeKey
   -> ReaderT SqlBackend (RIO env) (Maybe Tree)
-loadTree (TreeKey key) = do
+loadTree key = do
+  ment <- getTreeSForKey key
+  case ment of
+    Nothing -> pure Nothing
+    Just ent -> Just <$> loadTreeByEnt ent
+
+getTreeSForKey
+  :: (HasPantryConfig env, HasLogFunc env)
+  => TreeKey
+  -> ReaderT SqlBackend (RIO env) (Maybe (Entity TreeS))
+getTreeSForKey (TreeKey key) = do
   mbid <- getBlobTableId key
   case mbid of
     Nothing -> pure Nothing
-    Just bid -> do
-      ment <- getBy $ UniqueTree bid
-      case ment of
-        Nothing -> pure Nothing
-        Just ent -> Just <$> loadTreeByEnt ent
+    Just bid -> getBy $ UniqueTree bid
 
 loadTreeById
   :: (HasPantryConfig env, HasLogFunc env)
   => TreeSId
   -> ReaderT SqlBackend (RIO env) (TreeKey, Tree)
 loadTreeById tid = do
-  Just ts <- get tid
+  mts <- get tid
+  ts <-
+    case mts of
+      Nothing -> error $ "loadTreeById: invalid foreign key " ++ show tid
+      Just ts -> pure ts
   tree <- loadTreeByEnt $ Entity tid ts
   key <- getBlobKey $ treeSKey ts
   pure (TreeKey key, tree)
@@ -486,31 +473,18 @@ loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
   => Entity TreeS
   -> ReaderT SqlBackend (RIO env) Tree
-loadTreeByEnt (Entity tid t) = do
-  case (treeSTarball t, treeSCabal t, treeSSubdir t) of
-    (Just _tarball, Just _cabal, Just _subdir) -> do
-      --tarballkey <- getBlobKey tarball
-      --cabalkey <- getBlobKey cabal
-      error "we don't support TreeTarball yet"
-      {-
-      pure $ TreeTarball PackageTarball
-        { ptBlob = tarballkey
-        , ptCabal = cabalkey
-        , ptSubdir = T.unpack subdir
-        }
-      -}
-    (x, y, z) -> assert (isNothing x && isNothing y && isNothing z) $ do
-      entries <- rawSql
-        "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
-        \FROM tree_entry, blob, file_path\n\
-        \WHERE tree_entry.tree=?\n\
-        \AND   tree_entry.blob=blob.id\n\
-        \AND   tree_entry.path=file_path.id"
-        [toPersistValue tid]
-      pure $ TreeMap $ Map.fromList $ map
-        (\(Single sfp, Single sha, Single size, Single ft) ->
-             (sfp, TreeEntry (BlobKey sha size) ft))
-        entries
+loadTreeByEnt (Entity tid _t) = do
+  entries <- rawSql
+    "SELECT file_path.path, blob.hash, blob.size, tree_entry.type\n\
+    \FROM tree_entry, blob, file_path\n\
+    \WHERE tree_entry.tree=?\n\
+    \AND   tree_entry.blob=blob.id\n\
+    \AND   tree_entry.path=file_path.id"
+    [toPersistValue tid]
+  pure $ TreeMap $ Map.fromList $ map
+    (\(Single sfp, Single sha, Single size, Single ft) ->
+         (sfp, TreeEntry (BlobKey sha size) ft))
+    entries
 
 storeHackageTree
   :: (HasPantryConfig env, HasLogFunc env)
@@ -533,7 +507,7 @@ loadHackageTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> StaticSHA256
+  -> SHA256
   -> ReaderT SqlBackend (RIO env) (Maybe TreeKey)
 loadHackageTreeKey name ver sha = do
   res <- rawSql
@@ -582,7 +556,7 @@ storeArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
   => Text -- ^ URL
   -> Text -- ^ subdir
-  -> StaticSHA256
+  -> SHA256
   -> FileSize
   -> TreeSId
   -> ReaderT SqlBackend (RIO env) ()
@@ -601,7 +575,7 @@ loadArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
   => Text -- ^ URL
   -> Text -- ^ subdir
-  -> ReaderT SqlBackend (RIO env) [(StaticSHA256, FileSize, TreeSId)]
+  -> ReaderT SqlBackend (RIO env) [(SHA256, FileSize, TreeSId)]
 loadArchiveCache url subdir = map go <$> selectList
   [ ArchiveCacheUrl ==. url
   , ArchiveCacheSubdir ==. subdir
@@ -609,6 +583,36 @@ loadArchiveCache url subdir = map go <$> selectList
   [Desc ArchiveCacheTime]
   where
     go (Entity _ ac) = (archiveCacheSha ac, archiveCacheSize ac, archiveCacheTree ac)
+
+storeRepoCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> Text -- ^ subdir
+  -> TreeSId
+  -> ReaderT SqlBackend (RIO env) ()
+storeRepoCache repo subdir tid = do
+  now <- getCurrentTime
+  insert_ RepoCache
+    { repoCacheTime = now
+    , repoCacheUrl = repoUrl repo
+    , repoCacheType = repoType repo
+    , repoCacheCommit = repoCommit repo
+    , repoCacheSubdir = subdir
+    , repoCacheTree = tid
+    }
+
+loadRepoCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Repo
+  -> Text -- ^ subdir
+  -> ReaderT SqlBackend (RIO env) (Maybe TreeSId)
+loadRepoCache repo subdir = fmap (repoCacheTree . entityVal) <$> selectFirst
+  [ RepoCacheUrl ==. repoUrl repo
+  , RepoCacheType ==. repoType repo
+  , RepoCacheCommit ==. repoCommit repo
+  , RepoCacheSubdir ==. subdir
+  ]
+  [Desc RepoCacheTime]
 
 -- Back in the days of all-cabal-hashes, we had a few cabal files that
 -- had CRLF/DOS-style line endings in them. The Git version ended up
@@ -665,3 +669,28 @@ loadPreferredVersion
 loadPreferredVersion name = do
   nameid <- getNameId name
   fmap (preferredVersionsPreferred . entityVal) <$> getBy (UniquePreferred nameid)
+
+sinkHackagePackageNames
+  :: (HasPantryConfig env, HasLogFunc env)
+  => (PackageName -> Bool)
+  -> ConduitT PackageName Void (ReaderT SqlBackend (RIO env)) a
+  -> ReaderT SqlBackend (RIO env) a
+sinkHackagePackageNames predicate sink = do
+  acqSrc <- selectSourceRes [] []
+  with acqSrc $ \src -> runConduit
+    $ src
+   .| concatMapMC go
+   .| sink
+  where
+    go (Entity nameid (Name (PackageNameP name)))
+      | predicate name = do
+          -- Make sure it's actually on Hackage. Would be much more
+          -- efficient with some raw SQL and an inner join, but we
+          -- don't have a Conduit version of rawSql.
+          onHackage <- checkOnHackage nameid
+          pure $ if onHackage then Just name else Nothing
+      | otherwise = pure Nothing
+
+    checkOnHackage nameid = do
+      cnt <- count [HackageCabalName ==. nameid]
+      pure $ cnt > 0

@@ -790,6 +790,9 @@ build:
 
   # Since 1.8
   interleaved-output: false
+
+  # Since 1.10
+  ddump-dir: ""
 ```
 
 The meanings of these settings correspond directly with the CLI flags of the
@@ -1010,3 +1013,33 @@ Since 1.3.0
 This option specifies which template to use with `stack new`, when none is
 specified. The default is called `new-template`. The other templates are listed
 in [the stack-templates repo](https://github.com/commercialhaskell/stack-templates/).
+
+### stack-colors
+
+Stack uses styles to format some of its output. The default styles do not work
+well with every terminal theme. This option specifies stack's output styles,
+allowing new styles to replace the defaults. The option is used as
+`stack-colors: <STYLES>`, where `<STYLES>` is a colon-delimited sequence of
+key=value, 'key' is a style name and 'value' is a semicolon-delimited list of
+'ANSI' SGR (Select Graphic Rendition) control codes (in decimal). Use the
+command `stack ls stack-colors --basic` to see the current sequence.
+
+The 'ANSI' standards refer to (1) standard ECMA-48 'Control Functions for Coded
+Character Sets' (5th edition, 1991); (2) extensions in ITU-T Recommendation
+(previously CCITT Recommendation) T.416 (03/93) 'Information Technology – Open
+Document Architecture (ODA) and Interchange Format: Character Content
+Architectures' (also published as ISO/IEC International Standard 8613-6); and
+(3) further extensions used by 'XTerm', a terminal emulator for the X Window
+System. The 'ANSI' SGR codes are described in a
+[Wikipedia article](http://en.wikipedia.org/wiki/ANSI_escape_code)
+and those codes supported on current versions of Windows in
+[Microsoft's documentation](https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences).
+
+For example, users of the popular
+[Solarized Dark](https://ethanschoonover.com/solarized/)
+terminal theme might wish to set the styles as follows:
+
+```yaml
+stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95
+```
+The styles can also be set at the command line using the equivalent `--stack-colors=<STYLES>` global option. Styles set at the command line take precedence over those set in a yaml configuration file.

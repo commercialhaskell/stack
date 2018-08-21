@@ -16,7 +16,6 @@ module Network.HTTP.Download
     , redownload
     , httpJSON
     , httpLbs
-    , httpLBS
     , parseRequest
     , parseUrlThrow
     , setGithubHeaders
@@ -31,7 +30,7 @@ import qualified Data.Conduit.Binary         as CB
 import           Data.Text.Encoding.Error    (lenientDecode)
 import           Data.Text.Encoding          (decodeUtf8With)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.StackClient    (Request, Response, HttpException, httpJSON, httpLbs, httpLBS, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders, requestHeaders, getResponseBody, getResponseStatusCode)
+import           Network.HTTP.StackClient    (Request, Response, HttpException, httpJSON, httpLbs, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders, requestHeaders, getResponseBody, getResponseStatusCode)
 import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)

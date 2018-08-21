@@ -7,16 +7,35 @@ Release notes:
 
 Major changes:
 
-* Drop support for multiple package indices and legacy `00-index.tar` style
-  indices. See [#4137](https://github.com/commercialhaskell/stack/issues/4137).
-* Changes to parsing of packages in `stack.yaml` files:
-    * All package types besides local file paths must now be treated as `extra-dep`s.
-    * Only local filepaths can be specified in `packages`. All other
-      must be specified in `extra-deps`.
-    * The `extra-dep` key in `packages` is no longer supported; please
-      move any such specifications to `extra-deps`.
-* A new command, `stack freeze` has been added which outputs project
-  and snapshot definitions with dependencies pinned to their exact versions.
+* Switch over to pantry for managing packages. This is a major change
+  to Stack's internals, and affects user-visible behavior in a few
+  places. Some highlights:
+    * Drop support for multiple package indices and legacy
+      `00-index.tar` style indices. See
+      [#4137](https://github.com/commercialhaskell/stack/issues/4137).
+    * Support for archives and repos in the `packages` section has
+      been removed. Instead, you must use `extra-deps` for such
+      dependencies. `packages` now only supports local filepaths.
+    * Addition of new configuration options for specifying a "pantry
+      tree" key, which provides more reproducibility around builds,
+      and (in the future) will be used for more efficient package
+      content downloads. You can also specify package name and version
+      for more efficient config parsing.
+          * __NOTE__ The new `stack freeze` command provides support
+            for automatically generating this additional
+            information. @@@TODO ensure `stack freeze` actually makes
+            it in.
+    * Package contents and metadata are stored in an SQLite database
+      in place of files on the filesystem. The `pantry` library can be
+      used for interacting with these contents.
+    * Internally, Stack has changed many datatypes, including moving
+      to Cabal's definition of many data types. As a result of such
+      changes, existing cache files will in general be invalidated,
+      resulting in Stack needing to rebuild many previously cached
+      builds in the new version. Sorry :(.
+    * A new command, `stack freeze` has been added which outputs
+      project and snapshot definitions with dependencies pinned to
+      their exact versions.
 
 Behavior changes:
 
@@ -26,6 +45,17 @@ Other enhancements:
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.
+* New command `stack ls stack-colors` lists the styles and the associated 'ANSI'
+  control character sequences that stack uses to color some of its output. See
+  `stack ls stack-colors --help` for more information.
+* New global option `--stack-colors=STYLES`, also available as a
+  non-project-specific yaml configuration parameter, allows a stack user to
+  redefine the default styles that stack uses to color some of its output. See
+  `stack --help` for more information.
+* New build option `--ddump-dir`. (See [#4225](https://github.com/commercialhaskell/stack/issues/4225))
+* Stack parses and respects the `preferred-versions` information from
+  Hackage for choosing latest version of a package in some cases,
+  e.g. `stack unpack packagename`.
 
 Bug fixes:
 

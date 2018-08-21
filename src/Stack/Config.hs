@@ -51,6 +51,7 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
+import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
 import           Data.IORef.RunOnce (runOnce)
 import qualified Data.IntMap as IntMap
@@ -65,10 +66,10 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform, Arc
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
-import           Lens.Micro (lens, set)
+import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -162,38 +163,31 @@ getSnapshots = do
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver
     :: HasConfig env
-    => Maybe (Path Abs Dir) -- ^ root of project for resolving custom relative paths
-    -> AbstractResolver
-    -> Maybe WantedCompiler
+    => AbstractResolver
     -> RIO env SnapshotLocation
-makeConcreteResolver root (ARResolver r) mcompiler = liftIO $ resolveSnapshotLocation r root mcompiler
-makeConcreteResolver root ar mcompiler = do
+makeConcreteResolver (ARResolver r) = pure r
+makeConcreteResolver ar = do
     snapshots <- getSnapshots
     r <-
         case ar of
-            ARResolver r -> assert False $ makeConcreteResolver root (ARResolver r) mcompiler
+            ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
                 let fp = implicitGlobalDir </> stackDotYaml
                 iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 ProjectAndConfigMonoid project _ <- liftIO iopc
-                return $
-                  case (projectResolver project, mcompiler) of
-                    (res, Nothing) -> res
-                    (SLCompiler _, Just compiler) -> SLCompiler compiler -- kinda weird, maybe warn the user?
-                    (SLUrl url mblob _, Just compiler) -> SLUrl url mblob (Just compiler)
-                    (SLFilePath resolved _, Just compiler) -> SLFilePath resolved (Just compiler)
-            ARLatestNightly -> return $ snd $ nightlySnapshotLocation mcompiler $ snapshotsNightly snapshots
+                return $ projectResolver project
+            ARLatestNightly -> return $ nightlySnapshotLocation $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ snd $ ltsSnapshotLocation mcompiler x y
+                    Just y -> return $ ltsSnapshotLocation x y
             ARLatestLTS
                 | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ snd $ ltsSnapshotLocation mcompiler x y
+                     in return $ ltsSnapshotLocation x y
     logInfo $ "Selected resolver: " <> display r
     return r
 
@@ -201,9 +195,9 @@ makeConcreteResolver root ar mcompiler = do
 getLatestResolver :: HasConfig env => RIO env SnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
-    let mlts = uncurry (ltsSnapshotLocation Nothing) <$>
+    let mlts = uncurry ltsSnapshotLocation <$>
                listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
-    pure $ snd $ fromMaybe (nightlySnapshotLocation Nothing (snapshotsNightly snapshots)) mlts
+    pure $ fromMaybe (nightlySnapshotLocation (snapshotsNightly snapshots)) mlts
 
 -- | Create a 'Config' value when we're not using any local
 -- configuration files (e.g., the script command)
@@ -364,7 +358,11 @@ configFromConfigMonoid
      let configMaybeProject = mproject
 
      configRunner' <- view runnerL
-     let configRunner = set processContextL origEnv configRunner'
+
+     let stylesUpdate' = runnerStylesUpdate configRunner' <>
+           configMonoidStyles
+         configRunner = configRunner' & processContextL .~ origEnv &
+           stylesUpdateL .~ stylesUpdate'
 
      case getFirst configMonoidIgnoreRevisionMismatch of
        Nothing -> pure ()
@@ -531,20 +529,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     -- correct base. Let's calculate the mresolver first.
     mresolver <- forM maresolver $ \aresolver -> do
       logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
-
-      -- In order to resolve custom snapshots, we need a base
-      -- directory to deal with relative paths. For the case of
-      -- LCSNoConfig, we use the parent directory provided. This is
-      -- because, when running the script interpreter, we assume the
-      -- resolver is in fact coming from the file contents itself and
-      -- not the command line. For the project and non project cases,
-      -- however, we use the current directory.
-      base <-
-        case mproject of
-          LCSNoConfig parentDir -> return parentDir
-          LCSProject _ -> resolveDir' "."
-          LCSNoProject -> resolveDir' "."
-      makeConcreteResolver (Just base) aresolver mcompiler
+      makeConcreteResolver aresolver
 
     (project', stackYamlFP) <- case mproject of
       LCSProject (project, fp, _) -> do
@@ -599,7 +584,7 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    sd <- runRIO config $ loadResolver $ projectResolver project
+    sd <- runRIO config $ loadResolver (projectResolver project) mcompiler
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -643,6 +628,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         , projectDependencies = []
         , projectFlags = mempty
         , projectResolver = r
+        , projectCompiler = Nothing
         , projectExtraPackageDBs = []
         , projectCurator = Nothing
         }
@@ -920,7 +906,7 @@ getFakeConfigPath
 getFakeConfigPath stackRoot ar = do
   asString <-
     case ar of
-      ARResolver r -> pure $ T.unpack $ staticSHA256ToText $ mkStaticSHA256FromBytes $ encodeUtf8 $ utf8BuilderToText $ display r
+      ARResolver r -> pure $ T.unpack $ SHA256.toHexText $ SHA256.hashLazyBytes $ toLazyByteString $ getUtf8Builder $ display r
       _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
   -- This takeWhile is an ugly hack. We don't actually need this
   -- path for anything useful. But if we take the raw value for
@@ -952,5 +938,12 @@ defaultConfigYaml = S.intercalate "\n"
      , "#    author-email:"
      , "#    copyright:"
      , "#    github-username:"
+     , ""
+     , "# The following parameter specifies stack's output styles; STYLES is a"
+     , "# colon-delimited sequence of key=value, where 'key' is a style name and"
+     , "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic"
+     , "# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\""
+     , "# to see the current sequence."
+     , "# stack-colors: STYLES"
      , ""
      ]

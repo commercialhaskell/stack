@@ -378,7 +378,7 @@ instance NFData BuildCache
 instance Store BuildCache
 
 buildCacheVC :: VersionConfig BuildCache
-buildCacheVC = storeVersionConfig "build-v1" "KVUoviSWWAd7tiRRGeWAvd0UIN4="
+buildCacheVC = storeVersionConfig "build-v2" "c9BeiWP7Mpe9OBDAPPEYPDaFEGM="
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache

@@ -12,33 +12,31 @@ module Pantry.Archive
 
 import RIO
 import RIO.FilePath (normalise, takeDirectory, (</>))
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import qualified RIO.Text as T
 import qualified RIO.List as List
-import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
+import qualified Data.Digest.CRC32 as CRC32
 
 import Conduit
-import Crypto.Hash.Conduit
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Conduit.Tar as Tar
-import Network.HTTP.Client (parseUrlThrow)
-import Network.HTTP.Simple (httpSink)
+import Pantry.HTTP
 
 fetchArchives
   :: (HasPantryConfig env, HasLogFunc env)
   => [(Archive, PackageMetadata)]
   -> RIO env ()
 fetchArchives pairs = do
-  -- FIXME be more efficient, group together shared archives
+  -- TODO be more efficient, group together shared archives
   for_ pairs $ uncurry getArchive
 
 getArchiveKey
@@ -66,7 +64,7 @@ getArchive archive pm =
     loc = archiveLocation archive
 
     withCache
-      :: RIO env (TreeSId, StaticSHA256, FileSize, TreeKey, Tree)
+      :: RIO env (TreeSId, SHA256, FileSize, TreeKey, Tree)
       -> RIO env (TreeKey, Tree)
     withCache inner =
       let loop [] = do
@@ -113,71 +111,32 @@ getArchive archive pm =
 withArchiveLoc
   :: HasLogFunc env
   => Archive
-  -> (FilePath -> StaticSHA256 -> FileSize -> RIO env a)
+  -> (FilePath -> SHA256 -> FileSize -> RIO env a)
   -> RIO env a
 withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
-  let fp = toFilePath $ resolvedAbsolute resolved
+  let abs' = resolvedAbsolute resolved
+      fp = toFilePath abs'
   (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
     size <- FileSize . fromIntegral <$> hFileSize h
-    for_ msize $ \size' -> when (size /= size') $ error $ "Mismatched local archive size: " ++ show (resolved, size, size')
+    for_ msize $ \size' -> when (size /= size') $ throwIO $ LocalInvalidSize abs' Mismatch
+      { mismatchExpected = size'
+      , mismatchActual = size
+      }
 
-    sha <- mkStaticSHA256FromDigest <$> runConduit (sourceHandle h .| sinkHash)
-    for_ msha $ \sha' -> when (sha /= sha') $ error $ "Mismatched local archive sha: " ++ show (resolved, sha, sha')
+    sha <- runConduit (sourceHandle h .| SHA256.sinkHash)
+    for_ msha $ \sha' -> when (sha /= sha') $ throwIO $ LocalInvalidSHA256 abs' Mismatch
+      { mismatchExpected = sha'
+      , mismatchActual = sha
+      }
 
     pure (sha, size)
   f fp sha size
 withArchiveLoc (Archive (ALUrl url) msha msize) f =
   withSystemTempFile "archive" $ \fp hout -> do
-    req <- parseUrlThrow $ T.unpack url
     logDebug $ "Downloading archive from " <> display url
-    (sha, size, ()) <- httpSink req $ const $ getZipSink $ (,,)
-      <$> ZipSink (checkSha msha)
-      <*> ZipSink (checkSize $ (\(FileSize w) -> w) <$> msize)
-      <*> ZipSink (sinkHandle hout)
+    (sha, size, ()) <- httpSinkChecked url msha msize (sinkHandle hout)
     hClose hout
-    f fp sha (FileSize size)
-  where
-    checkSha mexpected = do
-      actual <- mkStaticSHA256FromDigest <$> sinkHash
-      for_ mexpected $ \expected -> unless (actual == expected) $ error $ concat
-        [ "Invalid SHA256 downloading from "
-        , T.unpack url
-        , ". Expected: "
-        , show expected
-        , ". Actual: "
-        , show actual
-        ]
-      pure actual
-    checkSize mexpected =
-      loop 0
-      where
-        loop accum = do
-          mbs <- await
-          case mbs of
-            Nothing ->
-              case mexpected of
-                Just expected | expected /= accum -> error $ concat
-                    [ "Invalid file size downloading from "
-                    , T.unpack url
-                    , ". Expected: "
-                    , show expected
-                    , ". Actual: "
-                    , show accum
-                    ]
-                _ -> pure accum
-            Just bs -> do
-              let accum' = accum + fromIntegral (B.length bs)
-              case mexpected of
-                Just expected
-                  | accum' > expected -> error $ concat
-                    [ "Invalid file size downloading from "
-                    , T.unpack url
-                    , ". Expected: "
-                    , show expected
-                    , ", but file is at least: "
-                    , show accum'
-                    ]
-                _ -> loop accum'
+    f fp sha size
 
 data ArchiveType = ATTarGz | ATTar | ATZip
   deriving (Enum, Bounded)
@@ -201,18 +160,17 @@ data MetaEntry = MetaEntry
 
 foldArchive
   :: (HasPantryConfig env, HasLogFunc env)
-  => FilePath
+  => ArchiveLocation -- ^ for error reporting
+  -> FilePath
   -> ArchiveType
   -> a
   -> (a -> MetaEntry -> ConduitT ByteString Void (RIO env) a)
   -> RIO env a
-foldArchive fp ATTarGz accum f =
-  withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar accum f
-foldArchive fp ATTar accum f =
-  withSourceFile fp $ \src -> runConduit $ src .| foldTar accum f
-foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
-  -- We're entering lazy I/O land thanks to zip-archive.
-  lbs <- BL.hGetContents h
+foldArchive loc fp ATTarGz accum f =
+  withSourceFile fp $ \src -> runConduit $ src .| ungzip .| foldTar loc accum f
+foldArchive loc fp ATTar accum f =
+  withSourceFile fp $ \src -> runConduit $ src .| foldTar loc accum f
+foldArchive loc fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
   let go accum entry = do
         let me = MetaEntry (Zip.eRelativePath entry) met
             met = fromMaybe METNormal $ do
@@ -223,45 +181,58 @@ foldArchive fp ATZip accum0 f = withBinaryFile fp ReadMode $ \h -> do
                 if (modes .&. 0o100) == 0
                   then METNormal
                   else METExecutable
-        -- FIXME check crc32
-        runConduit $ sourceLazy (Zip.fromEntry entry) .| f accum me
+            lbs = Zip.fromEntry entry
+        let crcExpected = Zip.eCRC32 entry
+            crcActual = CRC32.crc32 lbs
+        when (crcExpected /= crcActual)
+          $ throwIO $ CRC32Mismatch loc (Zip.eRelativePath entry) Mismatch
+              { mismatchExpected = crcExpected
+              , mismatchActual = crcActual
+              }
+        runConduit $ sourceLazy lbs .| f accum me
       isDir entry =
         case reverse $ Zip.eRelativePath entry of
           '/':_ -> True
           _ -> False
+  -- We're entering lazy I/O land thanks to zip-archive.
+  lbs <- BL.hGetContents h
   foldM go accum0 (filter (not . isDir) $ Zip.zEntries $ Zip.toArchive lbs)
 
 foldTar
   :: (HasPantryConfig env, HasLogFunc env)
-  => a
+  => ArchiveLocation -- ^ for exceptions
+  -> a
   -> (a -> MetaEntry -> ConduitT ByteString o (RIO env) a)
   -> ConduitT ByteString o (RIO env) a
-foldTar accum0 f = do
+foldTar loc accum0 f = do
   ref <- newIORef accum0
-  Tar.untar $ \fi -> for_ (toME fi) $ \me -> do
+  Tar.untar $ \fi -> toME fi >>= traverse_ (\me -> do
     accum <- readIORef ref
     accum' <- f accum me
-    writeIORef ref $! accum'
+    writeIORef ref $! accum')
   readIORef ref
   where
-    toME :: Tar.FileInfo -> Maybe MetaEntry
+    toME :: MonadIO m => Tar.FileInfo -> m (Maybe MetaEntry)
     toME fi = do
-      met <-
+      let exc = InvalidTarFileType loc (Tar.getFileInfoPath fi) (Tar.fileType fi)
+      mmet <-
         case Tar.fileType fi of
           Tar.FTSymbolicLink bs ->
             case decodeUtf8' bs of
-              Left e -> error $ "Need to handle this case better! " ++ show e
-              Right text -> Just $ METLink $ T.unpack text
-          Tar.FTNormal -> Just $
+              Left _ -> throwIO exc
+              Right text -> pure $ Just $ METLink $ T.unpack text
+          Tar.FTNormal -> pure $ Just $
             if Tar.fileMode fi .&. 0o100 /= 0
               then METExecutable
               else METNormal
-          Tar.FTDirectory -> Nothing
-          _ -> Nothing
-      Just MetaEntry
-        { mePath = Tar.getFileInfoPath fi
-        , meType = met
-        }
+          Tar.FTDirectory -> pure Nothing
+          _ -> throwIO exc
+      pure $
+        (\met -> MetaEntry
+          { mePath = Tar.getFileInfoPath fi
+          , meType = met
+          })
+        <$> mmet
 
 data SimpleEntry = SimpleEntry
   { seSource :: !FilePath
@@ -276,9 +247,9 @@ parseArchive
   -> Text -- ^ subdir, besides the single-dir stripping logic
   -> RIO env (TreeSId, TreeKey, Tree)
 parseArchive loc fp subdir = do
-  let getFiles [] = error $ T.unpack $ utf8BuilderToText $ "Unable to determine archive type of: " <> display loc
+  let getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
-        eres <- tryAny $ foldArchive fp at id $ \m me -> pure $ m . (me:)
+        eres <- tryAny $ foldArchive loc fp at id $ \m me -> pure $ m . (me:)
         case eres of
           Left e -> do
             logDebug $ "parseArchive of " <> display at <> ": " <> displayShow e
@@ -304,8 +275,7 @@ parseArchive loc fp subdir = do
                       METLink _ -> Left $ "Symbolic link dest cannot be a symbolic link, from " ++ mePath me ++ " to " ++ relDest
 
   case traverse toSimple files of
-    Left e ->
-      error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
+    Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
           files3 = takeSubdir subdir files2
@@ -314,11 +284,11 @@ parseArchive loc fp subdir = do
               Nothing -> Left $ "Not a safe file path: " ++ show fp'
               Just sfp -> Right (sfp, a)
       case traverse toSafe files3 of
-        Left e -> error $ T.unpack $ utf8BuilderToText $ "Unsupported tarball from " <> display loc <> ": " <> fromString e
+        Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
         Right safeFiles -> do
           let toSave = Set.fromList $ map (seSource . snd) safeFiles
           blobs <-
-            foldArchive fp at mempty $ \m me ->
+            foldArchive loc fp at mempty $ \m me ->
               if mePath me `Set.member` toSave
                 then do
                   bs <- mconcat <$> sinkList

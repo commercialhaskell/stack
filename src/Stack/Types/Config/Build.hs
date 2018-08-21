@@ -89,6 +89,7 @@ data BuildOpts =
             ,boptsInterleavedOutput :: !Bool
             -- ^ Should we use the interleaved GHC output when building
             -- multiple packages?
+            ,boptsDdumpDir :: !(Maybe Text)
             }
   deriving (Show)
 
@@ -119,6 +120,7 @@ defaultBuildOpts = BuildOpts
     , boptsSplitObjs = False
     , boptsSkipComponents = []
     , boptsInterleavedOutput = False
+    , boptsDdumpDir = Nothing
     }
 
 defaultBuildOptsCLI ::BuildOptsCLI
@@ -188,6 +190,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidSplitObjs :: !(First Bool)
     , buildMonoidSkipComponents :: ![Text]
     , buildMonoidInterleavedOutput :: !(First Bool)
+    , buildMonoidDdumpDir :: !(First Text)
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
@@ -220,6 +223,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidSplitObjs <- First <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               buildMonoidInterleavedOutput <- First <$> o ..:? buildMonoidInterleavedOutputName
+              buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
               return BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
@@ -296,6 +300,9 @@ buildMonoidSkipComponentsName = "skip-components"
 
 buildMonoidInterleavedOutputName :: Text
 buildMonoidInterleavedOutputName = "interleaved-output"
+
+buildMonoidDdumpDirName :: Text
+buildMonoidDdumpDirName = "ddump-dir"
 
 instance Semigroup BuildOptsMonoid where
     (<>) = mappenddefault

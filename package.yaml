@@ -45,6 +45,7 @@ dependencies:
 - base >=4.10 && < 5
 - base64-bytestring
 - bytestring
+- colour
 - conduit >= 1.3
 - conduit-extra >= 1.3
 - containers
@@ -80,6 +81,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
+- pantry
 - path
 - path-io
 - persistent
@@ -91,10 +93,8 @@ dependencies:
 - project-template
 - regex-applicative-text
 - resourcet
-- resource-pool
 - retry
 - rio
-- rio-orphans
 - semigroups
 - split
 - stm
@@ -102,7 +102,6 @@ dependencies:
 - store-core
 - streaming-commons
 - tar
-- tar-conduit
 - template-haskell
 - temporary
 - text
@@ -133,16 +132,13 @@ when:
     - bindings-uname
     - unix
 library:
-  source-dirs:
-  - src/
-  - subs/pantry/src
+  source-dirs: src/
   ghc-options:
   - -fwarn-identities
   generated-exposed-modules:
   - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
-  - Data.Aeson.Extended
   - Data.Attoparsec.Args
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
@@ -257,6 +253,7 @@ library:
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
+  - Stack.Types.StylesUpdate
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
@@ -266,17 +263,6 @@ library:
   - Text.PrettyPrint.Leijen.Extended
   - System.Process.PagerEditor
   - System.Terminal
-  - Pantry
-  other-modules:
-  - Pantry.Archive
-  - Pantry.Hackage
-  - Pantry.Repo
-  - Pantry.StaticBytes
-  - Pantry.StaticSHA256
-  - Pantry.Storage
-  - Pantry.Tree
-  - Pantry.Types
-  - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
   - condition: 'os(windows)'
     then:
@@ -311,7 +297,7 @@ executables:
       cpp-options: -DSUPPORTED_BUILD
 tests:
   stack-test:
-    main: Test.hs
+    main: Spec.hs
     source-dirs: src/test
     ghc-options:
     - -threaded

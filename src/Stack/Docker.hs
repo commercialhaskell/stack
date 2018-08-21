@@ -755,14 +755,6 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
-
-          let srcPantry = origStackRoot </> $(mkRelDir "pantry")
-          existsSrc <- doesDirExist srcPantry
-          when existsSrc $ do
-            runRIO config $ do
-              let destPantry = view stackRootL config </> $(mkRelDir "pantry")
-              existsDest <- doesDirExist destPantry
-              unless existsDest $ copyDirRecur srcPantry destPantry
     return True
   where
     updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do

@@ -1,5 +1,10 @@
 resolver: nightly-2018-08-04
 
+packages:
+- .
+- subs/pantry
+- subs/curator
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
@@ -13,6 +18,11 @@ nix:
   packages:
     - zlib
     - unzip
+
+flags:
+  # https://github.com/haskell/cabal/issues/4883
+  cabal-install:
+    native-dns: false
 
 ghc-options:
    "$locals": -fhide-source-paths

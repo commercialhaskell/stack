@@ -58,7 +58,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
 import           Stack.DefaultColorWhen (defaultColorWhen)
-import           Stack.DefaultStyles (defaultStyles)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -193,7 +192,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal defColorWhen defaultStyles globalMonoid
+      global <- globalOptsFromMonoid isTerminal defColorWhen globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
@@ -309,7 +308,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     pathCmd
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots and dependencies)"
+                    "List command. (Supports snapshots, dependencies and stack's styles)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
@@ -673,7 +672,7 @@ uninstallCmd _ go = withConfigAndLock go $
 unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
 unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
 unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
-    mSnapshotDef <- mapM (\ares -> makeConcreteResolver Nothing ares Nothing >>= loadResolver) (globalResolver go)
+    mSnapshotDef <- mapM (\ares -> makeConcreteResolver ares >>= flip loadResolver Nothing) (globalResolver go)
     dstPath' <- resolveDir' $ T.unpack dstPath
     unpackPackages mSnapshotDef dstPath' names
 

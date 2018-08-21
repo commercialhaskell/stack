@@ -72,8 +72,7 @@ initProject whichCmd currDir initOpts mresolver = do
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
 
-    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
-                                                          mresolver bundle
+    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd initOpts mresolver bundle
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
@@ -116,6 +115,7 @@ initProject whichCmd currDir initOpts mresolver = do
             , projectDependencies = deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = sdResolver sd
+            , projectCompiler = Nothing
             , projectExtraPackageDBs = []
             , projectCurator = Nothing
             }
@@ -329,7 +329,6 @@ getSnapshots' = do
 getDefaultResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
-    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
@@ -343,11 +342,10 @@ getDefaultResolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
-    sd <- maybe selectSnapResolver (\res -> makeConcreteResolver (Just root) res Nothing >>= loadResolver) mresolver
+getDefaultResolver whichCmd initOpts mresolver bundle = do
+    sd <- maybe selectSnapResolver (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
     getWorkingResolverPlan whichCmd initOpts bundle sd
     where
-        root = parent stackYaml
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)

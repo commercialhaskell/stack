@@ -13,7 +13,6 @@ module Stack.SetupCmd
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Logger ()
 import           Control.Monad.Reader
 import qualified Data.Text as T
 import qualified Options.Applicative as OA

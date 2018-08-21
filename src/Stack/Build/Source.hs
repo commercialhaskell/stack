@@ -16,9 +16,7 @@ module Stack.Build.Source
     ) where
 
 import              Stack.Prelude
-import              Crypto.Hash (Digest, SHA256(..))
-import              Crypto.Hash.Conduit (sinkHash)
-import qualified    Data.ByteArray as Mem (convert)
+import qualified    Pantry.SHA256 as SHA256
 import qualified    Data.ByteString as S
 import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
@@ -467,11 +465,11 @@ calcFci modTime' fp = liftIO $
                 <$> ZipSink (CL.fold
                     (\x y -> x + fromIntegral (S.length y))
                     0)
-                <*> ZipSink sinkHash)
+                <*> ZipSink SHA256.sinkHash)
         return FileCacheInfo
             { fciModTime = modTime'
             , fciSize = size
-            , fciHash = Mem.convert (digest :: Digest SHA256)
+            , fciHash = digest
             }
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()

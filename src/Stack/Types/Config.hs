@@ -98,6 +98,8 @@ module Stack.Types.Config
   ,parsePvpBounds
   -- ** ColorWhen
   ,readColorWhen
+  -- ** Styles
+  ,readStyles
   -- ** SCM
   ,SCM(..)
   -- * Paths
@@ -203,7 +205,7 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
-import           Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Constants
@@ -215,9 +217,10 @@ import           Stack.Types.Image
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.PackageName
-import           Stack.Types.PrettyPrint (Styles)
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.StylesUpdate (StylesUpdate,
+                     parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
 import           Stack.Types.Urls
 import           Stack.Types.Version
@@ -427,7 +430,7 @@ data GlobalOpts = GlobalOpts
     , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
-    , globalStyles       :: !Styles -- ^ SGR (Ansi) codes for styles
+    , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
@@ -448,13 +451,14 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
+    , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidCompiler     :: !(First WantedCompiler) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
+    , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
-    } deriving (Show, Generic)
+    } deriving Generic
 
 instance Semigroup GlobalOptsMonoid where
     (<>) = mappenddefault
@@ -475,6 +479,9 @@ readColorWhen = do
         "always" -> return ColorAlways
         "auto" -> return ColorAuto
         _ -> OA.readerError "Expected values of color option are 'never', 'always', or 'auto'."
+
+readStyles :: ReadM StylesUpdate
+readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from
@@ -607,6 +614,8 @@ data Project = Project
     -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !SnapshotLocation
     -- ^ How we resolve which @SnapshotDef@ to use
+    , projectCompiler :: !(Maybe WantedCompiler)
+    -- ^ Override the compiler in 'projectResolver'
     , projectExtraPackageDBs :: ![FilePath]
     , projectCurator :: !(Maybe Curator)
     -- ^ Extra configuration intended exclusively for usage by the
@@ -617,18 +626,16 @@ data Project = Project
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver extraPackageDBs mcurator) = object $ concat
-      [ maybe [] (\cv -> ["compiler" .= cv]) compiler
+    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator) = object $ concat
+      [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= map mkUnresolvedPackageLocation extraDeps]
+      , if null extraDeps then [] else ["extra-deps" .= extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
-      , ["resolver" .= usl]
+      , ["resolver" .= resolver]
       , maybe [] (\c -> ["curator" .= c]) mcurator
       ]
-      where
-        (usl, compiler) = unresolveSnapshotLocation resolver
 
 -- | Extra configuration intended exclusively for usage by the
 -- curator tool. In other words, this is /not/ part of the
@@ -753,6 +760,7 @@ data ConfigMonoid =
     -- ^ See 'configHackageBaseUrl'
     , configMonoidIgnoreRevisionMismatch :: !(First Bool)
     -- ^ See 'configIgnoreRevisionMismatch'
+    , configMonoidStyles :: !StylesUpdate
     }
   deriving (Show, Generic)
 
@@ -850,6 +858,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
     configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
     configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
+    configMonoidStyles <- fromMaybe mempty <$> obj ..:? configMonoidStylesName
 
     return ConfigMonoid {..}
   where
@@ -995,6 +1004,9 @@ configMonoidHackageBaseUrlName = "hackage-base-url"
 configMonoidIgnoreRevisionMismatchName :: Text
 configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
 
+configMonoidStylesName :: Text
+configMonoidStylesName = "stack-colors"
+
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseCustomSnapshotException Text ParseException
@@ -1010,7 +1022,6 @@ data ConfigException
   | BadStackRoot (Path Abs Dir)
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
   | UserDoesn'tOwnDirectory (Path Abs Dir)
-  | FailedToCloneRepo String
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
@@ -1107,13 +1118,6 @@ instance Show ConfigException where
         , "\nRetry with '--"
         , T.unpack configMonoidAllowDifferentUserName
         , "' to disable this precaution."
-        ]
-    show (FailedToCloneRepo commandName) = concat
-        [ "Failed to use "
-        , commandName
-        , " to clone the repo.  Please ensure that "
-        , commandName
-        , " is installed and available to stack on your PATH environment variable."
         ]
     show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
         [ "stack can only control the "
@@ -1252,7 +1256,7 @@ platformSnapAndCompilerRel
 platformSnapAndCompilerRel = do
     sd <- view snapshotDefL
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ staticSHA256ToText $ sdUniqueHash sd
+    name <- parseRelDir $ T.unpack $ SHA256.toHexText $ sdUniqueHash sd
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1354,7 +1358,7 @@ configLoadedSnapshotCache
 configLoadedSnapshotCache sd gis = do
     root <- view stackRootL
     platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ T.unpack (staticSHA256ToText $ sdUniqueHash sd) ++ ".cache"
+    file <- parseRelFile $ T.unpack (SHA256.toHexText $ sdUniqueHash sd) ++ ".cache"
     gis' <- parseRelDir $
           case gis of
             GISSnapshotHints -> "__snapshot_hints__"
@@ -1469,11 +1473,12 @@ parseProjectAndConfigMonoid rootDir =
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         mcurator <- jsonSubWarningsT (o ..:? "curator")
         return $ do
-          deps' <- mapM (resolvePackageLocation rootDir) deps
-          resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
+          deps' <- mapM (resolvePaths (Just rootDir)) deps
+          resolver' <- resolvePaths (Just rootDir) resolver
           let project = Project
                   { projectUserMsg = msg
                   , projectResolver = resolver'
+                  , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
                   , projectExtraPackageDBs = extraPackageDBs
                   , projectPackages = packages
                   , projectDependencies = concat deps'

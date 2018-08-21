@@ -39,9 +39,8 @@ import qualified Distribution.Version as C
 import           Network.HTTP.Download (download, redownload)
 import           Network.HTTP.StackClient (Request, parseRequest)
 import qualified RIO
-import qualified RIO.ByteString.Lazy as BL
 import           Data.ByteString.Builder (toLazyByteString)
-import           Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.Types.BuildPlan
@@ -130,33 +129,35 @@ instance Show SnapshotException where
 loadResolver
   :: forall env. HasConfig env
   => SnapshotLocation
+  -> Maybe WantedCompiler
   -> RIO env SnapshotDef
-loadResolver sl = do
+loadResolver (SLCompiler c1) (Just c2) = throwIO $ InvalidOverrideCompiler c1 c2
+loadResolver sl mcompiler = do
   esnap <- loadPantrySnapshot sl
   (compiler, msnap, uniqueHash) <-
     case esnap of
       Left compiler -> pure (compiler, Nothing, mkUniqueHash compiler)
-      Right (snap, mcompiler, sha) -> do
-        sd <- loadResolver $ snapshotParent snap
+      Right (snap, sha) -> do
+        sd <- loadResolver (snapshotParent snap) (snapshotCompiler snap)
         pure
-          ( fromMaybe (sdWantedCompilerVersion sd) mcompiler
+          ( sdWantedCompilerVersion sd
           , Just (snap, sd)
           , combineHashes sha $ sdUniqueHash sd
           )
   pure SnapshotDef
     { sdResolver = sl
     , sdSnapshot = msnap
-    , sdWantedCompilerVersion = compiler
+    , sdWantedCompilerVersion = fromMaybe compiler mcompiler
     , sdUniqueHash = uniqueHash
     }
 
   where
 
-    mkUniqueHash :: WantedCompiler -> StaticSHA256
-    mkUniqueHash = mkStaticSHA256FromBytes . BL.toStrict . toLazyByteString . getUtf8Builder . RIO.display
+    mkUniqueHash :: WantedCompiler -> SHA256
+    mkUniqueHash = SHA256.hashLazyBytes . toLazyByteString . getUtf8Builder . RIO.display
 
-    combineHashes :: StaticSHA256 -> StaticSHA256 -> StaticSHA256
-    combineHashes x y = mkStaticSHA256FromBytes (staticSHA256ToRaw x <> staticSHA256ToRaw y)
+    combineHashes :: SHA256 -> SHA256 -> SHA256
+    combineHashes x y = SHA256.hashBytes (SHA256.toRaw x <> SHA256.toRaw y)
 
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot

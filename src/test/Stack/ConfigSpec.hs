@@ -7,10 +7,10 @@ module Stack.ConfigSpec where
 import Control.Arrow
 import Data.Aeson.Extended
 import Data.Yaml
+import Pantry.Internal (pcHpackExecutable)
 import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
-import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude
 import Stack.Types.Config
 import Stack.Types.Runner
@@ -85,7 +85,7 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner =
-          withRunner logLevel True False ColorAuto defaultStyles Nothing False $ \runner ->
+          withRunner logLevel True False ColorAuto mempty Nothing False $ \runner ->
             runRIO runner $ loadConfig mempty Nothing SYLDefault inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
@@ -96,7 +96,7 @@ spec = beforeAll setup $ do
       -- TODO(danburton): more specific test for exception
       loadConfig' (const (return ())) `shouldThrow` anyException
 
-    let configOverrideHpack config = view hpackExecutableL config
+    let configOverrideHpack = pcHpackExecutable . view pantryConfigL
 
     it "parses config option with-hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) hpackConfig

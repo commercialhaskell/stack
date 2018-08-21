@@ -10,7 +10,6 @@
 module Stack.Types.Package where
 
 import           Stack.Prelude
-import qualified Data.ByteString as S
 import qualified RIO.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as Set
@@ -306,7 +305,7 @@ data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
 data FileCacheInfo = FileCacheInfo
     { fciModTime :: !ModTime
     , fciSize :: !Word64
-    , fciHash :: !S.ByteString
+    , fciHash :: !SHA256
     }
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store FileCacheInfo

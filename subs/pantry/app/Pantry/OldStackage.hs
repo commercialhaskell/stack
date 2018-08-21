@@ -7,7 +7,7 @@ module Pantry.OldStackage
   ) where
 
 import Pantry.Types
-import Pantry.StaticSHA256
+import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import RIO
 import Data.Aeson
@@ -75,7 +75,7 @@ parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do
               case Map.lookup ("SHA256" :: Text) cfiHashes of
                 Nothing -> fail "Could not find SHA256"
                 Just shaText ->
-                  case mkStaticSHA256FromText shaText of
+                  case SHA256.fromHexText shaText of
                     Left e -> fail $ "Invalid SHA256: " ++ show e
                     Right x -> return x
             return $ CFIHash hash' msize

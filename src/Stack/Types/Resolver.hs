@@ -40,7 +40,7 @@ data AbstractResolver
     = ARLatestNightly
     | ARLatestLTS
     | ARLatestLTSMajor !Int
-    | ARResolver !UnresolvedSnapshotLocation
+    | ARResolver !SnapshotLocation
     | ARGlobal
 
 instance Show AbstractResolver where
@@ -53,16 +53,16 @@ instance Display AbstractResolver where
   display (ARResolver usl) = display usl
   display ARGlobal = "global"
 
-readAbstractResolver :: ReadM AbstractResolver
+readAbstractResolver :: ReadM (Unresolved AbstractResolver)
 readAbstractResolver = do
     s <- OA.readerAsk
     case s of
-        "global" -> return ARGlobal
-        "nightly" -> return ARLatestNightly
-        "lts" -> return ARLatestLTS
+        "global" -> pure $ pure ARGlobal
+        "nightly" -> pure $ pure ARLatestNightly
+        "lts" -> pure $ pure ARLatestLTS
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
-            return $ ARLatestLTSMajor x'
-        _ -> return $ ARResolver $ parseSnapshotLocation $ T.pack s
+            pure $ pure $ ARLatestLTSMajor x'
+        _ -> pure $ ARResolver <$> parseSnapshotLocation (T.pack s)
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName
