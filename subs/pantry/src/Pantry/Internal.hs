@@ -5,6 +5,7 @@ module Pantry.Internal
   , Tree (..)
   , TreeEntry (..)
   , mkSafeFilePath
+  , pcHpackExecutable
   ) where
 
 import Pantry.Types

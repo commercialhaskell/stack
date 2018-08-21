@@ -124,6 +124,11 @@ newtype Revision = Revision Word
 
 newtype Storage = Storage (Pool SqlBackend)
 
+-- | Configuration value used by the entire pantry package. Create one
+-- using @withPantryConfig@. See also @PantryApp@ for a convenience
+-- approach to using pantry.
+--
+-- @since 0.1.0.0
 data PantryConfig = PantryConfig
   { pcHackageSecurity :: !HackageSecurityConfig
   , pcHpackExecutable :: !HpackExecutable
@@ -260,6 +265,16 @@ instance FromJSON GitHubRepo where
             [x, y] | not (T.null x || T.null y) -> return (GitHubRepo s)
             _ -> fail "expecting \"user/repo\""
 
+-- | Configuration for Hackage Security to securely download package
+-- metadata and contents from Hackage. For most purposes, you'll want
+-- to use the default Hackage settings via
+-- @defaultHackageSecurityConfig@.
+--
+-- /NOTE/ It's highly recommended to only use the official Hackage
+-- server or a mirror. See
+-- <https://github.com/commercialhaskell/stack/issues/4137>.
+--
+-- @since 0.1.0.0
 data HackageSecurityConfig = HackageSecurityConfig
   { hscKeyIds :: ![Text]
   , hscKeyThreshold :: !Int
@@ -274,7 +289,13 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     hscKeyThreshold <- o ..: "key-threshold"
     pure HackageSecurityConfig {..}
 
+-- | An environment which contains a 'PantryConfig'.
+--
+-- @since 0.1.0.0
 class HasPantryConfig env where
+  -- | Lens to get or set the 'PantryConfig'
+  --
+  -- @since 0.1.0.0
   pantryConfigL :: Lens' env PantryConfig
 
 -- | File size in bytes
@@ -879,9 +900,9 @@ data UnresolvedArchiveLocation
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
 instance Store UnresolvedArchiveLocation
 instance NFData UnresolvedArchiveLocation
-instance ToJSON UnresolvedArchiveLocation where
-  toJSON (RALUrl url) = object ["url" .= url]
-  toJSON (RALFilePath (RelFilePath fp)) = object ["filepath" .= fp]
+instance ToJSON ArchiveLocation where
+  toJSON (ALUrl url) = object ["url" .= url]
+  toJSON (ALFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
 instance FromJSON UnresolvedArchiveLocation where
   parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
     where
@@ -908,9 +929,9 @@ data UnresolvedPackageLocation
   = UPLImmutable !UnresolvedPackageLocationImmutable
   | UPLMutable !RelFilePath
   deriving Show
-instance ToJSON UnresolvedPackageLocation where
-  toJSON (UPLImmutable rpl) = toJSON rpl
-  toJSON (UPLMutable (RelFilePath fp)) = toJSON fp
+instance ToJSON PackageLocation where
+  toJSON (PLImmutable pli) = toJSON pli
+  toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
 instance FromJSON (WithJSONWarnings UnresolvedPackageLocation) where
   parseJSON v =
     (fmap UPLImmutable <$> parseJSON v) <|>
@@ -925,22 +946,22 @@ data UnresolvedPackageLocationImmutable
   deriving (Show, Eq, Data, Generic)
 instance Store UnresolvedPackageLocationImmutable
 instance NFData UnresolvedPackageLocationImmutable
-instance ToJSON UnresolvedPackageLocationImmutable where
-  toJSON (UPLIHackage pir mtree) = object $ concat
+instance ToJSON PackageLocationImmutable where
+  toJSON (PLIHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
-  toJSON (UPLIArchive (UnresolvedArchive loc msha msize) os) = object $ concat
+  toJSON (PLIArchive (Archive loc msha msize) pm) = object $ concat
     [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
-    , osToPairs os
+    , pmToPairs pm
     ]
-  toJSON (UPLIRepo (Repo url commit typ) os) = object $ concat
+  toJSON (PLIRepo (Repo url commit typ) pm) = object $ concat
     [ [ urlKey .= url
       , "commit" .= commit
       ]
-    , osToPairs os
+    , pmToPairs pm
     ]
     where
       urlKey =
@@ -948,9 +969,8 @@ instance ToJSON UnresolvedPackageLocationImmutable where
           RepoGit -> "git"
           RepoHg  -> "hg"
 
-osToPairs :: OptionalSubdirs -> [(Text, Value)]
-osToPairs (OSSubdirs x xs) = [("subdirs" .= (x:xs))]
-osToPairs (OSPackageMetadata (PackageMetadata mname mversion mtree mcabal subdir)) = concat
+pmToPairs :: PackageMetadata -> [(Text, Value)]
+pmToPairs (PackageMetadata mname mversion mtree mcabal subdir) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
@@ -1349,7 +1369,7 @@ instance ToJSON Snapshot where
               Just compiler -> ["compiler" .= compiler]
           ]
     , ["name" .= snapshotName snap]
-    , ["packages" .= map mkUnresolvedPackageLocationImmutable (snapshotLocations snap)]
+    , ["packages" .= snapshotLocations snap]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
     , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]

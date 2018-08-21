@@ -7,6 +7,7 @@ module Stack.ConfigSpec where
 import Control.Arrow
 import Data.Aeson.Extended
 import Data.Yaml
+import Pantry.Internal (pcHpackExecutable)
 import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
@@ -95,7 +96,7 @@ spec = beforeAll setup $ do
       -- TODO(danburton): more specific test for exception
       loadConfig' (const (return ())) `shouldThrow` anyException
 
-    let configOverrideHpack config = view hpackExecutableL config
+    let configOverrideHpack = pcHpackExecutable . view pantryConfigL
 
     it "parses config option with-hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) hpackConfig

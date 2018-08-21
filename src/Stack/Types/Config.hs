@@ -628,7 +628,7 @@ instance ToJSON Project where
       [ maybe [] (\cv -> ["compiler" .= cv]) compiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= map mkUnresolvedPackageLocation extraDeps]
+      , if null extraDeps then [] else ["extra-deps" .= extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
       , ["resolver" .= usl]

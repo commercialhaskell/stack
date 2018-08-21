@@ -3,61 +3,91 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+-- | Content addressable Haskell package management, providing for
+-- secure, reproducible acquisition of Haskell package contents and
+-- metadata.
+--
+-- @since 0.1.0.0
 module Pantry
-  ( -- * Configuration
+  ( -- * Running
     PantryConfig
   , HackageSecurityConfig (..)
   , defaultHackageSecurityConfig
   , HasPantryConfig (..)
   , withPantryConfig
+  , HpackExecutable (..)
 
-    -- ** Lenses
-  , hpackExecutableL
+    -- ** Convenience
+  , PantryApp
+  , runPantryApp
+  , runPantryAppClean
 
     -- * Types
-  , SHA256
-  , CabalFileInfo (..)
-  , Revision (..)
-  , FileSize (..)
-  , PackageLocation (..)
-  , Archive (..)
-  , ArchiveLocation (..)
-  , Repo (..)
-  , RepoType (..)
-  , RelFilePath (..)
-  , PackageLocationImmutable (..)
-  , ResolvedPath (..)
-  , PackageIdentifierRevision (..)
-  , PackageName
-  , Version
-  , PackageIdentifier (..)
-  , FlagName
-  , TreeKey (..)
-  , BlobKey (..)
-  , HpackExecutable (..)
-  , PackageMetadata (..)
+
+    -- ** Exceptions
   , PantryException (..)
 
-    -- ** Unresolved package locations
+    -- ** Cabal types
+  , PackageName
+  , Version
+  , FlagName
+  , PackageIdentifier (..)
+
+    -- ** Files
+  , FileSize (..)
+  , RelFilePath (..)
+  , ResolvedPath (..)
+
+    -- ** Cryptography
+  , SHA256
+  , TreeKey (..)
+  , BlobKey (..)
+
+    -- ** Hackage
+  , CabalFileInfo (..)
+  , Revision (..)
+  , PackageIdentifierRevision (..)
+  , UsePreferredVersions (..)
+
+    -- ** Archives
+  , Archive (..)
+  , ArchiveLocation (..)
+
+    -- ** Repos
+  , Repo (..)
+  , RepoType (..)
+
+    -- ** Package location
+  , PackageLocation (..)
+  , PackageLocationImmutable (..)
+  , PackageMetadata (..)
+
+    -- *** Unresolved
   , UnresolvedPackageLocation
   , UnresolvedPackageLocationImmutable (..)
-  , resolvePackageLocation
-  , resolvePackageLocationImmutable
-  , mkUnresolvedPackageLocation
-  , mkUnresolvedPackageLocationImmutable
-  , completePackageLocation
-  , loadPackageLocation
 
     -- ** Snapshots
-  , UnresolvedSnapshotLocation (..)
-  , resolveSnapshotLocation
-  , unresolveSnapshotLocation
   , SnapshotLocation (..)
   , Snapshot (..)
   , WantedCompiler (..)
-  , parseWantedCompiler
+
+    -- *** Unresolved
+  , UnresolvedSnapshotLocation (..)
+
+    -- * Completion functions
+  , completePackageLocation
   , completeSnapshot
   , completeSnapshotLocation
+
+    -- ** FIXME
+  , resolvePackageLocation
+  , resolvePackageLocationImmutable
+  , loadPackageLocation
+
+    -- ** Snapshots
+  , resolveSnapshotLocation
+  , unresolveSnapshotLocation
+  , parseWantedCompiler
   , loadPantrySnapshot
   , parseSnapshotLocation
   , ltsSnapshotLocation
@@ -92,14 +122,8 @@ module Pantry
   , getLatestHackageVersion
   , typoCorrectionCandidates
 
-    -- * Convenience
-  , PantryApp
-  , runPantryApp
-  , runPantryAppClean
-
     -- * FIXME legacy from Stack, to be updated
   , getPackageVersions
-  , UsePreferredVersions (..)
   , fetchPackages
   , unpackPackageLocation
   ) where
@@ -135,13 +159,26 @@ import Pantry.HTTP
 import qualified RIO.FilePath
 import Data.Char (isHexDigit)
 
+-- | Create a new 'PantryConfig' with the given settings.
+--
+-- For something easier to use in simple cases, see 'runPantryApp'.
+--
+-- @since 0.1.0.0
 withPantryConfig
   :: HasLogFunc env
-  => Path Abs Dir -- ^ pantry root
+  => Path Abs Dir
+  -- ^ pantry root directory, where the SQLite database and Hackage
+  -- downloads are kept.
   -> HackageSecurityConfig
+  -- ^ Hackage configuration. You probably want
+  -- 'defaultHackageSecurityConfig'.
   -> HpackExecutable
-  -> Int -- ^ connection count
+  -- ^ When converting an hpack @package.yaml@ file to a cabal file,
+  -- what version of hpack should we use?
+  -> Int
+  -- ^ Maximum connection count
   -> (PantryConfig -> RIO env a)
+  -- ^ What to do with the config
   -> RIO env a
 withPantryConfig root hsc he count inner = do
   env <- ask
@@ -161,6 +198,9 @@ withPantryConfig root hsc he count inner = do
       , pcParsedCabalFilesMutable = ref2
       }
 
+-- | Default 'HackageSecurityConfig' value using the official Hackage server.
+--
+-- @since 0.1.0.0
 defaultHackageSecurityConfig :: HackageSecurityConfig
 defaultHackageSecurityConfig = HackageSecurityConfig
   { hscKeyIds =
@@ -696,14 +736,18 @@ getPackageLocationTreeKey pl =
         PLIArchive archive pm -> getArchiveKey archive pm
         PLIRepo repo pm -> getRepoKey repo pm
 
-hpackExecutableL :: HasPantryConfig env => SimpleGetter env HpackExecutable
-hpackExecutableL = pantryConfigL.to pcHpackExecutable
-
 getTreeKey :: PackageLocationImmutable -> Maybe TreeKey
 getTreeKey (PLIHackage _ mtree) = mtree
 getTreeKey (PLIArchive _ pm) = pmTree pm
 getTreeKey (PLIRepo _ pm) = pmTree pm
 
+-- | Convenient data type that allows you to work with pantry more
+-- easily than using 'withPantryConfig' directly. Uses basically sane
+-- settings, like sharing a pantry directory with Stack.
+--
+-- You can use 'runPantryApp' to use this.
+--
+-- @since 0.1.0.0
 data PantryApp = PantryApp
   { paSimpleApp :: !SimpleApp
   , paPantryConfig :: !PantryConfig
@@ -719,6 +763,11 @@ instance HasPantryConfig PantryApp where
 instance HasProcessContext PantryApp where
   processContextL = simpleAppL.processContextL
 
+-- | Run some code against pantry using basic sane settings.
+--
+-- For testing, see 'runPantryAppClean'.
+--
+-- @since 0.1.0.0
 runPantryApp :: MonadIO m => RIO PantryApp a -> m a
 runPantryApp f = runSimpleApp $ do
   sa <- ask
@@ -737,6 +786,10 @@ runPantryApp f = runSimpleApp $ do
           }
         f
 
+-- | Like 'runPantryApp', but uses an empty pantry directory instead
+-- of sharing with Stack. Useful for testing.
+--
+-- @since 0.1.0.0
 runPantryAppClean :: MonadIO m => RIO PantryApp a -> m a
 runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> runSimpleApp $ do
   sa <- ask
