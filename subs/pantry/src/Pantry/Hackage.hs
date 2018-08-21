@@ -291,7 +291,7 @@ getHackageCabalFile pir@(PackageIdentifierRevision _ _ cfi) = do
 resolveCabalFileInfo
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
-  -> RIO env BlobTableId
+  -> RIO env BlobId
 resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
   mres <- inner
   case mres of
@@ -390,8 +390,8 @@ withCachedTree
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> Version
-  -> BlobTableId -- ^ cabal file contents
-  -> RIO env (TreeSId, TreeKey, Tree)
+  -> BlobId -- ^ cabal file contents
+  -> RIO env (TreeId, TreeKey, Tree)
   -> RIO env (TreeKey, Tree)
 withCachedTree name ver bid inner = do
   mres <- withStorage $ loadHackageTree name ver bid
@@ -465,5 +465,5 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
     case tree of
       TreeMap m -> do
         let tree' = TreeMap $ Map.insert key (TreeEntry cabalFileKey ft) m
-        (tid, treeKey') <- withStorage $ storeTree tree'
+        (tid, treeKey') <- withStorage $ storeTree undefined tree' undefined
         pure (tid, treeKey', tree')

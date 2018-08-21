@@ -64,7 +64,7 @@ getArchive archive pm =
     loc = archiveLocation archive
 
     withCache
-      :: RIO env (TreeSId, SHA256, FileSize, TreeKey, Tree)
+      :: RIO env (TreeId, SHA256, FileSize, TreeKey, Tree)
       -> RIO env (TreeKey, Tree)
     withCache inner =
       let loop [] = do
@@ -245,7 +245,7 @@ parseArchive
   => ArchiveLocation
   -> FilePath -- ^ file holding the archive
   -> Text -- ^ subdir, besides the single-dir stripping logic
-  -> RIO env (TreeSId, TreeKey, Tree)
+  -> RIO env (TreeId, TreeKey, Tree)
 parseArchive loc fp subdir = do
   let getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
@@ -299,7 +299,7 @@ parseArchive loc fp subdir = do
             case Map.lookup (seSource se) blobs of
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
-          (tid, treeKey) <- withStorage $ storeTree tree
+          (tid, treeKey) <- withStorage $ storeTree undefined tree undefined
           pure (tid, treeKey, tree)
 
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]

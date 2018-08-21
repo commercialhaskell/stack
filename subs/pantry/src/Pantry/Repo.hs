@@ -54,7 +54,7 @@ getRepo repo pm =
         Nothing -> do
           (treeKey, tree) <- inner
           withStorage $ do
-            ment <- getTreeSForKey treeKey
+            ment <- getTreeForKey treeKey
             case ment of
               Nothing -> error $ "invariant violated, TreeS not found: " ++ show treeKey
               Just (Entity tid _) -> storeRepoCache repo (pmSubdir pm) tid
