@@ -88,10 +88,13 @@ updateHackageIndex mreason = gateUpdate $ do
         HS.checkForUpdates repo (Just now)
 
     case didUpdate of
-        HS.NoUpdates -> logInfo "No package index update available"
-        HS.HasUpdates -> logInfo "Updated package index downloaded"
-
-    withStorage $ do
+      HS.NoUpdates -> logInfo "No package index update available"
+      HS.HasUpdates -> do
+        logInfo "Updated package index downloaded"
+        updateCache tarball
+    logStickyDone "Package index cache populated"
+  where
+    updateCache tarball = withStorage $ do
       -- Alright, here's the story. In theory, we only ever append to
       -- a tarball. Therefore, we can store the last place we
       -- populated our cache from, and fast forward to that point. But
@@ -152,8 +155,6 @@ updateHackageIndex mreason = gateUpdate $ do
       populateCache tarball (fromIntegral offset) `onException`
         lift (logStickyDone "Failed populating package index cache")
       storeCacheUpdate (FileSize newSize) newHash
-    logStickyDone "Package index cache populated"
-  where
     gateUpdate inner = do
       pc <- view pantryConfigL
       join $ modifyMVar (pcUpdateRef pc) $ \toUpdate -> pure $
