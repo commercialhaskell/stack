@@ -33,6 +33,9 @@ Major changes:
       changes, existing cache files will in general be invalidated,
       resulting in Stack needing to rebuild many previously cached
       builds in the new version. Sorry :(.
+    * A new command, `stack freeze` has been added which outputs
+      project and snapshot definitions with dependencies pinned to
+      their exact versions.
 
 Behavior changes:
 
