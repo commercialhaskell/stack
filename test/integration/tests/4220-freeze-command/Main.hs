@@ -13,10 +13,9 @@ main = do
           , "    size: 409"
           , "    sha256: a7c6151a18b04afe1f13637627cad4deff91af51d336c4f33e95fc98c64c40d3"
           , "resolver:"
-          , "  blob:"
-          , "    size: 527165"
-          , "    sha256: 0116ad1779b20ad2c9d6620f172531f13b12bb69867e78f4277157e28865dfd4"
+          , "  size: 527165"
           , "  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/19.yaml"
+          , "  sha256: 0116ad1779b20ad2c9d6620f172531f13b12bb69867e78f4277157e28865dfd4"
           ]
     unless (stdOut == expected) $
       error $ concat [ "Expected: "
