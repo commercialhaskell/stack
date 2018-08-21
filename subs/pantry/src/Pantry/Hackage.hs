@@ -32,7 +32,7 @@ import Network.URI (parseURI)
 import Data.Time (getCurrentTime)
 import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
 import qualified Distribution.Text
-import Distribution.Types.PackageName (unPackageName)
+import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text.Metrics (damerauLevenshtein)
@@ -189,7 +189,7 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
           if
             | filename == "package.json" ->
                 sinkLazy >>= lift . addJSON name version
-            | filename == T.pack (unPackageName name) <> ".cabal" -> do
+            | filename == unSafeFilePath (cabalFileName name) -> do
                 (BL.toStrict <$> sinkLazy) >>= lift . addCabal name version
 
                 count <- readIORef counter
@@ -391,16 +391,16 @@ withCachedTree
   => PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
-  -> RIO env (TreeId, TreeKey, Tree)
-  -> RIO env (TreeKey, Tree)
+  -> RIO env Package
+  -> RIO env Package
 withCachedTree name ver bid inner = do
   mres <- withStorage $ loadHackageTree name ver bid
   case mres of
-    Just res -> pure res
+    Just package -> pure package
     Nothing -> do
-      (tid, treekey, tree) <- inner
-      withStorage $ storeHackageTree name ver bid tid
-      pure (treekey, tree)
+      package <- inner
+      withStorage $ storeHackageTree name ver bid $ packageTreeKey package
+      pure package
 
 getHackageTarballKey
   :: (HasPantryConfig env, HasLogFunc env)
@@ -409,16 +409,16 @@ getHackageTarballKey
 getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
   mres <- withStorage $ loadHackageTreeKey name ver sha
   case mres of
-    Nothing -> fst <$> getHackageTarball pir Nothing
+    Nothing -> packageTreeKey <$> getHackageTarball pir Nothing
     Just key -> pure key
-getHackageTarballKey pir = fst <$> getHackageTarball pir Nothing
+getHackageTarballKey pir = packageTreeKey <$> getHackageTarball pir Nothing
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageIdentifierRevision
   -> Maybe TreeKey
-  -> RIO env (TreeKey, Tree)
-getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = checkTreeKey (PLIHackage pir mtreeKey) mtreeKey $ do
+  -> RIO env Package
+getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
   withCachedTree name ver cabalFile $ do
@@ -446,7 +446,8 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    (treeKey, tree) <- getArchive
+    package <- getArchive
+      (PLIHackage pir mtreeKey)
       Archive
         { archiveLocation = ALUrl url
         , archiveHash = Just sha
@@ -455,15 +456,37 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = check
       PackageMetadata
         { pmName = Just name
         , pmVersion = Just ver
-        , pmTree = Nothing -- with a revision cabal file will differ giving a different tree
+        , pmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
         , pmCabal = Nothing -- cabal file in the tarball may be different!
         , pmSubdir = T.empty -- no subdirs on Hackage
         }
 
-    (key, TreeEntry _origkey ft) <- findCabalFile (PLIHackage pir (Just treeKey)) tree
-
-    case tree of
+    case packageTree package of
       TreeMap m -> do
-        let tree' = TreeMap $ Map.insert key (TreeEntry cabalFileKey ft) m
-        (tid, treeKey') <- withStorage $ storeTree undefined tree' undefined
-        pure (tid, treeKey', tree')
+        let TreeEntry _ ft = packageCabalEntry package
+            cabalEntry = TreeEntry cabalFileKey ft
+            tree' = TreeMap $ Map.insert (cabalFileName name) cabalEntry m
+            ident = PackageIdentifier name ver
+
+        cabalBS <- withStorage $ do
+          let BlobKey sha' _ = cabalFileKey
+          mcabalBS <- loadBlobBySHA sha'
+          case mcabalBS of
+            Nothing -> error $ "Invariant violated, cabal file key: " ++ show cabalFileKey
+            Just bid -> loadBlobById bid
+
+        (_warnings, gpd) <- rawParseGPD (Left (PLIHackage pir mtreeKey)) cabalBS
+        let gpdIdent = Cabal.package $ Cabal.packageDescription gpd
+        when (ident /= gpdIdent) $ throwIO $
+          MismatchedCabalFileForHackage pir Mismatch
+            { mismatchExpected = ident
+            , mismatchActual = gpdIdent
+            }
+
+        (_tid, treeKey') <- withStorage $ storeTree ident tree' cabalEntry
+        pure Package
+          { packageTreeKey = treeKey'
+          , packageTree = tree'
+          , packageIdent = ident
+          , packageCabalEntry = cabalEntry
+          }

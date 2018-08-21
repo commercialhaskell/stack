@@ -256,9 +256,7 @@ unpackPackageLocation
   => Path Abs Dir -- ^ unpack directory
   -> PackageLocationImmutable
   -> RIO env ()
-unpackPackageLocation fp loc = do
-  (_, tree) <- loadPackageLocation loc
-  unpackTree loc fp tree
+unpackPackageLocation fp loc = loadPackageLocation loc >>= unpackTree loc fp . packageTree
 
 -- | Ignores all warnings
 --
@@ -280,7 +278,7 @@ parseCabalFileImmutable loc = withCache $ do
             { pmName = Just name
             , pmVersion = Just version
             , pmSubdir = ""
-            , pmTree = mtree
+            , pmTreeKey = mtree
             , pmCabal =
                 case cfi of
                   CFIHash sha (Just size) -> Just $ BlobKey sha size
@@ -288,7 +286,7 @@ parseCabalFileImmutable loc = withCache $ do
             }
           PLIArchive _ pm' -> pm'
           PLIRepo _ pm' -> pm'
-  let exc = MismatchedPackageMetadata loc pm foundCabalKey (gpdPackageIdentifier gpd)
+  let exc = MismatchedPackageMetadata loc pm Nothing foundCabalKey (gpdPackageIdentifier gpd)
   maybe (throwIO exc) pure $ do
     guard $ maybe True (== gpdPackageName gpd) (pmName pm)
     guard $ maybe True (== gpdVersion gpd) (pmVersion pm)
@@ -348,7 +346,7 @@ parseCabalFilePath dir printWarnings = do
         -- Previously, we just use parsePackageNameFromFilePath. However, that can
         -- lead to confusing error messages. See:
         -- https://github.com/commercialhaskell/stack/issues/895
-        let expected = displayC name ++ ".cabal"
+        let expected = T.unpack $ unSafeFilePath $ cabalFileName name
         when (expected /= toFilePath (filename cabalfp))
             $ throwM $ MismatchedCabalName cabalfp name
 
@@ -442,8 +440,9 @@ loadCabalFile
 loadCabalFile (PLIHackage pir _mtree) = getHackageCabalFile pir
 
 loadCabalFile pl = do
-  (_, tree) <- loadPackageLocation pl
-  (sfp, TreeEntry cabalBlobKey _ft) <- findCabalFile pl tree
+  package <- loadPackageLocation pl
+  let sfp = cabalFileName $ pkgName $ packageIdent package
+      TreeEntry cabalBlobKey _ft = packageCabalEntry package
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
@@ -454,9 +453,9 @@ loadCabalFile pl = do
 loadPackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
-  -> RIO env (TreeKey, Tree)
+  -> RIO env Package
 loadPackageLocation (PLIHackage pir mtree) = getHackageTarball pir mtree
-loadPackageLocation (PLIArchive archive pm) = getArchive archive pm
+loadPackageLocation pli@(PLIArchive archive pm) = getArchive pli archive pm
 loadPackageLocation (PLIRepo repo pm) = getRepo repo pm
 
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
@@ -503,24 +502,23 @@ completePM
 completePM plOrig pm
   | isCompletePM pm = pure pm
   | otherwise = do
-      (treeKey, tree) <- loadPackageLocation plOrig
-      (cabalBlobKey, PackageIdentifier name version) <- loadPackageIdentFromTree plOrig tree
+      package <- loadPackageLocation plOrig
       let pmNew = PackageMetadata
-            { pmName = Just name
-            , pmVersion = Just version
-            , pmTree = Just treeKey
-            , pmCabal = Just cabalBlobKey
+            { pmName = Just $ pkgName $ packageIdent package
+            , pmVersion = Just $ pkgVersion $ packageIdent package
+            , pmTreeKey = Just $ packageTreeKey package
+            , pmCabal = Just $ teBlob $ packageCabalEntry package
             , pmSubdir = pmSubdir pm
             }
 
-          isSame _ Nothing = True
-          isSame x (Just y) = x == y
+          isSame (Just x) (Just y) = x == y
+          isSame _ _ = True
 
           allSame =
-            isSame name (pmName pm) &&
-            isSame version (pmVersion pm) &&
-            isSame treeKey (pmTree pm) &&
-            isSame cabalBlobKey (pmCabal pm)
+            isSame (pmName pmNew) (pmName pm) &&
+            isSame (pmVersion pmNew) (pmVersion pm) &&
+            isSame (pmTreeKey pmNew) (pmTreeKey pm) &&
+            isSame (pmCabal pmNew) (pmCabal pm)
       if allSame
         then pure pmNew
         else throwIO $ CompletePackageMetadataMismatch plOrig pmNew
@@ -693,9 +691,7 @@ getPackageLocationIdent
   => PackageLocationImmutable
   -> RIO env PackageIdentifier
 getPackageLocationIdent (PLIHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
-getPackageLocationIdent pli = do
-  (_, tree) <- loadPackageLocation pli
-  snd <$> loadPackageIdentFromTree pli tree
+getPackageLocationIdent pli = packageIdent <$> loadPackageLocation pli
 
 getPackageLocationTreeKey
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -707,13 +703,13 @@ getPackageLocationTreeKey pl =
     Nothing ->
       case pl of
         PLIHackage pir _ -> getHackageTarballKey pir
-        PLIArchive archive pm -> getArchiveKey archive pm
+        PLIArchive archive pm -> getArchiveKey pl archive pm
         PLIRepo repo pm -> getRepoKey repo pm
 
 getTreeKey :: PackageLocationImmutable -> Maybe TreeKey
 getTreeKey (PLIHackage _ mtree) = mtree
-getTreeKey (PLIArchive _ pm) = pmTree pm
-getTreeKey (PLIRepo _ pm) = pmTree pm
+getTreeKey (PLIArchive _ pm) = pmTreeKey pm
+getTreeKey (PLIRepo _ pm) = pmTreeKey pm
 
 -- | Convenient data type that allows you to work with pantry more
 -- easily than using 'withPantryConfig' directly. Uses basically sane

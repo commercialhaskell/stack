@@ -39,6 +39,7 @@ module Pantry.Types
   , SHA256
   , Unresolved
   , resolvePaths
+  , Package (..)
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -71,6 +72,7 @@ module Pantry.Types
   , Snapshot (..)
   , parseWantedCompiler
   , PackageMetadata (..)
+  , cabalFileName
   ) where
 
 import RIO
@@ -114,6 +116,23 @@ import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
+
+-- | Parsed tree with more information on the Haskell package it contains.
+--
+-- @since 0.1.0.0
+data Package = Package
+  { packageTreeKey :: !TreeKey
+  , packageTree :: !Tree
+  , packageCabalEntry :: !TreeEntry
+  , packageIdent :: !PackageIdentifier
+  }
+  deriving (Show, Eq)
+
+cabalFileName :: PackageName -> SafeFilePath
+cabalFileName name =
+  case mkSafeFilePath $ displayC name <> ".cabal" of
+    Nothing -> error $ "cabalFileName: failed for " ++ show name
+    Just sfp -> sfp
 
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
@@ -450,10 +469,10 @@ data PantryException
   | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
   | InvalidFilePathSnapshot !Text
   | InvalidSnapshot !SnapshotLocation !SomeException
-  | TreeKeyMismatch !PackageLocationImmutable !(Mismatch TreeKey)
   | MismatchedPackageMetadata
       !PackageLocationImmutable
       !PackageMetadata
+      !(Maybe TreeKey)
       !BlobKey -- cabal file found
       !PackageIdentifier
   | Non200ResponseStatus !Status
@@ -474,10 +493,11 @@ data PantryException
   | FailedToCloneRepo !Repo
   | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
   | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
-  | CRC32Mismatch !ArchiveLocation !FilePath (Mismatch Word32)
+  | CRC32Mismatch !ArchiveLocation !FilePath !(Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
   | CannotCompleteRepoNonSHA1 !Repo
   | MutablePackageLocationFromUrl !Text
+  | MismatchedCabalFileForHackage !PackageIdentifierRevision !(Mismatch PackageIdentifier)
 
   deriving Typeable
 instance Exception PantryException where
@@ -561,14 +581,14 @@ instance Display PantryException where
     display loc <>
     ":\n" <>
     displayShow e
-  display (TreeKeyMismatch loc Mismatch {..}) =
-    "Tree key mismatch when getting " <> display loc <>
-    "\nExpected: " <> display mismatchExpected <>
-    "\nActual:   " <> display mismatchActual
-  display (MismatchedPackageMetadata loc pm foundCabal foundIdent) =
+  display (MismatchedPackageMetadata loc pm mtreeKey foundCabal foundIdent) =
     "Mismatched package metadata for " <> display loc <>
     "\nFound: " <> displayC foundIdent <> " with cabal file " <>
-    display foundCabal <> "\nExpected: " <> display pm
+    display foundCabal <>
+    (case mtreeKey of
+       Nothing -> mempty
+       Just treeKey -> " and tree " <> display treeKey) <>
+    "\nExpected: " <> display pm
   display (Non200ResponseStatus status) =
     "Unexpected non-200 HTTP status code: " <>
     displayShow (statusCode status)
@@ -633,6 +653,11 @@ instance Display PantryException where
     display repo
   display (MutablePackageLocationFromUrl t) =
     "Cannot refer to a mutable package location from a URL: " <> display t
+  display (MismatchedCabalFileForHackage pir Mismatch{..}) =
+    "When processing cabal file for Hackage package " <> display pir <>
+    ":\nMismatched package identifier." <>
+    "\nExpected: " <> displayC mismatchExpected <>
+    "\nActual:   " <> displayC mismatchActual
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
@@ -690,7 +715,10 @@ instance PersistField FileType where
 instance PersistFieldSql FileType where
   sqlType _ = SqlInt32
 
-data TreeEntry = TreeEntry !BlobKey !FileType
+data TreeEntry = TreeEntry
+  { teBlob :: !BlobKey
+  , teType :: !FileType
+  }
   deriving (Show, Eq)
 
 newtype SafeFilePath = SafeFilePath Text
@@ -864,7 +892,7 @@ instance Store OptionalSubdirs
 data PackageMetadata = PackageMetadata
   { pmName :: !(Maybe PackageName)
   , pmVersion :: !(Maybe Version)
-  , pmTree :: !(Maybe TreeKey)
+  , pmTreeKey :: !(Maybe TreeKey)
   , pmCabal :: !(Maybe BlobKey)
   , pmSubdir :: !Text
   }
@@ -876,7 +904,7 @@ instance Display PackageMetadata where
   display pm = fold $ intersperse ", " $ catMaybes
     [ (\name -> "name == " <> displayC name) <$> pmName pm
     , (\version -> "version == " <> displayC version) <$> pmVersion pm
-    , (\tree -> "tree == " <> display tree) <$> pmTree pm
+    , (\tree -> "tree == " <> display tree) <$> pmTreeKey pm
     , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
     , if T.null $ pmSubdir pm
         then Nothing

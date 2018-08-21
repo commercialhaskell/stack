@@ -28,7 +28,7 @@ module Pantry.Storage
   , loadHackageTarballInfo
   , storeTree
   , loadTree
-  , loadTreeById
+  , loadPackageById
   , getTreeForKey
   , storeHackageTree
   , loadHackageTree
@@ -73,7 +73,7 @@ import Path.IO (ensureDir)
 import Data.Pool (destroyAllResources)
 import Conduit
 import Data.Acquire (with)
-import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..))
+import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 -- Raw blobs
@@ -149,6 +149,7 @@ CacheUpdate
 Tree
     key BlobId
     cabal BlobId
+    cabalType FileType
     name PackageNameId
     version VersionId
     UniqueTree key
@@ -449,10 +450,10 @@ storeTree
   :: (HasPantryConfig env, HasLogFunc env)
   => P.PackageIdentifier
   -> P.Tree
-  -> BlobKey
+  -> P.TreeEntry
   -- ^ cabal file
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.BlobKey cabal _) = do
+storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey cabal _) cabalType) = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
   mcabalid <- loadBlobBySHA cabal
   cabalid <-
@@ -464,6 +465,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.BlobKey cabal
   etid <- insertBy Tree
     { treeKey = bid
     , treeCabal = cabalid
+    , treeCabalType = cabalType
     , treeName = nameid
     , treeVersion = versionid
     }
@@ -505,19 +507,40 @@ getTreeForKey (P.TreeKey key) = do
     Nothing -> pure Nothing
     Just bid -> getBy $ UniqueTree bid
 
-loadTreeById
+loadPackageById
   :: (HasPantryConfig env, HasLogFunc env)
   => TreeId
-  -> ReaderT SqlBackend (RIO env) (P.TreeKey, P.Tree)
-loadTreeById tid = do
+  -> ReaderT SqlBackend (RIO env) Package
+loadPackageById tid = do
   mts <- get tid
   ts <-
     case mts of
-      Nothing -> error $ "loadTreeById: invalid foreign key " ++ show tid
+      Nothing -> error $ "loadPackageById: invalid foreign key " ++ show tid
       Just ts -> pure ts
   tree <- loadTreeByEnt $ Entity tid ts
   key <- getBlobKey $ treeKey ts
-  pure (P.TreeKey key, tree)
+
+  mname <- get $ treeName ts
+  name <-
+    case mname of
+      Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeName ts)
+      Just (PackageName (P.PackageNameP name)) -> pure name
+
+  mversion <- get $ treeVersion ts
+  version <-
+    case mversion of
+      Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeVersion ts)
+      Just (Version (P.VersionP version)) -> pure version
+
+  cabalKey <- getBlobKey $ treeCabal ts
+  let ident = P.PackageIdentifier name version
+  let cabalEntry = P.TreeEntry cabalKey (treeCabalType ts)
+  pure Package
+    { packageTreeKey = P.TreeKey key
+    , packageTree = tree
+    , packageCabalEntry = cabalEntry
+    , packageIdent = ident
+    }
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
@@ -541,17 +564,18 @@ storeHackageTree
   => P.PackageName
   -> P.Version
   -> BlobId
-  -> TreeId
+  -> P.TreeKey
   -> ReaderT SqlBackend (RIO env) ()
-storeHackageTree name version cabal tid = do
+storeHackageTree name version cabal treeKey' = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
-  updateWhere
+  ment <- getTreeForKey treeKey'
+  for_ ment $ \ent -> updateWhere
     [ HackageCabalName ==. nameid
     , HackageCabalVersion ==. versionid
     , HackageCabalCabal ==. cabal
     ]
-    [HackageCabalTree =. Just tid]
+    [HackageCabalTree =. Just (entityKey ent)]
 
 loadHackageTreeKey
   :: (HasPantryConfig env, HasLogFunc env)
@@ -585,7 +609,7 @@ loadHackageTree
   => P.PackageName
   -> P.Version
   -> BlobId
-  -> ReaderT SqlBackend (RIO env) (Maybe (P.TreeKey, P.Tree))
+  -> ReaderT SqlBackend (RIO env) (Maybe Package)
 loadHackageTree name ver bid = do
   nameid <- getPackageNameId name
   versionid <- getVersionId ver
@@ -601,7 +625,7 @@ loadHackageTree name ver bid = do
     Just (Entity _ hc) ->
       case hackageCabalTree hc of
         Nothing -> assert False $ pure Nothing
-        Just x -> Just <$> loadTreeById x
+        Just tid -> Just <$> loadPackageById tid
 
 storeArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
@@ -609,17 +633,18 @@ storeArchiveCache
   -> Text -- ^ subdir
   -> SHA256
   -> FileSize
-  -> TreeId
+  -> P.TreeKey
   -> ReaderT SqlBackend (RIO env) ()
-storeArchiveCache url subdir sha size tid = do
+storeArchiveCache url subdir sha size treeKey' = do
   now <- getCurrentTime
-  insert_ ArchiveCache
+  ment <- getTreeForKey treeKey'
+  for_ ment $ \ent -> insert_ ArchiveCache
     { archiveCacheTime = now
     , archiveCacheUrl = url
     , archiveCacheSubdir = subdir
     , archiveCacheSha = sha
     , archiveCacheSize = size
-    , archiveCacheTree = tid
+    , archiveCacheTree = entityKey ent
     }
 
 loadArchiveCache

@@ -9,7 +9,6 @@ module Pantry.Repo
 
 import Pantry.Types
 import Pantry.Archive
-import Pantry.Tree
 import Pantry.Storage
 import RIO
 import Path.IO (resolveFile')
@@ -32,39 +31,37 @@ getRepoKey
   => Repo
   -> PackageMetadata
   -> RIO env TreeKey
-getRepoKey repo pm = fst <$> getRepo repo pm -- potential optimization
+getRepoKey repo pm = packageTreeKey <$> getRepo repo pm -- potential optimization
 
 getRepo
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
   -> PackageMetadata
-  -> RIO env (TreeKey, Tree)
+  -> RIO env Package
 getRepo repo pm =
-  checkPackageMetadata (PLIRepo repo pm) pm $
-  withCache $
-  getRepo' repo pm
+  withCache $ getRepo' repo pm
   where
     withCache
-      :: RIO env (TreeKey, Tree)
-      -> RIO env (TreeKey, Tree)
+      :: RIO env Package
+      -> RIO env Package
     withCache inner = do
       mtid <- withStorage (loadRepoCache repo (pmSubdir pm))
       case mtid of
-        Just tid -> withStorage $ loadTreeById tid
+        Just tid -> withStorage $ loadPackageById tid
         Nothing -> do
-          (treeKey, tree) <- inner
+          package <- inner
           withStorage $ do
-            ment <- getTreeForKey treeKey
+            ment <- getTreeForKey $ packageTreeKey package
             case ment of
-              Nothing -> error $ "invariant violated, TreeS not found: " ++ show treeKey
+              Nothing -> error $ "invariant violated, Tree not found: " ++ show (packageTreeKey package)
               Just (Entity tid _) -> storeRepoCache repo (pmSubdir pm) tid
-          pure (treeKey, tree)
+          pure package
 
 getRepo'
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
   -> PackageMetadata
-  -> RIO env (TreeKey, Tree)
+  -> RIO env Package
 getRepo' repo@(Repo url commit repoType') pm =
   withSystemTempDirectory "get-repo" $
   \tmpdir -> withWorkingDir tmpdir $ do
@@ -100,6 +97,7 @@ getRepo' repo@(Repo url commit repoType') pm =
       void $ proc commandName archiveArgs readProcess_
     abs' <- resolveFile' tarball
     getArchive
+      (PLIRepo repo pm)
       Archive
         { archiveLocation = ALFilePath $ ResolvedPath
             { resolvedRelative = RelFilePath $ T.pack tarball
@@ -108,10 +106,4 @@ getRepo' repo@(Repo url commit repoType') pm =
         , archiveHash = Nothing
         , archiveSize = Nothing
         }
-      PackageMetadata
-        { pmName = Nothing
-        , pmVersion = Nothing
-        , pmTree = Nothing
-        , pmCabal = Nothing
-        , pmSubdir = pmSubdir pm
-        }
+      pm

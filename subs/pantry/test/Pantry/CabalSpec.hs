@@ -30,13 +30,13 @@ spec = describe "wrong cabal file" $ do
         size = FileSize 597
     go `shouldThrow'` \e ->
       case e of
-        MismatchedPackageMetadata pli' pm cabal ident ->
+        MismatchedPackageMetadata pli' pm _tree cabal ident ->
           pli == pli' &&
           pm == PackageMetadata
             { pmName = Just name
             , pmVersion = Just version3
             , pmSubdir = ""
-            , pmTree = Nothing
+            , pmTreeKey = Nothing
             , pmCabal = Just $ BlobKey sha size
             } &&
           cabal == BlobKey sha size &&
@@ -60,7 +60,7 @@ spec = describe "wrong cabal file" $ do
               { pmName = Just acmeMissiles
               , pmVersion = Just version2
               , pmCabal = Just $ BlobKey sha (FileSize 597)
-              , pmTree = Nothing
+              , pmTreeKey = Nothing
               , pmSubdir = "yesod-auth"
               }
         go = parseCabalFileImmutable pli
@@ -68,7 +68,7 @@ spec = describe "wrong cabal file" $ do
         version2 = mkVersion [0, 2]
     go `shouldThrow'` \e ->
       case e of
-        MismatchedPackageMetadata pli' pm' cabal ident ->
+        MismatchedPackageMetadata pli' pm' _treeKey cabal ident ->
           pli == pli' &&
           pm == pm' &&
           cabal == BlobKey
@@ -95,7 +95,7 @@ spec = describe "wrong cabal file" $ do
               { pmName = Just yesodAuth
               , pmVersion = Just version
               , pmCabal = Just $ BlobKey sha (FileSize 597)
-              , pmTree = Nothing
+              , pmTreeKey = Nothing
               , pmSubdir = "yesod-auth"
               }
         go = parseCabalFileImmutable pli
@@ -103,7 +103,7 @@ spec = describe "wrong cabal file" $ do
         version = mkVersion [1, 6, 4, 1]
     go `shouldThrow'` \e ->
       case e of
-        MismatchedPackageMetadata pli' pm' cabal ident ->
+        MismatchedPackageMetadata pli' pm' _treeKey cabal ident ->
           pli == pli' &&
           pm == pm' &&
           cabal == BlobKey

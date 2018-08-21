@@ -25,6 +25,7 @@ import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Digest.CRC32 as CRC32
+import Distribution.PackageDescription (packageDescription, package)
 
 import Conduit
 import Data.Conduit.Zlib (ungzip)
@@ -37,77 +38,131 @@ fetchArchives
   -> RIO env ()
 fetchArchives pairs = do
   -- TODO be more efficient, group together shared archives
-  for_ pairs $ uncurry getArchive
+  for_ pairs $ \(a, pm) -> getArchive (PLIArchive a pm) a pm
 
 getArchiveKey
   :: forall env. (HasPantryConfig env, HasLogFunc env)
-  => Archive
+  => PackageLocationImmutable -- ^ for exceptions
+  -> Archive
   -> PackageMetadata
   -> RIO env TreeKey
-getArchiveKey archive pm = fst <$> getArchive archive pm -- potential optimization
+getArchiveKey pli archive pm = packageTreeKey <$> getArchive pli archive pm -- potential optimization
 
 getArchive
   :: forall env. (HasPantryConfig env, HasLogFunc env)
-  => Archive
+  => PackageLocationImmutable -- ^ for exceptions
+  -> Archive
   -> PackageMetadata
-  -> RIO env (TreeKey, Tree)
-getArchive archive pm =
-  checkPackageMetadata (PLIArchive archive pm) pm $
-  withCache $
-  withArchiveLoc archive $ \fp sha size -> do
-    (tid, key, tree) <- parseArchive loc fp subdir
-    pure (tid, sha, size, key, tree)
+  -> RIO env Package
+getArchive pli archive pm = do
+  -- Check if the value is in the archive, and use it if possible
+  mpa <- loadCache archive (pmSubdir pm)
+  pa <-
+    case mpa of
+      Just pa -> pure pa
+      -- Not in the archive. Load the archive. Completely ignore the
+      -- PackageMetadata for now, we'll check that the Package
+      -- info matches next.
+      Nothing -> withArchiveLoc archive $ \fp sha size -> do
+        pa <- parseArchive pli (archiveLocation archive) fp (pmSubdir pm)
+        -- Storing in the cache exclusively uses information we have
+        -- about the archive itself, not metadata from the user.
+        storeCache archive (pmSubdir pm) sha size pa
+        pure pa
+
+  either throwIO pure $ checkPackageMetadata pli pm pa
+
+storeCache
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Archive
+  -> Text -- ^ subdir
+  -> SHA256
+  -> FileSize
+  -> Package
+  -> RIO env ()
+storeCache archive subdir sha size pa =
+  case archiveLocation archive of
+    ALUrl url -> withStorage $ storeArchiveCache url subdir sha size (packageTreeKey pa)
+    ALFilePath _ -> pure () -- TODO cache local as well
+
+loadCache
+  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  => Archive
+  -> Text -- ^ subdir
+  -> RIO env (Maybe Package)
+loadCache archive subdir =
+  case loc of
+    ALFilePath _ -> pure Nothing -- TODO can we do something intelligent here?
+    ALUrl url -> withStorage (loadArchiveCache url subdir) >>= loop
   where
+    loc = archiveLocation archive
     msha = archiveHash archive
     msize = archiveSize archive
-    subdir = pmSubdir pm
-    loc = archiveLocation archive
 
-    withCache
-      :: RIO env (TreeId, SHA256, FileSize, TreeKey, Tree)
-      -> RIO env (TreeKey, Tree)
-    withCache inner =
-      let loop [] = do
-            (tid, sha, size, treeKey, tree) <- inner
-            case loc of
-              ALUrl url -> withStorage $ storeArchiveCache url subdir sha size tid
-              ALFilePath _ -> pure ()
-            pure (treeKey, tree)
-          loop ((sha, size, tid):rest) =
-            case msha of
-              Nothing -> do
-                case msize of
-                  Just size' | size /= size' -> loop rest
-                  _ -> do
-                    case loc of
-                      ALUrl url -> do
-                        logWarn $ "Using archive from " <> display url <> " without a specified cryptographic hash"
-                        logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
-                        logWarn "For security and reproducibility, please add a hash and file size to your configuration"
-                      ALFilePath _ -> pure ()
-                    withStorage $ loadTreeById tid
-              Just sha'
-                | sha == sha' ->
-                    case msize of
-                      Nothing -> do
-                        case loc of
-                          ALUrl url -> do
-                            logWarn $ "Archive from " <> display url <> " does not specify a size"
-                            logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
-                          ALFilePath _ -> pure ()
-                        withStorage $ loadTreeById tid
-                      Just size'
-                        | size == size' -> withStorage $ loadTreeById tid
-                        | otherwise -> do
+    loadFromCache :: TreeId -> RIO env (Maybe Package)
+    loadFromCache tid = fmap Just $ withStorage $ loadPackageById tid
 
-                            logWarn $ "Archive from " <> display loc <> " has a matching hash but mismatched size"
-                            logWarn "Please verify that your configuration provides the correct size"
-                            loop rest
-                | otherwise -> loop rest
-       in case loc of
-            ALUrl url -> withStorage (loadArchiveCache url subdir) >>= loop
-            ALFilePath _ -> loop []
+    loop [] = pure Nothing
+    loop ((sha, size, tid):rest) =
+      case msha of
+        Nothing -> do
+          case msize of
+            Just size' | size /= size' -> loop rest
+            _ -> do
+              case loc of
+                ALUrl url -> do
+                  logWarn $ "Using archive from " <> display url <> " without a specified cryptographic hash"
+                  logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
+                  logWarn "For security and reproducibility, please add a hash and file size to your configuration"
+                ALFilePath _ -> pure ()
+              loadFromCache tid
+        Just sha'
+          | sha == sha' ->
+              case msize of
+                Nothing -> do
+                  case loc of
+                    ALUrl url -> do
+                      logWarn $ "Archive from " <> display url <> " does not specify a size"
+                      logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
+                    ALFilePath _ -> pure ()
+                  loadFromCache tid
+                Just size'
+                  | size == size' -> loadFromCache tid
+                  | otherwise -> do
 
+                      logWarn $ "Archive from " <> display loc <> " has a matching hash but mismatched size"
+                      logWarn "Please verify that your configuration provides the correct size"
+                      loop rest
+          | otherwise -> loop rest
+
+-- ensure name, version, etc are correct
+checkPackageMetadata
+  :: PackageLocationImmutable
+  -> PackageMetadata
+  -> Package
+  -> Either PantryException Package
+checkPackageMetadata pl pm pa = do
+  let err = MismatchedPackageMetadata
+              pl
+              pm
+              (Just (packageTreeKey pa))
+              (teBlob $ packageCabalEntry pa)
+              (packageIdent pa)
+      test (Just x) y = x == y
+      test Nothing _ = True
+
+      tests =
+        [ test (pmTreeKey pm) (packageTreeKey pa)
+        , test (pmName pm) (pkgName $ packageIdent pa)
+        , test (pmVersion pm) (pkgVersion $ packageIdent pa)
+        , test (pmCabal pm) (teBlob $ packageCabalEntry pa)
+        ]
+
+   in if and tests then Right pa else Left err
+
+-- | Provide a local file with the contents of the archive, regardless
+-- of where it comes from. Perform SHA256 and file size validation if
+-- downloading.
 withArchiveLoc
   :: HasLogFunc env
   => Archive
@@ -240,13 +295,23 @@ data SimpleEntry = SimpleEntry
   }
   deriving Show
 
+-- | Attempt to parse the contents of the given archive in the given
+-- subdir into a 'Tree'. This will not consult any caches. It will
+-- ensure that:
+--
+-- * The cabal file exists
+--
+-- * The cabal file can be parsed
+--
+-- * The name inside the cabal file matches the name of the cabal file itself
 parseArchive
   :: (HasPantryConfig env, HasLogFunc env)
-  => ArchiveLocation
+  => PackageLocationImmutable
+  -> ArchiveLocation
   -> FilePath -- ^ file holding the archive
   -> Text -- ^ subdir, besides the single-dir stripping logic
-  -> RIO env (TreeId, TreeKey, Tree)
-parseArchive loc fp subdir = do
+  -> RIO env Package
+parseArchive pli loc fp subdir = do
   let getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
         eres <- tryAny $ foldArchive loc fp at id $ \m me -> pure $ m . (me:)
@@ -299,9 +364,43 @@ parseArchive loc fp subdir = do
             case Map.lookup (seSource se) blobs of
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
-          (tid, treeKey) <- withStorage $ storeTree undefined tree undefined
-          pure (tid, treeKey, tree)
 
+          -- parse the cabal file and ensure it has the right name
+          (cabalPath, cabalEntry@(TreeEntry cabalBlobKey _)) <- findCabalFile pli tree
+          mbs <- withStorage $ loadBlob cabalBlobKey
+          bs <-
+            case mbs of
+              Nothing -> throwIO $ TreeReferencesMissingBlob pli cabalPath cabalBlobKey
+              Just bs -> pure bs
+          (_warnings, gpd) <- rawParseGPD (Left pli) bs
+          let ident@(PackageIdentifier name _) = package $ packageDescription gpd
+          when (cabalPath /= cabalFileName name) $
+            throwIO $ WrongCabalFileName pli cabalPath name
+
+          -- It's good! Store the tree, let's bounce
+          (_tid, treeKey) <- withStorage $ storeTree ident tree cabalEntry
+          pure Package
+            { packageTreeKey = treeKey
+            , packageTree = tree
+            , packageCabalEntry = cabalEntry
+            , packageIdent = ident
+            }
+
+findCabalFile
+  :: MonadThrow m
+  => PackageLocationImmutable -- ^ for exceptions
+  -> Tree
+  -> m (SafeFilePath, TreeEntry)
+findCabalFile loc (TreeMap m) = do
+  let isCabalFile (sfp, _) =
+        let txt = unSafeFilePath sfp
+         in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
+  case filter isCabalFile $ Map.toList m of
+    [] -> throwM $ TreeWithoutCabalFile loc
+    [(key, te)] -> pure (key, te)
+    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
+
+-- | If all files have a shared prefix, strip it off
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]
 stripCommonPrefix [] = []
 stripCommonPrefix pairs@((firstFP, _):_) = fromMaybe pairs $ do
@@ -310,7 +409,11 @@ stripCommonPrefix pairs@((firstFP, _):_) = fromMaybe pairs $ do
   let strip (fp, a) = (, a) <$> List.stripPrefix (firstDir ++ "/") fp
   stripCommonPrefix <$> traverse strip pairs
 
-takeSubdir :: Text -> [(FilePath, a)] -> [(Text, a)]
+-- | Take us down to the specified subdirectory
+takeSubdir
+  :: Text -- ^ subdir
+  -> [(FilePath, a)] -- ^ files after stripping common prefix
+  -> [(Text, a)]
 takeSubdir subdir = mapMaybe $ \(fp, a) -> do
   stripped <- T.stripPrefix subdir $ T.pack fp
   Just (T.dropWhile (== '/') stripped, a)

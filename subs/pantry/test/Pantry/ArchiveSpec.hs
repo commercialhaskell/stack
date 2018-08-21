@@ -24,7 +24,7 @@ spec = do
       PackageMetadata
         { pmName = Nothing
         , pmVersion = Nothing
-        , pmTree = Nothing
+        , pmTreeKey = Nothing
         , pmCabal = Nothing
         , pmSubdir = ""
         }
