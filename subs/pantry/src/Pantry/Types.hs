@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -36,6 +37,8 @@ module Pantry.Types
   , renderTree
   , parseTree
   , SHA256
+  , Unresolved
+  , resolvePaths
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -47,12 +50,8 @@ module Pantry.Types
   , parseFlagName
   , parseVersion
   , displayC
-  , UnresolvedPackageLocationImmutable (..)
-  , mkUnresolvedPackageLocationImmutable
-  , resolvePackageLocationImmutable
   , OptionalSubdirs (..)
   , ArchiveLocation (..)
-  , UnresolvedPackageLocation (..)
   , RelFilePath (..)
   , CabalString (..)
   , toCabalStringMap
@@ -64,14 +63,11 @@ module Pantry.Types
   , ResolvedPath (..)
   , HpackExecutable (..)
   , WantedCompiler (..)
-  , UnresolvedSnapshotLocation (..)
-  , resolveSnapshotLocation
-  , unresolveSnapshotLocation
+  --, resolveSnapshotLocation
   , ltsSnapshotLocation
   , nightlySnapshotLocation
   , SnapshotLocation (..)
   , parseSnapshotLocation
-  , parseSnapshot
   , Snapshot (..)
   , parseWantedCompiler
   , PackageMetadata (..)
@@ -114,7 +110,7 @@ import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
 import Path (Abs, Dir, File, toFilePath, filename)
 import Path.Internal (Path (..)) -- TODO don't import this
-import Path.IO (resolveFile)
+import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -145,6 +141,27 @@ data PantryConfig = PantryConfig
   , pcConnectionCount :: !Int
   -- ^ concurrently open downloads
   }
+
+-- | Wraps a value which potentially contains relative paths. Needs to
+-- be provided with a base directory to resolve these paths.
+--
+-- @since 0.1.0.0
+newtype Unresolved a = Unresolved (Maybe (Path Abs Dir) -> IO a)
+  deriving Functor
+instance Applicative Unresolved where
+  pure = Unresolved . const . pure
+  Unresolved f <*> Unresolved x = Unresolved $ \mdir -> f mdir <*> x mdir
+
+-- | Resolve all of the file paths in an 'Unresolved' relative to the
+-- given directory.
+--
+-- @since 0.1.0.0
+resolvePaths
+  :: MonadIO m
+  => Maybe (Path Abs Dir) -- ^ directory to use for relative paths
+  -> Unresolved a
+  -> m a
+resolvePaths mdir (Unresolved f) = liftIO (f mdir)
 
 -- | A directory which was loaded up relative and has been resolved
 -- against the config file it came from.
@@ -204,18 +221,6 @@ data Archive = Archive
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store Archive
 instance NFData Archive
-
--- | A package archive, could be from a URL or a local file
--- path. Local file path archives are assumed to be unchanging
--- over time, and so are allowed in custom snapshots.
-data UnresolvedArchive = UnresolvedArchive
-  { uaLocation :: !UnresolvedArchiveLocation
-  , uaHash :: !(Maybe SHA256)
-  , uaSize :: !(Maybe FileSize)
-  }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store UnresolvedArchive
-instance NFData UnresolvedArchive
 
 -- | The type of a source control repository.
 data RepoType = RepoGit | RepoHg
@@ -472,6 +477,7 @@ data PantryException
   | CRC32Mismatch !ArchiveLocation !FilePath (Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
   | CannotCompleteRepoNonSHA1 !Repo
+  | MutablePackageLocationFromUrl !Text
 
   deriving Typeable
 instance Exception PantryException where
@@ -625,6 +631,8 @@ instance Display PantryException where
   display (CannotCompleteRepoNonSHA1 repo) =
     "Cannot complete repo information for a non SHA1 commit due to non-reproducibility: " <>
     display repo
+  display (MutablePackageLocationFromUrl t) =
+    "Cannot refer to a mutable package location from a URL: " <> display t
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
@@ -875,12 +883,9 @@ instance Display PackageMetadata where
         else Just ("subdir == " <> display (pmSubdir pm))
     ]
 
-osNoInfo :: OptionalSubdirs
-osNoInfo = OSPackageMetadata $ PackageMetadata Nothing Nothing Nothing Nothing T.empty
-
 -- | File path relative to the configuration file it was parsed from
 newtype RelFilePath = RelFilePath Text
-  deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Data, Typeable, Store, NFData)
+  deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Data, Typeable, Store, NFData, Display)
 
 data ArchiveLocation
   = ALUrl !Text
@@ -893,59 +898,51 @@ instance Display ArchiveLocation where
   display (ALUrl url) = display url
   display (ALFilePath resolved) = fromString $ toFilePath $ resolvedAbsolute resolved
 
-data UnresolvedArchiveLocation
-  = RALUrl !Text
-  | RALFilePath !RelFilePath
-  -- ^ relative to the configuration file it came from
-  deriving (Show, Eq, Ord, Generic, Data, Typeable)
-instance Store UnresolvedArchiveLocation
-instance NFData UnresolvedArchiveLocation
 instance ToJSON ArchiveLocation where
   toJSON (ALUrl url) = object ["url" .= url]
   toJSON (ALFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
-instance FromJSON UnresolvedArchiveLocation where
+instance FromJSON (Unresolved ArchiveLocation) where
   parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
     where
       asObjectUrl = withObject "ArchiveLocation (URL object)" $ \o ->
-        RALUrl <$> ((o .: "url") >>= validateUrl)
+        (o .: "url") >>= validateUrl
       asObjectFilePath = withObject "ArchiveLocation (FilePath object)" $ \o ->
-        RALFilePath <$> ((o .: "url") >>= validateFilePath)
+        (o .: "url") >>= validateFilePath
 
       asText = withText "ArchiveLocation (Text)" $ \t ->
-        (RALUrl <$> validateUrl t) <|> (RALFilePath <$> validateFilePath t)
+        validateUrl t <|> validateFilePath t
 
       validateUrl t =
         case parseRequest $ T.unpack t of
           Left _ -> fail $ "Could not parse URL: " ++ T.unpack t
-          Right _ -> pure t
+          Right _ -> pure $ pure $ ALUrl t
 
       validateFilePath t =
         if any (\ext -> ext `T.isSuffixOf` t) (T.words ".zip .tar .tar.gz")
-          then pure (RelFilePath t)
+          then pure $ Unresolved $ \mdir ->
+                 case mdir of
+                   Nothing -> throwIO $ InvalidFilePathSnapshot t
+                   Just dir -> do
+                     abs' <- resolveFile dir $ T.unpack t
+                     pure $ ALFilePath $ ResolvedPath (RelFilePath t) abs'
           else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
--- | An unresolved package location /or/ a file path to a directory containing a package.
-data UnresolvedPackageLocation
-  = UPLImmutable !UnresolvedPackageLocationImmutable
-  | UPLMutable !RelFilePath
-  deriving Show
 instance ToJSON PackageLocation where
   toJSON (PLImmutable pli) = toJSON pli
   toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
-instance FromJSON (WithJSONWarnings UnresolvedPackageLocation) where
+instance FromJSON (WithJSONWarnings (Unresolved [PackageLocation])) where
   parseJSON v =
-    (fmap UPLImmutable <$> parseJSON v) <|>
-    ((noJSONWarnings . UPLMutable . RelFilePath) <$> parseJSON v)
+    ((fmap.fmap.fmap.fmap) PLImmutable (parseJSON v)) <|>
+    ((noJSONWarnings . mkMutable) <$> parseJSON v)
+    where
+      mkMutable :: Text -> Unresolved [PackageLocation]
+      mkMutable t = Unresolved $ \mdir -> do
+        case mdir of
+          Nothing -> throwIO $ MutablePackageLocationFromUrl t
+          Just dir -> do
+            abs' <- resolveDir dir $ T.unpack t
+            pure [PLMutable $ ResolvedPath (RelFilePath t) abs']
 
--- | The unresolved representation of packages allowed in a snapshot
--- specification.
-data UnresolvedPackageLocationImmutable
-  = UPLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
-  | UPLIArchive !UnresolvedArchive !OptionalSubdirs
-  | UPLIRepo !Repo !OptionalSubdirs
-  deriving (Show, Eq, Data, Generic)
-instance Store UnresolvedPackageLocationImmutable
-instance NFData UnresolvedPackageLocationImmutable
 instance ToJSON PackageLocationImmutable where
   toJSON (PLIHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
@@ -980,7 +977,7 @@ pmToPairs (PackageMetadata mname mversion mtree mcabal subdir) = concat
       else ["subdir" .= subdir]
   ]
 
-instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
+instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) where
   parseJSON v
       = http v
     <|> hackageText v
@@ -991,23 +988,21 @@ instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
     <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
     where
       http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t -> do
-        loc <- parseJSON $ String t
-        pure $ noJSONWarnings $ UPLIArchive
-          UnresolvedArchive
-            { uaLocation = loc
-            , uaHash = Nothing
-            , uaSize = Nothing
-            }
-          osNoInfo
+        Unresolved mkArchiveLocation <- parseJSON $ String t
+        pure $ noJSONWarnings $ Unresolved $ \mdir -> do
+          archiveLocation <- mkArchiveLocation mdir
+          let archiveHash = Nothing
+              archiveSize = Nothing
+          pure [PLIArchive Archive {..} (PackageMetadata Nothing Nothing Nothing Nothing T.empty)]
 
       hackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
           Left e -> fail $ show e
-          Right pir -> pure $ noJSONWarnings $ UPLIHackage pir Nothing
+          Right pir -> pure $ noJSONWarnings $ pure [PLIHackage pir Nothing]
 
-      hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> UPLIHackage
+      hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure.pure) <$> (PLIHackage
         <$> o ..: "hackage"
-        <*> o ..:? "pantry-tree"
+        <*> o ..:? "pantry-tree")
 
       optionalSubdirs :: Object -> WarningParser OptionalSubdirs
       optionalSubdirs o =
@@ -1031,72 +1026,36 @@ instance FromJSON (WithJSONWarnings UnresolvedPackageLocationImmutable) where
           ((RepoGit, ) <$> o ..: "git") <|>
           ((RepoHg, ) <$> o ..: "hg")
         repoCommit <- o ..: "commit"
-        UPLIRepo Repo {..} <$> optionalSubdirs o
+        os <- optionalSubdirs o
+        pure $ pure $ map (PLIRepo Repo {..}) (osToPms os)
 
       archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
-        uaLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
-        uaHash <- o ..:? "sha256"
-        uaSize <- o ..:? "size"
-        UPLIArchive UnresolvedArchive {..} <$> optionalSubdirs o
+        Unresolved mkArchiveLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        archiveHash <- o ..:? "sha256"
+        archiveSize <- o ..:? "size"
+        os <- optionalSubdirs o
+        pure $ Unresolved $ \mdir -> do
+          archiveLocation <- mkArchiveLocation mdir
+          pure $ map (PLIArchive Archive {..}) (osToPms os)
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let uaLocation = RALUrl $ T.concat
+        let archiveLocation = ALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
               , commit
               , ".tar.gz"
               ]
-        uaHash <- o ..:? "sha256"
-        uaSize <- o ..:? "size"
-        UPLIArchive UnresolvedArchive {..} <$> optionalSubdirs o
-
--- | Convert a 'UnresolvedPackageLocationImmutable' into a list of 'PackageLocation's.
-resolvePackageLocationImmutable
-  :: MonadIO m
-  => Maybe (Path Abs Dir) -- ^ directory to resolve relative paths from, if local
-  -> UnresolvedPackageLocationImmutable
-  -> m [PackageLocationImmutable]
-resolvePackageLocationImmutable _mdir (UPLIHackage pir mtree) = pure [PLIHackage pir mtree]
-resolvePackageLocationImmutable mdir (UPLIArchive ra os) = do
-  loc <-
-    case uaLocation ra of
-      RALUrl url -> pure $ ALUrl url
-      RALFilePath rel@(RelFilePath t) -> do
-        abs' <-
-          case mdir of
-            Nothing -> throwIO $ InvalidFilePathSnapshot t
-            Just dir -> resolveFile dir $ T.unpack t
-        pure $ ALFilePath $ ResolvedPath rel abs'
-  let archive = Archive
-        { archiveLocation = loc
-        , archiveHash = uaHash ra
-        , archiveSize = uaSize ra
-        }
-  pure $ map (PLIArchive archive) $ osToPms os
-resolvePackageLocationImmutable _mdir (UPLIRepo repo os) = pure $ map (PLIRepo repo) $ osToPms os
+        archiveHash <- o ..:? "sha256"
+        archiveSize <- o ..:? "size"
+        os <- optionalSubdirs o
+        pure $ pure $ map (PLIArchive Archive {..}) (osToPms os)
 
 osToPms :: OptionalSubdirs -> [PackageMetadata]
 osToPms (OSSubdirs x xs) = map (PackageMetadata Nothing Nothing Nothing Nothing) (x:xs)
 osToPms (OSPackageMetadata pm) = [pm]
-
--- | Convert a 'PackageLocationImmutable' into a 'UnresolvedPackageLocationImmutable'.
-mkUnresolvedPackageLocationImmutable :: PackageLocationImmutable -> UnresolvedPackageLocationImmutable
-mkUnresolvedPackageLocationImmutable (PLIHackage pir mtree) = UPLIHackage pir mtree
-mkUnresolvedPackageLocationImmutable (PLIArchive archive pm) =
-  UPLIArchive
-    UnresolvedArchive
-      { uaLocation =
-          case archiveLocation archive of
-            ALUrl url -> RALUrl url
-            ALFilePath resolved -> RALFilePath $ resolvedRelative resolved
-      , uaHash = archiveHash archive
-      , uaSize = archiveSize archive
-      }
-    (OSPackageMetadata pm)
-mkUnresolvedPackageLocationImmutable (PLIRepo repo pm) = UPLIRepo repo (OSPackageMetadata pm)
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.
 newtype CabalString a = CabalString { unCabalString :: a }
@@ -1191,70 +1150,27 @@ parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
       pure $ WCGhcjs ghcjsV ghcV
     parseGhc = fmap WCGhc . parseVersion . T.unpack
 
-data UnresolvedSnapshotLocation
-  = USLCompiler !WantedCompiler
-  | USLUrl !Text !(Maybe BlobKey)
-  | USLFilePath !RelFilePath
-  deriving (Show, Eq, Ord, Data, Typeable, Generic)
-instance ToJSON UnresolvedSnapshotLocation where
-  toJSON (USLCompiler c) = object ["compiler" .= c]
-  toJSON (USLUrl t mblob) = object $ concat
-    [ ["url" .= t]
-    , maybe [] (\blob -> ["blob" .= blob]) mblob
-    ]
-  toJSON (USLFilePath fp) = object ["filepath" .= fp]
-instance FromJSON (WithJSONWarnings UnresolvedSnapshotLocation) where
+instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
   parseJSON v = text v <|> obj v
     where
+      text :: Value -> Parser (WithJSONWarnings (Unresolved SnapshotLocation))
       text = withText "UnresolvedSnapshotLocation (Text)" $ pure . noJSONWarnings . parseSnapshotLocation
 
+      obj :: Value -> Parser (WithJSONWarnings (Unresolved SnapshotLocation))
       obj = withObjectWarnings "UnresolvedSnapshotLocation (Object)" $ \o ->
-        (USLCompiler <$> o ..: "compiler") <|>
-        (USLUrl <$> o ..: "url" <*> o ..:? "blob") <|>
-        (USLFilePath <$> o ..: "filepath")
-
-resolveSnapshotLocation
-  :: UnresolvedSnapshotLocation
-  -> Maybe (Path Abs Dir)
-  -> Maybe WantedCompiler
-  -> IO SnapshotLocation
-resolveSnapshotLocation (USLCompiler compiler) _ Nothing = pure $ SLCompiler compiler
-resolveSnapshotLocation (USLCompiler compiler1) _ (Just compiler2) = throwIO $ InvalidOverrideCompiler compiler1 compiler2
-resolveSnapshotLocation (USLUrl url mblob) _ mcompiler = pure $ SLUrl url mblob mcompiler
-resolveSnapshotLocation (USLFilePath (RelFilePath t)) Nothing _mcompiler = throwIO $ InvalidFilePathSnapshot t
-resolveSnapshotLocation (USLFilePath rfp@(RelFilePath t)) (Just dir) mcompiler = do
-  abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
-  pure $ SLFilePath
-            ResolvedPath
-              { resolvedRelative = rfp
-              , resolvedAbsolute = abs'
-              }
-            mcompiler
-
-unresolveSnapshotLocation
-  :: SnapshotLocation
-  -> (UnresolvedSnapshotLocation, Maybe WantedCompiler)
-unresolveSnapshotLocation (SLCompiler compiler) = (USLCompiler compiler, Nothing)
-unresolveSnapshotLocation (SLUrl url mblob mcompiler) = (USLUrl url mblob, mcompiler)
-unresolveSnapshotLocation (SLFilePath fp mcompiler) = (USLFilePath $ resolvedRelative fp, mcompiler)
-
-instance Display UnresolvedSnapshotLocation where
-  display (USLCompiler compiler) = display compiler
-  display (USLUrl url Nothing) = display url
-  display (USLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
-  display (USLFilePath (RelFilePath t)) = display t
+        ((pure . SLCompiler) <$> o ..: "compiler") <|>
+        ((\x y -> pure $ SLUrl x y) <$> o ..: "url" <*> o ..:? "blob") <|>
+        (parseSnapshotLocationPath <$> o ..: "filepath")
 
 instance Display SnapshotLocation where
-  display sl =
-    let (usl, mcompiler) = unresolveSnapshotLocation sl
-     in display usl <>
-        (case mcompiler of
-           Nothing -> mempty
-           Just compiler -> ", override compiler: " <> display compiler)
+  display (SLCompiler compiler) = display compiler
+  display (SLUrl url Nothing) = display url
+  display (SLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
+  display (SLFilePath resolved) = display (resolvedRelative resolved)
 
-parseSnapshotLocation :: Text -> UnresolvedSnapshotLocation
-parseSnapshotLocation t0 = fromMaybe parsePath $
-  (either (const Nothing) (Just . USLCompiler) (parseWantedCompiler t0)) <|>
+parseSnapshotLocation :: Text -> Unresolved SnapshotLocation
+parseSnapshotLocation t0 = fromMaybe (parseSnapshotLocationPath t0) $
+  (either (const Nothing) (Just . pure . SLCompiler) (parseWantedCompiler t0)) <|>
   parseLts <|>
   parseNightly <|>
   parseGithub <|>
@@ -1265,11 +1181,11 @@ parseSnapshotLocation t0 = fromMaybe parsePath $
       Right (x, t2) <- Just $ decimal t1
       t3 <- T.stripPrefix "." t2
       Right (y, "") <- Just $ decimal t3
-      Just $ fst $ ltsSnapshotLocation Nothing x y
+      Just $ pure $ ltsSnapshotLocation x y
     parseNightly = do
       t1 <- T.stripPrefix "nightly-" t0
       date <- readMaybe (T.unpack t1)
-      Just $ fst $ nightlySnapshotLocation Nothing date
+      Just $ pure $ nightlySnapshotLocation date
 
     parseGithub = do
       t1 <- T.stripPrefix "github:" t0
@@ -1277,14 +1193,21 @@ parseSnapshotLocation t0 = fromMaybe parsePath $
       t3 <- T.stripPrefix "/" t2
       let (repo, t4) = T.break (== ':') t3
       path <- T.stripPrefix ":" t4
-      Just $ fst $ githubSnapshotLocation Nothing user repo path
+      Just $ pure $ githubSnapshotLocation user repo path
 
-    parseUrl = parseRequest (T.unpack t0) $> USLUrl t0 Nothing
+    parseUrl = parseRequest (T.unpack t0) $> pure (SLUrl t0 Nothing)
 
-    parsePath = USLFilePath $ RelFilePath t0
+parseSnapshotLocationPath :: Text -> Unresolved SnapshotLocation
+parseSnapshotLocationPath t =
+  Unresolved $ \mdir ->
+  case mdir of
+    Nothing -> throwIO $ InvalidFilePathSnapshot t
+    Just dir -> do
+      abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
+      pure $ SLFilePath $ ResolvedPath (RelFilePath t) abs'
 
-githubSnapshotLocation :: Maybe WantedCompiler -> Text -> Text -> Text -> (UnresolvedSnapshotLocation, SnapshotLocation)
-githubSnapshotLocation mcompiler user repo path =
+githubSnapshotLocation :: Text -> Text -> Text -> SnapshotLocation
+githubSnapshotLocation user repo path =
   let url = T.concat
         [ "https://raw.githubusercontent.com/"
         , user
@@ -1293,7 +1216,7 @@ githubSnapshotLocation mcompiler user repo path =
         , "/master/"
         , path
         ]
-   in (USLUrl url Nothing, SLUrl url Nothing mcompiler)
+   in SLUrl url Nothing
 
 defUser :: Text
 defUser = "commercialhaskell"
@@ -1301,15 +1224,24 @@ defUser = "commercialhaskell"
 defRepo :: Text
 defRepo = "stackage-snapshots"
 
-ltsSnapshotLocation :: Maybe WantedCompiler -> Int -> Int -> (UnresolvedSnapshotLocation, SnapshotLocation)
-ltsSnapshotLocation mcompiler x y =
-  githubSnapshotLocation mcompiler defUser defRepo $
+-- | Location of an LTS snapshot
+--
+-- @since 0.1.0.0
+ltsSnapshotLocation
+  :: Int -- ^ major version
+  -> Int -- ^ minor version
+  -> SnapshotLocation
+ltsSnapshotLocation x y =
+  githubSnapshotLocation defUser defRepo $
   utf8BuilderToText $
   "lts/" <> display x <> "/" <> display y <> ".yaml"
 
-nightlySnapshotLocation :: Maybe WantedCompiler -> Day -> (UnresolvedSnapshotLocation, SnapshotLocation)
-nightlySnapshotLocation mcompiler date =
-  githubSnapshotLocation mcompiler defUser defRepo $
+-- | Location of a Stackage Nightly snapshot
+--
+-- @since 0.1.0.0
+nightlySnapshotLocation :: Day -> SnapshotLocation
+nightlySnapshotLocation date =
+  githubSnapshotLocation defUser defRepo $
   utf8BuilderToText $
   "nightly/" <> display year <> "/" <> display month <> "/" <> display day <> ".yaml"
   where
@@ -1317,11 +1249,18 @@ nightlySnapshotLocation mcompiler date =
 
 data SnapshotLocation
   = SLCompiler !WantedCompiler
-  | SLUrl !Text !(Maybe BlobKey) !(Maybe WantedCompiler)
-  | SLFilePath !(ResolvedPath File) !(Maybe WantedCompiler)
+  | SLUrl !Text !(Maybe BlobKey)
+  | SLFilePath !(ResolvedPath File)
   deriving (Show, Eq, Data, Ord, Generic)
 instance Store SnapshotLocation
 instance NFData SnapshotLocation
+
+instance ToJSON SnapshotLocation where
+  toJSON (SLCompiler compiler) = object ["compiler" .= compiler]
+  toJSON (SLUrl url mblob) = object
+    $ "url" .= url
+    : maybe [] blobKeyPairs mblob
+  toJSON (SLFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
 
 data Snapshot = Snapshot
   { snapshotParent :: !SnapshotLocation
@@ -1329,6 +1268,9 @@ data Snapshot = Snapshot
   -- compiler, or a @SnapshotLocation@ which gives us more information
   -- (like packages). Ultimately, we'll end up with a
   -- @CompilerVersion@.
+  , snapshotCompiler :: !(Maybe WantedCompiler)
+  -- ^ Override the compiler specified in 'snapshotParent'. Must be
+  -- 'Nothing' if using 'SLCompiler'.
   , snapshotName :: !Text
   -- ^ A user-friendly way of referring to this resolver.
   , snapshotLocations :: ![PackageLocationImmutable]
@@ -1351,23 +1293,8 @@ instance Store Snapshot
 instance NFData Snapshot
 instance ToJSON Snapshot where
   toJSON snap = object $ concat
-    [ case snapshotParent snap of
-        SLCompiler compiler -> ["compiler" .= compiler]
-        SLUrl url mblob mcompiler -> concat
-          [ pure $ "resolver" .= concat
-              [ ["url" .= url]
-              , maybe [] blobKeyPairs mblob
-              ]
-          , case mcompiler of
-              Nothing -> []
-              Just compiler -> ["compiler" .= compiler]
-          ]
-        SLFilePath resolved mcompiler -> concat
-          [ pure $ "resolver" .= object ["filepath" .= resolvedRelative resolved]
-          , case mcompiler of
-              Nothing -> []
-              Just compiler -> ["compiler" .= compiler]
-          ]
+    [ ["resolver" .= snapshotParent snap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (snapshotCompiler snap)
     , ["name" .= snapshotName snap]
     , ["packages" .= snapshotLocations snap]
     , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
@@ -1376,26 +1303,29 @@ instance ToJSON Snapshot where
     , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
     ]
 
-parseSnapshot :: Maybe (Path Abs Dir) -> Value -> Parser (WithJSONWarnings (IO Snapshot))
-parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
-  mcompiler <- o ..:? "compiler"
-  mresolver <- jsonSubWarningsT $ o ..:? "resolver"
-  iosnapshotParent <-
-    case (mcompiler, mresolver) of
-      (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
-      (Just compiler, Nothing) -> pure $ pure $ SLCompiler compiler
-      (_, Just usl) -> pure $ resolveSnapshotLocation usl mdir mcompiler
+instance FromJSON (WithJSONWarnings (Unresolved Snapshot)) where
+  parseJSON = withObjectWarnings "Snapshot" $ \o -> do
+    mcompiler <- o ..:? "compiler"
+    mresolver <- jsonSubWarningsT $ o ..:? "resolver"
+    unresolvedSnapshotParent <-
+      case (mcompiler, mresolver) of
+        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
+        (Just compiler, Nothing) -> pure $ pure (SLCompiler compiler, Nothing)
+        (_, Just (Unresolved usl)) -> pure $ Unresolved $ \mdir -> do
+          sl <- usl mdir
+          case (sl, mcompiler) of
+            (SLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
+            _ -> pure (sl, mcompiler)
 
-  snapshotName <- o ..: "name"
-  unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
-  snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
-  snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
-  snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
-  snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
-  pure $ do
-    snapshotLocations <- fmap concat $ mapM (resolvePackageLocationImmutable mdir) unresolvedLocs
-    snapshotParent <- iosnapshotParent
-    pure Snapshot {..}
+    snapshotName <- o ..: "name"
+    unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
+    snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
+    snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
+    snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
+    snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    pure $ (\snapshotLocations (snapshotParent, snapshotCompiler) -> Snapshot {..})
+      <$> (concat <$> sequenceA unresolvedLocs)
+      <*> unresolvedSnapshotParent
 
 -- TODO ORPHANS remove
 

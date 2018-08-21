@@ -57,8 +57,8 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         ('-': _) -> return []
         _ -> do
             defColorWhen <- liftIO defaultColorWhen
-            let go = (globalOptsFromMonoid False defColorWhen mempty)
-                    { globalLogLevel = LevelOther "silent" }
+            go' <- (globalOptsFromMonoid False defColorWhen mempty)
+            let go = go' { globalLogLevel = LevelOther "silent" }
             loadConfigWithOpts go $ \lc -> do
               bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
               envConfig <- runRIO bconfig (setupEnv Nothing)

@@ -129,23 +129,25 @@ instance Show SnapshotException where
 loadResolver
   :: forall env. HasConfig env
   => SnapshotLocation
+  -> Maybe WantedCompiler
   -> RIO env SnapshotDef
-loadResolver sl = do
+loadResolver (SLCompiler c1) (Just c2) = throwIO $ InvalidOverrideCompiler c1 c2
+loadResolver sl mcompiler = do
   esnap <- loadPantrySnapshot sl
   (compiler, msnap, uniqueHash) <-
     case esnap of
       Left compiler -> pure (compiler, Nothing, mkUniqueHash compiler)
-      Right (snap, mcompiler, sha) -> do
-        sd <- loadResolver $ snapshotParent snap
+      Right (snap, sha) -> do
+        sd <- loadResolver (snapshotParent snap) (snapshotCompiler snap)
         pure
-          ( fromMaybe (sdWantedCompilerVersion sd) mcompiler
+          ( sdWantedCompilerVersion sd
           , Just (snap, sd)
           , combineHashes sha $ sdUniqueHash sd
           )
   pure SnapshotDef
     { sdResolver = sl
     , sdSnapshot = msnap
-    , sdWantedCompilerVersion = compiler
+    , sdWantedCompilerVersion = fromMaybe compiler mcompiler
     , sdUniqueHash = uniqueHash
     }
 

@@ -451,14 +451,14 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
+    , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidCompiler     :: !(First WantedCompiler) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
-    } deriving (Show, Generic)
+    } deriving Generic
 
 instance Semigroup GlobalOptsMonoid where
     (<>) = mappenddefault
@@ -614,6 +614,8 @@ data Project = Project
     -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !SnapshotLocation
     -- ^ How we resolve which @SnapshotDef@ to use
+    , projectCompiler :: !(Maybe WantedCompiler)
+    -- ^ Override the compiler in 'projectResolver'
     , projectExtraPackageDBs :: ![FilePath]
     , projectCurator :: !(Maybe Curator)
     -- ^ Extra configuration intended exclusively for usage by the
@@ -624,18 +626,16 @@ data Project = Project
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver extraPackageDBs mcurator) = object $ concat
-      [ maybe [] (\cv -> ["compiler" .= cv]) compiler
+    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator) = object $ concat
+      [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
       , if null extraDeps then [] else ["extra-deps" .= extraDeps]
       , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
       , ["packages" .= packages]
-      , ["resolver" .= usl]
+      , ["resolver" .= resolver]
       , maybe [] (\c -> ["curator" .= c]) mcurator
       ]
-      where
-        (usl, compiler) = unresolveSnapshotLocation resolver
 
 -- | Extra configuration intended exclusively for usage by the
 -- curator tool. In other words, this is /not/ part of the
@@ -1473,11 +1473,12 @@ parseProjectAndConfigMonoid rootDir =
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         mcurator <- jsonSubWarningsT (o ..:? "curator")
         return $ do
-          deps' <- mapM (resolvePackageLocation rootDir) deps
-          resolver' <- resolveSnapshotLocation resolver (Just rootDir) mcompiler
+          deps' <- mapM (resolvePaths (Just rootDir)) deps
+          resolver' <- resolvePaths (Just rootDir) resolver
           let project = Project
                   { projectUserMsg = msg
                   , projectResolver = resolver'
+                  , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
                   , projectExtraPackageDBs = extraPackageDBs
                   , projectPackages = packages
                   , projectDependencies = concat deps'

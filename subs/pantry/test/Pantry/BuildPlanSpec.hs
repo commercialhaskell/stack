@@ -16,14 +16,14 @@ spec =
   describe "PackageLocation" $ do
     describe "Archive" $ do
       describe "github" $ do
-        let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings UnresolvedPackageLocationImmutable)
+        let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings (Unresolved [PackageLocationImmutable]))
             decode' = decodeThrow
 
             decode'' :: HasCallStack => ByteString -> IO [PackageLocationImmutable]
             decode'' bs = do
               WithJSONWarnings unresolved warnings <- decode' bs
               unless (null warnings) $ error $ show warnings
-              resolvePackageLocationImmutable Nothing unresolved
+              resolvePaths Nothing unresolved
 
         it "'github' and 'commit' keys" $ do
           let contents :: ByteString
@@ -87,7 +87,7 @@ spec =
                     [ "github: oink"
                     , "commit: abc123"
                     ])
-          decode' contents `shouldBe` Nothing
+          void (decode' contents) `shouldBe` Nothing
 
         it "does not parse GitHub repo with leading slash" $ do
           let contents :: ByteString
@@ -97,7 +97,7 @@ spec =
                     [ "github: /oink"
                     , "commit: abc123"
                     ])
-          decode' contents `shouldBe` Nothing
+          void (decode' contents) `shouldBe` Nothing
 
         it "does not parse GitHub repo with trailing slash" $ do
           let contents :: ByteString
@@ -107,7 +107,7 @@ spec =
                     [ "github: oink/"
                     , "commit: abc123"
                     ])
-          decode' contents `shouldBe` Nothing
+          void (decode' contents) `shouldBe` Nothing
 
         it "does not parse GitHub repo with more than one slash" $ do
           let contents :: ByteString
@@ -117,4 +117,4 @@ spec =
                     [ "github: oink/town/here"
                     , "commit: abc123"
                     ])
-          decode' contents `shouldBe` Nothing
+          void (decode' contents) `shouldBe` Nothing

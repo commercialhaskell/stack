@@ -37,6 +37,7 @@ module Pantry
   , FileSize (..)
   , RelFilePath (..)
   , ResolvedPath (..)
+  , Unresolved
 
     -- ** Cryptography
   , SHA256
@@ -62,17 +63,10 @@ module Pantry
   , PackageLocationImmutable (..)
   , PackageMetadata (..)
 
-    -- *** Unresolved
-  , UnresolvedPackageLocation
-  , UnresolvedPackageLocationImmutable (..)
-
     -- ** Snapshots
   , SnapshotLocation (..)
   , Snapshot (..)
   , WantedCompiler (..)
-
-    -- *** Unresolved
-  , UnresolvedSnapshotLocation (..)
 
     -- * Completion functions
   , completePackageLocation
@@ -80,13 +74,10 @@ module Pantry
   , completeSnapshotLocation
 
     -- ** FIXME
-  , resolvePackageLocation
-  , resolvePackageLocationImmutable
   , loadPackageLocation
+  , resolvePaths
 
     -- ** Snapshots
-  , resolveSnapshotLocation
-  , unresolveSnapshotLocation
   , parseWantedCompiler
   , loadPantrySnapshot
   , parseSnapshotLocation
@@ -143,7 +134,7 @@ import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
 import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent)
-import Path.IO (resolveDir, doesFileExist, resolveDir', listDir)
+import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
@@ -468,23 +459,6 @@ loadPackageLocation (PLIHackage pir mtree) = getHackageTarball pir mtree
 loadPackageLocation (PLIArchive archive pm) = getArchive archive pm
 loadPackageLocation (PLIRepo repo pm) = getRepo repo pm
 
--- | Convert a 'PackageLocation' into a 'UnresolvedPackageLocation'.
-mkUnresolvedPackageLocation :: PackageLocation -> UnresolvedPackageLocation
-mkUnresolvedPackageLocation (PLImmutable loc) = UPLImmutable (mkUnresolvedPackageLocationImmutable loc)
-mkUnresolvedPackageLocation (PLMutable fp) = UPLMutable $ resolvedRelative fp
-
--- | Convert an 'UnresolvedPackageLocation' into a list of 'PackageLocation's.
-resolvePackageLocation
-  :: MonadIO m
-  => Path Abs Dir -- ^ directory containing configuration file, to be used for resolving relative file paths
-  -> UnresolvedPackageLocation
-  -> m [PackageLocation]
-resolvePackageLocation dir (UPLImmutable rpl) =
-  map PLImmutable <$> resolvePackageLocationImmutable (Just dir) rpl
-resolvePackageLocation dir (UPLMutable rel@(RelFilePath fp)) = do
-  absolute <- resolveDir dir $ T.unpack fp
-  pure [PLMutable $ ResolvedPath rel absolute]
-
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
 completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -560,11 +534,11 @@ completeSnapshotLocation
   -> RIO env SnapshotLocation
 completeSnapshotLocation sl@SLCompiler{} = pure sl
 completeSnapshotLocation sl@SLFilePath{} = pure sl
-completeSnapshotLocation sl@(SLUrl _ (Just _) _) = pure sl
-completeSnapshotLocation (SLUrl url Nothing mcompiler) = do
+completeSnapshotLocation sl@(SLUrl _ (Just _)) = pure sl
+completeSnapshotLocation (SLUrl url Nothing) = do
   bs <- loadFromURL url Nothing
   let blobKey = BlobKey (SHA256.hashBytes bs) (FileSize $ fromIntegral $ B.length bs)
-  pure $ SLUrl url (Just blobKey) mcompiler
+  pure $ SLUrl url (Just blobKey)
 
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
 completeSnapshot
@@ -652,20 +626,20 @@ traverseConcurrentlyWith count f t0 = do
 loadPantrySnapshot
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (Snapshot, Maybe WantedCompiler, SHA256))
+  -> RIO env (Either WantedCompiler (Snapshot, SHA256))
 loadPantrySnapshot (SLCompiler compiler) = pure $ Left compiler
-loadPantrySnapshot sl@(SLUrl url mblob mcompiler) =
+loadPantrySnapshot sl@(SLUrl url mblob) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url mblob
     value <- Yaml.decodeThrow bs
-    snapshot <- warningsParserHelper sl value (parseSnapshot Nothing)
-    pure $ Right (snapshot, mcompiler, SHA256.hashBytes bs)
-loadPantrySnapshot sl@(SLFilePath fp mcompiler) =
+    snapshot <- warningsParserHelper sl value Nothing
+    pure $ Right (snapshot, SHA256.hashBytes bs)
+loadPantrySnapshot sl@(SLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
-    snapshot <- warningsParserHelper sl value $ parseSnapshot $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, mcompiler, sha)
+    snapshot <- warningsParserHelper sl value $ Just $ parent $ resolvedAbsolute fp
+    pure $ Right (snapshot, sha)
 
 loadFromURL
   :: (HasPantryConfig env, HasLogFunc env)
@@ -702,16 +676,16 @@ warningsParserHelper
   :: HasLogFunc env
   => SnapshotLocation
   -> Value
-  -> (Value -> Yaml.Parser (WithJSONWarnings (IO a)))
-  -> RIO env a
-warningsParserHelper sl val f =
-  case parseEither f val of
+  -> Maybe (Path Abs Dir)
+  -> RIO env Snapshot
+warningsParserHelper sl val mdir =
+  case parseEither Yaml.parseJSON val of
     Left e -> throwIO $ Couldn'tParseSnapshot sl e
     Right (WithJSONWarnings x ws) -> do
       unless (null ws) $ do
         logWarn $ "Warnings when parsing snapshot " <> display sl
         for_ ws $ logWarn . display
-      liftIO x
+      resolvePaths mdir x
 
 -- | Get the name of the package at the given location.
 getPackageLocationIdent

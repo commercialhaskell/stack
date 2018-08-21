@@ -10,7 +10,7 @@ import           Stack.Prelude
 import           Stack.Types.Resolver
 
 -- | Parser for the resolver
-abstractResolverOptsParser :: Bool -> Parser AbstractResolver
+abstractResolverOptsParser :: Bool -> Parser (Unresolved AbstractResolver)
 abstractResolverOptsParser hide =
     option readAbstractResolver
         (long "resolver" <>
