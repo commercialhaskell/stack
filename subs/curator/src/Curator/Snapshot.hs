@@ -18,6 +18,7 @@ makeSnapshot cons name = do
   locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
   pure Snapshot
     { snapshotParent = SLCompiler $ WCGhc $ consGhcVersion cons
+    , snapshotCompiler = Nothing
     , snapshotName = name
     , snapshotLocations = catMaybes locs
     , snapshotDropPackages = mempty

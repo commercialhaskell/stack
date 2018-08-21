@@ -78,7 +78,7 @@ build = do
 loadPantrySnapshotFile :: FilePath -> RIO PantryApp Curator.Snapshot
 loadPantrySnapshotFile fp = do
   abs' <- resolveFile' fp
-  eres <- loadPantrySnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs') Nothing
+  eres <- loadPantrySnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')
   case eres of
     Left x -> error $ "should not happen: " ++ show (fp, x)
-    Right (x, _, _) -> pure x
+    Right (x, _) -> pure x
