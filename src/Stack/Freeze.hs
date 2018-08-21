@@ -32,18 +32,24 @@ freeze (FreezeOpts FreezeProject) = do
               plm@(PLMutable _) -> pure plm
       resolver' <- completeSnapshotLocation resolver
       deps' <- mapM completePackageLocation' deps
-      when (deps' /= deps || resolver' /= resolver) $
+      if deps' == deps && resolver' == resolver
+      then
+        logInfo "No freezing is required for this project"
+      else
         liftIO $ B.putStr $ Yaml.encode p{ projectDependencies = deps'
                                          , projectResolver = resolver'
                                          }
-    Nothing -> pure ()
+    Nothing -> logWarn "No project was found: nothing to freeze"
 
 freeze (FreezeOpts FreezeSnapshot) = do
   msnapshot <- view $ buildConfigL.to bcSnapshotDef.to sdSnapshot
   case msnapshot of
     Just (snap, _) -> do
       snap' <- completeSnapshot snap
-      when (snap' /= snap) $
+      if snap' == snap
+      then
+        logInfo "No freezing is required for the snapshot of this project"
+      else
         liftIO $ B.putStr $ Yaml.encode snap'
     Nothing ->
-      return ()
+      logWarn "No snapshot was found: nothing to freeze"
