@@ -7,6 +7,7 @@ module Stack.Freeze
     , FreezeMode (..)
     ) where
 
+import           Data.Aeson ((.=), object)
 import qualified Data.Yaml as Yaml
 import qualified RIO.ByteString as B
 import           Stack.Prelude
@@ -35,10 +36,20 @@ freeze (FreezeOpts FreezeProject) = do
       if deps' == deps && resolver' == resolver
       then
         logInfo "No freezing is required for this project"
-      else
-        liftIO $ B.putStr $ Yaml.encode p{ projectDependencies = deps'
-                                         , projectResolver = resolver'
-                                         }
+      else do
+        logInfo "# Fields not mentioned below do not need to be updated"
+
+        if resolver' == resolver
+          then logInfo "# No update to resolver is needed"
+          else do
+            logInfo "# Frozen version of resolver"
+            B.putStr $ Yaml.encode $ object ["resolver" .= resolver']
+
+        if deps' == deps
+          then logInfo "# No update to extra-deps is needed"
+          else do
+            logInfo "# Frozen version of extra-deps"
+            B.putStr $ Yaml.encode $ object ["extra-deps" .= deps']
     Nothing -> logWarn "No project was found: nothing to freeze"
 
 freeze (FreezeOpts FreezeSnapshot) = do
