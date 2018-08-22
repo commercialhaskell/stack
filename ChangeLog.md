@@ -23,8 +23,7 @@ Major changes:
       for more efficient config parsing.
           * __NOTE__ The new `stack freeze` command provides support
             for automatically generating this additional
-            information. @@@TODO ensure `stack freeze` actually makes
-            it in.
+            information.
     * Package contents and metadata are stored in an SQLite database
       in place of files on the filesystem. The `pantry` library can be
       used for interacting with these contents.
