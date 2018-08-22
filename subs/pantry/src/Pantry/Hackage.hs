@@ -367,8 +367,10 @@ getHackageTypoCorrections
   -> RIO env [PackageName]
 getHackageTypoCorrections name1 =
     withStorage $ sinkHackagePackageNames
-      (\name2 -> damerauLevenshtein (displayC name1) (displayC name2) < 4)
+      (\name2 -> name1 `distance` name2 < 4)
       (takeC 10 .| sinkList)
+    where
+      distance = damerauLevenshtein `on` (T.pack . packageNameString)
 
 -- | Should we pay attention to Hackage's preferred versions?
 --
@@ -392,7 +394,7 @@ getHackagePackageVersions usePreferred name = withStorage $ do
   let predicate :: Version -> Map Revision BlobKey -> Bool
       predicate = fromMaybe (\_ _ -> True) $ do
         preferredT1 <- mpreferred
-        preferredT2 <- T.stripPrefix (displayC name) preferredT1
+        preferredT2 <- T.stripPrefix (T.pack $ packageNameString name) preferredT1
         vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
         Just $ \v _ -> withinRange v vr
   Map.filterWithKey predicate <$> loadHackagePackageVersions name

@@ -124,7 +124,7 @@ printPlan plan = do
         xs -> do
             logInfo "Would unregister locally:"
             forM_ xs $ \(ident, reason) -> logInfo $
-                displayC ident <>
+                fromString (packageIdentifierString ident) <>
                 if T.null reason
                   then ""
                   else " (" <> RIO.display reason <> ")"
@@ -168,7 +168,7 @@ printPlan plan = do
 -- | For a dry run
 displayTask :: Task -> Utf8Builder
 displayTask task =
-    displayC (taskProvides task) <>
+    fromString (packageIdentifierString (taskProvides task)) <>
     ": database=" <>
     (case taskLocation task of
         Snap -> "snapshot"
@@ -180,7 +180,7 @@ displayTask task =
     (if Set.null missing
         then ""
         else ", after: " <>
-             mconcat (intersperse "," (displayC <$> Set.toList missing)))
+             mconcat (intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
   where
     missing = tcoMissing $ taskConfigOpts task
 
@@ -250,7 +250,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
     wc <- view $ actualCompilerVersionL.whichCompilerL
     platformDir <- platformGhcRelDir
     config <- view configL
-    cabalVersionString <- view $ cabalVersionL.to displayC
+    cabalVersionString <- view $ cabalVersionL.to versionString
     actualCompilerVersionString <- view $ actualCompilerVersionL.to compilerVersionString
     platform <- view platformL
     let baseNameS = concat
@@ -597,7 +597,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
             localDB <- packageDatabaseLocal
             forM_ ids $ \(id', (ident, reason)) -> do
                 logInfo $
-                    displayC ident <>
+                    fromString (packageIdentifierString ident) <>
                     ": unregistering" <>
                     if T.null reason
                         then ""
@@ -631,10 +631,10 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     run $ logStickyDone ("Completed " <> RIO.display total <> " action(s).")
                 | otherwise = do
                     inProgress <- readTVarIO actionsVar
-                    let packageNames = map (\(ActionId pkgID _) -> displayC pkgID) (toList inProgress)
+                    let packageNames = map (\(ActionId pkgID _) -> pkgName pkgID) (toList inProgress)
                         nowBuilding :: [PackageName] -> Utf8Builder
                         nowBuilding []    = ""
-                        nowBuilding names = mconcat $ ": " : intersperse ", " (map displayC names)
+                        nowBuilding names = mconcat $ ": " : intersperse ", " (map (fromString . packageNameString) names)
                     when terminal $ run $
                         logSticky $
                             "Progress " <> RIO.display prev <> "/" <> RIO.display total <>
@@ -872,7 +872,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
 
 announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
 announceTask task x = logInfo $
-    displayC (taskProvides task) <>
+    fromString (packageIdentifierString (taskProvides task)) <>
     ": " <>
     RIO.display x
 
@@ -944,7 +944,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         case taskType of
             TTFilePath lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
             TTRemote package _ pkgloc -> do
-                suffix <- parseRelDir $ displayC $ packageIdent package
+                suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
                 let dir = eeTempDir </> suffix
                 unpackPackageLocation dir pkgloc
 
@@ -963,14 +963,15 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                   renameDir oldDist newDist
 
                 let name = pkgName taskProvides
-                cabalfpRel <- parseRelFile $ displayC name ++ ".cabal"
+                cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
                 let cabalfp = dir </> cabalfpRel
                 inner package cabalfp dir
 
     withOutputType pkgDir package inner
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
-        | boptsInterleavedOutput eeBuildOpts = inner $ OTConsole $ displayC (packageName package) <> "> "
+        | boptsInterleavedOutput eeBuildOpts =
+            inner $ OTConsole $ fromString (packageNameString (packageName package)) <> "> "
 
         -- Not in interleaved mode. When building a single wanted package, dump
         -- to the console with no prefix.
@@ -1025,7 +1026,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                     -- https://github.com/commercialhaskell/stack/issues/1356
                     | packageName package == $(mkPackageName "Cabal") = []
                     | otherwise =
-                        ["-package=" ++ displayC
+                        ["-package=" ++ packageIdentifierString
                                             (PackageIdentifier cabalPackageName
                                                               eeCabalPkgVer)]
                 packageDBArgs =
@@ -1044,7 +1045,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (TTFilePath lp Local, C.Custom) | lpWanted lp -> do
                             prettyWarnL
                                 [ flow "Package"
-                                , displayC $ packageName package
+                                , fromString $ packageNameString $ packageName package
                                 , flow "uses a custom Cabal build, but does not use a custom-setup stanza"
                                 ]
                         _ -> return ()
@@ -1060,7 +1061,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (Just customSetupDeps, _) -> do
                             unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
                                 prettyWarnL
-                                    [ displayC $ packageName package
+                                    [ fromString $ packageNameString $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]
                             allDeps <-
@@ -1076,11 +1077,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                 case filter (matches . fst) (Map.toList allDeps) of
                                     x:xs -> do
                                         unless (null xs)
-                                            (logWarn ("Found multiple installed packages for custom-setup dep: " <> displayC name))
+                                            (logWarn ("Found multiple installed packages for custom-setup dep: " <> fromString (packageNameString name)))
                                         return ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
                                     [] -> do
-                                        logWarn ("Could not find custom-setup dep: " <> displayC name)
-                                        return ("-package=" ++ displayC name, Nothing)
+                                        logWarn ("Could not find custom-setup dep: " <> fromString (packageNameString name))
+                                        return ("-package=" ++ packageNameString name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
@@ -1342,8 +1343,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             TTFilePath lp _ -> packageInternalLibraries $ lpPackage lp
             TTRemote p _ _ -> packageInternalLibraries p
           PackageIdentifier name version = taskProvides
-          mainLibName = displayC name
-          mainLibVersion = displayC version
+          mainLibName = packageNameString name
+          mainLibVersion = versionString version
           pkgName = mainLibName ++ "-" ++ mainLibVersion
           -- z-package-z-internal for internal lib internal of package package
           toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
@@ -1401,7 +1402,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
                  (logInfo
-                      ("Building all executables for `" <> displayC (packageName package) <>
+                      ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
@@ -1590,7 +1591,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 sublibsPkgIds <- fmap catMaybes $
                   forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
                     -- z-haddock-library-z-attoparsec for internal lib attoparsec of haddock-library
-                    let sublibName = T.concat ["z-", displayC $ packageName package, "-z-", sublib]
+                    let sublibName = T.concat ["z-", T.pack $ packageNameString $ packageName package, "-z-", sublib]
                     case parsePackageName $ T.unpack sublibName of
                       Nothing -> return Nothing -- invalid lib, ignored
                       Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
@@ -1840,7 +1841,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         logError $ displayShow $ TestSuiteExeMissing
                             (packageBuildType package == C.Simple)
                             exeName
-                            (displayC (packageName package))
+                            (packageNameString (packageName package))
                             (T.unpack testName)
                         return $ Map.singleton testName Nothing
 
@@ -2012,7 +2013,7 @@ primaryComponentOptions executableBuildStatuses lp =
          NoLibraries -> []
          HasLibraries names ->
              map T.unpack
-           $ T.append "lib:" (displayC (packageName package))
+           $ T.append "lib:" (T.pack (packageNameString (packageName package)))
            : map (T.append "flib:") (Set.toList names)) ++
       map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
       map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)

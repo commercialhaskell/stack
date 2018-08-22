@@ -29,15 +29,15 @@ unpackSnapshot cons snap root = do
     PackageIdentifier name version <- getPackageLocationIdent pl
     pc <-
       case Map.lookup name $ consPackages cons of
-        Nothing -> error $ "Package not found in constraints: " ++ displayC name
+        Nothing -> error $ "Package not found in constraints: " ++ packageNameString name
         Just pc -> pure pc
     if pcSkipBuild pc
       then pure mempty
       else do
         let suffixBuilder =
-              displayC name <>
+              fromString (packageNameString name) <>
               "-" <>
-              displayC version <>
+              fromString (versionString version) <>
               "@" <>
               display sha
         suffixTmp <- parseRelDir $ T.unpack $ utf8BuilderToText $ suffixBuilder <> ".tmp"
@@ -67,7 +67,7 @@ unpackSnapshot cons snap root = do
   stackYaml <- parseRelFile "stack.yaml"
   let stackYamlFP = toFilePath $ root </> stackYaml
   liftIO $ encodeFile stackYamlFP $ object
-    [ "resolver" .= ("ghc-" ++ displayC (consGhcVersion cons))
+    [ "resolver" .= ("ghc-" ++ versionString (consGhcVersion cons))
     , "packages" .= Set.map (\suffix -> toFilePath (unpacked </> suffix)) suffixes
     , "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
     , "curator" .= object

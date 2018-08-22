@@ -89,7 +89,7 @@ targetsParser =
               completer targetCompleter <>
               help ("If none specified, use all local packages. " <>
                     "See https://docs.haskellstack.org/en/v" <>
-                    displayC stackMinorVersion <>
+                    versionString stackMinorVersion <>
                     "/build_command/#target-syntax for details.")))
 
 flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))

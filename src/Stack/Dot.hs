@@ -141,7 +141,7 @@ listDependencies opts = do
                   if listDepsLicense opts
                       then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
-                line = displayC name <> listDepsSep opts <> payloadText
+                line = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
@@ -217,7 +217,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of
-          Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ displayC pkgName ++ " in global DB")
+          Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
           Just dp -> pure (Set.fromList deps, payloadFromDump dp)
             where
               deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
@@ -258,7 +258,7 @@ printGraph dotOpts locals graph = do
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
   where filteredLocals = Set.filter (\local' ->
-          displayC local' `Set.notMember` dotPrune dotOpts) locals
+          packageNameString local' `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadIO m)
@@ -289,7 +289,7 @@ printEdge from to' = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> "
 
 -- | Convert a package name to a graph node name.
 nodeName :: PackageName -> Text
-nodeName name = "\"" <> displayC name <> "\""
+nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
 
 -- | Print a node with no dependencies
 printLeaf :: MonadIO m => PackageName -> m ()

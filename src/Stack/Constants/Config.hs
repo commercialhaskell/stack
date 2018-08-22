@@ -126,7 +126,7 @@ distRelativeDir = do
     envDir <-
         parseRelDir $
         (if wc == Ghcjs then (++ "_ghcjs") else id) $
-        displayC $
+        packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
     workDir <- view workDirL

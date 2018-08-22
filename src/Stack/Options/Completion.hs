@@ -86,7 +86,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
             $ Map.toList lpvs
         normalFlags
             = concatMap (\(name, lpv) ->
-                map (\fl -> displayC name ++ ":" ++ flagString name fl)
+                map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
                     (C.genPackageFlags (lpvGPD lpv)))
             $ Map.toList lpvs
         flagString name fl =

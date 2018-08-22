@@ -55,7 +55,7 @@ nixCompiler :: WantedCompiler -> Either StringException T.Text
 nixCompiler compilerVersion =
   case compilerVersion of
     WCGhc version ->
-      case T.split (== '.') (displayC version) of
+      case T.split (== '.') (fromString $ versionString version) of
         x : y : minor ->
           Right $
           case minor of
@@ -70,7 +70,7 @@ nixCompiler compilerVersion =
               \(lib.attrNames haskell.compiler); in \
               \if compilers == [] \
               \then abort \"No compiler found for GHC "
-              <> displayC version <> "\"\
+              <> T.pack (versionString version) <> "\"\
               \else haskell.compiler.${builtins.head compilers})"
             _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
         _ -> Left $ stringException "GHC major version not specified"

@@ -155,7 +155,7 @@ checkCabalVersion = do
     when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
         CabalVersionException $
             "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
-            displayC cabalVer ++
+            versionString cabalVer ++
             " was found."
 
 newtype CabalVersionException = CabalVersionException { unCabalVersionException :: String }
@@ -176,7 +176,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             exesText pkgs =
                 T.intercalate
                     ", "
-                    ["'" <> displayC p <> ":" <> exe <> "'" | p <- pkgs]
+                    ["'" <> T.pack (packageNameString p) <> ":" <> exe <> "'" | p <- pkgs]
         (logWarn . display . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
@@ -389,7 +389,7 @@ rawBuildInfo = do
         ]
   where
     localToPair lp =
-        (displayC $ packageName p, value)
+        (T.pack $ packageNameString $ packageName p, value)
       where
         p = lpPackage lp
         value = object

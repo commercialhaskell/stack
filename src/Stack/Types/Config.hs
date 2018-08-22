@@ -1134,7 +1134,7 @@ instance Show ConfigException where
       where
         go (name, dirs) = unlines
             $ ""
-            : (displayC name ++ " used in:")
+            : (packageNameString name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
 instance Exception ConfigException
@@ -1318,7 +1318,7 @@ compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (
 compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
-        ACGhc version -> displayC version
+        ACGhc version -> versionString version
         ACGhcjs {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into

@@ -315,7 +315,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
-          = Just $ "Dependency being unregistered: " <> displayC dep
+          = Just $ "Dependency being unregistered: " <> T.pack (packageIdentifierString dep)
       -- None of the above, keep it!
       | otherwise = Nothing
       where
@@ -539,7 +539,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             shouldInstall <- checkDirtiness ps installed package present (wanted ctx)
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
-            let t = T.intercalate ", " $ map (displayC . pkgName) (Set.toList missing)
+            let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
             tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
@@ -643,9 +643,9 @@ addPackageDeps treatAsDep package = do
                                     [ "WARNING: Ignoring out of range dependency"
                                     , reason
                                     , ": "
-                                    , displayC $ PackageIdentifier depname (adrVersion adr)
+                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
                                     , ". "
-                                    , displayC $ packageName package
+                                    , T.pack $ packageNameString $ packageName package
                                     , " requires: "
                                     , versionRangeText range
                                     ]
@@ -865,7 +865,7 @@ toolWarningText (ToolWarning (ExeName toolName) pkgName) =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
-    displayC pkgName
+    T.pack (packageNameString pkgName)
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan
@@ -1005,7 +1005,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (style Error . displayC) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (style Error . fromString . packageNameString) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -1019,18 +1019,18 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     Just (target:path) -> line <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
-                            [style Target . displayC $ target] ++
-                            map displayC path ++
+                            [style Target . fromString . packageIdentifierString $ target] ++
+                            map (fromString . packageIdentifierString) path ++
                             [pkgIdent]
               where
-                pkgName = style Current . displayC $ packageName pkg
-                pkgIdent = style Current . displayC $ packageIdentifier pkg
+                pkgName = style Current . fromString . packageNameString $ packageName pkg
+                pkgIdent = style Current . fromString . packageIdentifierString $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `Set.member` wiredInPackages =
-            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . displayC $ name)
-        | otherwise = Just $ flow "Unknown package:" <+> (style Current . displayC $ name)
+            Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . fromString . packageNameString $ name)
+        | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
 
     pprintFlags flags
         | Map.null flags = ""
@@ -1040,7 +1040,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
-            style Error (displayC name) <+>
+            style Error (fromString $ packageNameString name) <+>
             align ((if range == Cabal.anyVersion
                       then flow "needed"
                       else flow "must match" <+> goodRange) <> "," <> softline <>
@@ -1048,7 +1048,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                    latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
-            (style Error . displayC) (PackageIdentifier name version) <+>
+            (style Error . fromString . packageIdentifierString) (PackageIdentifier name version) <+>
             align (flow "from stack configuration does not match" <+> goodRange <+>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
@@ -1056,11 +1056,11 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
         -- path from a target to the package.
         Couldn'tResolveItsDependencies _version -> Nothing
         HasNoLibrary -> Just $
-            style Error (displayC name) <+>
+            style Error (fromString $ packageNameString name) <+>
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
-            style Error (displayC name) <+>
-            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map displayC names))
+            style Error (fromString $ packageNameString name) <+>
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =
@@ -1073,7 +1073,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                     | Just laVer == mversion -> softline <>
                         flow "(latest matching version is specified)"
                     | otherwise -> softline <>
-                        flow "(latest matching version is" <+> style Good (displayC laVer) <> ")"
+                        flow "(latest matching version is" <+> style Good (fromString $ versionString laVer) <> ")"
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
@@ -1126,14 +1126,14 @@ data DepsPath = DepsPath
 startDepsPath :: PackageIdentifier -> DepsPath
 startDepsPath ident = DepsPath
     { dpLength = 1
-    , dpNameLength = T.length (displayC (pkgName ident))
+    , dpNameLength = length (packageNameString (pkgName ident))
     , dpPath = [ident]
     }
 
 extendDepsPath :: PackageIdentifier -> DepsPath -> DepsPath
 extendDepsPath ident dp = DepsPath
     { dpLength = dpLength dp + 1
-    , dpNameLength = dpNameLength dp + T.length (displayC (pkgName ident))
+    , dpNameLength = dpNameLength dp + length (packageNameString (pkgName ident))
     , dpPath = [ident]
     }
 

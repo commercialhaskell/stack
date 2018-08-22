@@ -41,7 +41,7 @@ renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent
 
 renderPkgComponent :: (PackageName, NamedComponent) -> Text
-renderPkgComponent (pkg, comp) = displayC pkg <> ":" <> renderComponent comp
+renderPkgComponent (pkg, comp) = fromString (packageNameString pkg) <> ":" <> renderComponent comp
 
 exeComponents :: Set NamedComponent -> Set Text
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList

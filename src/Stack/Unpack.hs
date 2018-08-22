@@ -44,7 +44,7 @@ unpackPackages mSnapshotDef dest input = do
       errs -> throwM $ CouldNotParsePackageSelectors errs
     locs <- Map.fromList <$> mapM
           (\(pir, ident) -> do
-              suffix <- parseRelDir $ displayC ident
+              suffix <- parseRelDir $ packageIdentifierString ident
               pure (pir, dest </> suffix)
           )
           (map (\pir@(PackageIdentifierRevision name ver _) ->
@@ -73,7 +73,7 @@ unpackPackages mSnapshotDef dest input = do
         case mver1 of
           Just _ -> pure mver1
           Nothing -> do
-            updated <- updateHackageIndex $ Just $ "Could not find package " <> displayC name <> ", updating"
+            updated <- updateHackageIndex $ Just $ "Could not find package " <> fromString (packageNameString name) <> ", updating"
             case updated of
               UpdateOccurred -> getLatestHackageVersion name UsePreferredVersions
               NoUpdateOccurred -> pure Nothing
@@ -82,11 +82,11 @@ unpackPackages mSnapshotDef dest input = do
           candidates <- getHackageTypoCorrections name
           pure $ Left $ concat
             [ "Could not find package "
-            , displayC name
+            , packageNameString name
             , " on Hackage"
             , if null candidates
                 then ""
-                else ". Perhaps you meant: " ++ intercalate ", " (map displayC candidates)
+                else ". Perhaps you meant: " ++ intercalate ", " (map packageNameString candidates)
             ]
         Just pir@(PackageIdentifierRevision _ ver _) -> pure $ Right
           ( PLIHackage pir Nothing
@@ -97,7 +97,7 @@ unpackPackages mSnapshotDef dest input = do
     toLocSnapshot sd name =
         go $ concatMap snapshotLocations $ sdSnapshots sd
       where
-        go [] = pure $ Left $ "Package does not appear in snapshot: " ++ displayC name
+        go [] = pure $ Left $ "Package does not appear in snapshot: " ++ packageNameString name
         go (loc:locs) = do
           ident@(PackageIdentifier name' _) <- getPackageLocationIdent loc
           if name == name'

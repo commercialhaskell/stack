@@ -50,7 +50,11 @@ module Pantry.Types
   , parsePackageName
   , parseFlagName
   , parseVersion
-  , displayC
+  , packageIdentifierString
+  , packageNameString
+  , flagNameString
+  , versionString
+  , moduleNameString
   , OptionalSubdirs (..)
   , ArchiveLocation (..)
   , RelFilePath (..)
@@ -98,9 +102,9 @@ import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
-import Distribution.Types.PackageName (PackageName)
+import Distribution.Types.PackageName (PackageName, unPackageName)
 import Distribution.Types.VersionRange (VersionRange)
-import Distribution.PackageDescription (FlagName, GenericPackageDescription)
+import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.ModuleName (ModuleName)
@@ -144,7 +148,7 @@ data Package = Package
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
-  case mkSafeFilePath $ displayC name <> ".cabal" of
+  case mkSafeFilePath $ T.pack (packageNameString name) <> ".cabal" of
     Nothing -> error $ "cabalFileName: failed for " ++ show name
     Just sfp -> sfp
 
@@ -437,7 +441,7 @@ instance FromJSON BlobKey where
 
 newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
 instance PersistField PackageNameP where
-  toPersistValue (PackageNameP pn) = PersistText $ displayC pn
+  toPersistValue (PackageNameP pn) = PersistText $ T.pack $ packageNameString pn
   fromPersistValue v = do
     str <- fromPersistValue v
     case parsePackageName str of
@@ -448,7 +452,7 @@ instance PersistFieldSql PackageNameP where
 
 newtype VersionP = VersionP Version
 instance PersistField VersionP where
-  toPersistValue (VersionP v) = PersistText $ displayC v
+  toPersistValue (VersionP v) = PersistText $ T.pack $ versionString v
   fromPersistValue v = do
     str <- fromPersistValue v
     case parseVersion str of
@@ -509,7 +513,7 @@ instance Show PackageIdentifierRevision where
 
 instance Display PackageIdentifierRevision where
   display (PackageIdentifierRevision name version cfi) =
-    displayC name <> "-" <> displayC version <> display cfi
+    fromString (packageNameString name) <> "-" <> fromString (versionString version) <> display cfi
 
 instance ToJSON PackageIdentifierRevision where
   toJSON = toJSON . utf8BuilderToText . display
@@ -648,9 +652,9 @@ instance Display PantryException where
        Just version
          | version > cabalSpecLatestVersion ->
              "\n\nThe cabal file uses the cabal specification version " <>
-             displayC version <>
+             fromString (versionString version) <>
              ", but we only support up to version " <>
-             displayC cabalSpecLatestVersion <>
+             fromString (versionString cabalSpecLatestVersion) <>
              ".\nRecommended action: upgrade your build tool (e.g., `stack upgrade`)."
        _ -> mempty)
   display (TreeWithoutCabalFile pl) = "No cabal file found for " <> display pl
@@ -662,7 +666,7 @@ instance Display PantryException where
     fromString (toFilePath fp) <>
     " does not match the package name it defines.\n" <>
     "Please rename the file to: " <>
-    displayC name <>
+    fromString (packageNameString name) <>
     ".cabal\n" <>
     "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
   display (NoCabalFileFound dir) =
@@ -699,7 +703,7 @@ instance Display PantryException where
     displayShow e
   display (MismatchedPackageMetadata loc pm mtreeKey foundCabal foundIdent) =
     "Mismatched package metadata for " <> display loc <>
-    "\nFound: " <> displayC foundIdent <> " with cabal file " <>
+    "\nFound: " <> fromString (packageIdentifierString foundIdent) <> " with cabal file " <>
     display foundCabal <>
     (case mtreeKey of
        Nothing -> mempty
@@ -718,7 +722,7 @@ instance Display PantryException where
   display (WrongCabalFileName pl sfp name) =
     "Wrong cabal file name for package " <> display pl <>
     "\nCabal file is named " <> display sfp <>
-    ", but package name is " <> displayC name <>
+    ", but package name is " <> fromString (packageNameString name) <>
     "\nFor more information, see:\n  - https://github.com/commercialhaskell/stack/issues/317\n  -https://github.com/commercialhaskell/stack/issues/895"
   display (DownloadInvalidSHA256 url Mismatch {..}) =
     "Mismatched SHA256 hash from " <> display url <>
@@ -745,7 +749,8 @@ instance Display PantryException where
     "Unsupported tar filetype in archive " <> display loc <> " at file " <> fromString fp <> ": " <> displayShow x
   display (UnsupportedTarball loc e) =
     "Unsupported tarball from " <> display loc <> ": " <> display e
-  display (NoHackageCryptographicHash ident) = "Not cryptographic hash found for Hackage package " <> displayC ident
+  display (NoHackageCryptographicHash ident) =
+    "Not cryptographic hash found for Hackage package " <> fromString (packageIdentifierString ident)
   display (FailedToCloneRepo repo) = "Failed to clone repo " <> display repo
   display (TreeReferencesMissingBlob loc sfp key) =
     "The package " <> display loc <>
@@ -772,8 +777,8 @@ instance Display PantryException where
   display (MismatchedCabalFileForHackage pir Mismatch{..}) =
     "When processing cabal file for Hackage package " <> display pir <>
     ":\nMismatched package identifier." <>
-    "\nExpected: " <> displayC mismatchExpected <>
-    "\nActual:   " <> displayC mismatchActual
+    "\nExpected: " <> fromString (packageIdentifierString mismatchExpected) <>
+    "\nActual:   " <> fromString (packageIdentifierString mismatchActual)
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
@@ -786,7 +791,7 @@ displayFuzzy (FRNameNotFound names) =
     Nothing -> ""
     Just names' ->
       "\nPerhaps you meant " <>
-      orSeparated (NE.map displayC names') <>
+      orSeparated (NE.map (fromString . packageNameString) names') <>
       "?"
 displayFuzzy (FRVersionNotFound pirs) =
   "\nPossible candidates: " <>
@@ -1015,13 +1020,35 @@ parseVersionRange = Distribution.Text.simpleParse
 parseFlagName :: String -> Maybe FlagName
 parseFlagName = Distribution.Text.simpleParse
 
--- | Display Cabal types using 'Distribution.Text.Text'.
---
--- FIXME this should be removed and replaced with monomorphic functions for safety.
+-- | Render a package name as a 'String'.
 --
 -- @since 0.1.0.0
-displayC :: (IsString str, Distribution.Text.Text a) => a -> str
-displayC = fromString . Distribution.Text.display
+packageNameString :: PackageName -> String
+packageNameString = unPackageName
+
+-- | Render a package identifier as a 'String'.
+--
+-- @since 0.1.0.0
+packageIdentifierString :: PackageIdentifier -> String
+packageIdentifierString = Distribution.Text.display
+
+-- | Render a version as a 'String'.
+--
+-- @since 0.1.0.0
+versionString :: Version -> String
+versionString = Distribution.Text.display
+
+-- | Render a flag name as a 'String'.
+--
+-- @since 0.1.0.0
+flagNameString :: FlagName -> String
+flagNameString = unFlagName
+
+-- | Render a module name as a 'String'.
+--
+-- @since 0.1.0.0
+moduleNameString :: ModuleName -> String
+moduleNameString = Distribution.Text.display
 
 data OptionalSubdirs
   = OSSubdirs !(NonEmpty Text)
@@ -1061,8 +1088,8 @@ instance NFData PackageMetadata
 
 instance Display PackageMetadata where
   display pm = fold $ intersperse ", " $ catMaybes
-    [ (\name -> "name == " <> displayC name) <$> pmName pm
-    , (\version -> "version == " <> displayC version) <$> pmVersion pm
+    [ (\name -> "name == " <> fromString (packageNameString name)) <$> pmName pm
+    , (\version -> "version == " <> fromString (versionString version)) <$> pmVersion pm
     , (\tree -> "tree == " <> display tree) <$> pmTreeKey pm
     , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
     ]
@@ -1286,7 +1313,7 @@ unCabalStringMap = Map.mapKeysMonotonic unCabalString
 instance Distribution.Text.Text a => ToJSON (CabalString a) where
   toJSON = toJSON . Distribution.Text.display . unCabalString
 instance Distribution.Text.Text a => ToJSONKey (CabalString a) where
-  toJSONKey = toJSONKeyText $ displayC . unCabalString
+  toJSONKey = toJSONKeyText $ T.pack . Distribution.Text.display . unCabalString
 
 instance forall a. IsCabalString a => FromJSON (CabalString a) where
   parseJSON = withText name $ \t ->
@@ -1348,8 +1375,9 @@ data WantedCompiler
 instance NFData WantedCompiler
 instance Store WantedCompiler
 instance Display WantedCompiler where
-  display (WCGhc vghc) = "ghc-" <> displayC vghc
-  display (WCGhcjs vghcjs vghc) = "ghcjs-" <> displayC vghcjs <> "_ghc-" <> displayC vghc
+  display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
+  display (WCGhcjs vghcjs vghc) =
+    "ghcjs-" <> fromString (versionString vghcjs) <> "_ghc-" <> fromString (versionString vghc)
 instance ToJSON WantedCompiler where
   toJSON = toJSON . utf8BuilderToText . display
 instance FromJSON WantedCompiler where
@@ -1618,25 +1646,25 @@ instance Store PackageName where
     VarSize $ \name ->
     case size of
       ConstSize x -> x
-      VarSize f -> f (displayC name :: String)
+      VarSize f -> f (packageNameString name)
   peek = peek >>= maybe (fail "Invalid package name") pure . parsePackageName
-  poke name = poke (displayC name :: String)
+  poke name = poke (packageNameString name)
 instance Store Version where
   size =
     VarSize $ \version ->
     case size of
       ConstSize x -> x
-      VarSize f -> f (displayC version :: String)
+      VarSize f -> f (versionString version)
   peek = peek >>= maybe (fail "Invalid version") pure . parseVersion
-  poke version = poke (displayC version :: String)
+  poke version = poke (versionString version)
 instance Store FlagName where
   size =
     VarSize $ \fname ->
     case size of
       ConstSize x -> x
-      VarSize f -> f (displayC fname :: String)
+      VarSize f -> f (flagNameString fname)
   peek = peek >>= maybe (fail "Invalid flag name") pure . parseFlagName
-  poke fname = poke (displayC fname :: String)
+  poke fname = poke (flagNameString fname)
 instance Store ModuleName where
   size =
     VarSize $ \mname ->

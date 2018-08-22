@@ -76,7 +76,7 @@ instance Show PackageException where
     show (MismatchedCabalIdentifier pir ident) = concat
         [ "Mismatched package identifier."
         , "\nFound:    "
-        , displayC ident
+        , packageIdentifierString ident
         , "\nExpected: "
         , T.unpack $ utf8BuilderToText $ display pir
         ]

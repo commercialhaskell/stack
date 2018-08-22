@@ -155,7 +155,7 @@ getSDistTarball mpvpBounds pkgDir = do
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
-        pkgId = displayC (packageIdentifier (lpPackage lp))
+        pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
     dirEntries <- mapM packDir (dirsFromFiles files)
     fileEntries <- mapM packFile files
     mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
@@ -405,7 +405,7 @@ checkPackageInExtractedTarball pkgDir = do
     config  <- getDefaultPackageConfig
     (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir NoPrintWarnings
     logInfo $
-        "Checking package '" <> displayC name <> "' for common mistakes"
+        "Checking package '" <> fromString (packageNameString name) <> "' for common mistakes"
     let pkgChecks =
           -- MSS 2017-12-12: Try out a few different variants of
           -- pkgDesc to try and provoke an error or warning. I don't

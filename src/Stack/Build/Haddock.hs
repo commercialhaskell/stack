@@ -62,7 +62,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
     docFile <-
         case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
             ([_], [Just (pkgId, iloc)]) -> do
-                pkgRelDir <- (parseRelDir . displayC) pkgId
+                pkgRelDir <- (parseRelDir . packageIdentifierString) pkgId
                 let docLocation =
                         case iloc of
                             Snap -> snapDocDir bco
@@ -234,8 +234,8 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                 let (PackageIdentifier name _) = dpPackageIdent
                     destInterfaceRelFP =
                         docRelFP FP.</>
-                        displayC dpPackageIdent FP.</>
-                        (displayC name FP.<.> "haddock")
+                        packageIdentifierString dpPackageIdent FP.</>
+                        (packageNameString name FP.<.> "haddock")
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
                 return $
@@ -245,7 +245,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                             Just
                                 ( [ "-i"
                                   , concat
-                                        [ docRelFP FP.</> displayC dpPackageIdent
+                                        [ docRelFP FP.</> packageIdentifierString dpPackageIdent
                                         , ","
                                         , destInterfaceRelFP ]]
                                 , srcInterfaceModTime

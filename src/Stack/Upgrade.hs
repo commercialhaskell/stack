@@ -148,9 +148,9 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             Just downloadVersion -> do
                 prettyInfoL
                     [ flow "Current Stack version:"
-                    , displayC stackVersion <> ","
+                    , fromString (versionString stackVersion) <> ","
                     , flow "available download version:"
-                    , displayC downloadVersion
+                    , fromString (versionString downloadVersion)
                     ]
                 return $ downloadVersion > stackVersion
 
@@ -229,7 +229,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                suffix <- parseRelDir $ "stack-" ++ displayC version
+                suffix <- parseRelDir $ "stack-" ++ versionString version
                 let dir = tmp </> suffix
                 unpackPackageLocation dir $ PLIHackage pir Nothing
                 pure $ Just dir

@@ -176,7 +176,7 @@ ghci opts@GhciOpts{..} = do
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
     stackYaml <- view stackYamlL
-    buildDepsAndInitialSteps opts (map (displayC . fst) localTargets)
+    buildDepsAndInitialSteps opts (map (T.pack . packageNameString . fst) localTargets)
     targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
@@ -293,7 +293,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
         then return directlyWanted
         else do
             let extraList =
-                  mconcat $ intersperse ", " (map (displayC . fst) extraLoadDeps)
+                  mconcat $ intersperse ", " (map (fromString . packageNameString . fst) extraLoadDeps)
             if ghciLoadLocalDeps
                 then logInfo $
                   "The following libraries will also be loaded into GHCi because " <>
@@ -362,7 +362,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
               -- is because it tries to use the interpreter to set
               -- buffering options on standard IO.
               (if null targets then ["-package", "base"] else []) ++
-              concatMap (\n -> ["-package", displayC n]) exposePackages
+              concatMap (\n -> ["-package", packageNameString n]) exposePackages
             else []
         oneWordOpts bio
             | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
@@ -386,7 +386,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
     logInfo $
       "Configuring GHCi with the following packages: " <>
-      mconcat (intersperse ", " (map (displayC . ghciPkgName) pkgs))
+      mconcat (intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
             withProcessContext menv $ exec
@@ -543,7 +543,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
     renderCandidate c@(pkgName,namedComponent,mainIs) =
         let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . elemIndex c
         in  candidateIndex candidates <> ". Package `" <>
-            displayC pkgName <>
+            T.pack (packageNameString pkgName) <>
             "' component " <>
             renderComp namedComponent <>
             " with main-is file: " <>
@@ -576,9 +576,9 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
             CTest name -> "test:" <> name
             CBench name -> "bench:" <> name
     sampleTargetArg (pkg,comp,_) =
-        displayC pkg <> ":" <> renderComp comp
+        T.pack (packageNameString pkg) <> ":" <> renderComp comp
     sampleMainIsArg (pkg,comp,_) =
-        "--main-is " <> displayC pkg <> ":" <> renderComp comp
+        "--main-is " <> T.pack (packageNameString pkg) <> ":" <> renderComp comp
 
 loadGhciPkgDescs
     :: HasEnvConfig env
@@ -618,7 +618,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
 
     -- Source the package's *.buildinfo file created by configure if any. See
     -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
-    buildinfofp <- parseRelFile (displayC name ++ ".buildinfo")
+    buildinfofp <- parseRelFile (packageNameString name ++ ".buildinfo")
     hasDotBuildinfo <- doesFileExist (parent cabalfp </> buildinfofp)
     let mbuildinfofp
           | hasDotBuildinfo = Just (parent cabalfp </> buildinfofp)
@@ -820,7 +820,7 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
   unless (null nonLocalTargets) $
     prettyWarnL
       [ flow "Some targets"
-      , parens $ fillSep $ punctuate "," $ map (style Good . displayC) nonLocalTargets
+      , parens $ fillSep $ punctuate "," $ map (style Good . fromString . packageNameString) nonLocalTargets
       , flow "are not local packages, and so cannot be directly loaded."
       , flow "In future versions of stack, this might be supported - see"
       , style Url "https://github.com/commercialhaskell/stack/issues/1441"

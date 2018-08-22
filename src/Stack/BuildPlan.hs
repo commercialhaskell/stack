@@ -86,20 +86,20 @@ instance Show BuildPlanException where
                     [] -> []
                     noKnown ->
                         [ "There are no known versions of the following packages:"
-                        , intercalate ", " $ map displayC noKnown
+                        , intercalate ", " $ map packageNameString noKnown
                         ]
                 ]
           where
-            go (dep, (_, users)) | Set.null users = displayC dep
+            go (dep, (_, users)) | Set.null users = packageNameString dep
             go (dep, (_, users)) = concat
-                [ displayC dep
+                [ packageNameString dep
                 , " (used by "
-                , intercalate ", " $ map displayC $ Set.toList users
+                , intercalate ", " $ map packageNameString $ Set.toList users
                 , ")"
                 ]
 
             goRecommend (name, (Just version, _)) =
-                Just $ "- " ++ displayC (PackageIdentifier name version)
+                Just $ "- " ++ packageIdentifierString (PackageIdentifier name version)
             goRecommend (_, (Nothing, _)) = Nothing
 
             getNoKnown (name, (Nothing, _)) = Just name
@@ -118,17 +118,17 @@ instance Show BuildPlanException where
                 , ["Note: further dependencies may need to be added"]
                 ]
           where
-            go (dep, users) | Set.null users = displayC dep ++ " (internal stack error: this should never be null)"
+            go (dep, users) | Set.null users = packageNameString dep ++ " (internal stack error: this should never be null)"
             go (dep, users) = concat
-                [ displayC dep
+                [ packageNameString dep
                 , " (used by "
                 , intercalate ", "
-                    $ map (displayC . pkgName)
+                    $ map (packageNameString . pkgName)
                     $ Set.toList users
                 , ")"
                 ]
 
-            extraDeps = map (\ident -> "- " ++ displayC ident)
+            extraDeps = map (\ident -> "- " ++ packageIdentifierString ident)
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
@@ -427,7 +427,7 @@ showPackageFlags pkg fl =
     if not $ Map.null fl then
         T.concat
             [ "    - "
-            , T.pack $ displayC pkg
+            , T.pack $ packageNameString pkg
             , ": "
             , T.pack $ intercalate ", "
                      $ map formatFlags (Map.toList fl)
@@ -438,7 +438,7 @@ showPackageFlags pkg fl =
         formatFlags (f, v) = show f ++ " = " ++ show v
 
 showMapPackages :: Map PackageName a -> Text
-showMapPackages mp = showItems $ map displayC $ Map.keys mp
+showMapPackages mp = showItems $ map packageNameString $ Map.keys mp
 
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)
@@ -467,12 +467,12 @@ showDepErrors flags errs =
             ]
 
         showDepVersion depName mversion = T.concat
-            [ T.pack $ displayC depName
+            [ T.pack $ packageNameString depName
             , case mversion of
                 Nothing -> " not found"
                 Just version -> T.concat
                     [ " version "
-                    , T.pack $ displayC version
+                    , T.pack $ versionString version
                     , " found"
                     ]
             , "\n"
@@ -480,7 +480,7 @@ showDepErrors flags errs =
 
         showRequirement (user, range) = T.concat
             [ "    - "
-            , T.pack $ displayC user
+            , T.pack $ packageNameString user
             , " requires "
             , T.pack $ display range
             , "\n"

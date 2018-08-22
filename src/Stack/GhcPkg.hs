@@ -146,7 +146,7 @@ findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
                   -> PackageName
                   -> RIO env (Maybe Version)
 findGhcPkgVersion wc pkgDbs name = do
-    mv <- findGhcPkgField wc pkgDbs (displayC name) "version"
+    mv <- findGhcPkgField wc pkgDbs (packageNameString name) "version"
     case mv of
         Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
@@ -168,7 +168,7 @@ unregisterGhcPkgId wc cv pkgDb gid ident = do
     args = "unregister" : "--user" : "--force" :
         (case cv of
             ACGhc v | v < $(mkVersion "7.9") ->
-                [displayC ident]
+                [packageIdentifierString ident]
             _ -> ["--ipid", ghcPkgIdString gid])
 
 -- | Get the version of Cabal from the global package database.

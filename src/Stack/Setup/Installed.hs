@@ -45,11 +45,11 @@ data Tool
     | ToolGhcjs ActualCompiler -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
 
 toolString :: Tool -> String
-toolString (Tool ident) = displayC ident
+toolString (Tool ident) = packageIdentifierString ident
 toolString (ToolGhcjs cv) = compilerVersionString cv
 
 toolNameString :: Tool -> String
-toolNameString (Tool ident) = displayC $ pkgName ident
+toolNameString (Tool ident) = packageNameString $ pkgName ident
 toolNameString ToolGhcjs{} = "ghcjs"
 
 parseToolText :: Text -> Maybe Tool

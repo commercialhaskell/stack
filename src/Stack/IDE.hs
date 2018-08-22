@@ -27,7 +27,7 @@ listPackages = do
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
         (gpd, _) <- loadCabalFilePath dir NoPrintWarnings
-        (logInfo . displayC) (gpdPackageName gpd)
+        (logInfo . fromString . packageNameString) (gpdPackageName gpd)
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()

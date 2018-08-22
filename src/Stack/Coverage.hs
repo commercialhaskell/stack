@@ -81,7 +81,7 @@ updateTixFile pkgName' tixSrc testName = do
 hpcPkgPath :: HasEnvConfig env => PackageName -> RIO env (Path Abs Dir)
 hpcPkgPath pkgName' = do
     outputDir <- hpcReportDir
-    pkgNameRel <- parseRelDir (displayC pkgName')
+    pkgNameRel <- parseRelDir (packageNameString pkgName')
     return (outputDir </> pkgNameRel)
 
 -- | Get the tix file location, given the name of the file (without extension), and the package
@@ -100,8 +100,8 @@ generateHpcReport pkgDir package tests = do
     compilerVersion <- view actualCompilerVersionL
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
-    let pkgName' = displayC (packageName package)
-        pkgId = displayC (packageIdentifier package)
+    let pkgName' = T.pack $ packageNameString (packageName package)
+        pkgId = packageIdentifierString (packageIdentifier package)
         ghcVersion = getGhcVersion compilerVersion
         hasLibrary =
           case packageLibraries package of
@@ -234,7 +234,7 @@ generateHpcReportForTargets opts = do
                  case target of
                      TargetAll Dependency -> throwString $
                          "Error: Expected a local package, but " ++
-                         displayC name ++
+                         packageNameString name ++
                          " is either an extra-dep or in the snapshot."
                      TargetComps comps -> do
                          pkgPath <- hpcPkgPath name
@@ -244,7 +244,7 @@ generateHpcReportForTargets opts = do
                                      liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
                                  _ -> fail $
                                      "Can't specify anything except test-suites as hpc report targets (" ++
-                                     displayC name ++
+                                     packageNameString name ++
                                      " is used with a non test-suite target)"
                      TargetAll ProjectPackage -> do
                          pkgPath <- hpcPkgPath name
@@ -432,7 +432,7 @@ findPackageFieldForBuiltPackage
 findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
     distDir <- distDirFromDir pkgDir
     let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
-        pkgIdStr = displayC pkgId
+        pkgIdStr = packageIdentifierString pkgId
         notFoundErr = return $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
         extractField path = do
             contents <- liftIO $ T.readFile (toFilePath path)
