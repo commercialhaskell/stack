@@ -589,7 +589,7 @@ loadHackageTreeKey name ver sha = do
     \FROM blob as treeblob, blob as cabalblob, package_name, version, hackage_cabal, tree\n\
     \WHERE package_name.name=?\n\
     \AND   version.version=?\n\
-    \AND   cabalblob.hash=?\n\
+    \AND   cabalblob.sha=?\n\
     \AND   hackage_cabal.name=package_name.id\n\
     \AND   hackage_cabal.version=version.id\n\
     \AND   hackage_cabal.cabal=cabalblob.id\n\

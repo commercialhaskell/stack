@@ -1385,8 +1385,17 @@ instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
       obj :: Value -> Parser (WithJSONWarnings (Unresolved SnapshotLocation))
       obj = withObjectWarnings "UnresolvedSnapshotLocation (Object)" $ \o ->
         ((pure . SLCompiler) <$> o ..: "compiler") <|>
-        ((\x y -> pure $ SLUrl x y) <$> o ..: "url" <*> o ..:? "blob") <|>
+        ((\x y -> pure $ SLUrl x y) <$> o ..: "url" <*> blobKey o) <|>
         (parseSnapshotLocationPath <$> o ..: "filepath")
+
+      blobKey o = do
+        msha <- o ..:? "sha256"
+        msize <- o ..:? "size"
+        case (msha, msize) of
+          (Nothing, Nothing) -> pure Nothing
+          (Just sha, Just size) -> pure $ Just $ BlobKey sha size
+          (Just _sha, Nothing) -> fail "You must also specify the file size"
+          (Nothing, Just _) -> fail "You must also specify the file's SHA256"
 
 instance Display SnapshotLocation where
   display (SLCompiler compiler) = display compiler
