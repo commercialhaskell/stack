@@ -1395,7 +1395,7 @@ instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
         msize <- o ..:? "size"
         case (msha, msize) of
           (Nothing, Nothing) -> pure Nothing
-          (Just sha, Just size) -> pure $ Just $ BlobKey sha size
+          (Just sha, Just size') -> pure $ Just $ BlobKey sha size'
           (Just _sha, Nothing) -> fail "You must also specify the file size"
           (Nothing, Just _) -> fail "You must also specify the file's SHA256"
 
