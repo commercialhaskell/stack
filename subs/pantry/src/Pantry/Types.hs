@@ -1093,34 +1093,32 @@ instance Display ArchiveLocation where
   display (ALUrl url) = display url
   display (ALFilePath resolved) = fromString $ toFilePath $ resolvedAbsolute resolved
 
-instance ToJSON ArchiveLocation where
-  toJSON (ALUrl url) = object ["url" .= url]
-  toJSON (ALFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
-instance FromJSON (Unresolved ArchiveLocation) where
-  parseJSON v = asObjectUrl v <|> asObjectFilePath v <|> asText v
-    where
-      asObjectUrl = withObject "ArchiveLocation (URL object)" $ \o ->
-        (o .: "url") >>= validateUrl
-      asObjectFilePath = withObject "ArchiveLocation (FilePath object)" $ \o ->
-        (o .: "url") >>= validateFilePath
+parseArchiveLocationObject :: Object -> WarningParser (Unresolved ArchiveLocation)
+parseArchiveLocationObject o =
+    ((o ..: "url") >>= validateUrl) <|>
+    ((o ..: "filepath") >>= validateFilePath) <|>
+    ((o ..: "archive") >>= parseArchiveLocationText)
 
-      asText = withText "ArchiveLocation (Text)" $ \t ->
-        validateUrl t <|> validateFilePath t
+-- Forgive me my father, for I have sinned (bad fail, bad!)
+parseArchiveLocationText :: (Monad m, Alternative m) => Text -> m (Unresolved ArchiveLocation)
+parseArchiveLocationText t = validateUrl t <|> validateFilePath t
 
-      validateUrl t =
-        case parseRequest $ T.unpack t of
-          Left _ -> fail $ "Could not parse URL: " ++ T.unpack t
-          Right _ -> pure $ pure $ ALUrl t
+validateUrl :: Monad m => Text -> m (Unresolved ArchiveLocation)
+validateUrl t =
+  case parseRequest $ T.unpack t of
+    Left _ -> fail $ "Could not parse URL: " ++ T.unpack t
+    Right _ -> pure $ pure $ ALUrl t
 
-      validateFilePath t =
-        if any (\ext -> ext `T.isSuffixOf` t) (T.words ".zip .tar .tar.gz")
-          then pure $ Unresolved $ \mdir ->
-                 case mdir of
-                   Nothing -> throwIO $ InvalidFilePathSnapshot t
-                   Just dir -> do
-                     abs' <- resolveFile dir $ T.unpack t
-                     pure $ ALFilePath $ ResolvedPath (RelFilePath t) abs'
-          else fail $ "Does not have an archive file extension: " ++ T.unpack t
+validateFilePath :: Monad m => Text -> m (Unresolved ArchiveLocation)
+validateFilePath t =
+  if any (\ext -> ext `T.isSuffixOf` t) (T.words ".zip .tar .tar.gz")
+    then pure $ Unresolved $ \mdir ->
+           case mdir of
+             Nothing -> throwIO $ InvalidFilePathSnapshot t
+             Just dir -> do
+               abs' <- resolveFile dir $ T.unpack t
+               pure $ ALFilePath $ ResolvedPath (RelFilePath t) abs'
+    else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
 instance ToJSON PackageLocation where
   toJSON (PLImmutable pli) = toJSON pli
@@ -1144,9 +1142,11 @@ instance ToJSON PackageLocationImmutable where
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
   toJSON (PLIArchive (Archive loc msha msize subdir) pm) = object $ concat
-    [ ["location" .= loc]
+    [ case loc of
+        ALUrl url -> ["url" .= url]
+        ALFilePath resolved -> ["filepath" .= resolvedRelative resolved]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
-    , maybe [] (\size' -> ["size " .= size']) msize
+    , maybe [] (\size' -> ["size" .= size']) msize
     , if T.null subdir then [] else ["subdir" .= subdir]
     , pmToPairs pm
     ]
@@ -1182,14 +1182,16 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
     <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
     where
       http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
-      http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t -> do
-        Unresolved mkArchiveLocation <- parseJSON $ String t
-        pure $ noJSONWarnings $ Unresolved $ \mdir -> do
-          archiveLocation <- mkArchiveLocation mdir
-          let archiveHash = Nothing
-              archiveSize = Nothing
-              archiveSubdir = T.empty
-          pure $ pure $ PLIArchive Archive {..} pmEmpty
+      http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
+        case parseArchiveLocationText t of
+          Nothing -> fail $ "Invalid archive location: " ++ T.unpack t
+          Just (Unresolved mkArchiveLocation) ->
+            pure $ noJSONWarnings $ Unresolved $ \mdir -> do
+              archiveLocation <- mkArchiveLocation mdir
+              let archiveHash = Nothing
+                  archiveSize = Nothing
+                  archiveSubdir = T.empty
+              pure $ pure $ PLIArchive Archive {..} pmEmpty
 
       hackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
@@ -1227,7 +1229,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
         pure $ pure $ NE.map (\(repoSubdir, pm) -> PLIRepo Repo {..} pm) (osToPms os)
 
       archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
-        Unresolved mkArchiveLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
+        Unresolved mkArchiveLocation <- parseArchiveLocationObject o
         archiveHash <- o ..:? "sha256"
         archiveSize <- o ..:? "size"
         os <- optionalSubdirs o
