@@ -36,6 +36,8 @@ Major changes:
     * A new command, `stack freeze` has been added which outputs
       project and snapshot definitions with dependencies pinned to
       their exact versions.
+    * The `ignore-revision-mismatch` setting is no longer needed, and
+      has been removed.
 
 Behavior changes:
 

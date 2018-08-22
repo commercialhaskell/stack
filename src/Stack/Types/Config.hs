@@ -758,8 +758,6 @@ data ConfigMonoid =
     -- ^ See 'configSaveHackageCreds'
     , configMonoidHackageBaseUrl     :: !(First Text)
     -- ^ See 'configHackageBaseUrl'
-    , configMonoidIgnoreRevisionMismatch :: !(First Bool)
-    -- ^ See 'configIgnoreRevisionMismatch'
     , configMonoidStyles :: !StylesUpdate
     }
   deriving (Show, Generic)
@@ -857,7 +855,6 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
     configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
-    configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
     configMonoidStyles <- fromMaybe mempty <$> obj ..:? configMonoidStylesName
 
     return ConfigMonoid {..}
@@ -1000,9 +997,6 @@ configMonoidSaveHackageCredsName = "save-hackage-creds"
 
 configMonoidHackageBaseUrlName :: Text
 configMonoidHackageBaseUrlName = "hackage-base-url"
-
-configMonoidIgnoreRevisionMismatchName :: Text
-configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
 
 configMonoidStylesName :: Text
 configMonoidStylesName = "stack-colors"

@@ -364,10 +364,6 @@ configFromConfigMonoid
          configRunner = configRunner' & processContextL .~ origEnv &
            stylesUpdateL .~ stylesUpdate'
 
-     case getFirst configMonoidIgnoreRevisionMismatch of
-       Nothing -> pure ()
-       Just _ -> logWarn "You configured the ignore-revision-mismatch setting, but it is no longer used by Stack"
-
      hsc <-
        case getFirst configMonoidPackageIndices of
          Nothing -> pure defaultHackageSecurityConfig
