@@ -175,8 +175,17 @@ data PantryConfig = PantryConfig
   -- time. Start at @True@.
   , pcParsedCabalFilesImmutable :: !(IORef (Map PackageLocationImmutable GenericPackageDescription))
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
-  , pcParsedCabalFilesMutable :: !(IORef (Map (Path Abs Dir) (GenericPackageDescription, Path Abs File)))
-  -- ^ Same
+  , pcParsedCabalFilesMutable ::
+      !(IORef
+        (Map
+         (Path Abs Dir)
+         (GenericPackageDescription, Path Abs File, [PWarning])
+        )
+       )
+  -- ^ Same. We also keep a list of warnings which haven't been
+  -- printed yet, so that if a file is first loaded with warnings
+  -- turned off, and then again with warnings turned on, we print the
+  -- warnings.
   , pcConnectionCount :: !Int
   -- ^ concurrently open downloads
   }

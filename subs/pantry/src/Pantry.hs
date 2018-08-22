@@ -353,19 +353,28 @@ loadCabalFilePath
   -> RIO env (GenericPackageDescription, Path Abs File)
 loadCabalFilePath dir printWarnings = do
   ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
-  m0 <- readIORef ref
-  case Map.lookup dir m0 of
-    Just x -> return x
+  mcached <- atomicModifyIORef' ref $ \m ->
+    case (Map.lookup dir m, printWarnings) of
+      (Nothing, _) -> (m, Nothing)
+      (Just (gpd, file, warnings@(_:_)), YesPrintWarnings) ->
+        -- There are warnings and we're going to print them, so remove
+        -- from the cache.
+        (Map.insert dir (gpd, file, []) m, Just (gpd, file, warnings))
+      (Just triple, _) -> (m, Just triple)
+  case mcached of
+    Just (gpd, cabalfp, warnings) -> do
+      mapM_ (logWarn . toPretty cabalfp) warnings
+      pure (gpd, cabalfp)
     Nothing -> do
       cabalfp <- findOrGenerateCabalFile dir
       bs <- liftIO $ B.readFile $ toFilePath cabalfp
-      (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
-      case printWarnings of
-        YesPrintWarnings -> mapM_ (logWarn . toPretty cabalfp) warnings
-        NoPrintWarnings -> pure ()
+      (warnings0, gpd) <- rawParseGPD (Right cabalfp) bs
+      warnings <-
+        case printWarnings of
+          YesPrintWarnings -> mapM_ (logWarn . toPretty cabalfp) warnings0 $> warnings0
+          NoPrintWarnings -> pure warnings0
       checkCabalFileName (gpdPackageName gpd) cabalfp
-      let ret = (gpd, cabalfp)
-      atomicModifyIORef' ref $ \m -> (Map.insert dir ret m, ret)
+      atomicModifyIORef' ref $ \m -> (Map.insert dir (gpd, cabalfp, warnings) m, (gpd, cabalfp))
   where
     toPretty :: Path Abs File -> PWarning -> Utf8Builder
     toPretty src (PWarning _type pos msg) =
