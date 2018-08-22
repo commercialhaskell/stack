@@ -480,3 +480,13 @@ $ stack freeze --snapshot
 In this mode `freeze` command works almost like in the default mode, the main
 differenc is that it works with the projects snapshot definition and thus it
 pins packages from its `packages` field and not from the project's `extra-deps`.
+
+## Updating frozen information
+
+Suppose you're depending on `foo-1.2.3` from Hackage, and have used `stack
+freeze` on your file. Now you'd like to upgrade to `foo-1.2.4`. Doing so
+requires you to:
+
+* Change the version number specified to `1.2.4`
+* Remove any freeze information that may conflict, like cabal file info, pantry tree, etc
+* Rerun the `stack freeze` command to generate the new freeze information
