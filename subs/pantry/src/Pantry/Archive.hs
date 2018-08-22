@@ -56,7 +56,7 @@ getArchive
   -> RIO env Package
 getArchive pli archive pm = do
   -- Check if the value is in the archive, and use it if possible
-  mpa <- loadCache archive (pmSubdir pm)
+  mpa <- loadCache archive
   pa <-
     case mpa of
       Just pa -> pure pa
@@ -64,10 +64,10 @@ getArchive pli archive pm = do
       -- PackageMetadata for now, we'll check that the Package
       -- info matches next.
       Nothing -> withArchiveLoc archive $ \fp sha size -> do
-        pa <- parseArchive pli (archiveLocation archive) fp (pmSubdir pm)
+        pa <- parseArchive pli archive fp
         -- Storing in the cache exclusively uses information we have
         -- about the archive itself, not metadata from the user.
-        storeCache archive (pmSubdir pm) sha size pa
+        storeCache archive sha size pa
         pure pa
 
   either throwIO pure $ checkPackageMetadata pli pm pa
@@ -75,25 +75,23 @@ getArchive pli archive pm = do
 storeCache
   :: forall env. (HasPantryConfig env, HasLogFunc env)
   => Archive
-  -> Text -- ^ subdir
   -> SHA256
   -> FileSize
   -> Package
   -> RIO env ()
-storeCache archive subdir sha size pa =
+storeCache archive sha size pa =
   case archiveLocation archive of
-    ALUrl url -> withStorage $ storeArchiveCache url subdir sha size (packageTreeKey pa)
+    ALUrl url -> withStorage $ storeArchiveCache url (archiveSubdir archive) sha size (packageTreeKey pa)
     ALFilePath _ -> pure () -- TODO cache local as well
 
 loadCache
   :: forall env. (HasPantryConfig env, HasLogFunc env)
   => Archive
-  -> Text -- ^ subdir
   -> RIO env (Maybe Package)
-loadCache archive subdir =
+loadCache archive =
   case loc of
     ALFilePath _ -> pure Nothing -- TODO can we do something intelligent here?
-    ALUrl url -> withStorage (loadArchiveCache url subdir) >>= loop
+    ALUrl url -> withStorage (loadArchiveCache url (archiveSubdir archive)) >>= loop
   where
     loc = archiveLocation archive
     msha = archiveHash archive
@@ -168,7 +166,7 @@ withArchiveLoc
   => Archive
   -> (FilePath -> SHA256 -> FileSize -> RIO env a)
   -> RIO env a
-withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
+withArchiveLoc (Archive (ALFilePath resolved) msha msize _subdir) f = do
   let abs' = resolvedAbsolute resolved
       fp = toFilePath abs'
   (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
@@ -186,7 +184,7 @@ withArchiveLoc (Archive (ALFilePath resolved) msha msize) f = do
 
     pure (sha, size)
   f fp sha size
-withArchiveLoc (Archive (ALUrl url) msha msize) f =
+withArchiveLoc (Archive (ALUrl url) msha msize _subdir) f =
   withSystemTempFile "archive" $ \fp hout -> do
     logDebug $ "Downloading archive from " <> display url
     (sha, size, ()) <- httpSinkChecked url msha msize (sinkHandle hout)
@@ -307,12 +305,12 @@ data SimpleEntry = SimpleEntry
 parseArchive
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageLocationImmutable
-  -> ArchiveLocation
+  -> Archive
   -> FilePath -- ^ file holding the archive
-  -> Text -- ^ subdir, besides the single-dir stripping logic
   -> RIO env Package
-parseArchive pli loc fp subdir = do
-  let getFiles [] = throwIO $ UnknownArchiveType loc
+parseArchive pli archive fp = do
+  let loc = archiveLocation archive
+      getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
         eres <- tryAny $ foldArchive loc fp at id $ \m me -> pure $ m . (me:)
         case eres of
@@ -343,7 +341,7 @@ parseArchive pli loc fp subdir = do
     Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
-          files3 = takeSubdir subdir files2
+          files3 = takeSubdir (archiveSubdir archive) files2
           toSafe (fp', a) =
             case mkSafeFilePath fp' of
               Nothing -> Left $ "Not a safe file path: " ++ show fp'

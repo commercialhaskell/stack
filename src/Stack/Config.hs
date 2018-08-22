@@ -591,7 +591,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      (resolved,) <$> runOnce (mkLocalPackageView True resolved)
+      (resolved,) <$> runOnce (mkLocalPackageView YesPrintWarnings resolved)
 
     let deps = projectDependencies project
 
@@ -647,7 +647,7 @@ getLocalPackages = do
             packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
 
             deps <- forM (bcDependencies bc) $ \plp -> do
-              gpd <- parseCabalFile plp
+              gpd <- loadCabalFile plp
               let name = pkgName $ C.package $ C.packageDescription gpd
               pure (name, (gpd, plp))
 

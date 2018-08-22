@@ -18,7 +18,7 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Stack.Prelude hiding (Display (..))
+import           Stack.Prelude hiding (Display (..), loadPackage)
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
 import           Data.List
@@ -130,7 +130,6 @@ data Ctx = Ctx
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
-    , getVersions    :: !(PackageName -> IO (Map Version (Map Revision BlobKey)))
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -237,7 +236,6 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
-        , getVersions = runRIO econfig . getPackageVersions YesPreferredVersions
         , wanted = wantedLocalPackages locals <> extraToBuild0
         , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
@@ -609,8 +607,9 @@ addPackageDeps treatAsDep package = do
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep treatAsDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
-            getLatestApplicableVersionAndRev =
-              liftIO $ flip fmap (getVersions ctx depname) $ \vsAndRevs -> do
+            getLatestApplicableVersionAndRev = do
+              vsAndRevs <- runRIO ctx $ getHackagePackageVersions YesPreferredVersions depname
+              pure $ do
                 lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
                 revs <- Map.lookup lappVer vsAndRevs
                 (cabalHash, _) <- Map.maxView revs

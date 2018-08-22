@@ -76,7 +76,6 @@ import              Stack.Build (build)
 import              Stack.Config (loadConfig)
 import              Stack.Constants (stackProgName)
 import              Stack.Constants.Config (distRelativeDir)
-import              Pantry
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint
@@ -696,7 +695,7 @@ upgradeCabal wc upgradeTo = do
                   displayC installed <>
                   " is already installed"
         Latest -> do
-          mversion <- getLatestHackageVersion name
+          mversion <- getLatestHackageVersion name YesPreferredVersions
           case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
             Just (PackageIdentifierRevision _name latestVersion _cabalHash) -> do

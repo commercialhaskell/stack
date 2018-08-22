@@ -45,7 +45,7 @@ getRepo repo pm =
       :: RIO env Package
       -> RIO env Package
     withCache inner = do
-      mtid <- withStorage (loadRepoCache repo (pmSubdir pm))
+      mtid <- withStorage (loadRepoCache repo (repoSubdir repo))
       case mtid of
         Just tid -> withStorage $ loadPackageById tid
         Nothing -> do
@@ -54,7 +54,7 @@ getRepo repo pm =
             ment <- getTreeForKey $ packageTreeKey package
             case ment of
               Nothing -> error $ "invariant violated, Tree not found: " ++ show (packageTreeKey package)
-              Just (Entity tid _) -> storeRepoCache repo (pmSubdir pm) tid
+              Just (Entity tid _) -> storeRepoCache repo (repoSubdir repo) tid
           pure package
 
 getRepo'
@@ -62,7 +62,7 @@ getRepo'
   => Repo
   -> PackageMetadata
   -> RIO env Package
-getRepo' repo@(Repo url commit repoType') pm =
+getRepo' repo@(Repo url commit repoType' subdir) pm =
   withSystemTempDirectory "get-repo" $
   \tmpdir -> withWorkingDir tmpdir $ do
     let suffix = "cloned"
@@ -105,5 +105,6 @@ getRepo' repo@(Repo url commit repoType') pm =
             }
         , archiveHash = Nothing
         , archiveSize = Nothing
+        , archiveSubdir = subdir
         }
       pm

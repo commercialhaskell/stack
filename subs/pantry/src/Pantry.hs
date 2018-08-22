@@ -43,6 +43,10 @@ module Pantry
   , TreeKey (..)
   , BlobKey (..)
 
+    -- ** Packages
+  , PackageMetadata (..)
+  , Package (..)
+
     -- ** Hackage
   , CabalFileInfo (..)
   , Revision (..)
@@ -60,35 +64,39 @@ module Pantry
     -- ** Package location
   , PackageLocation (..)
   , PackageLocationImmutable (..)
-  , PackageMetadata (..)
 
     -- ** Snapshots
   , SnapshotLocation (..)
   , Snapshot (..)
   , WantedCompiler (..)
 
+    -- * Loading values
+  , resolvePaths
+  , loadPackage
+  , loadSnapshot
+
     -- * Completion functions
   , completePackageLocation
   , completeSnapshot
   , completeSnapshotLocation
 
-    -- ** FIXME
-  , loadPackageLocation
-  , resolvePaths
-
-    -- ** Snapshots
+    -- * Parsers
   , parseWantedCompiler
-  , loadPantrySnapshot
   , parseSnapshotLocation
-  , ltsSnapshotLocation
-  , nightlySnapshotLocation
+  , parsePackageIdentifierRevision
 
-    -- ** Cabal helpers
+    -- ** Cabal values
   , parsePackageIdentifier
   , parsePackageName
   , parseFlagName
   , parseVersion
-  , displayC
+
+    -- * Stackage snapshots
+  , ltsSnapshotLocation
+  , nightlySnapshotLocation
+
+    -- * Cabal helpers
+  , displayC -- FIXME remove
   , CabalString (..)
   , toCabalStringMap
   , unCabalStringMap
@@ -96,26 +104,25 @@ module Pantry
   , gpdPackageName
   , gpdVersion
 
-    -- ** Parsers
-  , parsePackageIdentifierRevision
-
     -- * Package location
-  , parseCabalFile
-  , parseCabalFileImmutable
-  , parseCabalFilePath
+  , fetchPackages
+  , unpackPackageLocation
   , getPackageLocationIdent
   , getPackageLocationTreeKey
 
+    -- * Cabal files
+  , loadCabalFile
+  , loadCabalFileImmutable
+  , loadCabalFilePath
+  , PrintWarnings (..)
+
     -- * Hackage index
   , updateHackageIndex
+  , DidUpdateOccur (..)
   , hackageIndexTarballL
+  , getHackagePackageVersions
   , getLatestHackageVersion
-  , typoCorrectionCandidates
-
-    -- * FIXME legacy from Stack, to be updated
-  , getPackageVersions
-  , fetchPackages
-  , unpackPackageLocation
+  , getHackageTypoCorrections
   ) where
 
 import RIO
@@ -132,7 +139,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent, parseRelFile)
+import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
@@ -210,13 +217,16 @@ defaultHackageSecurityConfig = HackageSecurityConfig
   }
 
 -- | Returns the latest version of the given package available from
--- Hackage. Uses preferred versions to ignore packages.
+-- Hackage.
+--
+-- @since 0.1.0.0
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName -- ^ package name
+  -> UsePreferredVersions
   -> RIO env (Maybe PackageIdentifierRevision)
-getLatestHackageVersion name =
-  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getPackageVersions YesPreferredVersions name
+getLatestHackageVersion name preferred =
+  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getHackagePackageVersions preferred name
   where
     go (version, m) = do
       (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m
@@ -229,6 +239,11 @@ fetchTreeKeys
 fetchTreeKeys _ =
   logWarn "Network caching not yet implemented!" -- TODO pantry wire
 
+-- | Download all of the packages provided into the local cache
+-- without performing any unpacking. Can be useful for build tools
+-- wanting to prefetch or provide an offline mode.
+--
+-- @since 0.1.0.0
 fetchPackages
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env, Foldable f)
   => f PackageLocationImmutable
@@ -251,25 +266,33 @@ fetchPackages pls = do
     go (PLIArchive archive pm) = (mempty, s (archive, pm), mempty)
     go (PLIRepo repo pm) = (mempty, mempty, s (repo, pm))
 
+-- | Unpack a given 'PackageLocationImmutable' into the given
+-- directory. Does not generate any extra subdirectories.
+--
+-- @since 0.1.0.0
 unpackPackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Path Abs Dir -- ^ unpack directory
   -> PackageLocationImmutable
   -> RIO env ()
-unpackPackageLocation fp loc = loadPackageLocation loc >>= unpackTree loc fp . packageTree
+unpackPackageLocation fp loc = loadPackage loc >>= unpackTree loc fp . packageTree
 
--- | Ignores all warnings
+-- | Load the cabal file for the given 'PackageLocationImmutable'.
+--
+-- This function ignores all warnings.
 --
 -- Note that, for now, this will not allow support for hpack files in
 -- these package locations. Instead, all @PackageLocationImmutable@s
--- will require a .cabal file.
-parseCabalFileImmutable
+-- will require a .cabal file. This may be relaxed in the future.
+--
+-- @since 0.1.0.0
+loadCabalFileImmutable
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
-parseCabalFileImmutable loc = withCache $ do
+loadCabalFileImmutable loc = withCache $ do
   logDebug $ "Parsing cabal file for " <> display loc
-  bs <- loadCabalFile loc
+  bs <- loadCabalFileBytes loc
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let pm =
@@ -277,7 +300,6 @@ parseCabalFileImmutable loc = withCache $ do
           PLIHackage (PackageIdentifierRevision name version cfi) mtree -> PackageMetadata
             { pmName = Just name
             , pmVersion = Just version
-            , pmSubdir = ""
             , pmTreeKey = mtree
             , pmCabal =
                 case cfi of
@@ -302,23 +324,34 @@ parseCabalFileImmutable loc = withCache $ do
           x <- inner
           atomicModifyIORef' ref $ \m -> (Map.insert loc x m, x)
 
--- | Same as 'parseCabalFileRemote', but takes a
--- 'PackageLocation'. Never prints warnings, see
--- 'parseCabalFilePath' for that.
-parseCabalFile
+-- | Same as 'loadCabalFileImmutable', but takes a
+-- 'PackageLocation'. Never prints warnings, see 'loadCabalFilePath'
+-- for that.
+--
+-- @since 0.1.0.0
+loadCabalFile
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocation
   -> RIO env GenericPackageDescription
-parseCabalFile (PLImmutable loc) = parseCabalFileImmutable loc
-parseCabalFile (PLMutable rfp) = fst <$> parseCabalFilePath (resolvedAbsolute rfp) False
+loadCabalFile (PLImmutable loc) = loadCabalFileImmutable loc
+loadCabalFile (PLMutable rfp) = fst <$> loadCabalFilePath (resolvedAbsolute rfp) NoPrintWarnings
 
--- | Read the raw, unresolved package information from a file.
-parseCabalFilePath
+-- | Should we print warnings when loading a cabal file?
+--
+-- @since 0.1.0.0
+data PrintWarnings = YesPrintWarnings | NoPrintWarnings
+
+-- | Parse the cabal file for the package inside the given
+-- directory. Performs various sanity checks, such as the file name
+-- being correct and having only a single cabal file.
+--
+-- @since 0.1.0.0
+loadCabalFilePath
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Path Abs Dir -- ^ project directory, with a cabal file or hpack file
-  -> Bool -- ^ print warnings?
+  -> PrintWarnings
   -> RIO env (GenericPackageDescription, Path Abs File)
-parseCabalFilePath dir printWarnings = do
+loadCabalFilePath dir printWarnings = do
   ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
   m0 <- readIORef ref
   case Map.lookup dir m0 of
@@ -327,8 +360,9 @@ parseCabalFilePath dir printWarnings = do
       cabalfp <- findOrGenerateCabalFile dir
       bs <- liftIO $ B.readFile $ toFilePath cabalfp
       (warnings, gpd) <- rawParseGPD (Right cabalfp) bs
-      when printWarnings
-        $ mapM_ (logWarn . toPretty cabalfp) warnings
+      case printWarnings of
+        YesPrintWarnings -> mapM_ (logWarn . toPretty cabalfp) warnings
+        NoPrintWarnings -> pure ()
       checkCabalFileName (gpdPackageName gpd) cabalfp
       let ret = (gpd, cabalfp)
       atomicModifyIORef' ref $ \m -> (Map.insert dir ret m, ret)
@@ -421,16 +455,25 @@ hpack pkgDir = do
                 withWorkingDir (toFilePath pkgDir) $
                 proc command [] runProcess_
 
+-- | Get the 'PackageIdentifier' from a 'GenericPackageDescription'.
+--
+-- @since 0.1.0.0
 gpdPackageIdentifier :: GenericPackageDescription -> PackageIdentifier
 gpdPackageIdentifier = D.package . D.packageDescription
 
+-- | Get the 'PackageName' from a 'GenericPackageDescription'.
+--
+-- @since 0.1.0.0
 gpdPackageName :: GenericPackageDescription -> PackageName
 gpdPackageName = pkgName . gpdPackageIdentifier
 
+-- | Get the 'Version' from a 'GenericPackageDescription'.
+--
+-- @since 0.1.0.0
 gpdVersion :: GenericPackageDescription -> Version
 gpdVersion = pkgVersion . gpdPackageIdentifier
 
-loadCabalFile
+loadCabalFileBytes
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env ByteString
@@ -438,10 +481,10 @@ loadCabalFile
 -- Just ignore the mtree for this. Safe assumption: someone who filled
 -- in the TreeKey also filled in the cabal file hash, and that's a
 -- more efficient lookup mechanism.
-loadCabalFile (PLIHackage pir _mtree) = getHackageCabalFile pir
+loadCabalFileBytes (PLIHackage pir _mtree) = getHackageCabalFile pir
 
-loadCabalFile pl = do
-  package <- loadPackageLocation pl
+loadCabalFileBytes pl = do
+  package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
       TreeEntry cabalBlobKey _ft = packageCabalEntry package
   mbs <- withStorage $ loadBlob cabalBlobKey
@@ -451,15 +494,20 @@ loadCabalFile pl = do
       throwIO $ TreeReferencesMissingBlob pl sfp cabalBlobKey
     Just bs -> pure bs
 
-loadPackageLocation
+-- | Load a 'Package' from a 'PackageLocationImmutable'.
+--
+-- @since 0.1.0.0
+loadPackage
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env Package
-loadPackageLocation (PLIHackage pir mtree) = getHackageTarball pir mtree
-loadPackageLocation pli@(PLIArchive archive pm) = getArchive pli archive pm
-loadPackageLocation (PLIRepo repo pm) = getRepo repo pm
+loadPackage (PLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackage pli@(PLIArchive archive pm) = getArchive pli archive pm
+loadPackage (PLIRepo repo pm) = getRepo repo pm
 
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
+--
+-- @since 0.1.0.0
 completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
@@ -490,10 +538,10 @@ completeArchive
   :: (HasPantryConfig env, HasLogFunc env)
   => Archive
   -> RIO env Archive
-completeArchive a@(Archive _ (Just _) (Just _)) = pure a
-completeArchive a@(Archive loc _ _) =
+completeArchive a@(Archive _ (Just _) (Just _) _) = pure a
+completeArchive a@(Archive loc _ _ subdir) =
   withArchiveLoc a $ \_fp sha size ->
-  pure $ Archive loc (Just sha) (Just size)
+  pure $ Archive loc (Just sha) (Just size) subdir
 
 completePM
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -503,13 +551,12 @@ completePM
 completePM plOrig pm
   | isCompletePM pm = pure pm
   | otherwise = do
-      package <- loadPackageLocation plOrig
+      package <- loadPackage plOrig
       let pmNew = PackageMetadata
             { pmName = Just $ pkgName $ packageIdent package
             , pmVersion = Just $ pkgVersion $ packageIdent package
             , pmTreeKey = Just $ packageTreeKey package
             , pmCabal = Just $ teBlob $ packageCabalEntry package
-            , pmSubdir = pmSubdir pm
             }
 
           isSame (Just x) (Just y) = x == y
@@ -524,9 +571,12 @@ completePM plOrig pm
         then pure pmNew
         else throwIO $ CompletePackageMetadataMismatch plOrig pmNew
   where
-    isCompletePM (PackageMetadata (Just _) (Just _) (Just _) (Just _) _) = True
+    isCompletePM (PackageMetadata (Just _) (Just _) (Just _) (Just _)) = True
     isCompletePM _ = False
 
+-- | Add in hashes to make a 'SnapshotLocation' reproducible.
+--
+-- @since 0.1.0.0
 completeSnapshotLocation
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
@@ -540,6 +590,8 @@ completeSnapshotLocation (SLUrl url Nothing) = do
   pure $ SLUrl url (Just blobKey)
 
 -- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
+--
+-- @since 0.1.0.0
 completeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Snapshot
@@ -622,18 +674,25 @@ traverseConcurrentlyWith count f t0 = do
             loop
   sequence t1
 
-loadPantrySnapshot
+-- | Parse a snapshot value from a 'SnapshotLocation'.
+--
+-- Returns a 'Left' value if provided an 'SLCompiler'
+-- constructor. Otherwise, returns a 'Right' value providing both the
+-- 'Snapshot' and a hash of the input configuration file.
+--
+-- @since 0.1.0.0
+loadSnapshot
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
   -> RIO env (Either WantedCompiler (Snapshot, SHA256))
-loadPantrySnapshot (SLCompiler compiler) = pure $ Left compiler
-loadPantrySnapshot sl@(SLUrl url mblob) =
+loadSnapshot (SLCompiler compiler) = pure $ Left compiler
+loadSnapshot sl@(SLUrl url mblob) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url mblob
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelper sl value Nothing
     pure $ Right (snapshot, SHA256.hashBytes bs)
-loadPantrySnapshot sl@(SLFilePath fp) =
+loadSnapshot sl@(SLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
@@ -686,14 +745,21 @@ warningsParserHelper sl val mdir =
         for_ ws $ logWarn . display
       resolvePaths mdir x
 
--- | Get the name of the package at the given location.
+-- | Get the 'PackageIdentifier' of the package at the given location.
+--
+-- @since 0.1.0.0
 getPackageLocationIdent
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env PackageIdentifier
 getPackageLocationIdent (PLIHackage (PackageIdentifierRevision name version _) _) = pure $ PackageIdentifier name version
-getPackageLocationIdent pli = packageIdent <$> loadPackageLocation pli
+getPackageLocationIdent (PLIRepo _ PackageMetadata { pmName = Just name, pmVersion = Just version }) = pure $ PackageIdentifier name version
+getPackageLocationIdent (PLIArchive _ PackageMetadata { pmName = Just name, pmVersion = Just version }) = pure $ PackageIdentifier name version
+getPackageLocationIdent pli = packageIdent <$> loadPackage pli
 
+-- | Get the 'TreeKey' of the package at the given location.
+--
+-- @since 0.1.0.0
 getPackageLocationTreeKey
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable

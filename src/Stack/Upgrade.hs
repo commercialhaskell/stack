@@ -218,7 +218,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
       Nothing -> do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
-        mversion <- getLatestHackageVersion "stack"
+        mversion <- getLatestHackageVersion "stack" YesPreferredVersions
         pir@(PackageIdentifierRevision _ version _) <-
           case mversion of
             Nothing -> throwString "No stack found in package indices"

@@ -40,6 +40,7 @@ import           Network.HTTP.Download (download, redownload)
 import           Network.HTTP.StackClient (Request, parseRequest)
 import qualified RIO
 import           Data.ByteString.Builder (toLazyByteString)
+import qualified Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Package
 import           Stack.PackageDump
@@ -133,7 +134,7 @@ loadResolver
   -> RIO env SnapshotDef
 loadResolver (SLCompiler c1) (Just c2) = throwIO $ InvalidOverrideCompiler c1 c2
 loadResolver sl mcompiler = do
-  esnap <- loadPantrySnapshot sl
+  esnap <- Pantry.loadSnapshot sl
   (compiler, msnap, uniqueHash) <-
     case esnap of
       Left compiler -> pure (compiler, Nothing, mkUniqueHash compiler)
@@ -200,7 +201,7 @@ loadSnapshot mcompiler =
 
     inner2 snap ls0 = do
       gpds <-
-        forM (snapshotLocations snap) $ \loc -> (, PLImmutable loc) <$> parseCabalFileImmutable loc
+        forM (snapshotLocations snap) $ \loc -> (, PLImmutable loc) <$> loadCabalFileImmutable loc
 
       (globals, snapshot, locals) <-
         calculatePackagePromotion ls0
@@ -340,7 +341,7 @@ recalculate compilerVersion allFlags allHide allOptions (name, lpi0) = do
     Nothing -> return (name, lpi0 { lpiHide = hide, lpiGhcOptions = options }) -- optimization
     Just flags -> do
       let loc = lpiLocation lpi0
-      gpd <- parseCabalFile loc
+      gpd <- loadCabalFile loc
       platform <- view platformL
       let res@(name', lpi) = calculate gpd platform compilerVersion loc flags hide options
       unless (name == name' && lpiVersion lpi0 == lpiVersion lpi) $ error "recalculate invariant violated"

@@ -168,7 +168,7 @@ getCabalLbs :: HasEnvConfig env
             -> Path Abs File -- ^ cabal file
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp = do
-    (gpd, cabalfp') <- parseCabalFilePath (parent cabalfp) False
+    (gpd, cabalfp') <- loadCabalFilePath (parent cabalfp) NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -296,7 +296,7 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     config  <- getDefaultPackageConfig
-    (package, cabalfp) <- readPackageDir config pkgDir True
+    (package, cabalfp) <- readPackageDir config pkgDir YesPrintWarnings
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
@@ -400,10 +400,10 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    (gpd, _cabalfp) <- parseCabalFilePath pkgDir True
+    (gpd, _cabalfp) <- loadCabalFilePath pkgDir YesPrintWarnings
     let name = gpdPackageName gpd
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir NoPrintWarnings
     logInfo $
         "Checking package '" <> displayC name <> "' for common mistakes"
     let pkgChecks =
@@ -444,7 +444,7 @@ buildExtractedTarball pkgDir = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
   pathsToKeep <- filterM (fmap not . isPathToRemove . resolvedAbsolute . fst) allPackagePaths
-  getLPV <- runOnce $ mkLocalPackageView True pkgDir
+  getLPV <- runOnce $ mkLocalPackageView YesPrintWarnings pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig

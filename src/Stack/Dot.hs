@@ -32,7 +32,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
-import           Stack.Prelude hiding (Display (..), pkgName)
+import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
 import qualified Stack.Prelude (pkgName)
 import           Stack.Types.Build
 import           Stack.Types.Config

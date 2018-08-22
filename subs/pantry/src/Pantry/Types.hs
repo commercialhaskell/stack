@@ -122,9 +122,23 @@ import qualified Data.List.NonEmpty as NE
 -- @since 0.1.0.0
 data Package = Package
   { packageTreeKey :: !TreeKey
+  -- ^ The 'TreeKey' containing this package.
+  --
+  -- This is a hash of the binary representation of 'packageTree'.
+  --
+  -- @since 0.1.0.0
   , packageTree :: !Tree
+  -- ^ The 'Tree' containing this package.
+  --
+  -- @since 0.1.0.0
   , packageCabalEntry :: !TreeEntry
+  -- ^ Information on the cabal file inside this package.
+  --
+  -- @since 0.1.0.0
   , packageIdent :: !PackageIdentifier
+  -- ^ The package name and version in this package.
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq)
 
@@ -134,6 +148,12 @@ cabalFileName name =
     Nothing -> error $ "cabalFileName: failed for " ++ show name
     Just sfp -> sfp
 
+-- | The revision number of a package from Hackage, counting upwards
+-- from 0 (the original cabal file).
+--
+-- See caveats on 'CFIRevision'.
+--
+-- @since 0.1.0.0
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
 
@@ -164,6 +184,8 @@ data PantryConfig = PantryConfig
 -- | Wraps a value which potentially contains relative paths. Needs to
 -- be provided with a base directory to resolve these paths.
 --
+-- Unwrap this using 'resolvePaths'.
+--
 -- @since 0.1.0.0
 newtype Unresolved a = Unresolved (Maybe (Path Abs Dir) -> IO a)
   deriving Functor
@@ -182,19 +204,25 @@ resolvePaths
   -> m a
 resolvePaths mdir (Unresolved f) = liftIO (f mdir)
 
--- | A directory which was loaded up relative and has been resolved
--- against the config file it came from.
+-- | A combination of the relative path provided in a config file,
+-- together with the resolved absolute path.
+--
+-- @since 0.1.0.0
 data ResolvedPath t = ResolvedPath
   { resolvedRelative :: !RelFilePath
   -- ^ Original value parsed from a config file.
   , resolvedAbsolute :: !(Path Abs t)
+  -- ^ Absolute path resolved against base directory loaded from.
   }
   deriving (Show, Eq, Data, Generic, Ord)
 instance NFData (ResolvedPath t)
 instance (Generic t, Store t) => Store (ResolvedPath t)
 
--- | Either an immutable package location or a local package directory which is
--- a subject to change.
+-- | Location to load a package from. Can either be immutable (see
+-- 'PackageLocationImmutable') or a local directory which is expected
+-- to change over time.
+--
+-- @since 0.1.0.0
 data PackageLocation
   = PLImmutable !PackageLocationImmutable
   | PLMutable !(ResolvedPath Dir)
@@ -207,6 +235,8 @@ instance Display PackageLocation where
   display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
 
 -- | Location for remote packages or archives assumed to be immutable.
+--
+-- @since 0.1.0.0
 data PackageLocationImmutable
   = PLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
   | PLIArchive !Archive !PackageMetadata
@@ -217,31 +247,48 @@ instance Store PackageLocationImmutable
 
 instance Display PackageLocationImmutable where
   display (PLIHackage pir _tree) = display pir <> " (from Hackage)"
-  display (PLIArchive archive pm) =
+  display (PLIArchive archive _pm) =
     "Archive from " <> display (archiveLocation archive) <>
-    (if T.null $ pmSubdir pm
+    (if T.null $ archiveSubdir archive
        then mempty
-       else " in subdir " <> display (pmSubdir pm))
-  display (PLIRepo repo pm) =
+       else " in subdir " <> display (archiveSubdir archive))
+  display (PLIRepo repo _pm) =
     "Repo from " <> display (repoUrl repo) <>
     ", commit " <> display (repoCommit repo) <>
-    (if T.null $ pmSubdir pm
+    (if T.null $ repoSubdir repo
        then mempty
-       else " in subdir " <> display (pmSubdir pm))
+       else " in subdir " <> display (repoSubdir repo))
 
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
 -- over time, and so are allowed in custom snapshots.
+--
+-- @since 0.1.0.0
 data Archive = Archive
   { archiveLocation :: !ArchiveLocation
+  -- ^ Location of the archive
+  --
+  -- @since 0.1.0.0
   , archiveHash :: !(Maybe SHA256)
+  -- ^ Cryptographic hash of the archive file
+  --
+  -- @since 0.1.0.0
   , archiveSize :: !(Maybe FileSize)
+  -- ^ Size of the archive file
+  --
+  -- @since 0.1.0.0
+  , archiveSubdir :: !Text
+  -- ^ Subdirectory within the archive to get the package from.
+  --
+  -- @since 0.1.0.0
   }
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store Archive
 instance NFData Archive
 
 -- | The type of a source control repository.
+--
+-- @since 0.1.0.0
 data RepoType = RepoGit | RepoHg
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store RepoType
@@ -259,25 +306,44 @@ instance PersistFieldSql RepoType where
   sqlType _ = SqlInt32
 
 -- | Information on packages stored in a source control repository.
+--
+-- @since 0.1.0.0
 data Repo = Repo
-    { repoUrl :: !Text
-    , repoCommit :: !Text
-    , repoType :: !RepoType
-    }
+  { repoUrl :: !Text
+    -- ^ Location of the repo
+    --
+    -- @since 0.1.0.0
+  , repoCommit :: !Text
+    -- ^ Commit to use from the repo. It's strongly recommended to use
+    -- a hash instead of a tag or branch name.
+    --
+    -- @since 0.1.0.0
+  , repoType :: !RepoType
+    -- ^ The type of the repo
+    --
+    -- @since 0.1.0.0
+  , repoSubdir :: !Text
+  -- ^ Subdirectory within the archive to get the package from.
+  --
+  -- @since 0.1.0.0
+  }
     deriving (Generic, Eq, Ord, Data, Typeable)
 instance Store Repo
 instance NFData Repo
 instance Show Repo where
   show = T.unpack . utf8BuilderToText . display
 instance Display Repo where
-  display (Repo url commit typ) =
+  display (Repo url commit typ subdir) =
     (case typ of
        RepoGit -> "Git"
        RepoHg -> "Mercurial") <>
     " repo at " <>
     display url <>
     ", commit " <>
-    display commit
+    display commit <>
+    (if T.null subdir
+      then mempty
+      else " in subdirectory " <> display subdir)
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
@@ -323,9 +389,20 @@ class HasPantryConfig env where
   pantryConfigL :: Lens' env PantryConfig
 
 -- | File size in bytes
+--
+-- @since 0.1.0.0
 newtype FileSize = FileSize Word
   deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, ToJSON, FromJSON)
 
+-- | A key for looking up a blob, which combines the SHA256 hash of
+-- the contents and the file size.
+--
+-- The file size may seem redundant with the hash. However, it is
+-- necessary for safely downloading blobs from an untrusted
+-- source. See
+-- <https://www.fpcomplete.com/blog/2018/07/pantry-part-2-trees-keys>.
+--
+-- @since 0.1.0.0
 data BlobKey = BlobKey !SHA256 !FileSize
   deriving (Eq, Ord, Data, Typeable, Generic)
 instance Store BlobKey
@@ -371,22 +448,33 @@ instance PersistField VersionP where
 instance PersistFieldSql VersionP where
   sqlType _ = SqlString
 
--- | Information on the contents of a cabal file
+-- | How to choose a cabal file for a package from Hackage. This is to
+-- work with Hackage cabal file revisions, which makes
+-- @PackageIdentifier@ insufficient for specifying a package from
+-- Hackage.
+--
+-- @since 0.1.0.0
 data CabalFileInfo
   = CFILatest
   -- ^ Take the latest revision of the cabal file available. This
   -- isn't reproducible at all, but the running assumption (not
   -- necessarily true) is that cabal file revisions do not change
   -- semantics of the build.
+  --
+  -- @since 0.1.0.0
   | CFIHash !SHA256 !(Maybe FileSize)
   -- ^ Identify by contents of the cabal file itself. Only reason for
   -- @Maybe@ on @FileSize@ is for compatibility with input that
   -- doesn't include the file size.
+  --
+  -- @since 0.1.0.0
   | CFIRevision !Revision
   -- ^ Identify by revision number, with 0 being the original and
   -- counting upward. This relies on Hackage providing consistent
   -- versioning. @CFIHash@ should be preferred wherever possible for
   -- reproducibility.
+  --
+  -- @since 0.1.0.0
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store CabalFileInfo
 instance NFData CabalFileInfo
@@ -398,6 +486,11 @@ instance Display CabalFileInfo where
     "@sha256:" <> display hash' <> maybe mempty (\i -> "," <> display i) msize
   display (CFIRevision rev) = "@rev:" <> display rev
 
+-- | A full specification for a package from Hackage, including the
+-- package name, version, and how to load up the correct cabal file
+-- revision.
+--
+-- @since 0.1.0.0
 data PackageIdentifierRevision = PackageIdentifierRevision !PackageName !Version !CabalFileInfo
   deriving (Generic, Eq, Ord, Data, Typeable)
 instance NFData PackageIdentifierRevision
@@ -418,8 +511,10 @@ instance FromJSON PackageIdentifierRevision where
       Right pir -> pure pir
 
 -- | Parse a 'PackageIdentifierRevision'
-parsePackageIdentifierRevision :: MonadThrow m => Text -> m PackageIdentifierRevision
-parsePackageIdentifierRevision t = maybe (throwM $ PackageIdentifierRevisionParseFail t) pure $ do
+--
+-- @since 0.1.0.0
+parsePackageIdentifierRevision :: Text -> Either PantryException PackageIdentifierRevision
+parsePackageIdentifierRevision t = maybe (Left $ PackageIdentifierRevisionParseFail t) Right $ do
   let (identT, cfiT) = T.break (== '@') t
   PackageIdentifier name version <- parsePackageIdentifier $ T.unpack identT
   cfi <-
@@ -452,6 +547,18 @@ data Mismatch a = Mismatch
   , mismatchActual :: !a
   }
 
+-- | Things that can go wrong in pantry. Note two things:
+--
+-- * Many other exception types may be thrown from underlying
+--   libraries. Pantry does not attempt to wrap these underlying
+--   exceptions.
+--
+-- * We may add more constructors to this data type in minor version
+--   bumps of pantry. This technically breaks the PVP. You should not
+--   be writing pattern matches against this type that expect total
+--   matching.
+--
+-- @since 0.1.0.0
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
@@ -749,9 +856,16 @@ mkSafeFilePath t = do
 
   Just $ SafeFilePath t
 
+-- | The hash of the binary representation of a 'Tree'.
+--
+-- @since 0.1.0.0
 newtype TreeKey = TreeKey BlobKey
   deriving (Show, Eq, Ord, Generic, Data, Typeable, ToJSON, FromJSON, NFData, Store, Display)
 
+-- | Represents the contents of a tree, which is a mapping from
+-- relative file paths to 'TreeEntry's.
+--
+-- @since 0.1.0.0
 newtype Tree
   = TreeMap (Map SafeFilePath TreeEntry)
   -- In the future, consider allowing more lax parsing
@@ -854,6 +968,8 @@ data PackageTarball = PackageTarball
 -- | This is almost a copy of Cabal's parser for package identifiers,
 -- the main difference is in the fact that Stack requires version to be
 -- present while Cabal uses "null version" as a defaul value
+--
+-- @since 0.1.0.0
 parsePackageIdentifier :: String -> Maybe PackageIdentifier
 parsePackageIdentifier str =
     case [p | (p, s) <- Parse.readP_to_S parser str, all isSpace s] of
@@ -866,35 +982,69 @@ parsePackageIdentifier str =
         v <- Parse.char '-' >> Distribution.Text.parse
         return (PackageIdentifier n v)
 
+-- | Parse a package name from a 'String'.
+--
+-- @since 0.1.0.0
 parsePackageName :: String -> Maybe PackageName
 parsePackageName = Distribution.Text.simpleParse
 
+-- | Parse a version from a 'String'.
+--
+-- @since 0.1.0.0
 parseVersion :: String -> Maybe Version
 parseVersion = Distribution.Text.simpleParse
 
+-- | Parse a version range from a 'String'.
+--
+-- @since 0.1.0.0
 parseVersionRange :: String -> Maybe VersionRange
 parseVersionRange = Distribution.Text.simpleParse
 
+-- | Parse a flag name from a 'String'.
+--
+-- @since 0.1.0.0
 parseFlagName :: String -> Maybe FlagName
 parseFlagName = Distribution.Text.simpleParse
 
 -- | Display Cabal types using 'Distribution.Text.Text'.
+--
+-- FIXME this should be removed and replaced with monomorphic functions for safety.
+--
+-- @since 0.1.0.0
 displayC :: (IsString str, Distribution.Text.Text a) => a -> str
 displayC = fromString . Distribution.Text.display
 
 data OptionalSubdirs
-  = OSSubdirs !Text ![Text] -- non-empty list
-  | OSPackageMetadata !PackageMetadata
+  = OSSubdirs !(NonEmpty Text)
+  | OSPackageMetadata !Text !PackageMetadata
+  -- ^ subdirectory and package metadata
   deriving (Show, Eq, Data, Generic)
 instance NFData OptionalSubdirs
 instance Store OptionalSubdirs
 
+-- | Metadata provided by a config file for archives and repos. This
+-- information can be used for optimized lookups of information like
+-- package identifiers, or for validating that the user configuration
+-- has the expected information.
+--
+-- @since 0.1.0.0
 data PackageMetadata = PackageMetadata
   { pmName :: !(Maybe PackageName)
+    -- ^ Package name in the cabal file
+    --
+    -- @since 0.1.0.0
   , pmVersion :: !(Maybe Version)
+    -- ^ Package version in the cabal file
+    --
+    -- @since 0.1.0.0
   , pmTreeKey :: !(Maybe TreeKey)
+    -- ^ Tree key of the loaded up package
+    --
+    -- @since 0.1.0.0
   , pmCabal :: !(Maybe BlobKey)
-  , pmSubdir :: !Text
+    -- ^ Blob key containing the cabal file
+    --
+    -- @since 0.1.0.0
   }
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
 instance Store PackageMetadata
@@ -906,18 +1056,26 @@ instance Display PackageMetadata where
     , (\version -> "version == " <> displayC version) <$> pmVersion pm
     , (\tree -> "tree == " <> display tree) <$> pmTreeKey pm
     , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
-    , if T.null $ pmSubdir pm
-        then Nothing
-        else Just ("subdir == " <> display (pmSubdir pm))
     ]
 
 -- | File path relative to the configuration file it was parsed from
+--
+-- @since 0.1.0.0
 newtype RelFilePath = RelFilePath Text
   deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Data, Typeable, Store, NFData, Display)
 
+-- | Location that an archive is stored at
+--
+-- @since 0.1.0.0
 data ArchiveLocation
   = ALUrl !Text
+    -- ^ Archive stored at an HTTP(S) URL
+    --
+    -- @since 0.1.0.0
   | ALFilePath !(ResolvedPath File)
+    -- ^ Archive stored at a local file path
+    --
+    -- @since 0.1.0.0
   deriving (Show, Eq, Ord, Generic, Data, Typeable)
 instance Store ArchiveLocation
 instance NFData ArchiveLocation
@@ -958,34 +1116,36 @@ instance FromJSON (Unresolved ArchiveLocation) where
 instance ToJSON PackageLocation where
   toJSON (PLImmutable pli) = toJSON pli
   toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
-instance FromJSON (WithJSONWarnings (Unresolved [PackageLocation])) where
+instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocation))) where
   parseJSON v =
     ((fmap.fmap.fmap.fmap) PLImmutable (parseJSON v)) <|>
     ((noJSONWarnings . mkMutable) <$> parseJSON v)
     where
-      mkMutable :: Text -> Unresolved [PackageLocation]
+      mkMutable :: Text -> Unresolved (NonEmpty PackageLocation)
       mkMutable t = Unresolved $ \mdir -> do
         case mdir of
           Nothing -> throwIO $ MutablePackageLocationFromUrl t
           Just dir -> do
             abs' <- resolveDir dir $ T.unpack t
-            pure [PLMutable $ ResolvedPath (RelFilePath t) abs']
+            pure $ pure $ PLMutable $ ResolvedPath (RelFilePath t) abs'
 
 instance ToJSON PackageLocationImmutable where
   toJSON (PLIHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
-  toJSON (PLIArchive (Archive loc msha msize) pm) = object $ concat
+  toJSON (PLIArchive (Archive loc msha msize subdir) pm) = object $ concat
     [ ["location" .= loc]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size " .= size']) msize
+    , if T.null subdir then [] else ["subdir" .= subdir]
     , pmToPairs pm
     ]
-  toJSON (PLIRepo (Repo url commit typ) pm) = object $ concat
+  toJSON (PLIRepo (Repo url commit typ subdir) pm) = object $ concat
     [ [ urlKey .= url
       , "commit" .= commit
       ]
+    , if T.null subdir then [] else ["subdir" .= subdir]
     , pmToPairs pm
     ]
     where
@@ -995,17 +1155,14 @@ instance ToJSON PackageLocationImmutable where
           RepoHg  -> "hg"
 
 pmToPairs :: PackageMetadata -> [(Text, Value)]
-pmToPairs (PackageMetadata mname mversion mtree mcabal subdir) = concat
+pmToPairs (PackageMetadata mname mversion mtree mcabal) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
-  , if T.null subdir
-      then []
-      else ["subdir" .= subdir]
   ]
 
-instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) where
+instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) where
   parseJSON v
       = http v
     <|> hackageText v
@@ -1015,18 +1172,20 @@ instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) whe
     <|> github v
     <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
     where
+      http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
       http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t -> do
         Unresolved mkArchiveLocation <- parseJSON $ String t
         pure $ noJSONWarnings $ Unresolved $ \mdir -> do
           archiveLocation <- mkArchiveLocation mdir
           let archiveHash = Nothing
               archiveSize = Nothing
-          pure [PLIArchive Archive {..} (PackageMetadata Nothing Nothing Nothing Nothing T.empty)]
+              archiveSubdir = T.empty
+          pure $ pure $ PLIArchive Archive {..} pmEmpty
 
       hackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
           Left e -> fail $ show e
-          Right pir -> pure $ noJSONWarnings $ pure [PLIHackage pir Nothing]
+          Right pir -> pure $ noJSONWarnings $ pure $ pure $ PLIHackage pir Nothing
 
       hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure.pure) <$> (PLIHackage
         <$> o ..: "hackage"
@@ -1039,15 +1198,16 @@ instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) whe
           Just v' -> do
             tellJSONField "subdirs"
             subdirs <- lift $ parseJSON v'
-            case subdirs of
-              [] -> fail "Invalid empty subdirs"
-              x:xs -> pure $ OSSubdirs x xs
-          Nothing -> OSPackageMetadata <$> (PackageMetadata
-            <$> (fmap unCabalString <$> (o ..:? "name"))
-            <*> (fmap unCabalString <$> (o ..:? "version"))
-            <*> o ..:? "pantry-tree"
-            <*> o ..:? "cabal-file"
-            <*> o ..:? "subdir" ..!= T.empty)
+            case NE.nonEmpty subdirs of
+              Nothing -> fail "Invalid empty subdirs"
+              Just x -> pure $ OSSubdirs x
+          Nothing -> OSPackageMetadata
+            <$> o ..:? "subdir" ..!= T.empty
+            <*> (PackageMetadata
+                  <$> (fmap unCabalString <$> (o ..:? "name"))
+                  <*> (fmap unCabalString <$> (o ..:? "version"))
+                  <*> o ..:? "pantry-tree"
+                  <*> o ..:? "cabal-file")
 
       repo = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIRepo" $ \o -> do
         (repoType, repoUrl) <-
@@ -1055,7 +1215,7 @@ instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) whe
           ((RepoHg, ) <$> o ..: "hg")
         repoCommit <- o ..: "commit"
         os <- optionalSubdirs o
-        pure $ pure $ map (PLIRepo Repo {..}) (osToPms os)
+        pure $ pure $ NE.map (\(repoSubdir, pm) -> PLIRepo Repo {..} pm) (osToPms os)
 
       archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
         Unresolved mkArchiveLocation <- o ..: "archive" <|> o ..: "location" <|> o ..: "url"
@@ -1064,7 +1224,7 @@ instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) whe
         os <- optionalSubdirs o
         pure $ Unresolved $ \mdir -> do
           archiveLocation <- mkArchiveLocation mdir
-          pure $ map (PLIArchive Archive {..}) (osToPms os)
+          pure $ NE.map (\(archiveSubdir, pm) -> PLIArchive Archive {..} pm) (osToPms os)
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
@@ -1079,21 +1239,36 @@ instance FromJSON (WithJSONWarnings (Unresolved [PackageLocationImmutable])) whe
         archiveHash <- o ..:? "sha256"
         archiveSize <- o ..:? "size"
         os <- optionalSubdirs o
-        pure $ pure $ map (PLIArchive Archive {..}) (osToPms os)
+        pure $ pure $ NE.map (\(archiveSubdir, pm) -> PLIArchive Archive {..} pm) (osToPms os)
 
-osToPms :: OptionalSubdirs -> [PackageMetadata]
-osToPms (OSSubdirs x xs) = map (PackageMetadata Nothing Nothing Nothing Nothing) (x:xs)
-osToPms (OSPackageMetadata pm) = [pm]
+-- | Returns pairs of subdirectory and 'PackageMetadata'.
+osToPms :: OptionalSubdirs -> NonEmpty (Text, PackageMetadata)
+osToPms (OSSubdirs subdirs) = NE.map (, pmEmpty) subdirs
+osToPms (OSPackageMetadata subdir pm) = pure (subdir, pm)
+
+pmEmpty :: PackageMetadata
+pmEmpty = PackageMetadata Nothing Nothing Nothing Nothing
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.
+--
+-- @since 0.1.0.0
 newtype CabalString a = CabalString { unCabalString :: a }
   deriving (Show, Eq, Ord, Typeable)
 
 -- I'd like to use coerce here, but can't due to roles. unsafeCoerce
 -- could work, but let's avoid unsafe code.
+
+-- | Wrap the keys in a 'Map' with a 'CabalString' to get a 'ToJSON'
+-- instance.
+--
+-- @since 0.1.0.0
 toCabalStringMap :: Map a v -> Map (CabalString a) v
 toCabalStringMap = Map.mapKeysMonotonic CabalString
 
+-- | Unwrap the 'CabalString' from the keys in a 'Map' to use a
+-- 'FromJSON' instance.
+--
+-- @since 0.1.0.0
 unCabalStringMap :: Map (CabalString a) v -> Map a v
 unCabalStringMap = Map.mapKeysMonotonic unCabalString
 
@@ -1137,16 +1312,27 @@ instance IsCabalString FlagName where
   cabalStringName _ = "flag name"
   cabalStringParser = parseFlagName
 
+-- | What to use for running hpack
+--
+-- @since 0.1.0.0
 data HpackExecutable
     = HpackBundled
-    | HpackCommand String
+    -- ^ Compiled in library
+    | HpackCommand !FilePath
+    -- ^ Executable at the provided path
     deriving (Show, Read, Eq, Ord)
 
+-- | Which compiler a snapshot wants to use. The build tool may elect
+-- to do some fuzzy matching of versions (e.g., allowing different
+-- patch versions).
+--
+-- @since 0.1.0.0
 data WantedCompiler
   = WCGhc !Version
   | WCGhcjs
-      !Version -- GHCJS version
-      !Version -- GHC version
+      !Version
+      !Version
+    -- ^ GHCJS version followed by GHC version
  deriving (Show, Eq, Ord, Data, Generic)
 instance NFData WantedCompiler
 instance Store WantedCompiler
@@ -1164,6 +1350,9 @@ instance FromJSONKey WantedCompiler where
       Left e -> fail $ "Invalid WantedComiler " ++ show t ++ ": " ++ show e
       Right x -> pure x
 
+-- | Parse a 'Text' into a 'WantedCompiler' value.
+--
+-- @since 0.1.0.0
 parseWantedCompiler :: Text -> Either PantryException WantedCompiler
 parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
   case T.stripPrefix "ghcjs-" t0 of
@@ -1196,6 +1385,9 @@ instance Display SnapshotLocation where
   display (SLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
   display (SLFilePath resolved) = display (resolvedRelative resolved)
 
+-- | Parse a 'Text' into an 'Unresolved' 'SnapshotLocation'.
+--
+-- @since 0.1.0.0
 parseSnapshotLocation :: Text -> Unresolved SnapshotLocation
 parseSnapshotLocation t0 = fromMaybe (parseSnapshotLocationPath t0) $
   (either (const Nothing) (Just . pure . SLCompiler) (parseWantedCompiler t0)) <|>
@@ -1275,10 +1467,24 @@ nightlySnapshotLocation date =
   where
     (year, month, day) = toGregorian date
 
+-- | Where to load a snapshot from.
+--
+-- @since 0.1.0.0
 data SnapshotLocation
   = SLCompiler !WantedCompiler
+    -- ^ Don't use an actual snapshot, just a version of the compiler
+    -- with its shipped packages.
+    --
+    -- @since 0.1.0.0
   | SLUrl !Text !(Maybe BlobKey)
+    -- ^ Download the snapshot from the given URL. The optional
+    -- 'BlobKey' is used for reproducibility.
+    --
+    -- @since 0.1.0.0
   | SLFilePath !(ResolvedPath File)
+    -- ^ Snapshot at a local file path.
+    --
+    -- @since 0.1.0.0
   deriving (Show, Eq, Data, Ord, Generic)
 instance Store SnapshotLocation
 instance NFData SnapshotLocation
@@ -1290,31 +1496,50 @@ instance ToJSON SnapshotLocation where
     : maybe [] blobKeyPairs mblob
   toJSON (SLFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
 
+-- | Specification of a snapshot, such as LTS Haskell.
+--
+-- @since 0.1.0.0
 data Snapshot = Snapshot
   { snapshotParent :: !SnapshotLocation
   -- ^ The snapshot to extend from. This is either a specific
   -- compiler, or a @SnapshotLocation@ which gives us more information
   -- (like packages). Ultimately, we'll end up with a
   -- @CompilerVersion@.
+  --
+  -- @since 0.1.0.0
   , snapshotCompiler :: !(Maybe WantedCompiler)
   -- ^ Override the compiler specified in 'snapshotParent'. Must be
   -- 'Nothing' if using 'SLCompiler'.
+  --
+  -- @since 0.1.0.0
   , snapshotName :: !Text
   -- ^ A user-friendly way of referring to this resolver.
+  --
+  -- @since 0.1.0.0
   , snapshotLocations :: ![PackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
+  --
+  -- @since 0.1.0.0
   , snapshotDropPackages :: !(Set PackageName)
   -- ^ Packages present in the parent which should not be included
   -- here.
+  --
+  -- @since 0.1.0.0
   , snapshotFlags :: !(Map PackageName (Map FlagName Bool))
   -- ^ Flag values to override from the defaults
+  --
+  -- @since 0.1.0.0
   , snapshotHidden :: !(Map PackageName Bool)
   -- ^ Packages which should be hidden when registering. This will
   -- affect, for example, the import parser in the script
   -- command. We use a 'Map' instead of just a 'Set' to allow
   -- overriding the hidden settings in a parent snapshot.
+  --
+  -- @since 0.1.0.0
   , snapshotGhcOptions :: !(Map PackageName [Text])
   -- ^ GHC options per package
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Data, Generic)
 instance Store Snapshot
@@ -1352,7 +1577,7 @@ instance FromJSON (WithJSONWarnings (Unresolved Snapshot)) where
     snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
     snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
     pure $ (\snapshotLocations (snapshotParent, snapshotCompiler) -> Snapshot {..})
-      <$> (concat <$> sequenceA unresolvedLocs)
+      <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
 
 -- TODO ORPHANS remove

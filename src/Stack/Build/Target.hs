@@ -313,7 +313,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = Dependency
           }
       | otherwise = do
-          mversion <- getLatestHackageVersion name
+          mversion <- getLatestHackageVersion name YesPreferredVersions
           return $ case mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
@@ -505,7 +505,7 @@ parseTargets needTargets boptscli = do
 
   (globals', snapshots, locals') <- do
     addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseCabalFileImmutable loc
+      gpd <- loadCabalFileImmutable loc
       return (name, (gpd, PLImmutable loc, Nothing))
 
     -- Calculate a list of all of the locals, based on the project

@@ -4,12 +4,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pantry.Hackage
   ( updateHackageIndex
+  , DidUpdateOccur (..)
   , hackageIndexTarballL
   , getHackageTarball
   , getHackageTarballKey
   , getHackageCabalFile
-  , getPackageVersions
-  , typoCorrectionCandidates
+  , getHackagePackageVersions
+  , getHackageTypoCorrections
   , UsePreferredVersions (..)
   ) where
 
@@ -29,7 +30,7 @@ import Pantry.Tree
 import qualified Pantry.SHA256 as SHA256
 import Network.URI (parseURI)
 import Data.Time (getCurrentTime)
-import Path ((</>), Path, Abs, Rel, Dir, File, mkRelDir, mkRelFile, toFilePath, parseRelDir, parseRelFile)
+import Path ((</>), Path, Abs, Rel, Dir, File, toFilePath, parseRelDir, parseRelFile)
 import qualified Distribution.Text
 import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
@@ -54,18 +55,28 @@ hackageDirL = pantryConfigL.to ((</> hackageRelDir) . pcRootDir)
 indexRelFile :: Path Rel File
 indexRelFile = either impureThrow id $ parseRelFile "00-index.tar"
 
+-- | Where does pantry download its 01-index.tar file from Hackage?
+--
+-- @since 0.1.0.0
 hackageIndexTarballL :: HasPantryConfig env => SimpleGetter env (Path Abs File)
 hackageIndexTarballL = hackageDirL.to (</> indexRelFile)
+
+-- | Did an update occur when running 'updateHackageIndex'?
+--
+-- @since 0.1.0.0
+data DidUpdateOccur = YesUpdateOccurred | NoUpdateOccurred
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
 --
--- Returns @True@ if an update occurred, @False@ if we've already
--- updated once.
+-- This function will only perform an update once per 'PantryConfig'
+-- for user sanity. See the return value to find out if it happened.
+--
+-- @since 0.1.0.0
 updateHackageIndex
   :: (HasPantryConfig env, HasLogFunc env)
   => Maybe Utf8Builder -- ^ reason for updating, if any
-  -> RIO env Bool
+  -> RIO env DidUpdateOccur
 updateHackageIndex mreason = gateUpdate $ do
     for_ mreason logInfo
     pc <- view pantryConfigL
@@ -171,8 +182,8 @@ updateHackageIndex mreason = gateUpdate $ do
       pc <- view pantryConfigL
       join $ modifyMVar (pcUpdateRef pc) $ \toUpdate -> pure $
         if toUpdate
-          then (False, True <$ inner)
-          else (False, pure False)
+          then (False, YesUpdateOccurred <$ inner)
+          else (False, pure NoUpdateOccurred)
 
 -- | Populate the SQLite tables with Hackage index information.
 populateCache
@@ -303,7 +314,10 @@ resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
     Just res -> pure res
     Nothing -> do
       updated <- updateHackageIndex $ Just $ "Cabal file info not found for " <> display pir <> ", updating"
-      mres' <- if updated then inner else pure Nothing
+      mres' <-
+        case updated of
+          YesUpdateOccurred -> inner
+          NoUpdateOccurred -> pure Nothing
       case mres' of
         Nothing -> fuzzyLookupCandidates name ver >>= throwIO . UnknownHackagePackage pir
         Just res -> pure res
@@ -323,9 +337,9 @@ fuzzyLookupCandidates
   -> Version
   -> RIO env FuzzyResults
 fuzzyLookupCandidates name ver0 = do
-  m <- getPackageVersions YesPreferredVersions name
+  m <- getHackagePackageVersions YesPreferredVersions name
   if Map.null m
-    then FRNameNotFound <$> typoCorrectionCandidates name
+    then FRNameNotFound <$> getHackageTypoCorrections name
     else
       case Map.lookup ver0 m of
         Nothing -> do
@@ -356,29 +370,35 @@ toMajorVersion v =
     [a]   -> [a, 0]
     a:b:_ -> [a, b]
 
--- | Try to come up with typo corrections for given package identifier using
--- package caches. This should be called before giving up, i.e. when
--- 'fuzzyLookupCandidates' cannot return anything.
-typoCorrectionCandidates
+-- | Try to come up with typo corrections for given package identifier
+-- using Hackage package names. This can provide more user-friendly
+-- information in error messages.
+--
+-- @since 0.1.0.0
+getHackageTypoCorrections
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> RIO env [PackageName]
-typoCorrectionCandidates name1 =
+getHackageTypoCorrections name1 =
     withStorage $ sinkHackagePackageNames
       (\name2 -> damerauLevenshtein (displayC name1) (displayC name2) < 4)
       (takeC 10 .| sinkList)
 
 -- | Should we pay attention to Hackage's preferred versions?
+--
+-- @since 0.1.0.0
 data UsePreferredVersions = YesPreferredVersions | NoPreferredVersions
   deriving Show
 
 -- | Returns the versions of the package available on Hackage.
-getPackageVersions
+--
+-- @since 0.1.0.0
+getHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
   => UsePreferredVersions
   -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getPackageVersions usePreferred name = withStorage $ do
+getHackagePackageVersions usePreferred name = withStorage $ do
   mpreferred <-
     case usePreferred of
       YesPreferredVersions -> loadPreferredVersion name
@@ -435,9 +455,9 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           let exc = NoHackageCryptographicHash $ PackageIdentifier name ver
           updated <- updateHackageIndex $ Just $ display exc <> ", updating"
           mpair2 <-
-            if updated
-              then withStorage $ loadHackageTarballInfo name ver
-              else pure Nothing
+            case updated of
+              YesUpdateOccurred -> withStorage $ loadHackageTarballInfo name ver
+              NoUpdateOccurred -> pure Nothing
           case mpair2 of
             Nothing -> throwIO exc
             Just pair2 -> pure pair2
@@ -457,13 +477,13 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
         { archiveLocation = ALUrl url
         , archiveHash = Just sha
         , archiveSize = Just size
+        , archiveSubdir = T.empty -- no subdirs on Hackage
         }
       PackageMetadata
         { pmName = Just name
         , pmVersion = Just ver
         , pmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
         , pmCabal = Nothing -- cabal file in the tarball may be different!
-        , pmSubdir = T.empty -- no subdirs on Hackage
         }
 
     case packageTree package of

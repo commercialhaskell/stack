@@ -21,7 +21,7 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (loadPackage)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import qualified Data.HashMap.Strict as HM
 import           Data.List ((\\), isPrefixOf)
@@ -284,7 +284,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }
-  resolvePackage pkgConfig <$> parseCabalFileImmutable loc
+  resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

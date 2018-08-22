@@ -26,7 +26,7 @@ listPackages = do
     -- the directory.
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
-        (gpd, _) <- parseCabalFilePath dir False
+        (gpd, _) <- loadCabalFilePath dir NoPrintWarnings
         (logInfo . displayC) (gpdPackageName gpd)
 
 -- | List the targets in the current project.

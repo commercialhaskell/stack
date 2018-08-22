@@ -22,7 +22,7 @@ import           RIO                  as X
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
-import           Pantry               as X
+import           Pantry               as X hiding (Package (..), loadSnapshot)
 
 import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo (..))
 

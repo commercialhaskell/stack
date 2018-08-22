@@ -66,7 +66,6 @@ import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Pantry
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import qualified Stack.PrettyPrint as PP (Style (Module))
@@ -111,10 +110,10 @@ readPackageDir
   :: forall env. HasConfig env
   => PackageConfig
   -> Path Abs Dir
-  -> Bool -- ^ print warnings from cabal file parsing?
+  -> PrintWarnings
   -> RIO env (Package, Path Abs File)
 readPackageDir packageConfig dir printWarnings =
-  first (resolvePackage packageConfig) <$> parseCabalFilePath dir printWarnings
+  first (resolvePackage packageConfig) <$> loadCabalFilePath dir printWarnings
 
 -- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
 -- from given directory.
@@ -122,10 +121,10 @@ readPackageDescriptionDir
   :: forall env. HasConfig env
   => PackageConfig
   -> Path Abs Dir
-  -> Bool -- ^ print warnings?
+  -> PrintWarnings
   -> RIO env (GenericPackageDescription, PackageDescriptionPair)
 readPackageDescriptionDir config pkgDir printWarnings = do
-    (gdesc, _) <- parseCabalFilePath pkgDir printWarnings
+    (gdesc, _) <- loadCabalFilePath pkgDir printWarnings
     return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
@@ -1390,11 +1389,11 @@ resolveDirOrWarn = resolveOrWarn "Directory" f
 -- | Create a 'LocalPackageView' from a directory containing a package.
 mkLocalPackageView
   :: forall env. HasConfig env
-  => Bool -- ^ print warnings?
+  => PrintWarnings
   -> ResolvedPath Dir
   -> RIO env LocalPackageView
 mkLocalPackageView printWarnings dir = do
-  (gpd, cabalfp) <- parseCabalFilePath (resolvedAbsolute dir) printWarnings
+  (gpd, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir) printWarnings
   return LocalPackageView
     { lpvCabalFP = cabalfp
     , lpvGPD = gpd

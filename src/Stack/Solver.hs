@@ -529,7 +529,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
     logInfo $ formatGroup relpaths
 
     packages <- map (\(x, y) -> (y, x)) <$>
-                mapM (flip parseCabalFilePath True)
+                mapM (flip loadCabalFilePath YesPrintWarnings)
                 cabaldirs
 
     -- package name cannot be empty or missing otherwise

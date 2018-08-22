@@ -12,12 +12,12 @@ spec = do
   it "update works" $ asIO $ void $ runPantryApp $ updateHackageIndex Nothing
   it "fuzzy lookup kicks in" $ do
     let pir = PackageIdentifierRevision "thisisnot-tobe-foundon-hackage-please" (mkVersion [1..3]) CFILatest
-    runPantryApp (loadPackageLocation (PLIHackage pir Nothing))
+    runPantryApp (loadPackage (PLIHackage pir Nothing))
       `shouldThrow` \e ->
         case e of
           UnknownHackagePackage pir' _  -> pir == pir'
           _ -> False
   -- Flaky test, can be broken by new packages on Hackage.
   it "finds acme-missiles" $ do
-    x <- runPantryApp (typoCorrectionCandidates "acme-missile")
+    x <- runPantryApp (getHackageTypoCorrections "acme-missile")
     x `shouldSatisfy` ("acme-missiles" `elem`)

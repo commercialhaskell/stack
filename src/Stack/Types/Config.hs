@@ -1481,7 +1481,7 @@ parseProjectAndConfigMonoid rootDir =
                   , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
                   , projectExtraPackageDBs = extraPackageDBs
                   , projectPackages = packages
-                  , projectDependencies = concat deps'
+                  , projectDependencies = concatMap toList (deps' :: [NonEmpty PackageLocation])
                   , projectFlags = flags
                   , projectCurator = mcurator
                   }

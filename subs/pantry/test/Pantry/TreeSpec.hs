@@ -15,7 +15,6 @@ spec = do
         , pmVersion = Nothing
         , pmTreeKey = Nothing
         , pmCabal = Nothing
-        , pmSubdir = ""
         }
       mkArchive url =
         PLIArchive
@@ -23,6 +22,7 @@ spec = do
             { archiveLocation = ALUrl url
             , archiveHash = Nothing
             , archiveSize = Nothing
+            , archiveSubdir = ""
             }
           pm
       tarPL = mkArchive tarURL
@@ -33,6 +33,7 @@ spec = do
               { repoUrl = "https://github.com/snoyberg/file-embed.git"
               , repoCommit = "47b499c3c58ca465c56ee0295d0a76782a66751d"
               , repoType = RepoGit
+              , repoSubdir = ""
               }
             pm
       hgPL =
@@ -41,18 +42,19 @@ spec = do
               { repoUrl = "https://bitbucket.org/snoyberg/file-embed"
               , repoCommit = "6d8126e7a4821788a0275fa7c2c4a0083e14d690"
               , repoType = RepoHg
+              , repoSubdir = ""
               }
             pm
 
   it "zip and tar.gz archives match" $ asIO $ runPantryAppClean $ do
-    pair1 <- loadPackageLocation tarPL
-    pair2 <- loadPackageLocation zipPL
+    pair1 <- loadPackage tarPL
+    pair2 <- loadPackage zipPL
     liftIO $ pair2 `shouldBe` pair1
   it "archive and Git repo match" $ asIO $ runPantryAppClean $ do
-    pair1 <- loadPackageLocation tarPL
-    pair2 <- loadPackageLocation gitPL
+    pair1 <- loadPackage tarPL
+    pair2 <- loadPackage gitPL
     liftIO $ pair2 `shouldBe` pair1
   it "archive and Hg repo match" $ asIO $ runPantryAppClean $ do
-    pair1 <- loadPackageLocation tarPL
-    pair2 <- loadPackageLocation hgPL
+    pair1 <- loadPackage tarPL
+    pair2 <- loadPackage hgPL
     liftIO $ pair2 `shouldBe` pair1

@@ -81,7 +81,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
         hooglePackageIdentifier <- do
-          mversion <- getLatestHackageVersion hooglePackageName
+          mversion <- getLatestHackageVersion hooglePackageName YesPreferredVersions
 
           -- FIXME For a while, we've been following the logic of
           -- taking the latest Hoogle version available. However, we

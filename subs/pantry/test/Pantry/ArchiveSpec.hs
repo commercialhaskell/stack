@@ -20,13 +20,13 @@ spec = do
             }
         , archiveHash = Nothing
         , archiveSize = Nothing
+        , archiveSubdir = ""
         }
       PackageMetadata
         { pmName = Nothing
         , pmVersion = Nothing
         , pmTreeKey = Nothing
         , pmCabal = Nothing
-        , pmSubdir = ""
         }
     case parsePackageIdentifier "package-0.1.2.3" of
       Nothing -> error "should have parsed"

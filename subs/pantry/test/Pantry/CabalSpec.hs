@@ -23,7 +23,7 @@ spec = describe "wrong cabal file" $ do
               version3
               (CFIHash sha (Just size)))
             Nothing
-        go = parseCabalFileImmutable pli
+        go = loadCabalFileImmutable pli
         name = mkPackageName "acme-missiles"
         version2 = mkVersion [0, 2]
         version3 = mkVersion [0, 3]
@@ -35,7 +35,6 @@ spec = describe "wrong cabal file" $ do
           pm == PackageMetadata
             { pmName = Just name
             , pmVersion = Just version3
-            , pmSubdir = ""
             , pmTreeKey = Nothing
             , pmCabal = Just $ BlobKey sha size
             } &&
@@ -54,6 +53,7 @@ spec = describe "wrong cabal file" $ do
               { archiveLocation = ALUrl "https://github.com/yesodweb/yesod/archive/yesod-auth-1.6.4.1.tar.gz"
               , archiveHash = Just archiveHash'
               , archiveSize = Just $ FileSize 309199
+              , archiveSubdir = "yesod-auth"
               }
         pm =
             PackageMetadata
@@ -61,9 +61,8 @@ spec = describe "wrong cabal file" $ do
               , pmVersion = Just version2
               , pmCabal = Just $ BlobKey sha (FileSize 597)
               , pmTreeKey = Nothing
-              , pmSubdir = "yesod-auth"
               }
-        go = parseCabalFileImmutable pli
+        go = loadCabalFileImmutable pli
         acmeMissiles = mkPackageName "acme-missiles"
         version2 = mkVersion [0, 2]
     go `shouldThrow'` \e ->
@@ -89,6 +88,7 @@ spec = describe "wrong cabal file" $ do
               , archiveHash = either impureThrow Just
                             $ SHA256.fromHexBytes "b5a582209c50e4a61e4b6c0fb91a6a7d65177a881225438b0144719bc3682c3a"
               , archiveSize = Just $ FileSize 309199
+              , archiveSubdir = "yesod-auth"
               }
         pm =
             PackageMetadata
@@ -96,9 +96,8 @@ spec = describe "wrong cabal file" $ do
               , pmVersion = Just version
               , pmCabal = Just $ BlobKey sha (FileSize 597)
               , pmTreeKey = Nothing
-              , pmSubdir = "yesod-auth"
               }
-        go = parseCabalFileImmutable pli
+        go = loadCabalFileImmutable pli
         yesodAuth = mkPackageName "yesod-auth"
         version = mkVersion [1, 6, 4, 1]
     go `shouldThrow'` \e ->

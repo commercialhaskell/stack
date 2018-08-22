@@ -40,7 +40,7 @@ toLoc
 toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
-      versions <- getPackageVersions NoPreferredVersions name -- don't follow the preferred versions on Hackage, give curators more control
+      versions <- getHackagePackageVersions NoPreferredVersions name -- don't follow the preferred versions on Hackage, give curators more control
       when (Map.null versions) $ error $ "Package not found on Hackage: " ++ displayC name
       for_ mrequiredLatest $ \required ->
         case Map.maxViewWithKey versions of
