@@ -75,3 +75,10 @@ For doing experiments which just involve packages installed in your databases,
 it may be useful to run ghci plainly like `stack exec ghci`. This will run a
 plain `ghci` in an environment which includes `GHC_PACKAGE_PATH`, and so will
 have access to your databases.
+
+*Note*: Running `stack ghci` on a pristine copy of the code doesn't currently
+build libraries
+([#2790](https://github.com/commercialhaskell/stack/issues/2790)) or internal
+libraries ([#4148](https://github.com/commercialhaskell/stack/issues/4148)).
+It is recommended to always run a `stack build` before running `stack ghci`,
+until these two issues are closed.
