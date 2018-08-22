@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Pantry.Hackage
   ( updateHackageIndex
   , hackageIndexTarballL
@@ -30,7 +29,7 @@ import Pantry.Tree
 import qualified Pantry.SHA256 as SHA256
 import Network.URI (parseURI)
 import Data.Time (getCurrentTime)
-import Path ((</>), Path, Abs, Dir, File, mkRelDir, mkRelFile, toFilePath)
+import Path ((</>), Path, Abs, Rel, Dir, File, mkRelDir, mkRelFile, toFilePath, parseRelDir, parseRelFile)
 import qualified Distribution.Text
 import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
@@ -46,11 +45,17 @@ import qualified Hackage.Security.Client.Repository.HttpLib.HttpClient as HS
 import qualified Hackage.Security.Util.Path as HS
 import qualified Hackage.Security.Util.Pretty as HS
 
+hackageRelDir :: Path Rel Dir
+hackageRelDir = either impureThrow id $ parseRelDir "hackage"
+
 hackageDirL :: HasPantryConfig env => SimpleGetter env (Path Abs Dir)
-hackageDirL = pantryConfigL.to ((</> $(mkRelDir "hackage")) . pcRootDir)
+hackageDirL = pantryConfigL.to ((</> hackageRelDir) . pcRootDir)
+
+indexRelFile :: Path Rel File
+indexRelFile = either impureThrow id $ parseRelFile "00-index.tar"
 
 hackageIndexTarballL :: HasPantryConfig env => SimpleGetter env (Path Abs File)
-hackageIndexTarballL = hackageDirL.to (</> $(mkRelFile "00-index.tar"))
+hackageIndexTarballL = hackageDirL.to (</> indexRelFile)
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.

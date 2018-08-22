@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 -- | Content addressable Haskell package management, providing for
 -- secure, reproducible acquisition of Haskell package contents and
@@ -133,7 +132,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent)
+import Path (Path, Abs, File, toFilePath, Dir, mkRelFile, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
@@ -173,8 +172,9 @@ withPantryConfig
   -> RIO env a
 withPantryConfig root hsc he count inner = do
   env <- ask
+  pantryRelFile <- parseRelFile "pantry.sqlite3"
   -- Silence persistent's logging output, which is really noisy
-  runRIO (mempty :: LogFunc) $ initStorage (root </> $(mkRelFile "pantry.sqlite3")) $ \storage -> runRIO env $ do
+  runRIO (mempty :: LogFunc) $ initStorage (root </> pantryRelFile) $ \storage -> runRIO env $ do
     ur <- newMVar True
     ref1 <- newIORef mempty
     ref2 <- newIORef mempty
@@ -390,7 +390,8 @@ hpack
   => Path Abs Dir
   -> RIO env ()
 hpack pkgDir = do
-    let hpackFile = pkgDir </> $(mkRelFile Hpack.packageConfig)
+    packageConfigRelFile <- parseRelFile Hpack.packageConfig
+    let hpackFile = pkgDir </> packageConfigRelFile
     exists <- liftIO $ doesFileExist hpackFile
     when exists $ do
         logDebug $ "Running hpack on " <> fromString (toFilePath hpackFile)
