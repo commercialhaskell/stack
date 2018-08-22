@@ -58,6 +58,8 @@ Other enhancements:
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,
   e.g. `stack unpack packagename`.
+* Git repos are shared across multiple projects. See
+  [#3551](https://github.com/commercialhaskell/stack/issues/3551)
 
 Bug fixes:
 
