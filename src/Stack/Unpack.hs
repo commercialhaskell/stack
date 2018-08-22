@@ -68,14 +68,14 @@ unpackPackages mSnapshotDef dest input = do
 
     toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
     toLocNoSnapshot name = do
-      mver1 <- getLatestHackageVersion name YesPreferredVersions
+      mver1 <- getLatestHackageVersion name UsePreferredVersions
       mver <-
         case mver1 of
           Just _ -> pure mver1
           Nothing -> do
             updated <- updateHackageIndex $ Just $ "Could not find package " <> displayC name <> ", updating"
             case updated of
-              YesUpdateOccurred -> getLatestHackageVersion name YesPreferredVersions
+              UpdateOccurred -> getLatestHackageVersion name UsePreferredVersions
               NoUpdateOccurred -> pure Nothing
       case mver of
         Nothing -> do

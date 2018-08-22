@@ -608,7 +608,7 @@ addPackageDeps treatAsDep package = do
         eres <- addDep treatAsDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev = do
-              vsAndRevs <- runRIO ctx $ getHackagePackageVersions YesPreferredVersions depname
+              vsAndRevs <- runRIO ctx $ getHackagePackageVersions UsePreferredVersions depname
               pure $ do
                 lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
                 revs <- Map.lookup lappVer vsAndRevs

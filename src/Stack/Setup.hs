@@ -695,7 +695,7 @@ upgradeCabal wc upgradeTo = do
                   displayC installed <>
                   " is already installed"
         Latest -> do
-          mversion <- getLatestHackageVersion name YesPreferredVersions
+          mversion <- getLatestHackageVersion name UsePreferredVersions
           case mversion of
             Nothing -> throwString "No Cabal library found in index, cannot upgrade"
             Just (PackageIdentifierRevision _name latestVersion _cabalHash) -> do

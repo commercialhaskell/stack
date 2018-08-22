@@ -64,7 +64,7 @@ hackageIndexTarballL = hackageDirL.to (</> indexRelFile)
 -- | Did an update occur when running 'updateHackageIndex'?
 --
 -- @since 0.1.0.0
-data DidUpdateOccur = YesUpdateOccurred | NoUpdateOccurred
+data DidUpdateOccur = UpdateOccurred | NoUpdateOccurred
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
@@ -182,7 +182,7 @@ updateHackageIndex mreason = gateUpdate $ do
       pc <- view pantryConfigL
       join $ modifyMVar (pcUpdateRef pc) $ \toUpdate -> pure $
         if toUpdate
-          then (False, YesUpdateOccurred <$ inner)
+          then (False, UpdateOccurred <$ inner)
           else (False, pure NoUpdateOccurred)
 
 -- | Populate the SQLite tables with Hackage index information.
@@ -302,7 +302,7 @@ resolveCabalFileInfo pir@(PackageIdentifierRevision name ver cfi) = do
       updated <- updateHackageIndex $ Just $ "Cabal file info not found for " <> display pir <> ", updating"
       mres' <-
         case updated of
-          YesUpdateOccurred -> inner
+          UpdateOccurred -> inner
           NoUpdateOccurred -> pure Nothing
       case mres' of
         Nothing -> fuzzyLookupCandidates name ver >>= throwIO . UnknownHackagePackage pir
@@ -323,7 +323,7 @@ fuzzyLookupCandidates
   -> Version
   -> RIO env FuzzyResults
 fuzzyLookupCandidates name ver0 = do
-  m <- getHackagePackageVersions YesPreferredVersions name
+  m <- getHackagePackageVersions UsePreferredVersions name
   if Map.null m
     then FRNameNotFound <$> getHackageTypoCorrections name
     else
@@ -373,7 +373,7 @@ getHackageTypoCorrections name1 =
 -- | Should we pay attention to Hackage's preferred versions?
 --
 -- @since 0.1.0.0
-data UsePreferredVersions = YesPreferredVersions | NoPreferredVersions
+data UsePreferredVersions = UsePreferredVersions | IgnorePreferredVersions
   deriving Show
 
 -- | Returns the versions of the package available on Hackage.
@@ -387,8 +387,8 @@ getHackagePackageVersions
 getHackagePackageVersions usePreferred name = withStorage $ do
   mpreferred <-
     case usePreferred of
-      YesPreferredVersions -> loadPreferredVersion name
-      NoPreferredVersions -> pure Nothing
+      UsePreferredVersions -> loadPreferredVersion name
+      IgnorePreferredVersions -> pure Nothing
   let predicate :: Version -> Map Revision BlobKey -> Bool
       predicate = fromMaybe (\_ _ -> True) $ do
         preferredT1 <- mpreferred
@@ -442,7 +442,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           updated <- updateHackageIndex $ Just $ display exc <> ", updating"
           mpair2 <-
             case updated of
-              YesUpdateOccurred -> withStorage $ loadHackageTarballInfo name ver
+              UpdateOccurred -> withStorage $ loadHackageTarballInfo name ver
               NoUpdateOccurred -> pure Nothing
           case mpair2 of
             Nothing -> throwIO exc

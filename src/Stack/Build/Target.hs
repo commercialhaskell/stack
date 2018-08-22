@@ -313,7 +313,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = Dependency
           }
       | otherwise = do
-          mversion <- getLatestHackageVersion name YesPreferredVersions
+          mversion <- getLatestHackageVersion name UsePreferredVersions
           return $ case mversion of
             -- This is actually an error case. We _could_ return a
             -- Left value here, but it turns out to be better to defer
