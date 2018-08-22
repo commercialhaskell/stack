@@ -240,20 +240,6 @@ populateCache fp offset = withBinaryFile (toFilePath fp) ReadMode $ \h -> do
 
       storeHackageRevision name version blobTableId
 
-      -- Some older Stackage snapshots ended up with slightly
-      -- modified cabal files, in particular having DOS-style
-      -- line endings (CRLF) converted to Unix-style (LF). As a
-      -- result, we track both hashes with and without CR
-      -- characters stripped for compatibility with these older
-      -- snapshots.
-      --
-      -- TODO: once we move over to the new curator tool completely,
-      -- we can drop this hack
-      let cr = 13
-      when (cr `B.elem` bs) $ do
-        (stripped, _) <- storeBlob $ B.filter (/= cr) bs
-        storeCrlfHack stripped blobTableId
-
     breakSlash x
         | T.null z = Nothing
         | otherwise = Just (y, unsafeTail z)
