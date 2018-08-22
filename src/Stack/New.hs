@@ -65,7 +65,7 @@ new opts forceOverwrite = do
       throwM $ Can'tUseWiredInName (newOptsProjectName opts)
     pwd <- getCurrentDir
     absDir <- if bare then return pwd
-                      else do relDir <- parseRelDir (displayC project)
+                      else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
     exists <- doesDirExist absDir
     configTemplate <- view $ configL.to configDefaultTemplate
@@ -99,7 +99,7 @@ new opts forceOverwrite = do
         logInfo
             (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             displayC project <>
+             fromString (packageNameString project) <>
              "\" in " <>
              if bare then "the current directory"
                      else fromString (toFilePath (dirname absDir)) <>
@@ -197,9 +197,9 @@ applyTemplate project template nonceParams dir templateText = do
       return $ T.pack . show $ year
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
-            nameAsVarId = T.replace "-" "_" $ displayC project
-            nameAsModule = T.filter (/= '-') $ T.toTitle $ displayC project
-            nameParams = M.fromList [ ("name", displayC project)
+            nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
+            nameAsModule = T.filter (/= '-') $ T.toTitle $ T.pack $ packageNameString project
+            nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                     , ("name-as-varid", nameAsVarId)
                                     , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
@@ -368,7 +368,7 @@ instance Show NewException where
                              "    " <> key <> ": value")
                        (S.toList missingKeys))
             , "Or you can pass each one as parameters like this:"
-            , "stack new " <> displayC name <> " " <>
+            , "stack new " <> packageNameString name <> " " <>
               T.unpack (templateName template) <>
               " " <>
               unwords
@@ -389,4 +389,4 @@ instance Show NewException where
     show (BadTemplatesHelpEncoding url err) =
         "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
     show (Can'tUseWiredInName name) =
-        "The name \"" <> displayC name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"
+        "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"

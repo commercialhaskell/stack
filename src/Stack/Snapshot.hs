@@ -72,7 +72,7 @@ instance Show SnapshotException where
     ]
   show (PackageDefinedTwice name loc1 loc2) = concat
     [ "Package "
-    , displayC name
+    , packageNameString name
     , " is defined twice, at "
     , show loc1
     , " and "
@@ -83,19 +83,19 @@ instance Show SnapshotException where
     where
       go (name, deps) = concat
         $ "\n"
-        : displayC name
+        : packageNameString name
         : " is missing:\n"
         : map goDep (Map.toList deps)
 
       goDep (dep, (intervals, mversion)) = concat
         [ "- "
-        , displayC dep
+        , packageNameString dep
         , ". Requires: "
         , display $ toVersionRange intervals
         , ", "
         , case mversion of
             Nothing -> "none present"
-            Just version -> displayC version ++ " found"
+            Just version -> versionString version ++ " found"
         , "\n"
         ]
   show (FilepathInCustomSnapshot url) =
@@ -106,7 +106,7 @@ instance Show SnapshotException where
     T.unpack url
   show (MissingPackages names) =
     "The following packages specified by flags or options are not found: " ++
-    unwords (map displayC (Set.toList names))
+    unwords (map packageNameString (Set.toList names))
   show (CustomResolverException url loc e) = concat
     [ "Unable to load custom resolver "
     , T.unpack url
@@ -360,7 +360,8 @@ fromGlobalHints =
       -- project compatibility.
       , lpiLocation = either impureThrow id
                     $ parseGhcPkgId
-                    $ displayC
+                    $ fromString
+                    $ packageIdentifierString
                     $ PackageIdentifier name ver
       , lpiFlags = Map.empty
       , lpiGhcOptions = []

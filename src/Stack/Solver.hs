@@ -135,7 +135,7 @@ cabalSolver cabalfps constraintType
 
             when (any isNothing mPkgNames) $ do
                   logInfo $ "*** Only some package names could be parsed: " <>
-                      mconcat (intersperse ", " (map displayC pkgNames))
+                      mconcat (intersperse ", " (map (fromString . packageNameString) pkgNames))
                   error $ T.unpack $
                        "*** User packages involved in cabal failure: "
                        <> T.intercalate ", " (parseConflictingPkgs msg)
@@ -176,7 +176,7 @@ cabalSolver cabalfps constraintType
     formatFlagConstraint package flag enabled =
         let sign = if enabled then '+' else '-'
         in
-        "--constraint=" ++ unwords [displayC package, sign : displayC flag]
+        "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
 
     -- Note the order of the Map union is important
     -- We override a package in snapshot by a src package
@@ -237,15 +237,15 @@ getCabalConfig dir constraintType constraints = do
     return $ cache : remote : map goConstraint (Map.toList constraints)
   where
     goConstraint (name, version) =
-        assert (not . T.null . displayC $ version) $
+        assert (not . null . versionString $ version) $
             T.concat
               [ if constraintType == Constraint
                    || name `Set.member` wiredInPackages
                 then "constraint: "
                 else "preference: "
-              , displayC name
+              , T.pack $ packageNameString name
               , "=="
-              , displayC version
+              , T.pack $ versionString version
               ]
 
 setupCompiler
@@ -300,12 +300,12 @@ setupCabalEnv compiler inner = do
         Just version
             | version < $(mkVersion "1.24") -> prettyWarn $
                 "Installed version of cabal-install (" <>
-                displayC version <>
+                fromString (versionString version) <>
                 ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
                 "To resolve this, install a newer version via 'stack install cabal-install'." <> line
             | version >= $(mkVersion "1.25") -> prettyWarn $
                 "Installed version of cabal-install (" <>
-                displayC version <>
+                fromString (versionString version) <>
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
@@ -539,7 +539,7 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
 
     let normalizeString = T.unpack . T.normalize T.NFC . T.pack
         getNameMismatchPkg (fp, gpd)
-            | (normalizeString . displayC . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
+            | (normalizeString . packageNameString . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
                 = Just fp
             | otherwise = Nothing
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages

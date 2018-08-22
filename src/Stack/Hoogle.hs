@@ -95,11 +95,11 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
         case hooglePackageIdentifier of
             Left{} -> logInfo $
               "Minimum " <>
-              displayC hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               " is not in your index. Installing the minimum version."
             Right ident -> logInfo $
               "Minimum version is " <>
-              displayC hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               ". Found acceptable " <>
               display ident <>
               " in your index, installing it."
@@ -117,7 +117,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 { boptsCLITargets =
                                     pure $
                                     either
-                                     displayC
+                                     (T.pack . packageIdentifierString)
                                      (utf8BuilderToText . display)
                                      hooglePackageIdentifier
                                 }))
@@ -167,7 +167,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 [ "Installed Hoogle is too old, "
                                 , T.pack hooglePath
                                 , " is version "
-                                , displayC ver
+                                , T.pack $ versionString ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of

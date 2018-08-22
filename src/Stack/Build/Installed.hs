@@ -171,16 +171,16 @@ processLoadResult _ True (WrongVersion actual wanted, lh)
     | fst (lhPair lh) `Set.member` ghcjsBootPackages = do
         logWarn $
             "Ignoring that the GHCJS boot package \"" <>
-            displayC (fst (lhPair lh)) <>
+            fromString (packageNameString (fst (lhPair lh))) <>
             "\" has a different version, " <>
-            displayC actual <>
+            fromString (versionString actual) <>
             ", than the resolver's wanted version, " <>
-            displayC wanted
+            fromString (versionString wanted)
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
     logDebug $
         "Ignoring package " <>
-        displayC (fst (lhPair lh)) <>
+        fromString (packageNameString (fst (lhPair lh))) <>
         maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
         " due to" <>
         case reason of
@@ -192,9 +192,9 @@ processLoadResult mdb _ (reason, lh) = do
             WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
             WrongVersion actual wanted ->
                 " wanting version " <>
-                displayC wanted <>
+                fromString (versionString wanted) <>
                 " instead of " <>
-                displayC actual
+                fromString (versionString actual)
     return Nothing
 
 data Allowed

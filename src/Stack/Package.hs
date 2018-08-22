@@ -286,7 +286,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 
     -- Is the package dependency mentioned here me: either the package
     -- name itself, or the name of one of the sub libraries
-    isMe name' = name' == name || displayC name' `S.member` extraLibNames
+    isMe name' = name' == name || fromString (packageNameString name') `S.member` extraLibNames
 
 -- | Generate GHC options for the package's components, and a list of
 -- options which apply generally to the package, not one specific
@@ -402,9 +402,9 @@ generateBuildInfoOpts BioInput {..} =
         concat
             [ case M.lookup name biInstalledMap of
                 Just (_, Stack.Types.Package.Library _ident ipid _) -> ["-package-id=" <> ghcPkgIdString ipid]
-                _ -> ["-package=" <> displayC name <>
+                _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
-                     ((("-" <>) . displayC) . piiVersion)
+                     ((("-" <>) . versionString) . piiVersion)
                      (M.lookup name biSourceMap)]
             | name <- pkgs]
     pkgs =
@@ -1252,7 +1252,7 @@ findCandidate dirs name = do
             DotCabalMain{} -> DotCabalMainPath
             DotCabalFile{} -> DotCabalFilePath
             DotCabalCFile{} -> DotCabalCFilePath
-    paths_pkg pkg = "Paths_" ++ displayC pkg
+    paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
         liftM (nubOrd . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates :: Path Abs Dir
@@ -1348,7 +1348,7 @@ buildLogPath package' msuffix = do
   env <- ask
   let stack = getProjectWorkDir env
   fp <- parseRelFile $ concat $
-    displayC (packageIdentifier package') :
+    packageIdentifierString (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]
   return $ stack </> $(mkRelDir "logs") </> fp
 

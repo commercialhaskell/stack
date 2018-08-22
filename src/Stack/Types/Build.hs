@@ -138,9 +138,9 @@ data UnusedFlags = UFNoPackage FlagSource PackageName
 
 instance Show StackBuildException where
     show (Couldn'tFindPkgId name) =
-              "After installing " <> displayC name <>
+              "After installing " <> packageNameString name <>
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
-               displayC name <> "). This shouldn't happen, " <>
+               packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug"
     show (CompilerVersionMismatch mactual (expected, earch) ghcVariant ghcBuild check mstack resolution) = concat
                 [ case mactual of
@@ -179,9 +179,9 @@ instance Show StackBuildException where
             | Set.null noKnown = []
             | otherwise = return $
                 "The following target packages were not found: " ++
-                intercalate ", " (map displayC $ Set.toList noKnown) ++
+                intercalate ", " (map packageNameString $ Set.toList noKnown) ++
                 "\nSee https://docs.haskellstack.org/en/v"
-                <> displayC stackMinorVersion <>
+                <> versionString stackMinorVersion <>
                 "/build_command/#target-syntax for details."
         notInSnapshot'
             | Map.null notInSnapshot = []
@@ -193,11 +193,11 @@ instance Show StackBuildException where
                 : "but there's no guarantee that they'll build together)."
                 : ""
                 : map
-                    (\(name, version') -> "- " ++ displayC
+                    (\(name, version') -> "- " ++ packageIdentifierString
                         (PackageIdentifier name version'))
                     (Map.toList notInSnapshot)
     show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
-        [ ["Test suite failure for package " ++ displayC ident]
+        [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
             [ "    "
             , T.unpack name
@@ -227,11 +227,11 @@ instance Show StackBuildException where
     show (ExecutionFailure es) = intercalate "\n\n" $ map show es
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Version for local package "
-        , displayC name
+        , packageNameString name
         , " is "
-        , displayC localV
+        , versionString localV
         , ", but you asked for "
-        , displayC requestedV
+        , versionString requestedV
         , " on the command line"
         ]
     show (NoSetupHsFound dir) =
@@ -247,7 +247,7 @@ instance Show StackBuildException where
         go :: UnusedFlags -> String
         go (UFNoPackage src name) = concat
             [ "- Package '"
-            , displayC name
+            , packageNameString name
             , "' not found"
             , showFlagSrc src
             ]
@@ -258,18 +258,18 @@ instance Show StackBuildException where
             , showFlagSrc src
             , ":\n"
             , intercalate "\n"
-                          (map (\flag -> "  " ++ displayC flag)
+                          (map (\flag -> "  " ++ flagNameString flag)
                                (Set.toList flags))
             , "\n- Flags defined by package '" ++ name ++ "':\n"
             , intercalate "\n"
-                          (map (\flag -> "  " ++ name ++ ":" ++ displayC flag)
+                          (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
                                (Set.toList pkgFlags))
             ]
-          where name = displayC (packageName pkg)
+          where name = packageNameString (packageName pkg)
                 pkgFlags = packageDefinedFlags pkg
         go (UFSnapshot name) = concat
             [ "- Attempted to set flag on snapshot package "
-            , displayC name
+            , packageNameString name
             , ", please add to extra-deps"
             ]
     show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
@@ -308,7 +308,7 @@ instance Show StackBuildException where
     show (ConstructPlanFailed msg) = msg
     show (LocalPackagesPresent locals) = unlines
       $ "Local packages are not allowed when using the script command. Packages found:"
-      : map (\ident -> "- " ++ displayC ident) locals
+      : map (\ident -> "- " ++ packageIdentifierString ident) locals
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =
@@ -342,9 +342,9 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
   in "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
        (False, Nothing) -> error "Invariant violated: unexpected case in showBuildError"
-       (False, Just taskProvides') -> "package " ++ dropQuotes (displayC taskProvides')
+       (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')
        (True, Nothing) -> "simple Setup.hs"
-       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (displayC taskProvides')
+       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')
      ) ++
      " using:\n      " ++ fullCmd ++ "\n" ++
      "    Process exited with code: " ++ show exitCode ++
@@ -566,7 +566,7 @@ configureOptsDirs bco loc package = concat
             Nothing -> installRoot </> docDirSuffix
             Just dir -> installRoot </> docDirSuffix </> dir
     pkgVerDir =
-        parseRelDir (displayC (PackageIdentifier (packageName package)
+        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
                                                                 (packageVersion package)) ++
                      [pathSeparator])
 
@@ -591,7 +591,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        (if enabled
                            then ""
                            else "-") <>
-                       displayC name)
+                       flagNameString name)
                     (Map.toList flags)
     , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
     , map ("--extra-include-dirs=" ++) (Set.toList (configExtraIncludeDirs config))
@@ -623,16 +623,16 @@ configureOptsNoDir econfig bco deps isLocal package = concat
 
     toDepOption1_22 (PackageIdentifier name _) gid = concat
         [ "--dependency="
-        , displayC name
+        , packageNameString name
         , "="
         , ghcPkgIdString gid
         ]
 
     toDepOption1_18 ident _gid = concat
         [ "--constraint="
-        , displayC name
+        , packageNameString name
         , "=="
-        , displayC version'
+        , versionString version'
         ]
       where
         PackageIdentifier name version' = ident

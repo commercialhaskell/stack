@@ -179,9 +179,9 @@ uploadRevision baseUrl creds ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
     [ baseUrl
     , "package/"
-    , displayC ident
+    , packageIdentifierString ident
     , "/"
-    , displayC name
+    , packageNameString name
     , ".cabal/edit"
     ]
   req1 <- formDataBody

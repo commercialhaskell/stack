@@ -86,7 +86,7 @@ markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     ensureDir dir
-    ident' <- parseRelFile $ displayC ident
+    ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
     -- Remove old install records for this package.
     -- TODO: This is a bit in-efficient. Put all this metadata into one file?
@@ -103,7 +103,7 @@ markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThr
                     => InstallLocation -> PackageIdentifier -> m ()
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
-    ident' <- parseRelFile $ displayC ident
+    ident' <- parseRelFile $ packageIdentifierString ident
     liftIO $ ignoringAbsence (removeFile $ dir </> ident')
 
 buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
@@ -185,7 +185,7 @@ flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of
             Library _ gid _ -> ghcPkgIdString gid
-            Executable ident -> displayC ident
+            Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
 
@@ -257,7 +257,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
   ec <- view envConfigL
 
   compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
-  cabal <- view cabalVersionL >>= parseRelDir . displayC
+  cabal <- view cabalVersionL >>= parseRelDir . versionString
 
   -- The goal here is to come up with a string representing the
   -- package location which is unique. Luckily @TreeKey@s are exactly

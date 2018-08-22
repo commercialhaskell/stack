@@ -96,7 +96,11 @@ module Pantry
   , nightlySnapshotLocation
 
     -- * Cabal helpers
-  , displayC -- FIXME remove
+  , packageIdentifierString
+  , packageNameString
+  , flagNameString
+  , versionString
+  , moduleNameString
   , CabalString (..)
   , toCabalStringMap
   , unCabalStringMap

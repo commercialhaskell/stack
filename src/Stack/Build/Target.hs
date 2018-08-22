@@ -103,7 +103,7 @@ getRawInput boptscli locals =
         textTargets =
             -- Handle the no targets case, which means we pass in the names of all project packages
             if null textTargets'
-                then map displayC (Map.keys locals)
+                then map (T.pack . packageNameString) (Map.keys locals)
                 else textTargets'
      in (textTargets', map RawInput textTargets)
 
@@ -254,7 +254,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                     ]
     go (RTPackageComponent name ucomp) = return $
         case Map.lookup name locals of
-            Nothing -> Left $ T.pack $ "Unknown local package: " ++ displayC name
+            Nothing -> Left $ T.pack $ "Unknown local package: " ++ packageNameString name
             Just lpv ->
                 case ucomp of
                     ResolvedComponent comp
@@ -269,7 +269,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                             [ "Component "
                             , show comp
                             , " does not exist in package "
-                            , displayC name
+                            , packageNameString name
                             ]
                     UnresolvedComponent comp ->
                         case filter (isCompNamed comp) $ Set.toList $ lpvComponents lpv of
@@ -277,7 +277,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                                 [ "Component "
                                 , comp
                                 , " does not exist in package "
-                                , displayC name
+                                , T.pack $ packageNameString name
                                 ]
                             [x] -> Right ResolveResult
                               { rrName = name
@@ -290,7 +290,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                                 [ "Ambiguous component name "
                                 , comp
                                 , " for package "
-                                , displayC name
+                                , T.pack $ packageNameString name
                                 , ": "
                                 , T.pack $ show matches
                                 ]
@@ -343,7 +343,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
-            [ tshow (displayC name :: String)
+            [ tshow (packageNameString name)
             , " target has a specific version number, but it is a local package."
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
             , "\nTo build the local package, specify the target without an explicit version."
@@ -369,7 +369,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
             -- index, so refuse to do the override
             Just loc' -> Left $ T.concat
               [ "Package with identifier was targeted on the command line: "
-              , displayC ident
+              , T.pack $ packageIdentifierString ident
               , ", but it was specified from a non-index location: "
               , T.pack $ show loc'
               , ".\nRecommendation: add the correctly desired version to extra-deps."
@@ -432,7 +432,7 @@ combineResolveResults results = do
                   | all isJust mcomps -> Right $ Map.singleton name $ TargetComps $ Set.fromList $ catMaybes mcomps
                   | otherwise -> Left $ T.concat
                       [ "The package "
-                      , displayC name
+                      , T.pack $ packageNameString name
                       , " was specified in multiple, incompatible ways: "
                       , T.unwords $ map (unRawInput . rrRaw) rrs
                       ]

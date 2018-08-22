@@ -41,19 +41,19 @@ toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
       versions <- getHackagePackageVersions NoPreferredVersions name -- don't follow the preferred versions on Hackage, give curators more control
-      when (Map.null versions) $ error $ "Package not found on Hackage: " ++ displayC name
+      when (Map.null versions) $ error $ "Package not found on Hackage: " ++ packageNameString name
       for_ mrequiredLatest $ \required ->
         case Map.maxViewWithKey versions of
-          Nothing -> error $ "No versions found for " ++ displayC name
+          Nothing -> error $ "No versions found for " ++ packageNameString name
           Just ((version, _), _)
             | version == required -> pure ()
             | otherwise -> error $ concat
                 [ "For package "
-                , displayC name
+                , fromString (packageNameString name)
                 , ", required latest version to be "
-                , displayC required
+                , fromString (versionString required)
                 , ", but actual latest is "
-                , displayC version
+                , fromString (versionString version)
                 ]
       let versions' =
             case mrange of
