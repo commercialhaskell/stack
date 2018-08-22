@@ -73,24 +73,6 @@ library:
   - Pantry.Internal
   - Pantry.Internal.StaticBytes
 
-flags:
-  convert-old-stackage:
-    description: Build the convert-old-stackage executable
-    manual: true
-    default: false
-
-executables:
-  # Remove this executable once we're totally switched over.
-  # Keeping the src directory for now to avoid needing to expose internals.
-  convert-old-stackage:
-    when:
-    - condition: ! '! flag(convert-old-stackage)'
-      buildable: False
-    source-dirs:
-    - app/
-    - src/
-    main: convert-old-stackage.hs
-
 tests:
   spec:
     source-dirs: test
