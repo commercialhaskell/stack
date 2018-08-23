@@ -11,7 +11,7 @@ module Pantry.Archive
   ) where
 
 import RIO
-import RIO.FilePath (normalise, takeDirectory, (</>), normalise, splitPath)
+import RIO.FilePath (takeDirectory)
 import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
