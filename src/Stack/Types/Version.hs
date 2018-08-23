@@ -15,7 +15,6 @@ module Stack.Types.Version
   ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
   ,IntersectingVersionRange(..)
   ,VersionCheck(..)
-  ,parseVersionThrowing
   ,versionRangeText
   ,withinRange
   ,Stack.Types.Version.intersectVersionRanges
@@ -40,13 +39,6 @@ import           Distribution.Version (Version, versionNumbers, withinRange)
 import qualified Paths_stack as Meta
 import           Text.PrettyPrint (render)
 
--- | A parse fail.
-newtype VersionParseFail = VersionParseFail Text
-  deriving (Typeable)
-instance Exception VersionParseFail
-instance Show VersionParseFail where
-    show (VersionParseFail bs) = "Invalid version: " ++ show bs
-
 -- | A Package upgrade; Latest or a specific version.
 data UpgradeTo = Specific Version | Latest deriving (Show)
 
@@ -61,13 +53,6 @@ instance Semigroup IntersectingVersionRange where
 instance Monoid IntersectingVersionRange where
     mempty = IntersectingVersionRange Cabal.anyVersion
     mappend = (<>)
-
--- | Convenient way to parse a package version from a 'String'.
-parseVersionThrowing :: MonadThrow m => String -> m Version
-parseVersionThrowing str =
-  case parseVersion str of
-    Nothing -> throwM $ VersionParseFail $ T.pack str
-    Just v -> pure v
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text

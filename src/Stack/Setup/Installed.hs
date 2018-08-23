@@ -37,7 +37,6 @@ import           Path
 import           Path.IO
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.Version
 import           RIO.Process
 
 data Tool

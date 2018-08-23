@@ -24,7 +24,6 @@ import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
 import           RIO.Process
 import qualified RIO.Text as T

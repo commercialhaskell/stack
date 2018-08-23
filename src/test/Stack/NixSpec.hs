@@ -15,7 +15,6 @@ import Stack.Prelude
 import Stack.Types.Config
 import Stack.Types.Nix
 import Stack.Types.Runner
-import Stack.Types.Version
 import System.Directory
 import System.Environment
 import Test.Hspec

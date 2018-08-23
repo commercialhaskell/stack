@@ -48,8 +48,11 @@ module Pantry.Types
   , RepoType (..)
   , parsePackageIdentifier
   , parsePackageName
+  , parsePackageNameThrowing
+  , parsePackageNameFromFilePath
   , parseFlagName
   , parseVersion
+  , parseVersionThrowing
   , packageIdentifierString
   , packageNameString
   , flagNameString
@@ -1002,11 +1005,55 @@ parsePackageIdentifier str =
 parsePackageName :: String -> Maybe PackageName
 parsePackageName = Distribution.Text.simpleParse
 
+-- | A package name parse fail.
+data PackageNameParseFail
+  = PackageNameParseFail Text
+  | CabalFileNameParseFail FilePath
+  | CabalFileNameInvalidPackageName FilePath
+  deriving (Typeable)
+instance Exception PackageNameParseFail
+instance Show PackageNameParseFail where
+    show (PackageNameParseFail bs) = "Invalid package name: " ++ show bs
+    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
+    show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
+
+-- | Parse a package name from a 'String'.
+parsePackageNameThrowing :: MonadThrow m => String -> m PackageName
+parsePackageNameThrowing str =
+  case parsePackageName str of
+    Nothing -> throwM $ PackageNameParseFail $ T.pack str
+    Just pn -> pure pn
+
+-- | Parse a package name from a file path.
+parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
+parsePackageNameFromFilePath fp = do
+    base <- clean $ toFilePath $ filename fp
+    case parsePackageName base of
+        Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
+        Just x -> return x
+  where clean = liftM reverse . strip . reverse
+        strip ('l':'a':'b':'a':'c':'.':xs) = return xs
+        strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
+
 -- | Parse a version from a 'String'.
 --
 -- @since 0.1.0.0
 parseVersion :: String -> Maybe Version
 parseVersion = Distribution.Text.simpleParse
+
+-- | A parse fail.
+newtype VersionParseFail = VersionParseFail Text
+  deriving (Typeable)
+instance Exception VersionParseFail
+instance Show VersionParseFail where
+    show (VersionParseFail bs) = "Invalid version: " ++ show bs
+
+-- | Convenient way to parse a package version from a 'String'.
+parseVersionThrowing :: MonadThrow m => String -> m Version
+parseVersionThrowing str =
+  case parseVersion str of
+    Nothing -> throwM $ VersionParseFail $ T.pack str
+    Just v -> pure v
 
 -- | Parse a version range from a 'String'.
 --

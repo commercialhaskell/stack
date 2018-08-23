@@ -77,7 +77,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
