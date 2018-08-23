@@ -5,6 +5,9 @@ packages:
 - subs/pantry
 - subs/curator
 
+extra-deps:
+- persistent-sqlite-2.8.2@sha256:6874958eb2943c4567c30bc0069ce4868b2813c490402c22bb2e0efa5b4c4c71,3873
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
