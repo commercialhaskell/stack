@@ -64,6 +64,7 @@ import           Data.Time.Clock
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
+import           Distribution.Version            (mkVersion)
 import           Path                            (mkRelDir, parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
@@ -610,7 +611,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- earlier. Cabal also might do less work then.
     useExactConf = configAllowNewer config
 
-    newerCabal = view cabalVersionL econfig >= $(mkVersion "1.22")
+    newerCabal = view cabalVersionL econfig >= mkVersion [1, 22]
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.

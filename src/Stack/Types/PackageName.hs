@@ -10,20 +10,13 @@
 -- | Names for packages.
 
 module Stack.Types.PackageName
-  (PackageName
-  ,PackageNameParseFail(..)
-  ,parsePackageName
-  ,parsePackageNameThrowing
+  (parsePackageNameThrowing
   ,parsePackageNameFromFilePath
-  ,mkPackageName
   ,packageNameArgument)
   where
 
 import           Stack.Prelude
 import qualified Data.Text as T
-import qualified Distribution.Package as Cabal
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
 import qualified Options.Applicative as O
 import           Path
 
@@ -38,13 +31,6 @@ instance Show PackageNameParseFail where
     show (PackageNameParseFail bs) = "Invalid package name: " ++ show bs
     show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
     show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
-
--- | Make a package name.
-mkPackageName :: String -> Q Exp
-mkPackageName s =
-  case parsePackageName s of
-    Nothing -> qRunIO $ throwIO (PackageNameParseFail $ T.pack s)
-    Just _ -> [|Cabal.mkPackageName s|]
 
 -- | Parse a package name from a 'String'.
 parsePackageNameThrowing :: MonadThrow m => String -> m PackageName

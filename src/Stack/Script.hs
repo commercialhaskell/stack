@@ -13,6 +13,7 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
+import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
 import qualified Stack.Build
@@ -163,48 +164,48 @@ getPackagesFromModuleInfo mi scriptFP = do
 -- packages that should never be auto-parsed in.
 blacklist :: Set PackageName
 blacklist = Set.fromList
-    [ $(mkPackageName "async-dejafu")
-    , $(mkPackageName "monads-tf")
-    , $(mkPackageName "crypto-api")
-    , $(mkPackageName "fay-base")
-    , $(mkPackageName "hashmap")
-    , $(mkPackageName "hxt-unicode")
-    , $(mkPackageName "hledger-web")
-    , $(mkPackageName "plot-gtk3")
-    , $(mkPackageName "gtk3")
-    , $(mkPackageName "regex-pcre-builtin")
-    , $(mkPackageName "regex-compat-tdfa")
-    , $(mkPackageName "log")
-    , $(mkPackageName "zip")
-    , $(mkPackageName "monad-extras")
-    , $(mkPackageName "control-monad-free")
-    , $(mkPackageName "prompt")
-    , $(mkPackageName "kawhi")
-    , $(mkPackageName "language-c")
-    , $(mkPackageName "gl")
-    , $(mkPackageName "svg-tree")
-    , $(mkPackageName "Glob")
-    , $(mkPackageName "nanospec")
-    , $(mkPackageName "HTF")
-    , $(mkPackageName "courier")
-    , $(mkPackageName "newtype-generics")
-    , $(mkPackageName "objective")
-    , $(mkPackageName "binary-ieee754")
-    , $(mkPackageName "rerebase")
-    , $(mkPackageName "cipher-aes")
-    , $(mkPackageName "cipher-blowfish")
-    , $(mkPackageName "cipher-camellia")
-    , $(mkPackageName "cipher-des")
-    , $(mkPackageName "cipher-rc4")
-    , $(mkPackageName "crypto-cipher-types")
-    , $(mkPackageName "crypto-numbers")
-    , $(mkPackageName "crypto-pubkey")
-    , $(mkPackageName "crypto-random")
-    , $(mkPackageName "cryptohash")
-    , $(mkPackageName "cryptohash-conduit")
-    , $(mkPackageName "cryptohash-md5")
-    , $(mkPackageName "cryptohash-sha1")
-    , $(mkPackageName "cryptohash-sha256")
+    [ mkPackageName "async-dejafu"
+    , mkPackageName "monads-tf"
+    , mkPackageName "crypto-api"
+    , mkPackageName "fay-base"
+    , mkPackageName "hashmap"
+    , mkPackageName "hxt-unicode"
+    , mkPackageName "hledger-web"
+    , mkPackageName "plot-gtk3"
+    , mkPackageName "gtk3"
+    , mkPackageName "regex-pcre-builtin"
+    , mkPackageName "regex-compat-tdfa"
+    , mkPackageName "log"
+    , mkPackageName "zip"
+    , mkPackageName "monad-extras"
+    , mkPackageName "control-monad-free"
+    , mkPackageName "prompt"
+    , mkPackageName "kawhi"
+    , mkPackageName "language-c"
+    , mkPackageName "gl"
+    , mkPackageName "svg-tree"
+    , mkPackageName "Glob"
+    , mkPackageName "nanospec"
+    , mkPackageName "HTF"
+    , mkPackageName "courier"
+    , mkPackageName "newtype-generics"
+    , mkPackageName "objective"
+    , mkPackageName "binary-ieee754"
+    , mkPackageName "rerebase"
+    , mkPackageName "cipher-aes"
+    , mkPackageName "cipher-blowfish"
+    , mkPackageName "cipher-camellia"
+    , mkPackageName "cipher-des"
+    , mkPackageName "cipher-rc4"
+    , mkPackageName "crypto-cipher-types"
+    , mkPackageName "crypto-numbers"
+    , mkPackageName "crypto-pubkey"
+    , mkPackageName "crypto-random"
+    , mkPackageName "cryptohash"
+    , mkPackageName "cryptohash-conduit"
+    , mkPackageName "cryptohash-md5"
+    , mkPackageName "cryptohash-sha1"
+    , mkPackageName "cryptohash-sha256"
     ]
 
 toModuleInfo :: LoadedSnapshot -> ModuleInfo

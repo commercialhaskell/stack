@@ -63,6 +63,8 @@ import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
+import              Distribution.Types.PackageName (mkPackageName)
+import              Distribution.Version (mkVersion)
 import              Lens.Micro (set)
 import              Network.HTTP.StackClient (getResponseBody, getResponseStatusCode)
 import              Network.HTTP.Download
@@ -377,7 +379,7 @@ ensureCompiler :: (HasConfig env, HasGHCVariant env)
                -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (wantedToActual (soptsWantedCompiler sopts))
-    when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < $(mkVersion "7.8")) $ do
+    when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < mkVersion [7, 8]) $ do
         logWarn "Stack will almost certainly fail with GHC below version 7.8"
         logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
@@ -407,7 +409,7 @@ ensureCompiler sopts = do
 
             case platform of
                 Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
-                    case getInstalledTool installed $(mkPackageName "msys2") (const True) of
+                    case getInstalledTool installed (mkPackageName "msys2") (const True) of
                         Just tool -> return (Just tool)
                         Nothing
                             | soptsInstallIfMissing sopts -> do
@@ -418,7 +420,7 @@ ensureCompiler sopts = do
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
                                         Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
-                                let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
+                                let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
                                 Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
                             | otherwise -> do
                                 logWarn "Continuing despite missing tool: msys2"
@@ -661,7 +663,7 @@ ensureDockerStackExe containerPlatform = do
     config <- view configL
     containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
-        tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
+        tool = Tool (PackageIdentifier (mkPackageName "stack") stackVersion)
     stackExeDir <- installDir programsPath tool
     let stackExePath = stackExeDir </> $(mkRelFile "stack")
     stackExeExists <- doesFileExist stackExePath
@@ -683,7 +685,7 @@ upgradeCabal :: (HasConfig env, HasGHCVariant env)
 upgradeCabal wc upgradeTo = do
     logWarn "Using deprecated --upgrade-cabal feature, this is not recommended"
     logWarn "Manipulating the global Cabal is only for debugging purposes"
-    let name = $(mkPackageName "Cabal")
+    let name = mkPackageName "Cabal"
     installed <- getCabalPkgVer wc
     case upgradeTo of
         Specific wantedVersion -> do
@@ -715,7 +717,7 @@ doCabalInstall :: (HasConfig env, HasGHCVariant env)
                -> Version
                -> RIO env ()
 doCabalInstall wc installed wantedVersion = do
-    when (wantedVersion >= $(mkVersion "2.2")) $ do
+    when (wantedVersion >= mkVersion [2, 2]) $ do
         logWarn "--upgrade-cabal will almost certainly fail for Cabal 2.2 or later"
         logWarn "See: https://github.com/commercialhaskell/stack/issues/4070"
         logWarn "Valiantly attempting to build it anyway, but I know this is doomed"
@@ -725,7 +727,7 @@ doCabalInstall wc installed wantedVersion = do
             fromString (versionString wantedVersion) <>
             " to replace " <>
             fromString (versionString installed)
-        let name = $(mkPackageName "Cabal")
+        let name = mkPackageName "Cabal"
         suffix <- parseRelDir $ "Cabal-" ++ versionString wantedVersion
         let dir = tmpdir </> suffix
         unpackPackageLocation dir $ PLIHackage
@@ -1267,20 +1269,20 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
             logInfo "No cabal-install binary found for use with GHCJS."
             return True
         Just v
-            | v < $(mkVersion "1.22.4") -> do
+            | v < mkVersion [1, 22, 4] -> do
                 logInfo $
                     "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
                     fromString (versionString v) <>
                     ")."
                 return True
-            | v >= $(mkVersion "1.23") -> do
+            | v >= mkVersion [1, 23] -> do
                 logWarn $
                     "The cabal-install found on PATH is a version stack doesn't know about, version " <>
                     fromString (versionString v) <>
                     ". This may or may not work.\n" <>
                     "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
                 return False
-            | ghcjsVersion >= $(mkVersion "0.2.0.20160413") && v >= $(mkVersion "1.22.8") -> do
+            | ghcjsVersion >= mkVersion [0, 2, 0, 20160413] && v >= mkVersion [1, 22, 8] -> do
                 logWarn $
                     "The cabal-install found on PATH, version " <>
                     fromString (versionString v) <>
@@ -1315,7 +1317,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
                 Nothing -> do
                     logError "Failed to get cabal-install version after installing it."
                     failedToFindErr
-                Just v | v >= $(mkVersion "1.22.8") && v < $(mkVersion "1.23") ->
+                Just v | v >= mkVersion [1, 22, 8] && v < mkVersion [1, 23] ->
                     logWarn $
                         "Installed version of cabal-install is in a version range which may not work.\n" <>
                         "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
@@ -1680,7 +1682,7 @@ getUtf8EnvVars
     => ActualCompiler
     -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
-    if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
+    if getGhcVersion compilerVer >= mkVersion [7, 10, 3]
         -- GHC_CHARENC supported by GHC >=7.10.3
         then return $ Map.singleton "GHC_CHARENC" "UTF-8"
         else legacyLocale

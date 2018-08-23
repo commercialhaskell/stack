@@ -12,13 +12,13 @@ import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
 import qualified Data.Text as T
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version (mkVersion)
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           System.Exit
 import           RIO.Process
 
@@ -74,8 +74,8 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
                        return ()))
-    hooglePackageName = $(mkPackageName "hoogle")
-    hoogleMinVersion = $(mkVersion "5.0")
+    hooglePackageName = mkPackageName "hoogle"
+    hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
         PackageIdentifier hooglePackageName hoogleMinVersion
     installHoogle :: RIO EnvConfig ()

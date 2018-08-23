@@ -58,6 +58,8 @@ import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version (mkVersion)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
@@ -82,7 +84,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
@@ -838,7 +839,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         deleteCaches pkgDir
         announce
         let programNames =
-                if eeCabalPkgVer < $(mkVersion "1.22")
+                if eeCabalPkgVer < mkVersion [1, 22]
                     then ["ghc", "ghc-pkg"]
                     else ["ghc", "ghc-pkg", "ghcjs", "ghcjs-pkg"]
         exes <- forM programNames $ \name -> do
@@ -1024,7 +1025,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                     -- Omit cabal package dependency when building
                     -- Cabal. See
                     -- https://github.com/commercialhaskell/stack/issues/1356
-                    | packageName package == $(mkPackageName "Cabal") = []
+                    | packageName package == mkPackageName "Cabal" = []
                     | otherwise =
                         ["-package=" ++ packageIdentifierString
                                             (PackageIdentifier cabalPackageName
@@ -1059,7 +1060,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
                         (Just customSetupDeps, _) -> do
-                            unless (Map.member $(mkPackageName "Cabal") customSetupDeps) $
+                            unless (Map.member (mkPackageName "Cabal") customSetupDeps) $
                                 prettyWarnL
                                     [ fromString $ packageNameString $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
@@ -1525,7 +1526,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             let quickjump =
                   case actualCompiler of
                     ACGhc ghcVer
-                      | ghcVer >= $(mkVersion "8.4") -> ["--haddock-option=--quickjump"]
+                      | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
                     _ -> []
 
             cabal KeepTHLoading $ concat
@@ -1928,7 +1929,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     filterLinkerWarnings
         -- Check for ghc 7.8 since it's the only one prone to producing
         -- linker warnings on Windows x64
-        | getGhcVersion compilerVer >= $(mkVersion "7.8") = doNothing
+        | getGhcVersion compilerVer >= mkVersion [7, 8] = doNothing
         | otherwise = CL.filter (not . isLinkerWarning)
 
     isLinkerWarning :: Text -> Bool
@@ -2101,7 +2102,7 @@ addGlobalPackages deps globals0 =
     ----------------------------------
 
     -- Is the given package identifier for any version of Cabal
-    isCabal (PackageIdentifier name _) = name == $(mkPackageName "Cabal")
+    isCabal (PackageIdentifier name _) = name == mkPackageName "Cabal"
 
     -- Is the given package name provided by the package dependencies?
     isDep dp = pkgName (dpPackageIdent dp) `Set.member` depNames

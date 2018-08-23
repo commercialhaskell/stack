@@ -39,6 +39,7 @@ import qualified Data.Yaml as Yaml
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text as C
+import           Distribution.Version (mkVersion)
 import           Path
 import           Path.Find (findFiles)
 import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
@@ -55,9 +56,6 @@ import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.Version
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           RIO.Process
@@ -207,9 +205,8 @@ parseCabalOutputLine t0 = maybe (Left t0) Right . join .  match re $ t0
 
     mk :: String -> [Maybe (Bool, String)] -> Maybe (PackageName, (Version, Map FlagName Bool))
     mk ident fl = do
-        PackageIdentifier name version <-
-            parsePackageIdentifierThrowing ident
-        fl' <- (traverse . traverse) parseFlagNameThrowing $ catMaybes fl
+        PackageIdentifier name version <- parsePackageIdentifier ident
+        fl' <- (traverse . traverse) parseFlagName $ catMaybes fl
         return (name, (version, Map.fromList $ map swap fl'))
 
     lexeme r = some (psym isSpace) *> r
@@ -298,12 +295,12 @@ setupCabalEnv compiler inner = do
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
         Just version
-            | version < $(mkVersion "1.24") -> prettyWarn $
+            | version < mkVersion [1, 24] -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 fromString (versionString version) <>
                 ") doesn't support custom-setup clause, and so may not yield correct results." <> line <>
                 "To resolve this, install a newer version via 'stack install cabal-install'." <> line
-            | version >= $(mkVersion "1.25") -> prettyWarn $
+            | version >= mkVersion [1, 25] -> prettyWarn $
                 "Installed version of cabal-install (" <>
                 fromString (versionString version) <>
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line

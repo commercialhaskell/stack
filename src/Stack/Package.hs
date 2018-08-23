@@ -58,6 +58,7 @@ import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
+import           Distribution.Version (mkVersion)
 import           Lens.Micro (lens)
 import qualified Hpack.Config as Hpack
 import           Path as FL
@@ -498,7 +499,7 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
 -- | Make the global autogen dir if Cabal version is new enough.
 packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
 packageAutogenDir cabalVer distDir
-    | cabalVer < $(mkVersion "2.0") = Nothing
+    | cabalVer < mkVersion [2, 0] = Nothing
     | otherwise = Just $ buildDir distDir </> $(mkRelDir "global-autogen")
 
 -- | Make the autogen dir.
@@ -509,7 +510,7 @@ componentAutogenDir cabalVer component distDir =
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
 componentBuildDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentBuildDir cabalVer component distDir
-    | cabalVer < $(mkVersion "2.0") = buildDir distDir
+    | cabalVer < mkVersion [2, 0] = buildDir distDir
     | otherwise =
         case component of
             CLib -> buildDir distDir
@@ -562,7 +563,7 @@ packageDependencies pkgConfig pkg' =
   maybe [] setupDepends (setupBuildInfo pkg)
   where
     pkg
-      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= $(mkVersion "8.0") = pkg'
+      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= mkVersion [8, 0] = pkg'
       -- Set all components to buildable. Only need to worry about
       -- library, exe, test, and bench, since others didn't exist in
       -- older Cabal versions

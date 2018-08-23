@@ -40,10 +40,10 @@ module Stack.Constants
 
 import           Data.Char (toUpper)
 import qualified Data.Set as Set
+import           Distribution.Package (mkPackageName)
 import           Path as FL
 import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.PackageName
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -164,7 +164,7 @@ ghcjsBootPackages =
 -- | Just to avoid repetition and magic strings.
 cabalPackageName :: PackageName
 cabalPackageName =
-    $(mkPackageName "Cabal")
+    mkPackageName "Cabal"
 
 -- | Deprecated implicit global project directory used when outside of a project.
 implicitGlobalProjectDirDeprecated :: Path Abs Dir -- ^ Stack root.

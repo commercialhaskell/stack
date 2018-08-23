@@ -10,13 +10,12 @@ import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.License          (License(..))
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version          (mkVersion)
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
@@ -72,7 +71,8 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "haskell2010-1.1.2.0-05c8dd51009e08c6371c82972d40f55a"
-            packageIdent <- parsePackageIdentifierThrowing "haskell2010-1.1.2.0"
+            packageIdent <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "haskell2010-1.1.2.0"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
@@ -105,7 +105,8 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "ghc-7.10.1-325809317787a897b7a97d646ceaa3a3"
-            pkgIdent <- parsePackageIdentifierThrowing "ghc-7.10.1"
+            pkgIdent <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "ghc-7.10.1"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.1.0-e29cdbe82692341ebb7ce6e2798294f9"
                 , "base-4.8.0.0-1b689eb8d72c4d4cc88f445839c1f01a"
@@ -148,7 +149,8 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
-            pkgId <- parsePackageIdentifierThrowing"hmatrix-0.16.1.5"
+            pkgId <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "hmatrix-0.16.1.5"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-918c7ac27f65a87103264a9f51652d63"
@@ -189,7 +191,8 @@ spec = do
              .| conduitDumpPackage
              .| CL.consume
           ghcPkgId <- parseGhcPkgId "ghc-boot-0.0.0.0"
-          pkgId <- parsePackageIdentifierThrowing"ghc-boot-0.0.0.0"
+          pkgId <- maybe (fail "Not parsable package id") return $
+            parsePackageIdentifier "ghc-boot-0.0.0.0"
           depends <- mapM parseGhcPkgId
             [ "base-4.9.0.0"
             , "binary-0.7.5.0"
@@ -233,13 +236,13 @@ spec = do
             .| addProfiling icache
             .| addHaddock icache
             .| fakeAddSymbols
-            .| sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
-        case Map.lookup $(mkPackageName "base") m of
+            .| sinkMatching False False False (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
+        case Map.lookup (mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
         liftIO $ do
-          Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
-          Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
+          Map.lookup (mkPackageName "transformers") m `shouldBe` Nothing
+          Map.lookup (mkPackageName "ghc") m `shouldBe` Nothing
 
     describe "pruneDeps" $ do
         it "sanity check" $ do

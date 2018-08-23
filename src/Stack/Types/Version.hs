@@ -15,9 +15,7 @@ module Stack.Types.Version
   ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
   ,IntersectingVersionRange(..)
   ,VersionCheck(..)
-  ,parseVersion
   ,parseVersionThrowing
-  ,mkVersion
   ,versionRangeText
   ,withinRange
   ,Stack.Types.Version.intersectVersionRanges
@@ -39,8 +37,6 @@ import qualified Data.Text as T
 import           Distribution.Text (disp)
 import qualified Distribution.Version as Cabal
 import           Distribution.Version (Version, versionNumbers, withinRange)
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
 import qualified Paths_stack as Meta
 import           Text.PrettyPrint (render)
 
@@ -72,13 +68,6 @@ parseVersionThrowing str =
   case parseVersion str of
     Nothing -> throwM $ VersionParseFail $ T.pack str
     Just v -> pure v
-
--- | Make a package version.
-mkVersion :: String -> Q Exp
-mkVersion s =
-  case parseVersion s of
-    Nothing -> qRunIO $ throwIO (VersionParseFail $ T.pack s)
-    Just (versionNumbers -> vs) -> [|Cabal.mkVersion vs|]
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text
