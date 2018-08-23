@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: dedbcf32c495f3c94a429dbff58018d9cc5752dbc15da5970b6dd481481b2087
+-- hash: eba6c9bbaefbe2f054bed34aa2f27e1055f41fa29b37db14a5f70ff84151c739
 
 name:           pantry
 version:        0.1.0.0
@@ -58,7 +58,7 @@ library
     , digest
     , generic-deriving
     , hackage-security
-    , hpack
+    , hpack >=0.29.6
     , http-client
     , http-client-tls
     , http-conduit
@@ -98,6 +98,7 @@ test-suite spec
       Pantry.CabalSpec
       Pantry.HackageSpec
       Pantry.Internal.StaticBytesSpec
+      Pantry.InternalSpec
       Pantry.TreeSpec
       Pantry.TypesSpec
       Paths_pantry
@@ -120,7 +121,7 @@ test-suite spec
     , generic-deriving
     , hackage-security
     , hedgehog
-    , hpack
+    , hpack >=0.29.6
     , hspec
     , http-client
     , http-client-tls

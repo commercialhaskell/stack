@@ -56,7 +56,7 @@ dependencies:
 - tar-conduit
 - time
 - unix-compat
-- hpack
+- hpack >= 0.29.6
 - yaml
 - zip-archive
 - text-metrics
