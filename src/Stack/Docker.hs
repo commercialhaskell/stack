@@ -41,6 +41,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (showVersion)
+import           Distribution.Version (mkVersion)
 import           GHC.Exts (sortWith)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -706,7 +707,7 @@ checkDockerVersion docker =
                return ()
            _ -> throwIO InvalidVersionOutputException
        _ -> throwIO InvalidVersionOutputException
-  where minimumDockerVersion = $(mkVersion "1.6.0")
+  where minimumDockerVersion = mkVersion [1, 6, 0]
         prohibitedDockerVersions = []
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
 

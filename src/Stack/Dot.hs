@@ -3,7 +3,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Dot (dot
                  ,listDependencies
@@ -24,6 +23,7 @@ import qualified Data.Traversable as T
 import           Distribution.Text (display)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
+import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -38,7 +38,6 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageName
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -123,7 +122,7 @@ createDependencyGraph dotOpts = do
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
-          | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
+          | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
               return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
           | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader

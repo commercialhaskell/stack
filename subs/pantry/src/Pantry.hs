@@ -88,8 +88,10 @@ module Pantry
     -- ** Cabal values
   , parsePackageIdentifier
   , parsePackageName
+  , parsePackageNameThrowing
   , parseFlagName
   , parseVersion
+  , parseVersionThrowing
 
     -- * Stackage snapshots
   , ltsSnapshotLocation

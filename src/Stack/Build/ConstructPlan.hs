@@ -4,12 +4,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -32,6 +29,8 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version (mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Path (parent)
 import qualified RIO
@@ -50,7 +49,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.IO (putStrLn)
@@ -225,7 +223,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps bconfig =
-        $(mkPackageName "base") `elem`
+        mkPackageName "base" `elem`
         [n | (PLImmutable (PLIHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx
@@ -956,7 +954,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
 
     addExtraDepsRecommendations
       | Map.null extras = []
-      | (Just _) <- Map.lookup $(mkPackageName "base") extras =
+      | (Just _) <- Map.lookup (mkPackageName "base") extras =
           [ "  *" <+> align (flow "Build requires unattainable version of base. Since base is a part of GHC, you most likely need to use a different GHC version with the matching base.")
            , line
           ]
@@ -1097,7 +1095,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted name =
     -- search of dependencies.
     findShortest :: Int -> Map PackageName DepsPath -> [PackageIdentifier]
     findShortest fuel _ | fuel <= 0 =
-        [PackageIdentifier $(mkPackageName "stack-ran-out-of-jet-fuel") $(mkVersion "0")]
+        [PackageIdentifier (mkPackageName "stack-ran-out-of-jet-fuel") (mkVersion [0])]
     findShortest _ paths | M.null paths = []
     findShortest fuel paths =
         case targets of

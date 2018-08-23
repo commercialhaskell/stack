@@ -48,8 +48,10 @@ module Pantry.Types
   , RepoType (..)
   , parsePackageIdentifier
   , parsePackageName
+  , parsePackageNameThrowing
   , parseFlagName
   , parseVersion
+  , parseVersionThrowing
   , packageIdentifierString
   , packageNameString
   , flagNameString
@@ -618,6 +620,8 @@ data PantryException
   | CannotCompleteRepoNonSHA1 !Repo
   | MutablePackageLocationFromUrl !Text
   | MismatchedCabalFileForHackage !PackageIdentifierRevision !(Mismatch PackageIdentifier)
+  | PackageNameParseFail !Text
+  | PackageVersionParseFail !Text
 
   deriving Typeable
 instance Exception PantryException where
@@ -779,6 +783,10 @@ instance Display PantryException where
     ":\nMismatched package identifier." <>
     "\nExpected: " <> fromString (packageIdentifierString mismatchExpected) <>
     "\nActual:   " <> fromString (packageIdentifierString mismatchActual)
+  display (PackageNameParseFail t) =
+    "Invalid package name: " <> display t
+  display (PackageVersionParseFail t) =
+    "Invalid version: " <> display t
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
@@ -1002,11 +1010,29 @@ parsePackageIdentifier str =
 parsePackageName :: String -> Maybe PackageName
 parsePackageName = Distribution.Text.simpleParse
 
+-- | Parse a package name from a 'String' throwing on failure
+--
+-- @since 0.1.0.0
+parsePackageNameThrowing :: MonadThrow m => String -> m PackageName
+parsePackageNameThrowing str =
+  case parsePackageName str of
+    Nothing -> throwM $ PackageNameParseFail $ T.pack str
+    Just pn -> pure pn
+
 -- | Parse a version from a 'String'.
 --
 -- @since 0.1.0.0
 parseVersion :: String -> Maybe Version
 parseVersion = Distribution.Text.simpleParse
+
+-- | Parse a package version from a 'String' throwing on failure
+--
+-- @since 0.1.0.0
+parseVersionThrowing :: MonadThrow m => String -> m Version
+parseVersionThrowing str =
+  case parseVersion str of
+    Nothing -> throwM $ PackageVersionParseFail $ T.pack str
+    Just v -> pure v
 
 -- | Parse a version range from a 'String'.
 --

@@ -199,7 +199,7 @@ import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import qualified Distribution.Types.UnqualComponentName as C
-import           Distribution.Version (anyVersion, mkVersion')
+import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
@@ -216,7 +216,6 @@ import           Stack.Types.Docker
 import           Stack.Types.Image
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
-import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.StylesUpdate (StylesUpdate,
@@ -864,9 +863,9 @@ parseConfigMonoidObject rootDir obj = do
         name <-
             if name' == "*"
                 then return Nothing
-                else case parsePackageNameThrowing $ T.unpack name' of
-                        Left e -> fail $ show e
-                        Right x -> return $ Just x
+                else case parsePackageName $ T.unpack name' of
+                        Nothing -> fail $ "Invalid package name: " ++ show name'
+                        Just x -> return $ Just x
         return (name, b)
 
 configMonoidWorkDirName :: Text
@@ -1747,9 +1746,9 @@ instance FromJSONKey GhcOptionKey where
       "$locals" -> return GOKLocals
       "$targets" -> return GOKTargets
       _ ->
-        case parsePackageNameThrowing $ T.unpack t of
-          Left e -> fail $ show e
-          Right x -> return $ GOKPackage x
+        case parsePackageName $ T.unpack t of
+          Nothing -> fail $ "Invalid package name: " ++ show t
+          Just x -> return $ GOKPackage x
   fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
 
 newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
@@ -1963,7 +1962,7 @@ envOverrideSettingsL = configL.lens
 shouldForceGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env Bool
 shouldForceGhcColorFlag = do
-    canDoColor <- (>= $(mkVersion "8.2.1")) . getGhcVersion
+    canDoColor <- (>= mkVersion [8, 2, 1]) . getGhcVersion
               <$> view actualCompilerVersionL
     shouldDoColor <- view useColorL
     return $ canDoColor && shouldDoColor

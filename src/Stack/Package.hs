@@ -58,6 +58,7 @@ import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
+import           Distribution.Version (mkVersion)
 import           Lens.Micro (lens)
 import qualified Hpack.Config as Hpack
 import           Path as FL
@@ -76,7 +77,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
@@ -498,7 +498,7 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
 -- | Make the global autogen dir if Cabal version is new enough.
 packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
 packageAutogenDir cabalVer distDir
-    | cabalVer < $(mkVersion "2.0") = Nothing
+    | cabalVer < mkVersion [2, 0] = Nothing
     | otherwise = Just $ buildDir distDir </> $(mkRelDir "global-autogen")
 
 -- | Make the autogen dir.
@@ -509,7 +509,7 @@ componentAutogenDir cabalVer component distDir =
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
 componentBuildDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentBuildDir cabalVer component distDir
-    | cabalVer < $(mkVersion "2.0") = buildDir distDir
+    | cabalVer < mkVersion [2, 0] = buildDir distDir
     | otherwise =
         case component of
             CLib -> buildDir distDir
@@ -562,7 +562,7 @@ packageDependencies pkgConfig pkg' =
   maybe [] setupDepends (setupBuildInfo pkg)
   where
     pkg
-      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= $(mkVersion "8.0") = pkg'
+      | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= mkVersion [8, 0] = pkg'
       -- Set all components to buildable. Only need to worry about
       -- library, exe, test, and bench, since others didn't exist in
       -- older Cabal versions
@@ -1224,6 +1224,27 @@ resolveFiles
     -> RIO Ctx [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names =
     forM names (\name -> liftM (name, ) (findCandidate dirs name))
+
+data CabalFileNameParseFail
+  = CabalFileNameParseFail FilePath
+  | CabalFileNameInvalidPackageName FilePath
+  deriving (Typeable)
+
+instance Exception CabalFileNameParseFail
+instance Show CabalFileNameParseFail where
+    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
+    show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
+
+-- | Parse a package name from a file path.
+parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
+parsePackageNameFromFilePath fp = do
+    base <- clean $ toFilePath $ filename fp
+    case parsePackageName base of
+        Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
+        Just x -> return x
+  where clean = liftM reverse . strip . reverse
+        strip ('l':'a':'b':'a':'c':'.':xs) = return xs
+        strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.

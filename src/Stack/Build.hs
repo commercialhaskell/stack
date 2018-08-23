@@ -2,13 +2,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Build the project.
 
@@ -36,6 +32,7 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
+import           Distribution.Version (mkVersion)
 import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
@@ -48,7 +45,6 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Version
 
 import           Stack.Types.Compiler (compilerVersionText
 #ifdef WINDOWS
@@ -152,7 +148,7 @@ checkCabalVersion = do
     allowNewer <- view $ configL.to configAllowNewer
     cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
-    when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
+    when (allowNewer && cabalVer < mkVersion [1, 22]) $ throwM $
         CabalVersionException $
             "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
             versionString cabalVer ++
@@ -293,7 +289,7 @@ fixCodePage :: HasEnvConfig env => RIO env a -> RIO env a
 fixCodePage inner = do
     mcp <- view $ configL.to configModifyCodePage
     ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
-    if mcp && ghcVersion < $(mkVersion "7.10.3")
+    if mcp && ghcVersion < mkVersion [7, 10, 3]
         then fixCodePage'
         -- GHC >=7.10.3 doesn't need this code page hack.
         else inner

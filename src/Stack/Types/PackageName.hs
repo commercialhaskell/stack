@@ -1,68 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TupleSections #-}
 
 -- | Names for packages.
 
 module Stack.Types.PackageName
-  (PackageName
-  ,PackageNameParseFail(..)
-  ,parsePackageName
-  ,parsePackageNameThrowing
-  ,parsePackageNameFromFilePath
-  ,mkPackageName
-  ,packageNameArgument)
-  where
+    ( packageNameArgument
+    ) where
 
 import           Stack.Prelude
-import qualified Data.Text as T
-import qualified Distribution.Package as Cabal
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
 import qualified Options.Applicative as O
-import           Path
 
--- | A parse fail.
-data PackageNameParseFail
-  = PackageNameParseFail Text
-  | CabalFileNameParseFail FilePath
-  | CabalFileNameInvalidPackageName FilePath
-  deriving (Typeable)
-instance Exception PackageNameParseFail
-instance Show PackageNameParseFail where
-    show (PackageNameParseFail bs) = "Invalid package name: " ++ show bs
-    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
-    show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
-
--- | Make a package name.
-mkPackageName :: String -> Q Exp
-mkPackageName s =
-  case parsePackageName s of
-    Nothing -> qRunIO $ throwIO (PackageNameParseFail $ T.pack s)
-    Just _ -> [|Cabal.mkPackageName s|]
-
--- | Parse a package name from a 'String'.
-parsePackageNameThrowing :: MonadThrow m => String -> m PackageName
-parsePackageNameThrowing str =
-  case parsePackageName str of
-    Nothing -> throwM $ PackageNameParseFail $ T.pack str
-    Just pn -> pure pn
-
--- | Parse a package name from a file path.
-parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
-parsePackageNameFromFilePath fp = do
-    base <- clean $ toFilePath $ filename fp
-    case parsePackageName base of
-        Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
-        Just x -> return x
-  where clean = liftM reverse . strip . reverse
-        strip ('l':'a':'b':'a':'c':'.':xs) = return xs
-        strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@.

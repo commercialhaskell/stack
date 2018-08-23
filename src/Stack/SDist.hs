@@ -43,7 +43,6 @@ import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import qualified Distribution.Text as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
@@ -59,7 +58,6 @@ import           Stack.Package
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
@@ -195,7 +193,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
                   $ Cabal.packageDescription gpd'
                   }
               }
-    ident <- parsePackageIdentifierThrowing $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
+        ident = Cabal.package $ Cabal.packageDescription gpd''
     -- Sanity rendering and reparsing the input, to ensure there are no
     -- cabal bugs, since there have been bugs here before, and currently
     -- are at the time of writing:

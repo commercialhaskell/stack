@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Distribution.Version (mkVersion)
 import           Path (parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -34,7 +35,6 @@ import           Stack.Constants
 import           Stack.Types.Build
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
-import           Stack.Types.Version
 import           System.FilePath (searchPathSeparator)
 import           RIO.Process
 
@@ -167,7 +167,7 @@ unregisterGhcPkgId wc cv pkgDb gid ident = do
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = "unregister" : "--user" : "--force" :
         (case cv of
-            ACGhc v | v < $(mkVersion "7.9") ->
+            ACGhc v | v < mkVersion [7, 9] ->
                 [packageIdentifierString ident]
             _ -> ["--ipid", ghcPkgIdString gid])
 
