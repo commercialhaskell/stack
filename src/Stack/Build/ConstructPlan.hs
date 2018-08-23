@@ -715,7 +715,7 @@ checkDirtiness :: PackageSource
                -> Map PackageIdentifier GhcPkgId
                -> Set PackageName
                -> M Bool
-checkDirtiness ps installed package present wanted = do
+checkDirtiness ps installed package present wanted' = do
     ctx <- ask
     moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
@@ -734,7 +734,7 @@ checkDirtiness ps installed package present wanted = do
                     PSFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSRemote{} -> Set.empty
             , configCacheHaddock =
-                shouldHaddockPackage buildOpts wanted (packageName package) ||
+                shouldHaddockPackage buildOpts wanted' (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
                 maybe False configCacheHaddock moldOpts
             , configCachePkgSrc = toCachePkgSrc ps
@@ -859,11 +859,11 @@ data ToolWarning = ToolWarning ExeName PackageName
   deriving Show
 
 toolWarningText :: ToolWarning -> Text
-toolWarningText (ToolWarning (ExeName toolName) pkgName) =
+toolWarningText (ToolWarning (ExeName toolName) pkgName') =
     "No packages found in snapshot which provide a " <>
     T.pack (show toolName) <>
     " executable, which is a build-tool dependency of " <>
-    T.pack (packageNameString pkgName)
+    T.pack (packageNameString pkgName')
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan
@@ -892,9 +892,9 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
     p <- asks ls
-    ls <- asks localNames
+    ls' <- asks localNames
     return $ fromMaybe False $ do
-        guard $ not $ name `Set.member` ls
+        guard $ not $ name `Set.member` ls'
         lpi <- Map.lookup name (lsPackages p)
         return $ lpiVersion lpi == version
 
@@ -931,7 +931,7 @@ pprintExceptions
     -> ParentMap
     -> Set PackageName
     -> StyleDoc
-pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
+pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
       , line <> line
@@ -1011,9 +1011,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                 flow "In the dependencies for" <+> pkgIdent <>
                 pprintFlags (packageFlags pkg) <> ":" <> line <>
                 indent 4 (vsep depErrors) <>
-                case getShortestDepsPath parentMap wanted (packageName pkg) of
+                case getShortestDepsPath parentMap wanted' (packageName pkg) of
                     Nothing -> line <> flow "needed for unknown reason - stack invariant violated."
-                    Just [] -> line <> flow "needed since" <+> pkgName <+> flow "is a build target."
+                    Just [] -> line <> flow "needed since" <+> pkgName' <+> flow "is a build target."
                     Just (target:path) -> line <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
                       where
                         pathElems =
@@ -1021,7 +1021,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted =
                             map (fromString . packageIdentifierString) path ++
                             [pkgIdent]
               where
-                pkgName = style Current . fromString . packageNameString $ packageName pkg
+                pkgName' = style Current . fromString . packageNameString $ packageName pkg
                 pkgIdent = style Current . fromString . packageIdentifierString $ packageIdentifier pkg
     -- Skip these when they are redundant with 'NotInBuildPlan' info.
     pprintException (UnknownPackage name)
@@ -1081,8 +1081,8 @@ getShortestDepsPath
     -> Set PackageName
     -> PackageName
     -> Maybe [PackageIdentifier]
-getShortestDepsPath (MonoidMap parentsMap) wanted name =
-    if Set.member name wanted
+getShortestDepsPath (MonoidMap parentsMap) wanted' name =
+    if Set.member name wanted'
         then Just []
         else case M.lookup name parentsMap of
             Nothing -> Nothing
@@ -1102,7 +1102,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted name =
             [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $ concatMap extendPath recurses
             _ -> let (DepsPath _ _ path) = minimum (map snd targets) in path
       where
-        (targets, recurses) = partition (\(n, _) -> n `Set.member` wanted) (M.toList paths)
+        (targets, recurses) = partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
     chooseBest :: DepsPath -> DepsPath -> DepsPath
     chooseBest x y = if x > y then x else y
     -- Extend a path to all its parents.
