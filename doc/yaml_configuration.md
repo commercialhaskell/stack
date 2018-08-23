@@ -837,7 +837,7 @@ Since 1.8.0
 ### ignore-revision-mismatch
 
 This flag was introduced in Stack 1.6, and removed in Stack 1.11 with
-hte move to Pantry. You will receive a warning if this configuration
+the move to Pantry. You will receive a warning if this configuration
 value is set.
 
 ### urls
