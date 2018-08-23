@@ -1014,6 +1014,17 @@ This option specifies which template to use with `stack new`, when none is
 specified. The default is called `new-template`. The other templates are listed
 in [the stack-templates repo](https://github.com/commercialhaskell/stack-templates/).
 
+### color
+
+This option specifies when to use color in output. The option is used as
+`color: <WHEN>`, where `<WHEN>` is 'always', 'never', or 'auto'. On Windows
+versions before Windows 10, for terminals that do not support color codes, the
+default is 'never'; color may work on terminals that support color codes.
+
+The color use can also be set at the command line using the equivalent
+`--color=<WHEN>` global option. Color use set at the command line takes
+precedence over that set in a yaml configuration file.
+
 ### stack-colors
 
 Stack uses styles to format some of its output. The default styles do not work

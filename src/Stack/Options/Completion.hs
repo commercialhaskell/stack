@@ -21,7 +21,6 @@ import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Config (getLocalPackages)
-import           Stack.DefaultColorWhen (defaultColorWhen)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
 import           Stack.Prelude hiding (lift)
@@ -58,8 +57,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         -- If it looks like a flag, skip this more costly completion.
         ('-': _) -> return []
         _ -> do
-            defColorWhen <- liftIO defaultColorWhen
-            let go = (globalOptsFromMonoid False defColorWhen mempty)
+            let go = (globalOptsFromMonoid False mempty)
                     { globalLogLevel = LevelOther "silent" }
             loadConfigWithOpts go $ \lc -> do
               bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)

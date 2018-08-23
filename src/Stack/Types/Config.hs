@@ -441,7 +441,6 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalCompiler     :: !(Maybe (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
-    , globalColorWhen    :: !ColorWhen -- ^ When to use ansi terminal colors
     , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
@@ -466,7 +465,6 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidResolver     :: !(First AbstractResolver) -- ^ Resolver override
     , globalMonoidCompiler     :: !(First (CompilerVersion 'CVWanted)) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
-    , globalMonoidColorWhen    :: !(First ColorWhen) -- ^ When to use ansi colors
     , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
@@ -793,7 +791,9 @@ data ConfigMonoid =
     -- ^ See 'configHackageBaseUrl'
     , configMonoidIgnoreRevisionMismatch :: !(First Bool)
     -- ^ See 'configIgnoreRevisionMismatch'
-    , configMonoidStyles :: !StylesUpdate
+    , configMonoidColorWhen          :: !(First ColorWhen)
+    -- ^ When to use 'ANSI' colors
+    , configMonoidStyles             :: !StylesUpdate
     }
   deriving (Show, Generic)
 
@@ -891,6 +891,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
     configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
     configMonoidIgnoreRevisionMismatch <- First <$> obj ..:? configMonoidIgnoreRevisionMismatchName
+    configMonoidColorWhen <- First <$> obj ..:? configMonoidColorWhenName
     configMonoidStyles <- fromMaybe mempty <$> obj ..:? configMonoidStylesName
 
     return ConfigMonoid {..}
@@ -1036,6 +1037,9 @@ configMonoidHackageBaseUrlName = "hackage-base-url"
 
 configMonoidIgnoreRevisionMismatchName :: Text
 configMonoidIgnoreRevisionMismatchName = "ignore-revision-mismatch"
+
+configMonoidColorWhenName :: Text
+configMonoidColorWhenName = "color"
 
 configMonoidStylesName :: Text
 configMonoidStylesName = "stack-colors"

@@ -14,7 +14,6 @@ import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
 globalOptsParser :: FilePath -> GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
@@ -34,15 +33,6 @@ globalOptsParser currentDir kind defLogLevel =
         "terminal"
         "overriding terminal detection in the case of running in a false terminal"
         hide <*>
-    optionalFirst (option readColorWhen
-        (long "color" <>
-         metavar "WHEN" <>
-         completeWith ["always", "never", "auto"] <>
-         help "Specify when to use color in output; WHEN is 'always', 'never', \
-              \or 'auto'. On Windows versions before Windows 10, for terminals \
-              \that do not support color codes, the default is 'never'; color \
-              \may work on terminals that support color codes" <>
-         hide)) <*>
     option readStyles
          (long "stack-colors" <>
           metavar "STYLES" <>
@@ -73,8 +63,8 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: Bool -> ColorWhen -> GlobalOptsMonoid -> GlobalOpts
-globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = GlobalOpts
+globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
+globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
@@ -83,7 +73,6 @@ globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = Glo
     , globalResolver = getFirst globalMonoidResolver
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
-    , globalColorWhen = fromFirst defaultColorWhen globalMonoidColorWhen
     , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
