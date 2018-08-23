@@ -1,0 +1,154 @@
+cabal-version: >= 1.10
+
+-- This file has been generated from package.yaml by hpack version 0.29.6.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: dedbcf32c495f3c94a429dbff58018d9cc5752dbc15da5970b6dd481481b2087
+
+name:           pantry
+version:        0.1.0.0
+synopsis:       Content addressable Haskell package management
+description:    Please see the README and documentation at <https://www.stackage.org/package/pantry>
+category:       Development
+homepage:       https://github.com/commercialhaskell/pantry#readme
+bug-reports:    https://github.com/commercialhaskell/pantry/issues
+author:         Michael Snoyman
+maintainer:     michael@snoyman.com
+copyright:      2018 FP Complete
+license:        MIT
+build-type:     Simple
+extra-source-files:
+    attic/package-0.1.2.3.tar.gz
+
+source-repository head
+  type: git
+  location: https://github.com/commercialhaskell/pantry
+
+library
+  exposed-modules:
+      Pantry
+      Pantry.SHA256
+      Data.Aeson.Extended
+      Pantry.Internal
+      Pantry.Internal.StaticBytes
+  other-modules:
+      Hackage.Security.Client.Repository.HttpLib.HttpClient
+      Pantry.Archive
+      Pantry.Hackage
+      Pantry.HTTP
+      Pantry.Repo
+      Pantry.Storage
+      Pantry.Tree
+      Pantry.Types
+      Paths_pantry
+  hs-source-dirs:
+      src/
+  default-extensions: MonadFailDesugaring
+  build-depends:
+      Cabal
+    , aeson
+    , base
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , digest
+    , generic-deriving
+    , hackage-security
+    , hpack
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-types
+    , memory
+    , network-uri
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite >=2.8.2
+    , persistent-template
+    , primitive
+    , resource-pool
+    , resourcet
+    , rio
+    , rio-orphans
+    , store
+    , tar-conduit
+    , text
+    , text-metrics
+    , time
+    , transformers
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Pantry.ArchiveSpec
+      Pantry.BuildPlanSpec
+      Pantry.CabalSpec
+      Pantry.HackageSpec
+      Pantry.Internal.StaticBytesSpec
+      Pantry.TreeSpec
+      Pantry.TypesSpec
+      Paths_pantry
+  hs-source-dirs:
+      test
+  default-extensions: MonadFailDesugaring
+  build-depends:
+      Cabal
+    , QuickCheck
+    , aeson
+    , base
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , digest
+    , exceptions
+    , generic-deriving
+    , hackage-security
+    , hedgehog
+    , hpack
+    , hspec
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-types
+    , memory
+    , network-uri
+    , pantry
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite >=2.8.2
+    , persistent-template
+    , primitive
+    , resource-pool
+    , resourcet
+    , rio
+    , rio-orphans
+    , store
+    , tar-conduit
+    , text
+    , text-metrics
+    , time
+    , transformers
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+  default-language: Haskell2010
