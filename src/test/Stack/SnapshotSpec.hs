@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Stack.SnapshotSpec (spec) where
 
 import Distribution.Types.PackageName (mkPackageName)
