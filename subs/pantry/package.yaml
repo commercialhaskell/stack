@@ -46,7 +46,7 @@ dependencies:
 - cryptonite
 - cryptonite-conduit
 - persistent
-- persistent-sqlite
+- persistent-sqlite >= 2.8.2
 - persistent-template
 - resource-pool
 - Cabal

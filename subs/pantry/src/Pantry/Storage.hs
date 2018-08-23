@@ -192,7 +192,7 @@ initStorage fp inner = do
     forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
     inner (P.Storage pool)
   where
-    sqinfo = set walEnabled False
+    sqinfo = set extraPragmas ["PRAGMA busy_timeout=2000;"]
            $ set fkEnabled True
            $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
 
