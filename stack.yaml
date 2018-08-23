@@ -5,6 +5,13 @@ packages:
 - subs/pantry
 - subs/curator
 
+extra-deps:
+# Ugly, temporary hack
+- github: fpco/store
+  commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a
+  subdirs:
+  - store
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
