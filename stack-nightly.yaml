@@ -12,6 +12,9 @@ extra-deps:
   commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a
   subdirs:
   - store
+# Switch to Hackage version when released
+- github: snoyberg/tar-conduit
+  commit: fd03a66110f7d0feff6fe7eb1cc9ca1a56b38fea
 
 # docker:
 #   enable: true
