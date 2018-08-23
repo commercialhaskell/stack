@@ -31,3 +31,20 @@ spec = do
     case parsePackageIdentifier "package-0.1.2.3" of
       Nothing -> error "should have parsed"
       Just expected -> liftIO $ ident `shouldBe` expected
+  it "handles symlinks to parent dirs" $ do
+    ident <- runPantryApp $ getPackageLocationIdent $ PLIArchive
+      Archive
+        { archiveLocation = ALUrl "https://github.com/commercialhaskell/stack/archive/2b846ff4fda13a8cd095e7421ce76df0a08b10dc.tar.gz"
+        , archiveHash = Nothing
+        , archiveSize = Nothing
+        , archiveSubdir = "subs/pantry/"
+        }
+      PackageMetadata
+        { pmName = Nothing
+        , pmVersion = Nothing
+        , pmTreeKey = Nothing
+        , pmCabal = Nothing
+        }
+    case parsePackageIdentifier "pantry-0.1.0.0" of
+      Nothing -> error "should have parsed"
+      Just expected -> ident `shouldBe` expected

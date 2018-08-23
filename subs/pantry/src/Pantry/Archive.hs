@@ -11,7 +11,7 @@ module Pantry.Archive
   ) where
 
 import RIO
-import RIO.FilePath (normalise, takeDirectory, (</>))
+import RIO.FilePath (normalise, takeDirectory, (</>), normalise, splitPath)
 import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
@@ -326,11 +326,11 @@ parseArchive pli archive fp = do
           METNormal -> Right $ SimpleEntry (mePath me) FTNormal
           METExecutable -> Right $ SimpleEntry (mePath me) FTExecutable
           METLink relDest ->
-            let dest = map toSlash $ normalise $ takeDirectory (mePath me) </> relDest
+            let dest = map toSlash $ myNormalise $ takeDirectory (mePath me) </> relDest
                 toSlash '\\' = '/'
                 toSlash c = c
              in case Map.lookup dest files of
-                  Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest
+                  Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest ++ ", looking for " ++ dest
                   Just me' ->
                     case meType me' of
                       METNormal -> Right $ SimpleEntry dest FTNormal
@@ -383,6 +383,14 @@ parseArchive pli archive fp = do
             , packageCabalEntry = cabalEntry
             , packageIdent = ident
             }
+
+-- | Like 'normalise', but also strips out @x/../@ pieces.
+myNormalise :: FilePath -> FilePath
+myNormalise = concat . go . splitPath . normalise
+  where
+    go (_:"../":rest) = go rest
+    go [] = []
+    go (x:xs) = x : go xs
 
 findCabalFile
   :: MonadThrow m
