@@ -89,7 +89,6 @@ module Pantry
   , parsePackageIdentifier
   , parsePackageName
   , parsePackageNameThrowing
-  , parsePackageNameFromFilePath
   , parseFlagName
   , parseVersion
   , parseVersionThrowing
