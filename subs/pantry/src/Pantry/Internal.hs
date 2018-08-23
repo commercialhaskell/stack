@@ -8,8 +8,10 @@ module Pantry.Internal
   , mkSafeFilePath
   , pcHpackExecutable
   , normalizeParents
+  , makeTarRelative
   ) where
 
+import Control.Exception (assert)
 import Pantry.Types
 import qualified Data.Text as T
 
@@ -50,3 +52,19 @@ normalizeParents fp = do
   case loop c2 of
     [] -> Left "no non-empty components"
     c' -> Right $ T.unpack $ T.intercalate "/" c'
+
+-- | Following tar file rules (Unix file paths only), make the second
+-- file relative to the first file.
+makeTarRelative
+  :: FilePath -- ^ base file
+  -> FilePath -- ^ relative part
+  -> Either String FilePath
+makeTarRelative _ ('/':_) = Left "absolute path found"
+makeTarRelative base rel =
+  case reverse base of
+    [] -> Left "cannot have empty base"
+    '/':_ -> Left "base cannot be a directory"
+    _:rest -> Right $
+      case dropWhile (/= '/') rest of
+        '/':rest' -> reverse rest' ++ '/' : rel
+        rest' -> assert (null rest') rel

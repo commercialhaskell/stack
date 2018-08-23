@@ -157,7 +157,6 @@ import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Pantry.HTTP
-import qualified RIO.FilePath
 import Data.Char (isHexDigit)
 
 -- | Create a new 'PantryConfig' with the given settings.
@@ -822,7 +821,7 @@ runPantryApp :: MonadIO m => RIO PantryApp a -> m a
 runPantryApp f = runSimpleApp $ do
   sa <- ask
   stack <- getAppUserDataDirectory "stack"
-  root <- parseAbsDir $ stack RIO.FilePath.</> "pantry"
+  root <- parseAbsDir $ stack FilePath.</> "pantry"
   withPantryConfig
     root
     defaultHackageSecurityConfig

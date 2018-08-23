@@ -11,12 +11,11 @@ module Pantry.Archive
   ) where
 
 import RIO
-import RIO.FilePath (takeDirectory)
 import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
-import Pantry.Internal (normalizeParents)
+import Pantry.Internal (normalizeParents, makeTarRelative)
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.ByteString.Lazy as BL
@@ -330,10 +329,17 @@ parseArchive pli archive fp = do
             case relDest of
               '/':_ -> Left $ "Cannot have an absolute relative dest: " ++ relDest
               _ -> Right ()
-            let dest0 =
-                  case takeDirectory (mePath me) of
-                    "" -> relDest
-                    x -> x ++ '/' : relDest
+            dest0 <-
+              case makeTarRelative (mePath me) relDest of
+                Left e -> Left $ concat
+                  [ "Error resolving relative path "
+                  , relDest
+                  , " from symlink at "
+                  , mePath me
+                  , ": "
+                  , e
+                  ]
+                Right x -> Right x
             dest <-
               case normalizeParents dest0 of
                 Left e -> Left $ concat
