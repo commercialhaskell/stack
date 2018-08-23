@@ -16,6 +16,7 @@ import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
+import Pantry.Internal (normalizeParents)
 import qualified RIO.Text as T
 import qualified RIO.List as List
 import qualified RIO.ByteString.Lazy as BL
@@ -325,17 +326,34 @@ parseArchive pli archive fp = do
         case meType me of
           METNormal -> Right $ SimpleEntry (mePath me) FTNormal
           METExecutable -> Right $ SimpleEntry (mePath me) FTExecutable
-          METLink relDest ->
-            let dest = map toSlash $ myNormalise $ takeDirectory (mePath me) </> relDest
-                toSlash '\\' = '/'
-                toSlash c = c
-             in case Map.lookup dest files of
-                  Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest ++ ", looking for " ++ dest
-                  Just me' ->
-                    case meType me' of
-                      METNormal -> Right $ SimpleEntry dest FTNormal
-                      METExecutable -> Right $ SimpleEntry dest FTExecutable
-                      METLink _ -> Left $ "Symbolic link dest cannot be a symbolic link, from " ++ mePath me ++ " to " ++ relDest
+          METLink relDest -> do
+            case relDest of
+              '/':_ -> Left $ "Cannot have an absolute relative dest: " ++ relDest
+              _ -> Right ()
+            let dest0 =
+                  case takeDirectory (mePath me) of
+                    "" -> relDest
+                    x -> x ++ '/' : relDest
+            dest <-
+              case normalizeParents dest0 of
+                Left e -> Left $ concat
+                  [ "Invalid symbolic link from "
+                  , mePath me
+                  , " to "
+                  , relDest
+                  , ", tried parsing "
+                  , dest0
+                  , ": "
+                  , e
+                  ]
+                Right x -> Right x
+            case Map.lookup dest files of
+              Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest ++ ", looking for " ++ dest
+              Just me' ->
+                case meType me' of
+                  METNormal -> Right $ SimpleEntry dest FTNormal
+                  METExecutable -> Right $ SimpleEntry dest FTExecutable
+                  METLink _ -> Left $ "Symbolic link dest cannot be a symbolic link, from " ++ mePath me ++ " to " ++ relDest
 
   case traverse toSimple files of
     Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
@@ -383,14 +401,6 @@ parseArchive pli archive fp = do
             , packageCabalEntry = cabalEntry
             , packageIdent = ident
             }
-
--- | Like 'normalise', but also strips out @x/../@ pieces.
-myNormalise :: FilePath -> FilePath
-myNormalise = concat . go . splitPath . normalise
-  where
-    go (_:"../":rest) = go rest
-    go [] = []
-    go (x:xs) = x : go xs
 
 findCabalFile
   :: MonadThrow m
