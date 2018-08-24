@@ -359,10 +359,10 @@ michael@d30748af6d3d:~/helloworld$ stack build
 # build output ...
 ```
 
-Finally, to find out which versions of these libraries stack installed, we can ask stack to `list-dependencies`:
+Finally, to find out which versions of these libraries stack installed, we can ask stack to `ls dependencies`:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack list-dependencies
+michael@d30748af6d3d:~/helloworld$ stack ls dependencies
 # dependency output ...
 ```
 
