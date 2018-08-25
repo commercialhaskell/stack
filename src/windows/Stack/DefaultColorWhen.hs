@@ -16,11 +16,24 @@ import Data.Bits ((.|.), (.&.))
 import Foreign.Marshal (alloca)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (peek)
+import System.Environment (lookupEnv)
 import System.Win32.Types (BOOL, DWORD, HANDLE, iNVALID_HANDLE_VALUE,
   nullHANDLE, withHandleToHANDLE)
 
+-- |The default adopts the standard proposed at http://no-color.org/, that color
+-- should not be added by default if the @NO_COLOR@ environment variable is
+-- present.
 defaultColorWhen :: IO ColorWhen
-defaultColorWhen = withHandleToHANDLE stdout aNSISupport
+defaultColorWhen = do
+  -- 'aNSISupport' has the side effect of enabling ANSI for ANSI-capable native
+  -- (ConHost) terminals, if not already ANSI-enabled. Consequently, it is
+  -- actioned even if @NO_COLOR@ might exist, as @NO_COLOR@ might be overridden
+  -- in a yaml configuration file or at the command line.
+  defColorWhen <- withHandleToHANDLE stdout aNSISupport
+  mIsNoColor <- lookupEnv "NO_COLOR"
+  return $ case mIsNoColor of
+    Just _ -> ColorNever
+    _      -> defColorWhen
 
 -- The following is based on extracts from the modules
 -- System.Console.ANSI.Windows.Foreign and System.Console.ANSI.Windows.Detect
