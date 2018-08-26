@@ -20,29 +20,33 @@ import qualified System.FilePath as FilePath
 -- | Command-line arguments parser for configuration.
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
-    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch ghcVariant ghcBuild jobs includes libs overrideGccPath overrideHpack skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser dumpLogs -> mempty
-        { configMonoidStackRoot = stackRoot
-        , configMonoidWorkDir = workDir
-        , configMonoidBuildOpts = buildOpts
-        , configMonoidDockerOpts = dockerOpts
-        , configMonoidNixOpts = nixOpts
-        , configMonoidSystemGHC = systemGHC
-        , configMonoidInstallGHC = installGHC
-        , configMonoidSkipGHCCheck = skipGHCCheck
-        , configMonoidArch = arch
-        , configMonoidGHCVariant = ghcVariant
-        , configMonoidGHCBuild = ghcBuild
-        , configMonoidJobs = jobs
-        , configMonoidExtraIncludeDirs = includes
-        , configMonoidExtraLibDirs = libs
-        , configMonoidOverrideGccPath = overrideGccPath
-        , configMonoidOverrideHpack = overrideHpack
-        , configMonoidSkipMsys = skipMsys
-        , configMonoidLocalBinPath = localBin
-        , configMonoidModifyCodePage = modifyCodePage
-        , configMonoidAllowDifferentUser = allowDifferentUser
-        , configMonoidDumpLogs = dumpLogs
-        })
+    (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
+        ghcVariant ghcBuild jobs includes libs overrideGccPath overrideHpack
+        skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser
+        dumpLogs colorWhen -> mempty
+            { configMonoidStackRoot = stackRoot
+            , configMonoidWorkDir = workDir
+            , configMonoidBuildOpts = buildOpts
+            , configMonoidDockerOpts = dockerOpts
+            , configMonoidNixOpts = nixOpts
+            , configMonoidSystemGHC = systemGHC
+            , configMonoidInstallGHC = installGHC
+            , configMonoidSkipGHCCheck = skipGHCCheck
+            , configMonoidArch = arch
+            , configMonoidGHCVariant = ghcVariant
+            , configMonoidGHCBuild = ghcBuild
+            , configMonoidJobs = jobs
+            , configMonoidExtraIncludeDirs = includes
+            , configMonoidExtraLibDirs = libs
+            , configMonoidOverrideGccPath = overrideGccPath
+            , configMonoidOverrideHpack = overrideHpack
+            , configMonoidSkipMsys = skipMsys
+            , configMonoidLocalBinPath = localBin
+            , configMonoidModifyCodePage = modifyCodePage
+            , configMonoidAllowDifferentUser = allowDifferentUser
+            , configMonoidDumpLogs = dumpLogs
+            , configMonoidColorWhen = colorWhen
+            })
     <$> optionalFirst (absDirOption
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
@@ -139,6 +143,17 @@ configOptsParser currentDir hide0 =
              "dump-logs"
              "dump the build output logs for local packages to the console"
              hide)
+    <*> optionalFirst (option readColorWhen
+             ( long "color"
+            <> metavar "WHEN"
+            <> completeWith ["always", "never", "auto"]
+            <> help "Specify when to use color in output; WHEN is 'always', \
+                    \'never', or 'auto'. On Windows versions before Windows \
+                    \10, for terminals that do not support color codes, the \
+                    \default is 'never'; color may work on terminals that \
+                    \support color codes"
+            <> hide
+             ))
   where
     hide = hideMods (hide0 /= OuterGlobalOpts)
     toDumpLogs (First (Just True)) = First (Just DumpAllLogs)

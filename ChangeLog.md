@@ -46,6 +46,10 @@ Other enhancements:
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.
+* Existing global option `--color=WHEN` is now also available as a
+  non-project-specific yaml configuration parameter `color:`.
+* Adopt the standard proposed at http://no-color.org/, that color should not be
+  added by default if the `NO_COLOR` environment variable is present.
 * New command `stack ls stack-colors` lists the styles and the associated 'ANSI'
   control character sequences that stack uses to color some of its output. See
   `stack ls stack-colors --help` for more information.

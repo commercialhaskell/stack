@@ -15,7 +15,6 @@ import           Stack.Options.ResolverParser
 import           Stack.Options.Utils
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Types.Runner
 
 -- | Parser for global command-line options.
 globalOptsParser :: FilePath -> GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
@@ -35,15 +34,6 @@ globalOptsParser currentDir kind defLogLevel =
         "terminal"
         "overriding terminal detection in the case of running in a false terminal"
         hide <*>
-    optionalFirst (option readColorWhen
-        (long "color" <>
-         metavar "WHEN" <>
-         completeWith ["always", "never", "auto"] <>
-         help "Specify when to use color in output; WHEN is 'always', 'never', \
-              \or 'auto'. On Windows versions before Windows 10, for terminals \
-              \that do not support color codes, the default is 'never'; color \
-              \may work on terminals that support color codes" <>
-         hide)) <*>
     option readStyles
          (long "stack-colors" <>
           metavar "STYLES" <>
@@ -74,8 +64,8 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: MonadIO m => Bool -> ColorWhen -> GlobalOptsMonoid -> m GlobalOpts
-globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = do
+globalOptsFromMonoid :: MonadIO m => Bool -> GlobalOptsMonoid -> m GlobalOpts
+globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
   resolver <- for (getFirst globalMonoidResolver) $ \ur -> do
     cwd <- getCurrentDir
     resolvePaths (Just cwd) ur
@@ -88,7 +78,6 @@ globalOptsFromMonoid defaultTerminal defaultColorWhen GlobalOptsMonoid{..} = do
     , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
-    , globalColorWhen = fromFirst defaultColorWhen globalMonoidColorWhen
     , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml

@@ -57,7 +57,6 @@ import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
-import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
@@ -176,7 +175,6 @@ main = do
   -- On Windows, where applicable, defaultColorWhen has the side effect of
   -- enabling ANSI for ANSI-capable native (ConHost) terminals, if not already
   -- ANSI-enabled.
-  defColorWhen <- defaultColorWhen
   execExtraHelp args
                 Docker.dockerHelpOptName
                 (dockerOptsParser False)
@@ -192,7 +190,7 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      global <- globalOptsFromMonoid isTerminal defColorWhen globalMonoid
+      global <- globalOptsFromMonoid isTerminal globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do

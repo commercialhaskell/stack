@@ -25,6 +25,7 @@ import           Stack.Prelude
 import           Path
 import           Path.IO
 import           Stack.Config
+import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
@@ -209,14 +210,19 @@ loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
         liftIO $ inner lc
 
 withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
-withRunnerGlobal GlobalOpts{..} = withRunner
-  globalLogLevel
-  globalTimeInLog
-  globalTerminal
-  globalColorWhen
-  globalStylesUpdate
-  globalTermWidth
-  (isJust globalReExecVersion)
+withRunnerGlobal GlobalOpts{..} inner = do
+    defColorWhen <- defaultColorWhen
+    let globalColorWhen =
+            fromFirst defColorWhen (configMonoidColorWhen globalConfigMonoid)
+    withRunner
+        globalLogLevel
+        globalTimeInLog
+        globalTerminal
+        globalColorWhen
+        globalStylesUpdate
+        globalTermWidth
+        (isJust globalReExecVersion)
+        inner
 
 withMiniConfigAndLock
     :: GlobalOpts

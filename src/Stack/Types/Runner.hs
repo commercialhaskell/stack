@@ -21,6 +21,7 @@ module Stack.Types.Runner
     , withRunner
     ) where
 
+import           Data.Aeson (FromJSON (parseJSON))
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
@@ -109,3 +110,13 @@ withRunner logLevel useTime terminal colorWhen stylesUpdate widthOverride reExec
 
 data ColorWhen = ColorNever | ColorAlways | ColorAuto
     deriving (Eq, Show, Generic)
+
+instance FromJSON ColorWhen where
+    parseJSON v = do
+        s <- parseJSON v
+        case s of
+            "never"  -> return ColorNever
+            "always" -> return ColorAlways
+            "auto"   -> return ColorAuto
+            _ -> fail ("Unknown color use: " <> s <> ". Expected values of " <>
+                       "option are 'never', 'always', or 'auto'.")

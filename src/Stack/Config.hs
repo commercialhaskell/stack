@@ -90,6 +90,7 @@ import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.Urls
 import           Stack.Types.Version
+import           System.Console.ANSI (hSupportsANSI)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
@@ -358,10 +359,21 @@ configFromConfigMonoid
 
      configRunner' <- view runnerL
 
+     useAnsi <- liftIO $ hSupportsANSI stderr
+
      let stylesUpdate' = runnerStylesUpdate configRunner' <>
            configMonoidStyles
-         configRunner = configRunner' & processContextL .~ origEnv &
-           stylesUpdateL .~ stylesUpdate'
+         useColor' = runnerUseColor configRunner'
+         mUseColor = do
+            colorWhen <- getFirst configMonoidColorWhen
+            return $ case colorWhen of
+                ColorNever  -> False
+                ColorAlways -> True
+                ColorAuto  -> useAnsi
+         configRunner = configRunner'
+             & processContextL .~ origEnv
+             & stylesUpdateL .~ stylesUpdate'
+             & useColorL .~ fromMaybe useColor' mUseColor
 
      hsc <-
        case getFirst configMonoidPackageIndices of
