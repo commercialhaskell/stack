@@ -100,7 +100,7 @@ import              RIO.Process
 import              Text.Printf (printf)
 
 #if !WINDOWS
-import              Bindings.Uname (uname, release)
+import              System.Uname (uname, release)
 import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)

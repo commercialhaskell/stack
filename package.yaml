@@ -129,7 +129,6 @@ when:
     build-tools:
     - hsc2hs
     dependencies:
-    - bindings-uname
     - unix
 library:
   source-dirs: src/
@@ -267,6 +266,7 @@ library:
       source-dirs: src/windows/
     else:
       source-dirs: src/unix/
+      c-sources: src/unix/cbits/uname.c
 executables:
   stack:
     main: Main.hs
