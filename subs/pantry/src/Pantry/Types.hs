@@ -1150,7 +1150,8 @@ parseArchiveLocationObject :: Object -> WarningParser (Unresolved ArchiveLocatio
 parseArchiveLocationObject o =
     ((o ..: "url") >>= validateUrl) <|>
     ((o ..: "filepath") >>= validateFilePath) <|>
-    ((o ..: "archive") >>= parseArchiveLocationText)
+    ((o ..: "archive") >>= parseArchiveLocationText) <|>
+    ((o ..: "location") >>= parseArchiveLocationText)
 
 -- Forgive me my father, for I have sinned (bad fail, bad!)
 parseArchiveLocationText :: (Monad m, Alternative m) => Text -> m (Unresolved ArchiveLocation)
