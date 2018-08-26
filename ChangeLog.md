@@ -57,6 +57,9 @@ Other enhancements:
   non-project-specific yaml configuration parameter, allows a stack user to
   redefine the default styles that stack uses to color some of its output. See
   `stack --help` for more information.
+* British English spelling of 'color' (colour) accepted as an alias for
+  `--color`, `--stack-colors`, `stack ls stack-colors` at the command line and
+  for `color:` and `stack-colors:` in yaml configuration files.
 * New build option `--ddump-dir`. (See [#4225](https://github.com/commercialhaskell/stack/issues/4225))
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,

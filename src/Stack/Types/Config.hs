@@ -854,8 +854,16 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
     configMonoidSaveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
     configMonoidHackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
-    configMonoidColorWhen <- First <$> obj ..:? configMonoidColorWhenName
-    configMonoidStyles <- fromMaybe mempty <$> obj ..:? configMonoidStylesName
+
+    configMonoidColorWhenUS <- obj ..:? configMonoidColorWhenUSName
+    configMonoidColorWhenGB <- obj ..:? configMonoidColorWhenGBName
+    let configMonoidColorWhen =  First $   configMonoidColorWhenUS
+                                       <|> configMonoidColorWhenGB
+
+    configMonoidStylesUS <- obj ..:? configMonoidStylesUSName
+    configMonoidStylesGB <- obj ..:? configMonoidStylesGBName
+    let configMonoidStyles = fromMaybe mempty $   configMonoidStylesUS
+                                              <|> configMonoidStylesGB
 
     return ConfigMonoid {..}
   where
@@ -998,11 +1006,17 @@ configMonoidSaveHackageCredsName = "save-hackage-creds"
 configMonoidHackageBaseUrlName :: Text
 configMonoidHackageBaseUrlName = "hackage-base-url"
 
-configMonoidColorWhenName :: Text
-configMonoidColorWhenName = "color"
+configMonoidColorWhenUSName :: Text
+configMonoidColorWhenUSName = "color"
 
-configMonoidStylesName :: Text
-configMonoidStylesName = "stack-colors"
+configMonoidColorWhenGBName :: Text
+configMonoidColorWhenGBName = "colour"
+
+configMonoidStylesUSName :: Text
+configMonoidStylesUSName = "stack-colors"
+
+configMonoidStylesGBName :: Text
+configMonoidStylesGBName = "stack-colours"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

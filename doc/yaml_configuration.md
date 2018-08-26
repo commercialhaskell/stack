@@ -955,6 +955,9 @@ The color use can also be set at the command line using the equivalent
 `--color=<WHEN>` global option. Color use set at the command line takes
 precedence over that set in a yaml configuration file.
 
+(The British English spelling (colour) is also accepted. In yaml configuration
+files, the American spelling is the alternative that has priority.)
+
 ### stack-colors
 
 Stack uses styles to format some of its output. The default styles do not work
@@ -983,4 +986,9 @@ terminal theme might wish to set the styles as follows:
 ```yaml
 stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95
 ```
-The styles can also be set at the command line using the equivalent `--stack-colors=<STYLES>` global option. Styles set at the command line take precedence over those set in a yaml configuration file.
+The styles can also be set at the command line using the equivalent `--stack-colors=<STYLES>`
+global option. Styles set at the command line take precedence over those set in
+a yaml configuration file.
+
+(The British English spelling (colour) is also accepted. In yaml configuration
+files, the American spelling is the alternative that has priority.)

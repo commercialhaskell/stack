@@ -36,6 +36,7 @@ globalOptsParser currentDir kind defLogLevel =
         hide <*>
     option readStyles
          (long "stack-colors" <>
+          long "stack-colours" <>
           metavar "STYLES" <>
           value mempty <>
           help "Specify stack's output styles; STYLES is a colon-delimited \

@@ -145,6 +145,7 @@ configOptsParser currentDir hide0 =
              hide)
     <*> optionalFirst (option readColorWhen
              ( long "color"
+            <> long "colour"
             <> metavar "WHEN"
             <> completeWith ["always", "never", "auto"]
             <> help "Specify when to use color in output; WHEN is 'always', \
