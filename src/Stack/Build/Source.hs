@@ -16,13 +16,10 @@ module Stack.Build.Source
     ) where
 
 import              Stack.Prelude
-import              Crypto.Hash (Digest, SHA256(..))
-import              Crypto.Hash.Conduit (sinkHash)
-import qualified    Data.ByteArray as Mem (convert)
+import qualified    Pantry.SHA256 as SHA256
 import qualified    Data.ByteString as S
-import              Data.Conduit (ZipSink (..))
+import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
-import qualified    Data.HashSet as HashSet
 import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
@@ -32,14 +29,11 @@ import              Stack.Build.Target
 import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
-import              Stack.PackageLocation
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
-import              Stack.Types.FlagName
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
-import              Stack.Types.PackageName
 import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
@@ -92,19 +86,20 @@ loadSourceMapFull needTargets boptsCli = do
           let configOpts = getGhcOptions bconfig boptsCli n False False
           case lpiLocation lpi of
             -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
-            PLIndex pir -> return $ PSIndex loc (lpiFlags lpi) configOpts pir
-            PLOther pl -> do
-              root <- view projectRootL
-              lpv <- parseSingleCabalFile root True pl
+            PLImmutable pkgloc -> do
+              ident <- getPackageLocationIdent pkgloc
+              return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
+            PLMutable dir -> do
+              lpv <- mkLocalPackageView YesPrintWarnings dir
               lp' <- loadLocalPackage False boptsCli targets (n, lpv)
-              return $ PSFiles lp' loc
+              return $ PSFilePath lp' loc
     sourceMap' <- Map.unions <$> sequence
-      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFiles lp' Local)) locals
+      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFilePath lp' Local)) locals
       , sequence $ Map.mapWithKey (goLPI Local) localDeps
       , sequence $ Map.mapWithKey (goLPI Snap) (lsPackages ls)
       ]
     let sourceMap = sourceMap'
-            `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
+            `Map.difference` Map.fromList (map (, ()) (toList wiredInPackages))
 
     return
       ( targets
@@ -188,15 +183,16 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
+    mcurator <- view $ buildConfigL.to bcCurator
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
                 Just (TargetAll _packageType) ->
                     ( packageExes pkg
-                    , if boptsTests bopts
+                    , if boptsTests bopts && maybe True (Set.notMember name . curatorSkipTest) mcurator
                         then Map.keysSet (packageTests pkg)
                         else Set.empty
-                    , if boptsBenchmarks bopts
+                    , if boptsBenchmarks bopts && maybe True (Set.notMember name . curatorSkipBenchmark) mcurator
                         then packageBenchmarks pkg
                         else Set.empty
                     )
@@ -302,7 +298,6 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = lpvCabalFP lpv
-        , lpDir = lpvRoot lpv
         , lpWanted = isWanted
         , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
@@ -315,7 +310,6 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
             (exes `Set.difference` packageExes pkg)
             (tests `Set.difference` Map.keysSet (packageTests pkg))
             (benches `Set.difference` packageBenchmarks pkg)
-        , lpLocation = lpvLoc lpv
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
@@ -323,7 +317,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOptsCLI
                -> [LocalPackage]
-               -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ local deps
+               -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ local deps
                -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
 checkFlagsUsed boptsCli lps extraDeps snapshot = do
@@ -471,11 +465,11 @@ calcFci modTime' fp = liftIO $
                 <$> ZipSink (CL.fold
                     (\x y -> x + fromIntegral (S.length y))
                     0)
-                <*> ZipSink sinkHash)
+                <*> ZipSink SHA256.sinkHash)
         return FileCacheInfo
             { fciModTime = modTime'
             , fciSize = size
-            , fciHash = Mem.convert (digest :: Digest SHA256)
+            , fciHash = digest
             }
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()

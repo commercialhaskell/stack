@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 module Stack.Script
     ( scriptCmd
@@ -13,6 +12,7 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
+import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
 import qualified Stack.Build
@@ -23,9 +23,9 @@ import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.PackageName
 import           System.FilePath            (dropExtension, replaceExtension)
 import           RIO.Process
+import qualified RIO.Text as T
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
@@ -64,7 +64,7 @@ scriptCmd opts go' = do
                     getPackagesFromModuleInfo moduleInfo (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
-                    targets' <- mapM parsePackageNameFromString targets
+                    targets' <- mapM parsePackageNameThrowing targets
                     return $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
@@ -85,7 +85,7 @@ scriptCmd opts go' = do
                 else do
                     logDebug "Missing packages, performing installation"
                     Stack.Build.build Nothing lk defaultBuildOptsCLI
-                        { boptsCLITargets = map packageNameText $ Set.toList targetsSet
+                        { boptsCLITargets = map (T.pack . packageNameString) $ Set.toList targetsSet
                         }
 
         let ghcArgs = concat
@@ -146,7 +146,7 @@ getPackagesFromModuleInfo mi scriptFP = do
                                 [pn] -> return $ Set.singleton pn
                                 pns' -> throwString $ concat
                                     [ "Module "
-                                    , S8.unpack $ unModuleName mn
+                                    , moduleNameString mn
                                     , " appears in multiple packages: "
                                     , unwords $ map packageNameString pns'
                                     ]
@@ -162,48 +162,48 @@ getPackagesFromModuleInfo mi scriptFP = do
 -- packages that should never be auto-parsed in.
 blacklist :: Set PackageName
 blacklist = Set.fromList
-    [ $(mkPackageName "async-dejafu")
-    , $(mkPackageName "monads-tf")
-    , $(mkPackageName "crypto-api")
-    , $(mkPackageName "fay-base")
-    , $(mkPackageName "hashmap")
-    , $(mkPackageName "hxt-unicode")
-    , $(mkPackageName "hledger-web")
-    , $(mkPackageName "plot-gtk3")
-    , $(mkPackageName "gtk3")
-    , $(mkPackageName "regex-pcre-builtin")
-    , $(mkPackageName "regex-compat-tdfa")
-    , $(mkPackageName "log")
-    , $(mkPackageName "zip")
-    , $(mkPackageName "monad-extras")
-    , $(mkPackageName "control-monad-free")
-    , $(mkPackageName "prompt")
-    , $(mkPackageName "kawhi")
-    , $(mkPackageName "language-c")
-    , $(mkPackageName "gl")
-    , $(mkPackageName "svg-tree")
-    , $(mkPackageName "Glob")
-    , $(mkPackageName "nanospec")
-    , $(mkPackageName "HTF")
-    , $(mkPackageName "courier")
-    , $(mkPackageName "newtype-generics")
-    , $(mkPackageName "objective")
-    , $(mkPackageName "binary-ieee754")
-    , $(mkPackageName "rerebase")
-    , $(mkPackageName "cipher-aes")
-    , $(mkPackageName "cipher-blowfish")
-    , $(mkPackageName "cipher-camellia")
-    , $(mkPackageName "cipher-des")
-    , $(mkPackageName "cipher-rc4")
-    , $(mkPackageName "crypto-cipher-types")
-    , $(mkPackageName "crypto-numbers")
-    , $(mkPackageName "crypto-pubkey")
-    , $(mkPackageName "crypto-random")
-    , $(mkPackageName "cryptohash")
-    , $(mkPackageName "cryptohash-conduit")
-    , $(mkPackageName "cryptohash-md5")
-    , $(mkPackageName "cryptohash-sha1")
-    , $(mkPackageName "cryptohash-sha256")
+    [ mkPackageName "async-dejafu"
+    , mkPackageName "monads-tf"
+    , mkPackageName "crypto-api"
+    , mkPackageName "fay-base"
+    , mkPackageName "hashmap"
+    , mkPackageName "hxt-unicode"
+    , mkPackageName "hledger-web"
+    , mkPackageName "plot-gtk3"
+    , mkPackageName "gtk3"
+    , mkPackageName "regex-pcre-builtin"
+    , mkPackageName "regex-compat-tdfa"
+    , mkPackageName "log"
+    , mkPackageName "zip"
+    , mkPackageName "monad-extras"
+    , mkPackageName "control-monad-free"
+    , mkPackageName "prompt"
+    , mkPackageName "kawhi"
+    , mkPackageName "language-c"
+    , mkPackageName "gl"
+    , mkPackageName "svg-tree"
+    , mkPackageName "Glob"
+    , mkPackageName "nanospec"
+    , mkPackageName "HTF"
+    , mkPackageName "courier"
+    , mkPackageName "newtype-generics"
+    , mkPackageName "objective"
+    , mkPackageName "binary-ieee754"
+    , mkPackageName "rerebase"
+    , mkPackageName "cipher-aes"
+    , mkPackageName "cipher-blowfish"
+    , mkPackageName "cipher-camellia"
+    , mkPackageName "cipher-des"
+    , mkPackageName "cipher-rc4"
+    , mkPackageName "crypto-cipher-types"
+    , mkPackageName "crypto-numbers"
+    , mkPackageName "crypto-pubkey"
+    , mkPackageName "crypto-random"
+    , mkPackageName "cryptohash"
+    , mkPackageName "cryptohash-conduit"
+    , mkPackageName "cryptohash-md5"
+    , mkPackageName "cryptohash-sha1"
+    , mkPackageName "cryptohash-sha256"
     ]
 
 toModuleInfo :: LoadedSnapshot -> ModuleInfo
@@ -242,11 +242,13 @@ parseImports =
             bs3 = fromMaybe bs2 $ stripPrefix "qualified " bs2
         case stripPrefix "\"" bs3 of
             Just bs4 -> do
-                pn <- parsePackageNameFromString $ S8.unpack $ S8.takeWhile (/= '"') bs4
+                pn <- parsePackageNameThrowing $ S8.unpack $ S8.takeWhile (/= '"') bs4
                 Just (Set.singleton pn, Set.empty)
             Nothing -> Just
                 ( Set.empty
                 , Set.singleton
-                    $ ModuleName
+                    $ fromString
+                    $ T.unpack
+                    $ decodeUtf8With lenientDecode
                     $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
                 )

@@ -25,6 +25,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
+import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -42,27 +43,21 @@ import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import qualified Distribution.Text as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
-import qualified RIO
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
-import           Stack.PackageLocation (resolveMultiPackageLocation)
 import           Stack.PrettyPrint
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
@@ -171,7 +166,7 @@ getCabalLbs :: HasEnvConfig env
             -> Path Abs File -- ^ cabal file
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp = do
-    (gpd, cabalfp') <- readPackageUnresolvedDir (parent cabalfp) False
+    (gpd, cabalfp') <- loadCabalFilePath (parent cabalfp) NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -183,7 +178,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
                                 sourceMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
-          map (fromCabalPackageName . Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
+          map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
         gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
         gpd'' =
           case mrev of
@@ -198,7 +193,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
                   $ Cabal.packageDescription gpd'
                   }
               }
-    ident <- parsePackageIdentifierFromString $ Cabal.display $ Cabal.package $ Cabal.packageDescription gpd''
+        ident = Cabal.package $ Cabal.packageDescription gpd''
     -- Sanity rendering and reparsing the input, to ensure there are no
     -- cabal bugs, since there have been bugs here before, and currently
     -- are at the time of writing:
@@ -257,17 +252,16 @@ getCabalLbs pvpBounds mrev cabalfp = do
       )
   where
     addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages sourceMap installedMap dep@(Dependency cname range) =
+    addBounds internalPackages sourceMap installedMap dep@(Dependency name range) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
           Nothing -> dep
-          Just version -> Dependency cname $ simplifyVersionRange
+          Just version -> Dependency name $ simplifyVersionRange
             $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
             $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
               range
       where
-        name = fromCabalPackageName cname
         foundVersion =
           case Map.lookup name sourceMap of
               Just ps -> Just (piiVersion ps)
@@ -277,9 +271,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
                       Nothing -> Nothing
 
     addUpper version = intersectVersionRanges
-        (earlierVersion $ toCabalVersion $ nextMajorVersion version)
-    addLower version = intersectVersionRanges
-        (orLaterVersion (toCabalVersion version))
+        (earlierVersion $ nextMajorVersion version)
+    addLower version = intersectVersionRanges (orLaterVersion version)
 
     (toAddLower, toAddUpper) =
       case pvpBounds of
@@ -301,11 +294,10 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     config  <- getDefaultPackageConfig
-    (package, cabalfp) <- readPackageDir config pkgDir True
+    (package, cabalfp) <- readPackageDir config pkgDir YesPrintWarnings
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
-        , lpDir = pkgDir
         , lpCabalFile = cabalfp
         -- NOTE: these aren't the 'correct values, but aren't used in
         -- the usage of this function in this module.
@@ -318,7 +310,6 @@ readLocalPackage pkgDir = do
         , lpComponentFiles = pure Map.empty
         , lpComponents = Set.empty
         , lpUnbuildable = Set.empty
-        , lpLocation = PLFilePath $ toFilePath pkgDir
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
@@ -342,14 +333,14 @@ getSDistFileList lp =
     ac = ActionContext Set.empty [] ConcurrencyAllowed
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
-        , taskType = TTFiles lp Local
+        , taskType = TTFilePath lp Local
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
         , taskPresent = Map.empty
         , taskAllInOne = True
-        , taskCachePkgSrc = CacheSrcLocal (toFilePath (lpDir lp))
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent $ lpCabalFile lp))
         , taskAnyMissing = True
         , taskBuildTypeConfig = False
         }
@@ -396,7 +387,10 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    when (sdoptsBuildTarball opts) (buildExtractedTarball pkgDir)
+    when (sdoptsBuildTarball opts) (buildExtractedTarball ResolvedPath
+                                      { resolvedRelative = RelFilePath "this-is-not-used" -- ugly hack
+                                      , resolvedAbsolute = pkgDir
+                                      })
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
 checkPackageInExtractedTarball
@@ -404,12 +398,12 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    (gpd, _cabalfp) <- readPackageUnresolvedDir pkgDir True
+    (gpd, _cabalfp) <- loadCabalFilePath pkgDir YesPrintWarnings
     let name = gpdPackageName gpd
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir False
+    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir NoPrintWarnings
     logInfo $
-        "Checking package '" <> RIO.display name <> "' for common mistakes"
+        "Checking package '" <> fromString (packageNameString name) <> "' for common mistakes"
     let pkgChecks =
           -- MSS 2017-12-12: Try out a few different variants of
           -- pkgDesc to try and provoke an error or warning. I don't
@@ -438,19 +432,17 @@ checkPackageInExtractedTarball pkgDir = do
         Nothing -> return ()
         Just ne -> throwM $ CheckException ne
 
-buildExtractedTarball :: HasEnvConfig env => Path Abs Dir -> RIO env ()
+buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
-  projectRoot <- view projectRootL
   envConfig <- view envConfigL
-  localPackageToBuild <- readLocalPackage pkgDir
-  let packageEntries = bcPackages (envConfigBuildConfig envConfig)
-      getPaths = resolveMultiPackageLocation projectRoot
-  allPackagePaths <- fmap (map fst . mconcat) (mapM getPaths packageEntries)
+  localPackageToBuild <- readLocalPackage $ resolvedAbsolute pkgDir
+  let allPackagePaths = bcPackages (envConfigBuildConfig envConfig)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToKeep <- filterM (fmap not . isPathToRemove) allPackagePaths
+  pathsToKeep <- filterM (fmap not . isPathToRemove . resolvedAbsolute . fst) allPackagePaths
+  getLPV <- runOnce $ mkLocalPackageView YesPrintWarnings pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -459,7 +451,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = map (PLFilePath . toFilePath) $ pkgDir : pathsToKeep
+        { bcPackages = (pkgDir, getLPV) : pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True

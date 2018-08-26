@@ -22,6 +22,7 @@ module Network.HTTP.Download.Verified
 import qualified    Data.List as List
 import qualified    Data.ByteString as ByteString
 import qualified    Data.ByteString.Base64 as B64
+import              Conduit (withSinkFile)
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
 import qualified    Data.Text as Text

@@ -5,6 +5,7 @@ module Stack.Options.GlobalParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Path.IO (getCurrentDir)
 import qualified Stack.Docker                      as Docker
 import           Stack.Init
 import           Stack.Prelude
@@ -63,19 +64,24 @@ globalOptsParser currentDir kind defLogLevel =
     hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
-globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
-globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
+globalOptsFromMonoid :: MonadIO m => Bool -> GlobalOptsMonoid -> m GlobalOpts
+globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
+  resolver <- for (getFirst globalMonoidResolver) $ \ur -> do
+    cwd <- getCurrentDir
+    resolvePaths (Just cwd) ur
+  pure GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
     , globalTimeInLog = fromFirst True globalMonoidTimeInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
-    , globalResolver = getFirst globalMonoidResolver
+    , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
-    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml }
+    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml
+    }
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

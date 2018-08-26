@@ -41,8 +41,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (showVersion)
+import           Distribution.Version (mkVersion)
 import           GHC.Exts (sortWith)
-import           Lens.Micro (set)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
@@ -51,8 +51,6 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
-import           Stack.PackageIndex
-import           Stack.Types.PackageIndex
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -254,7 +252,7 @@ runContainerAndExit getCmdArgs
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
          muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
-         image = dockerImage docker
+     image <- either throwIO pure (dockerImage docker)
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           (logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
@@ -657,7 +655,7 @@ pull =
   do config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
-     pullImage docker (dockerImage docker)
+     either throwIO (pullImage docker) (dockerImage docker)
 
 -- | Pull Docker image from registry.
 pullImage :: (HasProcessContext env, HasLogFunc env)
@@ -697,7 +695,7 @@ checkDockerVersion docker =
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (stripVersion v) of
+         case parseVersion (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwIO (DockerTooOldException minimumDockerVersion v')
@@ -709,7 +707,7 @@ checkDockerVersion docker =
                return ()
            _ -> throwIO InvalidVersionOutputException
        _ -> throwIO InvalidVersionOutputException
-  where minimumDockerVersion = $(mkVersion "1.6.0")
+  where minimumDockerVersion = mkVersion [1, 6, 0]
         prohibitedDockerVersions = []
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
 
@@ -758,25 +756,8 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               unless exists $ do
                 ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
-          forM_ clIndices $ \pkgIdx -> do
-            msrcIndex <- runRIO (set stackRootL origStackRoot config) $ do
-               srcIndex <- configPackageIndex (indexName pkgIdx)
-               exists <- doesFileExist srcIndex
-               return $ if exists
-                 then Just srcIndex
-                 else Nothing
-            case msrcIndex of
-              Nothing -> return ()
-              Just srcIndex ->
-                runRIO config $ do
-                  destIndex <- configPackageIndex (indexName pkgIdx)
-                  exists <- doesFileExist destIndex
-                  unless exists $ do
-                    ensureDir (parent destIndex)
-                    copyFile srcIndex destIndex
     return True
   where
-    CabalLoader {..} = configCabalLoader
     updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do
       case estackUserEntry of
         Left _ -> do

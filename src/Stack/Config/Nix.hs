@@ -14,9 +14,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Distribution.System (OS (..))
 import Stack.Constants
-import Stack.Types.Version
 import Stack.Types.Nix
-import Stack.Types.Compiler
 import Stack.Types.Runner
 import System.Directory (doesFileExist)
 
@@ -53,11 +51,11 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: CompilerVersion a -> Either StringException T.Text
+nixCompiler :: WantedCompiler -> Either StringException T.Text
 nixCompiler compilerVersion =
   case compilerVersion of
-    GhcVersion version ->
-      case T.split (== '.') (versionText version) of
+    WCGhc version ->
+      case T.split (== '.') (fromString $ versionString version) of
         x : y : minor ->
           Right $
           case minor of
@@ -72,11 +70,11 @@ nixCompiler compilerVersion =
               \(lib.attrNames haskell.compiler); in \
               \if compilers == [] \
               \then abort \"No compiler found for GHC "
-              <> versionText version <> "\"\
+              <> T.pack (versionString version) <> "\"\
               \else haskell.compiler.${builtins.head compilers})"
             _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
         _ -> Left $ stringException "GHC major version not specified"
-    _ -> Left $ stringException "Only GHC is supported by stack --nix"
+    WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

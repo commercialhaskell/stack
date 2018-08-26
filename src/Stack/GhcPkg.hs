@@ -27,16 +27,14 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Distribution.Version (mkVersion)
 import           Path (parent, mkRelFile, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Build
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
 import           Stack.Types.Compiler
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           System.FilePath (searchPathSeparator)
 import           RIO.Process
 
@@ -150,12 +148,12 @@ findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
 findGhcPkgVersion wc pkgDbs name = do
     mv <- findGhcPkgField wc pkgDbs (packageNameString name) "version"
     case mv of
-        Just !v -> return (parseVersion v)
+        Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
 unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
-                    -> CompilerVersion 'CVActual
+                    -> ActualCompiler
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
                     -> PackageIdentifier
@@ -169,7 +167,7 @@ unregisterGhcPkgId wc cv pkgDb gid ident = do
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = "unregister" : "--user" : "--force" :
         (case cv of
-            GhcVersion v | v < $(mkVersion "7.9") ->
+            ACGhc v | v < mkVersion [7, 9] ->
                 [packageIdentifierString ident]
             _ -> ["--ipid", ghcPkgIdString gid])
 

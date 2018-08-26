@@ -39,9 +39,6 @@ import           Stack.Solver
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Config
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Resolver
 import           Stack.Types.Version
 import qualified System.FilePath                 as FP
@@ -75,13 +72,7 @@ initProject whichCmd currDir initOpts mresolver = do
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
 
-    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd dest initOpts
-                                                          mresolver bundle
-
-    -- Kind of inefficient, since we've already parsed this value. But
-    -- better to reparse in this one case than carry the unneeded data
-    -- around everywhere in the codebase.
-    resolver <- parseCustomLocation (Just (parent dest)) (void (sdResolver sd))
+    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd initOpts mresolver bundle
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
@@ -114,16 +105,19 @@ initProject whichCmd currDir initOpts mresolver = do
         userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
 
         gpds = Map.elems $ fmap snd rbundle
-        p = Project
+
+    deps <- for (Map.toList extraDeps) $ \(n, v) ->
+      PLImmutable <$> completePackageLocation (PLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+
+    let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
-            , projectPackages = pkgs
-            , projectDependencies = map
-                (\(n, v) -> PLIndex $ PackageIdentifierRevision (PackageIdentifier n v) CFILatest)
-                (Map.toList extraDeps)
+            , projectPackages = RelFilePath . T.pack <$> pkgs
+            , projectDependencies = deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
-            , projectResolver = resolver
+            , projectResolver = sdResolver sd
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
+            , projectCurator = Nothing
             }
 
         makeRelDir dir =
@@ -136,7 +130,7 @@ initProject whichCmd currDir initOpts mresolver = do
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
-        toPkg dir = PLFilePath $ makeRelDir dir
+        toPkg dir = makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
@@ -290,8 +284,7 @@ renderStackYaml p ignoredPackages dupPackages =
         ]
 
     footerHelp =
-        let major = toCabalVersion
-                    $ toMajorVersion $ fromCabalVersion $ C.mkVersion' Meta.version
+        let major = toMajorVersion $ C.mkVersion' Meta.version
         in commentHelp
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"
@@ -336,7 +329,6 @@ getSnapshots' = do
 getDefaultResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
-    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
@@ -350,16 +342,15 @@ getDefaultResolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
-    sd <- maybe selectSnapResolver (makeConcreteResolver (Just root) >=> loadResolver) mresolver
-    getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd
+getDefaultResolver whichCmd initOpts mresolver bundle = do
+    sd <- maybe selectSnapResolver (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
+    getWorkingResolverPlan whichCmd initOpts bundle sd
     where
-        root = parent stackYaml
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
             snaps <- fmap getRecommendedSnapshots getSnapshots'
-            (s, r) <- selectBestSnapshot (parent stackYaml) gpds snaps
+            (s, r) <- selectBestSnapshot gpds snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot whichCmd snaps)
@@ -368,7 +359,6 @@ getDefaultResolver whichCmd stackYaml initOpts mresolver bundle = do
 getWorkingResolverPlan
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
-    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
@@ -382,12 +372,12 @@ getWorkingResolverPlan
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
+getWorkingResolverPlan whichCmd initOpts bundle sd = do
     logInfo $ "Selected resolver: " <> display (sdResolverName sd)
     go bundle
     where
         go info = do
-            eres <- checkBundleResolver whichCmd stackYaml initOpts info sd
+            eres <- checkBundleResolver whichCmd initOpts info sd
             -- if some packages failed try again using the rest
             case eres of
                 Right (f, edeps)-> return (sd, f, edeps, info)
@@ -403,13 +393,13 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
-                          logWarn $ display $ indent $ showItems ignored
+                          logWarn $ display $ indent $ showItems $ map packageNameString ignored
                         else
                           logWarn $ "*** Ignoring package: "
-                                 <> display
+                                 <> fromString
                                       (case ignored of
                                         [] -> error "getWorkingResolverPlan.head"
-                                        x:_ -> x)
+                                        x:_ -> packageNameString x)
 
                         go available
                     where
@@ -420,7 +410,6 @@ getWorkingResolverPlan whichCmd stackYaml initOpts bundle sd = do
 checkBundleResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
-    -> Path Abs File   -- ^ stack.yaml
     -> InitOpts
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
@@ -428,14 +417,14 @@ checkBundleResolver
     -> RIO env
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
-checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
-    result <- checkSnapBuildPlanActual (parent stackYaml) gpds Nothing sd
+checkBundleResolver whichCmd initOpts bundle sd = do
+    result <- checkSnapBuildPlan gpds Nothing sd Nothing
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do
             shouldUseSolver <- case (resolver, initOpts) of
                 (_, InitOpts { useSolver = True }) -> return True
-                (ResolverCompiler _, _) -> do
+                (SLCompiler _, _) -> do
                     logInfo "Using solver because a compiler resolver was specified."
                     return True
                 _ -> return False
@@ -471,8 +460,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
           let cabalDirs      = map parent (Map.elems (fmap fst bundle))
               srcConstraints = mergeConstraints (gpdPackages gpds) flags
 
-          eresult <- solveResolverSpec stackYaml cabalDirs
-                                       (sd, srcConstraints, Map.empty)
+          eresult <- solveResolverSpec cabalDirs (sd, srcConstraints, Map.empty)
           case eresult of
               Right (src, ext) ->
                   return $ Right (fmap snd (Map.union src ext), fmap fst ext)
@@ -489,7 +477,7 @@ checkBundleResolver whichCmd stackYaml initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          (compiler, _) <- getResolverConstraints Nothing stackYaml sd
+          (compiler, _) <- getResolverConstraints Nothing sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

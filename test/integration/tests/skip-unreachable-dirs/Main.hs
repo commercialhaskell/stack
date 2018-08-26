@@ -1,8 +1,11 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 import StackTest
-import System.Directory (setPermissions, emptyPermissions, createDirectory)
+import System.Directory
+import Control.Exception (catch, IOException)
 
 main :: IO ()
 main = do
-    createDirectory "unreachabledir"
+    removeFileIgnore "stack.yaml"
+    createDirectory "unreachabledir" `catch` \(e :: IOException) -> pure ()
     setPermissions  "unreachabledir" emptyPermissions
     stack ["init"]

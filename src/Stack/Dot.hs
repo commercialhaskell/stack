@@ -3,7 +3,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Dot (dot
                  ,listDependencies
@@ -16,15 +15,15 @@ module Stack.Dot (dot
                  ) where
 
 import qualified Data.Foldable as F
-import qualified Data.HashSet as HashSet
-import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.Text (display)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
+import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
@@ -33,16 +32,12 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
-import           Stack.Prelude hiding (Display (..))
+import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
+import qualified Stack.Prelude (pkgName)
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -121,13 +116,13 @@ createDependencyGraph dotOpts = do
                                                    sourceMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
-  let globalDumpMap = Map.fromList $ map (\dp -> (packageIdentifierName (dpPackageIdent dp), dp)) globalDump
+  let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
-          | name `elem` [$(mkPackageName "rts"), $(mkPackageName "ghc")] =
+          | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
               return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
           | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
@@ -145,7 +140,7 @@ listDependencies opts = do
                   if listDepsLicense opts
                       then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
                       else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
-                line = packageNameText name <> listDepsSep opts <> payloadText
+                line = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText
             in  liftIO $ Text.putStrLn line
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
@@ -204,20 +199,20 @@ createDepLoader :: Applicative m
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> PackageLocationIndex FilePath ->
+                -> (PackageName -> Version -> PackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
                 -> PackageName
                 -> m (Set PackageName, DotPayload)
 createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
-  if not (pkgName `HashSet.member` wiredInPackages)
+  if not (pkgName `Set.member` wiredInPackages)
       then case Map.lookup pkgName sourceMap of
-          Just (PSFiles lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
+          Just (PSFilePath lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
             where
               pkg = localPackageToPackage lp
-          Just (PSIndex _ flags ghcOptions loc) ->
+          Just (PSRemote _ flags ghcOptions loc ident) ->
               -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
-              let PackageIdentifierRevision (PackageIdentifier name version) _ = loc
-               in assert (pkgName == name) (loadPackageDeps pkgName version (PLIndex loc) flags ghcOptions)
+              let PackageIdentifier name version = ident
+               in assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
           Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of
@@ -225,7 +220,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
           Just dp -> pure (Set.fromList deps, payloadFromDump dp)
             where
               deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
-                                          packageIdentifierName
+                                          Stack.Prelude.pkgName
                                           (Map.lookup depId globalIdMap))
                          (dpDepends dp)
   where
@@ -234,7 +229,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
         case maybePkg of
             Just (_, Library _ _ mlicense) -> mlicense
             _ -> Nothing
-    payloadFromDump dp = DotPayload (Just $ packageIdentifierVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
+    payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
@@ -293,7 +288,7 @@ printEdge from to' = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> "
 
 -- | Convert a package name to a graph node name.
 nodeName :: PackageName -> Text
-nodeName name = "\"" <> packageNameText name <> "\""
+nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
 
 -- | Print a node with no dependencies
 printLeaf :: MonadIO m => PackageName -> m ()
@@ -304,7 +299,7 @@ printLeaf package = liftIO . Text.putStrLn . Text.concat $
 
 -- | Check if the package is wired in (shipped with) ghc
 isWiredIn :: PackageName -> Bool
-isWiredIn = (`HashSet.member` wiredInPackages)
+isWiredIn = (`Set.member` wiredInPackages)
 
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp =

@@ -11,8 +11,6 @@ import           Stack.Options.Completion
 import           Stack.Options.PackageParser (readFlag)
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.FlagName
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | Parser for CLI-only build arguments

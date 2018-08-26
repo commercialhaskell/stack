@@ -2,13 +2,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Build the project.
 
@@ -21,7 +17,7 @@ module Stack.Build
   ,CabalVersionException(..))
   where
 
-import           Stack.Prelude
+import           Stack.Prelude hiding (loadPackage)
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import qualified Data.HashMap.Strict as HM
 import           Data.List ((\\), isPrefixOf)
@@ -36,6 +32,8 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
+import           Distribution.Version (mkVersion)
+import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Haddock
@@ -43,16 +41,10 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Package
-import           Stack.PackageLocation (parseSingleCabalFileIndex)
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 
 import           Stack.Types.Compiler (compilerVersionText
 #ifdef WINDOWS
@@ -89,10 +81,8 @@ build msetLocalFiles mbuildLk boptsCli = fixCodePage $ do
         -- The `locals` value above only contains local project
         -- packages, not local dependencies. This will get _all_
         -- of the local files we're interested in
-        -- watching. Arguably, we should not bother watching repo
-        -- and archive files, since those shouldn't
-        -- change. That's a possible optimization to consider.
-        [lpFiles lp | PSFiles lp _ <- Map.elems sourceMap]
+        -- watching.
+        [lpFiles lp | PSFilePath lp _ <- Map.elems sourceMap]
       setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
@@ -158,7 +148,7 @@ checkCabalVersion = do
     allowNewer <- view $ configL.to configAllowNewer
     cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
-    when (allowNewer && cabalVer < $(mkVersion "1.22")) $ throwM $
+    when (allowNewer && cabalVer < mkVersion [1, 22]) $ throwM $
         CabalVersionException $
             "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
             versionString cabalVer ++
@@ -182,7 +172,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             exesText pkgs =
                 T.intercalate
                     ", "
-                    ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
+                    ["'" <> T.pack (packageNameString p) <> ":" <> exe <> "'" | p <- pkgs]
         (logWarn . display . T.unlines . concat)
             [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
@@ -224,9 +214,9 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     exesToBuild :: Map Text (NonEmpty PackageName)
     exesToBuild =
         collect
-            [ (exe,pkgName)
-            | (pkgName,task) <- Map.toList (planTasks plan)
-            , TTFiles lp _ <- [taskType task] -- FIXME analyze logic here, do we need to check for Local?
+            [ (exe,pkgName')
+            | (pkgName',task) <- Map.toList (planTasks plan)
+            , TTFilePath lp _ <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
     localExes :: Map Text (NonEmpty PackageName)
@@ -275,14 +265,13 @@ mkBaseConfigOpts boptsCli = do
 -- | Provide a function for loading package information from the package index
 loadPackage
   :: HasEnvConfig env
-  => PackageLocationIndex FilePath
+  => PackageLocationImmutable
   -> Map FlagName Bool
   -> [Text]
   -> RIO env Package
 loadPackage loc flags ghcOptions = do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
-  root <- view projectRootL
   let pkgConfig = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
@@ -291,7 +280,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }
-  resolvePackage pkgConfig <$> parseSingleCabalFileIndex root loc
+  resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
@@ -300,7 +289,7 @@ fixCodePage :: HasEnvConfig env => RIO env a -> RIO env a
 fixCodePage inner = do
     mcp <- view $ configL.to configModifyCodePage
     ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
-    if mcp && ghcVersion < $(mkVersion "7.10.3")
+    if mcp && ghcVersion < mkVersion [7, 10, 3]
         then fixCodePage'
         -- GHC >=7.10.3 doesn't need this code page hack.
         else inner
@@ -385,16 +374,14 @@ queryBuildInfo selectors0 =
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
     (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
-    wantedCompiler <- view $ wantedCompilerVersionL.to compilerVersionText
+    wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
-    globalHints <- view globalHintsL
     return $ object
         [ "locals" .= Object (HM.fromList $ map localToPair locals)
         , "compiler" .= object
             [ "wanted" .= wantedCompiler
             , "actual" .= actualCompiler
             ]
-        , "global-hints" .= globalHints
         ]
   where
     localToPair lp =
@@ -402,6 +389,6 @@ rawBuildInfo = do
       where
         p = lpPackage lp
         value = object
-            [ "version" .= packageVersion p
-            , "path" .= toFilePath (lpDir lp)
+            [ "version" .= CabalString (packageVersion p)
+            , "path" .= toFilePath (parent $ lpCabalFile lp)
             ]

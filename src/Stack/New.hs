@@ -37,7 +37,6 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
-import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           RIO.Process
 import qualified Text.Mustache as Mustache
@@ -100,7 +99,7 @@ new opts forceOverwrite = do
         logInfo
             (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             display (packageNameText project) <>
+             fromString (packageNameString project) <>
              "\" in " <>
              if bare then "the current directory"
                      else fromString (toFilePath (dirname absDir)) <>
@@ -198,9 +197,9 @@ applyTemplate project template nonceParams dir templateText = do
       return $ T.pack . show $ year
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
-            nameAsVarId = T.replace "-" "_" $ packageNameText project
-            nameAsModule = T.filter (/= '-') $ T.toTitle $ packageNameText project
-            nameParams = M.fromList [ ("name", packageNameText project)
+            nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
+            nameAsModule = T.filter (/= '-') $ T.toTitle $ T.pack $ packageNameString project
+            nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                     , ("name-as-varid", nameAsVarId)
                                     , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config

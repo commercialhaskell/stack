@@ -46,8 +46,8 @@ dependencies:
 - base64-bytestring
 - bytestring
 - colour
-- conduit
-- conduit-extra
+- conduit >= 1.3
+- conduit-extra >= 1.3
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -81,6 +81,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
+- pantry
 - path
 - path-io
 - persistent
@@ -138,7 +139,6 @@ library:
   - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
-  - Data.Aeson.Extended
   - Data.Attoparsec.Args
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
@@ -178,8 +178,8 @@ library:
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Fetch
   - Stack.FileWatch
+  - Stack.Freeze
   - Stack.GhcPkg
   - Stack.Ghci
   - Stack.Ghci.Script
@@ -199,6 +199,7 @@ library:
   - Stack.Options.DockerParser
   - Stack.Options.DotParser
   - Stack.Options.ExecParser
+  - Stack.Options.FreezeParser
   - Stack.Options.GhcBuildParser
   - Stack.Options.GhciParser
   - Stack.Options.GhcVariantParser
@@ -217,8 +218,6 @@ library:
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
-  - Stack.PackageIndex
-  - Stack.PackageLocation
   - Stack.Path
   - Stack.Prelude
   - Stack.PrettyPrint
@@ -233,7 +232,6 @@ library:
   - Stack.Sig.Sign
   - Stack.Snapshot
   - Stack.Solver
-  - Stack.StaticBytes
   - Stack.Types.Build
   - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild
@@ -242,15 +240,12 @@ library:
   - Stack.Types.Config
   - Stack.Types.Config.Build
   - Stack.Types.Docker
-  - Stack.Types.FlagName
   - Stack.Types.GhcPkgId
   - Stack.Types.Image
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageDump
-  - Stack.Types.PackageIdentifier
-  - Stack.Types.PackageIndex
   - Stack.Types.PackageName
   - Stack.Types.PrettyPrint
   - Stack.Types.Resolver
@@ -260,13 +255,12 @@ library:
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
+  - Stack.Unpack
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended
   - System.Process.PagerEditor
   - System.Terminal
-  other-modules:
-  - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
   - condition: 'os(windows)'
     then:

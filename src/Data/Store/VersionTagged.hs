@@ -95,6 +95,7 @@ storeVersionConfig name hash = (namedVersionConfig name hash)
     { vcIgnore = S.fromList
         [ "Data.Vector.Unboxed.Base.Vector GHC.Types.Word"
         , "Data.ByteString.Internal.ByteString"
+        , "Data.ByteString.Short.Internal.ShortByteString"
         ]
     , vcRenames = M.fromList
         [ ( "Data.Maybe.Maybe", "GHC.Base.Maybe")

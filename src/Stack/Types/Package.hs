@@ -10,8 +10,7 @@
 module Stack.Types.Package where
 
 import           Stack.Prelude
-import qualified Data.ByteString as S
-import           Data.List
+import qualified RIO.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Data.IORef.RunOnce
@@ -23,15 +22,11 @@ import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           Path as FL
-import           Stack.Types.BuildPlan (PackageLocation, PackageLocationIndex (..), ExeName)
+import           Stack.Types.BuildPlan (ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -41,9 +36,6 @@ data PackageException
       !(Maybe Version)
       ![PError]
       ![PWarning]
-  | PackageNoCabalFileFound (Path Abs Dir)
-  | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
-  | MismatchedCabalName (Path Abs File) PackageName
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   deriving Typeable
 instance Exception PackageException
@@ -51,7 +43,7 @@ instance Show PackageException where
     show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse cabal file "
         , case loc of
-            Left pir -> "for " ++ packageIdentifierRevisionString pir
+            Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
             Right fp -> toFilePath fp
         {-
 
@@ -81,33 +73,12 @@ instance Show PackageException where
                 ])
             warnings
         ]
-    show (PackageNoCabalFileFound dir) = concat
-        [ "Stack looks for packages in the directories configured in"
-        , " the 'packages' and 'extra-deps' fields defined in your stack.yaml\n"
-        , "The current entry points to "
-        , toFilePath dir
-        , " but no .cabal or package.yaml file could be found there."
-        ]
-    show (PackageMultipleCabalFilesFound dir files) =
-        "Multiple .cabal files found in directory " ++
-        toFilePath dir ++
-        ": " ++
-        intercalate ", " (map (toFilePath . filename) files)
-    show (MismatchedCabalName fp name) = concat
-        [ "cabal file path "
-        , toFilePath fp
-        , " does not match the package name it defines.\n"
-        , "Please rename the file to: "
-        , packageNameString name
-        , ".cabal\n"
-        , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
-        ]
     show (MismatchedCabalIdentifier pir ident) = concat
         [ "Mismatched package identifier."
         , "\nFound:    "
         , packageIdentifierString ident
         , "\nExpected: "
-        , packageIdentifierRevisionString pir
+        , T.unpack $ utf8BuilderToText $ display pir
         ]
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
@@ -141,6 +112,9 @@ data Package =
                                                           -- ^ If present: custom-setup dependencies
           }
  deriving (Show,Typeable)
+
+packageIdent :: Package -> PackageIdentifier
+packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
 
 -- | The value for a map from dependency name. This contains both the
 -- version range and the type of dependency, and provides a semigroup
@@ -235,8 +209,7 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCompilerVersion
-                                  :: !(CompilerVersion 'CVActual) -- ^ GHC version
+                ,packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)
@@ -253,24 +226,19 @@ type SourceMap = Map PackageName PackageSource
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-  = PSFiles LocalPackage InstallLocation
-  -- ^ Package which exist on the filesystem (as opposed to an index tarball)
-  | PSIndex InstallLocation (Map FlagName Bool) [Text] PackageIdentifierRevision
-  -- ^ Package which is in an index, and the files do not exist on the
-  -- filesystem yet.
+  = PSFilePath LocalPackage InstallLocation
+  -- ^ Package which exist on the filesystem
+  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocationImmutable PackageIdentifier
+  -- ^ Package which is downloaded remotely.
     deriving Show
 
 piiVersion :: PackageSource -> Version
-piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
-piiVersion (PSIndex _ _ _ (PackageIdentifierRevision (PackageIdentifier _ v) _)) = v
+piiVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
+piiVersion (PSRemote _ _ _ _ (PackageIdentifier _ v)) = v
 
 piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSFiles _ loc) = loc
-piiLocation (PSIndex loc _ _ _) = loc
-
-piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
-piiPackageLocation (PSFiles lp _) = PLOther (lpLocation lp)
-piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
+piiLocation (PSFilePath _ loc) = loc
+piiLocation (PSRemote loc _ _ _ _) = loc
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -292,8 +260,6 @@ data LocalPackage = LocalPackage
     , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.
-    , lpDir           :: !(Path Abs Dir)
-    -- ^ Directory of the package.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
     , lpForceDirty    :: !Bool
@@ -305,8 +271,6 @@ data LocalPackage = LocalPackage
     -- ^ current state of the files
     , lpComponentFiles :: !(IOThunk (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
-    , lpLocation      :: !(PackageLocation FilePath)
-    -- ^ Where this source code came from
     }
     deriving Show
 
@@ -341,7 +305,7 @@ data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
 data FileCacheInfo = FileCacheInfo
     { fciModTime :: !ModTime
     , fciSize :: !Word64
-    , fciHash :: !S.ByteString
+    , fciHash :: !SHA256
     }
     deriving (Generic, Show, Eq, Data, Typeable)
 instance Store FileCacheInfo
@@ -427,4 +391,6 @@ installedPackageIdentifier (Executable pid) = pid
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
-installedVersion = packageIdentifierVersion . installedPackageIdentifier
+installedVersion i =
+  let PackageIdentifier _ version = installedPackageIdentifier i
+   in version

@@ -13,9 +13,6 @@ module Stack.Upgrade
     ) where
 
 import           Stack.Prelude               hiding (force, Display (..))
-import qualified Data.HashMap.Strict         as HashMap
-import qualified Data.List
-import qualified Data.Map                    as Map
 import qualified Data.Text as T
 import           Distribution.Version        (mkVersion')
 import           Lens.Micro                  (set)
@@ -28,14 +25,8 @@ import           Stack.Config
 #ifdef WINDOWS
 import           Stack.DefaultColorWhen (defaultColorWhen)
 #endif
-import           Stack.Fetch
-import           Stack.PackageIndex
 import           Stack.PrettyPrint
 import           Stack.Setup
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Exit                 (ExitCode (ExitSuccess))
@@ -157,9 +148,9 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             Just downloadVersion -> do
                 prettyInfoL
                     [ flow "Current Stack version:"
-                    , display stackVersion <> ","
+                    , fromString (versionString stackVersion) <> ","
                     , flow "available download version:"
-                    , display downloadVersion
+                    , fromString (versionString downloadVersion)
                     ]
                 return $ downloadVersion > stackVersion
 
@@ -225,34 +216,29 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
 #endif
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
-        updateAllIndices
-        PackageCache caches <- getPackageCaches
-        let versions
-                = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ maybe [] HashMap.keys
-                $ HashMap.lookup $(mkPackageName "stack") caches
+        void $ updateHackageIndex
+             $ Just "Updating index to make sure we find the latest Stack version"
+        mversion <- getLatestHackageVersion "stack" UsePreferredVersions
+        pir@(PackageIdentifierRevision _ version _) <-
+          case mversion of
+            Nothing -> throwString "No stack found in package indices"
+            Just version -> pure version
 
-        when (null versions) (throwString "No stack found in package indices")
-
-        let version = Data.List.maximum versions
-        if version <= fromCabalVersion (mkVersion' Paths.version)
+        if version <= mkVersion' Paths.version
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents tmp Nothing
-                    -- accept latest cabal revision
-                    [PackageIdentifierRevision ident CFILatest]
-                case Map.lookup ident paths of
-                    Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
-                    Just path -> return $ Just path
+                suffix <- parseRelDir $ "stack-" ++ versionString version
+                let dir = tmp </> suffix
+                unpackPackageLocation dir $ PLIHackage pir Nothing
+                pure $ Just dir
 
-    forM_ mdir $ \dir -> do
-        lc <- loadConfig
-            gConfigMonoid
-            mresolver
-            (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
+    forM_ mdir $ \dir ->
+      loadConfig
+      gConfigMonoid
+      mresolver
+      (SYLOverride $ dir </> $(mkRelFile "stack.yaml")) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
         envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

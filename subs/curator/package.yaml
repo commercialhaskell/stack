@@ -1,0 +1,24 @@
+name:    curator
+version: 2.0.0.0
+
+dependencies:
+- base
+- rio
+- pantry
+- Cabal
+- yaml
+- path
+- path-io
+- optparse-generic
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Curator
+
+executables:
+  curator:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - curator

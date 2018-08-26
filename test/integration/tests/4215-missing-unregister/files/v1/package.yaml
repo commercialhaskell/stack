@@ -1,0 +1,7 @@
+name: foo
+version: 1
+
+dependencies:
+- base
+
+library: {}

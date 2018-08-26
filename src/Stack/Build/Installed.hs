@@ -14,7 +14,7 @@ module Stack.Build.Installed
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Foldable as F
-import qualified Data.HashSet as HashSet
+import qualified Data.Set as Set
 import           Data.List
 import qualified Data.Map.Strict as Map
 import           Path
@@ -28,9 +28,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.PackageDump
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
@@ -171,19 +168,19 @@ processLoadResult _ _ (Allowed, lh) = return (Just lh)
 processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
-    | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
+    | fst (lhPair lh) `Set.member` ghcjsBootPackages = do
         logWarn $
             "Ignoring that the GHCJS boot package \"" <>
-            display (packageNameText (fst (lhPair lh))) <>
+            fromString (packageNameString (fst (lhPair lh))) <>
             "\" has a different version, " <>
-            display (versionText actual) <>
+            fromString (versionString actual) <>
             ", than the resolver's wanted version, " <>
-            display (versionText wanted)
+            fromString (versionString wanted)
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
     logDebug $
         "Ignoring package " <>
-        display (packageNameText (fst (lhPair lh))) <>
+        fromString (packageNameString (fst (lhPair lh))) <>
         maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
         " due to" <>
         case reason of
@@ -195,9 +192,9 @@ processLoadResult mdb _ (reason, lh) = do
             WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
             WrongVersion actual wanted ->
                 " wanting version " <>
-                display (versionText wanted) <>
+                fromString (versionString wanted) <>
                 " instead of " <>
-                display (versionText actual)
+                fromString (versionString actual)
     return Nothing
 
 data Allowed
@@ -278,7 +275,7 @@ toLoadHelper mloc dp = LoadHelper
         -- minor versions of GHC, where the dependencies of wired-in
         -- packages may change slightly and therefore not match the
         -- snapshot.
-        if name `HashSet.member` wiredInPackages
+        if name `Set.member` wiredInPackages
             then []
             else dpDepends dp
     , lhPair = (name, (toPackageLocation mloc, Library ident gid (Right <$> dpLicense dp)))

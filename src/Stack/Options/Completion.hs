@@ -26,9 +26,7 @@ import           Stack.Runners (loadConfigWithOpts)
 import           Stack.Prelude hiding (lift)
 import           Stack.Setup
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageName
 import           System.Process (readProcess)
 import           Language.Haskell.TH.Syntax (runIO, lift)
 
@@ -57,8 +55,8 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         -- If it looks like a flag, skip this more costly completion.
         ('-': _) -> return []
         _ -> do
-            let go = (globalOptsFromMonoid False mempty)
-                    { globalLogLevel = LevelOther "silent" }
+            go' <- globalOptsFromMonoid False mempty
+            let go = go' { globalLogLevel = LevelOther "silent" }
             loadConfigWithOpts go $ \lc -> do
               bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
               envConfig <- runRIO bconfig (setupEnv Nothing)
@@ -94,7 +92,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
              in (if flagEnabled name fl then "-" else "") ++ flname
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
-            Map.lookup (fromCabalFlagName (C.flagName fl)) $
+            Map.lookup (C.flagName fl) $
             Map.findWithDefault Map.empty name (bcFlags bconfig)
     return $ filter (input `isPrefixOf`) $
         case input of

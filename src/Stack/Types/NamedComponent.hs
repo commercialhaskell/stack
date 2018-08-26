@@ -16,8 +16,8 @@ module Stack.Types.NamedComponent
   , isCBench
   ) where
 
+import Pantry
 import Stack.Prelude
-import Stack.Types.PackageName
 import qualified Data.Set as Set
 import qualified Data.Text as T
 
@@ -41,7 +41,7 @@ renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent
 
 renderPkgComponent :: (PackageName, NamedComponent) -> Text
-renderPkgComponent (pkg, comp) = packageNameText pkg <> ":" <> renderComponent comp
+renderPkgComponent (pkg, comp) = fromString (packageNameString pkg) <> ":" <> renderComponent comp
 
 exeComponents :: Set NamedComponent -> Set Text
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList

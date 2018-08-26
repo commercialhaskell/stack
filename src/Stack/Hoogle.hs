@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | A wrapper around hoogle.
 module Stack.Hoogle
@@ -11,18 +10,14 @@ module Stack.Hoogle
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
-import           Data.List (find)
-import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version (mkVersion)
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
-import           Stack.Fetch
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           System.Exit
 import           RIO.Process
 
@@ -78,43 +73,32 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 defaultBuildOptsCLI))
                  (\(_ :: ExitCode) ->
                        return ()))
-    hooglePackageName = $(mkPackageName "hoogle")
-    hoogleMinVersion = $(mkVersion "5.0")
+    hooglePackageName = mkPackageName "hoogle"
+    hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
         PackageIdentifier hooglePackageName hoogleMinVersion
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
-        hooglePackageIdentifier <-
-            do (_,_,resolved) <-
-                   resolvePackagesAllowMissing
+        hooglePackageIdentifier <- do
+          mversion <- getLatestHackageVersion hooglePackageName UsePreferredVersions
 
-                       -- FIXME this Nothing means "do not follow any
-                       -- specific snapshot", which matches old
-                       -- behavior. However, since introducing the
-                       -- logic to pin a name to a package in a
-                       -- snapshot, we may arguably want to ensure
-                       -- that we're grabbing the version of Hoogle
-                       -- present in the snapshot currently being
-                       -- used.
-                       Nothing
+          -- FIXME For a while, we've been following the logic of
+          -- taking the latest Hoogle version available. However, we
+          -- may want to instead grab the version of Hoogle present in
+          -- the snapshot current being used instead.
+          pure $ fromMaybe (Left hoogleMinIdent) $ do
+            pir@(PackageIdentifierRevision _ ver _) <- mversion
+            guard $ ver >= hoogleMinVersion
+            Just $ Right pir
 
-                       mempty
-                       (Set.fromList [hooglePackageName])
-               return
-                   (case find
-                             ((== hooglePackageName) . packageIdentifierName)
-                             (map rpIdent resolved) of
-                        Just ident@(PackageIdentifier _ ver)
-                          | ver >= hoogleMinVersion -> Right ident
-                        _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
             Left{} -> logInfo $
               "Minimum " <>
-              display hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               " is not in your index. Installing the minimum version."
             Right ident -> logInfo $
               "Minimum version is " <>
-              display hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               ". Found acceptable " <>
               display ident <>
               " in your index, installing it."
@@ -129,11 +113,12 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 Nothing
                                 lk
                                 defaultBuildOptsCLI
-                                { boptsCLITargets = [ packageIdentifierText
-                                                          (either
-                                                               id
-                                                               id
-                                                               hooglePackageIdentifier)]
+                                { boptsCLITargets =
+                                    pure $
+                                    either
+                                     (T.pack . packageIdentifierString)
+                                     (utf8BuilderToText . display)
+                                     hooglePackageIdentifier
                                 }))
                  (\(e :: ExitCode) ->
                        case e of
@@ -173,7 +158,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                         ]
                 return $ case result of
                     Left err -> unexpectedResult $ T.pack (show err)
-                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (BL8.unpack bs)) of
+                    Right bs -> case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
                         Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
                         Just ver
                             | ver >= hoogleMinVersion -> Right hooglePath
@@ -181,7 +166,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 [ "Installed Hoogle is too old, "
                                 , T.pack hooglePath
                                 , " is version "
-                                , versionText ver
+                                , T.pack $ versionString ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of

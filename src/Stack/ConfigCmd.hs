@@ -29,7 +29,7 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 
 data ConfigCmdSet
-    = ConfigCmdSetResolver AbstractResolver
+    = ConfigCmdSetResolver (Unresolved AbstractResolver)
     | ConfigCmdSetSystemGhc CommandScope
                             Bool
     | ConfigCmdSetInstallGhc CommandScope
@@ -81,9 +81,10 @@ cfgCmdSetValue
     => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
-    concreteResolver <- makeConcreteResolver (Just root) newResolver
+    newResolver' <- resolvePaths (Just root) newResolver
+    concreteResolver <- makeConcreteResolver newResolver'
     -- Check that the snapshot actually exists
-    void $ loadResolver concreteResolver
+    void $ loadResolver concreteResolver Nothing
     return (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
     return (Yaml.Bool bool')

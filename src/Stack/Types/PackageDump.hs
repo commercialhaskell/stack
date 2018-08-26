@@ -14,7 +14,6 @@ import Data.Store.Version
 import Data.Store.VersionTagged
 import Stack.Prelude
 import Stack.Types.GhcPkgId
-import Stack.Types.PackageIdentifier
 
 -- | Cached information on whether package have profiling libraries and haddocks.
 newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
@@ -31,4 +30,4 @@ data InstalledCacheEntry = InstalledCacheEntry
 instance Store InstalledCacheEntry
 
 installedCacheVC :: VersionConfig InstalledCacheInner
-installedCacheVC = storeVersionConfig "installed-v1" "GGyaE6qY9FOqeWtozuadKqS7_QM="
+installedCacheVC = storeVersionConfig "installed-v2" "eHLVmgbOWvPSm1X3wLfclM-XiXc="

@@ -5,6 +5,7 @@ main :: IO ()
 main = do
   -- init
   removeFileIgnore "stack.yaml"
+  removeDirIgnore ".stack-work"
   stack ["init", defaultResolverArg]
 
   -- place to throw some exes

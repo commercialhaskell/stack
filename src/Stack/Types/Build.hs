@@ -32,7 +32,6 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
-    ,ttPackageLocation
     ,TaskConfigOpts(..)
     ,BuildCache(..)
     ,buildCacheVC
@@ -65,19 +64,16 @@ import           Data.Time.Clock
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
-import           Path                            (mkRelDir, parseRelDir, (</>))
+import           Distribution.Version            (mkVersion)
+import           Path                            (mkRelDir, parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit                     (ExitCode (ExitFailure))
 import           System.FilePath                 (pathSeparator)
@@ -88,8 +84,8 @@ import           RIO.Process                     (showProcessArgDebug)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
-        (Maybe (CompilerVersion 'CVActual, Arch)) -- found
-        (CompilerVersion 'CVWanted, Arch) -- expected
+        (Maybe (ActualCompiler, Arch)) -- found
+        (WantedCompiler, Arch) -- expected
         GHCVariant -- expected
         CompilerBuild -- expected
         VersionCheck
@@ -162,7 +158,7 @@ instance Show StackBuildException where
                     MatchMinor -> "minor version match with "
                     MatchExact -> "exact version "
                     NewerMinor -> "minor version match or newer with "
-                , compilerVersionString expected
+                , T.unpack $ utf8BuilderToText $ display expected
                 , " ("
                 , C.display earch
                 , ghcVariantSuffix ghcVariant
@@ -295,12 +291,12 @@ instance Show StackBuildException where
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
         T.unpack (renderPkgComponents xs) ++
         "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
-    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName testName) =
+    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
         missingExeError isSimpleBuildType $ concat
             [ "Test suite executable \""
             , exeName
             , " not found for "
-            , pkgName
+            , pkgName'
             , ":test:"
             , testName
             ]
@@ -347,9 +343,9 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
   in "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
        (False, Nothing) -> error "Invariant violated: unexpected case in showBuildError"
-       (False, Just taskProvides') -> "package " ++ dropQuotes (show taskProvides')
+       (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')
        (True, Nothing) -> "simple Setup.hs"
-       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (show taskProvides')
+       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')
      ) ++
      " using:\n      " ++ fullCmd ++ "\n" ++
      "    Process exited with code: " ++ show exitCode ++
@@ -371,7 +367,7 @@ instance Exception StackBuildException
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
     PkgDeps PackageName
-    deriving (Show,Typeable,Eq,Hashable,Store,NFData)
+    deriving (Show,Typeable,Eq,Store,NFData)
 
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
@@ -383,7 +379,7 @@ instance NFData BuildCache
 instance Store BuildCache
 
 buildCacheVC :: VersionConfig BuildCache
-buildCacheVC = storeVersionConfig "build-v1" "KVUoviSWWAd7tiRRGeWAvd0UIN4="
+buildCacheVC = storeVersionConfig "build-v2" "c9BeiWP7Mpe9OBDAPPEYPDaFEGM="
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
@@ -412,8 +408,8 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFiles lp _) = CacheSrcLocal (toFilePath (lpDir lp))
-toCachePkgSrc PSIndex{} = CacheSrcUpstream
+toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
 configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
@@ -464,25 +460,22 @@ instance Show TaskConfigOpts where
 
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
-data TaskType = TTFiles LocalPackage InstallLocation
-              | TTIndex Package InstallLocation PackageIdentifierRevision -- FIXME major overhaul for PackageLocation?
+data TaskType
+  = TTFilePath LocalPackage InstallLocation
+  | TTRemote Package InstallLocation PackageLocationImmutable
     deriving Show
-
-ttPackageLocation :: TaskType -> PackageLocationIndex FilePath
-ttPackageLocation (TTFiles lp _) = PLOther (lpLocation lp)
-ttPackageLocation (TTIndex _ _ pir) = PLIndex pir
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTFiles lp _ -> lpWanted lp
+        TTFilePath lp _ -> lpWanted lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
-        TTFiles _ loc -> loc
-        TTIndex _ loc _ -> loc
+        TTFilePath _ loc -> loc
+        TTRemote _ loc _ -> loc
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
@@ -618,7 +611,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- earlier. Cabal also might do less work then.
     useExactConf = configAllowNewer config
 
-    newerCabal = view cabalVersionL econfig >= $(mkVersion "1.22")
+    newerCabal = view cabalVersionL econfig >= mkVersion [1, 22]
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.
@@ -629,9 +622,9 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 
-    toDepOption1_22 ident gid = concat
+    toDepOption1_22 (PackageIdentifier name _) gid = concat
         [ "--dependency="
-        , packageNameString $ packageIdentifierName ident
+        , packageNameString name
         , "="
         , ghcPkgIdString gid
         ]

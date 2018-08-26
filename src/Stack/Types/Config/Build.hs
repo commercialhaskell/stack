@@ -32,8 +32,6 @@ import           Data.Aeson.Extended
 import qualified Data.Map.Strict as Map
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Stack.Prelude
-import           Stack.Types.FlagName
-import           Stack.Types.PackageName
 
 -- | Build options that is interpreted by the build command.
 --   This is built up from BuildOptsCLI and BuildOptsMonoid

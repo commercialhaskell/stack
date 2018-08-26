@@ -25,7 +25,6 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Runner
-import           Stack.Types.Compiler
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
@@ -35,7 +34,7 @@ import           RIO.Process (processContextL, exec)
 reexecWithOptionalShell
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
+    -> IO WantedCompiler
     -> IO ()
     -> RIO env ()
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
@@ -59,7 +58,7 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
 runShellAndExit
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
+    -> IO WantedCompiler
     -> RIO env (String, [String])
     -> RIO env ()
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do

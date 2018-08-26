@@ -35,7 +35,6 @@ module Stack.Build.Cache
 
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
-import           Control.Monad.Trans.Maybe
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
@@ -48,19 +47,15 @@ import qualified Data.Set as Set
 import qualified Data.Store as Store
 import           Data.Store.VersionTagged
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import           Path
 import           Path.IO
 import           Stack.Constants.Config
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.Version
 import qualified System.FilePath as FP
 
 -- | Directory containing files to mark an executable as installed
@@ -82,8 +77,8 @@ getInstalledExes loc = do
         -- before https://github.com/commercialhaskell/stack/issues/2373
         -- was fixed), then we don't know which is correct - ignore them.
         M.fromListWith (\_ _ -> []) $
-        map (\x -> (packageIdentifierName x, [x])) $
-        mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
+        map (\x -> (pkgName x, [x])) $
+        mapMaybe (parsePackageIdentifier . toFilePath . filename) files
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
@@ -96,7 +91,7 @@ markExeInstalled loc ident = do
     -- Remove old install records for this package.
     -- TODO: This is a bit in-efficient. Put all this metadata into one file?
     installed <- getInstalledExes loc
-    forM_ (filter (\x -> packageIdentifierName ident == packageIdentifierName x) installed)
+    forM_ (filter (\x -> pkgName ident == pkgName x) installed)
           (markExeNotInstalled loc)
     -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
@@ -254,73 +249,55 @@ checkTestSuccess dir =
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: HasEnvConfig env
-                     => PackageLocationIndex FilePath
+                     => PackageLocationImmutable
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
-                     -> RIO env (Maybe (Path Abs File))
+                     -> RIO env (Path Abs File)
 precompiledCacheFile loc copts installedPackageIDs = do
   ec <- view envConfigL
 
   compiler <- view actualCompilerVersionL >>= parseRelDir . compilerVersionString
   cabal <- view cabalVersionL >>= parseRelDir . versionString
-  let mpkgRaw =
-        -- The goal here is to come up with a string representing the
-        -- package location which is unique. For archives and repos,
-        -- we rely upon cryptographic hashes paired with
-        -- subdirectories to identify this specific package version.
-        case loc of
-          PLIndex pir -> Just $ packageIdentifierRevisionString pir
-          PLOther other -> case other of
-            PLFilePath _ -> assert False Nothing -- no PLFilePaths should end up in a snapshot
-            PLArchive a -> fmap
-              (\h -> T.unpack (staticSHA256ToText h) ++ archiveSubdirs a)
-              (archiveHash a)
-            PLRepo r -> Just $ T.unpack (repoCommit r) ++ repoSubdirs r
 
-  forM mpkgRaw $ \pkgRaw -> do
-    platformRelDir <- platformGhcRelDir
-    let precompiledDir =
-              view stackRootL ec
-          </> $(mkRelDir "precompiled")
-          </> platformRelDir
-          </> compiler
-          </> cabal
+  -- The goal here is to come up with a string representing the
+  -- package location which is unique. Luckily @TreeKey@s are exactly
+  -- that!
+  treeKey <- getPackageLocationTreeKey loc
+  pkg <- parseRelDir $ T.unpack $ utf8BuilderToText $ display treeKey
 
-    pkg <-
-      case parseRelDir pkgRaw of
-        Just x -> return x
-        Nothing -> parseRelDir
-                 $ T.unpack
-                 $ TE.decodeUtf8
-                 $ B64URL.encode
-                 $ TE.encodeUtf8
-                 $ T.pack pkgRaw
+  platformRelDir <- platformGhcRelDir
+  let precompiledDir =
+            view stackRootL ec
+        </> $(mkRelDir "precompiled")
+        </> platformRelDir
+        </> compiler
+        </> cabal
 
-    -- In Cabal versions 1.22 and later, the configure options contain the
-    -- installed package IDs, which is what we need for a unique hash.
-    -- Unfortunately, earlier Cabals don't have the information, so we must
-    -- supplement it with the installed package IDs directly.
-    -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-    let input = (coNoDirs copts, installedPackageIDs)
-    hashPath <- parseRelFile $ S8.unpack $ B64URL.encode
-              $ Mem.convert $ hashWith SHA256 $ Store.encode input
+  -- In Cabal versions 1.22 and later, the configure options contain the
+  -- installed package IDs, which is what we need for a unique hash.
+  -- Unfortunately, earlier Cabals don't have the information, so we must
+  -- supplement it with the installed package IDs directly.
+  -- See issue: https://github.com/commercialhaskell/stack/issues/1103
+  let input = (coNoDirs copts, installedPackageIDs)
+  hashPath <- parseRelFile $ S8.unpack $ B64URL.encode
+            $ Mem.convert $ hashWith SHA256 $ Store.encode input
 
-    let longPath = precompiledDir </> pkg </> hashPath
+  let longPath = precompiledDir </> pkg </> hashPath
 
-    -- See #3649 - shorten the paths on windows if MAX_PATH will be
-    -- violated. Doing this only when necessary allows use of existing
-    -- precompiled packages.
-    if pathTooLong (toFilePath longPath) then do
-        shortPkg <- shaPath pkg
-        shortHash <- shaPath hashPath
-        return $ precompiledDir </> shortPkg </> shortHash
-    else
-        return longPath
+  -- See #3649 - shorten the paths on windows if MAX_PATH will be
+  -- violated. Doing this only when necessary allows use of existing
+  -- precompiled packages.
+  if pathTooLong (toFilePath longPath) then do
+      shortPkg <- shaPath pkg
+      shortHash <- shaPath hashPath
+      return $ precompiledDir </> shortPkg </> shortHash
+  else
+      return longPath
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
                       => BaseConfigOpts
-                      -> PackageLocationIndex FilePath
+                      -> PackageLocationImmutable
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
@@ -328,24 +305,23 @@ writePrecompiledCache :: HasEnvConfig env
                       -> Set Text -- ^ executables
                       -> RIO env ()
 writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = do
-  mfile <- precompiledCacheFile loc copts depIDs
-  forM_ mfile $ \file -> do
-    ensureDir (parent file)
-    ec <- view envConfigL
-    let stackRootRelative = makeRelative (view stackRootL ec)
-    mlibpath <- case mghcPkgId of
-      Executable _ -> return Nothing
-      Library _ ipid _ -> liftM Just $ pathFromPkgId stackRootRelative ipid
-    sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
-    exes' <- forM (Set.toList exes) $ \exe -> do
-        name <- parseRelFile $ T.unpack exe
-        relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
-        return $ toFilePath relPath
-    $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
-        { pcLibrary = mlibpath
-        , pcSubLibs = sublibpaths
-        , pcExes = exes'
-        }
+  file <- precompiledCacheFile loc copts depIDs
+  ensureDir (parent file)
+  ec <- view envConfigL
+  let stackRootRelative = makeRelative (view stackRootL ec)
+  mlibpath <- case mghcPkgId of
+    Executable _ -> return Nothing
+    Library _ ipid _ -> liftM Just $ pathFromPkgId stackRootRelative ipid
+  sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
+  exes' <- forM (Set.toList exes) $ \exe -> do
+      name <- parseRelFile $ T.unpack exe
+      relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+      return $ toFilePath relPath
+  $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
+      { pcLibrary = mlibpath
+      , pcSubLibs = sublibpaths
+      , pcExes = exes'
+      }
   where
     pathFromPkgId stackRootRelative ipid = do
       ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
@@ -355,14 +331,14 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = d
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: forall env. HasEnvConfig env
-                     => PackageLocationIndex FilePath -- ^ target package
+                     => PackageLocationImmutable -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe PrecompiledCache)
-readPrecompiledCache loc copts depIDs = runMaybeT $
-    MaybeT (precompiledCacheFile loc copts depIDs) >>=
-    MaybeT . $(versionedDecodeFile precompiledCacheVC) >>=
-    lift . mkAbs
+readPrecompiledCache loc copts depIDs = do
+    file <- precompiledCacheFile loc copts depIDs
+    mcache <- $(versionedDecodeFile precompiledCacheVC) file
+    maybe (pure Nothing) (fmap Just . mkAbs) mcache
   where
     -- Since commit ed9ccc08f327bad68dd2d09a1851ce0d055c0422,
     -- pcLibrary paths are stored as relative to the stack

@@ -17,7 +17,7 @@ import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Stack.DefaultStyles (defaultStyles)
-import Stack.Prelude
+import Stack.Prelude hiding (Snapshot (..))
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
@@ -26,8 +26,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Typeable (Typeable)
 import qualified Data.Vector as V
-import Network.HTTP.StackClient (httpJSON, getGlobalManager, addRequestHeader, getResponseBody, parseRequest,
-        setRequestManager, hAccept)
+import Network.HTTP.StackClient (httpJSON, addRequestHeader, getResponseBody, parseRequest, hAccept)
 import qualified Options.Applicative as OA
 import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
@@ -250,11 +249,8 @@ handleRemote
     => LsCmdOpts -> m ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
-    mgr <- liftIO getGlobalManager
     isStdoutTerminal <- view terminalL
-    let req' =
-            setRequestManager mgr $
-            addRequestHeader hAccept "application/json" req
+    let req' = addRequestHeader hAccept "application/json" req
     result <- httpJSON req'
     let snapData = getResponseBody result
     case lsView lsOpts of

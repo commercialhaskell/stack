@@ -1,0 +1,3 @@
+resolver: ghc-8.2.2
+packages:
+- v1

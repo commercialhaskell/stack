@@ -35,8 +35,9 @@ import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.VersionTagged
-import qualified Data.Text as T
+import qualified RIO.Text as T
 import qualified Distribution.License as C
+import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.System as OS
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -44,9 +45,6 @@ import           Stack.GhcPkg
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageDump
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           System.Directory (getDirectoryContents, doesFileExist)
 import           System.Process (readProcess) -- FIXME confirm that this is correct
 import           RIO.Process hiding (readProcess)
@@ -68,7 +66,7 @@ ghcPkgDescribe
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
+ghcPkgDescribe pkgName' = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName']
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
@@ -162,7 +160,7 @@ sinkMatching :: Monad m
                          (Map PackageName (DumpPackage Bool Bool Bool))
 sinkMatching reqProfiling reqHaddock reqSymbols allowed =
       Map.fromList
-    . map (packageIdentifierName . dpPackageIdent &&& id)
+    . map (pkgName . dpPackageIdent &&& id)
     . Map.elems
     . pruneDeps
         id
@@ -287,7 +285,7 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
-    , dpExposedModules :: ![Text]
+    , dpExposedModules :: !(Set ModuleName)
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
@@ -342,8 +340,8 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
     case Map.lookup "id" m of
         Just ["builtin_rts"] -> return Nothing
         _ -> do
-            name <- parseS "name" >>= parsePackageName
-            version <- parseS "version" >>= parseVersion
+            name <- parseS "name" >>= parsePackageNameThrowing . T.unpack
+            version <- parseS "version" >>= parseVersionThrowing . T.unpack
             ghcPkgId <- parseS "id" >>= parseGhcPkgId
 
             -- if a package has no modules, these won't exist
@@ -360,7 +358,8 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
             -- Handle sublibs by recording the name of the parent library
             -- If name of parent library is missing, this is not a sublib.
             let mkParentLib n = PackageIdentifier n version
-                parentLib = mkParentLib <$> (parseS "package-name" >>= parsePackageName)
+                parentLib = mkParentLib <$> (parseS "package-name" >>=
+                                             parsePackageNameThrowing . T.unpack)
 
             let parseQuoted key =
                     case mapM (P.parseOnly (argsParser NoEscaping)) val of
@@ -380,7 +379,15 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
-                , dpExposedModules = T.words $ T.unwords exposedModules
+
+                -- Strip trailing commas from ghc package exposed-modules (looks buggy to me...).
+                -- Then try to parse the module names.
+                , dpExposedModules =
+                      Set.fromList
+                    $ mapMaybe (C.simpleParse . T.unpack . T.dropSuffix ",")
+                    $ T.words
+                    $ T.unwords exposedModules
+
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml

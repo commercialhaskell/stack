@@ -9,6 +9,7 @@
 module Stack.StoreSpec where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import           Data.Containers (mapFromList, setFromList)
 import           Data.Sequences (fromList)
 import           Data.Store.Internal (StaticSize (..))
@@ -40,6 +41,9 @@ instance (Monad m, Serial m a, UV.Unbox a) => Serial m (UV.Vector a) where
 
 instance Monad m => Serial m BS.ByteString where
     series = fmap BS.pack series
+
+instance Monad m => Serial m ShortByteString where
+    series = fmap SBS.pack series
 
 instance (Monad m, Serial m a, Ord a) => Serial m (Set a) where
     series = fmap setFromList series

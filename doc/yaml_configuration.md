@@ -60,210 +60,159 @@ are currently four resolver types:
 * No snapshot, just use packages shipped with the compiler
     * For GHC this looks like `resolver: ghc-7.10.2`
     * For GHCJS this looks like `resolver: ghcjs-0.1.0_ghc-7.10.2`.
-* [Custom snapshot](custom_snapshot.md)
+* Custom snapshot, via a URL or relative file path. (See [pantry docs](pantry.md) for more information.)
 
 Each of these resolvers will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
 
-### packages and extra-deps
+Since Stack 1.11, the resolver field corresponds to a Pantry snapshot
+location. See [the docs on pantry](pantry.md) for more information.
 
-_NOTE_ The contents of this section have changed significantly since
-extensible snapshots were implemented (see:
-[writeup](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots)
-and
-[PR #3249](https://github.com/commercialhaskell/stack/pull/3249)). Most
-old syntax is still supported with newer versions of Stack, but will
-not be documented here. Instead, this section contains the recommended
-syntax as of Stack v1.6.0.
+### packages
 
-There are two types of packages that can be defined in your
-`stack.yaml` file:
+_NOTE_ Beginning with Stack 1.11, Stack has moved over to Pantry for
+managing extra-deps, and has removed some legacy syntax for specifying
+dependencies in `packages`. See some conversion notes below.
 
-* __Project packages__, those which you are actually working on in
-  your current project. These are local file paths in your project
-  directory.
-* __Extra dependencies__, which are packages provided locally on top
-  of the snapshot definition of available packages. These can come
-  from Hackage (or an alternative package index you've defined, see
-  [package-indices](#package-indices)), an HTTP(S) or local archive, a
-  Git or Mercurial repository, or a local file path.
+A list of packages that are part of your local project. These are
+specified via paths to local directories. The paths are considered
+relative to the directory containing the `stack.yaml` file. For
+example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and
+you have:
 
-These two sets of packages are both installed into your local package
-database within your project. However, beyond that, they are
-completely different:
+```yaml
+packages:
+- hello
+- there/world
+```
+
+Your configuration means "I have packages in `/foo/bar/hello` and
+`/foo/bar/there/world`.
+
+If these packages should be treated as dependencies instead, specify
+them in `extra-deps`, described below.
+
+The `packages` field is _optional_. If omitted, it is treated as:
+
+```yaml
+packages:
+- .
+```
+
+Each package directory specified must have a valid cabal file or hpack
+`package.yaml` file present. Note that the subdirectories of the
+directory are not searched for cabal files. Subdirectories will have
+to be specified as independent items in the list of packages.
+
+Meaning that your project has exactly one package, and it is located
+in the current directory.
+
+Project packages are different from snapshot dependencies (via
+`resolver`) and extra dependencies (via `extra-deps`) in multiple
+ways, e.g.:
 
 * Project packages will be built by default with a `stack build`
-  without specific targets. Extra dependencies will only be built if
+  without specific targets. Dependencies will only be built if
   they are depended upon.
 * Test suites and benchmarks may be run for project packages. They are
   never run for extra dependencies.
 
-The `packages` key is a simple list of file paths, which will be
-treated as relative to the directory containing your `stack.yaml`
-file. For example:
+__Legacy syntax__ Prior to Stack 1.11, it was possible to specify
+dependencies in your `packages` configuration value as well. This
+support has been removed to simplify the file format. Instead, these
+values should be moved to `extra-deps`. As a concrete example, you
+would convert:
 
 ```yaml
 packages:
 - .
-- dir1/dir2
+- location:
+    git: https://github.com/bitemyapp/esqueleto.git
+    commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
+  extra-dep: true
+- location:
+    git: https://github.com/yesodweb/wai.git
+    commit: 6bf765e000c6fd14e09ebdea6c4c5b1510ff5376
+    subdirs:
+      - wai-extra
+  extra-dep: true
+
+extra-deps:
+  - streaming-commons-0.2.0.0
+  - time-1.9.1
+  - yesod-colonnade-1.3.0.1
+  - yesod-elements-1.1
 ```
 
-Each package directory or location specified must have a valid cabal
-file or hpack `package.yaml` file present. Note that the
-subdirectories of the directory are not searched for cabal
-files. Subdirectories will have to be specified as independent items
-in the list of packages.
-
-When the `packages` field is not present, it defaults to looking for a package
-in the project's root directory:
+into
 
 ```yaml
 packages:
 - .
+
+extra-deps:
+  - streaming-commons-0.2.0.0
+  - time-1.9.1
+  - yesod-colonnade-1.3.0.1
+  - yesod-elements-1.1
+  - git: https://github.com/bitemyapp/esqueleto.git
+    commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
+  - git: https://github.com/yesodweb/wai.git
+    commit: 6bf765e000c6fd14e09ebdea6c4c5b1510ff5376
+    subdirs:
+      - wai-extra
 ```
 
-The `extra-deps` key is given a list of all extra dependencies. If
-omitted, it is taken as the empty list, e.g.:
+And, in fact, the `packages` value could be left off entirely since
+it's using the default value.
+
+### extra-deps
+
+This field allows you to specify extra dependencies on top of what is
+defined in your snapshot (specified in the `resolver` field mentioned
+above). These dependencies may either come from a local file path or a
+Pantry package location.
+
+For the local file path case, the same relative path rules as apply to
+`packages` apply.
+
+Pantry package locations allow you to include dependencies from three
+different kinds of sources:
+
+* Hackage
+* Archives (tarballs or zip files, either local or over HTTP(S))
+* Git or Mercurial repositories
+
+Here's an example using all of the above:
+
+```yaml
+extra-deps:
+- vendor/hashable
+- streaming-commons-0.2.0.0
+- time-1.9.1
+- yesod-colonnade-1.3.0.1
+- yesod-elements-1.1
+- git: https://github.com/bitemyapp/esqueleto.git
+  commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
+- url: https://github.com/yesodweb/wai/archive/6bf765e000c6fd14e09ebdea6c4c5b1510ff5376.tar.gz
+  subdirs:
+    - wai-extra
+- github: snoyberg/conduit
+  commit: 2e3e41de93821bcfe8ec6210aeca21be3f2087bf
+  subdirs:
+    - network-conduit-tls
+```
+
+If no `extra-deps` value is provided, it defaults to an empty list,
+e.g.:
 
 ```yaml
 extra-deps: []
 ```
 
-It supports four different styles of values:
-
-#### Package index
-
-Packages can be stated by a name/version combination, which will be
-looked up in the package index (by default, Hackage). The basic syntax
-for this is:
-
-```yaml
-extra-deps:
-- acme-missiles-0.3
-```
-
-Using this syntax, the most recent Cabal file revision available will
-be used. For more reproducibility of builds, it is recommended to
-state the SHA256 hash of the cabal file contents as well, like this:
-
-```yaml
-extra-deps:
-- acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
-```
-
-Or a specific revision number, with `0` being the original file:
-
-```yaml
-extra-deps:
-- acme-missiles-0.3@rev:0
-```
-
-Note that specifying via SHA256 is slightly more resilient in that it
-does not rely on correct ordering in the package index, while revision
-number is likely simpler to use. In practice, both should guarantee
-equally reproducible build plans.
-
-#### Local file path
-
-Like `packages`, local file paths can be used in `extra-deps`, and
-will be relative to the directory containing the `stack.yaml` file.
-
-```yaml
-extra-deps:
-- vendor/somelib
-```
-
-Note that if a local directory can be parsed as a package identifier,
-Stack will treat it as a package identifier. In other words, if you
-have a local directory named `foo-1.2.3`, instead of:
-
-```yaml
-extra-deps:
-- foo-1.2.3
-```
-
-You should use the following to be explicit:
-
-```yaml
-extra-deps:
-- ./foo-1.2.3
-```
-
-#### Git and Mercurial repos
-
-You can give a Git or Mercurial repo at a specific commit, and Stack
-will clone that repo.
-
-```yaml
-extra-deps:
-- git: git@github.com:commercialhaskell/stack.git
-  commit: 6a86ee32e5b869a877151f74064572225e1a0398
-- git: git@github.com:snoyberg/http-client.git
-  commit: "a5f4f3"
-- hg: https://example.com/hg/repo
-  commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
-```
-
-__NOTE__ It is highly recommended that you only use SHA1 values for a
-Git or Mercurial commit. Other values may work, but they are not
-officially supported, and may result in unexpected behavior (namely,
-Stack will not automatically pull to update to new versions).
-Another problem with this is that your build will not be deterministic,
-because when someone else tries to build the project they can get a
-different checkout of the package.
-
-A common practice in the Haskell world is to use "megarepos", or
-repositories with multiple packages in various subdirectories. Some
-common examples include [wai](https://github.com/yesodweb/wai/) and
-[digestive-functors](https://github.com/jaspervdj/digestive-functors). To
-support this, you may also specify `subdirs` for repositories, e.g.:
-
-```yaml
-extra-deps:
-- git: git@github.com:yesodweb/wai
-  commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-  subdirs:
-  - auto-update
-  - wai
-```
-
-Since v1.7.1, you can specify packages from GitHub repository name using `github`:
-
-```yaml
-extra-deps:
-- github: snoyberg/http-client
-  commit: a5f4f30f01366738f913968163d856366d7e0342
-```
-
-If unspecified, `subdirs` defaults to `['.']` meaning looking for a
-package in the root of the repo..  Note that if you specify a value of
-`subdirs`, then `'.'` is _not_ included by default and needs to be
-explicitly specified if a required package is found in the top-level
-directory of the repository.
-
-#### Archives (HTTP(S) or local filepath)
-
-This one's pretty straightforward: you can use HTTP and HTTPS URLs and
-local filepaths referring to either tarballs or ZIP files.
-
-__NOTE__ Stack assumes that these files never change after downloading
-to avoid needing to make an HTTP request on each build.
-
-```yaml
-extra-deps:
-- https://example.com/foo/bar/baz-0.0.2.tar.gz
-- archive: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  subdirs:
-  - wai
-  - warp
-- archive: ../acme-missiles-0.3.tar.gz
-  sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
-```
-
-Note that HTTP(S) URLs also support `subdirs` like repos to allow for
-archives of megarepos. In order to leverage this, use `location:
-http://...`.
+For more information on the format for specifying dependencies, please
+see [the Pantry docs](pantry.md).
 
 ### flags
 
@@ -383,45 +332,38 @@ Default: `~/.local/bin`
 
 ### package-indices
 
+Since Stack 1.11, this field may only be used to specify a single
+package index, which must use the Hackage Security format. For the
+motivation for this change, please see [issue
+#4137](https://github.com/commercialhaskell/stack/issues/4137). Therefore,
+this field is most useful for providing an alternate Hackage mirror
+either for:
+
+* Bypassing a firewall
+* Faster download speeds
+
+The following is the default setting for this field:
+
 ```yaml
 package-indices:
-- name: Hackage
-  download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
-
-  # HTTP location of the package index
-  http: https://s3.amazonaws.com/hackage.fpcomplete.com/01-index.tar.gz
-
-  # Or, if using Hackage Security below, give the root URL:
-  http: https://s3.amazonaws.com/hackage.fpcomplete.com/
-
-  # optional fields, both default to false
-  require-hashes: false
-
-  # Starting with stack 1.4, we default to using Hackage Security
+- download-prefix: https://hackage.haskell.org/
   hackage-security:
-    keyids: ["deadbeef", "12345"] # list of all approved keys
+    keyids:
+    - 0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
+    - 1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+    - 280b10153a522681163658cb49f632cde3f38d768b736ddbc901d99a1a772833
+    - 2a96b1889dc221c17296fcc2bb34b908ca9734376f0f361660200935916ef201
+    - 2c6c3627bd6c982990239487f1abd02e08a02e6cf16edb105a8012d444d870c3
+    - 51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
+    - 772e9f4c7db33d251d5c6e357199c819e569d130857dc225549b40845ff0890d
+    - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
+    - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
     key-threshold: 3 # number of keys required
 ```
 
-One thing you should be aware of: if you change the contents of package-version
-combination by setting a different package index, this *can* have an effect on
-other projects by installing into your shared snapshot database.
-
-Note that older versions of Stack supported Git-based indices. This feature has since been removed. A line such as:
-
-```yaml
-git: https://github.com/commercialhaskell/all-cabal-hashes.git
-gpg-verify: false
-```
-
-Will now be ignored.
-
-__IMPORTANT__ Hackage and its mirrors typically have two index files
-available: `00-index.tar.gz` and `01-index.tar.gz`. The former is a
-legacy file for backwards compatibility. It does not contain the cabal
-file revisions produced by Hackage, and therefore _will not work_ with
-most snapshots. Instead, you need to use `01-index.tar.gz` to ensure
-that exact revisions can be found, ensuring more reproducible builds.
+If you provide a replacement index which does not mirror Hackage, it
+is likely that you'll end up with significant breakage, such as most
+snapshots failing to work.
 
 ### system-ghc
 
@@ -894,21 +836,9 @@ Since 1.8.0
 
 ### ignore-revision-mismatch
 
-Cabal files in packages can be specified via exact revisions to deal
-with Hackage revision metadata. The default behavior of Stack (since
-1.6.0) is to fail if an exact match is not found. In some cases
-(specifically, when using a legacy `00-index.tar.gz` file), users may
-wish to allow a mismatch. In such cases, you can change
-`ignore-revision-mismatch` from `false` to `true`.
-
-```yaml
-ignore-revision-mismatch: false
-```
-
-For more information, see
-[the Github issue #3520 discussion](https://github.com/commercialhaskell/stack/issues/3520).
-
-Since 1.6.0
+This flag was introduced in Stack 1.6, and removed in Stack 1.11 with
+the move to Pantry. You will receive a warning if this configuration
+value is set.
 
 ### urls
 

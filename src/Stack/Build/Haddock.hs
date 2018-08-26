@@ -33,8 +33,6 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           RIO.Process

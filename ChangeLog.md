@@ -7,6 +7,37 @@ Release notes:
 
 Major changes:
 
+* Switch over to pantry for managing packages. This is a major change
+  to Stack's internals, and affects user-visible behavior in a few
+  places. Some highlights:
+    * Drop support for multiple package indices and legacy
+      `00-index.tar` style indices. See
+      [#4137](https://github.com/commercialhaskell/stack/issues/4137).
+    * Support for archives and repos in the `packages` section has
+      been removed. Instead, you must use `extra-deps` for such
+      dependencies. `packages` now only supports local filepaths.
+    * Addition of new configuration options for specifying a "pantry
+      tree" key, which provides more reproducibility around builds,
+      and (in the future) will be used for more efficient package
+      content downloads. You can also specify package name and version
+      for more efficient config parsing.
+          * __NOTE__ The new `stack freeze` command provides support
+            for automatically generating this additional
+            information.
+    * Package contents and metadata are stored in an SQLite database
+      in place of files on the filesystem. The `pantry` library can be
+      used for interacting with these contents.
+    * Internally, Stack has changed many datatypes, including moving
+      to Cabal's definition of many data types. As a result of such
+      changes, existing cache files will in general be invalidated,
+      resulting in Stack needing to rebuild many previously cached
+      builds in the new version. Sorry :(.
+    * A new command, `stack freeze` has been added which outputs
+      project and snapshot definitions with dependencies pinned to
+      their exact versions.
+    * The `ignore-revision-mismatch` setting is no longer needed, and
+      has been removed.
+
 Behavior changes:
 
 Other enhancements:
@@ -27,9 +58,21 @@ Other enhancements:
   redefine the default styles that stack uses to color some of its output. See
   `stack --help` for more information.
 * New build option `--ddump-dir`. (See [#4225](https://github.com/commercialhaskell/stack/issues/4225))
+* Stack parses and respects the `preferred-versions` information from
+  Hackage for choosing latest version of a package in some cases,
+  e.g. `stack unpack packagename`.
+* Git repos are shared across multiple projects. See
+  [#3551](https://github.com/commercialhaskell/stack/issues/3551)
 
 Bug fixes:
 
+* Ignore duplicate files for a single module when a Haskell module was
+  generated from a preprocessor file. See
+  [#4076](https://github.com/commercialhaskell/stack/issues/4076).
+* Only track down components in current directory if there are no
+  hs-source-dirs found. This eliminates a number of false-positive
+  warnings, similar to
+  [#4076](https://github.com/commercialhaskell/stack/issues/4076).
 * Handle a change in GHC's hi-dump format around `addDependentFile`,
   which now includes a hash. See
   [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)

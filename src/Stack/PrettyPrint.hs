@@ -41,11 +41,8 @@ import qualified Data.Text as T
 import qualified Distribution.ModuleName as C (ModuleName)
 import qualified Distribution.Text as C (display)
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
-import           Stack.Types.Version
 import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
                      HasStyleAnn (..), StyleAnn (..), StyleDoc, (<+>), align,
                      angles, braces, brackets, cat,
@@ -164,15 +161,6 @@ debugBracket msg f = do
 -- |Annotate a 'StyleDoc' with a 'Style'.
 style :: Style -> StyleDoc -> StyleDoc
 style = styleAnn
-
-instance Display PackageName where
-    display = fromString . packageNameString
-
-instance Display PackageIdentifier where
-    display = fromString . packageIdentifierString
-
-instance Display Version where
-    display = fromString . versionString
 
 instance Display (Path b File) where
     display = style File . fromString . toFilePath

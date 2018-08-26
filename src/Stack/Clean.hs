@@ -17,7 +17,6 @@ import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
-import           Stack.Types.PackageName
 import           Stack.Types.Config
 import           System.Exit (exitFailure)
 
@@ -45,7 +44,7 @@ dirsToDelete cleanOpts = do
         CleanShallow targets -> do
             let localPkgViews = lpProject packages
                 localPkgNames = Map.keys localPkgViews
-                getPkgDir pkgName = fmap lpvRoot (Map.lookup pkgName localPkgViews)
+                getPkgDir pkgName' = fmap lpvRoot (Map.lookup pkgName' localPkgViews)
             case targets \\ localPkgNames of
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)

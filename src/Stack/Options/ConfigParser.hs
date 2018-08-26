@@ -122,7 +122,7 @@ configOptsParser currentDir hide0 =
             "skip-msys"
             "skipping the local MSYS installation (Windows only)"
             hide
-    <*> optionalFirst (strOption
+    <*> optionalFirst ((currentDir FilePath.</>) <$> strOption
              ( long "local-bin-path"
             <> metavar "DIR"
             <> completer dirCompleter

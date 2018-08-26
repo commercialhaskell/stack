@@ -8,6 +8,11 @@ This guide takes a new stack user through the typical workflows. This guide
 will not teach Haskell or involve much code, and it requires no prior experience
 with the Haskell packaging system or other build tools.
 
+__NOTE__ This document is probably out of date in some places and
+deserves a refresh. If you find this document helpful, please drop a
+note on [issue
+#4252](https://github.com/commercialhaskell/stack/issues/4252).
+
 ## Stack's functions
 
 stack handles the management of your toolchain (including GHC — the Glasgow

@@ -13,7 +13,6 @@ module Stack.SetupCmd
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Logger ()
 import           Control.Monad.Reader
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
@@ -22,12 +21,11 @@ import qualified Options.Applicative.Types as OA
 import           Path
 import           Stack.Prelude
 import           Stack.Setup
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Version
 
 data SetupCmdOpts = SetupCmdOpts
-    { scoCompilerVersion :: !(Maybe (CompilerVersion 'CVWanted))
+    { scoCompilerVersion :: !(Maybe WantedCompiler)
     , scoForceReinstall  :: !Bool
     , scoUpgradeCabal    :: !(Maybe UpgradeTo)
     , scoSetupInfoYaml   :: !String
@@ -54,7 +52,7 @@ cabalUpgradeParser = Specific <$> version' <|> latestParser
     where
         versionReader = do
             s <- OA.readerAsk
-            case parseVersion (T.pack s) of
+            case parseVersion s of
                 Nothing -> OA.readerError $ "Invalid version: " ++ s
                 Just v  -> return v
         version' = OA.option versionReader (
@@ -92,17 +90,17 @@ setupParser = SetupCmdOpts
   where
     readVersion = do
         s <- OA.readerAsk
-        case parseCompilerVersion ("ghc-" <> T.pack s) of
-            Nothing ->
-                case parseCompilerVersion (T.pack s) of
-                    Nothing -> OA.readerError $ "Invalid version: " ++ s
-                    Just x -> return x
-            Just x -> return x
+        case parseWantedCompiler ("ghc-" <> T.pack s) of
+            Left _ ->
+                case parseWantedCompiler (T.pack s) of
+                    Left _ -> OA.readerError $ "Invalid version: " ++ s
+                    Right x -> return x
+            Right x -> return x
 
 setup
     :: (HasConfig env, HasGHCVariant env)
     => SetupCmdOpts
-    -> CompilerVersion 'CVWanted
+    -> WantedCompiler
     -> VersionCheck
     -> Maybe (Path Abs File)
     -> RIO env ()
@@ -125,8 +123,8 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }
     let compiler = case wantedCompiler of
-            GhcVersion _ -> "GHC"
-            GhcjsVersion {} -> "GHCJS"
+            WCGhc _ -> "GHC"
+            WCGhcjs {} -> "GHCJS"
     if sandboxedGhc
         then logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
         else logInfo $ "stack will use the " <> compiler <> " on your PATH"

@@ -5,6 +5,7 @@ import System.Directory
 
 main :: IO ()
 main = do
+  removeFileIgnore "stack.yaml"
   stack ["init", defaultResolverArg]
   (_, stdErr) <- stackStderr ["install", "intero-0.1.23"]
   -- here we check stderr for 'allow-newer: true' and

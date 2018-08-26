@@ -61,8 +61,8 @@ import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
-import           Stack.Fetch
 import           Stack.FileWatch
+import           Stack.Freeze
 import           Stack.Ghci
 import           Stack.Hoogle
 import           Stack.Ls
@@ -77,6 +77,7 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
+import           Stack.Options.FreezeParser
 
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
@@ -85,7 +86,6 @@ import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
-import qualified Stack.PackageIndex
 import qualified Stack.Path
 import           Stack.PrettyPrint
 import qualified Stack.PrettyPrint as PP (style)
@@ -101,6 +101,7 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
+import           Stack.Unpack
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
@@ -189,12 +190,12 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid,run) -> do
-      let global = globalOptsFromMonoid isTerminal globalMonoid
+      global <- globalOptsFromMonoid isTerminal globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
           Just expectVersion -> do
-              expectVersion' <- parseVersionFromString expectVersion
-              unless (checkVersion MatchMinor expectVersion' (fromCabalVersion (mkVersion' Meta.version)))
+              expectVersion' <- parseVersionThrowing expectVersion
+              unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
                   $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
           _ -> return ()
       run global `catch` \e ->
@@ -217,7 +218,7 @@ commandLineHandler
   -> Bool
   -> IO (GlobalOptsMonoid, GlobalOpts -> IO ())
 commandLineHandler currentDir progName isInterpreter = complicatedOptions
-  Meta.version
+  (mkVersion' Meta.version)
   (Just versionString')
   VERSION_hpack
   "stack - The Haskell Tool Stack"
@@ -387,6 +388,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Run a Stack Script"
                   scriptCmd
                   scriptOptsParser
+      addCommand' "freeze"
+                  "Show project or snapshot with pinned dependencies if there are any such"
+                  freezeCmd
+                  freezeOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"
@@ -665,12 +670,13 @@ uninstallCmd _ go = withConfigAndLock go $
 unpackCmd :: ([String], Maybe Text) -> GlobalOpts -> IO ()
 unpackCmd (names, Nothing) go = unpackCmd (names, Just ".") go
 unpackCmd (names, Just dstPath) go = withConfigAndLock go $ do
-    mSnapshotDef <- mapM (makeConcreteResolver Nothing >=> loadResolver) (globalResolver go)
-    Stack.Fetch.unpackPackages mSnapshotDef (T.unpack dstPath) names
+    mSnapshotDef <- mapM (makeConcreteResolver >=> flip loadResolver Nothing) (globalResolver go)
+    dstPath' <- resolveDir' $ T.unpack dstPath
+    unpackPackages mSnapshotDef dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfigAndLock go Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfigAndLock go (void (updateHackageIndex Nothing))
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
@@ -1001,6 +1007,10 @@ queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selecto
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
 hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
+
+freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
+freezeCmd freezeOpts go =
+  withBuildConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable

@@ -2,6 +2,12 @@
 
 # Architecture
 
+__NOTE__ MSS 2018-08-22 This document is out of date, and will be made
+more out of date by
+[#3922](https://github.com/commercialhaskell/stack/issues/3922). I
+intend to update it when implementing #3922. Tracked in
+[#4251](https://github.com/commercialhaskell/stack/issues/4251).
+
 ## Terminology
 
 * Package identifier: a package name and version, e.g. text-1.2.1.0

@@ -1,0 +1,85 @@
+name:        pantry
+version:     0.1.0.0
+synopsis:    Content addressable Haskell package management
+description: Please see the README and documentation at <https://www.stackage.org/package/pantry>
+category:    Development
+author:      Michael Snoyman
+maintainer:  michael@snoyman.com
+copyright:   2018 FP Complete
+license:     MIT
+github:      commercialhaskell/pantry # TODO move to this repo!
+
+default-extensions:
+- MonadFailDesugaring
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+extra-source-files:
+- attic/package-0.1.2.3.tar.gz
+
+dependencies:
+- base
+- digest
+- rio
+- aeson
+- text
+- unordered-containers
+- containers
+- path
+- transformers
+- generic-deriving
+- unliftio
+- http-conduit
+- http-client-tls
+- http-types
+- http-client
+- conduit
+- bytestring
+- network-uri
+- hackage-security
+- primitive
+- vector
+- memory
+- store # TODO remove
+- cryptonite
+- cryptonite-conduit
+- persistent
+- persistent-sqlite >= 2.8.2
+- persistent-template
+- resource-pool
+- Cabal
+- path-io
+- rio-orphans
+- conduit-extra
+- tar-conduit
+- time
+- unix-compat
+- hpack >= 0.29.6
+- yaml
+- zip-archive
+- text-metrics
+- resourcet
+
+library:
+  source-dirs: src/
+  exposed-modules:
+  - Pantry
+  - Pantry.SHA256
+  - Data.Aeson.Extended
+
+  # For testing
+  - Pantry.Internal
+  - Pantry.Internal.StaticBytes
+
+tests:
+  spec:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - pantry
+    - hspec
+    - exceptions
+    - hedgehog
+    - QuickCheck

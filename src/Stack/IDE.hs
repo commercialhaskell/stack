@@ -14,7 +14,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Config (getLocalPackages)
-import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -27,8 +26,8 @@ listPackages = do
     -- the directory.
     packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
     forM_ packageDirs $ \dir -> do
-        (gpd, _) <- readPackageUnresolvedDir dir False
-        (logInfo . display) (gpdPackageName gpd)
+        (gpd, _) <- loadCabalFilePath dir NoPrintWarnings
+        (logInfo . fromString . packageNameString) (gpdPackageName gpd)
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()
@@ -43,5 +42,5 @@ listTargets =
                           toNameAndComponent
                           (Map.toList rawLocals))))
   where
-    toNameAndComponent (pkgName,view') =
-        map (pkgName, ) (Set.toList (lpvComponents view'))
+    toNameAndComponent (pkgName',view') =
+        map (pkgName', ) (Set.toList (lpvComponents view'))

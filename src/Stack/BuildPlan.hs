@@ -25,12 +25,11 @@ module Stack.BuildPlan
 
 import           Stack.Prelude hiding (Display (..))
 import qualified Data.Foldable as F
-import qualified Data.HashSet as HashSet
+import qualified Data.Set as Set
 import           Data.List (intercalate)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.Package as C
 import           Distribution.PackageDescription (GenericPackageDescription,
@@ -45,9 +44,6 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Snapshot
 import           Stack.Types.BuildPlan
-import           Stack.Types.FlagName
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
@@ -127,7 +123,7 @@ instance Show BuildPlanException where
                 [ packageNameString dep
                 , " (used by "
                 , intercalate ", "
-                    $ map (packageNameString . packageIdentifierName)
+                    $ map (packageNameString . pkgName)
                     $ Set.toList users
                 , ")"
                 ]
@@ -142,15 +138,13 @@ instance Show BuildPlanException where
         ", because no 'compiler' or 'resolver' is specified."
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
-gpdPackages gpds = Map.fromList $
-            map (fromCabalIdent . C.package . C.packageDescription) gpds
+gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
     where
-        fromCabalIdent (C.PackageIdentifier name version) =
-            (fromCabalPackageName name, fromCabalVersion version)
+        toPair (C.PackageIdentifier name version) = (name, version)
 
 gpdPackageDeps
     :: GenericPackageDescription
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Platform
     -> Map FlagName Bool
     -> Map PackageName VersionRange
@@ -188,10 +182,9 @@ removeSrcPkgDefaultFlags gpds flags =
             let tuples = map getDefault (C.genPackageFlags gpd)
             in Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
 
-        flagName' = fromCabalFlagName . C.flagName
         getDefault f
-            | C.flagDefault f = (flagName' f, True)
-            | otherwise       = (flagName' f, False)
+            | C.flagDefault f = (C.flagName f, True)
+            | otherwise       = (C.flagName f, False)
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
@@ -199,7 +192,7 @@ removeSrcPkgDefaultFlags gpds flags =
 -- Returns the plan which produces least number of dep errors
 selectPackageBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> GenericPackageDescription
     -> (Map PackageName (Map FlagName Bool), DepErrors)
@@ -232,13 +225,13 @@ selectPackageBuildPlan platform compiler pool gpd =
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]
             | otherwise = (fname, False) :| [(fname, True)]
-          where fname = (fromCabalFlagName . flagName) f
+          where fname = flagName f
 
 -- | Check whether with the given set of flags a package's dependency
 -- constraints can be satisfied against a given build plan or pool of packages.
 checkPackageBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> Map FlagName Bool
     -> GenericPackageDescription
@@ -292,7 +285,7 @@ combineDepError (DepError a x) (DepError b y) =
 -- will be chosen automatically.
 checkBundleBuildPlan
     :: Platform
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Map PackageName Version
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> [GenericPackageDescription]
@@ -316,7 +309,7 @@ data BuildPlanCheck =
       BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
     | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
-                            (CompilerVersion 'CVActual)
+                            ActualCompiler
 
 -- | Compare 'BuildPlanCheck', where GT means a better plan.
 compareBuildPlanCheck :: BuildPlanCheck -> BuildPlanCheck -> Ordering
@@ -342,15 +335,14 @@ instance Show BuildPlanCheck where
 -- the packages.
 checkSnapBuildPlan
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ project root, used for checking out necessary files
-    -> [GenericPackageDescription]
+    => [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
-    -> Maybe (CompilerVersion 'CVActual)
+    -> Maybe ActualCompiler
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
+checkSnapBuildPlan gpds flags snapshotDef mactualCompiler = do
     platform <- view platformL
-    rs <- loadSnapshot mactualCompiler root snapshotDef
+    rs <- loadSnapshot mactualCompiler snapshotDef
 
     let
         compiler = lsCompilerVersion rs
@@ -372,22 +364,23 @@ checkSnapBuildPlan root gpds flags snapshotDef mactualCompiler = do
             -- FIXME not sure how to handle ghcjs boot packages
             | otherwise = Map.empty
 
-        isGhcWiredIn p _ = p `HashSet.member` wiredInPackages
+        isGhcWiredIn p _ = p `Set.member` wiredInPackages
         ghcErrors = Map.filterWithKey isGhcWiredIn
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ project root, used for checking out necessary files
-    -> [GenericPackageDescription]
+    => [GenericPackageDescription]
     -> NonEmpty SnapName
     -> RIO env (SnapshotDef, BuildPlanCheck)
-selectBestSnapshot root gpds snaps = do
+selectBestSnapshot gpds snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
-    F.foldr1 go (NonEmpty.map (getResult <=< loadResolver . ResolverStackage) snaps)
+    let resolverStackage (LTS x y) = ltsSnapshotLocation x y
+        resolverStackage (Nightly d) = nightlySnapshotLocation d
+    F.foldr1 go (NonEmpty.map (getResult <=< flip loadResolver Nothing . resolverStackage) snaps)
     where
         go mold mnew = do
             old@(_snap, bpc) <- mold
@@ -396,12 +389,8 @@ selectBestSnapshot root gpds snaps = do
                 _ -> fmap (betterSnap old) mnew
 
         getResult snap = do
-            result <- checkSnapBuildPlan root gpds Nothing snap
-              -- We know that we're only dealing with ResolverStackage
-              -- here, where we can rely on the global package hints.
-              -- Therefore, we don't use an actual compiler. For more
-              -- info, see comments on
-              -- Stack.Solver.checkSnapBuildPlanActual.
+            result <- checkSnapBuildPlan gpds Nothing snap
+              -- Rely on global package hints.
               Nothing
             reportResult result snap
             return (snap, result)
@@ -424,12 +413,12 @@ selectBestSnapshot root gpds snaps = do
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-showItems :: Show a => [a] -> Text
+showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)
     where
         formatItem item = T.concat
             [ "    - "
-            , T.pack $ show item
+            , T.pack item
             , "\n"
             ]
 
@@ -449,12 +438,12 @@ showPackageFlags pkg fl =
         formatFlags (f, v) = show f ++ " = " ++ show v
 
 showMapPackages :: Map PackageName a -> Text
-showMapPackages mp = showItems $ Map.keys mp
+showMapPackages mp = showItems $ map packageNameString $ Map.keys mp
 
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)
     -> DepErrors
-    -> CompilerVersion 'CVActual
+    -> ActualCompiler
     -> Text
 showCompilerErrors flags errs compiler =
     T.concat
