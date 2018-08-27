@@ -507,6 +507,7 @@ data BuildConfig = BuildConfig
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
     , bcCurator :: !(Maybe Curator)
+    , bcClean :: !Bool
     }
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
