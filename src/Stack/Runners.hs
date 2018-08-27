@@ -140,6 +140,7 @@ withBuildConfigAndLockNoDocker go inner =
 
 withBuildConfigExt
     :: Bool
+    -> Bool -- ^ If perform the stack clean
     -> GlobalOpts
     -> Maybe (RIO Config ())
     -- ^ Action to perform before the build.  This will be run on the host
@@ -155,7 +156,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
+withBuildConfigExt skipDocker isClean go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -173,7 +174,8 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfi
 
       let inner'' lk = do
               bconfig <- lcLoadBuildConfig lc globalCompiler
-              envConfig <- runRIO bconfig (setupEnv Nothing)
+              let bconfig' = bconfig { bcClean = isClean }
+              envConfig <- runRIO bconfig' (setupEnv Nothing)
               runRIO envConfig (inner' lk)
 
       let getCompilerVersion = loadCompilerVersion go lc
