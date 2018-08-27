@@ -132,7 +132,14 @@ lsStylesCmd :: OA.Mod OA.CommandFields LsCmds
 lsStylesCmd =
     OA.command
         "stack-colors"
-        (OA.info lsStylesOptsParser (OA.progDesc "View stack's output styles"))
+        (OA.info lsStylesOptsParser
+                 (OA.progDesc "View stack's output styles"))
+    <>
+    OA.command
+        "stack-colours"
+        (OA.info lsStylesOptsParser
+                 (OA.progDesc "View stack's output styles (alias for \
+                              \'stack-colors')"))
 
 data Snapshot = Snapshot
     { snapId :: Text
