@@ -623,6 +623,9 @@ getGhcBuilds = do
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuilds [CompilerBuildSpecialized releaseStr]
+            Platform _ Cabal.FreeBSD -> do
+                releaseStr <- mungeRelease <$> sysRelease
+                useBuilds [CompilerBuildSpecialized releaseStr]
 #endif
             _ -> useBuilds [CompilerBuildStandard]
     useBuilds builds = do
@@ -632,14 +635,18 @@ getGhcBuilds = do
         return builds
 
 #if !WINDOWS
--- | Encode an OpenBSD version (like "6.1") into a valid argument for
+-- | Encode an OpenBSD/FreeBSD version (like "6.1"/"12.0-RELEASE") into a valid argument for
 -- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
 -- with "r".
 -- The result r must be such that "ghc-" ++ r is a valid package name,
 -- as recognized by parsePackageNameFromString.
 mungeRelease :: String -> String
-mungeRelease = intercalate "-" . prefixMaj . splitOn "."
+mungeRelease = intercalate "-" . prefixMaj . splitOn "." . cutOffFreeBSDSuffix
   where
+    cutOffFreeBSDSuffix s = if s == cutted
+                               then cutted
+                               else init cutted
+        where cutted = dropWhileEnd (/='-') s
     prefixFst pfx k (rev : revs) = (pfx ++ rev) : k revs
     prefixFst _ _ [] = []
     prefixMaj = prefixFst "maj" prefixMin
