@@ -11,6 +11,8 @@ module Stack.Runners
     , withMiniConfigAndLock
     , withBuildConfigAndLock
     , withBuildConfigAndLockNoDocker
+    , withBuildConfigAndLockInClean
+    , withBuildConfigAndLockNoDockerInClean
     , withBuildConfig
     , withBuildConfigExt
     , withBuildConfigDot
@@ -127,7 +129,7 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt False go Nothing inner Nothing
+    withBuildConfigExt False False go Nothing inner Nothing
 
 -- | See issue #2010 for why this exists. Currently just used for the
 -- specific case of "stack clean --full".
@@ -136,7 +138,23 @@ withBuildConfigAndLockNoDocker
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLockNoDocker go inner =
-    withBuildConfigExt True go Nothing inner Nothing
+    withBuildConfigExt True False go Nothing inner Nothing
+
+withBuildConfigAndLockInClean
+    :: GlobalOpts
+    -> (Maybe FileLock -> RIO EnvConfig ())
+    -> IO ()
+withBuildConfigAndLockInClean go inner =
+    withBuildConfigExt False True go Nothing inner Nothing
+
+-- | See issue #2010 for why this exists. Currently just used for the
+-- specific case of "stack clean --full".
+withBuildConfigAndLockNoDockerInClean
+    :: GlobalOpts
+    -> (Maybe FileLock -> RIO EnvConfig ())
+    -> IO ()
+withBuildConfigAndLockNoDockerInClean go inner =
+    withBuildConfigExt True True go Nothing inner Nothing
 
 withBuildConfigExt
     :: Bool
