@@ -45,7 +45,7 @@ dependencies:
 - base64-bytestring
 - bytestring
 - conduit
-- conduit-extra >= 1.2.3.1
+- conduit-extra
 - containers
 - cryptonite
 - cryptonite-conduit
@@ -61,7 +61,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hpack >= 0.29.6
+- hpack
 - hpc
 - http-client
 - http-client-tls
@@ -107,10 +107,10 @@ dependencies:
 - time
 - tls
 - transformers
-- typed-process >= 0.2.1.0
+- typed-process
 - unicode-transforms
 - unix-compat
-- unliftio >= 0.2.4.0
+- unliftio
 - unordered-containers
 - vector
 - yaml
@@ -121,7 +121,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32 >= 2.5.3.0
+    - Win32
   else:
     build-tools:
     - hsc2hs
