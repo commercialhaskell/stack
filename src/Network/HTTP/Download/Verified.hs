@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -192,11 +191,7 @@ hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 -- 'Control.Retry.recovering' customized for HTTP failures
 recoveringHttp :: forall env a. HasRunner env => RetryPolicy -> RIO env a -> RIO env a
 recoveringHttp retryPolicy =
-#if MIN_VERSION_retry(0,7,0)
     helper $ \run -> recovering retryPolicy (handlers run) . const
-#else
-    helper $ \run -> recovering retryPolicy (handlers run)
-#endif
   where
     helper :: (UnliftIO (RIO env) -> IO a -> IO a) -> RIO env a -> RIO env a
     helper wrapper action = withUnliftIO $ \run -> wrapper run (unliftIO run action)

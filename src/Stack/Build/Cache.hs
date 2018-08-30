@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -39,9 +38,7 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
-#ifdef mingw32_HOST_OS
 import           Data.Char (ord)
-#endif
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
@@ -359,8 +356,9 @@ readPrecompiledCache loc copts depIDs = do
 
 -- | Check if a filesystem path is too long.
 pathTooLong :: FilePath -> Bool
-#ifdef mingw32_HOST_OS
-pathTooLong path = utf16StringLength path >= win32MaxPath
+pathTooLong
+  | osIsWindows = \path -> utf16StringLength path >= win32MaxPath
+  | otherwise = const False
   where
     win32MaxPath = 260
     -- Calculate the length of a string in 16-bit units
@@ -370,6 +368,3 @@ pathTooLong path = utf16StringLength path >= win32MaxPath
       where
         utf16CharLength c | ord c < 0x10000 = 1
                           | otherwise       = 2
-#else
-pathTooLong _ = False
-#endif

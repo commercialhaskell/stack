@@ -93,7 +93,7 @@ dependencies:
 - project-template
 - regex-applicative-text
 - resourcet
-- retry
+- retry >= 0.7
 - rio
 - semigroups
 - split
@@ -258,6 +258,7 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - Text.PrettyPrint.Leijen.Extended
+  - System.Permissions
   - System.Process.PagerEditor
   - System.Terminal
   when:

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -1305,12 +1304,9 @@ platformGhcVerOnlyRelDirStr = do
 -- SHA1 hash of the path used on other architectures, encode with base
 -- 16 and take first 8 symbols of it.
 useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
-useShaPathOnWindows =
-#ifdef mingw32_HOST_OS
-    shaPath
-#else
-    return
-#endif
+useShaPathOnWindows
+  | osIsWindows = shaPath
+  | otherwise = pure
 
 shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
 shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath

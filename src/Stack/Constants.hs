@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-} -- keep TH usage here
@@ -132,6 +131,7 @@ import           Path as FL
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.TemplateName
+import           System.Permissions (osIsWindows)
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -324,15 +324,6 @@ maxTerminalWidth = 200
 -- automatically detect it and when the user doesn't supply one.
 defaultTerminalWidth :: Int
 defaultTerminalWidth = 100
-
--- | True if using Windows OS.
-osIsWindows :: Bool
-osIsWindows =
-#ifdef WINDOWS
-  True
-#else
-  False
-#endif
 
 relFileSetupHs :: Path Rel File
 relFileSetupHs = $(mkRelFile "Setup.hs")

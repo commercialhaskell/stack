@@ -66,6 +66,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Process.PagerEditor (editByteString)
+import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 import           RIO.Process
 import           Text.Printf (printf)
 
@@ -347,6 +348,8 @@ runContainerAndExit getCmdArgs
          ,[cmnd]
          ,args])
      before
+-- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
+-- `docker` process so that it can handle the signals directly?
 #ifndef WINDOWS
      run <- askRunInIO
      oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do

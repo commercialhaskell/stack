@@ -14,6 +14,7 @@ import GHC.IO.Exception
 import Path
 import System.FSNotify
 import System.IO (hPutStrLn, getLine)
+import System.Terminal
 
 fileWatch :: Handle
           -> ((Set (Path Abs File) -> IO ()) -> IO ())

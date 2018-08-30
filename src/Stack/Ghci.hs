@@ -4,7 +4,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 
 -- | Run a GHCi configured with the user's package(s).
@@ -50,10 +49,7 @@ import           Stack.Types.Package
 import           Stack.Types.Runner
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
-
-#ifndef WINDOWS
-import qualified System.Posix.Files as Posix
-#endif
+import           System.Permissions (setScriptPerms)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -886,20 +882,6 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                         return False
             (_, Just PSRemote{}) -> return loadAllDeps
             (_, _) -> return False
-
-setScriptPerms :: MonadIO m => FilePath -> m ()
-#ifdef WINDOWS
-setScriptPerms _ = do
-    return ()
-#else
-setScriptPerms fp = do
-    liftIO $ Posix.setFileMode fp $ foldl1 Posix.unionFileModes
-        [ Posix.ownerReadMode
-        , Posix.ownerWriteMode
-        , Posix.groupReadMode
-        , Posix.otherReadMode
-        ]
-#endif
 
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
 unionTargets = M.unionWith $ \l r ->

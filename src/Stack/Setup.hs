@@ -95,6 +95,7 @@ import              System.Exit (ExitCode (..), exitFailure)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
+import              System.Permissions (setFileExecutable)
 import              RIO.Process
 import              Text.Printf (printf)
 
@@ -103,7 +104,6 @@ import              System.Uname (uname, release)
 import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)
-import              System.Posix.Files (setFileMode)
 #endif
 
 -- | Default location of the stack-setup.yaml file
@@ -1899,9 +1899,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     platform <- view platformL
 
     liftIO $ do
-#if !WINDOWS
-      setFileMode (toFilePath tmpFile) 0o755
-#endif
+      setFileExecutable (toFilePath tmpFile)
 
       testExe tmpFile
 
@@ -1986,9 +1984,7 @@ performPathChecking newFile = do
     tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
     eres <- tryIO $ do
       liftIO $ copyFile newFile tmpFile
-#if !WINDOWS
-      liftIO $ setFileMode (toFilePath tmpFile) 0o755
-#endif
+      setFileExecutable (toFilePath tmpFile)
       liftIO $ renameFile tmpFile executablePath'
       logInfo "Stack executable copied successfully!"
     case eres of

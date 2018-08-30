@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -11,7 +10,6 @@ module Stack.Prelude
   , readProcessNull
   , withProcessContext
   , stripCR
-  , hIsTerminalDeviceOrMinTTY
   , prompt
   , promptPassword
   , promptBool
@@ -30,10 +28,6 @@ import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo
 import qualified Path.IO
 
 import           System.IO.Echo (withoutInputEcho)
-
-#ifdef WINDOWS
-import           System.Win32 (isMinTTYHandle, withHandleToHANDLE)
-#endif
 
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -126,19 +120,6 @@ withProcessContext pcNew inner = do
 -- | Remove a trailing carriage return if present
 stripCR :: Text -> Text
 stripCR = T.dropSuffix "\r"
-
--- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
--- devices, but isMinTTYHandle does.
-hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
-#ifdef WINDOWS
-hIsTerminalDeviceOrMinTTY h = do
-  isTD <- hIsTerminalDevice h
-  if isTD
-    then return True
-    else liftIO $ withHandleToHANDLE h isMinTTYHandle
-#else
-hIsTerminalDeviceOrMinTTY = hIsTerminalDevice
-#endif
 
 -- | Prompt the user by sending text to stdout, and taking a line of
 -- input from stdin.

@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -46,16 +45,9 @@ import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 
-import           Stack.Types.Compiler (compilerVersionText
-#ifdef WINDOWS
-                                      ,getGhcVersion
-#endif
-                                      )
+import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.FileLock (FileLock, unlockFile)
-
-#ifdef WINDOWS
-import           System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-#endif
+import           System.Terminal (fixCodePage)
 
 -- | Build.
 --
@@ -67,7 +59,10 @@ build :: HasEnvConfig env
       -> Maybe FileLock
       -> BuildOptsCLI
       -> RIO env ()
-build msetLocalFiles mbuildLk boptsCli = fixCodePage $ do
+build msetLocalFiles mbuildLk boptsCli = do
+  mcp <- view $ configL.to configModifyCodePage
+  ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
+  fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
@@ -281,53 +276,6 @@ loadPackage loc flags ghcOptions = do
         , packageConfigPlatform = platform
         }
   resolvePackage pkgConfig <$> loadCabalFileImmutable loc
-
--- | Set the code page for this process as necessary. Only applies to Windows.
--- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: HasEnvConfig env => RIO env a -> RIO env a
-#ifdef WINDOWS
-fixCodePage inner = do
-    mcp <- view $ configL.to configModifyCodePage
-    ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
-    if mcp && ghcVersion < mkVersion [7, 10, 3]
-        then fixCodePage'
-        -- GHC >=7.10.3 doesn't need this code page hack.
-        else inner
-  where
-    fixCodePage' = do
-        origCPI <- liftIO getConsoleCP
-        origCPO <- liftIO getConsoleOutputCP
-
-        let setInput = origCPI /= expected
-            setOutput = origCPO /= expected
-            fixInput
-                | setInput = bracket_
-                    (liftIO $ do
-                        setConsoleCP expected)
-                    (liftIO $ setConsoleCP origCPI)
-                | otherwise = id
-            fixOutput
-                | setOutput = bracket_
-                    (liftIO $ do
-                        setConsoleOutputCP expected)
-                    (liftIO $ setConsoleOutputCP origCPO)
-                | otherwise = id
-
-        case (setInput, setOutput) of
-            (False, False) -> return ()
-            (True, True) -> warn ""
-            (True, False) -> warn " input"
-            (False, True) -> warn " output"
-
-        fixInput $ fixOutput inner
-    expected = 65001 -- UTF-8
-    warn typ = logInfo $
-        "Setting" <>
-        typ <>
-        " codepage to UTF-8 (65001) to ensure correct output from GHC"
-#else
-fixCodePage = id
-#endif
 
 -- | Query information about the build and print the result to stdout in YAML format.
 queryBuildInfo :: HasEnvConfig env
