@@ -9,7 +9,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -24,7 +23,6 @@ module Stack.Snapshot
 
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict      (get, put, StateT, execStateT)
-import           Data.Store.VersionTagged
 import qualified Data.Conduit.List as CL
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -44,6 +42,7 @@ import qualified Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.StoreTH
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
 import           Stack.Types.VersionIntervals
@@ -174,7 +173,7 @@ loadSnapshot mcompiler =
       path <- configLoadedSnapshotCache
         sd
         (maybe GISSnapshotHints GISCompiler mcompiler)
-      $(versionedDecodeOrLoad loadedSnapshotVC) path (inner sd)
+      decodeOrLoadLoadedSnapshot path (inner sd)
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do

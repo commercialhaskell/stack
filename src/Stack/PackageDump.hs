@@ -6,7 +6,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Stack.PackageDump
     ( Line
     , eachSection
@@ -34,7 +33,6 @@ import qualified Data.Conduit.Text as CT
 import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Data.Store.VersionTagged
 import qualified RIO.Text as T
 import qualified Distribution.License as C
 import           Distribution.ModuleName (ModuleName)
@@ -42,6 +40,7 @@ import qualified Distribution.System as OS
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
+import           Stack.StoreTH
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageDump
@@ -100,13 +99,13 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 -- empty cache.
 loadInstalledCache :: HasLogFunc env => Path Abs File -> RIO env InstalledCache
 loadInstalledCache path = do
-    m <- $(versionedDecodeOrLoad installedCacheVC) path (return $ InstalledCacheInner Map.empty)
+    m <- decodeOrLoadInstalledCache path (return $ InstalledCacheInner Map.empty)
     liftIO $ InstalledCache <$> newIORef m
 
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: HasLogFunc env => Path Abs File -> InstalledCache -> RIO env ()
 saveInstalledCache path (InstalledCache ref) =
-    liftIO (readIORef ref) >>= $(versionedEncodeFile installedCacheVC) path
+    readIORef ref >>= encodeInstalledCache path
 
 -- | Prune a list of possible packages down to those whose dependencies are met.
 --

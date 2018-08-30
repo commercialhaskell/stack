@@ -118,7 +118,7 @@ module Stack.Constants
     ,relFileStackDotExe
     ,relFileStackDotTmpDotExe
     ,relFileStackDotTmp
-    ,defaultTemplateName
+    ,ghcShowOptionsOutput
     )
     where
 
@@ -127,11 +127,12 @@ import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import qualified Data.Set as Set
 import           Distribution.Package (mkPackageName)
 import qualified Hpack.Config as Hpack
+import qualified Language.Haskell.TH.Syntax as TH (runIO, lift)
 import           Path as FL
 import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.TemplateName
 import           System.Permissions (osIsWindows)
+import           System.Process (readProcess)
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -584,6 +585,8 @@ relFileStackDotTmp = $(mkRelFile "stack.tmp")
 relFileStack :: Path Rel File
 relFileStack = $(mkRelFile "stack")
 
--- | The default template name you can use if you don't have one.
-defaultTemplateName :: TemplateName
-defaultTemplateName = $(mkTemplateName "new-template")
+-- Technically, we should be consulting the user's current ghc,
+-- but that would require loading up a BuildConfig.
+ghcShowOptionsOutput :: [String]
+ghcShowOptionsOutput =
+  $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift . lines)

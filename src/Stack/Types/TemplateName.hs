@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -11,22 +10,20 @@ module Stack.Types.TemplateName
   , RepoTemplatePath (..)
   , RepoService (..)
   , TemplatePath (..)
-  , mkTemplateName
   , templateName
   , templatePath
   , parseTemplateNameFromString
   , parseRepoPathWithService
   , templateNameArgument
   , templateParamArgument
+  , defaultTemplateName
   ) where
 
 import           Data.Aeson (FromJSON (..), withText)
 import qualified Data.Text as T
-import           Language.Haskell.TH
 import           Network.HTTP.StackClient (parseRequest)
 import qualified Options.Applicative as O
 import           Path
-import           Path.Internal
 import           Stack.Prelude
 
 -- | A template name.
@@ -101,23 +98,12 @@ parseTemplateNameFromString fname =
     expected = "Expected a template like: foo or foo.hsfiles or\
                \ https://example.com/foo.hsfiles or github:user/foo"
 
--- | Make a template name.
-mkTemplateName :: String -> Q Exp
-mkTemplateName s =
-    case parseTemplateNameFromString s of
-        Left{} -> runIO $ throwString ("Invalid template name: " ++ show s)
-        Right (TemplateName (T.unpack -> prefix) p) ->
-            [|TemplateName (T.pack prefix) $(pn)|]
-            where pn =
-                      case p of
-                          AbsPath (Path fp) -> [|AbsPath (Path fp)|]
-                          RelPath (Path fp) -> [|RelPath (Path fp)|]
-                          UrlPath fp -> [|UrlPath fp|]
-                          RepoPath (RepoTemplatePath sv u t) ->
-                            case sv of
-                                Github    -> [|RepoPath $ RepoTemplatePath Github u t|]
-                                Gitlab    -> [|RepoPath $ RepoTemplatePath Gitlab u t|]
-                                Bitbucket -> [|RepoPath $ RepoTemplatePath Bitbucket u t|]
+-- | The default template name you can use if you don't have one.
+defaultTemplateName :: TemplateName
+defaultTemplateName =
+  case parseTemplateNameFromString "new-template" of
+    Left s -> error $ "Bug in Stack codebase, cannot parse default template name: " ++ s
+    Right x -> x
 
 -- | Get a text representation of the template name.
 templateName :: TemplateName -> Text

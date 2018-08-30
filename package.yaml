@@ -231,6 +231,7 @@ library:
   - Stack.Sig.Sign
   - Stack.Snapshot
   - Stack.Solver
+  - Stack.StoreTH
   - Stack.Types.Build
   - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild
