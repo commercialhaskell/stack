@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards #-}
 
 -- | Docker configuration
 module Stack.Config.Docker where
@@ -11,6 +11,7 @@ import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Distribution.Version (simplifyVersionRange)
 import           Path
+import           Stack.Constants
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -78,7 +79,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
         dockerSetUser = getFirst dockerMonoidSetUser
         dockerRequireDockerVersion =
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-        dockerDatabasePath = fromFirst (stackRoot </> $(mkRelFile "docker.db")) dockerMonoidDatabasePath
+        dockerDatabasePath = fromFirst (stackRoot </> relFileDockerDb) dockerMonoidDatabasePath
         dockerStackExe = getFirst dockerMonoidStackExe
 
     return DockerOpts{..}

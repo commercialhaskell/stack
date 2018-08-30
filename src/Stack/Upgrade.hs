@@ -5,7 +5,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade
     ( upgrade
     , UpgradeOpts
@@ -21,6 +20,7 @@ import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
+import           Stack.Constants
 -- Following import is redundant on non-Windows operating systems
 #ifdef WINDOWS
 import           Stack.DefaultColorWhen (defaultColorWhen)
@@ -214,7 +214,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- The folowing hack re-enables the lost ANSI-capability.
                 _ <- liftIO defaultColorWhen
 #endif
-                return $ Just $ tmp </> $(mkRelDir "stack")
+                return $ Just $ tmp </> relDirStackProgName
       Nothing -> do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
@@ -238,7 +238,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
       loadConfig
       gConfigMonoid
       mresolver
-      (SYLOverride $ dir </> $(mkRelFile "stack.yaml")) $ \lc -> do
+      (SYLOverride $ dir </> stackDotYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
         envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

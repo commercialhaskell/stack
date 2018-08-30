@@ -4,7 +4,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
@@ -28,7 +27,7 @@ import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.Version (mkVersion)
-import           Path (parent, mkRelFile, (</>))
+import           Path (parent, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
@@ -79,7 +78,7 @@ createDatabase
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler -> Path Abs Dir -> RIO env ()
 createDatabase wc db = do
-    exists <- doesFileExist (db </> $(mkRelFile "package.cache"))
+    exists <- doesFileExist (db </> relFilePackageCache)
     unless exists $ do
         -- ghc-pkg requires that the database directory does not exist
         -- yet. If the directory exists but the package.cache file

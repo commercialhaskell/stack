@@ -49,6 +49,7 @@ import           Data.Store.VersionTagged
 import qualified Data.Text as T
 import           Path
 import           Path.IO
+import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Build
 import           Stack.Types.Compiler
@@ -61,8 +62,8 @@ import qualified System.FilePath as FP
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
                 => InstallLocation -> m (Path Abs Dir)
-exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
-exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
+exeInstalledDir Snap = (</> relDirInstalledPackages) `liftM` installationRootDeps
+exeInstalledDir Local = (</> relDirInstalledPackages) `liftM` installationRootLocal
 
 -- | Get all of the installed executables
 getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
@@ -268,7 +269,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
   platformRelDir <- platformGhcRelDir
   let precompiledDir =
             view stackRootL ec
-        </> $(mkRelDir "precompiled")
+        </> relDirPrecompiled
         </> platformRelDir
         </> compiler
         </> cabal

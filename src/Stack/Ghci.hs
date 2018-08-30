@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -38,6 +37,7 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
+import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
@@ -416,7 +416,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     -- effect of making it possible to copy the ghci invocation out of
     -- the log and have it still work.
     tmpDirectory <-
-        (</> $(mkRelDir "haskell-stack-ghci")) <$>
+        (</> relDirHaskellStackGhci) <$>
         (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
     ghciDir <- view ghciDirL
     ensureDir ghciDir
@@ -443,13 +443,13 @@ writeMacrosFile outputDirectory pkgs = do
                     return Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        out <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "cabal_macros.h") $
+        out <- liftIO $ writeHashedFile outputDirectory relFileCabalMacrosH $
             S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
 writeGhciScript outputDirectory script = do
-    scriptPath <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "ghci-script") $
+    scriptPath <- liftIO $ writeHashedFile outputDirectory relFileGhciScript $
         LBS.toStrict $ scriptToLazyByteString script
     let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath

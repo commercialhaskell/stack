@@ -4,7 +4,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | Create new a new project directory populated with a basic working
 -- project.
@@ -169,8 +168,6 @@ loadTemplate name logIt = do
                 logWarn "Using cached local version. It may not be the most recent version though."
         else throwM (FailedToDownloadTemplate name exception)
 
-    backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
-
 -- | Construct a URL for downloading from a repo.
 urlFromRepoTemplatePath :: RepoTemplatePath -> Text
 urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
@@ -296,10 +293,6 @@ templatesHelp = do
 
 --------------------------------------------------------------------------------
 -- Defaults
-
--- | The default template name you can use if you don't have one.
-defaultTemplateName :: TemplateName
-defaultTemplateName = $(mkTemplateName "new-template")
 
 -- | The default service to use to download templates.
 defaultRepoService :: RepoService

@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE TemplateHaskell    #-}
 
 -- | This module builds Docker (OpenContainer) images.
 module Stack.Image
@@ -21,6 +20,7 @@ import qualified Data.Text as T
 import           Path
 import           Path.Extra
 import           Path.IO
+import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.PrettyPrint
 import           Stack.Types.Config
@@ -82,8 +82,8 @@ stageExesInDir
     :: HasEnvConfig env
     => ImageDockerOpts -> Path Abs Dir -> RIO env ()
 stageExesInDir opts dir = do
-    srcBinPath <- fmap (</> $(mkRelDir "bin")) installationRootLocal
-    let destBinPath = dir </> $(mkRelDir "usr/local/bin")
+    srcBinPath <- fmap (</> relDirBin) installationRootLocal
+    let destBinPath = dir </> relDirUsr </> relDirLocal </> relDirBin
     ensureDir destBinPath
     case imgDockerExecutables opts of
         Nothing -> do
@@ -136,7 +136,7 @@ createDockerImage dockerConfig dir =
         Just base -> do
             liftIO
                 (B.writeFile
-                     (toFilePath (dir </> $(mkRelFile "Dockerfile")))
+                     (toFilePath (dir </> relFileDockerfile))
                      (encodeUtf8 (T.pack (unlines ["FROM " ++ base, "ADD ./ /"]))))
             let args =
                     [ "build"
@@ -166,7 +166,7 @@ extendDockerImageWithEntrypoint dockerConfig dir = do
                       do liftIO
                              (B.writeFile
                                   (toFilePath
-                                       (dir </> $(mkRelFile "Dockerfile")))
+                                       (dir </> relFileDockerfile))
                                   (encodeUtf8 (T.pack (unlines
                                        [ "FROM " ++ dockerImageName
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++

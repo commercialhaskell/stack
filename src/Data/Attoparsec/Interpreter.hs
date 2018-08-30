@@ -62,7 +62,6 @@ import           Conduit
 import           Data.Conduit.Attoparsec
 import           Data.List (intercalate)
 import           Data.Text (pack)
-import           Stack.Constants
 import           Stack.Prelude
 import           System.FilePath (takeExtension)
 import           System.IO (stderr, hPutStrLn)

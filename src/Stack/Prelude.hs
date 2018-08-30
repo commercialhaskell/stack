@@ -15,6 +15,7 @@ module Stack.Prelude
   , prompt
   , promptPassword
   , promptBool
+  , stackProgName
   , module X
   ) where
 
@@ -176,3 +177,10 @@ promptBool txt = liftIO $ do
     _ -> do
       T.putStrLn "Please press either 'y' or 'n', and then enter."
       promptBool txt
+
+-- | Name of the 'stack' program.
+--
+-- NOTE: Should be defined in "Stack.Constants", but not doing so due to the
+-- GHC stage restrictions.
+stackProgName :: String
+stackProgName = "stack"

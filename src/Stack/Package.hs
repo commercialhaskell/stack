@@ -8,7 +8,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -59,8 +58,6 @@ import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Distribution.Version (mkVersion)
-import           Lens.Micro (lens)
-import qualified Hpack.Config as Hpack
 import           Path as FL
 import           Path.Extra
 import           Path.IO hiding (findFiles)
@@ -248,15 +245,15 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              setupFiles <-
                  if buildType pkg == Custom
                  then do
-                     let setupHsPath = pkgDir </> $(mkRelFile "Setup.hs")
-                         setupLhsPath = pkgDir </> $(mkRelFile "Setup.lhs")
+                     let setupHsPath = pkgDir </> relFileSetupHs
+                         setupLhsPath = pkgDir </> relFileSetupLhs
                      setupHsExists <- doesFileExist setupHsPath
                      if setupHsExists then return (S.singleton setupHsPath) else do
                          setupLhsExists <- doesFileExist setupLhsPath
                          if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
                  else return S.empty
              buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
-                 let hpackPath = pkgDir </> $(mkRelFile Hpack.packageConfig)
+                 let hpackPath = pkgDir </> relFileHpackPackageConfig
                  hpackExists <- doesFileExist hpackPath
                  return $ if hpackExists then S.singleton hpackPath else S.empty
              return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
@@ -389,7 +386,7 @@ generateBuildInfoOpts BioInput {..} =
         , bioOneWordOpts = nubOrd $ concat
             [extOpts, srcOpts, includeOpts, libOpts, fworks, cObjectFiles]
         , bioPackageFlags = deps
-        , bioCabalMacros = componentAutogen </> $(mkRelFile "cabal_macros.h")
+        , bioCabalMacros = componentAutogen </> relFileCabalMacrosH
         }
   where
     cObjectFiles =
@@ -499,12 +496,12 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
 packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
 packageAutogenDir cabalVer distDir
     | cabalVer < mkVersion [2, 0] = Nothing
-    | otherwise = Just $ buildDir distDir </> $(mkRelDir "global-autogen")
+    | otherwise = Just $ buildDir distDir </> relDirGlobalAutogen
 
 -- | Make the autogen dir.
 componentAutogenDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentAutogenDir cabalVer component distDir =
-    componentBuildDir cabalVer component distDir </> $(mkRelDir "autogen")
+    componentBuildDir cabalVer component distDir </> relDirAutogen
 
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
 componentBuildDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
@@ -534,7 +531,7 @@ componentOutputDir namedComponent distDir =
 -- | Make the build dir. Note that Cabal >= 2.0 uses the
 -- 'componentBuildDir' above for some things.
 buildDir :: Path Abs Dir -> Path Abs Dir
-buildDir distDir = distDir </> $(mkRelDir "build")
+buildDir distDir = distDir </> relDirBuild
 
 -- NOTE: don't export this, only use it for valid paths based on
 -- component names.
@@ -1371,7 +1368,7 @@ buildLogPath package' msuffix = do
   fp <- parseRelFile $ concat $
     packageIdentifierString (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]
-  return $ stack </> $(mkRelDir "logs") </> fp
+  return $ stack </> relDirLogs </> fp
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
 resolveOrWarn :: Text

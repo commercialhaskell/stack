@@ -4,7 +4,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -35,6 +34,7 @@ import qualified Distribution.System as Cabal
 import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.IO
+import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           RIO.Process
@@ -130,46 +130,46 @@ extraDirs tool = do
     case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+                [ dir </> relDirBin
+                , dir </> relDirMingw </> relDirBin
                 ]
             }
         (Platform Cabal.I386 Cabal.Windows, "msys2") -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw32 </> relDirBin
+                , dir </> relDirUsr </> relDirBin
+                , dir </> relDirUsr </> relDirLocal </> relDirBin
                 ]
             , edInclude =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                [ dir </> relDirMingw32 </> relDirInclude
                 ]
             , edLib =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw32 </> relDirLib
+                , dir </> relDirMingw32 </> relDirBin
                 ]
             }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw64 </> relDirBin
+                , dir </> relDirUsr </> relDirBin
+                , dir </> relDirUsr </> relDirLocal </> relDirBin
                 ]
             , edInclude =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
+                [ dir </> relDirMingw64 </> relDirInclude
                 ]
             , edLib =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw64 </> relDirLib
+                , dir </> relDirMingw64 </> relDirBin
                 ]
             }
         (_, isGHC -> True) -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "bin")
+                [ dir </> relDirBin
                 ]
             }
         (_, isGHCJS -> True) -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "bin")
+                [ dir </> relDirBin
                 ]
             }
         (Platform _ x, toolName) -> do

@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
              OverloadedStrings, PackageImports, RankNTypes, RecordWildCards, ScopedTypeVariables,
-             TemplateHaskell, TupleSections #-}
+             TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -286,7 +286,7 @@ runContainerAndExit getCmdArgs
      newPathEnv <- either throwM return $ augmentPath
                       ( toFilePath <$>
                       [ hostBinDirPath
-                      , sandboxHomeDir </> $(mkRelDir ".local/bin")])
+                      , sandboxHomeDir </> relDirDotLocal </> relDirBin])
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -388,7 +388,7 @@ runContainerAndExit getCmdArgs
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
     projectRoot = fromMaybeProjectRoot mprojectRoot
-    sshRelDir = $(mkRelDir ".ssh/")
+    sshRelDir = relDirDotSsh
 
 -- | Clean-up old docker images and containers.
 cleanup :: HasConfig env => CleanupOpts -> RIO env ()
@@ -746,7 +746,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           -- If the 'stack' user exists in the image, copy any build plans and package indices from
           -- its original home directory to the host's stack root, to avoid needing to download them
           origStackHomeDir <- liftIO $ parseAbsDir (User.homeDirectory ue)
-          let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
+          let origStackRoot = origStackHomeDir </> relDirDotStackProgName
           buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)
           when buildPlanDirExists $ do
             (_, buildPlans) <- listDir (buildPlanDir origStackRoot)
@@ -832,7 +832,7 @@ readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
-homeDirName = $(mkRelDir "_home/")
+homeDirName = relDirUnderHome
 
 -- | Directory where 'stack' executable is bind-mounted in Docker container
 hostBinDir :: FilePath

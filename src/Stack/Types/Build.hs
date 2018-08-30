@@ -5,7 +5,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TemplateHaskell            #-}
 
 -- | Build-specific types.
 
@@ -65,7 +64,7 @@ import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
 import           Distribution.Version            (mkVersion)
-import           Path                            (mkRelDir, parseRelDir, (</>), parent)
+import           Path                            (parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
 import           Stack.Types.Compiler
@@ -548,11 +547,11 @@ configureOptsDirs bco loc package = concat
     , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case loc of
         Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
         Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
-    , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "lib"))
+    , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLib)
       , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "share"))
-      , "--libexecdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "libexec"))
-      , "--sysconfdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "etc"))
+      , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> relDirShare)
+      , "--libexecdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLibexec)
+      , "--sysconfdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirEtc)
       , "--docdir=" ++ toFilePathNoTrailingSep docDir
       , "--htmldir=" ++ toFilePathNoTrailingSep docDir
       , "--haddockdir=" ++ toFilePathNoTrailingSep docDir]

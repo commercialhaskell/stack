@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 
 -- | Generate haddocks
 module Stack.Build.Haddock
@@ -26,6 +25,7 @@ import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
+import           Stack.Constants
 import           Stack.PackageDump
 import           Stack.PrettyPrint
 import           Stack.Types.Build
@@ -283,7 +283,7 @@ lookupDumpPackage ghcPkgId dumpPkgs =
 
 -- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File
-haddockIndexFile destDir = destDir </> $(mkRelFile "index.html")
+haddockIndexFile destDir = destDir </> relFileIndexHtml
 
 -- | Path of local packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
@@ -291,7 +291,7 @@ localDocDir bco = bcoLocalInstallRoot bco </> docDirSuffix
 
 -- | Path of documentation directory for the dependencies of local packages
 localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
-localDepsDocDir bco = localDocDir bco </> $(mkRelDir "all")
+localDepsDocDir bco = localDocDir bco </> relDirAll
 
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir

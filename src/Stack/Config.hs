@@ -7,7 +7,6 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -237,7 +236,7 @@ configFromConfigMonoid
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
-     configWorkDir0 <- maybe (return $(mkRelDir ".stack-work")) (liftIO . parseRelDir) mstackWorkEnv
+     configWorkDir0 <- maybe (return relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
      -- This code is to handle the deprecation of latest-snapshot-url
      configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
@@ -315,7 +314,7 @@ configFromConfigMonoid
          case getFirst configMonoidLocalBinPath of
              Nothing -> do
                  localDir <- getAppUserDataDir "local"
-                 return $ localDir </> $(mkRelDir "bin")
+                 return $ localDir </> relDirBin
              Just userPath ->
                  (case mproject of
                      -- Not in a project
@@ -381,7 +380,7 @@ configFromConfigMonoid
          Just [hsc] -> pure hsc
          Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
      withPantryConfig
-       (configStackRoot </> $(mkRelDir "pantry"))
+       (configStackRoot </> relDirPantry)
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
@@ -395,7 +394,7 @@ getDefaultLocalProgramsBase :: MonadThrow m
                             -> m (Path Abs Dir)
 getDefaultLocalProgramsBase configStackRoot configPlatform override =
   let
-    defaultBase = configStackRoot </> $(mkRelDir "programs")
+    defaultBase = configStackRoot </> relDirPrograms
   in
     case configPlatform of
       -- For historical reasons, on Windows a subdirectory of LOCALAPPDATA is
@@ -407,7 +406,8 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
           Just t ->
             case parseAbsDir $ T.unpack t of
               Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
-              Just lad -> return $ lad </> $(mkRelDir "Programs") </> $(mkRelDir stackProgName)
+              Just lad ->
+                return $ lad </> relDirUpperPrograms </> relDirStackProgName
           Nothing -> return defaultBase
       _ -> return defaultBase
 
@@ -583,7 +583,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
                            , "#\n"
                            , Yaml.encode p]
-                       S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $ S.concat
+                       S.writeFile (toFilePath $ parent dest </> relFileReadmeTxt) $ S.concat
                            [ "This is the implicit global project, which is used only when 'stack' is run\n"
                            , "outside of a real project.\n" ]
                    return (p, dest)
@@ -922,7 +922,7 @@ getFakeConfigPath stackRoot ar = do
   -- Better would be to defer figuring out this value until
   -- after we have a fully loaded snapshot with a hash.
   asDir <- parseRelDir $ takeWhile (/= ':') asString
-  let full = stackRoot </> $(mkRelDir "script") </> asDir </> $(mkRelFile "config.yaml")
+  let full = stackRoot </> relDirScript </> asDir </> relFileConfigYaml
   ensureDir (parent full)
   return full
 
