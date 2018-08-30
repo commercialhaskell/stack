@@ -3,8 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
 -- | Functions for the GHC package database.

@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE DataKinds             #-}
