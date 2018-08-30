@@ -23,13 +23,6 @@ To create a signed binary package, you need:
   [msysgit](https://msysgit.github.io) on Windows)
 - `dev@fpcomplete.com` secret key in GPG keyring.
 
-To create signed Windows executables, you also need:
-
-- `signtool.exe`, which is installed with the
-  [Windows SDK](http://microsoft.com/en-us/download/confirmation.aspx?id=8279).
-- "FP Complete, Corporation" code signing key installed. See
-  [instructions for creating one with StartSSL](https://forum.startcom.org/viewtopic.php?p=5480&sid=143a360f30427e979f6c5b05c2df82cc#p5480).
-
 To upload a binary to a Github release, you also need:
 
 - A [Github authorization token](https://github.com/settings/tokens) with
@@ -38,24 +31,6 @@ To upload a binary to a Github release, you also need:
 - A [Github release](https://github.com/commercialhaskell/stack/releases)
   (probably as a draft) with a tag for the stack package's version (e.g.
   `vX.Y.Z`).
-
-To create and upload Debian/Ubuntu packages, you need:
-
-- deb-s3 installed (`sudo gem install deb-s3`).
-- `dev@fpcomplete.com` secret key in GPG keyring.
-- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
-  credentials that allow uploading to download.fpcomplete.com S3 bucket.
-
-To create and upload Red Hat/CentOS packages, you need:
-
-- [rpm-s3 installed](https://github.com/crohr/rpm-s3).
-- `dev@fpcomplete.com` secret key in GPG keyring.
-- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
-  credentials that allow uploading to download.fpcomplete.com S3 bucket.
-
-To create and upload Arch packages, you need:
-
-- [AWS CLI installed](http://docs.aws.amazon.com/cli/latest/userguide/installing.html).
 
 Invocation
 ----------
