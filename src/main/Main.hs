@@ -963,7 +963,7 @@ imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
     let mProjectRoot = lcProjectRoot lc
     withBuildConfigExt
-        False
+        WithDocker
         False
         go
         Nothing

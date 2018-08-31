@@ -81,6 +81,8 @@ module Stack.Types.Config
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
+  -- ** WithDocker
+  ,WithDocker(..)
 
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -509,6 +511,10 @@ data BuildConfig = BuildConfig
     , bcCurator :: !(Maybe Curator)
     , bcClean :: !Bool
     }
+
+data WithDocker
+  = SkipDocker
+  | WithDocker
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
 stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
