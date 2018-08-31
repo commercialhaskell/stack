@@ -12,6 +12,7 @@ packages:
 - rio-orphans-0.1.1.0@sha256:15600084c56ef4e1f22ac2091d10fa6ed62f01f531d819c6a5a19492212a76c9
 - persistent-sqlite-2.8.2@sha256:6874958eb2943c4567c30bc0069ce4868b2813c490402c22bb2e0efa5b4c4c71,3873
 - yaml-0.10.1.1@rev:0 #for hpack-0.30
+- tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
 
 flags:
   cabal-install:

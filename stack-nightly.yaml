@@ -6,15 +6,11 @@ packages:
 - subs/curator
 
 extra-deps:
-- persistent-sqlite-2.8.2@sha256:6874958eb2943c4567c30bc0069ce4868b2813c490402c22bb2e0efa5b4c4c71,3873
 # Ugly, temporary hack
 - github: fpco/store
   commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a
   subdirs:
   - store
-# Switch to Hackage version when released
-- github: snoyberg/tar-conduit
-  commit: fd03a66110f7d0feff6fe7eb1cc9ca1a56b38fea
 
 # docker:
 #   enable: true

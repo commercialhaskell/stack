@@ -53,7 +53,7 @@ dependencies:
 - path-io
 - rio-orphans
 - conduit-extra
-- tar-conduit
+- tar-conduit >= 0.3.0
 - time
 - unix-compat
 - hpack >= 0.29.6
