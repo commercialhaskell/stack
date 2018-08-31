@@ -129,7 +129,7 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt WithDocker False go Nothing inner Nothing
+    withBuildConfigExt WithDocker WithDownloadCompiler go Nothing inner Nothing
 
 -- | See issue #2010 for why this exists. Currently just used for the
 -- specific case of "stack clean --full".
@@ -138,14 +138,14 @@ withBuildConfigAndLockNoDocker
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLockNoDocker go inner =
-    withBuildConfigExt SkipDocker False go Nothing inner Nothing
+    withBuildConfigExt SkipDocker WithDownloadCompiler go Nothing inner Nothing
 
 withBuildConfigAndLockInClean
     :: GlobalOpts
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLockInClean go inner =
-    withBuildConfigExt WithDocker True go Nothing inner Nothing
+    withBuildConfigExt WithDocker SkipDownloadCompiler go Nothing inner Nothing
 
 -- | See issue #2010 for why this exists. Currently just used for the
 -- specific case of "stack clean --full".
@@ -154,11 +154,11 @@ withBuildConfigAndLockNoDockerInClean
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLockNoDockerInClean go inner =
-    withBuildConfigExt SkipDocker True go Nothing inner Nothing
+    withBuildConfigExt SkipDocker SkipDownloadCompiler go Nothing inner Nothing
 
 withBuildConfigExt
     :: WithDocker
-    -> Bool -- ^ If perform the stack clean
+    -> WithDownloadCompiler -- ^ bypassed download compiler if SkipDownloadCompiler.
     -> GlobalOpts
     -> Maybe (RIO Config ())
     -- ^ Action to perform before the build.  This will be run on the host
@@ -174,7 +174,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker isClean go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
+withBuildConfigExt skipDocker downloadCompiler go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -192,7 +192,7 @@ withBuildConfigExt skipDocker isClean go@GlobalOpts{..} mbefore inner mafter = l
 
       let inner'' lk = do
               bconfig <- lcLoadBuildConfig lc globalCompiler
-              let bconfig' = bconfig { bcClean = isClean }
+              let bconfig' = bconfig { bcDownloadCompiler = downloadCompiler }
               envConfig <- runRIO bconfig' (setupEnv Nothing)
               runRIO envConfig (inner' lk)
 

@@ -83,6 +83,8 @@ module Stack.Types.Config
   ,LoadConfig(..)
   -- ** WithDocker
   ,WithDocker(..)
+  -- ** WithDownloadCompiler
+  ,WithDownloadCompiler(..)
 
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -509,12 +511,16 @@ data BuildConfig = BuildConfig
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
     , bcCurator :: !(Maybe Curator)
-    , bcClean :: !Bool
+    , bcDownloadCompiler :: !WithDownloadCompiler
     }
 
 data WithDocker
   = SkipDocker
   | WithDocker
+
+data WithDownloadCompiler
+  = SkipDownloadCompiler
+  | WithDownloadCompiler
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
 stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })

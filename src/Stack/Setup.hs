@@ -234,7 +234,10 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, compilerBuild, _) <- if bcClean bconfig then pure (Nothing, CompilerBuildStandard, False) else ensureCompiler sopts
+    (mghcBin, compilerBuild, _) <-
+      case bcDownloadCompiler bconfig of
+        SkipDownloadCompiler -> pure (Nothing, CompilerBuildStandard, False)
+        WithDownloadCompiler -> ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
