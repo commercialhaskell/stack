@@ -543,7 +543,7 @@ data EnvConfig = EnvConfig
     -- ^ The actual version of the compiler to be used, as opposed to
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
-    ,envConfigCompilerBuild :: !CompilerBuild
+    ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
     ,envConfigLoadedSnapshot :: !LoadedSnapshot
     -- ^ The fully resolved snapshot information.
     }
@@ -1282,9 +1282,9 @@ platformGhcRelDir
     => m (Path Rel Dir)
 platformGhcRelDir = do
     ec <- view envConfigL
+    let cbSuffix = maybe "" compilerBuildSuffix $ envConfigCompilerBuild ec
     verOnly <- platformGhcVerOnlyRelDirStr
-    parseRelDir (mconcat [ verOnly
-                         , compilerBuildSuffix (envConfigCompilerBuild ec)])
+    parseRelDir (mconcat [ verOnly, cbSuffix ])
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist build
 platformGhcVerOnlyRelDir

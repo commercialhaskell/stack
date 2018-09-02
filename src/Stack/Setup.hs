@@ -234,9 +234,9 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, compilerBuild, _) <-
+    (mghcBin, mCompilerBuild, _) <-
       case bcDownloadCompiler bconfig of
-        SkipDownloadCompiler -> pure (Nothing, CompilerBuildStandard, False)
+        SkipDownloadCompiler -> return (Nothing, Nothing, False)
         WithDownloadCompiler -> ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
@@ -269,7 +269,7 @@ setupEnv mResolveMissingGHC = do
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
             , envConfigCompilerVersion = compilerVer
-            , envConfigCompilerBuild = compilerBuild
+            , envConfigCompilerBuild = mCompilerBuild
             , envConfigLoadedSnapshot = ls
             }
 
@@ -356,7 +356,7 @@ setupEnv mResolveMissingGHC = do
             }
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
-        , envConfigCompilerBuild = compilerBuild
+        , envConfigCompilerBuild = mCompilerBuild
         , envConfigLoadedSnapshot = ls
         }
 
@@ -374,7 +374,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
+               -> RIO env (Maybe ExtraDirs, Maybe CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (wantedToActual (soptsWantedCompiler sopts))
     when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < mkVersion [7, 8]) $ do
@@ -532,7 +532,7 @@ ensureCompiler sopts = do
 
     when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck wc
 
-    return (mpaths, compilerBuild, needLocal)
+    return (mpaths, Just compilerBuild, needLocal)
 
 -- | Determine which GHC builds to use depending on which shared libraries are available
 -- on the system.
