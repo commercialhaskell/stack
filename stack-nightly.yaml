@@ -1,4 +1,4 @@
-resolver: nightly-2018-08-04
+resolver: nightly-2018-09-02
 
 # docker:
 #   enable: true

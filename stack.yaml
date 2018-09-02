@@ -21,9 +21,10 @@ extra-deps:
 - cabal-install-2.2.0.0@rev:1
 - resolv-0.1.1.1@rev:0
 - infer-license-0.2.0@rev:0
-- hpack-0.29.6@rev:0
+- hpack-0.30.0@rev:0
 - http-api-data-0.3.8.1@rev:0
 - githash-0.1.0.1@rev:0
+- yaml-0.10.1.1@rev:0 #for hpack-0.30
 
 # Avoid https://github.com/commercialhaskell/stack/issues/4125
 # (triggered because later versions of persistent transitively depends
