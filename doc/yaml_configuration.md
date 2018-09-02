@@ -832,7 +832,7 @@ Sets the address of the Hackage server to upload the package to. Default is
 hackage-base-url: https://hackage.example.com/
 ```
 
-Since 1.8.0
+Since 1.9.1
 
 ### ignore-revision-mismatch
 

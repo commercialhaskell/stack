@@ -81,7 +81,7 @@ Bug fixes:
   [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
 
 
-## v1.9.0 (release candidate)
+## v1.9.0.1 (release candidate)
 
 Release notes:
 

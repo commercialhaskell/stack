@@ -46,8 +46,8 @@ dependencies:
 - base64-bytestring
 - bytestring
 - colour
-- conduit >= 1.3
-- conduit-extra >= 1.3
+- conduit
+- conduit-extra
 - containers
 - cryptonite
 - cryptonite-conduit
