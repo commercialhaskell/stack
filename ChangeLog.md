@@ -8,6 +8,10 @@ Release notes:
 Major changes:
 
 * Upgrade to Cabal 2.4
+    * Note that, in this process, the behavior of file globbing has
+      been modified to match that of Cabal. In particular, this means
+      that for Cabal spec versions less than 2.4, `*.txt` will
+      match `foo.txt`, but not `foo.2.txt`.
 
 Behavior changes:
 
