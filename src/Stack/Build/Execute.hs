@@ -1,13 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
@@ -43,7 +40,6 @@ import           Data.Conduit.Process.Typed
                      createPipe, runProcess_, getStdout,
                      getStderr, createSource)
 import qualified Data.Conduit.Text as CT
-import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
 import qualified Data.Map.Strict as M
@@ -228,11 +224,6 @@ buildSetupArgs =
      , "StackSetupShim.mainOverride"
      ]
 
-setupGhciShimCode :: S.ByteString
-setupGhciShimCode = $(do
-    path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-    embedFile path)
-
 simpleSetupCode :: S.ByteString
 simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
 
@@ -274,7 +265,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
             baseNameS ++ ".jsexe"
         setupDir =
             view stackRootL config </>
-            $(mkRelDir "setup-exe-cache") </>
+            relDirSetupExeCache </>
             platformDir
 
     exePath <- (setupDir </>) <$> parseRelFile exeNameS
@@ -333,7 +324,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         -- Create files for simple setup and setup shim, if necessary
         let setupSrcDir =
                 view stackRootL config </>
-                $(mkRelDir "setup-exe-src")
+                relDirSetupExeSrc
         ensureDir setupSrcDir
         setupFileName <- parseRelFile ("setup-" ++ simpleSetupHash ++ ".hs")
         let setupHs = setupSrcDir </> setupFileName
@@ -864,7 +855,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     -- with autoreconf -i. See:
     -- https://github.com/commercialhaskell/stack/issues/3534
     ensureConfigureScript = do
-      let fp = pkgDir </> $(mkRelFile "configure")
+      let fp = pkgDir </> relFileConfigure
       exists <- doesFileExist fp
       unless exists $ do
         logInfo $ "Trying to generate configure with autoreconf in " <> fromString (toFilePath pkgDir)
@@ -951,7 +942,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
                 -- See: https://github.com/fpco/stack/issues/157
                 distDir <- distRelativeDir
-                let oldDist = dir </> $(mkRelDir "dist")
+                let oldDist = dir </> relDirDist
                     newDist = dir </> distDir
                 exists <- doesDirExist oldDist
                 when exists $ do
@@ -1086,7 +1077,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
-                                cppMacrosFile = toFilePath $ setupDir </> $(mkRelFile "setup_macros.h")
+                                cppMacrosFile = toFilePath $ setupDir </> relFileSetupMacrosH
                                 cppArgs = ["-optP-include", "-optP" ++ cppMacrosFile]
                             liftIO $ S.writeFile cppMacrosFile (encodeUtf8 (T.pack (C.generatePackageVersionMacros macroDeps)))
                             return (packageDBArgs ++ depsArgs ++ cppArgs)
@@ -1193,8 +1184,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 Left setupExe -> return setupExe
                 Right setuphs -> do
                     distDir <- distDirFromDir pkgDir
-                    let setupDir = distDir </> $(mkRelDir "setup")
-                        outputFile = setupDir </> $(mkRelFile "setup")
+                    let setupDir = distDir </> relDirSetup
+                        outputFile = setupDir </> relFileSetupLower
                     customBuilt <- liftIO $ readIORef eeCustomBuilt
                     if Set.member (packageName package) customBuilt
                         then return outputFile
@@ -1662,7 +1653,7 @@ checkExeStatus
     -> RIO env (Text, ExecutableBuildStatus)
 checkExeStatus compiler platform distDir name = do
     exename <- parseRelDir (T.unpack name)
-    exists <- checkPath (distDir </> $(mkRelDir "build") </> exename)
+    exists <- checkPath (distDir </> relDirBuild </> exename)
     pure
         ( name
         , if exists
@@ -1984,8 +1975,8 @@ getSetupHs dir = do
                 then return fp2
                 else throwM $ NoSetupHsFound dir
   where
-    fp1 = dir </> $(mkRelFile "Setup.hs")
-    fp2 = dir </> $(mkRelFile "Setup.lhs")
+    fp1 = dir </> relFileSetupHs
+    fp2 = dir </> relFileSetupLhs
 
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like `hint`.

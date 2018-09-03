@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Stack.Options.Completion
@@ -21,14 +20,13 @@ import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Config (getLocalPackages)
+import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
-import           Stack.Prelude hiding (lift)
+import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
-import           System.Process (readProcess)
-import           Language.Haskell.TH.Syntax (runIO, lift)
 
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
@@ -38,10 +36,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
         otherArgs = reverse otherArgsReversed
      in if null curArg then [] else
          map (otherArgs ++) $
-         filter (curArg `isPrefixOf`)
-                -- Technically, we should be consulting the user's current ghc,
-                -- but that would require loading up a BuildConfig.
-                $(runIO (readProcess "ghc" ["--show-options"] "") >>= lift . lines)
+         filter (curArg `isPrefixOf`) ghcShowOptionsOutput
 
 -- TODO: Ideally this would pay attention to --stack-yaml, may require
 -- changes to optparse-applicative.

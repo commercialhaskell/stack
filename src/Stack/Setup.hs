@@ -8,7 +8,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -76,7 +75,7 @@ import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
 import              Stack.Config (loadConfig)
-import              Stack.Constants (stackProgName)
+import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
@@ -96,6 +95,7 @@ import              System.Exit (ExitCode (..), exitFailure)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
+import              System.Permissions (setFileExecutable)
 import              RIO.Process
 import              Text.Printf (printf)
 
@@ -104,7 +104,6 @@ import              System.Uname (uname, release)
 import              Data.List.Split (splitOn)
 import              Foreign.C (throwErrnoIfMinus1_, peekCString)
 import              Foreign.Marshal (alloca)
-import              System.Posix.Files (setFileMode)
 #endif
 
 -- | Default location of the stack-setup.yaml file
@@ -585,29 +584,28 @@ getGhcBuilds = do
                         | libT `elem` firstWords = do
                             logDebug ("Found shared library " <> libD <> " in 'ldconfig -p' output")
                             return True
-                        | otherwise = do
-#ifdef WINDOWS
-                            -- (mkAbsDir "/usr/lib") fails to compile on Windows, thus the CPP
+                        | osIsWindows =
+                            -- Cannot parse /usr/lib on Windows
                             return False
-#else
+                        | otherwise = do
                             -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
                             -- the 'ldconfig -p' output on Arch even when it exists.
                             -- There doesn't seem to be an easy way to get the true list of directories
                             -- to scan for shared libs, but this works for our particular case.
-                            e <- doesFileExist ($(mkAbsDir "/usr/lib") </> lib)
+                            usrLib <- parseAbsDir "/usr/lib"
+                            e <- doesFileExist (usrLib </> lib)
                             if e
                                 then logDebug ("Found shared library " <> libD <> " in /usr/lib")
                                 else logDebug ("Did not find shared library " <> libD)
                             return e
-#endif
                       where
                         libT = T.pack (toFilePath lib)
                         libD = fromString (toFilePath lib)
-                hastinfo5 <- checkLib $(mkRelFile "libtinfo.so.5")
-                hastinfo6 <- checkLib $(mkRelFile "libtinfo.so.6")
-                hasncurses6 <- checkLib $(mkRelFile "libncursesw.so.6")
-                hasgmp5 <- checkLib $(mkRelFile "libgmp.so.10")
-                hasgmp4 <- checkLib $(mkRelFile "libgmp.so.3")
+                hastinfo5 <- checkLib relFileLibtinfoSo5
+                hastinfo6 <- checkLib relFileLibtinfoSo6
+                hasncurses6 <- checkLib relFileLibncurseswSo6
+                hasgmp5 <- checkLib relFileLibgmpSo10
+                hasgmp4 <- checkLib relFileLibgmpSo3
                 let libComponents = concat
                         [ [["tinfo6"] | hastinfo6 && hasgmp5]
                         , [[] | hastinfo5 && hasgmp5]
@@ -664,7 +662,7 @@ ensureDockerStackExe containerPlatform = do
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
         tool = Tool (PackageIdentifier (mkPackageName "stack") stackVersion)
     stackExeDir <- installDir programsPath tool
-    let stackExePath = stackExeDir </> $(mkRelFile "stack")
+    let stackExePath = stackExeDir </> relFileStack
     stackExeExists <- doesFileExist stackExePath
     unless stackExeExists $ do
         logInfo $
@@ -736,13 +734,13 @@ doCabalInstall wc installed wantedVersion = do
                     >>= either throwM parseAbsFile
         versionDir <- parseRelDir $ versionString wantedVersion
         let installRoot = toFilePath $ parent (parent compilerPath)
-                                    </> $(mkRelDir "new-cabal")
+                                    </> relDirNewCabal
                                     </> versionDir
         withWorkingDir (toFilePath dir) $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
         platform <- view platformL
         let setupExe = dir </> case platform of
-                Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
-                _                        -> $(mkRelFile "Setup")
+                Platform _ Cabal.Windows -> relFileSetupExe
+                _                        -> relFileSetupUpper
             dirArgument name' = concat [ "--"
                                        , name'
                                        , "dir="
@@ -1129,7 +1127,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
         (gdiConfigureEnv downloadInfo)
-        (toFilePath $ dir </> $(mkRelFile "configure"))
+        (toFilePath $ dir </> relFileConfigure)
         (("--prefix=" ++ toFilePath destDir) : map T.unpack (gdiConfigureOpts downloadInfo))
 
     logSticky "Installing GHC ..."
@@ -1165,7 +1163,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     -- environment of the stack.yaml which came with ghcjs, in order to
     -- install cabal-install. This lets us also fix the version of
     -- cabal-install used.
-    let unpackDir = destDir </> $(mkRelDir "src")
+    let unpackDir = destDir </> relDirSrc
     runUnpack <- case platform of
         Platform _ Cabal.Windows -> return $
             withUnpackedTarball7z "GHCJS" si archiveFile archiveType Nothing unpackDir
@@ -1196,8 +1194,8 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
     runUnpack
 
     logSticky "Setting up GHCJS build environment"
-    let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
-        destBinDir = destDir </> $(mkRelDir "bin")
+    let stackYaml = unpackDir </> stackDotYaml
+        destBinDir = destDir </> relDirBin
     ensureDir destBinDir
     loadGhcjsEnvConfig stackYaml destBinDir $ \envConfig' -> do
 
@@ -1213,9 +1211,9 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
       buildInGhcjsEnv envConfig' defaultBuildOptsCLI
       -- Copy over *.options files needed on windows.
       forM_ mwindowsInstallDir $ \dir -> do
-          (_, files) <- listDir (dir </> $(mkRelDir "bin"))
+          (_, files) <- listDir (dir </> relDirBin)
           forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
-              let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
+              let dest = destDir </> relDirBin </> filename optionsFile
               liftIO $ ignoringAbsence (removeFile dest)
               copyFile optionsFile dest
       logStickyDone "Installed GHCJS."
@@ -1233,7 +1231,7 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
             if not shouldBoot then throwM GHCJSNotBooted else do
                 config <- view configL
                 destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
-                let stackYaml = destDir </> $(mkRelFile "src/stack.yaml")
+                let stackYaml = destDir </> relDirSrc </> stackDotYaml
                 -- TODO: Remove 'actualStackYaml' and just use
                 -- 'stackYaml' for a version after 0.1.6. It's for
                 -- compatibility with the directories setup used for
@@ -1248,7 +1246,7 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
                         _ -> error "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else
-                        liftM ((destDir </> $(mkRelDir "src")) </>) $
+                        liftM ((destDir </> relDirSrc) </>) $
                         parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
                 actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
@@ -1259,7 +1257,7 @@ ensureGhcjsBooted cv shouldBoot bootOpts = do
 bootGhcjs :: (HasRunner env, HasProcessContext env)
           => Version -> Path Abs File -> Path Abs Dir -> [String] -> RIO env ()
 bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
-  loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin")) $ \envConfig -> do
+  loadGhcjsEnvConfig stackYaml (destDir </> relDirBin) $ \envConfig -> do
     menv <- liftIO $ configProcessContextSettings (view configL envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
     mcabal <- withProcessContext menv getCabalInstallVersion
@@ -1439,7 +1437,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
     menv0 <- view processContextL
     newEnv0 <- modifyEnvVars menv0 $ Map.insert "MSYSTEM" "MSYS"
     newEnv <- either throwM return $ augmentPathMap
-                  [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
+                  [toFilePath $ destDir </> relDirUsr </> relDirBin]
                   (view envVarsL newEnv0)
     menv <- mkProcessContext newEnv
     withWorkingDir (toFilePath destDir) $ withProcessContext menv
@@ -1501,8 +1499,8 @@ setup7z :: (HasConfig env, MonadIO m)
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
-    let exe = dir </> $(mkRelFile "7z.exe")
-        dll = dir </> $(mkRelFile "7z.dll")
+    let exe = dir </> relFile7zexe
+        dll = dir </> relFile7zdll
     case (siSevenzDll si, siSevenzExe si) of
         (Just sevenzDll, Just sevenzExe) -> do
             chattyDownload "7z.dll" sevenzDll dll
@@ -1646,7 +1644,7 @@ sanityCheck :: (HasProcessContext env, HasLogFunc env)
             => WhichCompiler
             -> RIO env ()
 sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
-    let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
+    let fp = toFilePath $ dir </> relFileMainHs
     liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
@@ -1879,12 +1877,12 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     let (destFile, tmpFile)
             | isWindows =
-                ( destDir </> $(mkRelFile "stack.exe")
-                , destDir </> $(mkRelFile "stack.tmp.exe")
+                ( destDir </> relFileStackDotExe
+                , destDir </> relFileStackDotTmpDotExe
                 )
             | otherwise =
-                ( destDir </> $(mkRelFile "stack")
-                , destDir </> $(mkRelFile "stack.tmp")
+                ( destDir </> relFileStack
+                , destDir </> relFileStackDotTmp
                 )
 
     logInfo $ "Downloading from: " <> RIO.display archiveURL
@@ -1901,9 +1899,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     platform <- view platformL
 
     liftIO $ do
-#if !WINDOWS
-      setFileMode (toFilePath tmpFile) 0o755
-#endif
+      setFileExecutable (toFilePath tmpFile)
 
       testExe tmpFile
 
@@ -1988,9 +1984,7 @@ performPathChecking newFile = do
     tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
     eres <- tryIO $ do
       liftIO $ copyFile newFile tmpFile
-#if !WINDOWS
-      liftIO $ setFileMode (toFilePath tmpFile) 0o755
-#endif
+      setFileExecutable (toFilePath tmpFile)
       liftIO $ renameFile tmpFile executablePath'
       logInfo "Stack executable copied successfully!"
     case eres of

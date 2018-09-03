@@ -8,7 +8,6 @@ import           Distribution.Version              (anyVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Stack.Constants
 import           Stack.Docker
 import qualified Stack.Docker                      as Docker
 import           Stack.Prelude

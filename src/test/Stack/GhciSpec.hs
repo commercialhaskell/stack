@@ -46,11 +46,11 @@ shouldBeLE actual expected = shouldBe actual (textToLazy $ T.filter (/= '\r') ex
 
 baseProjDir, projDirA, projDirB :: Path Abs Dir
 baseProjDir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src")
-projDirA = baseProjDir </> $(mkRelDir "project-a")
-projDirB = baseProjDir </> $(mkRelDir "project-b")
+projDirA = baseProjDir </> either impureThrow id (parseRelDir "project-a")
+projDirB = baseProjDir </> either impureThrow id (parseRelDir "project-b")
 
 relFile :: Path Rel File
-relFile = $(mkRelFile $ "exe" FP.</> "Main.hs")
+relFile = either impureThrow id (parseRelFile $ "exe" FP.</> "Main.hs")
 
 absFile :: Path Abs File
 absFile = projDirA </> relFile

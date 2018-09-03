@@ -110,6 +110,7 @@ import           System.Exit
 import           System.FilePath (isValid, pathSeparator)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
+import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception

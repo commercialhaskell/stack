@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
-             OverloadedStrings, PackageImports, RankNTypes, RecordWildCards, ScopedTypeVariables,
-             TemplateHaskell, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -66,6 +73,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Process.PagerEditor (editByteString)
+import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 import           RIO.Process
 import           Text.Printf (printf)
 
@@ -286,7 +294,7 @@ runContainerAndExit getCmdArgs
      newPathEnv <- either throwM return $ augmentPath
                       ( toFilePath <$>
                       [ hostBinDirPath
-                      , sandboxHomeDir </> $(mkRelDir ".local/bin")])
+                      , sandboxHomeDir </> relDirDotLocal </> relDirBin])
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -347,6 +355,8 @@ runContainerAndExit getCmdArgs
          ,[cmnd]
          ,args])
      before
+-- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
+-- `docker` process so that it can handle the signals directly?
 #ifndef WINDOWS
      run <- askRunInIO
      oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do
@@ -388,7 +398,7 @@ runContainerAndExit getCmdArgs
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
     projectRoot = fromMaybeProjectRoot mprojectRoot
-    sshRelDir = $(mkRelDir ".ssh/")
+    sshRelDir = relDirDotSsh
 
 -- | Clean-up old docker images and containers.
 cleanup :: HasConfig env => CleanupOpts -> RIO env ()
@@ -746,7 +756,7 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           -- If the 'stack' user exists in the image, copy any build plans and package indices from
           -- its original home directory to the host's stack root, to avoid needing to download them
           origStackHomeDir <- liftIO $ parseAbsDir (User.homeDirectory ue)
-          let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
+          let origStackRoot = origStackHomeDir </> relDirDotStackProgName
           buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)
           when buildPlanDirExists $ do
             (_, buildPlans) <- listDir (buildPlanDir origStackRoot)
@@ -832,7 +842,7 @@ readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
-homeDirName = $(mkRelDir "_home/")
+homeDirName = relDirUnderHome
 
 -- | Directory where 'stack' executable is bind-mounted in Docker container
 hostBinDir :: FilePath

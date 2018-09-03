@@ -1,11 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 
 -- | Run a GHCi configured with the user's package(s).
@@ -38,6 +36,7 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
+import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
@@ -50,10 +49,7 @@ import           Stack.Types.Package
 import           Stack.Types.Runner
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
-
-#ifndef WINDOWS
-import qualified System.Posix.Files as Posix
-#endif
+import           System.Permissions (setScriptPerms)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -416,7 +412,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     -- effect of making it possible to copy the ghci invocation out of
     -- the log and have it still work.
     tmpDirectory <-
-        (</> $(mkRelDir "haskell-stack-ghci")) <$>
+        (</> relDirHaskellStackGhci) <$>
         (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
     ghciDir <- view ghciDirL
     ensureDir ghciDir
@@ -443,13 +439,13 @@ writeMacrosFile outputDirectory pkgs = do
                     return Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
-        out <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "cabal_macros.h") $
+        out <- liftIO $ writeHashedFile outputDirectory relFileCabalMacrosH $
             S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
         return ["-optP-include", "-optP" <> toFilePath out]
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
 writeGhciScript outputDirectory script = do
-    scriptPath <- liftIO $ writeHashedFile outputDirectory $(mkRelFile "ghci-script") $
+    scriptPath <- liftIO $ writeHashedFile outputDirectory relFileGhciScript $
         LBS.toStrict $ scriptToLazyByteString script
     let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
@@ -886,20 +882,6 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                         return False
             (_, Just PSRemote{}) -> return loadAllDeps
             (_, _) -> return False
-
-setScriptPerms :: MonadIO m => FilePath -> m ()
-#ifdef WINDOWS
-setScriptPerms _ = do
-    return ()
-#else
-setScriptPerms fp = do
-    liftIO $ Posix.setFileMode fp $ foldl1 Posix.unionFileModes
-        [ Posix.ownerReadMode
-        , Posix.ownerWriteMode
-        , Posix.groupReadMode
-        , Posix.otherReadMode
-        ]
-#endif
 
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
 unionTargets = M.unionWith $ \l r ->

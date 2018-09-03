@@ -1,9 +1,5 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE DataKinds             #-}
@@ -39,30 +35,28 @@ import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
-#ifdef mingw32_HOST_OS
 import           Data.Char (ord)
-#endif
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
-import           Data.Store.VersionTagged
 import qualified Data.Text as T
 import           Path
 import           Path.IO
+import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.StoreTH
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
-import           Stack.Types.Package
 import qualified System.FilePath as FP
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
                 => InstallLocation -> m (Path Abs Dir)
-exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
-exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
+exeInstalledDir Snap = (</> relDirInstalledPackages) `liftM` installationRootDeps
+exeInstalledDir Local = (</> relDirInstalledPackages) `liftM` installationRootLocal
 
 -- | Get all of the installed executables
 getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
@@ -126,17 +120,17 @@ tryGetBuildCache :: HasEnvConfig env
                  => Path Abs Dir
                  -> NamedComponent
                  -> RIO env (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . $(versionedDecodeFile buildCacheVC) =<< buildCacheFile dir component
+tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . decodeBuildCache =<< buildCacheFile dir component
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: HasEnvConfig env
                   => Path Abs Dir -> RIO env (Maybe ConfigCache)
-tryGetConfigCache dir = $(versionedDecodeFile configCacheVC) =<< configCacheFile dir
+tryGetConfigCache dir = decodeConfigCache =<< configCacheFile dir
 
 -- | Try to read the mod time of the cabal file from the last build
 tryGetCabalMod :: HasEnvConfig env
                => Path Abs Dir -> RIO env (Maybe ModTime)
-tryGetCabalMod dir = $(versionedDecodeFile modTimeVC) =<< configCabalMod dir
+tryGetCabalMod dir = decodeModTime =<< configCabalMod dir
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: HasEnvConfig env
@@ -145,7 +139,7 @@ writeBuildCache :: HasEnvConfig env
                 -> Map FilePath FileCacheInfo -> RIO env ()
 writeBuildCache dir component times = do
     fp <- buildCacheFile dir component
-    $(versionedEncodeFile buildCacheVC) fp BuildCache
+    encodeBuildCache fp BuildCache
         { buildCacheTimes = times
         }
 
@@ -156,7 +150,7 @@ writeConfigCache :: HasEnvConfig env
                 -> RIO env ()
 writeConfigCache dir x = do
     fp <- configCacheFile dir
-    $(versionedEncodeFile configCacheVC) fp x
+    encodeConfigCache fp x
 
 -- | See 'tryGetCabalMod'
 writeCabalMod :: HasEnvConfig env
@@ -165,7 +159,7 @@ writeCabalMod :: HasEnvConfig env
               -> RIO env ()
 writeCabalMod dir x = do
     fp <- configCabalMod dir
-    $(versionedEncodeFile modTimeVC) fp x
+    encodeModTime fp x
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -195,7 +189,7 @@ tryGetFlagCache :: HasEnvConfig env
                 -> RIO env (Maybe ConfigCache)
 tryGetFlagCache gid = do
     fp <- flagCacheFile gid
-    $(versionedDecodeFile configCacheVC) fp
+    decodeConfigCache fp
 
 writeFlagCache :: HasEnvConfig env
                => Installed
@@ -204,7 +198,7 @@ writeFlagCache :: HasEnvConfig env
 writeFlagCache gid cache = do
     file <- flagCacheFile gid
     ensureDir (parent file)
-    $(versionedEncodeFile configCacheVC) file cache
+    encodeConfigCache file cache
 
 -- | Mark a test suite as having succeeded
 setTestSuccess :: HasEnvConfig env
@@ -212,7 +206,7 @@ setTestSuccess :: HasEnvConfig env
                -> RIO env ()
 setTestSuccess dir = do
     fp <- testSuccessFile dir
-    $(versionedEncodeFile testSuccessVC) fp True
+    encodeTestSuccess fp True
 
 -- | Mark a test suite as not having succeeded
 unsetTestSuccess :: HasEnvConfig env
@@ -220,7 +214,7 @@ unsetTestSuccess :: HasEnvConfig env
                  -> RIO env ()
 unsetTestSuccess dir = do
     fp <- testSuccessFile dir
-    $(versionedEncodeFile testSuccessVC) fp False
+    encodeTestSuccess fp False
 
 -- | Check if the test suite already passed
 checkTestSuccess :: HasEnvConfig env
@@ -229,7 +223,7 @@ checkTestSuccess :: HasEnvConfig env
 checkTestSuccess dir =
     liftM
         (fromMaybe False)
-        ($(versionedDecodeFile testSuccessVC) =<< testSuccessFile dir)
+        (decodeTestSuccess =<< testSuccessFile dir)
 
 --------------------------------------
 -- Precompiled Cache
@@ -268,7 +262,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
   platformRelDir <- platformGhcRelDir
   let precompiledDir =
             view stackRootL ec
-        </> $(mkRelDir "precompiled")
+        </> relDirPrecompiled
         </> platformRelDir
         </> compiler
         </> cabal
@@ -317,7 +311,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = d
       name <- parseRelFile $ T.unpack exe
       relPath <- stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
       return $ toFilePath relPath
-  $(versionedEncodeFile precompiledCacheVC) file PrecompiledCache
+  encodePrecompiledCache file PrecompiledCache
       { pcLibrary = mlibpath
       , pcSubLibs = sublibpaths
       , pcExes = exes'
@@ -337,7 +331,7 @@ readPrecompiledCache :: forall env. HasEnvConfig env
                      -> RIO env (Maybe PrecompiledCache)
 readPrecompiledCache loc copts depIDs = do
     file <- precompiledCacheFile loc copts depIDs
-    mcache <- $(versionedDecodeFile precompiledCacheVC) file
+    mcache <- decodePrecompiledCache file
     maybe (pure Nothing) (fmap Just . mkAbs) mcache
   where
     -- Since commit ed9ccc08f327bad68dd2d09a1851ce0d055c0422,
@@ -358,8 +352,9 @@ readPrecompiledCache loc copts depIDs = do
 
 -- | Check if a filesystem path is too long.
 pathTooLong :: FilePath -> Bool
-#ifdef mingw32_HOST_OS
-pathTooLong path = utf16StringLength path >= win32MaxPath
+pathTooLong
+  | osIsWindows = \path -> utf16StringLength path >= win32MaxPath
+  | otherwise = const False
   where
     win32MaxPath = 260
     -- Calculate the length of a string in 16-bit units
@@ -369,6 +364,3 @@ pathTooLong path = utf16StringLength path >= win32MaxPath
       where
         utf16CharLength c | ord c < 0x10000 = 1
                           | otherwise       = 2
-#else
-pathTooLong _ = False
-#endif

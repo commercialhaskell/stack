@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TemplateHaskell  #-}
 module Stack.ConfigSpec where
 
 import Control.Arrow
@@ -58,7 +57,7 @@ hpackConfig =
   "packages: ['.']\n"
 
 stackDotYaml :: Path Rel File
-stackDotYaml = $(mkRelFile "stack.yaml")
+stackDotYaml = either impureThrow id (parseRelFile "stack.yaml")
 
 setup :: IO ()
 setup = unsetEnv "STACK_YAML"
@@ -154,8 +153,8 @@ spec = beforeAll setup $ do
 
     it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
-        let childRel = $(mkRelDir "child")
-            yamlRel = childRel </> $(mkRelFile "some-other-name.config")
+        let childRel = either impureThrow id (parseRelDir "child")
+            yamlRel = childRel </> either impureThrow id (parseRelFile "some-other-name.config")
             yamlAbs = parentDir </> yamlRel
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"

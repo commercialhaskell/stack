@@ -18,7 +18,6 @@ import Distribution.Text (simpleParse, display)
 import Distribution.Version (anyVersion)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
-import Stack.Constants
 import Stack.Types.Version
 import Text.Read (Read (..))
 

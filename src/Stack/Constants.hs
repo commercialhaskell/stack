@@ -1,7 +1,6 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-} -- keep TH usage here
 
 -- | Constants used throughout the project.
 
@@ -17,7 +16,6 @@ module Stack.Constants
     ,deprecatedStackRootOptionName
     ,inContainerEnvVar
     ,inNixShellEnvVar
-    ,stackProgName
     ,stackProgNameUpper
     ,wiredInPackages
     ,ghcjsBootPackages
@@ -35,15 +33,106 @@ module Stack.Constants
     ,maxTerminalWidth
     ,defaultTerminalWidth
     ,osIsWindows
+    ,relFileSetupHs
+    ,relFileSetupLhs
+    ,relFileHpackPackageConfig
+    ,relDirGlobalAutogen
+    ,relDirAutogen
+    ,relDirLogs
+    ,relFileCabalMacrosH
+    ,relDirBuild
+    ,relDirBin
+    ,relDirPantry
+    ,relDirPrograms
+    ,relDirUpperPrograms
+    ,relDirStackProgName
+    ,relDirStackWork
+    ,relFileReadmeTxt
+    ,relDirScript
+    ,relFileConfigYaml
+    ,relFileInstalledCacheBin
+    ,relDirSnapshots
+    ,relDirGlobalHints
+    ,relFileGlobalHintsYaml
+    ,relDirInstall
+    ,relDirCompilerTools
+    ,relDirHoogle
+    ,relFileDatabaseHoo
+    ,relDirPkgdb
+    ,relDirFlagCache
+    ,relDirLoadedSnapshotCache
+    ,bindirSuffix
+    ,docDirSuffix
+    ,relDirHpc
+    ,relDirLib
+    ,relDirShare
+    ,relDirLibexec
+    ,relDirEtc
+    ,setupGhciShimCode
+    ,relDirSetupExeCache
+    ,relDirSetupExeSrc
+    ,relFileConfigure
+    ,relDirDist
+    ,relFileSetupMacrosH
+    ,relDirSetup
+    ,relFileSetupLower
+    ,relDirMingw
+    ,relDirMingw32
+    ,relDirMingw64
+    ,relDirLocal
+    ,relDirUsr
+    ,relDirInclude
+    ,relFileDockerDb
+    ,relFileIndexHtml
+    ,relDirAll
+    ,relFilePackageCache
+    ,relFileDockerfile
+    ,relDirHaskellStackGhci
+    ,relFileGhciScript
+    ,relFileLockfile
+    ,relDirCombined
+    ,relFileHpcIndexHtml
+    ,relDirCustom
+    ,relDirPackageConfInplace
+    ,relDirExtraTixFiles
+    ,relDirInstalledPackages
+    ,relDirPrecompiled
+    ,backupUrlRelPath
+    ,relDirDotLocal
+    ,relDirDotSsh
+    ,relDirDotStackProgName
+    ,relDirUnderHome
+    ,relDirSrc
+    ,relFileLibtinfoSo5
+    ,relFileLibtinfoSo6
+    ,relFileLibncurseswSo6
+    ,relFileLibgmpSo10
+    ,relFileLibgmpSo3
+    ,relDirNewCabal
+    ,relFileSetupExe
+    ,relFileSetupUpper
+    ,relFile7zexe
+    ,relFile7zdll
+    ,relFileMainHs
+    ,relFileStack
+    ,relFileStackDotExe
+    ,relFileStackDotTmpDotExe
+    ,relFileStackDotTmp
+    ,ghcShowOptionsOutput
     )
     where
 
 import           Data.Char (toUpper)
+import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import qualified Data.Set as Set
 import           Distribution.Package (mkPackageName)
+import qualified Hpack.Config as Hpack
+import qualified Language.Haskell.TH.Syntax as TH (runIO, lift)
 import           Path as FL
 import           Stack.Prelude
 import           Stack.Types.Compiler
+import           System.Permissions (osIsWindows)
+import           System.Process (readProcess)
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -56,10 +145,6 @@ haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 -- | Name of the 'stack' program, uppercased
 stackProgNameUpper :: String
 stackProgNameUpper = map toUpper stackProgName
-
--- | Name of the 'stack' program.
-stackProgName :: String
-stackProgName = "stack"
 
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
@@ -241,11 +326,267 @@ maxTerminalWidth = 200
 defaultTerminalWidth :: Int
 defaultTerminalWidth = 100
 
--- | True if using Windows OS.
-osIsWindows :: Bool
-osIsWindows =
-#ifdef WINDOWS
-  True
-#else
-  False
-#endif
+relFileSetupHs :: Path Rel File
+relFileSetupHs = $(mkRelFile "Setup.hs")
+
+relFileSetupLhs :: Path Rel File
+relFileSetupLhs = $(mkRelFile "Setup.lhs")
+
+relFileHpackPackageConfig :: Path Rel File
+relFileHpackPackageConfig = $(mkRelFile Hpack.packageConfig)
+
+relDirGlobalAutogen :: Path Rel Dir
+relDirGlobalAutogen = $(mkRelDir "global-autogen")
+
+relDirAutogen :: Path Rel Dir
+relDirAutogen = $(mkRelDir "autogen")
+
+relDirLogs :: Path Rel Dir
+relDirLogs = $(mkRelDir "logs")
+
+relFileCabalMacrosH :: Path Rel File
+relFileCabalMacrosH = $(mkRelFile "cabal_macros.h")
+
+relDirBuild :: Path Rel Dir
+relDirBuild = $(mkRelDir "build")
+
+relDirBin :: Path Rel Dir
+relDirBin = $(mkRelDir "bin")
+
+relDirPantry :: Path Rel Dir
+relDirPantry = $(mkRelDir "pantry")
+
+relDirPrograms :: Path Rel Dir
+relDirPrograms = $(mkRelDir "programs")
+
+relDirUpperPrograms :: Path Rel Dir
+relDirUpperPrograms = $(mkRelDir "Programs")
+
+relDirStackProgName :: Path Rel Dir
+relDirStackProgName = $(mkRelDir stackProgName)
+
+relDirStackWork :: Path Rel Dir
+relDirStackWork = $(mkRelDir ".stack-work")
+
+relFileReadmeTxt :: Path Rel File
+relFileReadmeTxt = $(mkRelFile "README.txt")
+
+relDirScript :: Path Rel Dir
+relDirScript = $(mkRelDir "script")
+
+relFileConfigYaml :: Path Rel File
+relFileConfigYaml = $(mkRelFile "config.yaml")
+
+relFileInstalledCacheBin :: Path Rel File
+relFileInstalledCacheBin = $(mkRelFile "installed-cache.bin")
+
+relDirSnapshots :: Path Rel Dir
+relDirSnapshots = $(mkRelDir "snapshots")
+
+relDirGlobalHints :: Path Rel Dir
+relDirGlobalHints = $(mkRelDir "global-hints")
+
+relFileGlobalHintsYaml :: Path Rel File
+relFileGlobalHintsYaml = $(mkRelFile "global-hints.yaml")
+
+relDirInstall :: Path Rel Dir
+relDirInstall = $(mkRelDir "install")
+
+relDirCompilerTools :: Path Rel Dir
+relDirCompilerTools = $(mkRelDir "compiler-tools")
+
+relDirHoogle :: Path Rel Dir
+relDirHoogle = $(mkRelDir "hoogle")
+
+relFileDatabaseHoo :: Path Rel File
+relFileDatabaseHoo = $(mkRelFile "database.hoo")
+
+relDirPkgdb :: Path Rel Dir
+relDirPkgdb = $(mkRelDir "pkgdb")
+
+relDirFlagCache :: Path Rel Dir
+relDirFlagCache = $(mkRelDir "flag-cache")
+
+relDirLoadedSnapshotCache :: Path Rel Dir
+relDirLoadedSnapshotCache = $(mkRelDir "loaded-snapshot-cached")
+
+-- | Suffix applied to an installation root to get the bin dir
+bindirSuffix :: Path Rel Dir
+bindirSuffix = relDirBin
+
+-- | Suffix applied to an installation root to get the doc dir
+docDirSuffix :: Path Rel Dir
+docDirSuffix = $(mkRelDir "doc")
+
+relDirHpc :: Path Rel Dir
+relDirHpc = $(mkRelDir "hpc")
+
+relDirLib :: Path Rel Dir
+relDirLib = $(mkRelDir "lib")
+
+relDirShare :: Path Rel Dir
+relDirShare = $(mkRelDir "share")
+
+relDirLibexec :: Path Rel Dir
+relDirLibexec = $(mkRelDir "libexec")
+
+relDirEtc :: Path Rel Dir
+relDirEtc = $(mkRelDir "etc")
+
+setupGhciShimCode :: ByteString
+setupGhciShimCode = $(do
+    path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+    embedFile path)
+
+relDirSetupExeCache :: Path Rel Dir
+relDirSetupExeCache = $(mkRelDir "setup-exe-cache")
+
+relDirSetupExeSrc :: Path Rel Dir
+relDirSetupExeSrc = $(mkRelDir "setup-exe-src")
+
+relFileConfigure :: Path Rel File
+relFileConfigure = $(mkRelFile "configure")
+
+relDirDist :: Path Rel Dir
+relDirDist = $(mkRelDir "dist")
+
+relFileSetupMacrosH :: Path Rel File
+relFileSetupMacrosH = $(mkRelFile "setup_macros.h")
+
+relDirSetup :: Path Rel Dir
+relDirSetup = $(mkRelDir "setup")
+
+relFileSetupLower :: Path Rel File
+relFileSetupLower = $(mkRelFile "setup")
+
+relDirMingw :: Path Rel Dir
+relDirMingw = $(mkRelDir "mingw")
+
+relDirMingw32 :: Path Rel Dir
+relDirMingw32 = $(mkRelDir "mingw32")
+
+relDirMingw64 :: Path Rel Dir
+relDirMingw64 = $(mkRelDir "mingw64")
+
+relDirLocal :: Path Rel Dir
+relDirLocal = $(mkRelDir "local")
+
+relDirUsr :: Path Rel Dir
+relDirUsr = $(mkRelDir "usr")
+
+relDirInclude :: Path Rel Dir
+relDirInclude = $(mkRelDir "include")
+
+relFileDockerDb :: Path Rel File
+relFileDockerDb = $(mkRelFile "docker.db")
+
+relFileIndexHtml :: Path Rel File
+relFileIndexHtml = $(mkRelFile "index.html")
+
+relDirAll :: Path Rel Dir
+relDirAll = $(mkRelDir "all")
+
+relFilePackageCache :: Path Rel File
+relFilePackageCache = $(mkRelFile "package.cache")
+
+relFileDockerfile :: Path Rel File
+relFileDockerfile = $(mkRelFile "Dockerfile")
+
+relDirHaskellStackGhci :: Path Rel Dir
+relDirHaskellStackGhci = $(mkRelDir "haskell-stack-ghci")
+
+relFileGhciScript :: Path Rel File
+relFileGhciScript = $(mkRelFile "ghci-script")
+
+relFileLockfile :: Path Rel File
+relFileLockfile = $(mkRelFile "lockfile")
+
+relDirCombined :: Path Rel Dir
+relDirCombined = $(mkRelDir "combined")
+
+relFileHpcIndexHtml :: Path Rel File
+relFileHpcIndexHtml = $(mkRelFile "hpc_index.html")
+
+relDirCustom :: Path Rel Dir
+relDirCustom = $(mkRelDir "custom")
+
+relDirPackageConfInplace :: Path Rel Dir
+relDirPackageConfInplace = $(mkRelDir "package.conf.inplace")
+
+relDirExtraTixFiles :: Path Rel Dir
+relDirExtraTixFiles = $(mkRelDir "extra-tix-files")
+
+relDirInstalledPackages :: Path Rel Dir
+relDirInstalledPackages = $(mkRelDir "installed-packages")
+
+relDirPrecompiled :: Path Rel Dir
+relDirPrecompiled = $(mkRelDir "precompiled")
+
+backupUrlRelPath :: Path Rel File
+backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
+
+relDirDotLocal :: Path Rel Dir
+relDirDotLocal = $(mkRelDir ".local")
+
+relDirDotSsh :: Path Rel Dir
+relDirDotSsh = $(mkRelDir ".ssh")
+
+relDirDotStackProgName :: Path Rel Dir
+relDirDotStackProgName = $(mkRelDir ('.' : stackProgName))
+
+relDirUnderHome :: Path Rel Dir
+relDirUnderHome = $(mkRelDir "_home")
+
+relDirSrc :: Path Rel Dir
+relDirSrc = $(mkRelDir "src")
+
+relFileLibtinfoSo5 :: Path Rel File
+relFileLibtinfoSo5 = $(mkRelFile "libtinfo.so.5")
+
+relFileLibtinfoSo6 :: Path Rel File
+relFileLibtinfoSo6 = $(mkRelFile "libtinfo.so.6")
+
+relFileLibncurseswSo6 :: Path Rel File
+relFileLibncurseswSo6 = $(mkRelFile "libncursesw.so.6")
+
+relFileLibgmpSo10 :: Path Rel File
+relFileLibgmpSo10 = $(mkRelFile "libgmp.so.10")
+
+relFileLibgmpSo3 :: Path Rel File
+relFileLibgmpSo3 = $(mkRelFile "libgmp.so.3")
+
+relDirNewCabal :: Path Rel Dir
+relDirNewCabal = $(mkRelDir "new-cabal")
+
+relFileSetupExe :: Path Rel File
+relFileSetupExe = $(mkRelFile "Setup.exe")
+
+relFileSetupUpper :: Path Rel File
+relFileSetupUpper = $(mkRelFile "Setup")
+
+relFile7zexe :: Path Rel File
+relFile7zexe = $(mkRelFile "7z.exe")
+
+relFile7zdll :: Path Rel File
+relFile7zdll = $(mkRelFile "7z.dll")
+
+relFileMainHs :: Path Rel File
+relFileMainHs = $(mkRelFile "Main.hs")
+
+relFileStackDotExe :: Path Rel File
+relFileStackDotExe = $(mkRelFile "stack.exe")
+
+relFileStackDotTmpDotExe :: Path Rel File
+relFileStackDotTmpDotExe = $(mkRelFile "stack.tmp.exe")
+
+relFileStackDotTmp :: Path Rel File
+relFileStackDotTmp = $(mkRelFile "stack.tmp")
+
+relFileStack :: Path Rel File
+relFileStack = $(mkRelFile "stack")
+
+-- Technically, we should be consulting the user's current ghc,
+-- but that would require loading up a BuildConfig.
+ghcShowOptionsOutput :: [String]
+ghcShowOptionsOutput =
+  $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift . lines)

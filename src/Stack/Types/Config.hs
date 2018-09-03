@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
@@ -10,16 +9,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -1193,7 +1188,7 @@ getProjectWorkDir = do
 
 -- | File containing the installed cache, see "Stack.PackageDump"
 configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
-configInstalledCache = liftM (</> $(mkRelFile "installed-cache.bin")) getProjectWorkDir
+configInstalledCache = liftM (</> relFileInstalledCacheBin) getProjectWorkDir
 
 -- | Relative directory for the platform identifier
 platformOnlyRelDir
@@ -1209,13 +1204,13 @@ snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path A
 snapshotsDir = do
     root <- view stackRootL
     platform <- platformGhcRelDir
-    return $ root </> $(mkRelDir "snapshots") </> platform
+    return $ root </> relDirSnapshots </> platform
 
 -- | Cached global hints file
 globalHintsFile :: (MonadReader env m, HasConfig env) => m (Path Abs File)
 globalHintsFile = do
   root <- view stackRootL
-  pure $ root </> $(mkRelDir "global-hints") </> $(mkRelFile "global-hints.yaml")
+  pure $ root </> relDirGlobalHints </> relFileGlobalHintsYaml
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1223,14 +1218,14 @@ installationRootDeps = do
     root <- view stackRootL
     -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
     psc <- platformSnapAndCompilerRel
-    return $ root </> $(mkRelDir "snapshots") </> psc
+    return $ root </> relDirSnapshots </> psc
 
 -- | Installation root for locals
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-    return $ workDir </> $(mkRelDir "install") </> psc
+    return $ workDir </> relDirInstall </> psc
 
 -- | Installation root for compiler tools
 bindirCompilerTools :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1241,7 +1236,7 @@ bindirCompilerTools = do
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
         view stackRootL config </>
-        $(mkRelDir "compiler-tools") </>
+        relDirCompilerTools </>
         platform </>
         compiler </>
         bindirSuffix
@@ -1251,13 +1246,13 @@ hoogleRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs
 hoogleRoot = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-    return $ workDir </> $(mkRelDir "hoogle") </> psc
+    return $ workDir </> relDirHoogle </> psc
 
 -- | Get the hoogle database path.
 hoogleDatabasePath :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs File)
 hoogleDatabasePath = do
     dir <- hoogleRoot
-    return (dir </> $(mkRelFile "database.hoo"))
+    return (dir </> relFileDatabaseHoo)
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
@@ -1306,12 +1301,9 @@ platformGhcVerOnlyRelDirStr = do
 -- SHA1 hash of the path used on other architectures, encode with base
 -- 16 and take first 8 symbols of it.
 useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
-useShaPathOnWindows =
-#ifdef mingw32_HOST_OS
-    shaPath
-#else
-    return
-#endif
+useShaPathOnWindows
+  | osIsWindows = shaPath
+  | otherwise = pure
 
 shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
 shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath
@@ -1342,13 +1334,13 @@ compilerVersionDir = do
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
-    return $ root </> $(mkRelDir "pkgdb")
+    return $ root </> relDirPkgdb
 
 -- | Package database for installing local packages into
 packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 packageDatabaseLocal = do
     root <- installationRootLocal
-    return $ root </> $(mkRelDir "pkgdb")
+    return $ root </> relDirPkgdb
 
 -- | Extra package databases
 packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
@@ -1358,7 +1350,7 @@ packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
 flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 flagCacheLocal = do
     root <- installationRootLocal
-    return $ root </> $(mkRelDir "flag-cache")
+    return $ root </> relDirFlagCache
 
 -- | Where to store 'LoadedSnapshot' caches
 configLoadedSnapshotCache
@@ -1375,7 +1367,7 @@ configLoadedSnapshotCache sd gis = do
             GISSnapshotHints -> "__snapshot_hints__"
             GISCompiler cv -> compilerVersionString cv
     -- Yes, cached plans differ based on platform
-    return (root </> $(mkRelDir "loaded-snapshot-cache") </> platform </> gis' </> file)
+    return (root </> relDirLoadedSnapshotCache </> platform </> gis' </> file)
 
 -- | Where do we get information on global packages for loading up a
 -- 'LoadedSnapshot'?
@@ -1385,20 +1377,12 @@ data GlobalInfoSource
   | GISCompiler ActualCompiler
   -- ^ Look up the actual information in the installed compiler
 
--- | Suffix applied to an installation root to get the bin dir
-bindirSuffix :: Path Rel Dir
-bindirSuffix = $(mkRelDir "bin")
-
--- | Suffix applied to an installation root to get the doc dir
-docDirSuffix :: Path Rel Dir
-docDirSuffix = $(mkRelDir "doc")
-
 -- | Where HPC reports and tix files get stored.
 hpcReportDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
              => m (Path Abs Dir)
 hpcReportDir = do
    root <- installationRootLocal
-   return $ root </> $(mkRelDir "hpc")
+   return $ root </> relDirHpc
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --

@@ -53,7 +53,6 @@ import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.PrettyPrint
-import           Stack.Constants
 import           Stack.Package
 import           Stack.Types.Build
 import           Stack.Types.Config

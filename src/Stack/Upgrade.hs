@@ -1,11 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade
     ( upgrade
     , UpgradeOpts
@@ -21,10 +18,8 @@ import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
--- Following import is redundant on non-Windows operating systems
-#ifdef WINDOWS
+import           Stack.Constants
 import           Stack.DefaultColorWhen (defaultColorWhen)
-#endif
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.Config
@@ -207,14 +202,12 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
-#ifdef WINDOWS
                 -- On Windows 10, an upstream issue with the `git clone` command
                 -- means that command clears, but does not then restore, the
                 -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
                 -- The folowing hack re-enables the lost ANSI-capability.
-                _ <- liftIO defaultColorWhen
-#endif
-                return $ Just $ tmp </> $(mkRelDir "stack")
+                when osIsWindows $ void $ liftIO defaultColorWhen
+                return $ Just $ tmp </> relDirStackProgName
       Nothing -> do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
@@ -238,7 +231,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
       loadConfig
       gConfigMonoid
       mresolver
-      (SYLOverride $ dir </> $(mkRelFile "stack.yaml")) $ \lc -> do
+      (SYLOverride $ dir </> stackDotYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
         envConfig1 <- runRIO bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>

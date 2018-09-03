@@ -4,9 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE TupleSections         #-}
 
 -- | Generate HPC (Haskell Program Coverage) reports
@@ -35,6 +33,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Build.Target
 import           Stack.Config (getLocalPackages)
+import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Package
 import           Stack.PrettyPrint
@@ -194,7 +193,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     generateHpcErrorReport reportDir (msg True)
                     return Nothing
                 else do
-                    let reportPath = reportDir </> $(mkRelFile "hpc_index.html")
+                    let reportPath = reportDir </> relFileHpcIndexHtml
                     -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines (logInfo . displayBytesUtf8)
                     -- Generate the markup.
@@ -261,7 +260,7 @@ generateHpcReportForTargets opts = do
         throwString "Not generating combined report, because no targets or tix files are specified."
     outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
-        Nothing -> return (outputDir </> $(mkRelDir "combined/custom"))
+        Nothing -> return (outputDir </> relDirCombined </> relDirCustom)
         Just destDir -> do
             dest <- resolveDir' destDir
             ensureDir dest
@@ -287,7 +286,7 @@ generateHpcUnifiedReport = do
             return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
     extraTixFiles <- findExtraTixFiles
     let tixFiles = tixFiles0  ++ extraTixFiles
-        reportDir = outputDir </> $(mkRelDir "combined/all")
+        reportDir = outputDir </> relDirCombined </> relDirAll
     if length tixFiles < 2
         then logInfo $
             (if null tixFiles then "No tix files" else "Only one tix file") <>
@@ -342,13 +341,13 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
 generateHpcMarkupIndex :: HasEnvConfig env => RIO env ()
 generateHpcMarkupIndex = do
     outputDir <- hpcReportDir
-    let outputFile = outputDir </> $(mkRelFile "index.html")
+    let outputFile = outputDir </> relFileIndexHtml
     ensureDir outputDir
     (dirs, _) <- listDir outputDir
     rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
         (subdirs, _) <- listDir dir
         forM subdirs $ \subdir -> do
-            let indexPath = subdir </> $(mkRelFile "hpc_index.html")
+            let indexPath = subdir </> relFileHpcIndexHtml
             exists' <- doesFileExist indexPath
             if not exists' then return Nothing else do
                 relPath <- stripProperPrefix outputDir indexPath
@@ -395,7 +394,7 @@ generateHpcMarkupIndex = do
 generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Utf8Builder -> m ()
 generateHpcErrorReport dir err = do
     ensureDir dir
-    let fp = toFilePath (dir </> $(mkRelFile "hpc_index.html"))
+    let fp = toFilePath (dir </> relFileHpcIndexHtml)
     writeFileUtf8Builder fp $
         "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"></head><body>" <>
         "<h1>HPC Report Generation Error</h1>" <>
@@ -431,7 +430,7 @@ findPackageFieldForBuiltPackage
     -> RIO env (Either Text [Text])
 findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
     distDir <- distDirFromDir pkgDir
-    let inplaceDir = distDir </> $(mkRelDir "package.conf.inplace")
+    let inplaceDir = distDir </> relDirPackageConfInplace
         pkgIdStr = packageIdentifierString pkgId
         notFoundErr = return $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
         extractField path = do
@@ -488,7 +487,7 @@ displayReportPath report reportPath =
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do
     outputDir <- hpcReportDir
-    let dir = outputDir </> $(mkRelDir "extra-tix-files")
+    let dir = outputDir </> relDirExtraTixFiles
     dirExists <- doesDirExist dir
     if dirExists
         then do

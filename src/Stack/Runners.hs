@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | Utilities for running stack commands.
 module Stack.Runners
@@ -25,6 +24,7 @@ import           Stack.Prelude
 import           Path
 import           Path.IO
 import           Stack.Config
+import           Stack.Constants
 import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
@@ -60,7 +60,7 @@ withUserFileLock go@GlobalOpts{} dir act = do
     let toLock = lookup "STACK_LOCK" env == Just "true"
     if toLock
         then do
-            let lockfile = $(mkRelFile "lockfile")
+            let lockfile = relFileLockfile
             let pth = dir </> lockfile
             ensureDir dir
             -- Just in case of asynchronous exceptions, we need to be careful

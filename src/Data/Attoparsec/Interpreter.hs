@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
 {- |  This module implements parsing of additional arguments embedded in a
       comment when stack is invoked as a script interpreter
 
@@ -62,7 +61,6 @@ import           Conduit
 import           Data.Conduit.Attoparsec
 import           Data.List (intercalate)
 import           Data.Text (pack)
-import           Stack.Constants
 import           Stack.Prelude
 import           System.FilePath (takeExtension)
 import           System.IO (stderr, hPutStrLn)
@@ -146,11 +144,7 @@ getInterpreterArgs file = do
 
     decodeError e =
       case e of
-#if MIN_VERSION_conduit_extra(1,2,0)
         ParseError ctxs _ (Position line col _) ->
-#else
-        ParseError ctxs _ (Position line col) ->
-#endif
           if null ctxs
           then "Parse error"
           else ("Expecting " ++ intercalate " or " ctxs)

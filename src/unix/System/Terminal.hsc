@@ -2,10 +2,13 @@
 
 module System.Terminal
 ( getTerminalWidth
+, fixCodePage
+, hIsTerminalDeviceOrMinTTY
 ) where
 
 import           Foreign
 import           Foreign.C.Types
+import           RIO (MonadIO, Handle, hIsTerminalDevice)
 
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -33,3 +36,11 @@ getTerminalWidth =
       else do
         WindowWidth w <- peek p
         return . Just . fromIntegral $ w
+
+fixCodePage :: x -> y -> a -> a
+fixCodePage _ _ = id
+
+-- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
+-- devices, but isMinTTYHandle does.
+hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
+hIsTerminalDeviceOrMinTTY = hIsTerminalDevice
