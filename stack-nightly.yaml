@@ -12,6 +12,11 @@ extra-deps:
   subdirs:
   - store
 
+  # NOTE: Removing the following info is a nice way to repro
+  # issue https://github.com/commercialhaskell/stack/issues/4266
+  size: 56404
+  sha256: 18849d0766d9b4b4fd73ade6fe742b15b2e9d8c69ac00a3ca9e67b1e9044eaa9
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
