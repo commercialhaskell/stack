@@ -13,11 +13,7 @@ packages:
 - yaml-0.10.1.1@rev:0 #for hpack-0.30
 - tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
 - hackage-security-0.5.3.0@rev:2
-
-- github: snoyberg/http-api-data
-  commit: 37bbe89519c07ccf14f5897cdc2b73695217f90e
-  size: 22160
-  sha256: 0aa581e5c96a19fe73d8ea6ccee276d33a03607a70a317fe02a70eed3744618c
+- http-api-data-0.3.8.1@rev:1
 
 - github: snoyberg/cabal-doctest
   commit: 18360c6bf926ef2ea3841d5f7d20583dae225c24

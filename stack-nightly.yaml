@@ -7,11 +7,7 @@ packages:
 
 extra-deps:
 - Cabal-2.4.0.0@rev:0
-
-- github: snoyberg/http-api-data
-  commit: 37bbe89519c07ccf14f5897cdc2b73695217f90e
-  size: 22160
-  sha256: 0aa581e5c96a19fe73d8ea6ccee276d33a03607a70a317fe02a70eed3744618c
+- http-api-data-0.3.8.1@rev:1
 
 - github: snoyberg/cabal-doctest
   commit: 18360c6bf926ef2ea3841d5f7d20583dae225c24
