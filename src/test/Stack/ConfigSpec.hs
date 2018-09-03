@@ -133,6 +133,7 @@ spec = beforeAll setup $ do
       boptsCabalVerbose `shouldBe` True
 
     it "finds the config file in a parent directory" $ inTempDir $ do
+      writeFile "package.yaml" "name: foo"
       writeFile (toFilePath stackDotYaml) sampleConfig
       parentDir <- getCurrentDirectory >>= parseAbsDir
       let childDir = "child"
@@ -146,6 +147,7 @@ spec = beforeAll setup $ do
       withSystemTempDir "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
+        writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
         withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
           BuildConfig{..} <- lcLoadBuildConfig Nothing
           bcStackYaml `shouldBe` dir </> stackDotYaml
@@ -156,8 +158,10 @@ spec = beforeAll setup $ do
         let childRel = either impureThrow id (parseRelDir "child")
             yamlRel = childRel </> either impureThrow id (parseRelFile "some-other-name.config")
             yamlAbs = parentDir </> yamlRel
+            packageYaml = childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
+        writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
             BuildConfig{..} <- lcLoadBuildConfig Nothing
             bcStackYaml `shouldBe` yamlAbs

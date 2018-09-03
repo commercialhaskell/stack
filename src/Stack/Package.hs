@@ -12,9 +12,7 @@
 -- | Dealing with Cabal.
 
 module Stack.Package
-  (readPackageDir
-  ,readPackageDescriptionDir
-  ,readDotBuildinfo
+  (readDotBuildinfo
   ,resolvePackage
   ,packageFromPackageDescription
   ,Package(..)
@@ -99,28 +97,6 @@ instance HasProcessContext Ctx where
 instance HasBuildConfig Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
-
--- | Reads and exposes the package information
-readPackageDir
-  :: forall env. HasConfig env
-  => PackageConfig
-  -> Path Abs Dir
-  -> PrintWarnings
-  -> RIO env (Package, Path Abs File)
-readPackageDir packageConfig dir printWarnings =
-  first (resolvePackage packageConfig) <$> loadCabalFilePath dir printWarnings
-
--- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
--- from given directory.
-readPackageDescriptionDir
-  :: forall env. HasConfig env
-  => PackageConfig
-  -> Path Abs Dir
-  -> PrintWarnings
-  -> RIO env (GenericPackageDescription, PackageDescriptionPair)
-readPackageDescriptionDir config pkgDir printWarnings = do
-    (gdesc, _) <- loadCabalFilePath pkgDir printWarnings
-    return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
@@ -1409,9 +1385,10 @@ mkLocalPackageView
   -> ResolvedPath Dir
   -> RIO env LocalPackageView
 mkLocalPackageView printWarnings dir = do
-  (gpd, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir) printWarnings
+  (gpd, name, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
   return LocalPackageView
     { lpvCabalFP = cabalfp
-    , lpvGPD = gpd
+    , lpvGPD' = gpd printWarnings
     , lpvResolvedDir = dir
+    , lpvName = name
     }

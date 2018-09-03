@@ -859,7 +859,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
       getRunCmd args = do
-          pkgComponents <- liftM (map lpvComponents . Map.elems . lpProject) getLocalPackages
+          packages <- view $ buildConfigL.to bcPackages
+          pkgComponents <- for (Map.elems packages) lpvComponents
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
                              []   -> (firstExe, args)
@@ -914,12 +915,12 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
 -- | List packages in the project.
 idePackagesCmd :: () -> GlobalOpts -> IO ()
 idePackagesCmd () go =
-    withBuildConfig go IDE.listPackages
+    withBuildConfig go IDE.listPackages -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: () -> GlobalOpts -> IO ()
 ideTargetsCmd () go =
-    withBuildConfig go IDE.listTargets
+    withBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

@@ -339,12 +339,9 @@ loadCabalFile
   => PackageLocation
   -> RIO env GenericPackageDescription
 loadCabalFile (PLImmutable loc) = loadCabalFileImmutable loc
-loadCabalFile (PLMutable rfp) = fst <$> loadCabalFilePath (resolvedAbsolute rfp) NoPrintWarnings
-
--- | Should we print warnings when loading a cabal file?
---
--- @since 0.1.0.0
-data PrintWarnings = YesPrintWarnings | NoPrintWarnings
+loadCabalFile (PLMutable rfp) = do
+  (gpdio, _, _) <- loadCabalFilePath (resolvedAbsolute rfp)
+  liftIO $ gpdio NoPrintWarnings
 
 -- | Parse the cabal file for the package inside the given
 -- directory. Performs various sanity checks, such as the file name
@@ -354,33 +351,41 @@ data PrintWarnings = YesPrintWarnings | NoPrintWarnings
 loadCabalFilePath
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Path Abs Dir -- ^ project directory, with a cabal file or hpack file
-  -> PrintWarnings
-  -> RIO env (GenericPackageDescription, Path Abs File)
-loadCabalFilePath dir printWarnings = do
+  -> RIO env
+       ( PrintWarnings -> IO GenericPackageDescription
+       , PackageName
+       , Path Abs File
+       )
+loadCabalFilePath dir = do
   ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
-  mcached <- atomicModifyIORef' ref $ \m ->
-    case (Map.lookup dir m, printWarnings) of
-      (Nothing, _) -> (m, Nothing)
-      (Just (gpd, file, warnings@(_:_)), YesPrintWarnings) ->
-        -- There are warnings and we're going to print them, so remove
-        -- from the cache.
-        (Map.insert dir (gpd, file, []) m, Just (gpd, file, warnings))
-      (Just triple, _) -> (m, Just triple)
+  mcached <- Map.lookup dir <$> readIORef ref
   case mcached of
-    Just (gpd, cabalfp, warnings) -> do
-      mapM_ (logWarn . toPretty cabalfp) warnings
-      pure (gpd, cabalfp)
+    Just triple -> pure triple
     Nothing -> do
-      cabalfp <- findOrGenerateCabalFile dir
-      bs <- liftIO $ B.readFile $ toFilePath cabalfp
-      (warnings0, gpd) <- rawParseGPD (Right cabalfp) bs
+      (name, cabalfp) <- findOrGenerateCabalFile dir
+      gpdRef <- newIORef Nothing
+      run <- askRunInIO
+      let gpdio = run . getGPD cabalfp gpdRef
+          triple = (gpdio, name, cabalfp)
+      atomicModifyIORef' ref $ \m -> (Map.insert dir triple m, triple)
+  where
+    getGPD cabalfp gpdRef printWarnings = do
+      mpair <- readIORef gpdRef
+      (warnings0, gpd) <-
+        case mpair of
+          Just pair -> pure pair
+          Nothing -> do
+            bs <- liftIO $ B.readFile $ toFilePath cabalfp
+            (warnings0, gpd) <- rawParseGPD (Right cabalfp) bs
+            checkCabalFileName (gpdPackageName gpd) cabalfp
+            pure (warnings0, gpd)
       warnings <-
         case printWarnings of
-          YesPrintWarnings -> mapM_ (logWarn . toPretty cabalfp) warnings0 $> warnings0
+          YesPrintWarnings -> mapM_ (logWarn . toPretty cabalfp) warnings0 $> []
           NoPrintWarnings -> pure warnings0
-      checkCabalFileName (gpdPackageName gpd) cabalfp
-      atomicModifyIORef' ref $ \m -> (Map.insert dir (gpd, cabalfp, warnings) m, (gpd, cabalfp))
-  where
+      writeIORef gpdRef $ Just (warnings, gpd)
+      pure gpd
+
     toPretty :: Path Abs File -> PWarning -> Utf8Builder
     toPretty src (PWarning _type pos msg) =
       "Cabal file warning in" <>
@@ -408,28 +413,26 @@ loadCabalFilePath dir printWarnings = do
 findOrGenerateCabalFile
     :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Path Abs Dir -- ^ package directory
-    -> RIO env (Path Abs File)
+    -> RIO env (PackageName, Path Abs File)
 findOrGenerateCabalFile pkgDir = do
     hpack pkgDir
-    findCabalFile1
-  where
-    findCabalFile1 :: RIO env (Path Abs File)
-    findCabalFile1 = findCabalFile2 >>= either throwIO return
-
-    findCabalFile2 :: RIO env (Either PantryException (Path Abs File))
-    findCabalFile2 = do
-        files <- filter (flip hasExtension "cabal" . toFilePath) . snd
-             <$> listDir pkgDir
-        return $ case files of
-            [] -> Left $ NoCabalFileFound pkgDir
-            [x] -> Right x
-            -- If there are multiple files, ignore files that start with
-            -- ".". On unixlike environments these are hidden, and this
-            -- character is not valid in package names. The main goal is
-            -- to ignore emacs lock files - see
-            -- https://github.com/commercialhaskell/stack/issues/1897.
-            (filter (not . ("." `List.isPrefixOf`) . toFilePath . filename) -> [x]) -> Right x
-            _:_ -> Left $ MultipleCabalFilesFound pkgDir files
+    files <- filter (flip hasExtension "cabal" . toFilePath) . snd
+         <$> listDir pkgDir
+    -- If there are multiple files, ignore files that start with
+    -- ".". On unixlike environments these are hidden, and this
+    -- character is not valid in package names. The main goal is
+    -- to ignore emacs lock files - see
+    -- https://github.com/commercialhaskell/stack/issues/1897.
+    let isHidden ('.':_) = True
+        isHidden _ = False
+    case filter (not . isHidden . toFilePath . filename) files of
+        [] -> throwIO $ NoCabalFileFound pkgDir
+        [x] -> maybe
+          (throwIO $ InvalidCabalFilePath x)
+          (\pn -> pure $ (pn, x)) $
+            List.stripSuffix ".cabal" (toFilePath (filename x)) >>=
+            parsePackageName
+        _:_ -> throwIO $ MultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Generate .cabal file from package.yaml, if necessary.

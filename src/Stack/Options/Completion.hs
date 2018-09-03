@@ -19,7 +19,6 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
@@ -58,30 +57,31 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
               runRIO envConfig (inner input)
 
 targetCompleter :: Completer
-targetCompleter = buildConfigCompleter $ \input ->
-      filter (input `isPrefixOf`)
-    . concatMap allComponentNames
-    . Map.toList
-    . lpProject
-  <$> getLocalPackages
+targetCompleter = buildConfigCompleter $ \input -> do
+  packages <- view $ buildConfigL.to bcPackages
+  comps <- for packages lpvComponents
+  pure
+    $ filter (input `isPrefixOf`)
+    $ concatMap allComponentNames
+    $ Map.toList comps
   where
-    allComponentNames (name, lpv) =
-        map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
+    allComponentNames (name, comps) =
+        map (T.unpack . renderPkgComponent . (name,)) (Set.toList comps)
 
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- fmap lpProject getLocalPackages
     bconfig <- view buildConfigL
+    gpds <- for (bcPackages bconfig) lpvGPD
     let wildcardFlags
             = nubOrd
-            $ concatMap (\(name, lpv) ->
-                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags (lpvGPD lpv)))
-            $ Map.toList lpvs
+            $ concatMap (\(name, gpd) ->
+                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags gpd))
+            $ Map.toList gpds
         normalFlags
-            = concatMap (\(name, lpv) ->
+            = concatMap (\(name, gpd) ->
                 map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
-                    (C.genPackageFlags (lpvGPD lpv)))
-            $ Map.toList lpvs
+                    (C.genPackageFlags gpd))
+            $ Map.toList gpds
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
              in (if flagEnabled name fl then "-" else "") ++ flname
@@ -96,14 +96,15 @@ flagCompleter = buildConfigCompleter $ \input -> do
             _ -> normalFlags
 
 projectExeCompleter :: Completer
-projectExeCompleter = buildConfigCompleter $ \input ->
-      filter (input `isPrefixOf`)
-    . nubOrd
-    . concatMap
-        (\(_, lpv) -> map
+projectExeCompleter = buildConfigCompleter $ \input -> do
+  packages <- view $ buildConfigL.to bcPackages
+  gpds <- Map.traverseWithKey (const lpvGPD) packages
+  pure
+    $ filter (input `isPrefixOf`)
+    $ nubOrd
+    $ concatMap
+        (\gpd -> map
           (C.unUnqualComponentName . fst)
-          (C.condExecutables (lpvGPD lpv))
+          (C.condExecutables gpd)
         )
-    . Map.toList
-    . lpProject
-  <$> getLocalPackages
+        gpds

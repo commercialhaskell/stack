@@ -230,14 +230,15 @@ resolveRawTarget globals snap deps locals (ri, rt) =
     isCompNamed t1 (CTest t2) = t1 == t2
     isCompNamed t1 (CBench t2) = t1 == t2
 
-    go (RTComponent cname) = return $
+    go (RTComponent cname) = do
         -- Associated list from component name to package that defines
         -- it. We use an assoc list and not a Map so we can detect
         -- duplicates.
-        let allPairs = concatMap
-                (\(name, lpv) -> map (name,) $ Set.toList $ lpvComponents lpv)
-                (Map.toList locals)
-         in case filter (isCompNamed cname . snd) allPairs of
+        allPairs <- fmap concat $ flip Map.traverseWithKey locals
+          $ \name lpv -> do
+              comps <- lpvComponents lpv
+              pure $ map (name, ) $ Set.toList comps
+        pure $ case filter (isCompNamed cname . snd) allPairs of
                 [] -> Left $ cname `T.append` " doesn't seem to be a local target. Run 'stack ide targets' for a list of available targets"
                 [(name, comp)] -> Right ResolveResult
                   { rrName = name
@@ -252,13 +253,14 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                     , ", matches: "
                     , T.pack $ show matches
                     ]
-    go (RTPackageComponent name ucomp) = return $
+    go (RTPackageComponent name ucomp) =
         case Map.lookup name locals of
-            Nothing -> Left $ T.pack $ "Unknown local package: " ++ packageNameString name
-            Just lpv ->
-                case ucomp of
+            Nothing -> pure $ Left $ T.pack $ "Unknown local package: " ++ packageNameString name
+            Just lpv -> do
+                comps <- lpvComponents lpv
+                pure $ case ucomp of
                     ResolvedComponent comp
-                        | comp `Set.member` lpvComponents lpv -> Right ResolveResult
+                        | comp `Set.member` comps -> Right ResolveResult
                             { rrName = name
                             , rrRaw = ri
                             , rrComponent = Just comp
@@ -272,7 +274,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                             , packageNameString name
                             ]
                     UnresolvedComponent comp ->
-                        case filter (isCompNamed comp) $ Set.toList $ lpvComponents lpv of
+                        case filter (isCompNamed comp) $ Set.toList comps of
                             [] -> Left $ T.concat
                                 [ "Component "
                                 , comp
@@ -511,12 +513,13 @@ parseTargets needTargets boptscli = do
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
     -- command line
+    projectPackages' <- for (lpProject lp) $ \lpv -> do
+      gpd <- lpvGPD lpv
+      pure (gpd, PLMutable $ lpvResolvedDir lpv, Just lpv)
     let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe LocalPackageView)
         allLocals = Map.unions
           [ -- project packages
-            Map.map
-              (\lpv -> (lpvGPD lpv, PLMutable $ lpvResolvedDir lpv, Just lpv))
-              (lpProject lp)
+            projectPackages'
           , -- added deps take precendence over local deps
             addedDeps'
           , -- added deps take precendence over local deps

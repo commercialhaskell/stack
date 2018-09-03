@@ -524,9 +524,10 @@ cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
     logInfo "Using cabal packages:"
     logInfo $ formatGroup relpaths
 
-    packages <- map (\(x, y) -> (y, x)) <$>
-                mapM (flip loadCabalFilePath YesPrintWarnings)
-                cabaldirs
+    packages <- for cabaldirs $ \dir -> do
+      (gpdio, _name, cabalfp) <- loadCabalFilePath dir
+      gpd <- liftIO $ gpdio YesPrintWarnings
+      pure (cabalfp, gpd)
 
     -- package name cannot be empty or missing otherwise
     -- it will result in cabal solver failure.

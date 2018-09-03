@@ -184,6 +184,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
     config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
+    gpkg <- lpvGPD lpv
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
@@ -256,7 +257,6 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         -- This allows us to do an optimization where these are passed
         -- if the deps are present. This can avoid doing later
         -- unnecessary reconfigures.
-        gpkg = lpvGPD lpv
         pkg = resolvePackage config gpkg
         btpkg
             | Set.null tests && Set.null benches = Nothing

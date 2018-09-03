@@ -23,6 +23,7 @@ module Pantry.Types
   , PackageIdentifier (..)
   , Revision (..)
   , CabalFileInfo (..)
+  , PrintWarnings (..)
   , PackageNameP (..)
   , VersionP (..)
   , PackageIdentifierRevision (..)
@@ -185,16 +186,23 @@ data PantryConfig = PantryConfig
       !(IORef
         (Map
          (Path Abs Dir)
-         (GenericPackageDescription, Path Abs File, [PWarning])
+         (PrintWarnings -> IO GenericPackageDescription, PackageName, Path Abs File)
         )
        )
-  -- ^ Same. We also keep a list of warnings which haven't been
-  -- printed yet, so that if a file is first loaded with warnings
-  -- turned off, and then again with warnings turned on, we print the
-  -- warnings.
+  -- ^ Cache for mutable packages. We want to allow for an optimization:
+  -- deferring parsing of the 'GenericPackageDescription' until its actually
+  -- needed. Therefore, we keep the filepath and the 'PackageName' derived from
+  -- that filepath. When the @IO GenericPackageDescription@ is run, it will
+  -- ensure that the @PackageName@ matches the value inside the cabal file, and
+  -- print out any warnings that still need to be printed.
   , pcConnectionCount :: !Int
   -- ^ concurrently open downloads
   }
+
+-- | Should we print warnings when loading a cabal file?
+--
+-- @since 0.1.0.0
+data PrintWarnings = YesPrintWarnings | NoPrintWarnings
 
 -- | Wraps a value which potentially contains relative paths. Needs to
 -- be provided with a base directory to resolve these paths.
@@ -622,6 +630,7 @@ data PantryException
   | MismatchedCabalFileForHackage !PackageIdentifierRevision !(Mismatch PackageIdentifier)
   | PackageNameParseFail !Text
   | PackageVersionParseFail !Text
+  | InvalidCabalFilePath !(Path Abs File)
 
   deriving Typeable
 instance Exception PantryException where
@@ -787,6 +796,9 @@ instance Display PantryException where
     "Invalid package name: " <> display t
   display (PackageVersionParseFail t) =
     "Invalid version: " <> display t
+  display (InvalidCabalFilePath fp) =
+    "File path contains a name which is not a valid package name: " <>
+    fromString (toFilePath fp)
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
