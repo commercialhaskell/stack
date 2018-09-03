@@ -806,7 +806,7 @@ displayFuzzy (FRVersionNotFound pirs) =
   commaSeparated (NE.map display pirs) <>
   "."
 displayFuzzy (FRRevisionNotFound pirs) =
-  "The specified revision was not found.\nPossible candidates: " <>
+  "\nThe specified revision was not found.\nPossible candidates: " <>
   commaSeparated (NE.map display pirs) <>
   "."
 
