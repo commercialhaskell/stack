@@ -96,6 +96,7 @@ test-suite spec
       Pantry.ArchiveSpec
       Pantry.BuildPlanSpec
       Pantry.CabalSpec
+      Pantry.FileSpec
       Pantry.HackageSpec
       Pantry.Internal.StaticBytesSpec
       Pantry.InternalSpec

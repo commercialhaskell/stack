@@ -36,9 +36,9 @@ module Stack.Types.Config
   ,LocalPackages(..)
   ,LocalPackageView(..)
   ,lpvRoot
-  ,lpvName
   ,lpvVersion
   ,lpvComponents
+  ,lpvGPD
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -486,7 +486,7 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: ![(ResolvedPath Dir, IO LocalPackageView)]
+    , bcPackages :: !(Map PackageName LocalPackageView)
       -- ^ Local packages
     , bcDependencies :: ![PackageLocation]
       -- ^ Extra dependencies specified in configuration.
@@ -546,39 +546,36 @@ data LocalPackages = LocalPackages
 data LocalPackageView = LocalPackageView
     { lpvCabalFP    :: !(Path Abs File)
     , lpvResolvedDir :: !(ResolvedPath Dir)
-    , lpvGPD        :: !GenericPackageDescription
+    , lpvGPD' :: !(IO GenericPackageDescription)
+    , lpvName :: !PackageName
     }
+
+lpvGPD :: MonadIO m => LocalPackageView -> m GenericPackageDescription
+lpvGPD = liftIO . lpvGPD'
 
 -- | Root directory for the given 'LocalPackageView'
 lpvRoot :: LocalPackageView -> Path Abs Dir
 lpvRoot = parent . lpvCabalFP
 
--- | Package name for the given 'LocalPackageView
-lpvName :: LocalPackageView -> PackageName
-lpvName lpv =
-  let PackageIdentifier name _version = C.package $ C.packageDescription $ lpvGPD lpv
-   in name
-
 -- | All components available in the given 'LocalPackageView'
-lpvComponents :: LocalPackageView -> Set NamedComponent
-lpvComponents lpv = Set.fromList $ concat
-    [ maybe []  (const [CLib]) (C.condLibrary gpkg)
-    , go CExe   (map fst . C.condExecutables)
-    , go CTest  (map fst . C.condTestSuites)
-    , go CBench (map fst . C.condBenchmarks)
+lpvComponents :: MonadIO m => LocalPackageView -> m (Set NamedComponent)
+lpvComponents lpv = do
+  gpd <- lpvGPD lpv
+  pure $ Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpd)
+    , go CExe   (fst <$> C.condExecutables gpd)
+    , go CTest  (fst <$> C.condTestSuites gpd)
+    , go CBench (fst <$> C.condBenchmarks gpd)
     ]
   where
-    gpkg = lpvGPD lpv
     go :: (T.Text -> NamedComponent)
-       -> (C.GenericPackageDescription -> [C.UnqualComponentName])
+       -> [C.UnqualComponentName]
        -> [NamedComponent]
-    go wrapper f = map (wrapper . T.pack . C.unUnqualComponentName) $ f gpkg
+    go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
 
 -- | Version for the given 'LocalPackageView
-lpvVersion :: LocalPackageView -> Version
-lpvVersion lpv =
-  let PackageIdentifier _name version = C.package $ C.packageDescription $ lpvGPD lpv
-   in version
+lpvVersion :: MonadIO m => LocalPackageView -> m Version
+lpvVersion = fmap gpdVersion . lpvGPD
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig = LoadConfig

@@ -9,7 +9,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TupleSections #-}
 
 -- | The general Stack configuration that starts everything off. This should
 -- be smart to falback if there is no stack.yaml, instead relying on
@@ -47,7 +46,6 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
-import           Data.IORef.RunOnce (runOnce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Monoid
@@ -593,7 +591,10 @@ loadBuildConfig mproject maresolver mcompiler = do
     packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      (resolved,) <$> runOnce (mkLocalPackageView YesPrintWarnings resolved)
+      lpv <- mkLocalPackageView YesPrintWarnings resolved
+      pure (lpvName lpv, lpv)
+
+    checkDuplicateNames $ map (second (PLMutable . lpvResolvedDir)) packages
 
     let deps = projectDependencies project
 
@@ -601,7 +602,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         { bcConfig = config
         , bcSnapshotDef = sd
         , bcGHCVariant = configGHCVariantDefault config
-        , bcPackages = packages
+        , bcPackages = Map.fromList packages
         , bcDependencies = deps
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
@@ -646,19 +647,17 @@ getLocalPackages = do
         Nothing -> do
             bc <- view buildConfigL
 
-            packages <- for (bcPackages bc) $ fmap (lpvName &&& id) . liftIO . snd
-
             deps <- forM (bcDependencies bc) $ \plp -> do
               gpd <- loadCabalFile plp
               let name = pkgName $ C.package $ C.packageDescription gpd
               pure (name, (gpd, plp))
 
             checkDuplicateNames $
-              map (second (PLMutable . lpvResolvedDir)) packages ++
+              map (second (PLMutable . lpvResolvedDir)) (Map.toList (bcPackages bc)) ++
               map (second snd) deps
 
             return LocalPackages
-              { lpProject = Map.fromList packages
+              { lpProject = bcPackages bc
               , lpDependencies = Map.fromList deps
               }
 

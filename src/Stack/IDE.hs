@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Functions for IDEs.
 module Stack.IDE
@@ -13,34 +14,27 @@ module Stack.IDE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Stack.Config (getLocalPackages)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 
 -- | List the packages inside the current project.
-listPackages :: HasEnvConfig env => RIO env ()
+listPackages :: HasBuildConfig env => RIO env ()
 listPackages = do
-    -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
-    -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
-    -- the directory.
-    packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
-    forM_ packageDirs $ \dir -> do
-        (gpd, _) <- loadCabalFilePath dir NoPrintWarnings
-        (logInfo . fromString . packageNameString) (gpdPackageName gpd)
+  packages <- view $ buildConfigL.to bcPackages
+  for_ (Map.keys packages) (logInfo . fromString . packageNameString)
 
 -- | List the targets in the current project.
-listTargets :: HasEnvConfig env => RIO env ()
-listTargets =
-    do rawLocals <- lpProject <$> getLocalPackages
-       logInfo $ display
-           (T.intercalate
-                "\n"
-                (map
-                     renderPkgComponent
-                     (concatMap
-                          toNameAndComponent
-                          (Map.toList rawLocals))))
+listTargets :: forall env. HasBuildConfig env => RIO env ()
+listTargets = do
+  packages <- view $ buildConfigL.to bcPackages
+  pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
+  logInfo $ display $ T.intercalate "\n" $
+    map renderPkgComponent pairs
   where
-    toNameAndComponent (pkgName',view') =
-        map (pkgName', ) (Set.toList (lpvComponents view'))
+    toNameAndComponent
+      :: PackageName
+      -> LocalPackageView
+      -> RIO env [(PackageName, NamedComponent)]
+    toNameAndComponent pkgName' =
+        fmap (map (pkgName', ) . Set.toList) . lpvComponents

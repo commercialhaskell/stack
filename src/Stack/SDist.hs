@@ -25,7 +25,6 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
-import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -165,7 +164,8 @@ getCabalLbs :: HasEnvConfig env
             -> Path Abs File -- ^ cabal file
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp = do
-    (gpd, cabalfp') <- loadCabalFilePath (parent cabalfp) NoPrintWarnings
+    (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
+    gpd <- liftIO $ gpdio NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
@@ -293,7 +293,9 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     config  <- getDefaultPackageConfig
-    (package, cabalfp) <- readPackageDir config pkgDir YesPrintWarnings
+    (gpdio, _, cabalfp) <- loadCabalFilePath pkgDir
+    gpd <- liftIO $ gpdio YesPrintWarnings
+    let package = resolvePackage config gpd
     return LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
@@ -397,10 +399,10 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    (gpd, _cabalfp) <- loadCabalFilePath pkgDir YesPrintWarnings
-    let name = gpdPackageName gpd
+    (gpdio, name, _cabalfp) <- loadCabalFilePath pkgDir
+    gpd <- liftIO $ gpdio YesPrintWarnings
     config  <- getDefaultPackageConfig
-    (gdesc, PackageDescriptionPair pkgDesc _) <- readPackageDescriptionDir config pkgDir NoPrintWarnings
+    let PackageDescriptionPair pkgDesc _ = resolvePackageDescription config gpd
     logInfo $
         "Checking package '" <> fromString (packageNameString name) <> "' for common mistakes"
     let pkgChecks =
@@ -414,8 +416,8 @@ checkPackageInExtractedTarball pkgDir = do
           -- does. In any event, using `Nothing` seems more logical
           -- for this check anyway, and the fallback to `Just pkgDesc`
           -- is just a crazy sanity check.
-          case Check.checkPackage gdesc Nothing of
-            [] -> Check.checkPackage gdesc (Just pkgDesc)
+          case Check.checkPackage gpd Nothing of
+            [] -> Check.checkPackage gpd (Just pkgDesc)
             x -> x
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
     let checks = pkgChecks ++ fileChecks
@@ -435,13 +437,15 @@ buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
   envConfig <- view envConfigL
   localPackageToBuild <- readLocalPackage $ resolvedAbsolute pkgDir
-  let allPackagePaths = bcPackages (envConfigBuildConfig envConfig)
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
-  pathsToKeep <- filterM (fmap not . isPathToRemove . resolvedAbsolute . fst) allPackagePaths
-  getLPV <- runOnce $ mkLocalPackageView YesPrintWarnings pkgDir
+  pathsToKeep
+    <- fmap Map.fromList
+     $ flip filterM (Map.toList (bcPackages (envConfigBuildConfig envConfig)))
+     $ fmap not . isPathToRemove . resolvedAbsolute . lpvResolvedDir . snd
+  lpv <- mkLocalPackageView YesPrintWarnings pkgDir
   newPackagesRef <- liftIO (newIORef Nothing)
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -450,7 +454,7 @@ buildExtractedTarball pkgDir = do
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = (pkgDir, getLPV) : pathsToKeep
+        { bcPackages = Map.insert (lpvName lpv) lpv pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True
