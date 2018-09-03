@@ -37,6 +37,7 @@ Major changes:
       their exact versions.
     * The `ignore-revision-mismatch` setting is no longer needed, and
       has been removed.
+* Upgrade to Cabal 2.4
 
 Behavior changes:
 

@@ -417,7 +417,7 @@ checkPackageInExtractedTarball pkgDir = do
           case Check.checkPackage gdesc Nothing of
             [] -> Check.checkPackage gdesc (Just pkgDesc)
             x -> x
-    fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
+    fileChecks <- liftIO $ Check.checkPackageFiles minBound pkgDesc (toFilePath pkgDir)
     let checks = pkgChecks ++ fileChecks
         (errors, warnings) =
           let criticalIssue (Check.PackageBuildImpossible _) = True

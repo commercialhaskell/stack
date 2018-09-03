@@ -6,6 +6,18 @@ packages:
 - subs/curator
 
 extra-deps:
+- Cabal-2.4.0.0@rev:0
+
+- github: snoyberg/http-api-data
+  commit: 37bbe89519c07ccf14f5897cdc2b73695217f90e
+  size: 22160
+  sha256: 0aa581e5c96a19fe73d8ea6ccee276d33a03607a70a317fe02a70eed3744618c
+
+- github: snoyberg/cabal-doctest
+  commit: 18360c6bf926ef2ea3841d5f7d20583dae225c24
+  size: 13520
+  sha256: 12f01209a7d8f207f2fbd571f8a33b547c2056911ddd71f831501b28340c625d
+
 # Ugly, temporary hack
 - github: fpco/store
   commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a

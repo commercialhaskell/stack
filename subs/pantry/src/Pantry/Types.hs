@@ -827,7 +827,8 @@ cabalSpecLatestVersion =
     CabalSpecV1_22 -> error "this cannot happen"
     CabalSpecV1_24 -> error "this cannot happen"
     CabalSpecV2_0 -> error "this cannot happen"
-    CabalSpecV2_2 -> mkVersion [2, 2]
+    CabalSpecV2_2 -> error "this cannot happen"
+    CabalSpecV2_4 -> mkVersion [2, 4]
 
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)

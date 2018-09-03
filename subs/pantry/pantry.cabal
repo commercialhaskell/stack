@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b9dd4b79ed13901e98453a0bc57a938ee84271142242f8ee5345c2c9c69acacc
+-- hash: acc1eb1e521df7f11ac60ff9dd5d9e4fd2700d7f1cc981ff7fcf6691a8e25021
 
 name:           pantry
 version:        0.1.0.0
@@ -46,7 +46,7 @@ library
       src/
   default-extensions: MonadFailDesugaring
   build-depends:
-      Cabal
+      Cabal >=2.4
     , aeson
     , base
     , bytestring
@@ -106,7 +106,7 @@ test-suite spec
       test
   default-extensions: MonadFailDesugaring
   build-depends:
-      Cabal
+      Cabal >=2.4
     , QuickCheck
     , aeson
     , base
