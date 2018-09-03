@@ -14,11 +14,7 @@ packages:
 - tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
 - hackage-security-0.5.3.0@rev:2
 - http-api-data-0.3.8.1@rev:1
-
-- github: snoyberg/cabal-doctest
-  commit: 18360c6bf926ef2ea3841d5f7d20583dae225c24
-  size: 13520
-  sha256: 12f01209a7d8f207f2fbd571f8a33b547c2056911ddd71f831501b28340c625d
+- cabal-doctest-1.0.6@rev:2
 
 flags:
   cabal-install:
