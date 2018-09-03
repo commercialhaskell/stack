@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eba6c9bbaefbe2f054bed34aa2f27e1055f41fa29b37db14a5f70ff84151c739
+-- hash: b9dd4b79ed13901e98453a0bc57a938ee84271142242f8ee5345c2c9c69acacc
 
 name:           pantry
 version:        0.1.0.0
@@ -76,7 +76,7 @@ library
     , rio
     , rio-orphans
     , store
-    , tar-conduit
+    , tar-conduit >=0.3.0
     , text
     , text-metrics
     , time
@@ -141,7 +141,7 @@ test-suite spec
     , rio
     , rio-orphans
     , store
-    , tar-conduit
+    , tar-conduit >=0.3.0
     , text
     , text-metrics
     , time

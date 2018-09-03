@@ -11,9 +11,11 @@ extra-deps:
   commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a
   subdirs:
   - store
-# Switch to Hackage version when released
-- github: snoyberg/tar-conduit
-  commit: fd03a66110f7d0feff6fe7eb1cc9ca1a56b38fea
+
+  # NOTE: Removing the following info is a nice way to repro
+  # issue https://github.com/commercialhaskell/stack/issues/4266
+  size: 56404
+  sha256: 18849d0766d9b4b4fd73ade6fe742b15b2e9d8c69ac00a3ca9e67b1e9044eaa9
 
 # docker:
 #   enable: true
