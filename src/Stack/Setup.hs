@@ -50,7 +50,6 @@ import              Data.Conduit.Process.Typed (eceStderr)
 import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
-import              Data.IORef.RunOnce (runOnce)
 import              Data.List hiding (concat, elem, maximumBy, any)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
@@ -395,7 +394,7 @@ ensureCompiler sopts = do
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
         needLocal = not (any (uncurry canUseCompiler) msystem)
 
-    getSetupInfo' <- runOnce (getSetupInfo (soptsSetupInfoYaml sopts))
+    getSetupInfo' <- memoizeRef (getSetupInfo (soptsSetupInfoYaml sopts))
 
     let getMmsys2Tool = do
             platform <- view platformL
@@ -408,7 +407,7 @@ ensureCompiler sopts = do
                         Just tool -> return (Just tool)
                         Nothing
                             | soptsInstallIfMissing sopts -> do
-                                si <- getSetupInfo'
+                                si <- runMemoized getSetupInfo'
                                 osKey <- getOSKey platform
                                 config <- view configL
                                 VersionedDownloadInfo version info <-
@@ -455,7 +454,7 @@ ensureCompiler sopts = do
                 (tool, build_):_ -> return (tool, build_)
                 []
                     | soptsInstallIfMissing sopts -> do
-                        si <- getSetupInfo'
+                        si <- runMemoized getSetupInfo'
                         downloadAndInstallPossibleCompilers
                             (map snd possibleCompilers)
                             si

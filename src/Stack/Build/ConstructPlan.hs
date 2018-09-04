@@ -827,7 +827,7 @@ psForceDirty (PSFilePath lp _) = lpForceDirty lp
 psForceDirty PSRemote{} = False
 
 psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp _) = runIOThunk $ lpDirtyFiles lp
+psDirty (PSFilePath lp _) = runMemoized $ lpDirtyFiles lp
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool

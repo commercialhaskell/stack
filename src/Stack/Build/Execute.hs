@@ -40,7 +40,6 @@ import           Data.Conduit.Process.Typed
                      createPipe, runProcess_, getStdout,
                      getStderr, createSource)
 import qualified Data.Conduit.Text as CT
-import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -317,8 +316,8 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         idMap <- liftIO $ newTVarIO Map.empty
         config <- view configL
 
-        getGhcPath <- runOnce $ getCompilerPath Ghc
-        getGhcjsPath <- runOnce $ getCompilerPath Ghcjs
+        getGhcPath <- memoizeRef $ getCompilerPath Ghc
+        getGhcjsPath <- memoizeRef $ getCompilerPath Ghcjs
         customBuiltRef <- newIORef Set.empty
 
         -- Create files for simple setup and setup shim, if necessary
@@ -342,7 +341,6 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
         let totalWanted = length $ filter lpWanted locals
-        env <- ask
         inner ExecuteEnv
             { eeBuildOpts = bopts
             , eeBuildOptsCLI = boptsCli
@@ -367,8 +365,8 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
-            , eeGetGhcPath = runRIO env getGhcPath
-            , eeGetGhcjsPath = runRIO env getGhcjsPath
+            , eeGetGhcPath = runMemoized getGhcPath
+            , eeGetGhcjsPath = runMemoized getGhcjsPath
             , eeCustomBuilt = customBuiltRef
             } `finally` dumpLogs logFilesTChan totalWanted
   where
@@ -1437,7 +1435,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTFilePath lp _ -> do
                 when enableTests $ unsetTestSuccess pkgDir
-                caches <- runIOThunk $ lpNewBuildCaches lp
+                caches <- runMemoized $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList caches)
             TTRemote{} -> return ()
@@ -1679,7 +1677,7 @@ checkExeStatus compiler platform distDir name = do
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTFilePath lp _) preBuildTime pkgDir = do
-    caches <- runIOThunk $ lpNewBuildCaches lp
+    caches <- runMemoized $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime

@@ -13,7 +13,6 @@ import           Stack.Prelude
 import qualified RIO.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import           Data.IORef.RunOnce
 import           Data.Store.Version (VersionConfig)
 import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
@@ -263,30 +262,19 @@ data LocalPackage = LocalPackage
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
     , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(IOThunk (Maybe (Set FilePath)))
+    , lpDirtyFiles    :: !(Memoized (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(IOThunk (Map NamedComponent (Map FilePath FileCacheInfo)))
+    , lpNewBuildCaches :: !(Memoized (Map NamedComponent (Map FilePath FileCacheInfo)))
     -- ^ current state of the files
-    , lpComponentFiles :: !(IOThunk (Map NamedComponent (Set (Path Abs File))))
+    , lpComponentFiles :: !(Memoized (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
     }
     deriving Show
 
-newtype IOThunk a = IOThunk (IO a)
-  deriving (Functor, Applicative, Monad)
-instance Show (IOThunk a) where
-  show _ = "<<IOThunk>>"
-
-runIOThunk :: MonadIO m => IOThunk a -> m a
-runIOThunk (IOThunk m) = liftIO m
-
-mkIOThunk :: MonadUnliftIO m => m a -> m (IOThunk a)
-mkIOThunk m = IOThunk <$> runOnce m
-
 lpFiles :: MonadIO m => LocalPackage -> m (Set.Set (Path Abs File))
-lpFiles = runIOThunk . fmap (Set.unions . M.elems) . lpComponentFiles
+lpFiles = runMemoized . fmap (Set.unions . M.elems) . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local

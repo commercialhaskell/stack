@@ -113,7 +113,7 @@ dependencies:
 - typed-process
 - unicode-transforms
 - unix-compat
-- unliftio
+- unliftio >= 0.2.8.0
 - unordered-containers
 - vector
 - yaml
@@ -141,7 +141,6 @@ library:
   - Data.Attoparsec.Args
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
-  - Data.IORef.RunOnce
   - Data.Monoid.Map
   - Data.Store.VersionTagged
   - Network.HTTP.Download

@@ -263,10 +263,10 @@ loadLocalPackage isLocal boptsCli targets (name, pp) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    componentFiles <- mkIOThunk $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
+    componentFiles <- memoizeRef $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
-    checkCacheResults <- mkIOThunk $ do
-      componentFiles' <- runIOThunk componentFiles
+    checkCacheResults <- memoizeRef $ do
+      componentFiles' <- runMemoized componentFiles
       forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (ppRoot pp) component
         checkCacheResult <- checkBuildCache

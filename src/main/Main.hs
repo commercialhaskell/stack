@@ -25,7 +25,6 @@ import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
-import           Data.IORef.RunOnce (runOnce)
 import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -724,14 +723,14 @@ uploadCmd sdistOpts go = do
             liftIO exitFailure
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
-        getCreds <- liftIO (runOnce (Upload.loadCreds config))
+        getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_
             files
             (\file ->
                   do tarFile <- resolveFile' file
                      liftIO $ do
-                       creds <- getCreds
+                       creds <- runMemoized getCreds
                        Upload.upload hackageUrl creds (toFilePath tarFile)
                      when
                          (sdoptsSign sdistOpts)
@@ -745,7 +744,7 @@ uploadCmd sdistOpts go = do
                 (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
                 checkSDistTarball' sdistOpts tarName tarBytes
                 liftIO $ do
-                  creds <- getCreds
+                  creds <- runMemoized getCreds
                   Upload.uploadBytes hackageUrl creds tarName tarBytes
                   forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
                 tarPath <- parseRelFile tarName
