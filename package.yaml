@@ -98,8 +98,7 @@ dependencies:
 - semigroups
 - split
 - stm
-- store
-- store-core
+- store-core # FIXME remove
 - streaming-commons
 - tar
 - template-haskell

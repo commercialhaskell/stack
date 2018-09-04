@@ -40,7 +40,6 @@ dependencies:
 - primitive
 - vector
 - memory
-- store # TODO remove
 - cryptonite
 - cryptonite-conduit
 - persistent
@@ -60,16 +59,45 @@ dependencies:
 - text-metrics
 - resourcet
 
+# FIXME remove when we drop store
+- integer-gmp
+- ghc-prim
+- template-haskell
+- network
+- th-utilities
+- th-reify-many
+- th-lift
+- th-lift-instances
+- mono-traversable
+- store-core
+- safe
+- contravariant
+- syb
+- deepseq
+- array
+- hashable
+- base-orphans
+- th-orphans
+- cryptonite
+- base64-bytestring
+- directory
+- filepath
+
 library:
   source-dirs: src/
   exposed-modules:
   - Pantry
   - Pantry.SHA256
-  - Data.Aeson.Extended
 
   # For testing
   - Pantry.Internal
   - Pantry.Internal.StaticBytes
+
+  # FIXME must be removed from pantry!
+  - Data.Aeson.Extended
+  - Data.Store
+  - Data.Store.Version
+  - Data.Store.Internal
 
 tests:
   spec:

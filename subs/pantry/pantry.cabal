@@ -29,10 +29,15 @@ library
   exposed-modules:
       Pantry
       Pantry.SHA256
-      Data.Aeson.Extended
       Pantry.Internal
       Pantry.Internal.StaticBytes
+      Data.Aeson.Extended
+      Data.Store
+      Data.Store.Version
+      Data.Store.Internal
   other-modules:
+      Data.Store.Impl
+      Data.Store.TH.Internal
       Hackage.Security.Client.Repository.HttpLib.HttpClient
       Pantry.Archive
       Pantry.Hackage
@@ -48,22 +53,34 @@ library
   build-depends:
       Cabal >=2.4
     , aeson
+    , array
     , base
+    , base-orphans
+    , base64-bytestring
     , bytestring
     , conduit
     , conduit-extra
     , containers
+    , contravariant
     , cryptonite
     , cryptonite-conduit
+    , deepseq
     , digest
+    , directory
+    , filepath
     , generic-deriving
+    , ghc-prim
     , hackage-security
+    , hashable
     , hpack >=0.29.6
     , http-client
     , http-client-tls
     , http-conduit
     , http-types
+    , integer-gmp
     , memory
+    , mono-traversable
+    , network
     , network-uri
     , path
     , path-io
@@ -75,10 +92,18 @@ library
     , resourcet
     , rio
     , rio-orphans
-    , store
+    , safe
+    , store-core
+    , syb
     , tar-conduit >=0.3.0
+    , template-haskell
     , text
     , text-metrics
+    , th-lift
+    , th-lift-instances
+    , th-orphans
+    , th-reify-many
+    , th-utilities
     , time
     , transformers
     , unix-compat
@@ -110,17 +135,26 @@ test-suite spec
       Cabal >=2.4
     , QuickCheck
     , aeson
+    , array
     , base
+    , base-orphans
+    , base64-bytestring
     , bytestring
     , conduit
     , conduit-extra
     , containers
+    , contravariant
     , cryptonite
     , cryptonite-conduit
+    , deepseq
     , digest
+    , directory
     , exceptions
+    , filepath
     , generic-deriving
+    , ghc-prim
     , hackage-security
+    , hashable
     , hedgehog
     , hpack >=0.29.6
     , hspec
@@ -128,7 +162,10 @@ test-suite spec
     , http-client-tls
     , http-conduit
     , http-types
+    , integer-gmp
     , memory
+    , mono-traversable
+    , network
     , network-uri
     , pantry
     , path
@@ -141,10 +178,18 @@ test-suite spec
     , resourcet
     , rio
     , rio-orphans
-    , store
+    , safe
+    , store-core
+    , syb
     , tar-conduit >=0.3.0
+    , template-haskell
     , text
     , text-metrics
+    , th-lift
+    , th-lift-instances
+    , th-orphans
+    , th-reify-many
+    , th-utilities
     , time
     , transformers
     , unix-compat
