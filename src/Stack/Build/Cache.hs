@@ -199,13 +199,17 @@ writeFlagCache gid cache = do
     ensureDir (parent file)
     encodeConfigCache file cache
 
+successBS, failureBS :: ByteString
+successBS = "success"
+failureBS = "failure"
+
 -- | Mark a test suite as having succeeded
 setTestSuccess :: HasEnvConfig env
                => Path Abs Dir
                -> RIO env ()
 setTestSuccess dir = do
     fp <- testSuccessFile dir
-    encodeTestSuccess fp True
+    writeFileBinary (toFilePath fp) successBS
 
 -- | Mark a test suite as not having succeeded
 unsetTestSuccess :: HasEnvConfig env
@@ -213,16 +217,18 @@ unsetTestSuccess :: HasEnvConfig env
                  -> RIO env ()
 unsetTestSuccess dir = do
     fp <- testSuccessFile dir
-    encodeTestSuccess fp False
+    writeFileBinary (toFilePath fp) failureBS
 
 -- | Check if the test suite already passed
 checkTestSuccess :: HasEnvConfig env
                  => Path Abs Dir
                  -> RIO env Bool
-checkTestSuccess dir =
-    liftM
-        (fromMaybe False)
-        (decodeTestSuccess =<< testSuccessFile dir)
+checkTestSuccess dir = do
+  fp <- testSuccessFile dir
+  -- we could ensure the file is the right size first,
+  -- but we're not expected an attack from the user's filesystem
+  either (const False) (== successBS)
+    <$> tryIO (readFileBinary $ toFilePath fp)
 
 --------------------------------------
 -- Precompiled Cache

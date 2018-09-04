@@ -11,9 +11,6 @@ module Stack.StoreTH
   , decodeModTime
   , encodeModTime
 
-  , decodeTestSuccess
-  , encodeTestSuccess
-
   , decodePrecompiledCache
   , encodePrecompiledCache
 
@@ -68,19 +65,6 @@ encodeModTime
   -> ModTime
   -> RIO env ()
 encodeModTime = $(versionedEncodeFile modTimeVC)
-
-decodeTestSuccess
-  :: HasLogFunc env
-  => Path Abs File
-  -> RIO env (Maybe Bool)
-decodeTestSuccess = $(versionedDecodeFile testSuccessVC)
-
-encodeTestSuccess
-  :: HasLogFunc env
-  => Path Abs File
-  -> Bool
-  -> RIO env ()
-encodeTestSuccess = $(versionedEncodeFile testSuccessVC)
 
 decodePrecompiledCache
   :: HasLogFunc env
