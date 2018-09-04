@@ -1,10 +1,10 @@
-cabal-version: >= 1.10
+cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.29.6.
+-- This file has been generated from package.yaml by hpack version 0.30.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: acc1eb1e521df7f11ac60ff9dd5d9e4fd2700d7f1cc981ff7fcf6691a8e25021
+-- hash: ed0f447fdceff7f51c2eecf6d0280d2f6d80b270b641ae30e3c6d9e6515b2cd4
 
 name:           pantry
 version:        0.1.0.0
@@ -19,6 +19,8 @@ copyright:      2018 FP Complete
 license:        MIT
 build-type:     Simple
 extra-source-files:
+    README.md
+    ChangeLog.md
     attic/package-0.1.2.3.tar.gz
 
 source-repository head
@@ -37,7 +39,6 @@ library
       Data.Store.Internal
   other-modules:
       Data.Store.Impl
-      Data.Store.TH.Internal
       Hackage.Security.Client.Repository.HttpLib.HttpClient
       Pantry.Archive
       Pantry.Hackage
