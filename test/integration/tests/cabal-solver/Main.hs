@@ -11,5 +11,5 @@ main = do
       stack ["unpack", "acme-dont-1.1"]
       run "cabal" ["install", "./acme-dont-1.1"]
       removeDirectoryRecursive "acme-dont-1.1"
-      stack ["--install-ghc", "init", "--solver", "--resolver=lts-11.22"]
+      stack ["--install-ghc", "init", "--solver", defaultResolverArg]
       stack ["build"]
