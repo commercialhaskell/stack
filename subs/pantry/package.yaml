@@ -15,8 +15,6 @@ default-extensions:
 extra-source-files:
 - README.md
 - ChangeLog.md
-
-extra-source-files:
 - attic/package-0.1.2.3.tar.gz
 
 dependencies:
