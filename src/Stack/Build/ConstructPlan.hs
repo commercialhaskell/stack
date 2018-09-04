@@ -1031,8 +1031,8 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
     pprintFlags flags
         | Map.null flags = ""
         | otherwise = parens $ sep $ map pprintFlag $ Map.toList flags
-    pprintFlag (name, True) = "+" <> fromString (show name)
-    pprintFlag (name, False) = "-" <> fromString (show name)
+    pprintFlag (name, True) = "+" <> fromString (flagNameString name)
+    pprintFlag (name, False) = "-" <> fromString (flagNameString name)
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
         NotInBuildPlan -> Just $
