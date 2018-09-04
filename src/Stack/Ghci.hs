@@ -35,7 +35,6 @@ import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
@@ -273,15 +272,14 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- independently in order to handle the case where no targets are
     -- specified.
     let targets = maybe targets0 (unionTargets targets0) mainIsTargets
-    packages <- lpProject <$> getLocalPackages
+    packages <- view $ buildConfigL.to bcPackages
     -- Find all of the packages that are directly demanded by the
     -- targets.
-    directlyWanted <-
-        forMaybeM (M.toList packages) $
-        \(name, lpv) ->
+    let directlyWanted = flip mapMaybe (M.toList packages) $
+          \(name, pp) ->
                 case M.lookup name targets of
-                  Just simpleTargets -> return (Just (name, (lpvCabalFP lpv, simpleTargets)))
-                  Nothing -> return Nothing
+                  Just simpleTargets -> Just (name, (ppCabalFP pp, simpleTargets))
+                  Nothing -> Nothing
     -- Figure out
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps sourceMap directlyWanted
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
@@ -305,7 +303,7 @@ getAllNonLocalTargets
     :: Map PackageName Target
     -> RIO env [PackageName]
 getAllNonLocalTargets targets = do
-  let isNonLocal (TargetAll Dependency) = True
+  let isNonLocal (TargetAll PTDependency) = True
       isNonLocal _ = False
   return $ map fst $ filter (isNonLocal . snd) (M.toList targets)
 
@@ -700,7 +698,7 @@ makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets pkgDesc = do
 -- (differently).
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
-wantedPackageComponents bopts (TargetAll ProjectPackage) pkg = S.fromList $
+wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
     (case packageLibraries pkg of
        NoLibraries -> []
        HasLibraries names -> CLib : map CInternalLib (S.toList names)) ++
@@ -887,17 +885,17 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
 unionTargets = M.unionWith $ \l r ->
     case (l, r) of
-        (TargetAll Dependency, _) -> r
+        (TargetAll PTDependency, _) -> r
         (TargetComps sl, TargetComps sr) -> TargetComps (S.union sl sr)
-        (TargetComps _, TargetAll ProjectPackage) -> TargetAll ProjectPackage
+        (TargetComps _, TargetAll PTProject) -> TargetAll PTProject
         (TargetComps _, _) -> l
-        (TargetAll ProjectPackage, _) -> TargetAll ProjectPackage
+        (TargetAll PTProject, _) -> TargetAll PTProject
 
 hasLocalComp :: (NamedComponent -> Bool) -> Target -> Bool
 hasLocalComp p t =
     case t of
         TargetComps s -> any p (S.toList s)
-        TargetAll ProjectPackage -> True
+        TargetAll PTProject -> True
         _ -> False
 
 -- | Run a command and grab the first line of stdout, dropping

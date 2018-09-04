@@ -33,12 +33,12 @@ module Stack.Types.Config
   ,explicitSetupDeps
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
-  ,LocalPackages(..)
-  ,LocalPackageView(..)
-  ,lpvRoot
-  ,lpvVersion
-  ,lpvComponents
-  ,lpvGPD
+  ,ProjectPackage(..)
+  ,DepPackage(..)
+  ,ppRoot
+  ,ppVersion
+  ,ppComponents
+  ,ppGPD
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
@@ -486,9 +486,9 @@ data BuildConfig = BuildConfig
       -- ^ Build plan wanted for this build
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: !(Map PackageName LocalPackageView)
+    , bcPackages :: !(Map PackageName ProjectPackage)
       -- ^ Local packages
-    , bcDependencies :: ![PackageLocation]
+    , bcDependencies :: !(Map PackageName DepPackage)
       -- ^ Extra dependencies specified in configuration.
       --
       -- These dependencies will not be installed to a shared location, and
@@ -531,36 +531,36 @@ data EnvConfig = EnvConfig
     -- 'wantedCompilerL', which provides the version specified by the
     -- build plan.
     ,envConfigCompilerBuild :: !CompilerBuild
-    ,envConfigPackagesRef :: !(IORef (Maybe LocalPackages))
-    -- ^ Cache for 'getLocalPackages'.
     ,envConfigLoadedSnapshot :: !LoadedSnapshot
     -- ^ The fully resolved snapshot information.
     }
 
-data LocalPackages = LocalPackages
-  { lpProject :: !(Map PackageName LocalPackageView)
-  , lpDependencies :: !(Map PackageName (GenericPackageDescription, PackageLocation))
+-- | A view of a dependency package, specified in stack.yaml
+data DepPackage = DepPackage
+  { dpGPD' :: !(IO GenericPackageDescription)
+  , dpName :: !PackageName
+  , dpLocation :: !PackageLocation
   }
 
--- | A view of a local package needed for resolving components
-data LocalPackageView = LocalPackageView
-    { lpvCabalFP    :: !(Path Abs File)
-    , lpvResolvedDir :: !(ResolvedPath Dir)
-    , lpvGPD' :: !(IO GenericPackageDescription)
-    , lpvName :: !PackageName
+-- | A view of a project package needed for resolving components
+data ProjectPackage = ProjectPackage
+    { ppCabalFP    :: !(Path Abs File)
+    , ppResolvedDir :: !(ResolvedPath Dir)
+    , ppGPD' :: !(IO GenericPackageDescription)
+    , ppName :: !PackageName
     }
 
-lpvGPD :: MonadIO m => LocalPackageView -> m GenericPackageDescription
-lpvGPD = liftIO . lpvGPD'
+ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
+ppGPD = liftIO . ppGPD'
 
--- | Root directory for the given 'LocalPackageView'
-lpvRoot :: LocalPackageView -> Path Abs Dir
-lpvRoot = parent . lpvCabalFP
+-- | Root directory for the given 'ProjectPackage'
+ppRoot :: ProjectPackage -> Path Abs Dir
+ppRoot = parent . ppCabalFP
 
--- | All components available in the given 'LocalPackageView'
-lpvComponents :: MonadIO m => LocalPackageView -> m (Set NamedComponent)
-lpvComponents lpv = do
-  gpd <- lpvGPD lpv
+-- | All components available in the given 'ProjectPackage'
+ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
+ppComponents pp = do
+  gpd <- ppGPD pp
   pure $ Set.fromList $ concat
     [ maybe []  (const [CLib]) (C.condLibrary gpd)
     , go CExe   (fst <$> C.condExecutables gpd)
@@ -573,9 +573,9 @@ lpvComponents lpv = do
        -> [NamedComponent]
     go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
 
--- | Version for the given 'LocalPackageView
-lpvVersion :: MonadIO m => LocalPackageView -> m Version
-lpvVersion = fmap gpdVersion . lpvGPD
+-- | Version for the given 'ProjectPackage
+ppVersion :: MonadIO m => ProjectPackage -> m Version
+ppVersion = fmap gpdVersion . ppGPD
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig = LoadConfig

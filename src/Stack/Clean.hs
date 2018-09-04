@@ -15,7 +15,6 @@ import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.Config
 import           System.Exit (exitFailure)
@@ -36,20 +35,19 @@ clean cleanOpts = do
 
 dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
-    packages <- getLocalPackages
+    packages <- view $ buildConfigL.to bcPackages
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM (distDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
+            mapM (distDirFromDir . ppRoot) $ Map.elems packages
         CleanShallow targets -> do
-            let localPkgViews = lpProject packages
-                localPkgNames = Map.keys localPkgViews
-                getPkgDir pkgName' = fmap lpvRoot (Map.lookup pkgName' localPkgViews)
+            let localPkgNames = Map.keys packages
+                getPkgDir pkgName' = fmap ppRoot (Map.lookup pkgName' packages)
             case targets \\ localPkgNames of
                 [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM (workDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
+            pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 

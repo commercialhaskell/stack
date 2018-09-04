@@ -444,17 +444,15 @@ buildExtractedTarball pkgDir = do
   pathsToKeep
     <- fmap Map.fromList
      $ flip filterM (Map.toList (bcPackages (envConfigBuildConfig envConfig)))
-     $ fmap not . isPathToRemove . resolvedAbsolute . lpvResolvedDir . snd
-  lpv <- mkLocalPackageView YesPrintWarnings pkgDir
-  newPackagesRef <- liftIO (newIORef Nothing)
+     $ fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd
+  pp <- mkProjectPackage YesPrintWarnings pkgDir
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              {envConfigPackagesRef = newPackagesRef
-              ,envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+              {envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
               }
         in set envConfigL updatedEnvConfig env
       updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = Map.insert (lpvName lpv) lpv pathsToKeep
+        { bcPackages = Map.insert (ppName pp) pp pathsToKeep
         , bcConfig = (bcConfig buildConfig)
                      { configBuild = defaultBuildOpts
                        { boptsTests = True

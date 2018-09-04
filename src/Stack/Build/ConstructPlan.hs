@@ -222,9 +222,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             prettyErrorNoIndent $ pprintExceptions errs stackYaml stackRoot parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    hasBaseInDeps bconfig =
-        mkPackageName "base" `elem`
-        [n | (PLImmutable (PLIHackage (PackageIdentifierRevision n _ _) _)) <- bcDependencies bconfig]
+    hasBaseInDeps bconfig = Map.member (mkPackageName "base") (bcDependencies bconfig)
 
     mkCtx econfig = Ctx
         { ls = ls0

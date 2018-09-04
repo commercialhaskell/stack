@@ -27,7 +27,6 @@ module Stack.Config
   ,loadMiniConfig
   ,loadConfigYaml
   ,packagesParser
-  ,getLocalPackages
   ,getImplicitGlobalProjectDir
   ,getStackYaml
   ,getSnapshots
@@ -53,7 +52,6 @@ import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
-import qualified Distribution.PackageDescription as C
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
@@ -73,7 +71,7 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Package (mkLocalPackageView)
+import           Stack.Package (mkProjectPackage, mkDepPackage)
 import           Stack.Snapshot
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -591,19 +589,23 @@ loadBuildConfig mproject maresolver mcompiler = do
     packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      lpv <- mkLocalPackageView YesPrintWarnings resolved
-      pure (lpvName lpv, lpv)
+      pp <- mkProjectPackage YesPrintWarnings resolved
+      pure (ppName pp, pp)
 
-    checkDuplicateNames $ map (second (PLMutable . lpvResolvedDir)) packages
+    deps <- forM (projectDependencies project) $ \plp -> do
+      dp <- mkDepPackage plp
+      pure (dpName dp, dp)
 
-    let deps = projectDependencies project
+    checkDuplicateNames $
+      map (second (PLMutable . ppResolvedDir)) packages ++
+      map (second dpLocation) deps
 
     return BuildConfig
         { bcConfig = config
         , bcSnapshotDef = sd
         , bcGHCVariant = configGHCVariantDefault config
         , bcPackages = Map.fromList packages
-        , bcDependencies = deps
+        , bcDependencies = Map.fromList deps
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
@@ -635,31 +637,6 @@ loadBuildConfig mproject maresolver mcompiler = do
         , projectExtraPackageDBs = []
         , projectCurator = Nothing
         }
-
--- | Get packages from EnvConfig, downloading and cloning as necessary.
--- If the packages have already been downloaded, this uses a cached value.
-getLocalPackages :: forall env. HasEnvConfig env => RIO env LocalPackages
-getLocalPackages = do
-    cacheRef <- view $ envConfigL.to envConfigPackagesRef
-    mcached <- liftIO $ readIORef cacheRef
-    case mcached of
-        Just cached -> return cached
-        Nothing -> do
-            bc <- view buildConfigL
-
-            deps <- forM (bcDependencies bc) $ \plp -> do
-              gpd <- loadCabalFile plp
-              let name = pkgName $ C.package $ C.packageDescription gpd
-              pure (name, (gpd, plp))
-
-            checkDuplicateNames $
-              map (second (PLMutable . lpvResolvedDir)) (Map.toList (bcPackages bc)) ++
-              map (second snd) deps
-
-            return LocalPackages
-              { lpProject = bcPackages bc
-              , lpDependencies = Map.fromList deps
-              }
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.

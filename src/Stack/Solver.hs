@@ -45,7 +45,7 @@ import           Path.IO hiding (findExecutable, findFiles, withSystemTempDir)
 import qualified RIO
 import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
-import           Stack.Config (getLocalPackages, loadConfigYaml)
+import           Stack.Config (loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.PrettyPrint
 import           Stack.Setup
@@ -612,8 +612,8 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- prettyPath stackYaml
 
     logInfo $ "Using configuration file: " <> fromString relStackYaml
-    lp <- getLocalPackages
-    let packages = lpProject lp
+    packages <- view $ buildConfigL.to bcPackages
+    deps <- view $ buildConfigL.to bcDependencies
     let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
@@ -621,8 +621,8 @@ solveExtraDeps modStackYaml = do
         dupPkgFooter = "Please remove the directories containing duplicate \
                        \entries from '" <> relStackYaml <> "'."
 
-        cabalDirs = map lpvRoot    $ Map.elems packages
-        cabalfps  = map lpvCabalFP $ Map.elems packages
+        cabalDirs = map ppRoot    $ Map.elems packages
+        cabalfps  = map ppCabalFP $ Map.elems packages
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
@@ -630,8 +630,8 @@ solveExtraDeps modStackYaml = do
 
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig
-        oldExtraVersions  = Map.map (gpdVersion . fst) (lpDependencies lp)
-        sd                = bcSnapshotDef bconfig
+    oldExtraVersions <- for deps $ fmap gpdVersion . liftIO . dpGPD'
+    let sd                = bcSnapshotDef bconfig
         resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs

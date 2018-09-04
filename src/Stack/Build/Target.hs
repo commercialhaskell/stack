@@ -78,7 +78,6 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
-import           Stack.Config (getLocalPackages)
 import           Stack.Snapshot (calculatePackagePromotion)
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -97,7 +96,7 @@ data NeedTargets = NeedTargets | AllowNoTargets
 -- | Raw target information passed on the command line.
 newtype RawInput = RawInput { unRawInput :: Text }
 
-getRawInput :: BuildOptsCLI -> Map PackageName LocalPackageView -> ([Text], [RawInput])
+getRawInput :: BuildOptsCLI -> Map PackageName ProjectPackage -> ([Text], [RawInput])
 getRawInput boptscli locals =
     let textTargets' = boptsCLITargets boptscli
         textTargets =
@@ -138,7 +137,7 @@ data RawTarget
 -- | Same as @parseRawTarget@, but also takes directories into account.
 parseRawTargetDirs :: MonadIO m
                    => Path Abs Dir -- ^ current directory
-                   -> Map PackageName LocalPackageView
+                   -> Map PackageName ProjectPackage
                    -> RawInput -- ^ raw target information from the commandline
                    -> m (Either Text [(RawInput, RawTarget)])
 parseRawTargetDirs root locals ri =
@@ -156,8 +155,8 @@ parseRawTargetDirs root locals ri =
                             t
                         names -> return $ Right $ map ((ri, ) . RTPackage) names
   where
-    childOf dir (name, lpv) =
-        if dir == lpvRoot lpv || isProperPrefixOf dir (lpvRoot lpv)
+    childOf dir (name, pp) =
+        if dir == ppRoot pp || isProperPrefixOf dir (ppRoot pp)
             then Just name
             else Nothing
 
@@ -215,8 +214,8 @@ resolveRawTarget
   :: forall env. HasConfig env
   => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
   -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
-  -> Map PackageName (GenericPackageDescription, PackageLocation) -- ^ local deps
-  -> Map PackageName LocalPackageView -- ^ project packages
+  -> Map PackageName DepPackage -- ^ local deps
+  -> Map PackageName ProjectPackage -- ^ project packages
   -> (RawInput, RawTarget)
   -> RIO env (Either Text ResolveResult)
 resolveRawTarget globals snap deps locals (ri, rt) =
@@ -235,8 +234,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
         -- it. We use an assoc list and not a Map so we can detect
         -- duplicates.
         allPairs <- fmap concat $ flip Map.traverseWithKey locals
-          $ \name lpv -> do
-              comps <- lpvComponents lpv
+          $ \name pp -> do
+              comps <- ppComponents pp
               pure $ map (name, ) $ Set.toList comps
         pure $ case filter (isCompNamed cname . snd) allPairs of
                 [] -> Left $ cname `T.append` " doesn't seem to be a local target. Run 'stack ide targets' for a list of available targets"
@@ -245,7 +244,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                   , rrRaw = ri
                   , rrComponent = Just comp
                   , rrAddedDep = Nothing
-                  , rrPackageType = ProjectPackage
+                  , rrPackageType = PTProject
                   }
                 matches -> Left $ T.concat
                     [ "Ambiugous component name "
@@ -256,8 +255,8 @@ resolveRawTarget globals snap deps locals (ri, rt) =
     go (RTPackageComponent name ucomp) =
         case Map.lookup name locals of
             Nothing -> pure $ Left $ T.pack $ "Unknown local package: " ++ packageNameString name
-            Just lpv -> do
-                comps <- lpvComponents lpv
+            Just pp -> do
+                comps <- ppComponents pp
                 pure $ case ucomp of
                     ResolvedComponent comp
                         | comp `Set.member` comps -> Right ResolveResult
@@ -265,7 +264,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                             , rrRaw = ri
                             , rrComponent = Just comp
                             , rrAddedDep = Nothing
-                            , rrPackageType = ProjectPackage
+                            , rrPackageType = PTProject
                             }
                         | otherwise -> Left $ T.pack $ concat
                             [ "Component "
@@ -286,7 +285,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                               , rrRaw = ri
                               , rrComponent = Just x
                               , rrAddedDep = Nothing
-                              , rrPackageType = ProjectPackage
+                              , rrPackageType = PTProject
                               }
                             matches -> Left $ T.concat
                                 [ "Ambiguous component name "
@@ -303,7 +302,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrRaw = ri
           , rrComponent = Nothing
           , rrAddedDep = Nothing
-          , rrPackageType = ProjectPackage
+          , rrPackageType = PTProject
           }
       | Map.member name deps ||
         Map.member name snap ||
@@ -312,7 +311,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrRaw = ri
           , rrComponent = Nothing
           , rrAddedDep = Nothing
-          , rrPackageType = Dependency
+          , rrPackageType = PTDependency
           }
       | otherwise = do
           mversion <- getLatestHackageVersion name UsePreferredVersions
@@ -328,14 +327,14 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrRaw = ri
               , rrComponent = Nothing
               , rrAddedDep = Nothing
-              , rrPackageType = Dependency
+              , rrPackageType = PTDependency
               }
             Just pir -> Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
               , rrAddedDep = Just $ PLIHackage pir Nothing
-              , rrPackageType = Dependency
+              , rrPackageType = PTDependency
               }
 
     -- Note that we use CFILatest below, even though it's
@@ -365,7 +364,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                         then Nothing
                         -- OK, we'll override it
                         else Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
-                  , rrPackageType = Dependency
+                  , rrPackageType = PTDependency
                   }
             -- The package was coming from something besides the
             -- index, so refuse to do the override
@@ -382,7 +381,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
               , rrRaw = ri
               , rrComponent = Nothing
               , rrAddedDep = Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
-              , rrPackageType = Dependency
+              , rrPackageType = PTDependency
               }
 
       where
@@ -394,7 +393,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                   Nothing)
               globals
           , Map.map lpiLocation snap
-          , Map.map snd deps
+          , Map.map dpLocation deps
           ]
 
 ---------------------------------------------------------------------------------
@@ -408,7 +407,7 @@ data Target
   | TargetComps !(Set NamedComponent)
   -- ^ Only build specific components
 
-data PackageType = ProjectPackage | Dependency
+data PackageType = PTProject | PTDependency
   deriving (Eq, Show)
 
 combineResolveResults
@@ -459,15 +458,14 @@ parseTargets needTargets boptscli = do
   bconfig <- view buildConfigL
   ls0 <- view loadedSnapshotL
   workingDir <- getCurrentDir
-  lp <- getLocalPackages
-  let locals = lpProject lp
-      deps = lpDependencies lp
-      globals = lsGlobals ls0
+  locals <- view $ buildConfigL.to bcPackages
+  deps <- view $ buildConfigL.to bcDependencies
+  let globals = lsGlobals ls0
       snap = lsPackages ls0
       (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
-    parseRawTargetDirs workingDir (lpProject lp)
+    parseRawTargetDirs workingDir locals
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
     resolveRawTarget globals snap deps locals
@@ -513,19 +511,19 @@ parseTargets needTargets boptscli = do
     -- Calculate a list of all of the locals, based on the project
     -- packages, local dependencies, and added deps found from the
     -- command line
-    projectPackages' <- for (lpProject lp) $ \lpv -> do
-      gpd <- lpvGPD lpv
-      pure (gpd, PLMutable $ lpvResolvedDir lpv, Just lpv)
-    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe LocalPackageView)
+    projectPackages' <- for locals $ \pp -> do
+      gpd <- ppGPD pp
+      pure (gpd, PLMutable $ ppResolvedDir pp, Just pp)
+    deps' <- for deps $ \dp -> do
+      gpd <- liftIO $ dpGPD' dp
+      pure (gpd, dpLocation dp, Nothing)
+    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe ProjectPackage)
         allLocals = Map.unions
           [ -- project packages
             projectPackages'
           , -- added deps take precendence over local deps
             addedDeps'
-          , -- added deps take precendence over local deps
-            Map.map
-              (\(gpd, loc) -> (gpd, loc, Nothing))
-              (lpDependencies lp)
+          , deps'
           ]
 
     calculatePackagePromotion

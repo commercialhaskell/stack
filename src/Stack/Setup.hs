@@ -251,7 +251,6 @@ setupEnv mResolveMissingGHC = do
         <*> Concurrently (getGlobalDB wc)
 
     logDebug "Resolving package entries"
-    packagesRef <- liftIO $ newIORef Nothing
     bc <- view buildConfigL
 
     -- Set up a modified environment which includes the modified PATH
@@ -268,7 +267,6 @@ setupEnv mResolveMissingGHC = do
             , envConfigCabalVersion = cabalVer
             , envConfigCompilerVersion = compilerVer
             , envConfigCompilerBuild = compilerBuild
-            , envConfigPackagesRef = packagesRef
             , envConfigLoadedSnapshot = ls
             }
 
@@ -356,7 +354,6 @@ setupEnv mResolveMissingGHC = do
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
         , envConfigCompilerBuild = compilerBuild
-        , envConfigPackagesRef = envConfigPackagesRef envConfig0
         , envConfigLoadedSnapshot = ls
         }
 

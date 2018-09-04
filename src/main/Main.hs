@@ -763,7 +763,7 @@ sdistCmd sdistOpts go =
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
-                dirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . bcPackages)
                 when (null dirs) $ do
                     stackYaml <- view stackYamlL
                     prettyErrorL
@@ -860,7 +860,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
       getRunCmd args = do
           packages <- view $ buildConfigL.to bcPackages
-          pkgComponents <- for (Map.elems packages) lpvComponents
+          pkgComponents <- for (Map.elems packages) ppComponents
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
                              []   -> (firstExe, args)

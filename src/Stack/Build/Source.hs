@@ -26,7 +26,6 @@ import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.Config (getLocalPackages)
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.Types.Build
@@ -72,13 +71,13 @@ loadSourceMapFull :: HasEnvConfig env
 loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     (ls, localDeps, targets) <- parseTargets needTargets boptsCli
-    lp <- getLocalPackages
-    locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList $ lpProject lp
+    packages <- view $ buildConfigL.to bcPackages
+    locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList packages
     checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
     checkComponentsBuildable locals
 
     -- TODO for extra sanity, confirm that the targets we threw away are all TargetAll
-    let nonProjectTargets = Map.keysSet targets `Set.difference` Map.keysSet (lpProject lp)
+    let nonProjectTargets = Map.keysSet targets `Set.difference` Map.keysSet packages
 
     -- Combine the local packages, extra-deps, and LoadedSnapshot into
     -- one unified source map.
@@ -89,9 +88,9 @@ loadSourceMapFull needTargets boptsCli = do
             PLImmutable pkgloc -> do
               ident <- getPackageLocationIdent pkgloc
               return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
-            PLMutable dir -> do
-              lpv <- mkLocalPackageView YesPrintWarnings dir
-              lp' <- loadLocalPackage False boptsCli targets (n, lpv)
+            PLMutable dir -> do -- FIXME this is not correct, we don't want to treat all Mutable as local
+              pp <- mkProjectPackage YesPrintWarnings dir
+              lp' <- loadLocalPackage False boptsCli targets (n, pp)
               return $ PSFilePath lp' loc
     sourceMap' <- Map.unions <$> sequence
       [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFilePath lp' Local)) locals
@@ -177,14 +176,14 @@ loadLocalPackage
     -- See: https://github.com/commercialhaskell/stack/issues/3574#issuecomment-346512821
     -> BuildOptsCLI
     -> Map PackageName Target
-    -> (PackageName, LocalPackageView)
+    -> (PackageName, ProjectPackage)
     -> RIO env LocalPackage
-loadLocalPackage isLocal boptsCli targets (name, lpv) = do
+loadLocalPackage isLocal boptsCli targets (name, pp) = do
     let mtarget = Map.lookup name targets
     config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
-    gpkg <- lpvGPD lpv
+    gpkg <- ppGPD pp
     let (exeCandidates, testCandidates, benchCandidates) =
             case mtarget of
                 Just (TargetComps comps) -> splitComponents $ Set.toList comps
@@ -264,12 +263,12 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    componentFiles <- mkIOThunk $ fst <$> getPackageFilesForTargets pkg (lpvCabalFP lpv) nonLibComponents
+    componentFiles <- mkIOThunk $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
     checkCacheResults <- mkIOThunk $ do
       componentFiles' <- runIOThunk componentFiles
       forM (Map.toList componentFiles') $ \(component, files) -> do
-        mbuildCache <- tryGetBuildCache (lpvRoot lpv) component
+        mbuildCache <- tryGetBuildCache (ppRoot pp) component
         checkCacheResult <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (Set.toList files)
@@ -281,7 +280,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
           pure $
             if not (Set.null allDirtyFiles)
                 then let tryStripPrefix y =
-                          fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
+                          fromMaybe y (stripPrefix (toFilePath $ ppRoot pp) y)
                       in Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
         newBuildCaches =
@@ -297,7 +296,7 @@ loadLocalPackage isLocal boptsCli targets (name, lpv) = do
         , lpForceDirty = boptsForceDirty bopts
         , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches
-        , lpCabalFile = lpvCabalFP lpv
+        , lpCabalFile = ppCabalFP pp
         , lpWanted = isWanted
         , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these

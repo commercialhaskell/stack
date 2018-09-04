@@ -32,7 +32,6 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Build.Target
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Package
@@ -162,7 +161,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
+            pkgDirs <- view $ buildConfigL.to (map ppRoot . Map.elems . bcPackages)
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
@@ -231,7 +230,7 @@ generateHpcReportForTargets opts = do
                     { boptsCLITargets = if hroptsAll opts then [] else targetNames }
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     TargetAll Dependency -> throwString $
+                     TargetAll PTDependency -> throwString $
                          "Error: Expected a local package, but " ++
                          packageNameString name ++
                          " is either an extra-dep or in the snapshot."
@@ -245,7 +244,7 @@ generateHpcReportForTargets opts = do
                                      "Can't specify anything except test-suites as hpc report targets (" ++
                                      packageNameString name ++
                                      " is used with a non test-suite target)"
-                     TargetAll ProjectPackage -> do
+                     TargetAll PTProject -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath
                          if exists

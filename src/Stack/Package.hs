@@ -24,8 +24,9 @@ module Stack.Package
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageDependencies
-  ,mkLocalPackageView)
-  where
+  ,mkProjectPackage
+  ,mkDepPackage
+  ) where
 
 import qualified Data.ByteString.Lazy.Char8 as CL8
 import           Data.List (isPrefixOf, unzip)
@@ -1339,17 +1340,38 @@ resolveDirOrWarn :: FilePath.FilePath
 resolveDirOrWarn = resolveOrWarn "Directory" f
   where f p x = liftIO (forgivingAbsence (resolveDir p x)) >>= rejectMissingDir
 
--- | Create a 'LocalPackageView' from a directory containing a package.
-mkLocalPackageView
-  :: forall env. HasConfig env
+-- | Create a 'ProjectPackage' from a directory containing a package.
+mkProjectPackage
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PrintWarnings
   -> ResolvedPath Dir
-  -> RIO env LocalPackageView
-mkLocalPackageView printWarnings dir = do
+  -> RIO env ProjectPackage
+mkProjectPackage printWarnings dir = do
   (gpd, name, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
-  return LocalPackageView
-    { lpvCabalFP = cabalfp
-    , lpvGPD' = gpd printWarnings
-    , lpvResolvedDir = dir
-    , lpvName = name
+  return ProjectPackage
+    { ppCabalFP = cabalfp
+    , ppGPD' = gpd printWarnings
+    , ppResolvedDir = dir
+    , ppName = name
+    }
+
+-- | Create a 'DepPackage' from a 'PackageLocation'
+mkDepPackage
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => PackageLocation
+  -> RIO env DepPackage
+mkDepPackage pl = do
+  (name, gpdio) <-
+    case pl of
+      PLMutable dir -> do
+        (gpdio, name, _cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
+        pure (name, gpdio NoPrintWarnings)
+      PLImmutable pli -> do
+        PackageIdentifier name _ <- getPackageLocationIdent pli
+        run <- askRunInIO
+        pure (name, run $ loadCabalFileImmutable pli)
+  return DepPackage
+    { dpGPD' = gpdio
+    , dpLocation = pl
+    , dpName = name
     }

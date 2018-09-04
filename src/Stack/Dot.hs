@@ -28,7 +28,6 @@ import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Config (getLocalPackages)
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
@@ -91,7 +90,7 @@ createPrunedDependencyGraph :: HasEnvConfig env
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
-  localNames <- liftM (Map.keysSet . lpProject) getLocalPackages
+  localNames <- view $ buildConfigL.to (Map.keysSet . bcPackages)
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
                        then dotPrune dotOpts

@@ -34,7 +34,7 @@ listTargets = do
   where
     toNameAndComponent
       :: PackageName
-      -> LocalPackageView
+      -> ProjectPackage
       -> RIO env [(PackageName, NamedComponent)]
     toNameAndComponent pkgName' =
-        fmap (map (pkgName', ) . Set.toList) . lpvComponents
+        fmap (map (pkgName', ) . Set.toList) . ppComponents
