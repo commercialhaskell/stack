@@ -1107,10 +1107,10 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                            style Shell (fromString (unwords (cmd : args))) <> line <>
                            -- TODO: Figure out how to insert \ in the appropriate spots
                            -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
-                           "run in " <> display wd) <> line <> line <>
+                           "run in " <> pretty wd) <> line <> line <>
                         "The following directories may now contain files, but won't be used by stack:" <> line <>
-                        "  -" <+> display tempDir <> line <>
-                        "  -" <+> display destDir <> line
+                        "  -" <+> pretty tempDir <> line <>
+                        "  -" <+> pretty destDir <> line
                     liftIO exitFailure
 
     logSticky $

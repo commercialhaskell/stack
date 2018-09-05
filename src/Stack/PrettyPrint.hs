@@ -21,7 +21,7 @@ module Stack.PrettyPrint
     , spacedBulletedList
     , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
-    , Display (..), StyleDoc, StyleAnn (..), Doc
+    , Pretty (..), StyleDoc, StyleAnn (..)
     , nest, line, linebreak, group, softline, softbreak
     , align, hang, indent, encloseSep
     , (<+>)
@@ -39,7 +39,7 @@ import           Data.List (intersperse)
 import qualified Data.Text as T
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
-import           Text.PrettyPrint.Leijen.Extended (Display (display), Doc,
+import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
                      StyleAnn (..), StyleDoc, (<+>), align,
                      angles, braces, brackets, cat,
                      displayAnsi, displayPlain, dquotes, enclose, encloseSep,
@@ -49,7 +49,7 @@ import           Text.PrettyPrint.Leijen.Extended (Display (display), Doc,
                      styleAnn, vcat, vsep)
 
 displayWithColor
-    :: (HasRunner env, Display a,
+    :: (HasRunner env, Pretty a,
         MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
@@ -59,7 +59,7 @@ displayWithColor x = do
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: (HasRunner env, HasCallStack, Display b,
+prettyWith :: (HasRunner env, HasCallStack, Pretty b,
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
 prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
@@ -125,15 +125,15 @@ prettyErrorNoIndentS = prettyErrorNoIndentWith flow
 --   consistent spacing/indenting/etc.
 --
 --   For example this is used after "Warning:" in warning messages.
-indentAfterLabel :: Doc a -> Doc a
+indentAfterLabel :: StyleDoc -> StyleDoc
 indentAfterLabel = align
 
 -- | Make a 'Doc' from each word in a 'String'
-wordDocs :: String -> [Doc a]
+wordDocs :: String -> [StyleDoc]
 wordDocs = map fromString . words
 
 -- | Wordwrap a 'String'
-flow :: String -> Doc a
+flow :: String -> StyleDoc
 flow = fillSep . wordDocs
 
 debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,

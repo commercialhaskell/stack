@@ -209,7 +209,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     -- constitute the package. This is primarily used for dirtiness
     -- checking during build, as well as use by "stack ghci"
     pkgFiles = GetPackageFiles $
-        \cabalfp -> debugBracket ("getPackageFiles" <+> display cabalfp) $ do
+        \cabalfp -> debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
              env <- view envConfigL
@@ -1276,7 +1276,7 @@ logPossibilities dirs mn = do
         [ flow "Unable to find a known candidate for the Cabal entry"
         , (style PP.Module . fromString $ D.display mn) <> ","
         , flow "but did find:"
-        , line <> bulletedList (map display possibilities)
+        , line <> bulletedList (map pretty possibilities)
         , flow "If you are using a custom preprocessor for this module"
         , flow "with its own file extension, consider adding the file(s)"
         , flow "to your .cabal under extra-source-files."
@@ -1320,7 +1320,7 @@ resolveOrWarn subject resolver path =
        prettyWarnL
            [ fromString . T.unpack $ subject -- TODO: needs style?
            , flow "listed in"
-           , maybe (display file) display (stripProperPrefix cwd file)
+           , maybe (pretty file) pretty (stripProperPrefix cwd file)
            , flow "file does not exist:"
            , style Dir . fromString $ path
            ]

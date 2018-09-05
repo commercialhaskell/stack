@@ -235,7 +235,7 @@ findFileTargets locals fileTargets = do
             [] -> do
                 prettyWarn $ vsep
                     [ "Couldn't find a component for file target" <+>
-                      display fp <>
+                      pretty fp <>
                       ". This means that the correct ghc options might not be used."
                     , "Attempting to load the file anyway."
                     ]
@@ -243,12 +243,12 @@ findFileTargets locals fileTargets = do
             [x] -> do
                 prettyInfo $
                     "Using configuration for" <+> displayPkgComponent x <+>
-                    "to load" <+> display fp
+                    "to load" <+> pretty fp
                 return $ Right (fp, x)
             (x:_) -> do
                 prettyWarn $
                     "Multiple components contain file target" <+>
-                    display fp <> ":" <+>
+                    pretty fp <> ":" <+>
                     mconcat (intersperse ", " (map displayPkgComponent xs)) <> line <>
                     "Guessing the first one," <+> displayPkgComponent x <> "."
                 return $ Right (fp, x)
@@ -437,7 +437,7 @@ writeMacrosFile outputDirectory pkgs = do
             if exists
                 then return $ Just cabalMacros
                 else do
-                    prettyWarnL ["Didn't find expected autogen file:", display cabalMacros]
+                    prettyWarnL ["Didn't find expected autogen file:", pretty cabalMacros]
                     return Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
@@ -801,11 +801,11 @@ checkForDuplicateModules pkgs = do
       unionModuleMaps (map ghciPkgModules pkgs)
     prettyDuplicate :: (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent))) -> StyleDoc
     prettyDuplicate (mn, mp) =
-      style Error (display mn) <+> "found at the following paths" <> line <>
+      style Error (pretty mn) <+> "found at the following paths" <> line <>
       bulletedList (map fileDuplicate (M.toList mp))
     fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> StyleDoc
     fileDuplicate (fp, comps) =
-      display fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
+      pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
 targetWarnings
   :: HasRunner env
@@ -833,12 +833,12 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
           , ""
           , bulletedList
               [ fillSep
-                  [ flow "If you want to start a different project configuration than" <+> display stackYaml <> ", then you can use"
+                  [ flow "If you want to start a different project configuration than" <+> pretty stackYaml <> ", then you can use"
                   , style Shell "stack init"
                   , flow "to create a new stack.yaml for the packages in the current directory."
                   , line
                   ]
-              , flow "If you want to use the project configuration at" <+> display stackYaml <> ", then you can add to its 'packages' field."
+              , flow "If you want to use the project configuration at" <+> pretty stackYaml <> ", then you can add to its 'packages' field."
               ]
           , ""
           ]

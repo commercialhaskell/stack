@@ -1462,7 +1462,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
-                        display cabalfp <> ":" <> line <>
+                        pretty cabalfp <> ":" <> line <>
                         indent 4 (mconcat $ intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."

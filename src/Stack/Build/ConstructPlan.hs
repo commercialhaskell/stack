@@ -935,7 +935,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
       , line <> line
       ] ++
       (if not onlyHasDependencyMismatches then [] else
-         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> display (defaultUserConfigPath stackRoot) <+> "to ignore all version constraints and build anyway.")
+         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> pretty (defaultUserConfigPath stackRoot) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
       ) ++
@@ -956,7 +956,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
          [ "  *" <+> align
            (style Recommendation (flow "Recommended action:") <+>
             flow "try adding the following to your extra-deps in" <+>
-            display stackYaml <> ":")
+            pretty stackYaml <> ":")
          , line <> line
          , vsep (map pprintExtra (Map.toList extras))
          , line
