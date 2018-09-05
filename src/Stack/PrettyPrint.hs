@@ -36,7 +36,6 @@ module Stack.PrettyPrint
 import qualified RIO
 import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
-import qualified Data.Text as T
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
 import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
@@ -51,7 +50,7 @@ import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
 displayWithColor
     :: (HasRunner env, Pretty a,
         MonadReader env m, HasLogFunc env, HasCallStack)
-    => a -> m T.Text
+    => a -> m Utf8Builder
 displayWithColor x = do
     useAnsi <- view useColorL
     termWidth <- view $ runnerL.to runnerTermWidth

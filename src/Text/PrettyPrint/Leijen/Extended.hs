@@ -113,12 +113,10 @@ import Control.Monad.Reader (runReader, local)
 import Data.Array.IArray ((!), (//))
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Builder as LTB
 import Distribution.ModuleName (ModuleName)
 import qualified Distribution.Text (display)
 import Stack.DefaultStyles (defaultStyles)
-import Stack.Prelude hiding (Display (..))
+import Stack.Prelude
 import Stack.Types.PrettyPrint (Style (Dir, File), Styles)
 import Stack.Types.Runner (HasRunner, stylesUpdateL)
 import Stack.Types.StylesUpdate (StylesUpdate (..))
@@ -198,10 +196,9 @@ toAnsiDoc styles = go
 displayPlain
     :: (Pretty a, HasRunner env, HasLogFunc env, MonadReader env m,
         HasCallStack)
-    => Int -> a -> m T.Text
-displayPlain w x = do
-    t <- (displayAnsiSimple . renderDefault w . fmap (const mempty) . unStyleDoc . pretty) x
-    return $ LT.toStrict t
+    => Int -> a -> m Utf8Builder
+displayPlain w =
+    displayAnsiSimple . renderDefault w . fmap (const mempty) . unStyleDoc . pretty
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
@@ -212,10 +209,9 @@ renderDefault = P.renderPretty 1
 displayAnsi
     :: (Pretty a, HasRunner env, HasLogFunc env,
         MonadReader env m, HasCallStack)
-    => Int -> a -> m T.Text
-displayAnsi w x = do
-    t <- (displayAnsiSimple . renderDefault w . unStyleDoc . pretty) x
-    return $ LT.toStrict t
+    => Int -> a -> m Utf8Builder
+displayAnsi w = do
+    displayAnsiSimple . renderDefault w . unStyleDoc . pretty
 
 {- Not used --------------------------------------------------------------------
 
@@ -230,13 +226,13 @@ hDisplayAnsi h w x = liftIO $ do
 
 displayAnsiSimple
     :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
-    => SimpleDoc StyleAnn -> m LT.Text
+    => SimpleDoc StyleAnn -> m Utf8Builder
 displayAnsiSimple doc = do
     update <- view stylesUpdateL
     let styles = defaultStyles // stylesUpdate update
         doc' = toAnsiDoc styles doc
     return $
-        LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc'
+        flip runReader mempty $ displayDecoratedWrap go doc'
   where
     go (AnsiAnn sgrs) inner = do
         old <- ask
@@ -264,24 +260,24 @@ displayAnsiSimple doc = do
 
 displayDecoratedWrap
     :: forall a m. Monad m
-    => (forall b. a -> m (b, LTB.Builder) -> m (b, LTB.Builder))
+    => (forall b. a -> m (b, Utf8Builder) -> m (b, Utf8Builder))
     -> SimpleDoc a
-    -> m LTB.Builder
+    -> m Utf8Builder
 displayDecoratedWrap f doc = do
     (mafter, result) <- go doc
     case mafter of
       Just _ -> error "Invariant violated by input to displayDecoratedWrap: no matching SAnnotStart for SAnnotStop."
       Nothing -> return result
   where
-    spaces n = LTB.fromText (T.replicate n " ")
+    spaces n = display (T.replicate n " ")
 
-    go :: SimpleDoc a -> m (Maybe (SimpleDoc a), LTB.Builder)
+    go :: SimpleDoc a -> m (Maybe (SimpleDoc a), Utf8Builder)
     go SEmpty = return (Nothing, mempty)
-    go (SChar c x) = liftM (fmap (LTB.singleton c <>)) (go x)
+    go (SChar c x) = liftM (fmap (display c <>)) (go x)
     -- NOTE: Could actually use the length to guess at an initial
     -- allocation.  Better yet would be to just use Text in pprint..
     go (SText _l s x) = liftM (fmap (fromString s <>)) (go x)
-    go (SLine n x) = liftM (fmap ((LTB.singleton '\n' <>) . (spaces n <>))) (go x)
+    go (SLine n x) = liftM (fmap ((display '\n' <>) . (spaces n <>))) (go x)
     go (SAnnotStart ann x) = do
         (mafter, contents) <- f ann (go x)
         case mafter of
