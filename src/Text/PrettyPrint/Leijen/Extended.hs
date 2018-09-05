@@ -25,7 +25,7 @@ module Text.PrettyPrint.Leijen.Extended
   --
   -- See "System.Console.ANSI" for 'SGR' values to use beyond the colors
   -- provided.
-  StyleDoc, StyleAnn(..), HasStyleAnn(..),
+  StyleDoc, StyleAnn(..),
   -- hDisplayAnsi,
   displayAnsi, displayPlain, renderDefault,
 
@@ -145,14 +145,11 @@ instance Monoid (Doc a) where
 -- Pretty-Print class
 
 class Display a where
-    type Ann a
-    type Ann a = StyleAnn
-    display :: a -> Doc (Ann a)
-    default display :: Show a => a -> Doc (Ann a)
+    display :: a -> Doc StyleAnn
+    default display :: Show a => a -> Doc StyleAnn
     display = fromString . show
 
-instance Display (Doc a) where
-    type Ann (Doc a) = a
+instance a ~ StyleAnn => Display (Doc a) where
     display = id
 
 instance Display (Path b File) where
@@ -174,15 +171,6 @@ newtype StyleAnn = StyleAnn (Maybe Style)
 instance Monoid StyleAnn where
     mempty = StyleAnn Nothing
     mappend = (<>)
-
-class HasStyleAnn a where
-    getStyleAnn :: a -> StyleAnn
-    toStyleDoc :: Doc a -> StyleDoc
-    toStyleDoc = fmap getStyleAnn
-
-instance HasStyleAnn StyleAnn where
-    getStyleAnn = id
-    toStyleDoc = id
 
 -- |A document annotated by a style
 type StyleDoc = Doc StyleAnn
@@ -220,11 +208,11 @@ renderDefault :: Int -> Doc a -> SimpleDoc a
 renderDefault = renderPretty 1
 
 displayAnsi
-    :: (Display a, HasStyleAnn (Ann a), HasRunner env, HasLogFunc env,
+    :: (Display a, HasRunner env, HasLogFunc env,
         MonadReader env m, HasCallStack)
     => Int -> a -> m T.Text
 displayAnsi w x = do
-    t <- (displayAnsiSimple . renderDefault w . toStyleDoc . display) x
+    t <- (displayAnsiSimple . renderDefault w . display) x
     return $ LT.toStrict t
 
 {- Not used --------------------------------------------------------------------

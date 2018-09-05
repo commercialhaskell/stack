@@ -21,7 +21,7 @@ module Stack.PrettyPrint
     , spacedBulletedList
     , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
-    , Display (..), StyleDoc, StyleAnn (..), HasStyleAnn(..), Doc
+    , Display (..), StyleDoc, StyleAnn (..), Doc
     , nest, line, linebreak, group, softline, softbreak
     , align, hang, indent, encloseSep
     , (<+>)
@@ -39,8 +39,8 @@ import           Data.List (intersperse)
 import qualified Data.Text as T
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
-import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
-                     HasStyleAnn (..), StyleAnn (..), StyleDoc, (<+>), align,
+import           Text.PrettyPrint.Leijen.Extended (Display (display), Doc,
+                     StyleAnn (..), StyleDoc, (<+>), align,
                      angles, braces, brackets, cat,
                      displayAnsi, displayPlain, dquotes, enclose, encloseSep,
                      fill, fillBreak, fillCat, fillSep, group, hang, hcat, hsep,
@@ -49,7 +49,7 @@ import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
                      styleAnn, vcat, vsep)
 
 displayWithColor
-    :: (HasRunner env, Display a, HasStyleAnn (Ann a),
+    :: (HasRunner env, Display a,
         MonadReader env m, HasLogFunc env, HasCallStack)
     => a -> m T.Text
 displayWithColor x = do
@@ -59,7 +59,7 @@ displayWithColor x = do
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: (HasRunner env, HasCallStack, Display b, HasStyleAnn (Ann b),
+prettyWith :: (HasRunner env, HasCallStack, Display b,
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
 prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
