@@ -1,4 +1,4 @@
-resolver: nightly-2018-09-02
+resolver: snapshot-nightly.yaml
 
 packages:
 - .
@@ -6,11 +6,6 @@ packages:
 - subs/curator
 
 extra-deps:
-- Cabal-2.4.0.0@rev:0
-- http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.6@rev:2
-- unliftio-0.2.8.0@sha256:5a47f12ffcee837215c67b05abf35dffb792096564a6f81652d75a54668224cd,2250
-
 # Ugly, temporary hack
 - github: fpco/store
   commit: 8ff486ea5a16665c7fd279963344ac8ef99b6e2a
