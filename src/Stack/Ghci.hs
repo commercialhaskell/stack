@@ -210,6 +210,10 @@ parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
          { boptsCLITargets = [target] }
      return targets
 
+-- | Display PackageName + NamedComponent
+displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
+displayPkgComponent = style PkgComponent . fromString . T.unpack . renderPkgComponent
+
 findFileTargets
     :: HasEnvConfig env
     => [LocalPackage]
@@ -238,15 +242,15 @@ findFileTargets locals fileTargets = do
                 return $ Left fp
             [x] -> do
                 prettyInfo $
-                    "Using configuration for" <+> display x <+>
+                    "Using configuration for" <+> displayPkgComponent x <+>
                     "to load" <+> display fp
                 return $ Right (fp, x)
             (x:_) -> do
                 prettyWarn $
                     "Multiple components contain file target" <+>
                     display fp <> ":" <+>
-                    mconcat (intersperse ", " (map display xs)) <> line <>
-                    "Guessing the first one," <+> display x <> "."
+                    mconcat (intersperse ", " (map displayPkgComponent xs)) <> line <>
+                    "Guessing the first one," <+> displayPkgComponent x <> "."
                 return $ Right (fp, x)
     let (extraFiles, associatedFiles) = partitionEithers results
         targetMap =
@@ -801,7 +805,7 @@ checkForDuplicateModules pkgs = do
       bulletedList (map fileDuplicate (M.toList mp))
     fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> StyleDoc
     fileDuplicate (fp, comps) =
-      display fp <+> parens (fillSep (punctuate "," (map display (S.toList comps))))
+      display fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
 targetWarnings
   :: HasRunner env

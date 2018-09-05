@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -38,9 +37,6 @@ import qualified RIO
 import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
 import qualified Data.Text as T
-import qualified Distribution.ModuleName as C (ModuleName)
-import qualified Distribution.Text as C (display)
-import           Stack.Types.NamedComponent
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
 import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
@@ -161,18 +157,6 @@ debugBracket msg f = do
 -- |Annotate a 'StyleDoc' with a 'Style'.
 style :: Style -> StyleDoc -> StyleDoc
 style = styleAnn
-
-instance Display (Path b File) where
-    display = style File . fromString . toFilePath
-
-instance Display (Path b Dir) where
-    display = style Dir . fromString . toFilePath
-
-instance Display (PackageName, NamedComponent) where
-    display = style PkgComponent . fromString . T.unpack . renderPkgComponent
-
-instance Display C.ModuleName where
-    display = fromString . C.display
 
 -- Display milliseconds.
 displayMilliseconds :: Double -> StyleDoc

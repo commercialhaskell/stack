@@ -116,9 +116,11 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
+import Distribution.ModuleName (ModuleName)
+import qualified Distribution.Text (display)
 import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude hiding (Display (..))
-import Stack.Types.PrettyPrint (Style, Styles)
+import Stack.Types.PrettyPrint (Style (Dir, File), Styles)
 import Stack.Types.Runner (HasRunner, stylesUpdateL)
 import Stack.Types.StylesUpdate (StylesUpdate (..))
 import System.Console.ANSI (ConsoleLayer (..), SGR (..), setSGRCode)
@@ -152,6 +154,15 @@ class Display a where
 instance Display (Doc a) where
     type Ann (Doc a) = a
     display = id
+
+instance Display (Path b File) where
+    display = styleAnn File . fromString . toFilePath
+
+instance Display (Path b Dir) where
+    display = styleAnn Dir . fromString . toFilePath
+
+instance Display ModuleName where
+    display = fromString . Distribution.Text.display
 
 --------------------------------------------------------------------------------
 -- Style Doc
