@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ed0f447fdceff7f51c2eecf6d0280d2f6d80b270b641ae30e3c6d9e6515b2cd4
+-- hash: ef55ce5fc6e76cfd9c4cf5edcd15ad09467957a66ab02af3f5fa0cc6f7bd7f59
 
 name:           pantry
 version:        0.1.0.0
@@ -38,7 +38,6 @@ library
       Data.Store.Version
       Data.Store.Internal
   other-modules:
-      Data.Store.Impl
       Hackage.Security.Client.Repository.HttpLib.HttpClient
       Pantry.Archive
       Pantry.Hackage

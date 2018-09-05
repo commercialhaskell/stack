@@ -5,7 +5,6 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
