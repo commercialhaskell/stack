@@ -24,6 +24,7 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
+import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Constants (wiredInPackages)
@@ -33,9 +34,9 @@ import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
-import qualified    System.Directory as D
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
+import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
 -- | Like 'loadSourceMapFull', but doesn't return values that aren't as
 -- commonly needed.
@@ -374,7 +375,7 @@ checkBuildCache oldCache files = do
             fileTimes
             oldCache
   where
-    go :: FilePath -> Maybe ModTime -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
+    go :: FilePath -> Maybe CTime -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
     -- Filter out the cabal_macros file to avoid spurious recompilations
     go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
     -- Common case where it's in the cache and on the filesystem.
@@ -397,7 +398,7 @@ checkBuildCache oldCache files = do
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
     :: HasEnvConfig env
-    => ModTime
+    => CTime
     -> Package
     -> Path Abs File
     -> Set NamedComponent
@@ -443,20 +444,20 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
     return (componentsFiles, warnings)
 
 -- | Get file modification time, if it exists.
-getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)
+getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe CTime)
 getModTimeMaybe fp =
     liftIO
         (catch
              (liftM
-                  (Just . modTime)
-                  (D.getModificationTime fp))
+                  (Just . modificationTime)
+                  (getFileStatus fp))
              (\e ->
                    if isDoesNotExistError e
                        then return Nothing
                        else throwM e))
 
 -- | Create FileCacheInfo for a file.
-calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
+calcFci :: MonadIO m => CTime -> FilePath -> m FileCacheInfo
 calcFci modTime' fp = liftIO $
     withSourceFile fp $ \src -> do
         (size, digest) <- runConduit $ src .| getZipSink
@@ -467,7 +468,7 @@ calcFci modTime' fp = liftIO $
                 <*> ZipSink SHA256.sinkHash)
         return FileCacheInfo
             { fciModTime = modTime'
-            , fciSize = size
+            , fciSize = FileSize size
             , fciHash = digest
             }
 

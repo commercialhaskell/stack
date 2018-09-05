@@ -46,7 +46,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import           Data.Time.Clock (getCurrentTime)
 import           Data.Tuple
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
@@ -55,6 +54,7 @@ import           Distribution.System            (OS (Windows),
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
+import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
@@ -86,7 +86,8 @@ import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (..))
 import qualified System.FilePath as FP
 import           System.IO (hPutStr, stderr, stdout)
-import           System.PosixCompat.Files (createLink)
+import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
+import           System.PosixCompat.Time (epochTime)
 import           RIO.Process
 
 -- | Has an executable been built or not?
@@ -801,7 +802,7 @@ ensureConfig :: HasEnvConfig env
              -> Task
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
-    newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
+    newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
     needConfig <-
         if boptsReconfigure eeBuildOpts || taskAnyMissing task
             then return True
@@ -1442,7 +1443,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         -- FIXME: only output these if they're in the build plan.
 
-        preBuildTime <- modTime <$> liftIO getCurrentTime
+        preBuildTime <- liftIO epochTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
                     TTFilePath lp Local -> do
@@ -1675,7 +1676,7 @@ checkExeStatus compiler platform distDir name = do
         file = T.unpack name
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: HasEnvConfig env => TaskType -> ModTime -> Path Abs Dir -> RIO env [PackageWarning]
+checkForUnlistedFiles :: HasEnvConfig env => TaskType -> CTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTFilePath lp _) preBuildTime pkgDir = do
     caches <- runMemoized $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
