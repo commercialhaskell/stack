@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -28,9 +29,13 @@ module Data.Store.Version
     , namedVersionConfig
     , encodeWithVersionQ
     , decodeWithVersionQ
+    , storeVersionConfig
+    , versionedEncodeFile
+    , versionedDecodeFile
+    , versionedDecodeOrLoad
     ) where
 
-import           Control.Monad
+import RIO
 import           Control.Monad.Trans.State
 import qualified Crypto.Hash as Hash
 import qualified Data.ByteArray
@@ -40,7 +45,7 @@ import qualified Data.ByteString.Char8 as BS8
 import           Data.Generics hiding (DataType, Generic)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Store.Internal
+import           Data.Store
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -53,6 +58,10 @@ import           System.Environment
 import           System.FilePath
 import           TH.RelativePaths
 import           TH.Utilities
+import Data.Store.Core (unsafeEncodeWith)
+import Path (Path, Abs, File, toFilePath, parent)
+import Path.IO (ensureDir)
+import Prelude (ShowS, showChar, showString, showParen, repeat)
 
 newtype StoreVersion = StoreVersion { unStoreVersion :: BS.ByteString }
     deriving (Eq, Show, Ord, Data, Typeable, Generic, Store)
@@ -285,3 +294,88 @@ displayVersionError expectedVersion receivedVersion =
 
 markEncodedVersion :: Word32
 markEncodedVersion = 3908297288
+
+versionedEncodeFile :: Data a => VersionConfig a -> Q Exp
+versionedEncodeFile vc = [e| storeEncodeFile $(encodeWithVersionQ vc) $(decodeWithVersionQ vc) |]
+
+versionedDecodeOrLoad :: Data a => VersionConfig a -> Q Exp
+versionedDecodeOrLoad vc = [| versionedDecodeOrLoadImpl $(encodeWithVersionQ vc) $(decodeWithVersionQ vc) |]
+
+versionedDecodeFile :: Data a => VersionConfig a -> Q Exp
+versionedDecodeFile vc = [e| versionedDecodeFileImpl $(decodeWithVersionQ vc) |]
+
+-- | Write to the given file.
+storeEncodeFile :: (Store a, MonadIO m, MonadReader env m, HasCallStack, HasLogFunc env, Eq a)
+                => (a -> (Int, Poke ()))
+                -> Peek a
+                -> Path Abs File
+                -> a
+                -> m ()
+storeEncodeFile pokeFunc peekFunc fp x = do
+    let fpt = fromString (toFilePath fp)
+    logDebug $ "Encoding " <> fpt
+    ensureDir (parent fp)
+    let (sz, poker) = pokeFunc x
+        encoded = unsafeEncodeWith poker sz
+    assert (decodeExWith peekFunc encoded == x) $ liftIO $ BS.writeFile (toFilePath fp) encoded
+    logDebug $ "Finished writing " <> fpt
+
+-- | Read from the given file. If the read fails, run the given action and
+-- write that back to the file. Always starts the file off with the
+-- version tag.
+versionedDecodeOrLoadImpl :: (Store a, Eq a, MonadUnliftIO m, MonadReader env m, HasCallStack, HasLogFunc env)
+                          => (a -> (Int, Poke ()))
+                          -> Peek a
+                          -> Path Abs File
+                          -> m a
+                          -> m a
+versionedDecodeOrLoadImpl pokeFunc peekFunc fp mx = do
+    let fpt = fromString (toFilePath fp)
+    logDebug $ "Trying to decode " <> fpt
+    mres <- versionedDecodeFileImpl peekFunc fp
+    case mres of
+        Just x -> do
+            logDebug $ "Success decoding " <> fpt
+            return x
+        _ -> do
+            logDebug $ "Failure decoding " <> fpt
+            x <- mx
+            storeEncodeFile pokeFunc peekFunc fp x
+            return x
+
+versionedDecodeFileImpl :: (Store a, MonadUnliftIO m, MonadReader env m, HasCallStack, HasLogFunc env)
+                        => Peek a
+                        -> Path loc File
+                        -> m (Maybe a)
+versionedDecodeFileImpl peekFunc fp = do
+    mbs <- liftIO (Just <$> BS.readFile (toFilePath fp)) `catch` \(err :: IOException) -> do
+        logDebug ("Exception ignored when attempting to load " <> fromString (toFilePath fp) <> ": " <> displayShow err)
+        return Nothing
+    case mbs of
+        Nothing -> return Nothing
+        Just bs ->
+            liftIO (Just <$> decodeIOWith peekFunc bs) `catch` \(err :: PeekException) -> do
+                 let fpt = fromString (toFilePath fp)
+                 logDebug ("Error while decoding " <> fpt <> ": " <> displayShow err <> " (this might not be an error, when switching between stack versions)")
+                 return Nothing
+
+storeVersionConfig :: String -> String -> VersionConfig a
+storeVersionConfig name hash = (namedVersionConfig name hash)
+    { vcIgnore = S.fromList
+        [ "Data.Vector.Unboxed.Base.Vector GHC.Types.Word"
+        , "Data.ByteString.Internal.ByteString"
+        , "Data.ByteString.Short.Internal.ShortByteString"
+        ]
+    , vcRenames = M.fromList
+        [ ( "Data.Maybe.Maybe", "GHC.Base.Maybe")
+        , ( "Stack.Types.Compiler.CVActual"
+          , "Stack.Types.Compiler.'CVActual"
+          )
+        , ( "Stack.Types.Compiler.CVWanted"
+          , "Stack.Types.Compiler.'CVWanted"
+          )
+        -- moved in containers 0.5.9.1
+        , ( "Data.Map.Internal.Map", "Data.Map.Base.Map")
+        , ( "Data.Set.Internal.Set", "Data.Set.Base.Set")
+        ]
+    }

@@ -11,7 +11,6 @@ module Stack.Types.PackageDump
 
 import Data.Store
 import Data.Store.Version
-import Data.Store.VersionTagged
 import Stack.Prelude
 import Stack.Types.GhcPkgId
 

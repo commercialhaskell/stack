@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ef55ce5fc6e76cfd9c4cf5edcd15ad09467957a66ab02af3f5fa0cc6f7bd7f59
+-- hash: afccfe103ea543f631a45a4eb39d3e8e73f49aa792d9f0b23a5f4330279b151a
 
 name:           pantry
 version:        0.1.0.0
@@ -36,7 +36,6 @@ library
       Data.Aeson.Extended
       Data.Store
       Data.Store.Version
-      Data.Store.Internal
   other-modules:
       Hackage.Security.Client.Repository.HttpLib.HttpClient
       Pantry.Archive

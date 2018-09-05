@@ -54,7 +54,6 @@ import           Data.List.Extra
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
 import           Data.Store.Version
-import           Data.Store.VersionTagged
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8With)
 import           Data.Text.Encoding.Error        (lenientDecode)

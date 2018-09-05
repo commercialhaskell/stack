@@ -97,7 +97,6 @@ library:
   - Data.Aeson.Extended
   - Data.Store
   - Data.Store.Version
-  - Data.Store.Internal
 
 tests:
   spec:

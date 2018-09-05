@@ -20,7 +20,7 @@ module Stack.StoreTH
   , decodeOrLoadLoadedSnapshot
   ) where
 
-import Data.Store.VersionTagged
+import Data.Store.Version
 import Stack.Prelude
 import Stack.Types.Build
 import Stack.Types.BuildPlan

@@ -13,8 +13,7 @@ import           Stack.Prelude
 import qualified RIO.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import           Data.Store.Version (VersionConfig)
-import           Data.Store.VersionTagged (storeVersionConfig)
+import           Data.Store.Version (VersionConfig, storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)

@@ -26,7 +26,6 @@ module Stack.Types.BuildPlan
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.Version
-import           Data.Store.VersionTagged
 import qualified Distribution.ModuleName as C
 import           Distribution.ModuleName (ModuleName)
 import           Pantry
