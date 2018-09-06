@@ -80,7 +80,8 @@ withRunner logLevel useTime terminal colorWhen stylesUpdate widthOverride reExec
   useColor <- case colorWhen of
     ColorNever -> return False
     ColorAlways -> return True
-    ColorAuto -> liftIO $ hSupportsANSI stderr
+    ColorAuto -> liftIO $ fromMaybe True <$>
+                          hSupportsANSIWithoutEmulation stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> liftIO getTerminalWidth)
                                    pure widthOverride
