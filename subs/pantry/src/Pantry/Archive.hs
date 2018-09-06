@@ -441,5 +441,5 @@ takeSubdir subdir = mapMaybe $ \(fp, a) -> do
   stripped <- List.stripPrefix subdirs $ splitDirs $ T.pack fp
   Just (T.intercalate "/" stripped, a)
   where
-    splitDirs = List.dropWhile (== "") . T.splitOn "/"
+    splitDirs = List.dropWhile (`elem` [".", ""]) . T.splitOn "/"
     subdirs = splitDirs subdir
