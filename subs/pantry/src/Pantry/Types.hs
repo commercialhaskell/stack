@@ -11,7 +11,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-} -- TODO REMOVE!
 module Pantry.Types
   ( PantryConfig (..)
   , HackageSecurityConfig (..)
@@ -111,14 +110,12 @@ import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDesc
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
 import Distribution.ModuleName (ModuleName)
-import qualified Distribution.ModuleName as ModuleName
 import Distribution.Types.Version (Version, mkVersion)
 import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Abs, Dir, File, toFilePath, filename)
-import Path.Internal (Path (..)) -- TODO don't import this
+import Path (Path, Abs, Dir, File, toFilePath, filename)
 import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
@@ -239,7 +236,8 @@ data ResolvedPath t = ResolvedPath
   }
   deriving (Show, Eq, Data, Generic, Ord)
 instance NFData (ResolvedPath t)
-instance (Generic t, Store t) => Store (ResolvedPath t)
+instance Store (ResolvedPath Dir)
+instance Store (ResolvedPath File)
 
 -- | Location to load a package from. Can either be immutable (see
 -- 'PackageLocationImmutable') or a local directory which is expected
@@ -1668,51 +1666,6 @@ instance FromJSON (WithJSONWarnings (Unresolved Snapshot)) where
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
 
--- TODO ORPHANS remove
-
-instance Store PackageIdentifier where
-  size =
-    VarSize $ \(PackageIdentifier name version) ->
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f name) +
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f version)
-  peek = PackageIdentifier <$> peek <*> peek
-  poke (PackageIdentifier name version) = poke name *> poke version
-instance Store PackageName where
-  size =
-    VarSize $ \name ->
-    case size of
-      ConstSize x -> x
-      VarSize f -> f (packageNameString name)
-  peek = peek >>= maybe (fail "Invalid package name") pure . parsePackageName
-  poke name = poke (packageNameString name)
-instance Store Version where
-  size =
-    VarSize $ \version ->
-    case size of
-      ConstSize x -> x
-      VarSize f -> f (versionString version)
-  peek = peek >>= maybe (fail "Invalid version") pure . parseVersion
-  poke version = poke (versionString version)
-instance Store FlagName where
-  size =
-    VarSize $ \fname ->
-    case size of
-      ConstSize x -> x
-      VarSize f -> f (flagNameString fname)
-  peek = peek >>= maybe (fail "Invalid flag name") pure . parseFlagName
-  poke fname = poke (flagNameString fname)
-instance Store ModuleName where
-  size =
-    VarSize $ \mname ->
-    case size of
-      ConstSize x -> x
-      VarSize f -> f $ ModuleName.components mname
-  peek = ModuleName.fromComponents <$> peek
-  poke = poke . ModuleName.components
 instance Store PackageIdentifierRevision where
   size =
     VarSize $ \(PackageIdentifierRevision name version cfi) ->
@@ -1727,18 +1680,3 @@ instance Store PackageIdentifierRevision where
        VarSize f -> f cfi)
   peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
   poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
-
-deriving instance Data Abs
-deriving instance Data Dir
-deriving instance Data File
-deriving instance (Data a, Data t) => Data (Path a t)
-
-deriving instance Generic Abs
-deriving instance Generic Dir
-deriving instance Generic File
-deriving instance (Generic a, Generic t) => Generic (Path a t)
-
-instance Store Abs
-instance Store Dir
-instance Store File
-instance (Generic a, Generic t, Store a, Store t) => Store (Path a t)

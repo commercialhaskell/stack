@@ -769,7 +769,7 @@ sdistCmd sdistOpts go =
                         [ PP.style Shell "stack sdist"
                         , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
                         , flow "However, the configuration at"
-                        , display stackYaml
+                        , pretty stackYaml
                         , flow "contains no packages, so no sdist tarballs will be generated."
                         ]
                     liftIO exitFailure
@@ -781,7 +781,7 @@ sdistCmd sdistOpts go =
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
-            prettyInfoL [flow "Wrote sdist tarball to", display tarPath]
+            prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
             checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
             when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)

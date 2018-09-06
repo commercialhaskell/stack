@@ -13,8 +13,6 @@ module Stack.Types.Build
     ,FlagSource(..)
     ,UnusedFlags(..)
     ,InstallLocation(..)
-    ,ModTime
-    ,modTime
     ,Installed(..)
     ,piiVersion
     ,piiLocation
@@ -48,18 +46,16 @@ module Stack.Types.Build
     where
 
 import           Stack.Prelude
+import           Data.Aeson                      (ToJSON, FromJSON)
 import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
 import           Data.List.Extra
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
 import           Data.Store.Version
-import           Data.Store.VersionTagged
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8With)
 import           Data.Text.Encoding.Error        (lenientDecode)
-import           Data.Time.Calendar
-import           Data.Time.Clock
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
@@ -373,12 +369,11 @@ newtype BuildCache = BuildCache
     { buildCacheTimes :: Map FilePath FileCacheInfo
       -- ^ Modification times of files.
     }
-    deriving (Generic, Eq, Show, Data, Typeable)
+    deriving (Generic, Eq, Show, Typeable, ToJSON, FromJSON)
 instance NFData BuildCache
-instance Store BuildCache
 
 buildCacheVC :: VersionConfig BuildCache
-buildCacheVC = storeVersionConfig "build-v2" "c9BeiWP7Mpe9OBDAPPEYPDaFEGM="
+buildCacheVC = storeVersionConfig "build-v2" "jpB3Ro38UTc2fLzn4m6mfRPl9vw="
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
@@ -640,15 +635,6 @@ configureOptsNoDir econfig bco deps isLocal package = concat
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
 wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
-
--- | One-way conversion to serialized time.
-modTime :: UTCTime -> ModTime
-modTime x =
-    ModTime
-        ( toModifiedJulianDay
-              (utctDay x)
-        , toRational
-              (utctDayTime x))
 
 -- | Configure options to be sent to Setup.hs configure
 data ConfigureOpts = ConfigureOpts

@@ -136,7 +136,7 @@ generateHpcReport pkgDir package tests = do
                         Just includeNames -> "--include" : intersperse "--include" (map (\n -> n ++ ":") includeNames)
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
-                forM_ mreportPath (displayReportPath report . display)
+                forM_ mreportPath (displayReportPath report . pretty)
 
 generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
@@ -269,9 +269,9 @@ generateHpcReportForTargets opts = do
     forM_ mreportPath $ \reportPath ->
         if hroptsOpenBrowser opts
             then do
-                prettyInfo $ "Opening" <+> display reportPath <+> "in the browser."
+                prettyInfo $ "Opening" <+> pretty reportPath <+> "in the browser."
                 void $ liftIO $ openBrowser (toFilePath reportPath)
-            else displayReportPath report (display reportPath)
+            else displayReportPath report (pretty reportPath)
 
 generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
@@ -295,7 +295,7 @@ generateHpcUnifiedReport = do
         else do
             let report = "unified report"
             mreportPath <- generateUnionReport report reportDir tixFiles
-            forM_ mreportPath (displayReportPath report . display)
+            forM_ mreportPath (displayReportPath report . pretty)
 
 generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]

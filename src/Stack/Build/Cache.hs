@@ -5,7 +5,6 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
@@ -40,6 +39,8 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Store as Store
 import qualified Data.Text as T
+import qualified Data.Yaml as Yaml
+import           Foreign.C.Types (CTime)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -51,6 +52,7 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import qualified System.FilePath as FP
+import           System.PosixCompat.Files (modificationTime, getFileStatus, setFileTimes)
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -120,7 +122,11 @@ tryGetBuildCache :: HasEnvConfig env
                  => Path Abs Dir
                  -> NamedComponent
                  -> RIO env (Maybe (Map FilePath FileCacheInfo))
-tryGetBuildCache dir component = liftM (fmap buildCacheTimes) . decodeBuildCache =<< buildCacheFile dir component
+tryGetBuildCache dir component = do
+  fp <- buildCacheFile dir component
+  ensureDir $ parent fp
+  either (const Nothing) (Just . buildCacheTimes) <$>
+    liftIO (tryAny (Yaml.decodeFileThrow (toFilePath fp)))
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: HasEnvConfig env
@@ -129,8 +135,11 @@ tryGetConfigCache dir = decodeConfigCache =<< configCacheFile dir
 
 -- | Try to read the mod time of the cabal file from the last build
 tryGetCabalMod :: HasEnvConfig env
-               => Path Abs Dir -> RIO env (Maybe ModTime)
-tryGetCabalMod dir = decodeModTime =<< configCabalMod dir
+               => Path Abs Dir -> RIO env (Maybe CTime)
+tryGetCabalMod dir = do
+  fp <- toFilePath <$> configCabalMod dir
+  liftIO $ either (const Nothing) (Just . modificationTime) <$>
+      tryIO (getFileStatus fp)
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: HasEnvConfig env
@@ -138,8 +147,8 @@ writeBuildCache :: HasEnvConfig env
                 -> NamedComponent
                 -> Map FilePath FileCacheInfo -> RIO env ()
 writeBuildCache dir component times = do
-    fp <- buildCacheFile dir component
-    encodeBuildCache fp BuildCache
+    fp <- toFilePath <$> buildCacheFile dir component
+    liftIO $ Yaml.encodeFile fp BuildCache
         { buildCacheTimes = times
         }
 
@@ -155,11 +164,12 @@ writeConfigCache dir x = do
 -- | See 'tryGetCabalMod'
 writeCabalMod :: HasEnvConfig env
               => Path Abs Dir
-              -> ModTime
+              -> CTime
               -> RIO env ()
 writeCabalMod dir x = do
-    fp <- configCabalMod dir
-    encodeModTime fp x
+    fp <- toFilePath <$> configCabalMod dir
+    writeFileBinary fp "Just used for its modification time"
+    liftIO $ setFileTimes fp x x
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
@@ -200,13 +210,17 @@ writeFlagCache gid cache = do
     ensureDir (parent file)
     encodeConfigCache file cache
 
+successBS, failureBS :: ByteString
+successBS = "success"
+failureBS = "failure"
+
 -- | Mark a test suite as having succeeded
 setTestSuccess :: HasEnvConfig env
                => Path Abs Dir
                -> RIO env ()
 setTestSuccess dir = do
     fp <- testSuccessFile dir
-    encodeTestSuccess fp True
+    writeFileBinary (toFilePath fp) successBS
 
 -- | Mark a test suite as not having succeeded
 unsetTestSuccess :: HasEnvConfig env
@@ -214,16 +228,18 @@ unsetTestSuccess :: HasEnvConfig env
                  -> RIO env ()
 unsetTestSuccess dir = do
     fp <- testSuccessFile dir
-    encodeTestSuccess fp False
+    writeFileBinary (toFilePath fp) failureBS
 
 -- | Check if the test suite already passed
 checkTestSuccess :: HasEnvConfig env
                  => Path Abs Dir
                  -> RIO env Bool
-checkTestSuccess dir =
-    liftM
-        (fromMaybe False)
-        (decodeTestSuccess =<< testSuccessFile dir)
+checkTestSuccess dir = do
+  fp <- testSuccessFile dir
+  -- we could ensure the file is the right size first,
+  -- but we're not expected an attack from the user's filesystem
+  either (const False) (== successBS)
+    <$> tryIO (readFileBinary $ toFilePath fp)
 
 --------------------------------------
 -- Precompiled Cache

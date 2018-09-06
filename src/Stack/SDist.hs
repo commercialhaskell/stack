@@ -202,7 +202,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
     -- https://github.com/haskell/cabal/issues/4863 (current issue)
     let roundtripErrs =
           [ flow "Bug detected in Cabal library. ((parse . render . parse) === id) does not hold for the cabal file at"
-          <+> display cabalfp
+          <+> pretty cabalfp
           , ""
           ]
         (_warnings, eres) = Cabal.runParseResult

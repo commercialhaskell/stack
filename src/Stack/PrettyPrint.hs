@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,7 +21,7 @@ module Stack.PrettyPrint
     , spacedBulletedList
     , debugBracket
       -- * Re-exports from "Text.PrettyPrint.Leijen.Extended"
-    , Display (..), StyleDoc, StyleAnn (..), HasStyleAnn(..), Doc
+    , Pretty (..), StyleDoc, StyleAnn (..)
     , nest, line, linebreak, group, softline, softbreak
     , align, hang, indent, encloseSep
     , (<+>)
@@ -37,14 +36,10 @@ module Stack.PrettyPrint
 import qualified RIO
 import           Stack.Prelude hiding (Display (..))
 import           Data.List (intersperse)
-import qualified Data.Text as T
-import qualified Distribution.ModuleName as C (ModuleName)
-import qualified Distribution.Text as C (display)
-import           Stack.Types.NamedComponent
 import           Stack.Types.PrettyPrint (Style (..))
 import           Stack.Types.Runner
-import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
-                     HasStyleAnn (..), StyleAnn (..), StyleDoc, (<+>), align,
+import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
+                     StyleAnn (..), StyleDoc, (<+>), align,
                      angles, braces, brackets, cat,
                      displayAnsi, displayPlain, dquotes, enclose, encloseSep,
                      fill, fillBreak, fillCat, fillSep, group, hang, hcat, hsep,
@@ -53,9 +48,9 @@ import           Text.PrettyPrint.Leijen.Extended (Ann, Display (display), Doc,
                      styleAnn, vcat, vsep)
 
 displayWithColor
-    :: (HasRunner env, Display a, HasStyleAnn (Ann a),
+    :: (HasRunner env, Pretty a,
         MonadReader env m, HasLogFunc env, HasCallStack)
-    => a -> m T.Text
+    => a -> m Utf8Builder
 displayWithColor x = do
     useAnsi <- view useColorL
     termWidth <- view $ runnerL.to runnerTermWidth
@@ -63,7 +58,7 @@ displayWithColor x = do
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: (HasRunner env, HasCallStack, Display b, HasStyleAnn (Ann b),
+prettyWith :: (HasRunner env, HasCallStack, Pretty b,
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
 prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
@@ -129,15 +124,15 @@ prettyErrorNoIndentS = prettyErrorNoIndentWith flow
 --   consistent spacing/indenting/etc.
 --
 --   For example this is used after "Warning:" in warning messages.
-indentAfterLabel :: Doc a -> Doc a
+indentAfterLabel :: StyleDoc -> StyleDoc
 indentAfterLabel = align
 
 -- | Make a 'Doc' from each word in a 'String'
-wordDocs :: String -> [Doc a]
+wordDocs :: String -> [StyleDoc]
 wordDocs = map fromString . words
 
 -- | Wordwrap a 'String'
-flow :: String -> Doc a
+flow :: String -> StyleDoc
 flow = fillSep . wordDocs
 
 debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
@@ -161,18 +156,6 @@ debugBracket msg f = do
 -- |Annotate a 'StyleDoc' with a 'Style'.
 style :: Style -> StyleDoc -> StyleDoc
 style = styleAnn
-
-instance Display (Path b File) where
-    display = style File . fromString . toFilePath
-
-instance Display (Path b Dir) where
-    display = style Dir . fromString . toFilePath
-
-instance Display (PackageName, NamedComponent) where
-    display = style PkgComponent . fromString . T.unpack . renderPkgComponent
-
-instance Display C.ModuleName where
-    display = fromString . C.display
 
 -- Display milliseconds.
 displayMilliseconds :: Double -> StyleDoc

@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -9,7 +8,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
     ( constructPlan
@@ -901,9 +899,7 @@ data ConstructPlanException
     | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
-    deriving (Typeable, Eq, Ord, Show)
-
-deriving instance Ord VersionRange
+    deriving (Typeable, Eq, Show)
 
 -- | The latest applicable version and it's latest cabal file revision.
 -- For display purposes only, Nothing if package not found
@@ -939,7 +935,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
       , line <> line
       ] ++
       (if not onlyHasDependencyMismatches then [] else
-         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> toStyleDoc (display (defaultUserConfigPath stackRoot)) <+> "to ignore all version constraints and build anyway.")
+         [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> pretty (defaultUserConfigPath stackRoot) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
       ) ++
@@ -948,7 +944,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
       ] ++ addExtraDepsRecommendations
 
   where
-    exceptions' = nubOrd exceptions
+    exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions
 
     addExtraDepsRecommendations
       | Map.null extras = []
@@ -960,7 +956,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
          [ "  *" <+> align
            (style Recommendation (flow "Recommended action:") <+>
             flow "try adding the following to your extra-deps in" <+>
-            toStyleDoc (display stackYaml) <> ":")
+            pretty stackYaml <> ":")
          , line <> line
          , vsep (map pprintExtra (Map.toList extras))
          , line

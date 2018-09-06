@@ -26,10 +26,8 @@ module Stack.Types.BuildPlan
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Store.Version
-import           Data.Store.VersionTagged
 import qualified Distribution.ModuleName as C
 import           Distribution.ModuleName (ModuleName)
-import qualified Distribution.Version as C
 import           Pantry
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -183,31 +181,6 @@ data LoadedPackageInfo loc = LoadedPackageInfo
     deriving (Generic, Show, Eq, Data, Typeable, Functor)
 instance Store a => Store (LoadedPackageInfo a)
 instance NFData a => NFData (LoadedPackageInfo a)
-
-data DepInfo = DepInfo
-    { _diComponents :: !(Set Component)
-    , _diRange      :: !VersionIntervals
-    }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store DepInfo
-instance NFData DepInfo
-
-instance Semigroup DepInfo where
-    DepInfo a x <> DepInfo b y = DepInfo
-        (mappend a b)
-        (intersectVersionIntervals x y)
-
-instance Monoid DepInfo where
-    mempty = DepInfo mempty (fromVersionRange C.anyVersion)
-    mappend = (<>)
-
-data Component = CompLibrary
-               | CompExecutable
-               | CompTestSuite
-               | CompBenchmark
-    deriving (Generic, Show, Eq, Ord, Data, Typeable, Enum, Bounded)
-instance Store Component
-instance NFData Component
 
 newtype ModuleInfo = ModuleInfo
     { miModules      :: Map ModuleName (Set PackageName)

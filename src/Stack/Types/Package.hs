@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -10,11 +9,11 @@
 module Stack.Types.Package where
 
 import           Stack.Prelude
+import           Foreign.C.Types (CTime)
 import qualified RIO.Text as T
+import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import           Data.Store.Version (VersionConfig)
-import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
@@ -291,23 +290,26 @@ data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)
 
 data FileCacheInfo = FileCacheInfo
-    { fciModTime :: !ModTime
-    , fciSize :: !Word64
+    { fciModTime :: !CTime
+    , fciSize :: !FileSize
     , fciHash :: !SHA256
     }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store FileCacheInfo
+    deriving (Generic, Show, Eq, Typeable)
 instance NFData FileCacheInfo
 
--- | Used for storage and comparison.
-newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord, Show, Generic, Eq, NFData, Store, Data, Typeable)
-
-modTimeVC :: VersionConfig ModTime
-modTimeVC = storeVersionConfig "mod-time-v1" "UBECpUI0JvM_SBOnRNdaiF9_yOU="
-
-testSuccessVC :: VersionConfig Bool
-testSuccessVC = storeVersionConfig "test-v1" "jC_GB0SGtbpRQbDlm7oQJP7thu8="
+-- Provided for storing the BuildCache values in a file. But maybe
+-- JSON/YAML isn't the right choice here, worth considering.
+instance ToJSON FileCacheInfo where
+  toJSON (FileCacheInfo time size hash') = object
+    [ "modtime" .= time
+    , "size" .= size
+    , "hash" .= hash'
+    ]
+instance FromJSON FileCacheInfo where
+  parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
+    <$> o .: "modtime"
+    <*> o .: "size"
+    <*> o .: "hash"
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --

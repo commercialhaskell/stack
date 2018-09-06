@@ -1,10 +1,10 @@
-cabal-version: >= 1.10
+cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.29.6.
+-- This file has been generated from package.yaml by hpack version 0.30.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: acc1eb1e521df7f11ac60ff9dd5d9e4fd2700d7f1cc981ff7fcf6691a8e25021
+-- hash: afccfe103ea543f631a45a4eb39d3e8e73f49aa792d9f0b23a5f4330279b151a
 
 name:           pantry
 version:        0.1.0.0
@@ -19,6 +19,8 @@ copyright:      2018 FP Complete
 license:        MIT
 build-type:     Simple
 extra-source-files:
+    README.md
+    ChangeLog.md
     attic/package-0.1.2.3.tar.gz
 
 source-repository head
@@ -29,9 +31,11 @@ library
   exposed-modules:
       Pantry
       Pantry.SHA256
-      Data.Aeson.Extended
       Pantry.Internal
       Pantry.Internal.StaticBytes
+      Data.Aeson.Extended
+      Data.Store
+      Data.Store.Version
   other-modules:
       Hackage.Security.Client.Repository.HttpLib.HttpClient
       Pantry.Archive
@@ -48,22 +52,34 @@ library
   build-depends:
       Cabal >=2.4
     , aeson
+    , array
     , base
+    , base-orphans
+    , base64-bytestring
     , bytestring
     , conduit
     , conduit-extra
     , containers
+    , contravariant
     , cryptonite
     , cryptonite-conduit
+    , deepseq
     , digest
+    , directory
+    , filepath
     , generic-deriving
+    , ghc-prim
     , hackage-security
+    , hashable
     , hpack >=0.29.6
     , http-client
     , http-client-tls
     , http-conduit
     , http-types
+    , integer-gmp
     , memory
+    , mono-traversable
+    , network
     , network-uri
     , path
     , path-io
@@ -75,10 +91,18 @@ library
     , resourcet
     , rio
     , rio-orphans
-    , store
+    , safe
+    , store-core
+    , syb
     , tar-conduit >=0.3.0
+    , template-haskell
     , text
     , text-metrics
+    , th-lift
+    , th-lift-instances
+    , th-orphans
+    , th-reify-many
+    , th-utilities
     , time
     , transformers
     , unix-compat
@@ -110,17 +134,26 @@ test-suite spec
       Cabal >=2.4
     , QuickCheck
     , aeson
+    , array
     , base
+    , base-orphans
+    , base64-bytestring
     , bytestring
     , conduit
     , conduit-extra
     , containers
+    , contravariant
     , cryptonite
     , cryptonite-conduit
+    , deepseq
     , digest
+    , directory
     , exceptions
+    , filepath
     , generic-deriving
+    , ghc-prim
     , hackage-security
+    , hashable
     , hedgehog
     , hpack >=0.29.6
     , hspec
@@ -128,7 +161,10 @@ test-suite spec
     , http-client-tls
     , http-conduit
     , http-types
+    , integer-gmp
     , memory
+    , mono-traversable
+    , network
     , network-uri
     , pantry
     , path
@@ -141,10 +177,18 @@ test-suite spec
     , resourcet
     , rio
     , rio-orphans
-    , store
+    , safe
+    , store-core
+    , syb
     , tar-conduit >=0.3.0
+    , template-haskell
     , text
     , text-metrics
+    , th-lift
+    , th-lift-instances
+    , th-orphans
+    , th-reify-many
+    , th-utilities
     , time
     , transformers
     , unix-compat

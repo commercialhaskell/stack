@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -19,13 +18,13 @@
 module Text.PrettyPrint.Leijen.Extended
   (
   -- * Pretty-print typeclass
-  Display(..),
+  Pretty (..),
 
   -- * Ansi terminal Doc
   --
   -- See "System.Console.ANSI" for 'SGR' values to use beyond the colors
   -- provided.
-  StyleDoc, StyleAnn(..), HasStyleAnn(..),
+  StyleDoc, StyleAnn(..),
   -- hDisplayAnsi,
   displayAnsi, displayPlain, renderDefault,
 
@@ -36,7 +35,7 @@ module Text.PrettyPrint.Leijen.Extended
   -- ** Documents, parametrized by their annotations
   --
   -- Omitted compared to original: @putDoc, hPutDoc@
-  Doc,
+  -- Doc,
 
   -- ** Basic combinators
   --
@@ -114,16 +113,18 @@ import Control.Monad.Reader (runReader, local)
 import Data.Array.IArray ((!), (//))
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Builder as LTB
+import Distribution.ModuleName (ModuleName)
+import qualified Distribution.Text (display)
 import Stack.DefaultStyles (defaultStyles)
-import Stack.Prelude hiding (Display (..))
-import Stack.Types.PrettyPrint (Style, Styles)
+import Stack.Prelude
+import Stack.Types.PrettyPrint (Style (Dir, File), Styles)
 import Stack.Types.Runner (HasRunner, stylesUpdateL)
 import Stack.Types.StylesUpdate (StylesUpdate (..))
 import System.Console.ANSI (ConsoleLayer (..), SGR (..), setSGRCode)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
-import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
+import Text.PrettyPrint.Annotated.Leijen
+  ( Doc, SimpleDoc (..)
+  )
 
 -- TODO: consider smashing together the code for wl-annotated-pprint and
 -- wl-pprint-text. The code here already handles doing the
@@ -133,25 +134,31 @@ import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
 -- Perhaps it can still have native string support, by adding a type
 -- parameter to Doc?
 
-instance Semigroup (Doc a) where
-    (<>) = (P.<>)
-instance Monoid (Doc a) where
+instance Semigroup StyleDoc where
+    StyleDoc x <> StyleDoc y = StyleDoc (x P.<> y)
+instance Monoid StyleDoc where
     mappend = (<>)
-    mempty = empty
+    mempty = StyleDoc P.empty
 
 --------------------------------------------------------------------------------
 -- Pretty-Print class
 
-class Display a where
-    type Ann a
-    type Ann a = StyleAnn
-    display :: a -> Doc (Ann a)
-    default display :: Show a => a -> Doc (Ann a)
-    display = fromString . show
+class Pretty a where
+    pretty :: a -> StyleDoc
+    default pretty :: Show a => a -> StyleDoc
+    pretty = StyleDoc . fromString . show
 
-instance Display (Doc a) where
-    type Ann (Doc a) = a
-    display = id
+instance Pretty StyleDoc where
+    pretty = id
+
+instance Pretty (Path b File) where
+    pretty = styleAnn File . StyleDoc . fromString . toFilePath
+
+instance Pretty (Path b Dir) where
+    pretty = styleAnn Dir . StyleDoc . fromString . toFilePath
+
+instance Pretty ModuleName where
+    pretty = StyleDoc . fromString . Distribution.Text.display
 
 --------------------------------------------------------------------------------
 -- Style Doc
@@ -164,17 +171,9 @@ instance Monoid StyleAnn where
     mempty = StyleAnn Nothing
     mappend = (<>)
 
-class HasStyleAnn a where
-    getStyleAnn :: a -> StyleAnn
-    toStyleDoc :: Doc a -> StyleDoc
-    toStyleDoc = fmap getStyleAnn
-
-instance HasStyleAnn StyleAnn where
-    getStyleAnn = id
-    toStyleDoc = id
-
 -- |A document annotated by a style
-type StyleDoc = Doc StyleAnn
+newtype StyleDoc = StyleDoc { unStyleDoc :: Doc StyleAnn }
+  deriving IsString
 
 -- |An ANSI code(s) annotation.
 newtype AnsiAnn = AnsiAnn [SGR]
@@ -195,26 +194,24 @@ toAnsiDoc styles = go
     go (SAnnotStop d) = SAnnotStop (go d)
 
 displayPlain
-    :: (Display a, HasRunner env, HasLogFunc env, MonadReader env m,
+    :: (Pretty a, HasRunner env, HasLogFunc env, MonadReader env m,
         HasCallStack)
-    => Int -> a -> m T.Text
-displayPlain w x = do
-    t <- (displayAnsiSimple . renderDefault w . fmap (const mempty) . display) x
-    return $ LT.toStrict t
+    => Int -> a -> m Utf8Builder
+displayPlain w =
+    displayAnsiSimple . renderDefault w . fmap (const mempty) . unStyleDoc . pretty
 
 -- TODO: tweak these settings more?
 -- TODO: options for settings if this is released as a lib
 
 renderDefault :: Int -> Doc a -> SimpleDoc a
-renderDefault = renderPretty 1
+renderDefault = P.renderPretty 1
 
 displayAnsi
-    :: (Display a, HasStyleAnn (Ann a), HasRunner env, HasLogFunc env,
+    :: (Pretty a, HasRunner env, HasLogFunc env,
         MonadReader env m, HasCallStack)
-    => Int -> a -> m T.Text
-displayAnsi w x = do
-    t <- (displayAnsiSimple . renderDefault w . toStyleDoc . display) x
-    return $ LT.toStrict t
+    => Int -> a -> m Utf8Builder
+displayAnsi w = do
+    displayAnsiSimple . renderDefault w . unStyleDoc . pretty
 
 {- Not used --------------------------------------------------------------------
 
@@ -229,13 +226,13 @@ hDisplayAnsi h w x = liftIO $ do
 
 displayAnsiSimple
     :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
-    => SimpleDoc StyleAnn -> m LT.Text
+    => SimpleDoc StyleAnn -> m Utf8Builder
 displayAnsiSimple doc = do
     update <- view stylesUpdateL
     let styles = defaultStyles // stylesUpdate update
         doc' = toAnsiDoc styles doc
     return $
-        LTB.toLazyText $ flip runReader mempty $ displayDecoratedWrap go doc'
+        flip runReader mempty $ displayDecoratedWrap go doc'
   where
     go (AnsiAnn sgrs) inner = do
         old <- ask
@@ -263,24 +260,24 @@ displayAnsiSimple doc = do
 
 displayDecoratedWrap
     :: forall a m. Monad m
-    => (forall b. a -> m (b, LTB.Builder) -> m (b, LTB.Builder))
+    => (forall b. a -> m (b, Utf8Builder) -> m (b, Utf8Builder))
     -> SimpleDoc a
-    -> m LTB.Builder
+    -> m Utf8Builder
 displayDecoratedWrap f doc = do
     (mafter, result) <- go doc
     case mafter of
       Just _ -> error "Invariant violated by input to displayDecoratedWrap: no matching SAnnotStart for SAnnotStop."
       Nothing -> return result
   where
-    spaces n = LTB.fromText (T.replicate n " ")
+    spaces n = display (T.replicate n " ")
 
-    go :: SimpleDoc a -> m (Maybe (SimpleDoc a), LTB.Builder)
+    go :: SimpleDoc a -> m (Maybe (SimpleDoc a), Utf8Builder)
     go SEmpty = return (Nothing, mempty)
-    go (SChar c x) = liftM (fmap (LTB.singleton c <>)) (go x)
+    go (SChar c x) = liftM (fmap (display c <>)) (go x)
     -- NOTE: Could actually use the length to guess at an initial
     -- allocation.  Better yet would be to just use Text in pprint..
     go (SText _l s x) = liftM (fmap (fromString s <>)) (go x)
-    go (SLine n x) = liftM (fmap ((LTB.singleton '\n' <>) . (spaces n <>))) (go x)
+    go (SLine n x) = liftM (fmap ((display '\n' <>) . (spaces n <>))) (go x)
     go (SAnnotStart ann x) = do
         (mafter, contents) <- f ann (go x)
         case mafter of
@@ -318,8 +315,8 @@ colorFunctions color =
 
 -}
 
-styleAnn :: Style -> Doc StyleAnn -> Doc StyleAnn
-styleAnn = annotate . StyleAnn . Just
+styleAnn :: Style -> StyleDoc -> StyleDoc
+styleAnn s = StyleDoc . P.annotate (StyleAnn (Just s)) . unStyleDoc
 
 {- Not used --------------------------------------------------------------------
 
@@ -359,3 +356,97 @@ getSGRTag SetSwapForegroundBackground{} = TagSwapForegroundBackground
 getSGRTag (SetColor Foreground _ _)     = TagColorForeground
 getSGRTag (SetColor Background _ _)     = TagColorBackground
 getSGRTag SetRGBColor{}                 = TagRGBColor
+
+(<+>) :: StyleDoc -> StyleDoc -> StyleDoc
+StyleDoc x <+> StyleDoc y = StyleDoc (x P.<+> y)
+
+align :: StyleDoc -> StyleDoc
+align = StyleDoc . P.align . unStyleDoc
+
+noAnnotate :: StyleDoc -> StyleDoc
+noAnnotate = StyleDoc . P.noAnnotate . unStyleDoc
+
+braces :: StyleDoc -> StyleDoc
+braces = StyleDoc . P.braces . unStyleDoc
+
+angles :: StyleDoc -> StyleDoc
+angles = StyleDoc . P.angles . unStyleDoc
+
+parens :: StyleDoc -> StyleDoc
+parens = StyleDoc . P.parens . unStyleDoc
+
+dquotes :: StyleDoc -> StyleDoc
+dquotes = StyleDoc . P.dquotes . unStyleDoc
+
+squotes :: StyleDoc -> StyleDoc
+squotes = StyleDoc . P.squotes . unStyleDoc
+
+brackets :: StyleDoc -> StyleDoc
+brackets = StyleDoc . P.brackets . unStyleDoc
+
+annotate :: StyleAnn -> StyleDoc -> StyleDoc
+annotate a = StyleDoc . P.annotate a . unStyleDoc
+
+nest :: Int -> StyleDoc -> StyleDoc
+nest a = StyleDoc . P.nest a . unStyleDoc
+
+line :: StyleDoc
+line = StyleDoc P.line
+
+linebreak :: StyleDoc
+linebreak = StyleDoc P.linebreak
+
+fill :: Int -> StyleDoc -> StyleDoc
+fill a = StyleDoc . P.fill a . unStyleDoc
+
+fillBreak :: Int -> StyleDoc -> StyleDoc
+fillBreak a = StyleDoc . P.fillBreak a . unStyleDoc
+
+enclose :: StyleDoc -> StyleDoc -> StyleDoc -> StyleDoc
+enclose l r x = l <> x <> r
+
+cat :: [StyleDoc] -> StyleDoc
+cat = StyleDoc . P.cat . map unStyleDoc
+
+punctuate :: StyleDoc -> [StyleDoc] -> [StyleDoc]
+punctuate (StyleDoc x) = map StyleDoc . P.punctuate x . map unStyleDoc
+
+fillCat :: [StyleDoc] -> StyleDoc
+fillCat = StyleDoc . P.fillCat . map unStyleDoc
+
+hcat :: [StyleDoc] -> StyleDoc
+hcat = StyleDoc . P.hcat . map unStyleDoc
+
+vcat :: [StyleDoc] -> StyleDoc
+vcat = StyleDoc . P.vcat . map unStyleDoc
+
+sep :: [StyleDoc] -> StyleDoc
+sep = StyleDoc . P.sep . map unStyleDoc
+
+vsep :: [StyleDoc] -> StyleDoc
+vsep = StyleDoc . P.vsep . map unStyleDoc
+
+hsep :: [StyleDoc] -> StyleDoc
+hsep = StyleDoc . P.hsep . map unStyleDoc
+
+fillSep :: [StyleDoc] -> StyleDoc
+fillSep = StyleDoc . P.fillSep . map unStyleDoc
+
+encloseSep :: StyleDoc -> StyleDoc -> StyleDoc -> [StyleDoc] -> StyleDoc
+encloseSep (StyleDoc x) (StyleDoc y) (StyleDoc z) =
+  StyleDoc . P.encloseSep x y z . map unStyleDoc
+
+indent :: Int -> StyleDoc -> StyleDoc
+indent a = StyleDoc . P.indent a . unStyleDoc
+
+hang :: Int -> StyleDoc -> StyleDoc
+hang a = StyleDoc . P.hang a . unStyleDoc
+
+softbreak :: StyleDoc
+softbreak = StyleDoc P.softbreak
+
+softline :: StyleDoc
+softline = StyleDoc P.softline
+
+group :: StyleDoc -> StyleDoc
+group = StyleDoc . P.group . unStyleDoc

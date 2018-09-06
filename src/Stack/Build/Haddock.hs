@@ -78,7 +78,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                             ", but that file is missing.  Opening doc index instead."
                         getDocIndex
             _ -> getDocIndex
-    prettyInfo $ "Opening" <+> Stack.PrettyPrint.display docFile <+> "in the browser."
+    prettyInfo $ "Opening" <+> pretty docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
     return ()
 
