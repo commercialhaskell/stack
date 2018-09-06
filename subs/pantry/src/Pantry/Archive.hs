@@ -17,6 +17,7 @@ import Pantry.Tree
 import Pantry.Types
 import Pantry.Internal (normalizeParents, makeTarRelative)
 import qualified RIO.Text as T
+import qualified RIO.Text.Partial as T
 import qualified RIO.List as List
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
@@ -437,5 +438,8 @@ takeSubdir
   -> [(FilePath, a)] -- ^ files after stripping common prefix
   -> [(Text, a)]
 takeSubdir subdir = mapMaybe $ \(fp, a) -> do
-  stripped <- T.stripPrefix subdir $ T.pack fp
-  Just (T.dropWhile (== '/') stripped, a)
+  stripped <- List.stripPrefix subdirs $ splitDirs $ T.pack fp
+  Just (T.intercalate "/" stripped, a)
+  where
+    splitDirs = List.dropWhile (== "") . T.splitOn "/"
+    subdirs = splitDirs subdir
