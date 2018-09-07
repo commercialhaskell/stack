@@ -54,6 +54,10 @@ urlToStackCommit commit = TLUrl $ T.concat
   , ".tar.gz"
   ]
 
+treeWithoutCabalFile :: Selector PantryException
+treeWithoutCabalFile (TreeWithoutCabalFile _) = True
+treeWithoutCabalFile _ = False
+
 spec :: Spec
 spec = do
   it "finds cabal file from tarball" $ do
@@ -74,3 +78,9 @@ spec = do
       , testSubdir = "subs/pantry/"
       }
     ident `shouldBe` parsePackageIdentifier' "pantry-0.1.0.0"
+  it "matches whole directory name" $
+    getPackageLocationIdent' TestArchive
+      { testLocation = urlToStackCommit "2b846ff4fda13a8cd095e7421ce76df0a08b10dc"
+      , testSubdir = "subs/pant"
+      }
+    `shouldThrow` treeWithoutCabalFile
