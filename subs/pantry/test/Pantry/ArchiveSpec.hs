@@ -62,6 +62,12 @@ spec = do
       , testSubdir = ""
       }
     ident `shouldBe` parsePackageIdentifier' "package-0.1.2.3"
+  it "finds cabal file from tarball with subdir '.'" $ do
+    ident <- getPackageLocationIdent' TestArchive
+      { testLocation = TLFilePath "attic/package-0.1.2.3.tar.gz"
+      , testSubdir = "."
+      }
+    ident `shouldBe` parsePackageIdentifier' "package-0.1.2.3"
   it "finds cabal file from tarball with subdir 'subs/pantry/'" $ do
     ident <- getPackageLocationIdent' TestArchive
       { testLocation = urlToStackCommit "2b846ff4fda13a8cd095e7421ce76df0a08b10dc"
