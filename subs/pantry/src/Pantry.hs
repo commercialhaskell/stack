@@ -68,16 +68,21 @@ module Pantry
     -- ** Snapshots
   , SnapshotLocation (..)
   , Snapshot (..)
+  , SnapshotPackage (..)
+  , SnapshotLayer (..)
   , WantedCompiler (..)
 
     -- * Loading values
   , resolvePaths
   , loadPackage
+  , loadSnapshotLayer
   , loadSnapshot
+  , addPackagesToSnapshot
+  , AddPackagesConfig (..)
 
     -- * Completion functions
   , completePackageLocation
-  , completeSnapshot
+  , completeSnapshotLayer
   , completeSnapshotLocation
 
     -- * Parsers
@@ -113,6 +118,7 @@ module Pantry
     -- * Package location
   , fetchPackages
   , unpackPackageLocation
+  , getPackageLocationName
   , getPackageLocationIdent
   , getPackageLocationTreeKey
 
@@ -134,6 +140,7 @@ module Pantry
 import RIO
 import Conduit
 import qualified RIO.Map as Map
+import qualified RIO.Set as Set
 import qualified RIO.ByteString as B
 import qualified RIO.Text as T
 import qualified RIO.List as List
@@ -606,19 +613,19 @@ completeSnapshotLocation (SLUrl url Nothing) = do
   let blobKey = BlobKey (SHA256.hashBytes bs) (FileSize $ fromIntegral $ B.length bs)
   pure $ SLUrl url (Just blobKey)
 
--- | Fill in optional fields in a 'Snapshot' for more reproducible builds.
+-- | Fill in optional fields in a 'SnapshotLayer' for more reproducible builds.
 --
 -- @since 0.1.0.0
-completeSnapshot
+completeSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Snapshot
-  -> RIO env Snapshot
-completeSnapshot snapshot = do
-  parent' <- completeSnapshotLocation $ snapshotParent snapshot
-  pls <- traverseConcurrently completePackageLocation $ snapshotLocations snapshot
+  => SnapshotLayer
+  -> RIO env SnapshotLayer
+completeSnapshotLayer snapshot = do
+  parent' <- completeSnapshotLocation $ slParent snapshot
+  pls <- traverseConcurrently completePackageLocation $ slLocations snapshot
   pure snapshot
-    { snapshotParent = parent'
-    , snapshotLocations = pls
+    { slParent = parent'
+    , slLocations = pls
     }
 
 traverseConcurrently_
@@ -691,25 +698,175 @@ traverseConcurrentlyWith count f t0 = do
             loop
   sequence t1
 
--- | Parse a snapshot value from a 'SnapshotLocation'.
+-- | Parse a 'Snapshot' (all layers) from a 'SnapshotLocation.
+--
+-- @since 0.1.0.0
+loadSnapshot
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => SnapshotLocation
+  -> RIO env Snapshot
+loadSnapshot loc = do
+  eres <- loadSnapshotLayer loc
+  case eres of
+    Left wc ->
+      pure Snapshot
+        { snapshotCompiler = wc
+        , snapshotName = utf8BuilderToText $ display wc
+        , snapshotPackages = mempty
+        , snapshotDrop = mempty
+        }
+    Right (sl, _sha) -> do
+      snap0 <- loadSnapshot $ slParent sl
+      (packages, unused) <-
+        addPackagesToSnapshot
+          (display loc)
+          (slLocations sl)
+          AddPackagesConfig
+            { apcDrop = slDropPackages sl
+            , apcFlags = slFlags sl
+            , apcHiddens = slHidden sl
+            , apcGhcOptions = slGhcOptions sl
+            }
+          (snapshotPackages snap0)
+      warnUnusedAddPackagesConfig (display loc) unused
+      pure Snapshot
+        { snapshotCompiler = fromMaybe (snapshotCompiler snap0) (slCompiler sl)
+        , snapshotName = slName sl
+        , snapshotPackages = packages
+        , snapshotDrop = apcDrop unused
+        }
+
+data SingleOrNot a
+  = Single !a
+  | Multiple !a !a !([a] -> [a])
+instance Semigroup (SingleOrNot a) where
+  Single a <> Single b = Multiple a b id
+  Single a <> Multiple b c d = Multiple a b ((c:) . d)
+  Multiple a b c <> Single d = Multiple a b (c . (d:))
+  Multiple a b c <> Multiple d e f =
+    Multiple a b (c . (d:) . (e:) . f)
+
+sonToEither :: (k, SingleOrNot a) -> Either (k, a) (k, [a])
+sonToEither (k, Single a) = Left (k, a)
+sonToEither (k, Multiple a b c) = Right (k, (a : b : c []))
+
+-- | Package settings to be passed to 'addPackagesToSnapshot'.
+--
+-- @since 0.1.0.0
+data AddPackagesConfig = AddPackagesConfig
+  { apcDrop :: !(Set PackageName)
+  , apcFlags :: !(Map PackageName (Map FlagName Bool))
+  , apcHiddens :: !(Map PackageName Bool)
+  , apcGhcOptions :: !(Map PackageName [Text])
+  }
+
+-- | Does not warn about drops, those are allowed in order to ignore global
+-- packages.
+warnUnusedAddPackagesConfig
+  :: HasLogFunc env
+  => Utf8Builder -- ^ source
+  -> AddPackagesConfig
+  -> RIO env ()
+warnUnusedAddPackagesConfig source (AddPackagesConfig drops flags hiddens options) = do
+  unless (null ls) $ do
+    logWarn $ "Some warnings discovered when adding packages to snapshot (" <> source <> ")"
+    traverse_ logWarn ls
+  where
+    ls = concat [flags', hiddens', options']
+
+    flags' =
+      map
+        (\pn ->
+          "Setting flags for non-existent package: " <>
+          fromString (packageNameString pn))
+        (Map.keys flags)
+
+    hiddens' =
+      map
+        (\pn ->
+          "Hiding non-existent package: " <>
+          fromString (packageNameString pn))
+        (Map.keys hiddens)
+
+    options' =
+      map
+        (\pn ->
+          "Setting options for non-existent package: " <>
+          fromString (packageNameString pn))
+        (Map.keys options)
+
+-- | Add more packages to a snapshot
+--
+-- Note that any settings on a parent flag which is being replaced will be
+-- ignored. For example, if package @foo@ is in the parent and has flag @bar@
+-- set, and @foo@ also appears in new packages, then @bar@ will no longer be
+-- set.
+--
+-- Returns any of the 'AddPackagesConfig' values not used.
+--
+-- @since 0.1.0.0
+addPackagesToSnapshot
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Utf8Builder
+  -- ^ Text description of where these new packages are coming from, for error
+  -- messages only
+  -> [PackageLocationImmutable] -- ^ new packages
+  -> AddPackagesConfig
+  -> Map PackageName SnapshotPackage -- ^ packages from parent
+  -> RIO env (Map PackageName SnapshotPackage, AddPackagesConfig)
+addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens options) old = do
+  new' <- for newPackages $ \loc -> do
+    name <- getPackageLocationName loc
+    pure (name, SnapshotPackage
+      { spLocation = loc
+      , spFlags = Map.findWithDefault mempty name flags
+      , spHidden = Map.findWithDefault False name hiddens
+      , spGhcOptions = Map.findWithDefault [] name options
+      })
+  let (newSingles, newMultiples)
+        = partitionEithers
+        $ map sonToEither
+        $ Map.toList
+        $ Map.fromListWith (<>)
+        $ map (second Single) new'
+  unless (null $ newMultiples) $ throwIO $
+    DuplicatePackageNames source $ map (second (map spLocation)) newMultiples
+  let new = Map.fromList newSingles
+      allPackages0 = new `Map.union` (old `Map.difference` Map.fromSet (const ()) drops)
+      allPackages = flip Map.mapWithKey allPackages0 $ \name sp ->
+        sp
+          { spFlags = Map.findWithDefault (spFlags sp) name flags
+          , spHidden = Map.findWithDefault (spHidden sp) name hiddens
+          , spGhcOptions = Map.findWithDefault (spGhcOptions sp) name options
+          }
+
+      unused = AddPackagesConfig
+        (drops `Set.difference` Map.keysSet old)
+        (flags `Map.difference` allPackages)
+        (hiddens `Map.difference` allPackages)
+        (options `Map.difference` allPackages)
+
+  pure (allPackages, unused)
+
+-- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --
 -- Returns a 'Left' value if provided an 'SLCompiler'
 -- constructor. Otherwise, returns a 'Right' value providing both the
 -- 'Snapshot' and a hash of the input configuration file.
 --
 -- @since 0.1.0.0
-loadSnapshot
+loadSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (Snapshot, SHA256))
-loadSnapshot (SLCompiler compiler) = pure $ Left compiler
-loadSnapshot sl@(SLUrl url mblob) =
+  -> RIO env (Either WantedCompiler (SnapshotLayer, SHA256)) -- FIXME remove SHA? Be smart?
+loadSnapshotLayer (SLCompiler compiler) = pure $ Left compiler
+loadSnapshotLayer sl@(SLUrl url mblob) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url mblob
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelper sl value Nothing
     pure $ Right (snapshot, SHA256.hashBytes bs)
-loadSnapshot sl@(SLFilePath fp) =
+loadSnapshotLayer sl@(SLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
@@ -752,7 +909,7 @@ warningsParserHelper
   => SnapshotLocation
   -> Value
   -> Maybe (Path Abs Dir)
-  -> RIO env Snapshot
+  -> RIO env SnapshotLayer
 warningsParserHelper sl val mdir =
   case parseEither Yaml.parseJSON val of
     Left e -> throwIO $ Couldn'tParseSnapshot sl e
@@ -761,6 +918,15 @@ warningsParserHelper sl val mdir =
         logWarn $ "Warnings when parsing snapshot " <> display sl
         for_ ws $ logWarn . display
       resolvePaths mdir x
+
+-- | Get the 'PackageName' of the package at the given location.
+--
+-- @since 0.1.0.0
+getPackageLocationName
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => PackageLocationImmutable
+  -> RIO env PackageName
+getPackageLocationName = fmap pkgName . getPackageLocationIdent
 
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --

@@ -75,7 +75,9 @@ module Pantry.Types
   , nightlySnapshotLocation
   , SnapshotLocation (..)
   , parseSnapshotLocation
+  , SnapshotLayer (..)
   , Snapshot (..)
+  , SnapshotPackage (..)
   , parseWantedCompiler
   , PackageMetadata (..)
   , cabalFileName
@@ -629,6 +631,7 @@ data PantryException
   | PackageNameParseFail !Text
   | PackageVersionParseFail !Text
   | InvalidCabalFilePath !(Path Abs File)
+  | DuplicatePackageNames !Utf8Builder ![(PackageName, [PackageLocationImmutable])]
 
   deriving Typeable
 instance Exception PantryException where
@@ -797,6 +800,16 @@ instance Display PantryException where
   display (InvalidCabalFilePath fp) =
     "File path contains a name which is not a valid package name: " <>
     fromString (toFilePath fp)
+  display (DuplicatePackageNames source pairs) =
+    "Duplicate package names (" <> source <> "):\n" <>
+    foldMap
+      (\(name, locs) ->
+        fromString (packageNameString name) <> ":\n" <>
+        foldMap
+          (\loc -> "- " <> display loc <> "\n")
+          locs
+      )
+      pairs
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]
@@ -1582,67 +1595,97 @@ instance ToJSON SnapshotLocation where
     : maybe [] blobKeyPairs mblob
   toJSON (SLFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
 
--- | Specification of a snapshot, such as LTS Haskell.
+-- | A flattened representation of all the layers in a snapshot.
 --
 -- @since 0.1.0.0
 data Snapshot = Snapshot
-  { snapshotParent :: !SnapshotLocation
-  -- ^ The snapshot to extend from. This is either a specific
+  { snapshotCompiler :: !WantedCompiler
+  -- ^ The compiler wanted for this snapshot.
+  , snapshotName :: !Text
+  -- ^ The 'slName' from the top 'SnapshotLayer'.
+  , snapshotPackages :: !(Map PackageName SnapshotPackage)
+  -- ^ Packages available in this snapshot for installation. This will be
+  -- applied on top of any globally available packages.
+  , snapshotDrop :: !(Set PackageName)
+  -- ^ Global packages that should be dropped/ignored.
+  }
+
+-- | Settings for a package found in a snapshot.
+--
+-- @since 0.1.0.0
+data SnapshotPackage = SnapshotPackage
+  { spLocation :: !PackageLocationImmutable
+  -- ^ Where to get the package from
+  , spFlags :: !(Map FlagName Bool)
+  -- ^ Same as 'slFlags'
+  , spHidden :: !Bool
+  -- ^ Same as 'slHidden'
+  , spGhcOptions :: ![Text]
+  -- ^ Same as 'slGhcOptions'
+  }
+  deriving Show
+
+-- | A single layer of a snapshot, i.e. a specific YAML configuration file.
+--
+-- @since 0.1.0.0
+data SnapshotLayer = SnapshotLayer
+  { slParent :: !SnapshotLocation
+  -- ^ The sl to extend from. This is either a specific
   -- compiler, or a @SnapshotLocation@ which gives us more information
   -- (like packages). Ultimately, we'll end up with a
   -- @CompilerVersion@.
   --
   -- @since 0.1.0.0
-  , snapshotCompiler :: !(Maybe WantedCompiler)
-  -- ^ Override the compiler specified in 'snapshotParent'. Must be
+  , slCompiler :: !(Maybe WantedCompiler)
+  -- ^ Override the compiler specified in 'slParent'. Must be
   -- 'Nothing' if using 'SLCompiler'.
   --
   -- @since 0.1.0.0
-  , snapshotName :: !Text
+  , slName :: !Text
   -- ^ A user-friendly way of referring to this resolver.
   --
   -- @since 0.1.0.0
-  , snapshotLocations :: ![PackageLocationImmutable]
+  , slLocations :: ![PackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   --
   -- @since 0.1.0.0
-  , snapshotDropPackages :: !(Set PackageName)
+  , slDropPackages :: !(Set PackageName)
   -- ^ Packages present in the parent which should not be included
   -- here.
   --
   -- @since 0.1.0.0
-  , snapshotFlags :: !(Map PackageName (Map FlagName Bool))
+  , slFlags :: !(Map PackageName (Map FlagName Bool))
   -- ^ Flag values to override from the defaults
   --
   -- @since 0.1.0.0
-  , snapshotHidden :: !(Map PackageName Bool)
+  , slHidden :: !(Map PackageName Bool)
   -- ^ Packages which should be hidden when registering. This will
   -- affect, for example, the import parser in the script
   -- command. We use a 'Map' instead of just a 'Set' to allow
-  -- overriding the hidden settings in a parent snapshot.
+  -- overriding the hidden settings in a parent sl.
   --
   -- @since 0.1.0.0
-  , snapshotGhcOptions :: !(Map PackageName [Text])
+  , slGhcOptions :: !(Map PackageName [Text])
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
   }
   deriving (Show, Eq, Data, Generic)
-instance Store Snapshot
-instance NFData Snapshot
-instance ToJSON Snapshot where
+instance Store SnapshotLayer
+instance NFData SnapshotLayer
+instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
-    [ ["resolver" .= snapshotParent snap]
-    , maybe [] (\compiler -> ["compiler" .= compiler]) (snapshotCompiler snap)
-    , ["name" .= snapshotName snap]
-    , ["packages" .= snapshotLocations snap]
-    , if Set.null (snapshotDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (snapshotDropPackages snap)]
-    , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
-    , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
-    , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
+    [ ["resolver" .= slParent snap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (slCompiler snap)
+    , ["name" .= slName snap]
+    , ["packages" .= slLocations snap]
+    , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
+    , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
+    , if Map.null (slHidden snap) then [] else ["hidden" .= toCabalStringMap (slHidden snap)]
+    , if Map.null (slGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (slGhcOptions snap)]
     ]
 
-instance FromJSON (WithJSONWarnings (Unresolved Snapshot)) where
+instance FromJSON (WithJSONWarnings (Unresolved SnapshotLayer)) where
   parseJSON = withObjectWarnings "Snapshot" $ \o -> do
     mcompiler <- o ..:? "compiler"
     mresolver <- jsonSubWarningsT $ o ..:? "resolver"
@@ -1656,13 +1699,13 @@ instance FromJSON (WithJSONWarnings (Unresolved Snapshot)) where
             (SLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
             _ -> pure (sl, mcompiler)
 
-    snapshotName <- o ..: "name"
+    slName <- o ..: "name"
     unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
-    snapshotDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
-    snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
-    snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
-    snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
-    pure $ (\snapshotLocations (snapshotParent, snapshotCompiler) -> Snapshot {..})
+    slDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
+    slFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
+    slHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
+    slGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    pure $ (\slLocations (slParent, slCompiler) -> SnapshotLayer {..})
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
 
