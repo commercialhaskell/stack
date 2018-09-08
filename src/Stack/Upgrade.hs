@@ -19,11 +19,11 @@ import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Config
 import           Stack.Constants
-import           Stack.DefaultColorWhen (defaultColorWhen)
 import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.Resolver
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           RIO.Process
@@ -206,7 +206,8 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- means that command clears, but does not then restore, the
                 -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
                 -- The folowing hack re-enables the lost ANSI-capability.
-                when osIsWindows $ void $ liftIO defaultColorWhen
+                when osIsWindows $
+                  void $ liftIO $ hSupportsANSIWithoutEmulation stdout
                 return $ Just $ tmp </> relDirStackProgName
       Nothing -> do
         void $ updateHackageIndex
