@@ -55,7 +55,7 @@ data GhciOpts = GhciOpts
     { ghciTargets            :: ![Text]
     , ghciArgs               :: ![String]
     , ghciGhcOptions         :: ![Text]
-    , ghciFlags              :: !(Map (Maybe PackageName) (Map FlagName Bool))
+    , ghciFlags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
     , ghciGhcCommand         :: !(Maybe FilePath)
     , ghciNoLoadModules      :: !Bool
     , ghciAdditionalPackages :: ![String]

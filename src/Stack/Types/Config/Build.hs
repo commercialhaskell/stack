@@ -25,6 +25,8 @@ module Stack.Types.Config.Build
     , BenchmarkOptsMonoid(..)
     , FileWatchOpts(..)
     , BuildSubset(..)
+    , ApplyCLIFlag (..)
+    , boptsCLIFlagsByName
     )
     where
 
@@ -137,12 +139,31 @@ defaultBuildOptsCLI = BuildOptsCLI
     , boptsCLIInitialBuildSteps = False
     }
 
+-- | How to apply a CLI flag
+data ApplyCLIFlag
+  = ACFAllProjectPackages
+  -- ^ Apply to all project packages which have such a flag name available.
+  | ACFByName !PackageName
+  -- ^ Apply to the specified package only.
+  deriving (Show, Eq, Ord)
+
+-- | Only flags set via 'ACFByName'
+boptsCLIFlagsByName :: BuildOptsCLI -> Map PackageName (Map FlagName Bool)
+boptsCLIFlagsByName =
+  Map.fromList .
+  mapMaybe go .
+  Map.toList .
+  boptsCLIFlags
+  where
+    go (ACFAllProjectPackages, _) = Nothing
+    go (ACFByName name, flags) = Just (name, flags)
+
 -- | Build options that may only be specified from the CLI
 data BuildOptsCLI = BuildOptsCLI
     { boptsCLITargets :: ![Text]
     , boptsCLIDryrun :: !Bool
     , boptsCLIGhcOptions :: ![Text]
-    , boptsCLIFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
+    , boptsCLIFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
     , boptsCLIBuildSubset :: !BuildSubset
     , boptsCLIFileWatch :: !FileWatchOpts
     , boptsCLIExec :: ![(String, [String])]

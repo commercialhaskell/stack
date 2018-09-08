@@ -487,10 +487,8 @@ parseTargets needTargets boptscli = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  let dropMaybeKey (Nothing, _) = Map.empty
-      dropMaybeKey (Just key, value) = Map.singleton key value
-      flags = Map.unionWith Map.union
-        (Map.unions (map dropMaybeKey (Map.toList (boptsCLIFlags boptscli))))
+  let flags = Map.unionWith Map.union
+        (boptsCLIFlagsByName boptscli)
         (bcFlags bconfig)
       hides = Map.empty -- not supported to add hidden packages
 

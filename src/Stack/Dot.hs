@@ -50,7 +50,7 @@ data DotOpts = DotOpts
     -- ^ Package names to prune from the graph
     , dotTargets :: [Text]
     -- ^ stack TARGETs to trace dependencies for
-    , dotFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
+    , dotFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
     -- ^ Flags to apply when calculating dependencies
     , dotTestTargets :: Bool
     -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.

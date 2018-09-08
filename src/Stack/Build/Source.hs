@@ -116,8 +116,8 @@ getLocalFlags
     -> PackageName
     -> Map FlagName Bool
 getLocalFlags bconfig boptsCli name = Map.unions
-    [ Map.findWithDefault Map.empty (Just name) cliFlags
-    , Map.findWithDefault Map.empty Nothing cliFlags
+    [ Map.findWithDefault Map.empty (ACFByName name) cliFlags
+    , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
     , Map.findWithDefault Map.empty name (bcFlags bconfig)
     ]
   where
@@ -325,7 +325,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
 
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
-    let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
+    let flags = map (, FSCommandLine) [(k, v) | (ACFByName k, v) <- Map.toList $ boptsCLIFlags boptsCli]
              ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
