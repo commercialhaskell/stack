@@ -34,7 +34,6 @@ import           Network.HTTP.Download (download, redownload)
 import           Network.HTTP.StackClient (Request, parseRequest)
 import qualified RIO
 import           Data.ByteString.Builder (toLazyByteString)
-import qualified Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Package
 import           Stack.PackageDump
@@ -129,12 +128,12 @@ loadResolver
   -> RIO env SnapshotDef
 loadResolver (SLCompiler c1) (Just c2) = throwIO $ InvalidOverrideCompiler c1 c2
 loadResolver sl mcompiler = do
-  esnap <- Pantry.loadSnapshot sl
+  esnap <- loadSnapshotLayer sl
   (compiler, msnap, uniqueHash) <-
     case esnap of
       Left compiler -> pure (compiler, Nothing, mkUniqueHash compiler)
       Right (snap, sha) -> do
-        sd <- loadResolver (snapshotParent snap) (snapshotCompiler snap)
+        sd <- loadResolver (slParent snap) (slCompiler snap)
         pure
           ( sdWantedCompilerVersion sd
           , Just (snap, sd)
@@ -196,15 +195,15 @@ loadSnapshot mcompiler =
 
     inner2 snap ls0 = do
       gpds <-
-        forM (snapshotLocations snap) $ \loc -> (, PLImmutable loc) <$> loadCabalFileImmutable loc
+        forM (slLocations snap) $ \loc -> (, PLImmutable loc) <$> loadCabalFileImmutable loc
 
       (globals, snapshot, locals) <-
         calculatePackagePromotion ls0
         (map (\(x, y) -> (x, y, ())) gpds)
-        (snapshotFlags snap)
-        (snapshotHidden snap)
-        (snapshotGhcOptions snap)
-        (snapshotDropPackages snap)
+        (slFlags snap)
+        (slHidden snap)
+        (slGhcOptions snap)
+        (slDropPackages snap)
 
       return LoadedSnapshot
         { lsCompilerVersion = lsCompilerVersion ls0

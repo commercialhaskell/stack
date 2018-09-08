@@ -56,7 +56,7 @@ freeze (FreezeOpts FreezeSnapshot) = do
   msnapshot <- view $ buildConfigL.to bcSnapshotDef.to sdSnapshot
   case msnapshot of
     Just (snap, _) -> do
-      snap' <- completeSnapshot snap
+      snap' <- completeSnapshotLayer snap
       if snap' == snap
       then
         logInfo "No freezing is required for the snapshot of this project"

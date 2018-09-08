@@ -47,7 +47,7 @@ import           Stack.Types.VersionIntervals
 -- repos, figure out package names, and assigned values appropriately.
 data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/commercialhaskell/stack/issues/3922
     { sdResolver        :: !SnapshotLocation
-    , sdSnapshot        :: !(Maybe (Snapshot, SnapshotDef))
+    , sdSnapshot        :: !(Maybe (SnapshotLayer, SnapshotDef))
     , sdWantedCompilerVersion :: !WantedCompiler
     , sdUniqueHash :: !SHA256
     }
@@ -59,9 +59,9 @@ sdResolverName :: SnapshotDef -> Text
 sdResolverName sd =
   case sdSnapshot sd of
     Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
-    Just (snapshot, _) -> snapshotName snapshot
+    Just (snapshot, _) -> slName snapshot
 
-sdSnapshots :: SnapshotDef -> [Snapshot]
+sdSnapshots :: SnapshotDef -> [SnapshotLayer]
 sdSnapshots sd =
   case sdSnapshot sd of
     Nothing -> []
