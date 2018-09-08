@@ -17,6 +17,8 @@ import RIO.Directory (doesDirectoryExist)
 import RIO.Process
 import Database.Persist (Entity (..))
 import qualified RIO.Text as T
+import System.Console.ANSI (hSupportsANSIWithoutEmulation)
+import System.Permissions (osIsWindows)
 
 fetchRepos
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -89,6 +91,11 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
       commandName
       ("clone" : cloneArgs ++ [T.unpack url, suffix])
       readProcess_
+    -- On Windows 10, an upstream issue with the `git clone` command means that
+    -- command clears, but does not then restore, the
+    -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+    -- folowing hack re-enables the lost ANSI-capability.
+    when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
     created <- doesDirectoryExist dir
     unless created $ throwIO $ FailedToCloneRepo repo
 

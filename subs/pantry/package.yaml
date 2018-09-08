@@ -19,6 +19,7 @@ extra-source-files:
 
 dependencies:
 - base
+- ansi-terminal >= 0.8.1
 - digest
 - rio
 - aeson
@@ -85,6 +86,13 @@ dependencies:
 
 library:
   source-dirs: src/
+  when:
+  - condition: 'os(windows)'
+    then:
+      source-dirs: src/windows/
+    else:
+      source-dirs: src/unix/
+
   exposed-modules:
   - Pantry
   - Pantry.SHA256
