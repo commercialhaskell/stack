@@ -100,6 +100,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                               ,"LD_LIBRARY_PATH = libPath;"  -- LD_LIBRARY_PATH is set because for now it's
                                -- needed by builds using Template Haskell
                               ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
+                               -- overriding default locale so Unicode output using base won't be broken
+                              ,"LANG=\"en_US.UTF-8\";"
                               ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else []

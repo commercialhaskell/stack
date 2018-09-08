@@ -71,6 +71,9 @@ Other enhancements:
   e.g. `stack unpack packagename`.
 * Git repos are shared across multiple projects. See
   [#3551](https://github.com/commercialhaskell/stack/issues/3551)
+* Use en_US.UTF-8 locale by default in pure Nix mode so programs won't
+  crash because of Unicode in their output
+  [#4095](https://github.com/commercialhaskell/stack/issues/4095)
 
 Bug fixes:
 
