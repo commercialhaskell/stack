@@ -24,13 +24,15 @@ unpackSnapshot
   -> RIO env ()
 unpackSnapshot cons snap root = do
   unpacked <- parseRelDir "unpacked"
-  (suffixes, flags, skipTest, skipBench, skipHaddock) <- fmap fold $ for (snapshotLocations snap) $ \pl -> do
+  (suffixes, flags, skipTest, skipBench, skipHaddock) <- fmap fold $ for (snapshotPackages snap) $ \sp -> do
+    let pl = spLocation sp
     TreeKey (BlobKey sha _size) <- getPackageLocationTreeKey pl
     PackageIdentifier name version <- getPackageLocationIdent pl
     pc <-
       case Map.lookup name $ consPackages cons of
         Nothing -> error $ "Package not found in constraints: " ++ packageNameString name
         Just pc -> pure pc
+    unless (pcFlags pc == spFlags sp) $ error "mismatched flags!"
     if pcSkipBuild pc
       then pure mempty
       else do

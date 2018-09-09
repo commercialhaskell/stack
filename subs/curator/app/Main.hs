@@ -55,14 +55,16 @@ snapshotIncomplete = do
 snapshot :: RIO PantryApp ()
 snapshot = do
   logInfo "Writing snapshot.yaml"
-  incomplete <- loadPantrySnapshotFile "snapshot-incomplete.yaml"
-  complete <- completeSnapshot incomplete
+  incomplete <- loadPantrySnapshotLayerFile "snapshot-incomplete.yaml"
+  complete <- completeSnapshotLayer incomplete
   liftIO $ encodeFile "snapshot.yaml" complete
 
 unpackFiles :: RIO PantryApp ()
 unpackFiles = do
   logInfo "Unpacking files"
-  snapshot' <- loadPantrySnapshotFile "snapshot.yaml"
+  let fp = "snapshot.yaml"
+  abs' <- resolveFile' fp
+  snapshot' <- loadSnapshot $ SLFilePath $ ResolvedPath (RelFilePath (fromString fp)) abs'
   constraints' <- decodeFileThrow "constraints.yaml"
   dest <- resolveDir' "unpack-dir"
   unpackSnapshot constraints' snapshot' dest
@@ -75,10 +77,10 @@ build = do
     (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
     runProcess_
 
-loadPantrySnapshotFile :: FilePath -> RIO PantryApp Curator.Snapshot
-loadPantrySnapshotFile fp = do
+loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp Curator.SnapshotLayer
+loadPantrySnapshotLayerFile fp = do
   abs' <- resolveFile' fp
-  eres <- loadSnapshot $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')
+  eres <- loadSnapshotLayer $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')
   case eres of
     Left x -> error $ "should not happen: " ++ show (fp, x)
     Right (x, _) -> pure x
