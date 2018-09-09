@@ -7,7 +7,6 @@ import Data.Yaml (encodeFile, decodeFileThrow)
 import Options.Generic (ParseRecord, getRecord)
 import Path.IO (resolveFile', resolveDir')
 import RIO.Process
-import qualified Curator
 
 data CuratorOptions
   = Update
@@ -77,7 +76,7 @@ build = do
     (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
     runProcess_
 
-loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp Curator.SnapshotLayer
+loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp SnapshotLayer
 loadPantrySnapshotLayerFile fp = do
   abs' <- resolveFile' fp
   eres <- loadSnapshotLayer $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')

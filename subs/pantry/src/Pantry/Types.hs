@@ -800,7 +800,7 @@ instance Display PantryException where
   display (InvalidCabalFilePath fp) =
     "File path contains a name which is not a valid package name: " <>
     fromString (toFilePath fp)
-  display (DuplicatePackageNames source pairs) =
+  display (DuplicatePackageNames source pairs') =
     "Duplicate package names (" <> source <> "):\n" <>
     foldMap
       (\(name, locs) ->
@@ -809,7 +809,7 @@ instance Display PantryException where
           (\loc -> "- " <> display loc <> "\n")
           locs
       )
-      pairs
+      pairs'
 
 data FuzzyResults
   = FRNameNotFound ![PackageName]

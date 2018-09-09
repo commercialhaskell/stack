@@ -767,7 +767,7 @@ warnUnusedAddPackagesConfig
   => Utf8Builder -- ^ source
   -> AddPackagesConfig
   -> RIO env ()
-warnUnusedAddPackagesConfig source (AddPackagesConfig drops flags hiddens options) = do
+warnUnusedAddPackagesConfig source (AddPackagesConfig _drops flags hiddens options) = do
   unless (null ls) $ do
     logWarn $ "Some warnings discovered when adding packages to snapshot (" <> source <> ")"
     traverse_ logWarn ls
