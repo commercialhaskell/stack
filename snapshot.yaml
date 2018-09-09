@@ -2,6 +2,7 @@ resolver: lts-11.19
 name: snapshot-for-building-stack-with-ghc-8.2.2
 
 packages:
+- ansi-terminal-0.8.1@sha256:4cebbd2034dcd9029369c0a49c72666be8dacd11a2827d33bcfa539f2933614a,3116
 - Cabal-2.4.0.0@rev:0
 - cabal-install-2.2.0.0@rev:1
 - resolv-0.1.1.1@rev:0

@@ -2,6 +2,7 @@ resolver: nightly-2018-09-02
 name: snapshot-for-building-stack-with-ghc-8.4.3
 
 packages:
+- ansi-terminal-0.8.1@sha256:4cebbd2034dcd9029369c0a49c72666be8dacd11a2827d33bcfa539f2933614a,3116
 - Cabal-2.4.0.0@rev:0
 - http-api-data-0.3.8.1@rev:1
 - cabal-doctest-1.0.6@rev:2

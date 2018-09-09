@@ -38,7 +38,7 @@ dependencies:
 - Cabal >= 2.4
 - aeson
 - annotated-wl-pprint
-- ansi-terminal
+- ansi-terminal >= 0.8.1
 - array
 - async
 - attoparsec

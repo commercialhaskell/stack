@@ -80,7 +80,7 @@ import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.Urls
 import           Stack.Types.Version
-import           System.Console.ANSI (hSupportsANSI)
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
@@ -349,7 +349,8 @@ configFromConfigMonoid
 
      configRunner' <- view runnerL
 
-     useAnsi <- liftIO $ hSupportsANSI stderr
+     useAnsi <- liftIO $ fromMaybe True <$>
+                         hSupportsANSIWithoutEmulation stderr
 
      let stylesUpdate' = runnerStylesUpdate configRunner' <>
            configMonoidStyles
