@@ -6,7 +6,7 @@ __NOTE__ This document should *not be considered accurate* until this
 note is removed.
 
 This is a work-in-progress document covering the build process used by Stack.
-Stack. It was started following the Pantry rewrite work in Stack (likely to
+It was started following the Pantry rewrite work in Stack (likely to
 land as Stack 2.0), and contains some significant changes/simplifications from
 how things used to work. This document will likely not fully be reflected in
 the behavior of Stack itself until late in the Stack 2.0 development cycle.
@@ -22,15 +22,14 @@ the behavior of Stack itself until late in the Stack 2.0 development cycle.
   repository. In contrast to...
 * Mutable package: a package which comes from a local file path. The contents
   of such a package are assumed to mutate over time.
-* Snapshot database: a package database and set of executables for a given set
+* Write only database: a package database and set of executables for a given set
   of _immutable_ packages. Only packages from immutable sources and which
   depend exclusively on other immutable packages can be in this database.
-  *QUESTION* Would this better be called the _immutable database_ or _write only
-  database_?
-* Local database: a package database and set of executables for packages which
+  *NOTE* formerly this was the _snapshot database_.
+* Mutable database: a package database and set of executables for packages which
   are either mutable or depend on such mutable packages. Importantly, packages
   in this database can be unregister, replaced, etc, depending on what happens
-  with the source packages.
+  with the source packages. *NOTE* formerly this was the *local database*.
 
 Outdated terminology to be purged:
 
@@ -58,12 +57,12 @@ Given these inputs, Stack attempts the following process when performing a build
 
 This file is parsed to provide the following config values:
 
-* `resolver`
-* `compiler`
-* `packages`
-* `extra-deps`
-* `flags`
-* `ghc-options`
+* `resolver` (required field)
+* `compiler` (optional field)
+* `packages` (optional field, defaults to `["."]`)
+* `extra-deps` (optional field, defaults to `[]`)
+* `flags` (optional field, defaults to `{}`)
+* `ghc-options` (optional field, defaults to `{}`)
 
 `flags` and `ghc-options` break down into both _by name_ (applied to a
 specific package) and _general_.
@@ -139,7 +138,12 @@ actual targets.
 * For all package name + component, ensure that the package is a
   project package, and add that package + component to the set of
   project targets.
-* Ensure that no target has been specified multiple times.
+* Ensure that no target has been specified multiple times. (*FIXME*
+  Mihai states: I think we will need an extra consistency step for
+  internal libraries. Sometimes stack needs to use the mangled name
+  (`z-package-internallibname-z..`), sometimes the
+  `package:internallibname` one. But I think this will become obvious
+  when doing the code changes.)
 
 We now have an update four package maps, a new set of dependency
 targets, and a new set of project package targets (potentially with
@@ -149,17 +153,21 @@ specific components).
 
 Named CLI flags are applied to specific packages by updating the
 config in one of the four maps. If a flag is specified and no package
-is found, it's an error.
+is found, it's an error. Note that flag settings are added _on top of_
+previous settings in this case, and does not replace them. That is, if
+previously we have `singleton (FlagName "foo") True` and now add
+`singleton (FlagName "bar") True`, both `foo` and `bar` will now be
+true.
 
 ## Apply CLI GHC options
 
 Apply GHC options from the command line to all _project package
 targets_. *FIXME* confirm that this is in fact the correct behavior.
 
-## Apply general flags (CLI and config value)
+## Apply general flags from CLI
 
-*FIXME* figure out and document exactly which packages these will
-apply to.
+`--flag *:flagname[:bool]` specified on the CLI are applied to any
+project package which uses that flag name.
 
 ## Apply general GHC options
 
