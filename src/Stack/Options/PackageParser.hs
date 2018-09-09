@@ -5,9 +5,10 @@ import qualified Data.Map                          as Map
 import           Options.Applicative
 import           Options.Applicative.Types         (readerAsk)
 import           Stack.Prelude
+import           Stack.Types.Config.Build (ApplyCLIFlag (..))
 
 -- | Parser for package:[-]flag
-readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
+readFlag :: ReadM (Map ApplyCLIFlag (Map FlagName Bool))
 readFlag = do
     s <- readerAsk
     case break (== ':') s of
@@ -15,9 +16,9 @@ readFlag = do
             pn' <-
                 case parsePackageName pn of
                     Nothing
-                        | pn == "*" -> return Nothing
+                        | pn == "*" -> return ACFAllProjectPackages
                         | otherwise -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return $ Just x
+                    Just x -> return $ ACFByName x
             let (b, flagS) =
                     case mflag of
                         '-':x -> (False, x)

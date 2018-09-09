@@ -92,7 +92,7 @@ targetsParser =
                     versionString stackMinorVersion <>
                     "/build_command/#target-syntax for details.")))
 
-flagsParser :: Parser (Map.Map (Maybe PackageName) (Map.Map FlagName Bool))
+flagsParser :: Parser (Map.Map ApplyCLIFlag (Map.Map FlagName Bool))
 flagsParser =
      Map.unionsWith Map.union <$>
      many
