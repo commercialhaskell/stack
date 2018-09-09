@@ -10,8 +10,7 @@ with the Haskell packaging system or other build tools.
 
 __NOTE__ This document is probably out of date in some places and
 deserves a refresh. If you find this document helpful, please drop a
-note on [issue
-#4252](https://github.com/commercialhaskell/stack/issues/4252).
+note on [issue #4252](https://github.com/commercialhaskell/stack/issues/4252).
 
 ## Stack's functions
 

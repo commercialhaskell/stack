@@ -334,10 +334,9 @@ Default: `~/.local/bin`
 
 Since Stack 1.11, this field may only be used to specify a single
 package index, which must use the Hackage Security format. For the
-motivation for this change, please see [issue
-#4137](https://github.com/commercialhaskell/stack/issues/4137). Therefore,
-this field is most useful for providing an alternate Hackage mirror
-either for:
+motivation for this change, please see [issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
+Therefore, this field is most useful for providing an alternate
+Hackage mirror either for:
 
 * Bypassing a firewall
 * Faster download speeds
