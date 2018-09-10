@@ -95,8 +95,8 @@ So to manage your library:
 2. If you need to include another library (for example the package
    [`text`](https://hackage.haskell.org/package/text)):
 
-   - Add the package `text` to the file `my-project.cabal`
-     in the section `build-depends: ...`.
+   - Add the package `text` to the file `package.yaml`
+     in the section `dependencies: ...`.
    - Run `stack build` another time.
 
 3. If you get an error that tells you your package isn't in the LTS.
