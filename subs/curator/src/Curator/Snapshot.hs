@@ -13,18 +13,18 @@ makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
   -> Text -- ^ name
-  -> RIO env Snapshot
+  -> RIO env SnapshotLayer
 makeSnapshot cons name = do
   locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
-  pure Snapshot
-    { snapshotParent = SLCompiler $ WCGhc $ consGhcVersion cons
-    , snapshotCompiler = Nothing
-    , snapshotName = name
-    , snapshotLocations = catMaybes locs
-    , snapshotDropPackages = mempty
-    , snapshotFlags = Map.mapMaybe getFlags (consPackages cons)
-    , snapshotHidden = Map.filter id (pcHide <$> consPackages cons)
-    , snapshotGhcOptions = mempty
+  pure SnapshotLayer
+    { slParent = SLCompiler $ WCGhc $ consGhcVersion cons
+    , slCompiler = Nothing
+    , slName = name
+    , slLocations = catMaybes locs
+    , slDropPackages = mempty
+    , slFlags = Map.mapMaybe getFlags (consPackages cons)
+    , slHidden = Map.filter id (pcHide <$> consPackages cons)
+    , slGhcOptions = mempty
     }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
