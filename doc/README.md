@@ -98,6 +98,9 @@ So to manage your library:
    - Add the package `text` to the file `package.yaml`
      in the section `dependencies: ...`.
    - Run `stack build` another time.
+   - `stack build` will update my-project.cabal for you.
+     If desired you can update the .cabal file manually
+     and stack will use .cabal instead of package.yaml.
 
 3. If you get an error that tells you your package isn't in the LTS.
    Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
