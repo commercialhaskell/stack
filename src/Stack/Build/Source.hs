@@ -439,8 +439,8 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
     let necessaryComponents = Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
         components = necessaryComponents `Set.union` nonLibComponents
         componentsFiles =
-            M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath files)) $
-                M.filterWithKey (\component _ -> component `Set.member` components) compFiles
+            M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath $ Set.fromList files)) $
+                M.filterWithKey (\component _ -> component `elem` components) compFiles
     return (componentsFiles, warnings)
 
 -- | Get file modification time, if it exists.
