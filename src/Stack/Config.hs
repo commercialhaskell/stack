@@ -71,7 +71,6 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Package (mkProjectPackage, mkDepPackage)
 import           Stack.Snapshot
 import           Stack.Types.Config
 import           Stack.Types.Docker

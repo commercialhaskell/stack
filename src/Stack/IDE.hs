@@ -17,17 +17,18 @@ import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 
 -- | List the packages inside the current project.
 listPackages :: HasBuildConfig env => RIO env ()
 listPackages = do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   for_ (Map.keys packages) (logInfo . fromString . packageNameString)
 
 -- | List the targets in the current project.
 listTargets :: forall env. HasBuildConfig env => RIO env ()
 listTargets = do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   logInfo $ display $ T.intercalate "\n" $
     map renderPkgComponent pairs

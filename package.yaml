@@ -248,6 +248,7 @@ library:
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
+  - Stack.Types.SourceMap
   - Stack.Types.StylesUpdate
   - Stack.Types.TemplateName
   - Stack.Types.Version

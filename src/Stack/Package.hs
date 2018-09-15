@@ -24,8 +24,6 @@ module Stack.Package
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageDependencies
-  ,mkProjectPackage
-  ,mkDepPackage
   ) where
 
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -1340,6 +1338,7 @@ resolveDirOrWarn :: FilePath.FilePath
 resolveDirOrWarn = resolveOrWarn "Directory" f
   where f p x = liftIO (forgivingAbsence (resolveDir p x)) >>= rejectMissingDir
 
+    {- FIXME
 -- | Create a 'ProjectPackage' from a directory containing a package.
 mkProjectPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -1375,3 +1374,5 @@ mkDepPackage pl = do
     , dpLocation = pl
     , dpName = name
     }
+
+    -}

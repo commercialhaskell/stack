@@ -53,7 +53,7 @@ freeze (FreezeOpts FreezeProject) = do
     Nothing -> logWarn "No project was found: nothing to freeze"
 
 freeze (FreezeOpts FreezeSnapshot) = do
-  msnapshot <- view $ buildConfigL.to bcSnapshotDef.to sdSnapshot
+  msnapshot <- undefined -- view $ buildConfigL.to bcSnapshotDef.to sdSnapshot
   case msnapshot of
     Just (snap, _) -> do
       snap' <- completeSnapshotLayer snap

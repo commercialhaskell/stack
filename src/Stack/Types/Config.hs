@@ -213,6 +213,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
@@ -482,17 +483,9 @@ readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 -- These are the components which know nothing about local configuration.
 data BuildConfig = BuildConfig
     { bcConfig     :: !Config
-    , bcSnapshotDef :: !SnapshotDef
-      -- ^ Build plan wanted for this build
+    , bcSMWanted :: !SMWanted
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: !(Map PackageName ProjectPackage)
-      -- ^ Local packages
-    , bcDependencies :: !(Map PackageName DepPackage)
-      -- ^ Extra dependencies specified in configuration.
-      --
-      -- These dependencies will not be installed to a shared location, and
-      -- will override packages provided by the resolver.
     , bcExtraPackageDBs :: ![Path Abs Dir]
       -- ^ Extra package databases
     , bcStackYaml  :: !(Path Abs File)
@@ -501,8 +494,6 @@ data BuildConfig = BuildConfig
       -- Note: if the STACK_YAML environment variable is used, this may be
       -- different from projectRootL </> "stack.yaml" if a different file
       -- name is used.
-    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
-      -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
@@ -526,32 +517,14 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
-    ,envConfigCompilerVersion :: !ActualCompiler
-    -- ^ The actual version of the compiler to be used, as opposed to
-    -- 'wantedCompilerL', which provides the version specified by the
-    -- build plan.
+    ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !CompilerBuild
     ,envConfigLoadedSnapshot :: !LoadedSnapshot
     -- ^ The fully resolved snapshot information.
     }
 
--- | A view of a dependency package, specified in stack.yaml
-data DepPackage = DepPackage
-  { dpGPD' :: !(IO GenericPackageDescription)
-  , dpName :: !PackageName
-  , dpLocation :: !PackageLocation
-  }
-
--- | A view of a project package needed for resolving components
-data ProjectPackage = ProjectPackage
-    { ppCabalFP    :: !(Path Abs File)
-    , ppResolvedDir :: !(ResolvedPath Dir)
-    , ppGPD' :: !(IO GenericPackageDescription)
-    , ppName :: !PackageName
-    }
-
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . ppGPD'
+ppGPD = liftIO . cpGPD . ppCommon
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
@@ -1229,7 +1202,7 @@ bindirCompilerTools :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m 
 bindirCompilerTools = do
     config <- view configL
     platform <- platformGhcRelDir
-    compilerVersion <- envConfigCompilerVersion <$> view envConfigL
+    compilerVersion <- view actualCompilerVersionL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
         view stackRootL config </>
@@ -1257,9 +1230,9 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    sd <- view snapshotDefL
+    SourceMapHash smh <- view $ envConfigL.to (hashSourceMap . envConfigSourceMap)
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ SHA256.toHexText $ sdUniqueHash sd
+    name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1881,21 +1854,14 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
-wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
+wantedCompilerVersionL :: HasBuildConfig s => SimpleGetter s WantedCompiler
+wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfig s => Lens' s ActualCompiler
-actualCompilerVersionL = envConfigL.lens
-    envConfigCompilerVersion
-    (\x y -> x { envConfigCompilerVersion = y })
-
-snapshotDefL :: HasBuildConfig s => Lens' s SnapshotDef
-snapshotDefL = buildConfigL.lens
-    bcSnapshotDef
-    (\x y -> x { bcSnapshotDef = y })
+actualCompilerVersionL :: HasEnvConfig s => SimpleGetter s ActualCompiler
+actualCompilerVersionL = envConfigL.to (smCompiler . envConfigSourceMap)
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
