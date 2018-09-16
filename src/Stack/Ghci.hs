@@ -68,10 +68,10 @@ data GhciOpts = GhciOpts
     , ghciOnlyMain           :: !Bool
     } deriving Show
 
+-- | Necessary information to load a package or its components.
+--
 -- NOTE: GhciPkgInfo has paths as list instead of a Set to preserve files order
 -- as a workaround for bug https://ghc.haskell.org/trac/ghc/ticket/13786
-
--- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
     { ghciPkgName :: !PackageName
     , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
