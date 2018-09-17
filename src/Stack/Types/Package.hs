@@ -153,7 +153,7 @@ newtype GetPackageOpts = GetPackageOpts
                      -> Path Abs File
                      -> RIO env
                           (Map NamedComponent (Map ModuleName (Path Abs File))
-                          ,Map NamedComponent (Set DotCabalPath)
+                          ,Map NamedComponent [DotCabalPath]
                           ,Map NamedComponent BuildInfoOpts)
     }
 instance Show GetPackageOpts where
@@ -182,7 +182,7 @@ newtype GetPackageFiles = GetPackageFiles
                       => Path Abs File
                       -> RIO env
                            (Map NamedComponent (Map ModuleName (Path Abs File))
-                           ,Map NamedComponent (Set DotCabalPath)
+                           ,Map NamedComponent [DotCabalPath]
                            ,Set (Path Abs File)
                            ,[PackageWarning])
     }

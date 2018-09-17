@@ -271,7 +271,7 @@ generatePkgDescOpts
     -> [PackageName] -- ^ Packages to add to the "-package" flags
     -> Path Abs File
     -> PackageDescription
-    -> Map NamedComponent (Set DotCabalPath)
+    -> Map NamedComponent [DotCabalPath]
     -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
     config <- view configL
@@ -287,7 +287,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
                 , biOmitPackages = omitPkgs
                 , biAddPackages = addPkgs
                 , biBuildInfo = binfo
-                , biDotCabalPaths = fromMaybe mempty (M.lookup namedComponent componentPaths)
+                , biDotCabalPaths = fromMaybe [] (M.lookup namedComponent componentPaths)
                 , biConfigLibDirs = configExtraLibDirs config
                 , biConfigIncludeDirs = configExtraIncludeDirs config
                 , biComponentName = namedComponent
@@ -337,7 +337,7 @@ data BioInput = BioInput
     , biOmitPackages :: ![PackageName]
     , biAddPackages :: ![PackageName]
     , biBuildInfo :: !BuildInfo
-    , biDotCabalPaths :: !(Set DotCabalPath)
+    , biDotCabalPaths :: ![DotCabalPath]
     , biConfigLibDirs :: !(Set FilePath)
     , biConfigIncludeDirs :: !(Set FilePath)
     , biComponentName :: !NamedComponent
@@ -368,7 +368,7 @@ generateBuildInfoOpts BioInput {..} =
         mapMaybe (fmap toFilePath .
                   makeObjectFilePathFromC biCabalDir biComponentName biDistDir)
                  cfiles
-    cfiles = mapMaybe dotCabalCFilePath (S.toList biDotCabalPaths)
+    cfiles = mapMaybe dotCabalCFilePath biDotCabalPaths
     -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     deps =
         concat
@@ -641,7 +641,7 @@ allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
     :: PackageDescription
-    -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent (Set DotCabalPath), Set (Path Abs File), [PackageWarning])
+    -> RIO Ctx (Map NamedComponent (Map ModuleName (Path Abs File)), Map NamedComponent [DotCabalPath], Set (Path Abs File), [PackageWarning])
 packageDescModulesAndFiles pkg = do
     (libraryMods,libDotCabalFiles,libWarnings) <-
         maybe
@@ -729,7 +729,7 @@ resolveGlobFiles cabalFileVersion =
 benchmarkFiles
     :: NamedComponent
     -> Benchmark
-    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 benchmarkFiles component bench = do
     resolveComponentFiles component build names
   where
@@ -745,7 +745,7 @@ benchmarkFiles component bench = do
 testFiles
     :: NamedComponent
     -> TestSuite
-    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 testFiles component test = do
     resolveComponentFiles component build names
   where
@@ -762,7 +762,7 @@ testFiles component test = do
 executableFiles
     :: NamedComponent
     -> Executable
-    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 executableFiles component exe = do
     resolveComponentFiles component build names
   where
@@ -775,7 +775,7 @@ executableFiles component exe = do
 libraryFiles
     :: NamedComponent
     -> Library
-    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 libraryFiles component lib = do
     resolveComponentFiles component build names
   where
@@ -789,7 +789,7 @@ resolveComponentFiles
     :: NamedComponent
     -> BuildInfo
     -> [DotCabalDescriptor]
-    -> RIO Ctx (Map ModuleName (Path Abs File), Set DotCabalPath, [PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 resolveComponentFiles component build names = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
@@ -802,13 +802,11 @@ resolveComponentFiles component build names = do
     return (modules, files <> cfiles, warnings)
 
 -- | Get all C sources and extra source files in a build.
-buildOtherSources :: BuildInfo -> RIO Ctx (Set DotCabalPath)
+buildOtherSources :: BuildInfo -> RIO Ctx [DotCabalPath]
 buildOtherSources build =
-    do csources <- liftM
-                       (S.map DotCabalCFilePath . S.fromList)
+    do csources <- liftM (map DotCabalCFilePath)
                        (mapMaybeM resolveFileOrWarn (cSources build))
-       jsources <- liftM
-                       (S.map DotCabalFilePath . S.fromList)
+       jsources <- liftM (map DotCabalFilePath)
                        (mapMaybeM resolveFileOrWarn (targetJsSources build))
        return (csources <> jsources)
 
@@ -996,13 +994,13 @@ resolveFilesAndDeps
     :: NamedComponent       -- ^ Package component name
     -> [Path Abs Dir]       -- ^ Directories to look in.
     -> [DotCabalDescriptor] -- ^ Base names.
-    -> RIO Ctx (Map ModuleName (Path Abs File),Set DotCabalPath,[PackageWarning])
+    -> RIO Ctx (Map ModuleName (Path Abs File),[DotCabalPath],[PackageWarning])
 resolveFilesAndDeps component dirs names0 = do
     (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
     warnings <- liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
     return (foundModules, dotCabalPaths, warnings)
   where
-    loop [] _ = return (S.empty, M.empty, [])
+    loop [] _ = return ([], M.empty, [])
     loop names doneModules0 = do
         resolved <- resolveFiles dirs names
         let foundFiles = mapMaybe snd resolved
@@ -1021,10 +1019,7 @@ resolveFilesAndDeps component dirs names0 = do
         (resolvedFiles, resolvedModules, _) <-
             loop (map DotCabalModule (S.toList modulesRemaining)) doneModules
         return
-            ( S.union
-                  (S.fromList
-                       (foundFiles <> map DotCabalFilePath thDepFiles))
-                  resolvedFiles
+            ( nubOrd $ foundFiles <> map DotCabalFilePath thDepFiles <> resolvedFiles
             , M.union
                   (M.fromList foundModules)
                   resolvedModules
