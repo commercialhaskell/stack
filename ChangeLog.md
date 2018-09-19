@@ -90,6 +90,7 @@ Bug fixes:
 * Fix `subdirs` for git repos in `extra-deps` to match whole directory names.
   Also fixes for `subdirs: .`. See
   [#4292](https://github.com/commercialhaskell/stack/issues/4292)
+* Add `--cabal-files` flag to `stack ide targets` command.
 
 
 ## v1.9.0.1 (release candidate)
