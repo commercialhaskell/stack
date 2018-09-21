@@ -25,6 +25,7 @@ extra-deps:
 - http-api-data-0.3.8.1@rev:0
 - githash-0.1.0.1@rev:0
 - yaml-0.10.1.1@rev:0 #for hpack-0.31
+- windns-0.1.0.0@rev:0
 
 # Avoid https://github.com/commercialhaskell/stack/issues/4125
 # (triggered because later versions of persistent transitively depends
