@@ -71,25 +71,25 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
         dir = tmpdir </> suffix
         tarball = tmpdir </> "foo.tar"
 
-    let (commandName, cloneArgs, resetArgs, archiveArgs) =
+    let (commandName, resetArgs, submoduleArgs, archiveArgs) =
           case repoType' of
             RepoGit ->
               ( "git"
-              , ["--recursive"]
               , ["reset", "--hard", T.unpack commit]
+              , ["submodule", "update", "--init", "--recursive"]
               , ["archive", "-o", tarball, "HEAD"]
               )
             RepoHg ->
               ( "hg"
-              , []
               , ["update", "-C", T.unpack commit]
+              , []
               , ["archive", tarball, "-X", ".hg_archival.txt"]
               )
 
     logInfo $ "Cloning " <> display commit <> " from " <> display url
     void $ proc
       commandName
-      ("clone" : cloneArgs ++ [T.unpack url, suffix])
+      ("clone" : [T.unpack url, suffix])
       readProcess_
     -- On Windows 10, an upstream issue with the `git clone` command means that
     -- command clears, but does not then restore, the
@@ -101,6 +101,7 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
 
     withWorkingDir dir $ do
       void $ proc commandName resetArgs readProcess_
+      void $ proc commandName submoduleArgs readProcess_
       void $ proc commandName archiveArgs readProcess_
     abs' <- resolveFile' tarball
     getArchive

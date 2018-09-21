@@ -90,6 +90,8 @@ Bug fixes:
 * Fix `subdirs` for git repos in `extra-deps` to match whole directory names.
   Also fixes for `subdirs: .`. See
   [#4292](https://github.com/commercialhaskell/stack/issues/4292)
+* Fix for git packages to update submodules to the correct state. See
+  [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 
 
 ## v1.9.0.1 (release candidate)
