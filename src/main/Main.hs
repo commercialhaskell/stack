@@ -417,7 +417,11 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "packages"
                     "List all available local loadable packages"
                     idePackagesCmd
-                    (pure ())
+                    (flag
+                         IDE.ListPackageNames
+                         IDE.ListPackageCabalFiles
+                         (long "cabal-files" <>
+                          help "Print paths to package cabal-files instead of package names"))
                 addCommand'
                     "targets"
                     "List all available stack targets"
@@ -912,9 +916,9 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           (ghci ghciOpts)
 
 -- | List packages in the project.
-idePackagesCmd :: () -> GlobalOpts -> IO ()
-idePackagesCmd () go =
-    withBuildConfig go IDE.listPackages -- TODO don't need EnvConfig any more
+idePackagesCmd :: IDE.ListPackagesCmd -> GlobalOpts -> IO ()
+idePackagesCmd cmd go =
+    withBuildConfig go (IDE.listPackages cmd) -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: () -> GlobalOpts -> IO ()
