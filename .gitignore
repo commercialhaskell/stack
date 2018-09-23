@@ -9,6 +9,7 @@
 .stack-root/
 /.cabal-sandbox/
 TAGS
+Setup
 cabal-dev/
 cabal.sandbox.config
 dist/
