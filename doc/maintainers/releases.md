@@ -18,6 +18,15 @@
     * Also remove the `-nopie` variants from `etc/scripts/mirrog-ghc-bindists-to-github.sh`.
 * Remove workaround to [#4125](https://github.com/commercialhaskell/stack/issues/4125) from `stack.yaml` for next major version after 1.8.
 
+## Iterating on release process
+
+**IMPORTANT: all bindists for a given release should be built from a consistent git commit** (this can be relaxed a bit for release candidates, but still should be maintained as much as possible).
+
+Since the release process and scripts sometimes need to be iterated on during the process of building all the platforms' binaries, the scripts are all designed so that you can run them *from a different directory*.  This means you can have one source tree for the version of `stack` being released, and a separate one where you work on the release scripts and process.
+
+To use this way, set the current directory should be the version of `stack` to be released.  You can then call the scripts in another directory to use their version.  For example, `stack ../stack-release-scripts/etc/scripts/release.hs …` or `../stack-release-scripts/etc/scripts/vagrant-releases.hs`.
+
+
 ## Version scheme
 
 * Versions with an _even_ second component are development versions (the `master` branch)
@@ -138,14 +147,6 @@ See
 [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
 for requirements to perform the release, and more details about the tool.
 
-A note about the `etc/scripts/*-releases.sh` scripts: if you run them from a
-different working tree than the scripts themselves (e.g. if you have `stack1`
-and `stack2` trees, and run `cd stack1; ../stack2/etc/scripts/vagrant-release.sh`)
-the scripts and Vagrantfiles from the
-tree containing the script will be used to build the stack code in the current
-directory. That allows you to iterate on the release process while building a
-consistent and clean stack version.
-
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
   with tag and name `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field.  check the *This is a pre-release* checkbox.  `[RC]`
@@ -175,18 +176,28 @@ consistent and clean stack version.
 * On Linux ARM64 (aarch64): `[RC]`
     * Run `etc/scripts/linux-aarch64-release.sh`
 
+* Build a Linux static bindst `[RC]`
+    * Follow directions in the **Build Linux static binary distribution with Nix** section below.
+
 * Build sdist using `stack sdist .`, and upload it to the
-  Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.  Also upload GPG signature and checksums.
+  Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.  Also upload GPG signature and checksums. `[RC]`
+
   TODO: did this last time by copying to `_release` and then using `release.hs` to upload sigs and checksum -- should add all this logic to `release.hs` itself.  e.g.:
 
   ```
-  mv /Users/manny/fpco/stack-release/.stack-work/dist/x86_64-osx/Cabal-1.24.2.0/stack-1.6.5.tar.gz _release/stack-1.6.5-sdist-0.tar.gz
-  stack ../stack/etc/scripts/release.hs _release/stack-1.6.5-sdist-0.tar.gz.upload _release/stack-1.6.5-sdist-0.tar.gz.asc.upload _release/stack-1.6.5-sdist-0.tar.gz.sha256.upload
+  mv /home/vagrant/stack-release/.stack-work/dist/x86_64-linux/Cabal-2.0.1.0/stack-1.9.0.1.tar.gz _release/stack-1.9.0.1-sdist-0.tar.gz
+  stack ../stack/etc/scripts/release.hs _release/stack-1.9.0.1-sdist-0.tar.gz.upload _release/stack-1.9.0.1-sdist-0.tar.gz.asc.upload _release/stack-1.9.0.1-sdist-0.tar.gz.sha256.upload
   ```
 
-* Use `etc/scripts/sdist-with-bounds.sh` to generate a Cabal spec and sdist with dependency bounds.  [TODO: should add this logic to `release.hs` itself]
+* Use `etc/scripts/sdist-with-bounds.sh` to generate a Cabal spec and sdist with dependency bounds.  `[RC]` [TODO: should add this logic to `release.hs` itself]
 
-* Upload `_release/stack-X.Y.Z-sdist-1.tar.gz` to the Github release similarly to the `sdist-0` above.
+* Upload `_release/stack-X.Y.Z-sdist-1.tar.gz` to the Github release similarly to the `sdist-0` above. `[RC]`
+
+  TODO: did this last time by copying to `_release` and then using `release.hs` to upload sigs and checksum -- should add all this logic to `release.hs` itself.  e.g.:
+
+  ```
+  stack ../stack/etc/scripts/release.hs _release/stack-1.9.0.1-sdist-1.tar.gz.upload _release/stack-1.9.0.1-sdist-1.tar.gz.asc.upload _release/stack-1.9.0.1-sdist-1.tar.gz.sha256.upload
+  ```
 
 * Publish Github release. Include the changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
 
@@ -245,6 +256,58 @@ consistent and clean stack version.
   commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the markdown for the release description from Github. `[RC]`
 
 * Add back to Stackage nightly if fallen out (be sure to have a `< 9.9.9` constraint to avoid the accidentally uploaded stack-9.9.9 from being used).
+
+
+## Build Linux static binary distribution with Nix
+
+TODO: script this process and/or integrate with `etc/scripts/release.hs`
+
+TODO: run integration tests against static binary
+
+
+These instructions are tested on Ubuntu 16.04, but theoretically should work on any Linux distribution.
+
+- Install nix (tested with v2.0.4 and v2.1.2, but should work with any)
+
+  ```
+  curl https://nixos.org/nix/install | sh
+  ```
+
+- Install and authenticate cachix (first two steps at https://cachix.org/ after signing up)
+
+
+- Add nh2's cache:
+
+  ```
+  cachix use static-haskell-nix
+  ```
+
+  NOTE: to clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*` (useful if someone else uploads new stuff to the cache and you want to use it right away).  The recent `narinfo-cache-positive`/`negative-ttl` options might also help.
+
+- Check out stack commit to be released to `~/stack-release` (or elsewhere, in which case adjust following instructions)
+
+- `rm -f ~/stack-release/stack.cabal`, to ensure it's regenerated
+
+- clone https://github.com/nh2/static-haskell-nix (commit 6bd86c02ed11cc34f209430e23761cd14461c067)
+
+- in `static-stack` directory, run (from https://github.com/nh2/static-haskell-nix/blob/upstream-nixpkgs-musl-1.1.19/static-stack/README.md#Building):
+
+  ```
+  $(nix-build --no-out-link -A stack2nix-script) ~/stack-release
+  nix-build --no-out-link default.nix -A static_stack --arg release true
+  ```
+
+- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/.stack-release/_release/bin/stack-X.Y.Z-linux-x86_64-static/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
+
+- Package, sign, and upload to Github using stack's release script:
+
+  ```
+  stack etc/scripts/release.hs --no-test-haddocks --binary-variant=static --build-args=--dry-run upload
+  ```
+
+  (adding `--build-args=--dry-run` ensures the binary you copied will be used rather than building a new one)
+
+- Download the bindist from github and double check that the `stack` in it is actually static (use `ldd /path/to/stack`) and that `--version` reports correctly (and not dirty).
 
 
 ## Setting up a Windows VM for releases
@@ -325,7 +388,7 @@ Now continue to the **General Windows setup** subsection below.
 
 15. Run `C:\p\env.bat` (do this every time you open a new command prompt)
 
-16. `stack exec -- gpg --import`, and paste in the dev@fpcomplete.com secret key (must be done using `stack exec` because that uses the right keyring for the embedded msys GPG)
+16. `stack exec -- gpg --import`, and paste in the dev@fpcomplete.com secret key (must be done using `stack exec` because that uses the right keyring for the embedded msys GPG; you can get the key from another machine with `gpg --export-secret-keys --armor dev@fpcomplete.com`)
 
 17. Run in command prompt (adjust the `user.email` and `user.name` settings):
 
