@@ -17,9 +17,9 @@ Vagrant.configure(2) do |config|
     yum -y install perl make automake gcc gmp-devel zlib-devel rpm-build tar which git xz python-boto deltarpm python-deltarpm rpm-build rpm-sign ncurses-devel curl unzip
     yum update -y nss curl libcurl
     if ! which stack; then
-      curl -sSL https://www.stackage.org/stack/linux-x86_64-static \
-        | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
-      chmod a+x /usr/local/bin/stack
+      wget -q -O get_stack.sh http://get.haskellstack.org/
+      chmod +x get_stack.sh
+      ./get_stack.sh
     fi
   SHELL
 end
