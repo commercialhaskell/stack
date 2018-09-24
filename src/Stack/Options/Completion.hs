@@ -26,6 +26,7 @@ import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
@@ -58,7 +59,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   comps <- for packages ppComponents
   pure
     $ filter (input `isPrefixOf`)
@@ -71,7 +72,7 @@ targetCompleter = buildConfigCompleter $ \input -> do
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
     bconfig <- view buildConfigL
-    gpds <- for (bcPackages bconfig) ppGPD
+    gpds <- for (smwProject $ bcSMWanted bconfig) ppGPD
     let wildcardFlags
             = nubOrd
             $ concatMap (\(name, gpd) ->
@@ -88,7 +89,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (C.flagName fl) $
-            Map.findWithDefault Map.empty name (bcFlags bconfig)
+            Map.findWithDefault Map.empty name (error "bcFlags bconfig")
     return $ filter (input `isPrefixOf`) $
         case input of
             ('*' : ':' : _) -> wildcardFlags
@@ -97,7 +98,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   gpds <- Map.traverseWithKey (const ppGPD) packages
   pure
     $ filter (input `isPrefixOf`)

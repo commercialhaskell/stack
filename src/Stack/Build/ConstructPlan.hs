@@ -48,6 +48,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.IO (putStrLn)
 import           RIO.Process (findExecutable, HasProcessContext (..))
@@ -80,7 +81,7 @@ combineSourceInstalled ps (location, installed) =
 
 type CombinedMap = Map PackageName PackageInfo
 
-combineMap :: SourceMap -> InstalledMap -> CombinedMap
+combineMap :: Map PackageName PackageSource -> InstalledMap -> CombinedMap
 combineMap = Map.mergeWithKey
     (\_ s i -> Just $ combineSourceInstalled s i)
     (fmap PIOnlySource)
@@ -168,7 +169,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> Set PackageName -- ^ additional packages that must be built
               -> [DumpPackage () () ()] -- ^ locally registered
               -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
-              -> SourceMap
+              -> Map PackageName PackageSource -- FIXME:qrilka SourceMap
               -> InstalledMap
               -> Bool
               -> RIO env Plan
@@ -220,7 +221,7 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             prettyErrorNoIndent $ pprintExceptions errs stackYaml stackRoot parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    hasBaseInDeps bconfig = Map.member (mkPackageName "base") (bcDependencies bconfig)
+    hasBaseInDeps bconfig = Map.member (mkPackageName "base") (smwDeps $ bcSMWanted bconfig)
 
     mkCtx econfig = Ctx
         { ls = ls0
@@ -250,7 +251,7 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Reasons why packages are dirty and must be rebuilt
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
-                  -> SourceMap
+                  -> Map PackageName PackageSource -- FIXME:qrilka SourceMap
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps
                   -- build - don't unregister target packages.

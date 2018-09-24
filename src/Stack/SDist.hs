@@ -53,10 +53,12 @@ import           Stack.Build.Source (loadSourceMap)
 import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.PrettyPrint
 import           Stack.Package
+import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
@@ -250,7 +252,7 @@ getCabalLbs pvpBounds mrev cabalfp = do
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
   where
-    addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
+    addBounds :: Set PackageName -> Map PackageName PackageSource -> InstalledMap -> Dependency -> Dependency
     addBounds internalPackages sourceMap installedMap dep@(Dependency name range) =
       if name `Set.member` internalPackages
         then dep
@@ -443,14 +445,17 @@ buildExtractedTarball pkgDir = do
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
   pathsToKeep
     <- fmap Map.fromList
-     $ flip filterM (Map.toList (bcPackages (envConfigBuildConfig envConfig)))
+     $ flip filterM (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
      $ fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd
   pp <- mkProjectPackage YesPrintWarnings pkgDir
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              {envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+              { --envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+               envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
               }
         in set envConfigL updatedEnvConfig env
+      updatePackagesInSourceMap = error "TBD:qrilka"
+{-
       updatePackageInBuildConfig buildConfig = buildConfig
         { bcPackages = Map.insert (ppName pp) pp pathsToKeep
         , bcConfig = (bcConfig buildConfig)
@@ -459,6 +464,7 @@ buildExtractedTarball pkgDir = do
                        }
                      }
         }
+-}
   local adjustEnvForBuild $
     build Nothing Nothing defaultBuildOptsCLI
 

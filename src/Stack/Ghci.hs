@@ -46,6 +46,7 @@ import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap hiding (SourceMap) -- FIXME:qrilka
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 import           System.Permissions (setScriptPerms)
@@ -263,6 +264,8 @@ findFileTargets locals fileTargets = do
                 associatedFiles
     return (targetMap, infoMap, extraFiles)
 
+type SourceMap = Map PackageName PackageSource -- FIXME:qrilka
+
 getAllLocalTargets
     :: HasEnvConfig env
     => GhciOpts
@@ -276,7 +279,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
     -- independently in order to handle the case where no targets are
     -- specified.
     let targets = maybe targets0 (unionTargets targets0) mainIsTargets
-    packages <- view $ buildConfigL.to bcPackages
+    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     -- Find all of the packages that are directly demanded by the
     -- targets.
     let directlyWanted = flip mapMaybe (M.toList packages) $

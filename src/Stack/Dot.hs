@@ -37,6 +37,7 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
+import           Stack.Types.SourceMap
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -90,7 +91,7 @@ createPrunedDependencyGraph :: HasEnvConfig env
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
-  localNames <- view $ buildConfigL.to (Map.keysSet . bcPackages)
+  localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
                        then dotPrune dotOpts

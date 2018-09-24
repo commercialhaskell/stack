@@ -84,6 +84,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
+import           Stack.Types.SourceMap
 
 -- | Do we need any targets? For example, `stack build` will fail if
 -- no targets are provided.
@@ -458,8 +459,8 @@ parseTargets needTargets boptscli = do
   bconfig <- view buildConfigL
   ls0 <- view loadedSnapshotL
   workingDir <- getCurrentDir
-  locals <- view $ buildConfigL.to bcPackages
-  deps <- view $ buildConfigL.to bcDependencies
+  locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  deps <- view $ buildConfigL.to (smwDeps . bcSMWanted)
   let globals = lsGlobals ls0
       snap = lsPackages ls0
       (textTargets', rawInput) = getRawInput boptscli locals
@@ -489,7 +490,7 @@ parseTargets needTargets boptscli = do
 
   let flags = Map.unionWith Map.union
         (boptsCLIFlagsByName boptscli)
-        (bcFlags bconfig)
+        (undefined "bcFlags bconfig")
       hides = Map.empty -- not supported to add hidden packages
 
       -- We promote packages to the local database if the GHC options
@@ -513,7 +514,7 @@ parseTargets needTargets boptscli = do
       gpd <- ppGPD pp
       pure (gpd, PLMutable $ ppResolvedDir pp, Just pp)
     deps' <- for deps $ \dp -> do
-      gpd <- liftIO $ dpGPD' dp
+      gpd <- liftIO $ cpGPD (dpCommon dp)
       pure (gpd, dpLocation dp, Nothing)
     let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe ProjectPackage)
         allLocals = Map.unions

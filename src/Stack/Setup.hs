@@ -260,11 +260,11 @@ setupEnv mResolveMissingGHC = do
 
     ls <- runRIO bcPath $ loadSnapshot
       (Just compilerVer)
-      (bcSnapshotDef bc)
+      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = compilerVer
+            , envConfigSourceMap = error "TBD"
             , envConfigCompilerBuild = compilerBuild
             , envConfigLoadedSnapshot = ls
             }
@@ -351,7 +351,7 @@ setupEnv mResolveMissingGHC = do
                 }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigCompilerVersion = compilerVer
+        , envConfigSourceMap = error "TBD"
         , envConfigCompilerBuild = compilerBuild
         , envConfigLoadedSnapshot = ls
         }

@@ -41,6 +41,7 @@ import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           System.FilePath (isPathSeparator)
 import qualified RIO
 import           RIO.Process
@@ -161,7 +162,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
-            pkgDirs <- view $ buildConfigL.to (map ppRoot . Map.elems . bcPackages)
+            pkgDirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++

@@ -100,6 +100,7 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
+import           Stack.Types.SourceMap
 import           Stack.Unpack
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -762,7 +763,7 @@ sdistCmd sdistOpts go =
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
-                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . bcPackages)
+                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
                 when (null dirs) $ do
                     stackYaml <- view stackYamlL
                     prettyErrorL
@@ -858,7 +859,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
       getRunCmd args = do
-          packages <- view $ buildConfigL.to bcPackages
+          packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
           pkgComponents <- for (Map.elems packages) ppComponents
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of

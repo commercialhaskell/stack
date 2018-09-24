@@ -146,7 +146,7 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env. HasEnvConfig env
-                     => SourceMap
+                     => Map PackageName PackageSource
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]
@@ -220,7 +220,9 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) packageName
 
+{- FIXME:qrilka conflicts with the one in Stack.Types.SourceMap
 type SourceMap = Map PackageName PackageSource
+-}
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource

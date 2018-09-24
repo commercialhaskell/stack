@@ -9,7 +9,6 @@
 module Stack.Build.Source
     ( loadSourceMap
     , loadSourceMapFull
-    , SourceMap
     , getLocalFlags
     , getGhcOptions
     , addUnlistedToBuildCache
@@ -43,7 +42,7 @@ import              System.PosixCompat.Files (modificationTime, getFileStatus)
 loadSourceMap :: HasEnvConfig env
               => NeedTargets
               -> BuildOptsCLI
-              -> RIO env ([LocalPackage], SourceMap)
+              -> RIO env ([LocalPackage], Map PackageName PackageSource) -- FIXME:qrilka SourceMap)
 loadSourceMap needTargets boptsCli = do
     (_, _, locals, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
     return (locals, sourceMap)
@@ -67,12 +66,12 @@ loadSourceMapFull :: HasEnvConfig env
                        , LoadedSnapshot
                        , [LocalPackage] -- FIXME do we really want this? it's in the SourceMap
                        , Set PackageName -- non-project targets
-                       , SourceMap
+                       , Map PackageName PackageSource -- FIXME:qrilka SourceMap
                        )
 loadSourceMapFull needTargets boptsCli = do
     bconfig <- view buildConfigL
     (ls, localDeps, targets) <- parseTargets needTargets boptsCli
-    packages <- view $ buildConfigL.to bcPackages
+    packages <- view $ buildConfigL.to (error "could be smwProject but this code should be removed" . bcSMWanted)
     locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList packages
     checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
     checkComponentsBuildable locals
@@ -90,7 +89,7 @@ loadSourceMapFull needTargets boptsCli = do
               ident <- getPackageLocationIdent pkgloc
               return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
             PLMutable dir -> do -- FIXME this is not correct, we don't want to treat all Mutable as local
-              pp <- mkProjectPackage YesPrintWarnings dir
+              pp <- error "mkProjectPackage YesPrintWarnings dir"
               lp' <- loadLocalPackage False boptsCli targets (n, pp)
               return $ PSFilePath lp' loc
     sourceMap' <- Map.unions <$> sequence
@@ -118,7 +117,7 @@ getLocalFlags
 getLocalFlags bconfig boptsCli name = Map.unions
     [ Map.findWithDefault Map.empty (ACFByName name) cliFlags
     , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
-    , Map.findWithDefault Map.empty name (bcFlags bconfig)
+    , Map.findWithDefault Map.empty name (error "bcFlags bconfig")
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
@@ -326,7 +325,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
     let flags = map (, FSCommandLine) [(k, v) | (ACFByName k, v) <- Map.toList $ boptsCLIFlags boptsCli]
-             ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
+             ++ map (, FSStackYaml) (Map.toList $ error "bcFlags" bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
         checkFlagUsed ((name, userFlags), source) =

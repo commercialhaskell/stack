@@ -55,6 +55,7 @@ import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.SourceMap hiding (SourceMap) -- FIXME:qrilka
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           RIO.Process
@@ -612,8 +613,8 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- prettyPath stackYaml
 
     logInfo $ "Using configuration file: " <> fromString relStackYaml
-    packages <- view $ buildConfigL.to bcPackages
-    deps <- view $ buildConfigL.to bcDependencies
+    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+    deps <- view $ buildConfigL.to (smwDeps . bcSMWanted)
     let noPkgMsg = "No cabal packages found in " <> relStackYaml <>
                    ". Please add at least one directory containing a .cabal \
                    \file. You can also use 'stack init' to automatically \
@@ -629,9 +630,9 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalDirs noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = bcFlags bconfig
-    oldExtraVersions <- for deps $ fmap gpdVersion . liftIO . dpGPD'
-    let sd                = bcSnapshotDef bconfig
+        oldFlags          = error "bcFlags bconfig"
+    oldExtraVersions <- for deps $ fmap gpdVersion . liftIO . cpGPD . dpCommon
+    let sd                = error "bcSnapshotDef bconfig"
         resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs

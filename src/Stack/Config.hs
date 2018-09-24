@@ -40,6 +40,7 @@ module Stack.Config
   ) where
 
 import           Control.Monad.Extra (firstJustM)
+import           Control.Monad.State.Strict      (get, put, StateT, execStateT, modify)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -59,6 +60,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
+import           Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -71,12 +73,14 @@ import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
-import           Stack.Snapshot
+import           Stack.SourceMap
+import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
@@ -582,33 +586,54 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    sd <- runRIO config $ loadResolver (projectResolver project) mcompiler
+    snapshot <- loadSnapshot (projectResolver project)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
+    packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
       pp <- mkProjectPackage YesPrintWarnings resolved
-      pure (ppName pp, pp)
+      pure (cpName $ ppCommon pp, pp)
 
-    deps <- forM (projectDependencies project) $ \plp -> do
+    deps0 <- forM (projectDependencies project) $ \plp -> do
       dp <- mkDepPackage plp
-      pure (dpName dp, dp)
+      pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
-      map (second (PLMutable . ppResolvedDir)) packages ++
-      map (second dpLocation) deps
+      map (second (PLMutable . ppResolvedDir)) packages0 ++
+      map (second dpLocation) deps0
+
+    let snPackages = snapshotPackages snapshot `Map.difference` Map.fromList packages0
+          `Map.difference` Map.fromList deps0
+
+    snDeps <- Map.traverseWithKey snapToDepPackage snPackages
+
+    let deps1 = Map.fromList deps0 `Map.union` snDeps
+
+    (packages, deps) <- flip execStateT (Map.fromList packages0, deps1) $ do
+      forM_ (Map.toList $ projectFlags project) $ \(package, flags) -> do
+        let setProjectFlags p = p{ppCommon=(ppCommon p){cpFlags=flags}}
+            setDepFlags d = d{dpCommon=(dpCommon d){cpFlags=flags}}
+        modify $ \(packages, deps) -> do
+          if Map.member package packages
+          then (Map.adjust setProjectFlags package packages, deps)
+          else if Map.member package deps
+               then (packages, Map.adjust setDepFlags package deps)
+               else error "TBD: Report it properly"
+
+    let wanted = SMWanted
+          { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
+          , smwProject = packages
+          , smwDeps = deps
+          }
 
     return BuildConfig
         { bcConfig = config
-        , bcSnapshotDef = sd
+        , bcSMWanted = wanted
         , bcGHCVariant = configGHCVariantDefault config
-        , bcPackages = Map.fromList packages
-        , bcDependencies = Map.fromList deps
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
-        , bcFlags = projectFlags project
         , bcImplicitGlobal =
             case mproject of
                 LCSNoProject -> True

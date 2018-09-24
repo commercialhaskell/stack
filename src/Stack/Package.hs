@@ -263,7 +263,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 -- component.
 generatePkgDescOpts
     :: (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
-    => SourceMap
+    => Map PackageName PackageSource -- FIXME:qrilka SourceMap
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
     -> [PackageName] -- ^ Packages to add to the "-package" flags
@@ -328,7 +328,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
 
 -- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
-    { biSourceMap :: !SourceMap
+    { biSourceMap :: !(Map PackageName PackageSource) -- FIXME: qrilka
     , biInstalledMap :: !InstalledMap
     , biCabalDir :: !(Path Abs Dir)
     , biDistDir :: !(Path Abs Dir)
