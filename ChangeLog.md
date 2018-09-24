@@ -7,6 +7,8 @@ Release notes:
 
 Major changes:
 
+* Upgrade to Cabal 2.4
+
 Behavior changes:
 
 Other enhancements:
@@ -24,7 +26,6 @@ Release notes:
 Major changes:
 
 * `GHCJS` support is being downgraded to 'experimental'. A warning notifying the user of the experimental status of `GHCJS` will be displayed.
-* Upgrade to Cabal 2.4
 
 Behavior changes:
 
