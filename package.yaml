@@ -15,7 +15,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >=4.10 && < 5
-  - Cabal >= 2.4
+  - Cabal
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
@@ -35,7 +35,7 @@ ghc-options:
 - -fwarn-incomplete-record-updates
 - -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
-- Cabal >= 2.4
+- Cabal
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
