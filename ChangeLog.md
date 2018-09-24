@@ -3,17 +3,15 @@
 
 ## Unreleased changes
 
-        ## Unreleased changes
+Release notes:
 
-        Release notes:
+Major changes:
 
-        Major changes:
+Behavior changes:
 
-        Behavior changes:
+Other enhancements:
 
-        Other enhancements:
-
-        Bug fixes:
+Bug fixes:
 
 
 ## v1.9.0.1 (release candidate)
