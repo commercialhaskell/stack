@@ -1,5 +1,12 @@
 resolver: nightly-2018-09-02
 
+extra-deps:
+- Cabal-2.4.0.0@rev:0
+- cabal-install-2.4.0.0@rev:1
+- http-api-data-0.3.8.1@rev:1
+- cabal-doctest-1.0.6@rev:2
+- happy-1.19.9@rev:3
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full

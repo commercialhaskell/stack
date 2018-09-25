@@ -39,7 +39,7 @@ module Stack.Package
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as CL8
-import           Data.List (isSuffixOf, isPrefixOf, unzip)
+import           Data.List (isPrefixOf, unzip)
 import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -56,7 +56,7 @@ import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parsec
 import qualified Distribution.PackageDescription.Parsec as D
 import           Distribution.Parsec.Common (PWarning (..), showPos)
-import           Distribution.Simple.Utils
+import           Distribution.Simple.Glob (matchDirFileGlob)
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
 import qualified Distribution.Types.CondTree as Cabal
@@ -65,6 +65,7 @@ import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
+import qualified Distribution.Types.Version as Cabal
 import qualified Distribution.Verbosity as D
 import           Lens.Micro (lens)
 import qualified Hpack
@@ -93,7 +94,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
-import           System.FilePath (splitExtensions, replaceExtension)
+import           System.FilePath (replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
 import           RIO.Process
@@ -799,7 +800,7 @@ packageDescModulesAndFiles pkg = do
             (mapM
                  (asModuleAndFileMap benchComponent benchmarkFiles)
                  (benchmarks pkg))
-    dfiles <- resolveGlobFiles
+    dfiles <- resolveGlobFiles (specVersion pkg)
                     (extraSrcFiles pkg
                         ++ map (dataDir pkg FilePath.</>) (dataFiles pkg))
     let modules = libraryMods <> subLibrariesMods <> executableMods <> testMods <> benchModules
@@ -820,8 +821,11 @@ packageDescModulesAndFiles pkg = do
     foldTuples = foldl' (<>) (M.empty, M.empty, [])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: [String] -> RIO Ctx (Set (Path Abs File))
-resolveGlobFiles =
+resolveGlobFiles
+  :: Cabal.Version -- ^ cabal file version
+  -> [String]
+  -> RIO Ctx (Set (Path Abs File))
+resolveGlobFiles cabalFileVersion =
     liftM (S.fromList . catMaybes . concat) .
     mapM resolve
   where
@@ -838,7 +842,7 @@ resolveGlobFiles =
         mapM resolveFileOrWarn names
     matchDirFileGlob' dir glob =
         catch
-            (matchDirFileGlob_ dir glob)
+            (liftIO (matchDirFileGlob minBound cabalFileVersion dir glob))
             (\(e :: IOException) ->
                   if isUserError e
                       then do
@@ -850,48 +854,6 @@ resolveGlobFiles =
                               ]
                           return []
                       else throwIO e)
-
--- | This is a copy/paste of the Cabal library function, but with
---
--- @ext == ext'@
---
--- Changed to
---
--- @isSuffixOf ext ext'@
---
--- So that this will work:
---
--- @
--- λ> matchDirFileGlob_ "." "test/package-dump/*.txt"
--- ["test/package-dump/ghc-7.8.txt","test/package-dump/ghc-7.10.txt"]
--- @
---
-matchDirFileGlob_ :: HasRunner env => String -> String -> RIO env [String]
-matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
-  Nothing -> liftIO $ throwString $
-      "invalid file glob '" ++ filepath
-      ++ "'. Wildcards '*' are only allowed in place of the file"
-      ++ " name, not in the directory name or file extension."
-      ++ " If a wildcard is used it must be with an file extension."
-  Just (NoGlob filepath') -> return [filepath']
-  Just (FileGlob dir' ext) -> do
-    efiles <- liftIO $ try $ D.getDirectoryContents (dir FilePath.</> dir')
-    let matches =
-            case efiles of
-                Left (_ :: IOException) -> []
-                Right files ->
-                    [ dir' FilePath.</> file
-                    | file <- files
-                    , let (name, ext') = splitExtensions file
-                    , not (null name) && isSuffixOf ext ext'
-                    ]
-    when (null matches) $
-        prettyWarnL
-            [ flow "filepath wildcard"
-            , "'" <> styleFile (fromString filepath) <> "'"
-            , flow "does not match any files."
-            ]
-    return matches
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
