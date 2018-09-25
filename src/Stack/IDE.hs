@@ -7,7 +7,8 @@
 
 -- | Functions for IDEs.
 module Stack.IDE
-    ( listPackages
+    ( ListPackagesCmd(..)
+    , listPackages
     , listTargets
     ) where
 
@@ -18,11 +19,19 @@ import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 
+data ListPackagesCmd = ListPackageNames
+                     | ListPackageCabalFiles
+
 -- | List the packages inside the current project.
-listPackages :: HasBuildConfig env => RIO env ()
-listPackages = do
+listPackages :: HasBuildConfig env => ListPackagesCmd -> RIO env ()
+listPackages flag = do
   packages <- view $ buildConfigL.to bcPackages
-  for_ (Map.keys packages) (logInfo . fromString . packageNameString)
+  let strs = case flag of
+        ListPackageNames ->
+          map packageNameString (Map.keys packages)
+        ListPackageCabalFiles ->
+          map (toFilePath . ppCabalFP) (Map.elems packages)
+  mapM_ (logInfo . fromString) strs
 
 -- | List the targets in the current project.
 listTargets :: forall env. HasBuildConfig env => RIO env ()
