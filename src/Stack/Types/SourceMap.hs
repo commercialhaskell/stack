@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- | A sourcemap maps a package name to how it should be built,
 -- including source code, flags, options, etc. This module contains
 -- various stages of source map construction. See the
@@ -7,6 +8,8 @@ module Stack.Types.SourceMap
   ( -- * Different source map types
     SMWanted (..)
   , SMActual (..)
+  , Target (..)
+  , PackageType (..)
   , SMTargets (..)
   , SourceMap (..)
     -- * Helper types
@@ -19,8 +22,10 @@ module Stack.Types.SourceMap
   , hashSourceMap
   ) where
 
+import qualified Pantry.SHA256 as SHA256
 import Stack.Prelude
 import Stack.Types.Compiler
+import Stack.Types.NamedComponent
 import Distribution.PackageDescription (GenericPackageDescription)
 
 -- | Common settings for both dependency and project package.
@@ -49,7 +54,7 @@ data ProjectPackage = ProjectPackage
 
 -- | A view of a package installed in the global package database.
 data GlobalPackage = GlobalPackage
-  {
+  { gpVersion :: !Version
   }
 
 -- | A source map with information on the wanted (but not actual)
@@ -77,11 +82,22 @@ data SMActual = SMActual
   , smaGlobal :: !(Map PackageName GlobalPackage)
   }
 
+-- | How a package is intended to be built
+data Target
+  = TargetAll !PackageType -- FIXME:qrilka shouldn't that get removed?
+  -- ^ Build all of the default components.
+  | TargetComps !(Set NamedComponent)
+  -- ^ Only build specific components
+
+data PackageType = PTProject | PTDependency
+  deriving (Eq, Show)
+
 -- | Builds on an 'SMActual' by resolving the targets specified on the
 -- command line, potentially adding in new dependency packages in the
 -- process.
 data SMTargets = SMTargets
-  {
+  { smtTargets :: !(Map PackageName Target)
+  , smtDeps :: !(Map PackageName DepPackage)
   }
 
 -- | The final source map, taking an 'SMTargets' and applying all
@@ -95,4 +111,4 @@ newtype SourceMapHash = SourceMapHash SHA256
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'
 hashSourceMap :: SourceMap -> SourceMapHash
-hashSourceMap = undefined
+hashSourceMap _ = SourceMapHash $ SHA256.hashBytes "FIXME:qrilka"

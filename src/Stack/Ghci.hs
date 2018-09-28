@@ -605,7 +605,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = getLocalFlags bconfig buildOptsCLI name
+            , packageConfigFlags = getLocalFlags buildOptsCLI name
             , packageConfigGhcOptions = getGhcOptions bconfig buildOptsCLI name True True
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig

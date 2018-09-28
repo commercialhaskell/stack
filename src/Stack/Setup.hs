@@ -79,6 +79,7 @@ import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint
+import              Stack.SourceMap
 import              Stack.Setup.Installed
 import              Stack.Snapshot (loadSnapshot)
 import              Stack.Types.Build
@@ -87,6 +88,7 @@ import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.Runner
+import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
@@ -249,6 +251,8 @@ setupEnv mResolveMissingGHC = do
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
 
+    smActual <- toActual (bcSMWanted bconfig) compilerVer
+
     logDebug "Resolving package entries"
     bc <- view buildConfigL
 
@@ -258,15 +262,18 @@ setupEnv mResolveMissingGHC = do
     let bcPath :: BuildConfig
         bcPath = set processContextL menv bc
 
-    ls <- runRIO bcPath $ loadSnapshot
-      (Just compilerVer)
-      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
+--    ls <- runRIO bcPath $ loadSnapshot
+--      (Just compilerVer)
+--      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
+    -- FIXME:qrilka do we need it?
+    let sourceMap = SourceMap (smaCompiler smActual)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
-            , envConfigSourceMap = error "TBD"
+            , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = compilerBuild
-            , envConfigLoadedSnapshot = ls
+--            , envConfigLoadedSnapshot = ls
+            , envConfigSMActual = smActual
             }
 
     -- extra installation bin directories
@@ -351,9 +358,10 @@ setupEnv mResolveMissingGHC = do
                 }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigSourceMap = error "TBD"
+        , envConfigSourceMap = sourceMap
         , envConfigCompilerBuild = compilerBuild
-        , envConfigLoadedSnapshot = ls
+--        , envConfigLoadedSnapshot = ls
+        , envConfigSMActual = smActual
         }
 
 -- | Add the include and lib paths to the given Config

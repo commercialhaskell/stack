@@ -49,7 +49,7 @@ import           Path.IO hiding (getModificationTime, getPermissions, withSystem
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (loadSourceMap)
+import           Stack.Build.Source (loadSourceMap', localPackages)
 import           Stack.Build.Target hiding (PackageType (..))
 import           Stack.PrettyPrint
 import           Stack.Package
@@ -113,7 +113,9 @@ getSDistTarball mpvpBounds pkgDir = do
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> fromString pkgFp
-    (fileList, cabalfp) <-  getSDistFileList lp
+    targets <- parseTargets' AllowNoTargets defaultBuildOptsCLI
+    sourceMap <- loadSourceMap' targets{-AllowNoTargets -} defaultBuildOptsCLI
+    (fileList, cabalfp) <-  getSDistFileList lp sourceMap
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
@@ -140,13 +142,13 @@ getSDistTarball mpvpBounds pkgDir = do
             -- This is a cabal file, we're going to tweak it, but only
             -- tweak it as a revision.
             | tweakCabal && isCabalFp fp && asRevision = do
-                lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp
+                lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp sourceMap
                 liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
                 packWith packFileEntry False fp
             -- Same, except we'll include the cabal file in the
             -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
-                (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp
+                (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp sourceMap
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
                 tp <- liftIO $ tarPath False fp
                 return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
@@ -164,13 +166,13 @@ getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
             -> Path Abs File -- ^ cabal file
+            -> Map PackageName PackageSource
             -> RIO env (PackageIdentifier, L.ByteString)
-getCabalLbs pvpBounds mrev cabalfp = do
+getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
     gpd <- liftIO $ gpdio NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
-    (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
     (installedMap, _, _, _) <- getInstalled GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
@@ -316,13 +318,17 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
-getSDistFileList lp =
+getSDistFileList ::
+       HasEnvConfig env
+    => LocalPackage
+    -> Map PackageName PackageSource
+    -> RIO env (String, Path Abs File)
+getSDistFileList lp packageSources =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        (locals, _) <- loadSourceMap NeedTargets boptsCli
+        locals <- localPackages packageSources
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->

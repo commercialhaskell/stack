@@ -519,8 +519,9 @@ data EnvConfig = EnvConfig
     -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !CompilerBuild
-    ,envConfigLoadedSnapshot :: !LoadedSnapshot
-    -- ^ The fully resolved snapshot information.
+    ,envConfigSMActual :: !SMActual
+--    ,envConfigLoadedSnapshot :: !LoadedSnapshot
+--    -- ^ The fully resolved snapshot information.
     }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
@@ -1911,10 +1912,8 @@ cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
 
-loadedSnapshotL :: HasEnvConfig env => Lens' env LoadedSnapshot
-loadedSnapshotL = envConfigL.lens
-    envConfigLoadedSnapshot
-    (\x y -> x { envConfigLoadedSnapshot = y })
+loadedSnapshotL :: (HasEnvConfig env, HasCallStack) => Lens' env LoadedSnapshot
+loadedSnapshotL = error "FIXME:qrilka to be removed"
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler

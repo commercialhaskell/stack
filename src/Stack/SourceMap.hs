@@ -4,11 +4,16 @@ module Stack.SourceMap
     ( mkProjectPackage
     , mkDepPackage
     , snapToDepPackage
+    , toActual
     ) where
 
+import qualified Data.Conduit.List as CL
 import Pantry
+import qualified RIO.Map as Map
 import RIO.Process
+import Stack.PackageDump
 import Stack.Prelude
+import Stack.Types.Compiler
 import Stack.Types.SourceMap
 
 -- | Create a 'ProjectPackage' from a directory containing a package.
@@ -73,3 +78,27 @@ snapToDepPackage name SnapshotPackage{..} = do
                   , cpGhcOptions = spGhcOptions
                   }
     }
+
+toActual ::
+       (HasProcessContext env, HasLogFunc env)
+    => SMWanted
+    -> ActualCompiler
+    -> RIO env SMActual
+toActual smw compiler = do
+    let pkgConduit =
+            conduitDumpPackage .|
+            CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
+        toGlobals ds = Map.fromList $ map toGlobal $ Map.elems ds
+        toGlobal d =
+            ( pkgName $ dpPackageIdent d
+            , GlobalPackage (pkgVersion $ dpPackageIdent d))
+    dumped <- toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
+    let globals =
+            dumped `Map.difference` smwProject smw `Map.difference` smwDeps smw
+    return
+        SMActual
+        { smaCompiler = compiler
+        , smaProject = smwProject smw
+        , smaDeps = smwDeps smw
+        , smaGlobal = globals
+        }

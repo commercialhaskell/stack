@@ -7,7 +7,9 @@
 {-# LANGUAGE ConstraintKinds #-}
 -- Load information on package sources
 module Stack.Build.Source
-    ( loadSourceMap
+    ( localPackages
+    , loadSourceMap'
+    , loadSourceMap
     , loadSourceMapFull
     , getLocalFlags
     , getGhcOptions
@@ -28,14 +30,55 @@ import              Stack.Build.Cache
 import              Stack.Build.Target
 import              Stack.Constants (wiredInPackages)
 import              Stack.Package
+import              Stack.SourceMap
 import              Stack.Types.Build
 import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
+import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
+
+-- FIXME:qrilka move to a better place?
+localPackages :: HasEnvConfig env
+              => Map PackageName PackageSource
+              -> RIO env [LocalPackage]
+localPackages pkgSources = do
+    prjPackages <- view $ envConfigL . to (smaProject . envConfigSMActual)
+    let maybeToLocal (PSFilePath lp _) = Just lp
+        maybeToLocal _ = Nothing
+    return . mapMaybe maybeToLocal $
+        Map.elems (M.restrictKeys pkgSources (M.keysSet prjPackages))
+
+loadSourceMap' :: HasEnvConfig env
+               => SMTargets
+               -> BuildOptsCLI
+               -> RIO env (Map PackageName PackageSource)
+loadSourceMap' smt boptsCli = do
+  bconfig <- view buildConfigL
+  sma <- view $ envConfigL.to envConfigSMActual
+  let targets' = smtTargets smt
+  locals <- mapM (loadLocalPackage True boptsCli targets') $ Map.toList (smaProject sma)
+  let goDepPackage nm dp =
+          let common = dpCommon dp
+          in case dpLocation dp of
+            PLImmutable pkgloc -> do
+              ident <- getPackageLocationIdent pkgloc
+              let configOpts = getGhcOptions bconfig boptsCli nm False False
+              return $ PSRemote Snap (cpFlags common) configOpts pkgloc ident
+            PLMutable dir -> do
+              pp <- mkProjectPackage YesPrintWarnings dir
+              lp' <- loadLocalPackage False boptsCli targets' (nm, pp)
+              return $ PSFilePath lp' Local
+  packageSources' <- Map.unions <$> sequence
+      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFilePath lp' Local)) locals
+      , sequence $ Map.mapWithKey goDepPackage (smtDeps smt)
+      ]
+  let packageSources = packageSources'
+            `Map.difference` Map.fromList (map (, ()) (toList wiredInPackages))
+  return packageSources
 
 -- | Like 'loadSourceMapFull', but doesn't return values that aren't as
 -- commonly needed.
@@ -110,14 +153,12 @@ loadSourceMapFull needTargets boptsCli = do
 
 -- | All flags for a local package.
 getLocalFlags
-    :: BuildConfig
-    -> BuildOptsCLI
+    :: BuildOptsCLI
     -> PackageName
     -> Map FlagName Bool
-getLocalFlags bconfig boptsCli name = Map.unions
+getLocalFlags boptsCli name = Map.unions
     [ Map.findWithDefault Map.empty (ACFByName name) cliFlags
     , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
-    , Map.findWithDefault Map.empty name (error "bcFlags bconfig")
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
@@ -495,7 +536,7 @@ getPackageConfig boptsCli name isTarget isLocal = do
   return PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = getLocalFlags bconfig boptsCli name
+    , packageConfigFlags = getLocalFlags boptsCli name
     , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name isTarget isLocal
     , packageConfigCompilerVersion = compilerVersion
     , packageConfigPlatform = platform
