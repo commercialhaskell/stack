@@ -133,6 +133,8 @@ library:
   source-dirs: src/
   ghc-options:
   - -fwarn-identities
+  generated-exposed-modules:
+  - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
   - Data.Attoparsec.Args
@@ -148,7 +150,6 @@ library:
   - Path.CheckInstall
   - Path.Extra
   - Path.Find
-  - Paths_stack  # Generated
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -271,7 +272,7 @@ executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    other-modules:
+    generated-other-modules:
     - Build_stack,
     - Paths_stack
     ghc-options:
