@@ -259,8 +259,10 @@ library:
   - System.Permissions
   - System.Process.PagerEditor
   - System.Terminal
+  other-modules:
+  - System.Uname
   when:
-  - condition: 'os(windows)'
+  - condition: os(windows)
     then:
       source-dirs: src/windows/
     else:
