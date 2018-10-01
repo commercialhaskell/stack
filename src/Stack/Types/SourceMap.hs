@@ -103,7 +103,11 @@ data SMTargets = SMTargets
 -- | The final source map, taking an 'SMTargets' and applying all
 -- command line flags and GHC options.
 data SourceMap = SourceMap
-  { smCompiler :: !ActualCompiler
+  { smTargets :: !SMTargets
+  , smCompiler :: !ActualCompiler
+  , smProject :: !(Map PackageName ProjectPackage)
+  , smDeps :: !(Map PackageName DepPackage)
+  , smGlobal :: !(Map PackageName GlobalPackage)
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.

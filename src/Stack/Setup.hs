@@ -266,11 +266,11 @@ setupEnv mResolveMissingGHC = do
 --      (Just compilerVer)
 --      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
     -- FIXME:qrilka do we need it?
-    let sourceMap = SourceMap (smaCompiler smActual)
+--    let sourceMap = SourceMap (smaCompiler smActual)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
-            , envConfigSourceMap = sourceMap
+--            , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = compilerBuild
 --            , envConfigLoadedSnapshot = ls
             , envConfigSMActual = smActual
@@ -358,7 +358,7 @@ setupEnv mResolveMissingGHC = do
                 }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigSourceMap = sourceMap
+--        , envConfigSourceMap = sourceMap
         , envConfigCompilerBuild = compilerBuild
 --        , envConfigLoadedSnapshot = ls
         , envConfigSMActual = smActual

@@ -21,11 +21,12 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.Text (display)
+import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
-import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
+import           Stack.Build.Installed (getInstalled', GetInstalledOpts(..), toInstallMap)
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
@@ -33,6 +34,7 @@ import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
 import qualified Stack.Prelude (pkgName)
+import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -107,18 +109,22 @@ createDependencyGraph :: HasEnvConfig env
                        => DotOpts
                        -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  (locals, sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
-      { boptsCLITargets = dotTargets dotOpts
-      , boptsCLIFlags = dotFlags dotOpts
-      }
+  let boptsCLI = defaultBuildOptsCLI
+        { boptsCLITargets = dotTargets dotOpts
+        , boptsCLIFlags = dotFlags dotOpts
+        }
+  targets <- parseTargets' NeedTargets boptsCLI
+  sourceMap <- loadSourceMap' targets boptsCLI
+  locals <- localPackages sourceMap boptsCLI
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
-  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
-                                                   sourceMap
+  installMap <- toInstallMap sourceMap
+  (installedMap, globalDump, _, _) <- getInstalled' (GetInstalledOpts False False False)
+                                                    installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
-  let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
+  let depLoader = createDepLoader sourceMap boptsCLI installedMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
@@ -194,26 +200,37 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: Applicative m
-                => Map PackageName PackageSource
+createDepLoader :: HasEnvConfig env
+                => SourceMap
+                -> BuildOptsCLI
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
-                    Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
+                    Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
-                -> m (Set PackageName, DotPayload)
-createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
+                -> RIO env (Set PackageName, DotPayload)
+createDepLoader sourceMap boptsCLI installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `Set.member` wiredInPackages)
-      then case Map.lookup pkgName sourceMap of
-          Just (PSFilePath lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
-            where
-              pkg = localPackageToPackage lp
-          Just (PSRemote _ flags ghcOptions loc ident) ->
-              -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
-              let PackageIdentifier name version = ident
-               in assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
-          Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+      then case Map.lookup pkgName (smProject sourceMap) of
+          Just pp -> do
+            pkg <- lpPackage <$> loadLocalPackage' sourceMap boptsCLI pp
+            pure (packageAllDeps pkg, payloadFromLocal pkg)
+          Nothing ->
+            case Map.lookup pkgName (smDeps sourceMap) of
+              Just DepPackage{dpLocation=PLMutable dir} -> do
+                pp <- mkProjectPackage YesPrintWarnings dir
+                pkg <- lpPackage <$> loadLocalPackage' sourceMap boptsCLI pp
+                pure (packageAllDeps pkg, payloadFromLocal pkg)
+              Just dp@DepPackage{dpLocation=PLImmutable loc} -> do
+                let common = dpCommon dp
+                gpd <- liftIO $ cpGPD common
+                let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
+                    flags = cpFlags common
+                    ghcOptions = cpGhcOptions common
+                assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
+              Nothing ->
+                pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of
           Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")

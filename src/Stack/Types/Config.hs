@@ -517,7 +517,7 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
-    ,envConfigSourceMap :: !SourceMap
+--    ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !CompilerBuild
     ,envConfigSMActual :: !SMActual
 --    ,envConfigLoadedSnapshot :: !LoadedSnapshot
@@ -1231,7 +1231,7 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    SourceMapHash smh <- view $ envConfigL.to (hashSourceMap . envConfigSourceMap)
+    SourceMapHash smh <- view $ envConfigL.to (hashSourceMap . error "FIXME:qrilka envConfigSourceMap")
     platform <- platformGhcRelDir
     name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir
@@ -1862,7 +1862,7 @@ wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
 actualCompilerVersionL :: HasEnvConfig s => SimpleGetter s ActualCompiler
-actualCompilerVersionL = envConfigL.to (smCompiler . envConfigSourceMap)
+actualCompilerVersionL = envConfigL.to (smaCompiler . envConfigSMActual)
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens

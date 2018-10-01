@@ -166,23 +166,24 @@ getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
             -> Path Abs File -- ^ cabal file
-            -> Map PackageName PackageSource
+            -> SourceMap -- Map PackageName PackageSource
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
     gpd <- liftIO $ gpdio NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
-    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
+    installMap <- toInstallMap sourceMap
+    (installedMap, _, _, _) <- getInstalled' GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 , getInstalledSymbols = False
                                 }
-                                sourceMap
+                                installMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
           map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
-        gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
+        gpd' = gtraverseT (addBounds internalPackages installMap installedMap) gpd
         gpd'' =
           case mrev of
             Nothing -> gpd'
@@ -254,8 +255,8 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
   where
-    addBounds :: Set PackageName -> Map PackageName PackageSource -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages sourceMap installedMap dep@(Dependency name range) =
+    addBounds :: Set PackageName -> InstallMap -> InstalledMap -> Dependency -> Dependency
+    addBounds internalPackages installMap installedMap dep@(Dependency name range) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
@@ -266,8 +267,8 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
               range
       where
         foundVersion =
-          case Map.lookup name sourceMap of
-              Just ps -> Just (piiVersion ps)
+          case Map.lookup name installMap of
+              Just (_, version) -> Just version
               Nothing ->
                   case Map.lookup name installedMap of
                       Just (_, installed) -> Just (installedVersion installed)
@@ -321,14 +322,14 @@ readLocalPackage pkgDir = do
 getSDistFileList ::
        HasEnvConfig env
     => LocalPackage
-    -> Map PackageName PackageSource
+    -> SourceMap
     -> RIO env (String, Path Abs File)
-getSDistFileList lp packageSources =
+getSDistFileList lp sourceMap =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        locals <- localPackages packageSources
+        locals <- localPackages sourceMap boptsCli
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
@@ -457,10 +458,12 @@ buildExtractedTarball pkgDir = do
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               { --envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
-               envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
+               -- envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
+                envConfigSMActual = updatePackagesInSMActual (envConfigSMActual envConfig)
               }
         in set envConfigL updatedEnvConfig env
-      updatePackagesInSourceMap = error "TBD:qrilka"
+      updatePackagesInSMActual sma =
+        sma {smaProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
 {-
       updatePackageInBuildConfig buildConfig = buildConfig
         { bcPackages = Map.insert (ppName pp) pp pathsToKeep
