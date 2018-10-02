@@ -101,6 +101,11 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
     withWorkingDir dir $ do
       runCommand resetArgs
       traverse_ runCommand submoduleArgs
+      -- On Windows 10, an upstream issue with the `git submodule` command means
+      -- that command clears, but does not then restore, the
+      -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+      -- folowing hack re-enables the lost ANSI-capability.
+      when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
       runCommand archiveArgs
     abs' <- resolveFile' tarball
     getArchive
