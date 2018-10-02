@@ -234,7 +234,7 @@ renderStackYaml p ignoredPackages dupPackages =
         [ ("user-message"     , userMsgHelp)
         , ("resolver"         , resolverHelp)
         , ("packages"         , packageHelp)
-        , ("extra-deps"       , "# Dependency packages to be pulled from upstream that are not in the resolver\n# using the same syntax as the packages field.\n# (e.g., acme-missiles-0.3)")
+        , ("extra-deps"       , extraDepsHelp)
         , ("flags"            , "# Override default flag values for local packages and extra-deps")
         , ("extra-package-dbs", "# Extra package databases containing global packages")
         ]
@@ -274,13 +274,21 @@ renderStackYaml p ignoredPackages dupPackages =
         , "packages:"
         , "- some-directory"
         , "- https://example.com/foo/bar/baz-0.0.2.tar.gz"
-        , "- location:"
-        , "   git: https://github.com/commercialhaskell/stack.git"
-        , "   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
-        , "- location: https://github.com/commercialhaskell/stack/commit/e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
         , " subdirs:"
         , " - auto-update"
         , " - wai"
+        ]
+
+    extraDepsHelp = commentHelp
+        [ "Dependency packages to be pulled from upstream that are not in the resolver."
+        , "These entries can reference officially published versions as well as"
+        , "forks / in-progress versions pinned to a git hash. For example:"
+        , ""
+        , "extra-deps:"
+        , "- acme-missiles-0.3"
+        , "- git: https://github.com/commercialhaskell/stack.git"
+        , "  commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a"
+        , ""
         ]
 
     footerHelp =
