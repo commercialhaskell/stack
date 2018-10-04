@@ -15,6 +15,7 @@ module Stack.Dot (dot
                  ) where
 
 import qualified Data.Foldable as F
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.Text as Text
@@ -65,6 +66,8 @@ data ListDepsOpts = ListDepsOpts
     -- ^ Separator between the package name and details.
     , listDepsLicense :: !Bool
     -- ^ Print dependency licenses instead of versions.
+    , listDepsTree :: !Bool
+    -- ^ Print dependency tree.
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -132,15 +135,64 @@ listDependencies :: HasEnvConfig env
                   -> RIO env ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
-  (_, resultGraph) <- createPrunedDependencyGraph dotOpts
-  void (Map.traverseWithKey go (snd <$> resultGraph))
-    where go name payload =
-            let payloadText =
-                  if listDepsLicense opts
-                      then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
-                      else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
-                line = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText
-            in  liftIO $ Text.putStrLn line
+  (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
+  if listDepsTree opts then
+    do
+      liftIO $ Text.putStrLn "Packages"
+      liftIO $ printTree opts 0 [] pkgs resultGraph
+    else
+      void (Map.traverseWithKey go (snd <$> resultGraph))
+      where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
+
+printTree :: ListDepsOpts
+          -> Int
+          -> [Int]
+          -> Set PackageName
+          -> Map PackageName (Set PackageName, DotPayload)
+          -> IO ()
+printTree opts depth remainingDepsCounts packages dependencyMap =
+  F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
+  where
+    toSeq = Seq.fromList . Set.toList
+    go index name = let newDepsCounts = remainingDepsCounts ++ [Set.size packages - index - 1]
+                        (deps, payload) = (Map.!) dependencyMap name
+                     in do
+                          printTreeNode opts depth newDepsCounts deps payload name
+                          if Just depth == dotDependencyDepth (listDepsDotOpts opts)
+                             then return ()
+                             else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+
+printTreeNode :: ListDepsOpts
+              -> Int
+              -> [Int]
+              -> Set PackageName
+              -> DotPayload
+              -> PackageName
+              -> IO ()
+printTreeNode opts depth remainingDepsCounts deps payload name =
+  let remainingDepth = fromMaybe 999 (dotDependencyDepth (listDepsDotOpts opts)) - depth
+      hasDeps = not $ null deps
+   in Text.putStrLn $ treeNodePrefix "" remainingDepsCounts hasDeps  remainingDepth  <> " " <> listDepsLine opts name payload
+
+treeNodePrefix :: Text -> [Int] -> Bool -> Int -> Text
+treeNodePrefix t [] _ _      = t
+treeNodePrefix t [0] True  0 = t <> "└──"
+treeNodePrefix t [_] True  0 = t <> "├──"
+treeNodePrefix t [0] True  _ = t <> "└─┬"
+treeNodePrefix t [_] True  _ = t <> "├─┬"
+treeNodePrefix t [0] False _ = t <> "└──"
+treeNodePrefix t [_] False _ = t <> "├──"
+treeNodePrefix t (0:ns) d remainingDepth = treeNodePrefix (t <> "  ") ns d remainingDepth
+treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d remainingDepth
+
+listDepsLine :: ListDepsOpts -> PackageName -> DotPayload -> Text
+listDepsLine opts name payload = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText opts payload
+
+payloadText :: ListDepsOpts -> DotPayload -> Text
+payloadText opts payload =
+  if listDepsLicense opts
+    then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
+    else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans
