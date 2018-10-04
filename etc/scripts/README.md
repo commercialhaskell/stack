@@ -21,7 +21,12 @@ To create a signed binary package, you need:
 
 - GPG installed and in the PATH (included with
   [msysgit](https://msysgit.github.io) on Windows)
-- `dev@fpcomplete.com` secret key in GPG keyring.
+- `dev@fpcomplete.com` secret key in GPG keyring. You may also use the
+  environment variables `STACK_RELEASE_GPG_KEY` and
+  `STACK_RELEASE_GPG_KEY_NAME`. The variable `STACK_RELEASE_GPG_KEY` should be
+  set to the hexadecimal identifier of the GPG key, while
+  `STACK_RELEASE_GPG_KEY_NAME` should be set to the regular name (e.g.
+  dev@fpcomplete.com).
 
 To upload a binary to a Github release, you also need:
 
@@ -51,6 +56,13 @@ addition, the following options are accepted:
 * `--allow-dirty`: by default, the `check` rule aborts if the working tree is
   dirty, but this will allow it to continue.
   uploaded to.
+
+You may also use the following environment variables in order to use a custom
+GPG key:
+* `STACK_RELEASE_GPG_KEY` should be set to the hexadecimal identifier of the
+  GPG key
+* `STACK_RELEASE_GPG_KEY_NAME` should be set to the regular name (e.g.
+  dev@fpcomplete.com).
 
 ### Targets
 

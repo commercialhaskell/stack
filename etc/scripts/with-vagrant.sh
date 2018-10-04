@@ -4,7 +4,9 @@ set -xe
 export STACK_BUILD_DIR="$PWD"
 cd "$(dirname "$0")/../.."
 #TODO: set up gpg-agent forwarding for package signing (see http://superuser.com/questions/161973/how-can-i-forward-a-gpg-key-via-ssh-agent).
-gpg --export-secret-keys --armor dev@fpcomplete.com >"gpg-secret-key.asc~"
+
+gpg_key_name="${STACK_RELEASE_GPG_KEY_NAME:-dev@fpcomplete.com}" # :- means get from env or use default
+gpg --export-secret-keys --armor "$gpg_key_name" >"gpg-secret-key.asc~"
 cd "etc/vagrant/$1"
 
 # Double 'vagrant up' is a workaround for FreeBSD
