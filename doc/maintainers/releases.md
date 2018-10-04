@@ -4,7 +4,6 @@
 
 ## Upcoming release taks:
 
-* Update release process to support using GPG keys other than `dev@fpcomplete.com`.
 * Add back support for building static Linux binaries (by popular demand), and update `get-stack.sh` to use it (see [#4088](https://github.com/commercialhaskell/stack/issues/4088)).
 * Check whether `persistent` still needs `monad-logger`; remove dependency if not
 * Check if workaround for https://github.com/commercialhaskell/stack/issues/3922 still needed in stack.yaml

@@ -70,16 +70,19 @@ main =
                      , shakeChange = ChangeModtimeAndDigestInput }
         options $
         \flags args -> do
+            -- build the default value of type Global, with predefined constants
+
             -- 'stack build --dry-run' just ensures that 'stack.cabal' is generated from hpack
             _ <- readProcess "stack" ["build", "--dry-run"] ""
             gStackPackageDescription <-
                 packageDescription <$> readGenericPackageDescription silent "stack.cabal"
+            gGpgKey <- fromMaybe defaultGpgKey <$> lookupEnv gpgKeyEnvVar
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            let gGpgKey = "0x575159689BEFB442"
-                gAllowDirty = False
+
+            let gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
                 gArch = arch
@@ -90,6 +93,7 @@ main =
                 gBuildArgs = []
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags
+
             -- Need to get paths after options since the '--arch' argument can effect them.
             projectRoot' <- getStackPath global0 "project-root"
             let global = global0
@@ -105,7 +109,9 @@ options :: [OptDescr (Either String (Global -> Global))]
 options =
     [ Option "" [gpgKeyOptName]
         (ReqArg (\v -> Right $ \g -> g{gGpgKey = v}) "USER-ID")
-        "GPG user ID to sign distribution package with."
+        ("GPG user ID to sign distribution package with (defaults to " ++
+         gpgKeyEnvVar ++
+         " environment variable).")
     , Option "" [allowDirtyOptName] (NoArg $ Right $ \g -> g{gAllowDirty = True})
         "Allow a dirty working tree for release."
     , Option "" [githubAuthTokenOptName]
@@ -165,9 +171,6 @@ rules global@Global{..} args = do
 
     phony buildPhony $
         mapM_ (\f -> need [releaseDir </> f]) binaryPkgFileNames
-
-    distroPhonies ubuntuDistro ubuntuVersions debPackageFileName
-    distroPhonies centosDistro centosVersions rpmPackageFileName
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
@@ -300,34 +303,15 @@ rules global@Global{..} args = do
 
     getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*.md"]
 
-    distroVersionFromPath path versions =
-        let path' = dropDirectoryPrefix releaseDir path
-            version = takeDirectory1 (dropDirectory1 path')
-        in DistroVersion (takeDirectory1 path') version (lookupVersionCodeName version versions)
-
-    distroPhonies distro0 versions0 makePackageFileName =
-        forM_ versions0 $ \(version0,_) -> do
-            let dv@DistroVersion{..} = DistroVersion distro0 version0 (lookupVersionCodeName version0 versions0)
-            phony (distroUploadPhony dv) $ need [distroVersionDir dv </> makePackageFileName dv <.> uploadExt]
-            phony (distroBuildPhony dv) $ need [distroVersionDir dv </> makePackageFileName dv]
-
-    lookupVersionCodeName version versions =
-        fromMaybe (error $ "lookupVersionCodeName: could not find " ++ show version ++ " in " ++ show versions) $
-            lookup version versions
-
-
     releasePhony = "release"
     checkPhony = "check"
     uploadPhony = "upload"
     cleanPhony = "clean"
     buildPhony = "build"
-    distroUploadPhony DistroVersion{..} = "upload-" ++ dvDistro ++ "-" ++ dvVersion
-    distroBuildPhony DistroVersion{..} = "build-" ++ dvDistro ++ "-" ++ dvVersion
 
     releaseCheckDir = releaseDir </> "check"
     releaseStageDir = releaseDir </> "stage"
     releaseBinDir = releaseDir </> "bin"
-    distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
     binaryPkgFileNames =
         concatMap (\x -> [x, x <.> ascExt, x <.> sha256Ext]) binaryPkgArchiveFileNames
@@ -350,35 +334,6 @@ rules global@Global{..} args = do
             , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
     stackExeFileName = stackProgName <.> exe
 
-    debStagedDocDir dv = debStagingDir dv </> "usr/share/doc" </> stackProgName
-    debStagedBashCompletionFile dv = debStagingDir dv </> "etc/bash_completion.d/stack"
-    debStagedExeFile dv = debStagingDir dv </> "usr/bin/stack"
-    debStagingDir dv = distroVersionDir dv </> debPackageName dv
-    debPackageFileName dv = debPackageName dv <.> debExt
-    debPackageName dv = stackProgName ++ "_" ++ debPackageVersionStr dv ++ "_amd64"
-    debPackageVersionStr DistroVersion{..} = stackVersionStr global ++ "-0~" ++ dvCodeName
-
-    rpmStagedDocDir dv = rpmStagingDir dv </> "usr/share/doc" </> (stackProgName ++ "-" ++ rpmPackageVersionStr dv)
-    rpmStagedBashCompletionFile dv = rpmStagingDir dv </> "etc/bash_completion.d/stack"
-    rpmStagedExeFile dv = rpmStagingDir dv </> "usr/bin/stack"
-    rpmStagingDir dv = distroVersionDir dv </> rpmPackageName dv
-    rpmPackageFileName dv = rpmPackageName dv <.> rpmExt
-    rpmPackageName dv = stackProgName ++ "-" ++ rpmPackageVersionStr dv ++ "-" ++ rpmPackageIterationStr dv ++ ".x86_64"
-    rpmPackageIterationStr DistroVersion{..} = "0." ++ dvCodeName
-    rpmPackageVersionStr _ = stackVersionStr global
-
-    ubuntuVersions =
-        [ ("14.04", "trusty")
-        , ("16.04", "xenial") ]
-    centosVersions =
-        [ ("7", "el7")
-        , ("6", "el6") ]
-
-    ubuntuDistro = "ubuntu"
-    centosDistro = "centos"
-
-    anyDistroVersion distro = DistroVersion distro "*" "*"
-
     zipExt = ".zip"
     tarGzExt = tarExt <.> gzExt
     gzExt = ".gz"
@@ -386,8 +341,6 @@ rules global@Global{..} args = do
     ascExt = ".asc"
     sha256Ext = ".sha256"
     uploadExt = ".upload"
-    debExt = ".deb"
-    rpmExt = ".rpm"
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
@@ -487,7 +440,7 @@ platformOS =
 releaseDir :: FilePath
 releaseDir = "_release"
 
--- | @GITHUB_AUTH_TOKEN@ environment variale name.
+-- | @GITHUB_AUTH_TOKEN@ environment variable name.
 githubAuthTokenEnvVar :: String
 githubAuthTokenEnvVar = "GITHUB_AUTH_TOKEN"
 
@@ -498,6 +451,14 @@ githubAuthTokenOptName = "github-auth-token"
 -- | @--github-release-tag@ command-line option name.
 githubReleaseTagOptName :: String
 githubReleaseTagOptName = "github-release-tag"
+
+-- | Default GPG key ID for signing bindists
+defaultGpgKey :: String
+defaultGpgKey = "0x575159689BEFB442"
+
+-- | @STACK_RELEASE_GPG_KEY@ environment variable name.
+gpgKeyEnvVar :: String
+gpgKeyEnvVar =  "STACK_RELEASE_GPG_KEY"
 
 -- | @--gpg-key@ command-line option name.
 gpgKeyOptName :: String
