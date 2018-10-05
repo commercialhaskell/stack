@@ -406,22 +406,37 @@ addDep treatAsDep' name = do
                         -- recommendation available
                         Nothing -> return $ Left $ UnknownPackage name
                         Just (PIOnlyInstalled loc installed) -> do
+                            tellExecutablesUpstream
+                              name
+                              (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
+                              loc
+                              Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
-                            tellExecutables ps
+                            tellExecutables name ps
                             installPackage treatAsDep name ps Nothing
                         Just (PIBoth ps installed) -> do
-                            tellExecutables ps
+                            tellExecutables name ps
                             installPackage treatAsDep name ps (Just installed)
             updateLibMap name res
             return res
 
 -- FIXME what's the purpose of this? Add a Haddock!
-tellExecutables :: Source -> M ()
-tellExecutables (SourceLocal lp)
+tellExecutables :: PackageName -> Source -> M ()
+tellExecutables _name (SourceLocal lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
-tellExecutables SourceRemote{} = return ()
+-- Ignores ghcOptions because they don't matter for enumerating
+-- executables.
+tellExecutables name (SourceRemote pkgloc _version cp) =
+    tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
+
+tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream name pkgloc loc flags = do
+    ctx <- ask
+    when (name `Set.member` wanted ctx) $ do
+        p <- loadPackage ctx pkgloc flags []
+        tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
