@@ -129,7 +129,7 @@ build msetLocalFiles mbuildLk boptsCli = do
                          snapshotDumpPkgs
                          localDumpPkgs
                          installedMap
-                         (error "FIXME:qrilka targets")
+                         (smtTargets $ smTargets sourceMap)
                          plan
 
 -- | If all the tasks are local, they don't mutate anything outside of our local directory.
