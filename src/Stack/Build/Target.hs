@@ -636,7 +636,6 @@ parseTargets' :: HasEnvConfig env
 parseTargets' needTargets boptscli = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
-  sma <- view $ envConfigL.to envConfigSMActual
   workingDir <- getCurrentDir
   locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
   let (textTargets', rawInput) = getRawInput boptscli locals
@@ -667,12 +666,12 @@ parseTargets' needTargets boptscli = do
   addedDeps' <- mapM (mkDepPackage . PLImmutable) addedDeps
 
   return SMTargets
-    { smtTargets=targets
-    , smtDeps=addedDeps' <> smaDeps sma
+    { smtTargets = targets
+    , smtDeps = addedDeps'
     }
 
 parseTargets
-    :: HasEnvConfig env
+    :: (HasEnvConfig env)
     => NeedTargets
     -> BuildOptsCLI
     -> RIO env

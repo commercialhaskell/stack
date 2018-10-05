@@ -8,6 +8,7 @@
 -- Load information on package sources
 module Stack.Build.Source
     ( localPackages
+    , loadCommonPackage
     , loadLocalPackage'
     , loadSourceMap'
     , loadSourceMap
@@ -45,10 +46,9 @@ import              System.PosixCompat.Files (modificationTime, getFileStatus)
 -- FIXME:qrilka move to a better place?
 localPackages :: HasEnvConfig env
               => SourceMap
-              -> BuildOptsCLI
               -> RIO env [LocalPackage]
-localPackages sm boptsCLI =
-  for (toList $ smProject sm) $ loadLocalPackage' sm boptsCLI
+localPackages sm =
+  for (toList $ smProject sm) $ loadLocalPackage' sm
 
 loadSourceMap' :: HasEnvConfig env
                => SMTargets
@@ -216,17 +216,25 @@ splitComponents =
     go a b c (CTest x:xs) = go a (b . (x:)) c xs
     go a b c (CBench x:xs) = go a b (c . (x:)) xs
 
+loadCommonPackage ::
+       forall env. HasEnvConfig env
+    => CommonPackage
+    -> RIO env Package
+loadCommonPackage common = do
+    config <- getPackageConfig' (cpFlags common) (cpGhcOptions common)
+    gpkg <- liftIO $ cpGPD common
+    return $ resolvePackage config gpkg
+
 loadLocalPackage' ::
        forall env. HasEnvConfig env
     => SourceMap
-    -> BuildOptsCLI
     -> ProjectPackage
     -> RIO env LocalPackage
-loadLocalPackage' sm boptsCLI pp = do
+loadLocalPackage' sm pp = do
     let common = ppCommon pp
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
-    config <- getPackageConfig' boptsCLI (cpFlags common) (cpGhcOptions common)
+    config <- getPackageConfig' (cpFlags common) (cpGhcOptions common)
     gpkg <- ppGPD pp
     let name = cpName common
         mtarget = M.lookup name (smtTargets $ smTargets sm)
@@ -693,12 +701,10 @@ getPackageConfig boptsCli name isTarget isLocal = do
     }
 
 getPackageConfig' :: (MonadIO m, MonadReader env m, HasEnvConfig env)
-  => BuildOptsCLI
-  -> Map FlagName Bool
+  => Map FlagName Bool
   -> [Text]
   -> m PackageConfig
-getPackageConfig' boptsCli flags ghcOptions = do
-  bconfig <- view buildConfigL
+getPackageConfig' flags ghcOptions = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   return PackageConfig

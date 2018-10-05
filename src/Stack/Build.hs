@@ -40,10 +40,12 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Package
+import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
+import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.FileLock (FileLock, unlockFile)
@@ -67,29 +69,36 @@ build msetLocalFiles mbuildLk boptsCli = do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
 
-    (targets, ls, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    targets <- parseTargets' NeedTargets boptsCli
+    sourceMap <- loadSourceMap' targets boptsCli
+    locals <- localPackages sourceMap
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
-    for_ msetLocalFiles $ \setLocalFiles -> liftIO $ do
-      files <- sequence
-        -- The `locals` value above only contains local project
-        -- packages, not local dependencies. This will get _all_
-        -- of the local files we're interested in
-        -- watching.
-        [lpFiles lp | PSFilePath lp _ <- Map.elems sourceMap]
-      setLocalFiles $ Set.insert stackYaml $ Set.unions files
+    for_ msetLocalFiles $ \setLocalFiles -> do
+      depsLocals <- forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
+        case dpLocation dp of
+          PLMutable dir -> do
+            pp <- mkProjectPackage YesPrintWarnings dir
+            Just <$> loadLocalPackage' sourceMap pp
+          _ ->
+            return Nothing
 
+      files <- sequence
+        [lpFiles lp | lp <- locals ++ depsLocals]
+      liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
+
+    installMap <- toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled
+        getInstalled'
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
                          , getInstalledSymbols   = symbols }
-                     sourceMap
+                     installMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan ls baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -120,7 +129,7 @@ build msetLocalFiles mbuildLk boptsCli = do
                          snapshotDumpPkgs
                          localDumpPkgs
                          installedMap
-                         targets
+                         (error "FIXME:qrilka targets")
                          plan
 
 -- | If all the tasks are local, they don't mutate anything outside of our local directory.

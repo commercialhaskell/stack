@@ -115,7 +115,7 @@ createDependencyGraph dotOpts = do
         }
   targets <- parseTargets' NeedTargets boptsCLI
   sourceMap <- loadSourceMap' targets boptsCLI
-  locals <- localPackages sourceMap boptsCLI
+  locals <- localPackages sourceMap
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   installMap <- toInstallMap sourceMap
   (installedMap, globalDump, _, _) <- getInstalled' (GetInstalledOpts False False False)
@@ -124,7 +124,7 @@ createDependencyGraph dotOpts = do
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
-  let depLoader = createDepLoader sourceMap boptsCLI installedMap globalDumpMap globalIdMap loadPackageDeps
+  let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
@@ -202,7 +202,6 @@ resolveDependencies limit graph loadPackageDeps = do
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
 createDepLoader :: HasEnvConfig env
                 => SourceMap
-                -> BuildOptsCLI
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
@@ -210,17 +209,17 @@ createDepLoader :: HasEnvConfig env
                     Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
                 -> RIO env (Set PackageName, DotPayload)
-createDepLoader sourceMap boptsCLI installed globalDumpMap globalIdMap loadPackageDeps pkgName =
+createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `Set.member` wiredInPackages)
       then case Map.lookup pkgName (smProject sourceMap) of
           Just pp -> do
-            pkg <- lpPackage <$> loadLocalPackage' sourceMap boptsCLI pp
+            pkg <- lpPackage <$> loadLocalPackage' sourceMap pp
             pure (packageAllDeps pkg, payloadFromLocal pkg)
           Nothing ->
             case Map.lookup pkgName (smDeps sourceMap) of
               Just DepPackage{dpLocation=PLMutable dir} -> do
                 pp <- mkProjectPackage YesPrintWarnings dir
-                pkg <- lpPackage <$> loadLocalPackage' sourceMap boptsCLI pp
+                pkg <- loadCommonPackage (ppCommon pp)
                 pure (packageAllDeps pkg, payloadFromLocal pkg)
               Just dp@DepPackage{dpLocation=PLImmutable loc} -> do
                 let common = dpCommon dp

@@ -36,6 +36,7 @@ module Stack.Types.Build
     ,configCacheVC
     ,configureOpts
     ,CachePkgSrc (..)
+    ,Source(..)
     ,toCachePkgSrc
     ,isStackOpt
     ,wantedLocalPackages
@@ -69,6 +70,7 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Exit                     (ExitCode (ExitFailure))
 import           System.FilePath                 (pathSeparator)
@@ -401,9 +403,15 @@ data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
 instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
-toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
-toCachePkgSrc PSRemote{} = CacheSrcUpstream
+data Source
+    = SourceLocal LocalPackage
+    | SourceRemote PackageLocationImmutable
+                   Version
+                   CommonPackage
+
+toCachePkgSrc :: Source -> CachePkgSrc
+toCachePkgSrc (SourceLocal lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc SourceRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
 configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
@@ -632,6 +640,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       where
         PackageIdentifier name version' = ident
 
+-- FIXME:qrilka should be removed
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
 wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted

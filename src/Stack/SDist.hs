@@ -329,7 +329,7 @@ getSDistFileList lp sourceMap =
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        locals <- localPackages sourceMap boptsCli
+        locals <- localPackages sourceMap
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
