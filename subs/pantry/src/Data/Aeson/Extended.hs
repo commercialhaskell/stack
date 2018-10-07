@@ -71,14 +71,19 @@ wp ..!= d =
 -- | Synonym version of @..:@.
 (...:) :: FromJSON a => Object -> [Text] -> WarningParser a
 _ ...: [] = fail "failed to find an empty key"
-o ...: ss@(key:_) = do
-    when (presentCount /= 1) $ fail $
-      "failed to parse field " ++
-      "'" ++ show key ++ "': " ++
-      "keys " ++ show ss ++ " not present"
-    asum $ map (o..:) ss
+o ...: ss@(key:_) = apply
     where isPresent s = HashMap.member s o
           presentCount = length . filter isPresent $ ss
+          apply | presentCount == 0 = fail $
+                                        "failed to parse field " ++
+                                        show key ++ ": " ++
+                                        "keys " ++ show ss ++ " not present"
+                | presentCount >  1 = fail $
+                                        "failed to parse field " ++
+                                        show key ++ ": " ++
+                                        "two or more synonym keys " ++
+                                        show ss ++ " present"
+                | otherwise         = asum $ map (o..:) ss
 
 -- | Tell warning parser about an expected field, so it doesn't warn about it.
 tellJSONField :: Text -> WarningParser ()
