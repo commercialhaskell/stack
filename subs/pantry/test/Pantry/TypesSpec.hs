@@ -42,6 +42,7 @@ spec = do
       case parseWantedCompiler text of
         Left e -> throwIO e
         Right actual -> liftIO $ actual `shouldBe` wc
+
   describe "Tree" $ do
     hh "parse/render works" $ property $ do
       tree <- forAll $
@@ -59,11 +60,11 @@ spec = do
       let bs = renderTree tree
       liftIO $ parseTree bs `shouldBe` Just tree
 
-  describe "FromJSON SnapshotLayer" $ do
-    let parseSl' (Just (WithJSONWarnings x _)) = resolvePaths Nothing x
-        parseSl' Nothing                       = fail ""
-        parseSl :: String -> IO SnapshotLayer
-        parseSl str = parseSl' . Yaml.decodeThrow . S8.pack $ str
+  describe "SnapshotLayer" $ do
+    let parseSl :: String -> IO SnapshotLayer
+        parseSl str = case Yaml.decodeThrow . S8.pack $ str of
+          (Just (WithJSONWarnings x _)) -> resolvePaths Nothing x
+          Nothing -> fail "Can't parse SnapshotLayer"
 
     it "parses snapshot using 'resolver'" $ do
       SnapshotLayer{..} <- parseSl $
