@@ -75,14 +75,7 @@ build msetLocalFiles mbuildLk boptsCli = do
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do
-      depsLocals <- forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
-        case dpLocation dp of
-          PLMutable dir -> do
-            pp <- mkProjectPackage YesPrintWarnings dir
-            Just <$> loadLocalPackage' sourceMap pp
-          _ ->
-            return Nothing
-
+      depsLocals <- localDependencies
       files <- sequence
         [lpFiles lp | lp <- locals ++ depsLocals]
       liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files

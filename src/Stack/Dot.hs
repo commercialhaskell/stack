@@ -28,7 +28,6 @@ import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled', GetInstalledOpts(..), toInstallMap)
 import           Stack.Build.Source
-import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
@@ -111,7 +110,7 @@ createDependencyGraph :: HasEnvConfig env
 createDependencyGraph dotOpts = do
   sourceMap <- view $ envConfigL.to envConfigSourceMap
   locals <- localPackages sourceMap
-  let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
+  let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   installMap <- toInstallMap sourceMap
   (installedMap, globalDump, _, _) <- getInstalled' (GetInstalledOpts False False False)
                                                     installMap
@@ -242,9 +241,9 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
             _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
--- | Resolve the direct (depth 0) external dependencies of the given local packages
-localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
-localDependencies dotOpts locals =
+-- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
+projectPackageDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
+projectPackageDependencies dotOpts locals =
     map (\lp -> let pkg = localPackageToPackage lp
                  in (packageName pkg, (deps pkg, lpPayload pkg)))
         locals

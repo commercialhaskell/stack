@@ -44,8 +44,6 @@ data GetInstalledOpts = GetInstalledOpts
       -- ^ Require debugging symbols?
     }
 
-type InstallMap = Map PackageName (InstallLocation, Version)
-
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
     let loadVersion loc common = do

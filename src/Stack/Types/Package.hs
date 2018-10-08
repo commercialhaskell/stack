@@ -142,11 +142,13 @@ packageIdentifier pkg =
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+type InstallMap = Map PackageName (InstallLocation, Version)
+
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env. HasEnvConfig env
-                     => Map PackageName PackageSource
+                     => InstallMap
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]

@@ -46,7 +46,7 @@ import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Runner
-import           Stack.Types.SourceMap hiding (SourceMap) -- FIXME:qrilka
+import           Stack.Types.SourceMap
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 import           System.Permissions (setScriptPerms)
@@ -133,8 +133,12 @@ ghci opts@GhciOpts{..} = do
             { boptsCLITargets = []
             , boptsCLIFlags = ghciFlags
             }
-    -- Load source map, without explicit targets, to collect all info.
-    (locals, sourceMap) <- loadSourceMap AllowNoTargets buildOptsCLI
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
+    installMap <- toInstallMap sourceMap
+    locals <- localPackages sourceMap
+    depLocals <- localDependencies
+    let localMap =
+          M.fromList [(packageName $ lpPackage lp, lp) | lp <- locals ++ depLocals]
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets buildOptsCLI ghciMainIs
     -- Parse to either file targets or build targets
@@ -149,7 +153,7 @@ ghci opts@GhciOpts{..} = do
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
             return (targetMap, Just (fileInfo, extraFiles))
     -- Get a list of all the local target packages.
-    localTargets <- getAllLocalTargets opts inputTargets mainIsTargets sourceMap
+    localTargets <- getAllLocalTargets opts inputTargets mainIsTargets localMap
     -- Get a list of all the non-local target packages.
     nonLocalTargets <- getAllNonLocalTargets inputTargets
     -- Check if additional package arguments are sensible.
@@ -167,7 +171,7 @@ ghci opts@GhciOpts{..} = do
               -- why this is done again after the build. This could
               -- potentially be done more efficiently, because all we
               -- need is the location of main modules, not the rest.
-              pkgs0 <- getGhciPkgInfos sourceMap addPkgs (fmap fst mfileTargets) pkgDescs
+              pkgs0 <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
     stackYaml <- view stackYamlL
@@ -175,13 +179,14 @@ ghci opts@GhciOpts{..} = do
     targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
-    pkgs <- getGhciPkgInfos sourceMap addPkgs (fmap fst mfileTargets) pkgDescs
+    pkgs <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
     checkForIssues pkgs
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainFile pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
 
 preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI rawTargets = do
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
     let (fileTargetsRaw, normalTargetsRaw) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
@@ -198,12 +203,20 @@ preprocessTargets buildOptsCLI rawTargets = do
         else do
             -- Try parsing targets before checking if both file and
             -- module targets are specified (see issue#3342).
-            (_,_,normalTargets) <- parseTargets AllowNoTargets buildOptsCLI { boptsCLITargets = normalTargetsRaw }
+            let boptsCLI = buildOptsCLI { boptsCLITargets = normalTargetsRaw }
+                -- FIXME:qrilka this looks wrong to go back to SMActual
+                sma = SMActual
+                  { smaCompiler = smCompiler sourceMap
+                  , smaProject = smProject sourceMap
+                  , smaDeps = smDeps sourceMap
+                  , smaGlobal = smGlobal sourceMap
+                  }
+            normalTargets <- parseTargets' AllowNoTargets boptsCLI sma
                 `catch` \ex -> case ex of
                     TargetParseException xs -> throwM (GhciTargetParseException xs)
                     _ -> throwM ex
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
-            return (Right normalTargets)
+            return (Right $ smtTargets normalTargets)
 
 parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
@@ -264,22 +277,22 @@ findFileTargets locals fileTargets = do
                 associatedFiles
     return (targetMap, infoMap, extraFiles)
 
-type SourceMap = Map PackageName PackageSource -- FIXME:qrilka
+-- type SourceMap = Map PackageName PackageSource -- FIXME:qrilka
 
 getAllLocalTargets
     :: HasEnvConfig env
     => GhciOpts
     -> Map PackageName Target
     -> Maybe (Map PackageName Target)
-    -> SourceMap
+    -> Map PackageName LocalPackage
     -> RIO env [(PackageName, (Path Abs File, Target))]
-getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
+getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
     -- Use the 'mainIsTargets' as normal targets, for CLI concision. See
     -- #1845. This is a little subtle - we need to do the target parsing
     -- independently in order to handle the case where no targets are
     -- specified.
     let targets = maybe targets0 (unionTargets targets0) mainIsTargets
-    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+    packages <- view $ envConfigL.to envConfigSourceMap.to smProject
     -- Find all of the packages that are directly demanded by the
     -- targets.
     let directlyWanted = flip mapMaybe (M.toList packages) $
@@ -288,7 +301,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets sourceMap = do
                   Just simpleTargets -> Just (name, (ppCabalFP pp, simpleTargets))
                   Nothing -> Nothing
     -- Figure out
-    let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps sourceMap directlyWanted
+    let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps localMap directlyWanted
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
         then return directlyWanted
         else do
@@ -644,44 +657,44 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
 
 getGhciPkgInfos
     :: HasEnvConfig env
-    => SourceMap
+    => InstallMap
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
     -> [GhciPkgDesc]
     -> RIO env [GhciPkgInfo]
-getGhciPkgInfos sourceMap addPkgs mfileTargets localTargets = do
-    (installedMap, _, _, _) <- getInstalled
+getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
+    (installedMap, _, _, _) <- getInstalled'
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False
             , getInstalledSymbols   = False
             }
-        sourceMap
+        installMap
     let localLibs =
             [ packageName (ghciDescPkg desc)
             | desc <- localTargets
             , hasLocalComp isCLib (ghciDescTarget desc)
             ]
     forM localTargets $ \pkgDesc ->
-      makeGhciPkgInfo sourceMap installedMap localLibs addPkgs mfileTargets pkgDesc
+      makeGhciPkgInfo installMap installedMap localLibs addPkgs mfileTargets pkgDesc
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
     :: HasEnvConfig env
-    => SourceMap
+    => InstallMap
     -> InstalledMap
     -> [PackageName]
     -> [PackageName]
     -> Maybe (Map PackageName (Set (Path Abs File)))
     -> GhciPkgDesc
     -> RIO env GhciPkgInfo
-makeGhciPkgInfo sourceMap installedMap locals addPkgs mfileTargets pkgDesc = do
+makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
     bopts <- view buildOptsL
     let pkg = ghciDescPkg pkgDesc
         cabalfp = ghciDescCabalFp pkgDesc
         target = ghciDescTarget pkgDesc
         name = packageName pkg
-    (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
+    (mods,files,opts) <- getPackageOpts (packageOpts pkg) installMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
         allWanted = wantedPackageComponents bopts target pkg
@@ -855,10 +868,10 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
 -- if they aren't intermediate.
 getExtraLoadDeps
     :: Bool
-    -> SourceMap
+    -> Map PackageName LocalPackage
     -> [(PackageName, (Path Abs File, Target))]
     -> [(PackageName, (Path Abs File, Target))]
-getExtraLoadDeps loadAllDeps sourceMap targets =
+getExtraLoadDeps loadAllDeps localMap targets =
     M.toList $
     (\mp -> foldl' (flip M.delete) mp (map fst targets)) $
     M.mapMaybe id $
@@ -867,16 +880,16 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
   where
     getDeps :: PackageName -> [PackageName]
     getDeps name =
-        case M.lookup name sourceMap of
-            Just (PSFilePath lp _) -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
+        case M.lookup name localMap of
+            Just lp -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
             _ -> []
     go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, Target))) Bool
     go name = do
         cache <- get
-        case (M.lookup name cache, M.lookup name sourceMap) of
+        case (M.lookup name cache, M.lookup name localMap) of
             (Just (Just _), _) -> return True
             (Just Nothing, _) | not loadAllDeps -> return False
-            (_, Just (PSFilePath lp _)) -> do
+            (_, Just lp) -> do
                 let deps = M.keys (packageDeps (lpPackage lp))
                 shouldLoad <- liftM or $ mapM go deps
                 if shouldLoad
@@ -886,7 +899,6 @@ getExtraLoadDeps loadAllDeps sourceMap targets =
                     else do
                         modify (M.insert name Nothing)
                         return False
-            (_, Just PSRemote{}) -> return loadAllDeps
             (_, _) -> return False
 
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target

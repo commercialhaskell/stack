@@ -8,6 +8,7 @@
 -- Load information on package sources
 module Stack.Build.Source
     ( localPackages
+    , localDependencies
     , loadCommonPackage
     , loadLocalPackage'
     , loadSourceMap'
@@ -49,6 +50,16 @@ localPackages :: HasEnvConfig env
               -> RIO env [LocalPackage]
 localPackages sm =
   for (toList $ smProject sm) $ loadLocalPackage' sm
+
+localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
+localDependencies = do
+    sourceMap <- view $ envConfigL . to envConfigSourceMap
+    forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
+        case dpLocation dp of
+            PLMutable dir -> do
+                pp <- mkProjectPackage YesPrintWarnings dir
+                Just <$> loadLocalPackage' sourceMap pp
+            _ -> return Nothing
 
 loadSourceMap' :: HasBuildConfig env
                => SMTargets

@@ -903,7 +903,11 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
-  withDefaultBuildConfigAndLock go $ \lk -> do
+  let boptsCLI = defaultBuildOptsCLI
+          { boptsCLITargets = [] -- FIXME:qrilka really?
+          , boptsCLIFlags = ghciFlags ghciOpts
+          }
+  in withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
