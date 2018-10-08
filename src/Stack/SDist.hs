@@ -113,8 +113,7 @@ getSDistTarball mpvpBounds pkgDir = do
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> fromString pkgFp
-    targets <- parseTargets' AllowNoTargets defaultBuildOptsCLI
-    sourceMap <- loadSourceMap' targets{-AllowNoTargets -} defaultBuildOptsCLI
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
     (fileList, cabalfp) <-  getSDistFileList lp sourceMap
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
@@ -458,12 +457,11 @@ buildExtractedTarball pkgDir = do
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               { --envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
-               -- envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
-                envConfigSMActual = updatePackagesInSMActual (envConfigSMActual envConfig)
+                envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
               }
         in set envConfigL updatedEnvConfig env
-      updatePackagesInSMActual sma =
-        sma {smaProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
+      updatePackagesInSourceMap sm =
+        sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
 {-
       updatePackageInBuildConfig buildConfig = buildConfig
         { bcPackages = Map.insert (ppName pp) pp pathsToKeep

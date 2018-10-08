@@ -517,9 +517,9 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
---    ,envConfigSourceMap :: !SourceMap
+    ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !CompilerBuild
-    ,envConfigSMActual :: !SMActual
+--    ,envConfigSMActual :: !SMActual
 --    ,envConfigLoadedSnapshot :: !LoadedSnapshot
 --    -- ^ The fully resolved snapshot information.
     }
@@ -1862,7 +1862,7 @@ wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
 actualCompilerVersionL :: HasEnvConfig s => SimpleGetter s ActualCompiler
-actualCompilerVersionL = envConfigL.to (smaCompiler . envConfigSMActual)
+actualCompilerVersionL = envConfigL.to (smCompiler . envConfigSourceMap)
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens

@@ -36,7 +36,7 @@ scriptCmd opts go' = do
                 }
             , globalStackYaml = SYLNoConfig $ parent file
             }
-    withBuildConfigAndLock go $ \lk -> do
+    withDefaultBuildConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use
       -- logError instead of logWarn because, when using the

@@ -23,7 +23,7 @@ import           RIO.Process
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
+hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
@@ -61,7 +61,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     buildHaddocks =
         liftIO
             (catch
-                 (withBuildConfigAndLock
+                 (withDefaultBuildConfigAndLock
                       (set
                            (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
                            (Just True)
@@ -106,7 +106,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
         menv <- liftIO $ configProcessContextSettings config envSettings
         liftIO
             (catch
-                 (withBuildConfigAndLock
+                 (withDefaultBuildConfigAndLock
                       go
                       (\lk ->
                             Stack.Build.build

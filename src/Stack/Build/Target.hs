@@ -211,20 +211,12 @@ data ResolveResult = ResolveResult
   , rrPackageType :: !PackageType
   }
 
-resolveRawTarget'
-  :: forall env. HasEnvConfig env
-  => (RawInput, RawTarget)
-  -> RIO env (Either Text ResolveResult)
-resolveRawTarget' x = do
-  sma <- view $ envConfigL.to envConfigSMActual
-  resolveRawTarget'' sma x
-
-resolveRawTarget'' ::
+resolveRawTarget' ::
        (HasLogFunc env, HasPantryConfig env)
     => SMActual
     -> (RawInput, RawTarget)
     -> RIO env (Either Text ResolveResult)
-resolveRawTarget'' sma (ri, rt) =
+resolveRawTarget' sma (ri, rt) =
   go rt
   where
     locals = smaProject sma
@@ -629,11 +621,12 @@ combineResolveResults results = do
 -- OK, let's do it!
 ---------------------------------------------------------------------------------
 
-parseTargets' :: HasEnvConfig env
+parseTargets' :: HasBuildConfig env
     => NeedTargets
     -> BuildOptsCLI
+    -> SMActual
     -> RIO env SMTargets
-parseTargets' needTargets boptscli = do
+parseTargets' needTargets boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
@@ -644,7 +637,7 @@ parseTargets' needTargets boptscli = do
     parseRawTargetDirs workingDir locals
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget'
+    resolveRawTarget' smActual
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 

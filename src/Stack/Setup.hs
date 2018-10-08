@@ -73,6 +73,8 @@ import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
+import              Stack.Build.Source (loadSourceMap')
+import              Stack.Build.Target (NeedTargets(..), parseTargets')
 import              Stack.Config (loadConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
@@ -209,9 +211,11 @@ instance Show SetupException where
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (HasBuildConfig env, HasGHCVariant env)
-         => Maybe Text -- ^ Message to give user when necessary GHC is not available
+         => NeedTargets
+         -> BuildOptsCLI
+         -> Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> RIO env EnvConfig
-setupEnv mResolveMissingGHC = do
+setupEnv needTargets boptsCLI mResolveMissingGHC = do
     config <- view configL
     bconfig <- view buildConfigL
     let stackYaml = bcStackYaml bconfig
@@ -267,13 +271,14 @@ setupEnv mResolveMissingGHC = do
 --      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
     -- FIXME:qrilka do we need it?
 --    let sourceMap = SourceMap (smaCompiler smActual)
+    targets <- parseTargets' needTargets boptsCLI smActual
+    sourceMap <- loadSourceMap' targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
---            , envConfigSourceMap = sourceMap
+            , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = compilerBuild
 --            , envConfigLoadedSnapshot = ls
-            , envConfigSMActual = smActual
             }
 
     -- extra installation bin directories
@@ -358,10 +363,10 @@ setupEnv mResolveMissingGHC = do
                 }
             }
         , envConfigCabalVersion = cabalVer
---        , envConfigSourceMap = sourceMap
+        , envConfigSourceMap = sourceMap
         , envConfigCompilerBuild = compilerBuild
 --        , envConfigLoadedSnapshot = ls
-        , envConfigSMActual = smActual
+--        , envConfigSMActual = smActual
         }
 
 -- | Add the include and lib paths to the given Config
@@ -1353,7 +1358,7 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig <- runRIO bconfig $ setupEnv Nothing
+        envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing -- FIXME:qrilka check if those are safe defaults
         inner envConfig
 
 buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()

@@ -50,6 +50,7 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Build
+import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Clean (CleanOpts(..), clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -599,7 +600,7 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 pathCmd :: [Text] -> GlobalOpts -> IO ()
-pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
+pathCmd keys go = withDefaultBuildConfig go (Stack.Path.path keys)
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
@@ -632,8 +633,8 @@ cleanCmd opts go =
   -- See issues #2010 and #3468 for why "stack clean --full" is not used
   -- within docker.
   case opts of
-    CleanFull{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLock go (const (clean opts))
+    CleanFull{} -> withDefaultBuildConfigAndLockNoDocker go (const (clean opts))
+    CleanShallow{} -> withDefaultBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -648,7 +649,7 @@ buildCmd opts go = do
     FileWatch -> fileWatch stderr (inner . Just)
     NoFileWatch -> inner Nothing
   where
-    inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
+    inner setLocalFiles = withBuildConfigAndLock go' NeedTargets opts $ \lk ->
         Stack.Build.build setLocalFiles lk opts
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
@@ -706,7 +707,7 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    withBuildConfigAndLock go $ \_ -> do
+    withDefaultBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
@@ -759,7 +760,7 @@ uploadCmd sdistOpts go = do
 
 sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
 sdistCmd sdistOpts go =
-    withBuildConfig go $ do -- No locking needed.
+    withDefaultBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
@@ -805,7 +806,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (withBuildConfigAndLock go $ \buildLock -> do
+                    (withDefaultBuildConfigAndLock go $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
                         withProcessContext menv $ do
@@ -818,13 +819,14 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
-        ExecOptsEmbellished {..} ->
-            withBuildConfigAndLock go $ \lk -> do
-              let targets = concatMap words eoPackages
+        ExecOptsEmbellished {..} -> do
+            let targets = concatMap words eoPackages
+                boptsCLI = defaultBuildOptsCLI
+                           { boptsCLITargets = map T.pack targets
+                           }
+            withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
               unless (null targets) $
-                  Stack.Build.build Nothing lk defaultBuildOptsCLI
-                      { boptsCLITargets = map T.pack targets
-                      }
+                  Stack.Build.build Nothing lk boptsCLI -- FIXME:qrilka do we need to repeat?
 
               config <- view configL
               menv <- liftIO $ configProcessContextSettings config eoEnvSettings
@@ -901,7 +903,7 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
-  withBuildConfigAndLock go $ \lk -> do
+  withDefaultBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
@@ -915,12 +917,12 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
 -- | List packages in the project.
 idePackagesCmd :: () -> GlobalOpts -> IO ()
 idePackagesCmd () go =
-    withBuildConfig go IDE.listPackages -- TODO don't need EnvConfig any more
+    withDefaultBuildConfig go IDE.listPackages -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: () -> GlobalOpts -> IO ()
 ideTargetsCmd () go =
-    withBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
+    withDefaultBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
@@ -962,13 +964,15 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
     withBuildConfigExt
         False
         go
+        AllowNoTargets -- FIXME:qrilka check if it's OK
+        defaultBuildOptsCLI
         Nothing
         (\lk ->
               do when rebuild $
                      Stack.Build.build
                          Nothing
                          lk
-                         defaultBuildOptsCLI
+                         defaultBuildOptsCLI -- FIXME:qrilka remove?
                  Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
@@ -996,7 +1000,7 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
+    withDefaultBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
@@ -1004,15 +1008,15 @@ dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
-queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors go = withDefaultBuildConfig go $ queryBuildInfo $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
-hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
+hpcReportCmd hropts go = withDefaultBuildConfig go $ generateHpcReportForTargets hropts
 
 freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
 freezeCmd freezeOpts go =
-  withBuildConfig go $ freeze freezeOpts
+  withDefaultBuildConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable

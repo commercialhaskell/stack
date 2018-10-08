@@ -109,12 +109,7 @@ createDependencyGraph :: HasEnvConfig env
                        => DotOpts
                        -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  let boptsCLI = defaultBuildOptsCLI
-        { boptsCLITargets = dotTargets dotOpts
-        , boptsCLIFlags = dotFlags dotOpts
-        }
-  targets <- parseTargets' NeedTargets boptsCLI
-  sourceMap <- loadSourceMap' targets boptsCLI
+  sourceMap <- view $ envConfigL.to envConfigSourceMap
   locals <- localPackages sourceMap
   let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
   installMap <- toInstallMap sourceMap

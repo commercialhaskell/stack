@@ -69,8 +69,7 @@ build msetLocalFiles mbuildLk boptsCli = do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
 
-    targets <- parseTargets' NeedTargets boptsCli
-    sourceMap <- loadSourceMap' targets boptsCli
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
     locals <- localPackages sourceMap
 
     -- Set local files, necessary for file watching

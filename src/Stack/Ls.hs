@@ -32,7 +32,7 @@ import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
 import Stack.Dot
-import Stack.Runners (loadConfigWithOpts, withBuildConfig, withBuildConfigDot)
+import Stack.Runners (loadConfigWithOpts, withDefaultBuildConfig, withBuildConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import Stack.Types.PrettyPrint (StyleSpec)
@@ -282,8 +282,8 @@ lsCmd lsOpts go =
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
-                Local -> withBuildConfig go (handleLocal lsOpts)
-                Remote -> withBuildConfig go (handleRemote lsOpts)
+                Local -> withDefaultBuildConfig go (handleLocal lsOpts)
+                Remote -> withDefaultBuildConfig go (handleRemote lsOpts)
         LsDependencies depOpts -> listDependenciesCmd False depOpts go
         LsStyles stylesOpts -> loadConfigWithOpts go (listStylesCmd stylesOpts)
 

@@ -50,13 +50,13 @@ localPackages :: HasEnvConfig env
 localPackages sm =
   for (toList $ smProject sm) $ loadLocalPackage' sm
 
-loadSourceMap' :: HasEnvConfig env
+loadSourceMap' :: HasBuildConfig env
                => SMTargets
                -> BuildOptsCLI
+               -> SMActual
                -> RIO env SourceMap
-loadSourceMap' smt boptsCli = do
+loadSourceMap' smt boptsCli sma = do
     bconfig <- view buildConfigL
-    sma <- view $ envConfigL . to envConfigSMActual
     let project = M.map applyOptsFlagsPP $ smaProject sma
         applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
           p{ppCommon = applyOptsFlags (M.member (cpName c) (smtTargets smt)) True c}
