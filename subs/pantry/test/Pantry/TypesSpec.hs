@@ -79,7 +79,18 @@ spec = do
       slParent `shouldBe` ltsSnapshotLocation 2 10
 
     it "throws if both 'resolver' and 'snapshot' are present" $ do
-      let go = parseSl ("name: 'test'\n" ++
-                        "resolver: lts-2.10\n" ++
-                        "snapshot: lts-2.10\n")
+      let go = parseSl $
+                "name: 'test'\n" ++
+                "resolver: lts-2.10\n" ++
+                "snapshot: lts-2.10\n"
       go `shouldThrow` anyException
+
+    it "throws if both 'snapshot' and 'compiler' are not present" $ do
+      let go = parseSl "name: 'test'\n"
+      go `shouldThrow` anyException
+
+    it "works if no 'snapshot' specified" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "compiler: ghc-8.0.1\n"
+      slParent `shouldBe` SLCompiler (WCGhc (mkVersion [8, 0, 1]))

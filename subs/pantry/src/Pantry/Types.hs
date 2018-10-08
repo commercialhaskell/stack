@@ -1688,7 +1688,7 @@ instance ToJSON SnapshotLayer where
 instance FromJSON (WithJSONWarnings (Unresolved SnapshotLayer)) where
   parseJSON = withObjectWarnings "Snapshot" $ \o -> do
     mcompiler <- o ..:? "compiler"
-    mresolver <- jsonSubWarningsT $ o ..:? "resolver"
+    mresolver <- jsonSubWarningsT $ o ...:? ["snapshot", "resolver"]
     unresolvedSnapshotParent <-
       case (mcompiler, mresolver) of
         (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
