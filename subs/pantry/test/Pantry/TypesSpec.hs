@@ -1,5 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Pantry.TypesSpec (spec) where
 
 import Test.Hspec
@@ -12,6 +14,9 @@ import Pantry.Internal (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafe
 import RIO
 import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
+import qualified Data.Yaml as Yaml
+import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import qualified Data.ByteString.Char8 as S8
 
 hh :: HasCallStack => String -> Property -> Spec
 hh name p = it name $ do
@@ -53,3 +58,27 @@ spec = do
          in TreeMap <$> Gen.map (Range.linear 1 20) ((,) <$> sfp <*> entry)
       let bs = renderTree tree
       liftIO $ parseTree bs `shouldBe` Just tree
+
+  describe "FromJSON SnapshotLayer" $ do
+    let parseSl' (Just (WithJSONWarnings x _)) = resolvePaths Nothing x
+        parseSl' Nothing                       = fail ""
+        parseSl :: String -> IO SnapshotLayer
+        parseSl str = parseSl' . Yaml.decodeThrow . S8.pack $ str
+
+    it "parses snapshot using 'resolver'" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "resolver: lts-2.10\n"
+      slParent `shouldBe` ltsSnapshotLocation 2 10
+
+    it "parses snapshot using 'snapshot'" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "snapshot: lts-2.10\n"
+      slParent `shouldBe` ltsSnapshotLocation 2 10
+
+    it "throws if both 'resolver' and 'snapshot' are present" $ do
+      let go = parseSl ("name: 'test'\n" ++
+                        "resolver: lts-2.10\n" ++
+                        "snapshot: lts-2.10\n")
+      go `shouldThrow` anyException
