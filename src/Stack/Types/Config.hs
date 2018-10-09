@@ -156,7 +156,6 @@ module Stack.Types.Config
   ,cabalVersionL
   ,whichCompilerL
   ,envOverrideSettingsL
-  ,loadedSnapshotL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -1231,7 +1230,7 @@ platformSnapAndCompilerRel
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    SourceMapHash smh <- view $ envConfigL.to (hashSourceMap . error "FIXME:qrilka envConfigSourceMap")
+    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to hashSourceMap
     platform <- platformGhcRelDir
     name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir
@@ -1911,9 +1910,6 @@ cabalVersionL :: HasEnvConfig env => Lens' env Version
 cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
-
-loadedSnapshotL :: (HasEnvConfig env, HasCallStack) => Lens' env LoadedSnapshot
-loadedSnapshotL = error "FIXME:qrilka to be removed"
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler

@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 module Stack.Script
     ( scriptCmd
@@ -15,13 +16,16 @@ import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
 import qualified Stack.Build
+import           Stack.Build.Installed
 import           Stack.Constants            (osIsWindows)
 import           Stack.GhcPkg               (ghcPkgExeName)
+import           Stack.PackageDump
 import           Stack.Options.ScriptParser
 import           Stack.Runners
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.SourceMap
 import           System.FilePath            (dropExtension, replaceExtension)
 import           RIO.Process
 import qualified RIO.Text as T
@@ -59,7 +63,7 @@ scriptCmd opts go' = do
             case soPackages opts of
                 [] -> do
                     -- Using the import parser
-                    moduleInfo <- view $ loadedSnapshotL.to toModuleInfo
+                    moduleInfo <- getModuleInfo
                     getPackagesFromModuleInfo moduleInfo (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
@@ -205,20 +209,33 @@ blacklist = Set.fromList
     , mkPackageName "cryptohash-sha256"
     ]
 
-toModuleInfo :: LoadedSnapshot -> ModuleInfo
-toModuleInfo ls =
-      mconcat
-    $ map (\(pn, lpi) ->
-            ModuleInfo
-            $ Map.fromList
-            $ map (, Set.singleton pn)
-            $ Set.toList
-            $ lpiExposedModules lpi)
-    $ filter (\(pn, lpi) ->
-            not (lpiHide lpi) &&
-            pn `Set.notMember` blacklist)
-    $ Map.toList
-    $ Map.union (void <$> lsPackages ls) (void <$> lsGlobals ls)
+getModuleInfo :: HasEnvConfig env => RIO env ModuleInfo
+getModuleInfo = do
+    sourceMap <- view $ envConfigL . to envConfigSourceMap
+    installMap <- toInstallMap sourceMap
+    (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
+        getInstalled
+            GetInstalledOpts
+            { getInstalledProfiling = False
+            , getInstalledHaddock = False
+            , getInstalledSymbols = False
+            }
+            installMap
+    return $
+        toModuleInfo (smDeps sourceMap) snapshotDumpPkgs <>
+        toModuleInfo (smGlobal sourceMap) globalDumpPkgs
+  where
+    toModuleInfo pkgs dumpPkgs =
+        let pnames = Map.keysSet pkgs `Set.difference` blacklist
+            modules =
+                Map.fromList
+                    [ (m, Set.singleton pn)
+                    | DumpPackage {..} <- dumpPkgs
+                    , let PackageIdentifier pn _ = dpPackageIdent
+                    , pn `Set.member` pnames
+                    , m <- Set.toList dpExposedModules
+                    ]
+        in ModuleInfo modules
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
