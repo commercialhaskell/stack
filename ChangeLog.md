@@ -44,6 +44,7 @@ Major changes:
       match `foo.txt`, but not `foo.2.txt`.
 
 Behavior changes:
+* `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
 Other enhancements:
 

@@ -1,5 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Pantry.TypesSpec (spec) where
 
 import Test.Hspec
@@ -12,6 +14,9 @@ import Pantry.Internal (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafe
 import RIO
 import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
+import qualified Data.Yaml as Yaml
+import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import qualified Data.ByteString.Char8 as S8
 
 hh :: HasCallStack => String -> Property -> Spec
 hh name p = it name $ do
@@ -37,6 +42,7 @@ spec = do
       case parseWantedCompiler text of
         Left e -> throwIO e
         Right actual -> liftIO $ actual `shouldBe` wc
+
   describe "Tree" $ do
     hh "parse/render works" $ property $ do
       tree <- forAll $
@@ -53,3 +59,38 @@ spec = do
          in TreeMap <$> Gen.map (Range.linear 1 20) ((,) <$> sfp <*> entry)
       let bs = renderTree tree
       liftIO $ parseTree bs `shouldBe` Just tree
+
+  describe "SnapshotLayer" $ do
+    let parseSl :: String -> IO SnapshotLayer
+        parseSl str = case Yaml.decodeThrow . S8.pack $ str of
+          (Just (WithJSONWarnings x _)) -> resolvePaths Nothing x
+          Nothing -> fail "Can't parse SnapshotLayer"
+
+    it "parses snapshot using 'resolver'" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "resolver: lts-2.10\n"
+      slParent `shouldBe` ltsSnapshotLocation 2 10
+
+    it "parses snapshot using 'snapshot'" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "snapshot: lts-2.10\n"
+      slParent `shouldBe` ltsSnapshotLocation 2 10
+
+    it "throws if both 'resolver' and 'snapshot' are present" $ do
+      let go = parseSl $
+                "name: 'test'\n" ++
+                "resolver: lts-2.10\n" ++
+                "snapshot: lts-2.10\n"
+      go `shouldThrow` anyException
+
+    it "throws if both 'snapshot' and 'compiler' are not present" $ do
+      let go = parseSl "name: 'test'\n"
+      go `shouldThrow` anyException
+
+    it "works if no 'snapshot' specified" $ do
+      SnapshotLayer{..} <- parseSl $
+        "name: 'test'\n" ++
+        "compiler: ghc-8.0.1\n"
+      slParent `shouldBe` SLCompiler (WCGhc (mkVersion [8, 0, 1]))

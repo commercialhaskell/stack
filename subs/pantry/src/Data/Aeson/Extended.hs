@@ -22,7 +22,9 @@ module Data.Aeson.Extended (
   , tellJSONField
   , unWarningParser
   , (..:)
+  , (...:)
   , (..:?)
+  , (...:?)
   , (..!=)
   ) where
 
@@ -66,6 +68,38 @@ wp ..!= d =
     \p ->
          do a <- fmap snd p
             fmap (, a) (fmap fst p .!= d)
+
+presentCount :: Object -> [Text] -> Int
+presentCount o ss = length . filter (\x -> HashMap.member x o) $ ss
+
+-- | Synonym version of @..:@.
+(...:) :: FromJSON a => Object -> [Text] -> WarningParser a
+_ ...: [] = fail "failed to find an empty key"
+o ...: ss@(key:_) = apply
+    where pc = presentCount o ss
+          apply | pc == 0   = fail $
+                                "failed to parse field " ++
+                                show key ++ ": " ++
+                                "keys " ++ show ss ++ " not present"
+                | pc >  1   = fail $
+                                "failed to parse field " ++
+                                show key ++ ": " ++
+                                "two or more synonym keys " ++
+                                show ss ++ " present"
+                | otherwise = asum $ map (o..:) ss
+
+-- | Synonym version of @..:?@.
+(...:?) :: FromJSON a => Object -> [Text] -> WarningParser (Maybe a)
+_ ...:? [] = fail "failed to find an empty key"
+o ...:? ss@(key:_) = apply
+    where pc = presentCount o ss
+          apply | pc == 0   = return Nothing
+                | pc >  1   = fail $
+                                "failed to parse field " ++
+                                show key ++ ": " ++
+                                "two or more synonym keys " ++
+                                show ss ++ " present"
+                | otherwise = asum $ map (o..:) ss
 
 -- | Tell warning parser about an expected field, so it doesn't warn about it.
 tellJSONField :: Text -> WarningParser ()
