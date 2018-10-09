@@ -232,7 +232,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
-        lp <- loadLocalPackage' sourceMap pp
+        lp <- loadLocalPackage sourceMap pp
         return $ SourceLocal lp
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
@@ -244,7 +244,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             -- FIXME this is not correct, we don't want to treat all Mutable as local
             -- FIXME ^ is from Stack.Build.Source
             pp <- mkProjectPackage YesPrintWarnings dir
-            lp <- loadLocalPackage' sourceMap pp
+            lp <- loadLocalPackage sourceMap pp
             return $ SourceLocal lp
       return $ pPackages <> deps
 

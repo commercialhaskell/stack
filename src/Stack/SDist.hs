@@ -49,8 +49,7 @@ import           Path.IO hiding (getModificationTime, getPermissions, withSystem
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (loadSourceMap', localPackages)
-import           Stack.Build.Target hiding (PackageType (..))
+import           Stack.Build.Source (projectLocalPackages)
 import           Stack.PrettyPrint
 import           Stack.Package
 import           Stack.SourceMap
@@ -114,7 +113,7 @@ getSDistTarball mpvpBounds pkgDir = do
     lp <- readLocalPackage pkgDir
     logInfo $ "Getting file list for " <> fromString pkgFp
     sourceMap <- view $ envConfigL.to envConfigSourceMap
-    (fileList, cabalfp) <-  getSDistFileList lp sourceMap
+    (fileList, cabalfp) <- getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
@@ -173,7 +172,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     installMap <- toInstallMap sourceMap
-    (installedMap, _, _, _) <- getInstalled' GetInstalledOpts
+    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 , getInstalledSymbols = False
@@ -321,14 +320,13 @@ readLocalPackage pkgDir = do
 getSDistFileList ::
        HasEnvConfig env
     => LocalPackage
-    -> SourceMap
     -> RIO env (String, Path Abs File)
-getSDistFileList lp sourceMap =
+getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        locals <- localPackages sourceMap
+        locals <- projectLocalPackages
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->

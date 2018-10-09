@@ -214,9 +214,8 @@ data HpcReportOpts = HpcReportOpts
     } deriving (Show)
 
 generateHpcReportForTargets :: HasEnvConfig env
-                            => HpcReportOpts -> RIO env ()
-generateHpcReportForTargets opts = do
-    let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs opts)
+                            => HpcReportOpts -> [Text] -> [Text] -> RIO env ()
+generateHpcReportForTargets opts tixFiles targetNames = do
     targetTixFiles <-
          -- When there aren't any package component arguments, and --all
          -- isn't passed, default to not considering any targets.
@@ -225,10 +224,7 @@ generateHpcReportForTargets opts = do
          else do
              when (hroptsAll opts && not (null targetNames)) $
                  logWarn $ "Since --all is used, it is redundant to specify these targets: " <> displayShow targetNames
-             (_,_,targets) <- parseTargets
-                 AllowNoTargets
-                 defaultBuildOptsCLI
-                    { boptsCLITargets = if hroptsAll opts then [] else targetNames }
+             targets <- view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
                      TargetAll PTDependency -> throwString $

@@ -26,7 +26,7 @@ import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
-import           Stack.Build.Installed (getInstalled', GetInstalledOpts(..), toInstallMap)
+import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..), toInstallMap)
 import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
@@ -109,11 +109,11 @@ createDependencyGraph :: HasEnvConfig env
                        -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view $ envConfigL.to envConfigSourceMap
-  locals <- localPackages sourceMap
+  locals <- projectLocalPackages
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   installMap <- toInstallMap sourceMap
-  (installedMap, globalDump, _, _) <- getInstalled' (GetInstalledOpts False False False)
-                                                    installMap
+  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
+                                                   installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
@@ -207,7 +207,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
   if not (pkgName `Set.member` wiredInPackages)
       then case Map.lookup pkgName (smProject sourceMap) of
           Just pp -> do
-            pkg <- lpPackage <$> loadLocalPackage' sourceMap pp
+            pkg <- loadCommonPackage (ppCommon pp)
             pure (packageAllDeps pkg, payloadFromLocal pkg)
           Nothing ->
             case Map.lookup pkgName (smDeps sourceMap) of

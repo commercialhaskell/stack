@@ -1016,7 +1016,12 @@ queryCmd selectors go = withDefaultBuildConfig go $ queryBuildInfo $ map T.pack 
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
-hpcReportCmd hropts go = withDefaultBuildConfig go $ generateHpcReportForTargets hropts
+hpcReportCmd hropts go = do
+    let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+        boptsCLI = defaultBuildOptsCLI
+          { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
+    withBuildConfig go AllowNoTargets boptsCLI $
+        generateHpcReportForTargets hropts tixFiles targetNames
 
 freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
 freezeCmd freezeOpts go =

@@ -62,7 +62,6 @@ import           Stack.Constants.Config
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import qualified Stack.PrettyPrint as PP (Style (Module))
-import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config

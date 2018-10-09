@@ -38,9 +38,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Build.Target
 import           Stack.Package
-import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -70,7 +68,7 @@ build msetLocalFiles mbuildLk boptsCli = do
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
 
     sourceMap <- view $ envConfigL.to envConfigSourceMap
-    locals <- localPackages sourceMap
+    locals <- projectLocalPackages
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -82,7 +80,7 @@ build msetLocalFiles mbuildLk boptsCli = do
 
     installMap <- toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled'
+        getInstalled
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
@@ -322,7 +320,7 @@ queryBuildInfo selectors0 =
 -- | Get the raw build information object
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
-    (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    locals <- projectLocalPackages
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
     return $ object

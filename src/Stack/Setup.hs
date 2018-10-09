@@ -73,8 +73,8 @@ import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
-import              Stack.Build.Source (loadSourceMap')
-import              Stack.Build.Target (NeedTargets(..), parseTargets')
+import              Stack.Build.Source (loadSourceMap)
+import              Stack.Build.Target (NeedTargets(..), parseTargets)
 import              Stack.Config (loadConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
@@ -83,14 +83,12 @@ import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint
 import              Stack.SourceMap
 import              Stack.Setup.Installed
-import              Stack.Snapshot (loadSnapshot)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.Runner
-import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
@@ -260,25 +258,13 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     logDebug "Resolving package entries"
     bc <- view buildConfigL
 
-    -- Set up a modified environment which includes the modified PATH
-    -- that GHC can be found on. This is needed for looking up global
-    -- package information in loadSnapshot.
-    let bcPath :: BuildConfig
-        bcPath = set processContextL menv bc
-
---    ls <- runRIO bcPath $ loadSnapshot
---      (Just compilerVer)
---      (error "bcSnapshotDef bc") -- FIXME:qrilka we have snapshot in build config already
-    -- FIXME:qrilka do we need it?
---    let sourceMap = SourceMap (smaCompiler smActual)
-    targets <- parseTargets' needTargets boptsCLI smActual
-    sourceMap <- loadSourceMap' targets boptsCLI smActual
+    targets <- parseTargets needTargets boptsCLI smActual
+    sourceMap <- loadSourceMap targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
             , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = compilerBuild
---            , envConfigLoadedSnapshot = ls
             }
 
     -- extra installation bin directories

@@ -40,7 +40,7 @@ module Stack.Config
   ) where
 
 import           Control.Monad.Extra (firstJustM)
-import           Control.Monad.State.Strict      (get, put, StateT, execStateT, modify)
+import           Control.Monad.State.Strict      (execStateT, modify)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -74,7 +74,6 @@ import           Stack.Config.Urls
 import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.SourceMap
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix

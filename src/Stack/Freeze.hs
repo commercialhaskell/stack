@@ -11,7 +11,6 @@ import           Data.Aeson ((.=), object)
 import qualified Data.Yaml as Yaml
 import qualified RIO.ByteString as B
 import           Stack.Prelude
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 
 data FreezeMode = FreezeProject | FreezeSnapshot

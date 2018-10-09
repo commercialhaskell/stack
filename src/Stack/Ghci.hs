@@ -135,14 +135,21 @@ ghci opts@GhciOpts{..} = do
             }
     sourceMap <- view $ envConfigL.to envConfigSourceMap
     installMap <- toInstallMap sourceMap
-    locals <- localPackages sourceMap
+    locals <- projectLocalPackages
     depLocals <- localDependencies
     let localMap =
           M.fromList [(packageName $ lpPackage lp, lp) | lp <- locals ++ depLocals]
+        -- FIXME:qrilka this looks wrong to go back to SMActual
+        sma = SMActual
+             { smaCompiler = smCompiler sourceMap
+             , smaProject = smProject sourceMap
+             , smaDeps = smDeps sourceMap
+             , smaGlobal = smGlobal sourceMap
+             }
     -- Parse --main-is argument.
-    mainIsTargets <- parseMainIsTargets buildOptsCLI ghciMainIs
+    mainIsTargets <- parseMainIsTargets buildOptsCLI sma ghciMainIs
     -- Parse to either file targets or build targets
-    etargets <- preprocessTargets buildOptsCLI ghciTargets
+    etargets <- preprocessTargets buildOptsCLI sma ghciTargets
     (inputTargets, mfileTargets) <- case etargets of
         Right packageTargets -> return (packageTargets, Nothing)
         Left rawFileTargets -> do
@@ -184,9 +191,13 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainFile pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
 
-preprocessTargets :: HasEnvConfig env => BuildOptsCLI -> [Text] -> RIO env (Either [Path Abs File] (Map PackageName Target))
-preprocessTargets buildOptsCLI rawTargets = do
-    sourceMap <- view $ envConfigL.to envConfigSourceMap
+preprocessTargets
+    :: HasEnvConfig env
+    => BuildOptsCLI
+    -> SMActual
+    -> [Text]
+    -> RIO env (Either [Path Abs File] (Map PackageName Target))
+preprocessTargets buildOptsCLI sma rawTargets = do
     let (fileTargetsRaw, normalTargetsRaw) =
             partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
@@ -204,25 +215,23 @@ preprocessTargets buildOptsCLI rawTargets = do
             -- Try parsing targets before checking if both file and
             -- module targets are specified (see issue#3342).
             let boptsCLI = buildOptsCLI { boptsCLITargets = normalTargetsRaw }
-                -- FIXME:qrilka this looks wrong to go back to SMActual
-                sma = SMActual
-                  { smaCompiler = smCompiler sourceMap
-                  , smaProject = smProject sourceMap
-                  , smaDeps = smDeps sourceMap
-                  , smaGlobal = smGlobal sourceMap
-                  }
-            normalTargets <- parseTargets' AllowNoTargets boptsCLI sma
+            normalTargets <- parseTargets AllowNoTargets boptsCLI sma
                 `catch` \ex -> case ex of
                     TargetParseException xs -> throwM (GhciTargetParseException xs)
                     _ -> throwM ex
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
             return (Right $ smtTargets normalTargets)
 
-parseMainIsTargets :: HasEnvConfig env => BuildOptsCLI -> Maybe Text -> RIO env (Maybe (Map PackageName Target))
-parseMainIsTargets buildOptsCLI mtarget = forM mtarget $ \target -> do
-     (_,_,targets) <- parseTargets AllowNoTargets buildOptsCLI
-         { boptsCLITargets = [target] }
-     return targets
+parseMainIsTargets
+     :: HasEnvConfig env
+     => BuildOptsCLI
+     -> SMActual
+     -> Maybe Text
+     -> RIO env (Maybe (Map PackageName Target))
+parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
+     let boptsCLI = buildOptsCLI { boptsCLITargets = [target] }
+     targets <- parseTargets AllowNoTargets boptsCLI sma
+     return $ smtTargets targets
 
 -- | Display PackageName + NamedComponent
 displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
@@ -663,7 +672,7 @@ getGhciPkgInfos
     -> [GhciPkgDesc]
     -> RIO env [GhciPkgInfo]
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
-    (installedMap, _, _, _) <- getInstalled'
+    (installedMap, _, _, _) <- getInstalled
         GetInstalledOpts
             { getInstalledProfiling = False
             , getInstalledHaddock   = False

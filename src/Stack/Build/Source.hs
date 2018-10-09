@@ -7,13 +7,11 @@
 {-# LANGUAGE ConstraintKinds #-}
 -- Load information on package sources
 module Stack.Build.Source
-    ( localPackages
+    ( projectLocalPackages
     , localDependencies
     , loadCommonPackage
-    , loadLocalPackage'
-    , loadSourceMap'
+    , loadLocalPackage
     , loadSourceMap
-    , loadSourceMapFull
     , getLocalFlags
     , getGhcOptions
     , addUnlistedToBuildCache
@@ -31,11 +29,9 @@ import qualified    Data.Set as Set
 import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Target
-import              Stack.Constants (wiredInPackages)
 import              Stack.Package
 import              Stack.SourceMap
 import              Stack.Types.Build
-import              Stack.Types.BuildPlan
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
@@ -44,12 +40,12 @@ import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
--- FIXME:qrilka move to a better place?
-localPackages :: HasEnvConfig env
-              => SourceMap
-              -> RIO env [LocalPackage]
-localPackages sm =
-  for (toList $ smProject sm) $ loadLocalPackage' sm
+-- FIXME:qrilka move to a better place? Rename?
+projectLocalPackages :: HasEnvConfig env
+              => RIO env [LocalPackage]
+projectLocalPackages = do
+    sm <- view $ envConfigL.to envConfigSourceMap
+    for (toList $ smProject sm) $ loadLocalPackage sm
 
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
@@ -58,15 +54,17 @@ localDependencies = do
         case dpLocation dp of
             PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir
-                Just <$> loadLocalPackage' sourceMap pp
+                Just <$> loadLocalPackage sourceMap pp
             _ -> return Nothing
 
-loadSourceMap' :: HasBuildConfig env
-               => SMTargets
-               -> BuildOptsCLI
-               -> SMActual
-               -> RIO env SourceMap
-loadSourceMap' smt boptsCli sma = do
+-- | Given the parsed targets and buld command line options constructs
+--   a source map
+loadSourceMap :: HasBuildConfig env
+              => SMTargets
+              -> BuildOptsCLI
+              -> SMActual
+              -> RIO env SourceMap
+loadSourceMap smt boptsCli sma = do
     bconfig <- view buildConfigL
     let project = M.map applyOptsFlagsPP $ smaProject sma
         applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
@@ -99,77 +97,6 @@ loadSourceMap' smt boptsCli sma = do
         , smDeps = deps
         , smGlobal = globals
         }
-
--- | Like 'loadSourceMapFull', but doesn't return values that aren't as
--- commonly needed.
-loadSourceMap :: HasEnvConfig env
-              => NeedTargets
-              -> BuildOptsCLI
-              -> RIO env ([LocalPackage], Map PackageName PackageSource) -- FIXME:qrilka SourceMap)
-loadSourceMap needTargets boptsCli = do
-    (_, _, locals, _, sourceMap) <- loadSourceMapFull needTargets boptsCli
-    return (locals, sourceMap)
-
--- | Given the build commandline options, does the following:
---
--- * Parses the build targets.
---
--- * Loads the 'LoadedSnapshot' from the resolver, with extra-deps
---   shadowing any packages that should be built locally.
---
--- * Loads up the 'LocalPackage' info.
---
--- * Builds a 'SourceMap', which contains info for all the packages that
---   will be involved in the build.
-loadSourceMapFull :: HasEnvConfig env
-                  => NeedTargets
-                  -> BuildOptsCLI
-                  -> RIO env
-                       ( Map PackageName Target
-                       , LoadedSnapshot
-                       , [LocalPackage] -- FIXME do we really want this? it's in the SourceMap
-                       , Set PackageName -- non-project targets
-                       , Map PackageName PackageSource -- FIXME:qrilka SourceMap
-                       )
-loadSourceMapFull needTargets boptsCli = do
-    bconfig <- view buildConfigL
-    (ls, localDeps, targets) <- parseTargets needTargets boptsCli
-    packages <- view $ buildConfigL.to (error "could be smwProject but this code should be removed" . bcSMWanted)
-    locals <- mapM (loadLocalPackage True boptsCli targets) $ Map.toList packages
-    checkFlagsUsed boptsCli locals localDeps (lsPackages ls)
-    checkComponentsBuildable locals
-
-    -- TODO for extra sanity, confirm that the targets we threw away are all TargetAll
-    let nonProjectTargets = Map.keysSet targets `Set.difference` Map.keysSet packages
-
-    -- Combine the local packages, extra-deps, and LoadedSnapshot into
-    -- one unified source map.
-    let goLPI loc n lpi = do
-          let configOpts = getGhcOptions bconfig boptsCli n False False
-          case lpiLocation lpi of
-            -- NOTE: configOpts includes lpiGhcOptions for now, this may get refactored soon
-            PLImmutable pkgloc -> do
-              ident <- getPackageLocationIdent pkgloc
-              return $ PSRemote loc (lpiFlags lpi) configOpts pkgloc ident
-            PLMutable dir -> do -- FIXME this is not correct, we don't want to treat all Mutable as local
-              pp <- error "mkProjectPackage YesPrintWarnings dir"
-              lp' <- loadLocalPackage False boptsCli targets (n, pp)
-              return $ PSFilePath lp' loc
-    sourceMap' <- Map.unions <$> sequence
-      [ return $ Map.fromList $ map (\lp' -> (packageName $ lpPackage lp', PSFilePath lp' Local)) locals
-      , sequence $ Map.mapWithKey (goLPI Local) localDeps
-      , sequence $ Map.mapWithKey (goLPI Snap) (lsPackages ls)
-      ]
-    let sourceMap = sourceMap'
-            `Map.difference` Map.fromList (map (, ()) (toList wiredInPackages))
-
-    return
-      ( targets
-      , ls
-      , locals
-      , nonProjectTargets
-      , sourceMap
-      )
 
 -- | All flags for a local package.
 getLocalFlags
@@ -232,20 +159,22 @@ loadCommonPackage ::
     => CommonPackage
     -> RIO env Package
 loadCommonPackage common = do
-    config <- getPackageConfig' (cpFlags common) (cpGhcOptions common)
+    config <- getPackageConfig (cpFlags common) (cpGhcOptions common)
     gpkg <- liftIO $ cpGPD common
     return $ resolvePackage config gpkg
 
-loadLocalPackage' ::
+-- | Upgrade the initial project package info to a full-blown @LocalPackage@
+-- based on the selected components
+loadLocalPackage ::
        forall env. HasEnvConfig env
     => SourceMap
     -> ProjectPackage
     -> RIO env LocalPackage
-loadLocalPackage' sm pp = do
+loadLocalPackage sm pp = do
     let common = ppCommon pp
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
-    config <- getPackageConfig' (cpFlags common) (cpGhcOptions common)
+    config <- getPackageConfig (cpFlags common) (cpGhcOptions common)
     gpkg <- ppGPD pp
     let name = cpName common
         mtarget = M.lookup name (smtTargets $ smTargets sm)
@@ -376,196 +305,6 @@ loadLocalPackage' sm pp = do
             (benches `Set.difference` packageBenchmarks pkg)
         }
 
--- | Upgrade the initial local package info to a full-blown @LocalPackage@
--- based on the selected components
-loadLocalPackage
-    :: forall env. HasEnvConfig env
-    => Bool
-    -- ^ Should this be treated as part of $locals? False for extra-deps.
-    --
-    -- See: https://github.com/commercialhaskell/stack/issues/3574#issuecomment-346512821
-    -> BuildOptsCLI
-    -> Map PackageName Target
-    -> (PackageName, ProjectPackage)
-    -> RIO env LocalPackage
-loadLocalPackage isLocal boptsCli targets (name, pp) = do
-    let mtarget = Map.lookup name targets
-    config  <- getPackageConfig boptsCli name (isJust mtarget) isLocal
-    bopts <- view buildOptsL
-    mcurator <- view $ buildConfigL.to bcCurator
-    gpkg <- ppGPD pp
-    let (exeCandidates, testCandidates, benchCandidates) =
-            case mtarget of
-                Just (TargetComps comps) -> splitComponents $ Set.toList comps
-                Just (TargetAll _packageType) ->
-                    ( packageExes pkg
-                    , if boptsTests bopts && maybe True (Set.notMember name . curatorSkipTest) mcurator
-                        then Map.keysSet (packageTests pkg)
-                        else Set.empty
-                    , if boptsBenchmarks bopts && maybe True (Set.notMember name . curatorSkipBenchmark) mcurator
-                        then packageBenchmarks pkg
-                        else Set.empty
-                    )
-                Nothing -> mempty
-
-        -- See https://github.com/commercialhaskell/stack/issues/2862
-        isWanted = case mtarget of
-            Nothing -> False
-            -- FIXME: When issue #1406 ("stack 0.1.8 lost ability to
-            -- build individual executables or library") is resolved,
-            -- 'hasLibrary' is only relevant if the library is
-            -- part of the target spec.
-            Just _ ->
-              let hasLibrary =
-                    case packageLibraries pkg of
-                      NoLibraries -> False
-                      HasLibraries _ -> True
-               in hasLibrary
-               || not (Set.null nonLibComponents)
-               || not (Set.null $ packageInternalLibraries pkg)
-
-        filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
-
-        (exes, tests, benches) = (filterSkippedComponents exeCandidates,
-                                  filterSkippedComponents testCandidates,
-                                  filterSkippedComponents benchCandidates)
-
-        nonLibComponents = toComponents exes tests benches
-
-        toComponents e t b = Set.unions
-            [ Set.map CExe e
-            , Set.map CTest t
-            , Set.map CBench b
-            ]
-
-        btconfig = config
-            { packageConfigEnableTests = not $ Set.null tests
-            , packageConfigEnableBenchmarks = not $ Set.null benches
-            }
-        testconfig = config
-            { packageConfigEnableTests = True
-            , packageConfigEnableBenchmarks = False
-            }
-        benchconfig = config
-            { packageConfigEnableTests = False
-            , packageConfigEnableBenchmarks = True
-            }
-
-        -- We resolve the package in 4 different configurations:
-        --
-        -- - pkg doesn't have tests or benchmarks enabled.
-        --
-        -- - btpkg has them enabled if they are present.
-        --
-        -- - testpkg has tests enabled, but not benchmarks.
-        --
-        -- - benchpkg has benchmarks enablde, but not tests.
-        --
-        -- The latter two configurations are used to compute the deps
-        -- when --enable-benchmarks or --enable-tests are configured.
-        -- This allows us to do an optimization where these are passed
-        -- if the deps are present. This can avoid doing later
-        -- unnecessary reconfigures.
-        pkg = resolvePackage config gpkg
-        btpkg
-            | Set.null tests && Set.null benches = Nothing
-            | otherwise = Just (resolvePackage btconfig gpkg)
-        testpkg = resolvePackage testconfig gpkg
-        benchpkg = resolvePackage benchconfig gpkg
-
-    componentFiles <- memoizeRef $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
-
-    checkCacheResults <- memoizeRef $ do
-      componentFiles' <- runMemoized componentFiles
-      forM (Map.toList componentFiles') $ \(component, files) -> do
-        mbuildCache <- tryGetBuildCache (ppRoot pp) component
-        checkCacheResult <- checkBuildCache
-            (fromMaybe Map.empty mbuildCache)
-            (Set.toList files)
-        return (component, checkCacheResult)
-
-    let dirtyFiles = do
-          checkCacheResults' <- checkCacheResults
-          let allDirtyFiles = Set.unions $ map (\(_, (x, _)) -> x) checkCacheResults'
-          pure $
-            if not (Set.null allDirtyFiles)
-                then let tryStripPrefix y =
-                          fromMaybe y (stripPrefix (toFilePath $ ppRoot pp) y)
-                      in Just $ Set.map tryStripPrefix allDirtyFiles
-                else Nothing
-        newBuildCaches =
-            M.fromList . map (\(c, (_, cache)) -> (c, cache))
-            <$> checkCacheResults
-
-    return LocalPackage
-        { lpPackage = pkg
-        , lpTestDeps = dvVersionRange <$> packageDeps testpkg
-        , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
-        , lpTestBench = btpkg
-        , lpComponentFiles = componentFiles
-        , lpForceDirty = boptsForceDirty bopts
-        , lpDirtyFiles = dirtyFiles
-        , lpNewBuildCaches = newBuildCaches
-        , lpCabalFile = ppCabalFP pp
-        , lpWanted = isWanted
-        , lpComponents = nonLibComponents
-        -- TODO: refactor this so that it's easier to be sure that these
-        -- components are indeed unbuildable.
-        --
-        -- The reasoning here is that if the STLocalComps specification
-        -- made it through component parsing, but the components aren't
-        -- present, then they must not be buildable.
-        , lpUnbuildable = toComponents
-            (exes `Set.difference` packageExes pkg)
-            (tests `Set.difference` Map.keysSet (packageTests pkg))
-            (benches `Set.difference` packageBenchmarks pkg)
-        }
-
--- | Ensure that the flags specified in the stack.yaml file and on the command
--- line are used.
-checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
-               => BuildOptsCLI
-               -> [LocalPackage]
-               -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ local deps
-               -> Map PackageName snapshot -- ^ snapshot, for error messages
-               -> m ()
-checkFlagsUsed boptsCli lps extraDeps snapshot = do
-    bconfig <- view buildConfigL
-
-        -- Check if flags specified in stack.yaml and the command line are
-        -- used, see https://github.com/commercialhaskell/stack/issues/617
-    let flags = map (, FSCommandLine) [(k, v) | (ACFByName k, v) <- Map.toList $ boptsCLIFlags boptsCli]
-             ++ map (, FSStackYaml) (Map.toList $ error "bcFlags" bconfig)
-
-        localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
-        checkFlagUsed ((name, userFlags), source) =
-            case Map.lookup name localNameMap of
-                -- Package is not available locally
-                Nothing ->
-                    if Map.member name extraDeps
-                        -- We don't check for flag presence for extra deps
-                        then Nothing
-                        -- Also not in extra-deps, it's an error
-                        else
-                            case Map.lookup name snapshot of
-                                Nothing -> Just $ UFNoPackage source name
-                                Just _ -> Just $ UFSnapshot name
-                -- Package exists locally, let's check if the flags are defined
-                Just pkg ->
-                    let unused = Set.difference (Map.keysSet userFlags) (packageDefinedFlags pkg)
-                     in if Set.null unused
-                            -- All flags are defined, nothing to do
-                            then Nothing
-                            -- Error about the undefined flags
-                            else Just $ UFFlagsNotDefined source pkg unused
-
-        unusedFlags = mapMaybe checkFlagUsed flags
-
-    unless (null unusedFlags)
-        $ throwM
-        $ InvalidFlagSpecification
-        $ Set.fromList unusedFlags
-
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.
 checkBuildCache :: forall m. (MonadIO m)
@@ -681,41 +420,12 @@ calcFci modTime' fp = liftIO $
             , fciHash = digest
             }
 
-checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
-checkComponentsBuildable lps =
-    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
-  where
-    unbuildable =
-        [ (packageName (lpPackage lp), c)
-        | lp <- lps
-        , c <- Set.toList (lpUnbuildable lp)
-        ]
-
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
-  => BuildOptsCLI
-  -> PackageName
-  -> Bool
-  -> Bool
-  -> m PackageConfig
-getPackageConfig boptsCli name isTarget isLocal = do
-  bconfig <- view buildConfigL
-  platform <- view platformL
-  compilerVersion <- view actualCompilerVersionL
-  return PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = getLocalFlags boptsCli name
-    , packageConfigGhcOptions = getGhcOptions bconfig boptsCli name isTarget isLocal
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
-    }
-
-getPackageConfig' :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => Map FlagName Bool
   -> [Text]
   -> m PackageConfig
-getPackageConfig' flags ghcOptions = do
+getPackageConfig flags ghcOptions = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   return PackageConfig
