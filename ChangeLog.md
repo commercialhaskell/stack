@@ -44,6 +44,7 @@ Major changes:
       match `foo.txt`, but not `foo.2.txt`.
 
 Behavior changes:
+* `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
 Other enhancements:
 
@@ -90,6 +91,9 @@ Bug fixes:
 * Fix `subdirs` for git repos in `extra-deps` to match whole directory names.
   Also fixes for `subdirs: .`. See
   [#4292](https://github.com/commercialhaskell/stack/issues/4292)
+* Fix for git packages to update submodules to the correct state. See
+  [#4314](https://github.com/commercialhaskell/stack/pull/4314)
+* Add `--cabal-files` flag to `stack ide targets` command.
 
 
 ## v1.9.0.1 (release candidate)

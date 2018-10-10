@@ -69,14 +69,17 @@ data GhciOpts = GhciOpts
     } deriving Show
 
 -- | Necessary information to load a package or its components.
+--
+-- NOTE: GhciPkgInfo has paths as list instead of a Set to preserve files order
+-- as a workaround for bug https://ghc.haskell.org/trac/ghc/ticket/13786
 data GhciPkgInfo = GhciPkgInfo
     { ghciPkgName :: !PackageName
     , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
     , ghciPkgDir :: !(Path Abs Dir)
     , ghciPkgModules :: !ModuleMap
-    , ghciPkgCFiles :: !(Set (Path Abs File)) -- ^ C files.
-    , ghciPkgMainIs :: !(Map NamedComponent (Set (Path Abs File)))
-    , ghciPkgTargetFiles :: !(Maybe (Set (Path Abs File)))
+    , ghciPkgCFiles :: ![Path Abs File] -- ^ C files.
+    , ghciPkgMainIs :: !(Map NamedComponent [Path Abs File])
+    , ghciPkgTargetFiles :: !(Maybe [Path Abs File])
     , ghciPkgPackage :: !Package
     } deriving Show
 
@@ -241,16 +244,16 @@ findFileTargets
     :: HasEnvConfig env
     => [LocalPackage]
     -> [Path Abs File]
-    -> RIO env (Map PackageName Target, Map PackageName (Set (Path Abs File)), [Path Abs File])
+    -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
     filePackages <- forM locals $ \lp -> do
         (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
-        return (lp, M.map (S.map dotCabalGetPath) compFiles)
+        return (lp, M.map (map dotCabalGetPath) compFiles)
     let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
         foundFileTargetComponents =
             map (\fp -> (fp, ) $ sort $
                         concatMap (\(lp, files) -> map ((packageName (lpPackage lp), ) . fst)
-                                                       (filter (S.member fp . snd) (M.toList files))
+                                                       (filter (elem fp . snd) (M.toList files))
                                   ) filePackages
                 ) fileTargets
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
@@ -281,8 +284,8 @@ findFileTargets locals fileTargets = do
             map (\(_, (name, comp)) -> M.singleton name (TargetComps (S.singleton comp)))
                 associatedFiles
         infoMap =
-            foldl (M.unionWith S.union) M.empty $
-            map (\(fp, (name, _)) -> M.singleton name (S.singleton fp))
+            foldl (M.unionWith (<>)) M.empty $
+            map (\(fp, (name, _)) -> M.singleton name [fp])
                 associatedFiles
     return (targetMap, infoMap, extraFiles)
 
@@ -513,7 +516,7 @@ renderScript isIntero pkgs mainFile onlyMain extraFiles = do
 -- Hacky check if module / main phase should be omitted. This should be
 -- improved if / when we have a better per-component load.
 getFileTargets :: [GhciPkgInfo] -> [Path Abs File]
-getFileTargets = concatMap (concatMap S.toList . maybeToList . ghciPkgTargetFiles)
+getFileTargets = concatMap (concat . maybeToList . ghciPkgTargetFiles)
 
 -- | Figure out the main-is file to load based on the targets. Asks the
 -- user for input if there is more than one candidate main-is file.
@@ -557,7 +560,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
                     M.toList $
                     M.filterWithKey (\k _ -> k `S.member` wantedComponents)
                                     (ghciPkgMainIs pkg)
-                main <- S.toList mains
+                main <- mains
                 return (ghciPkgName pkg, component, main)
               where
                 wantedComponents =
@@ -668,7 +671,7 @@ getGhciPkgInfos
     :: HasEnvConfig env
     => InstallMap
     -> [PackageName]
-    -> Maybe (Map PackageName (Set (Path Abs File)))
+    -> Maybe (Map PackageName [Path Abs File])
     -> [GhciPkgDesc]
     -> RIO env [GhciPkgInfo]
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
@@ -694,7 +697,7 @@ makeGhciPkgInfo
     -> InstalledMap
     -> [PackageName]
     -> [PackageName]
-    -> Maybe (Map PackageName (Set (Path Abs File)))
+    -> Maybe (Map PackageName [Path Abs File])
     -> GhciPkgDesc
     -> RIO env GhciPkgInfo
 makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
@@ -707,7 +710,6 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
         allWanted = wantedPackageComponents bopts target pkg
-        setMapMaybe f = S.fromList . mapMaybe f . S.toList
     return
         GhciPkgInfo
         { ghciPkgName = name
@@ -716,8 +718,8 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
         , ghciPkgModules = unionModuleMaps $
           map (\(comp, mp) -> M.map (\fp -> M.singleton fp (S.singleton (packageName pkg, comp))) mp)
               (M.toList (filterWanted mods))
-        , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) files
-        , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files)))
+        , ghciPkgMainIs = M.map (mapMaybe dotCabalMainPath) files
+        , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (mapMaybe dotCabalCFilePath) files)))
         , ghciPkgTargetFiles = mfileTargets >>= M.lookup name
         , ghciPkgPackage = pkg
         }
@@ -837,7 +839,7 @@ targetWarnings
   => Path Abs File
   -> [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
-  -> Maybe (Map PackageName (Set (Path Abs File)), [Path Abs File])
+  -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
   -> RIO env ()
 targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
   unless (null nonLocalTargets) $

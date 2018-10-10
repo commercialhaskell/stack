@@ -49,6 +49,8 @@ resolver.
 
 ### resolver
 
+> Note: Starting with **Stack 2.0**, `snapshot` is accepted as a synonym for `resolver`. Only one of these fields is permitted, not both.
+
 Specifies which snapshot is to be used for this project. A snapshot
 defines a GHC version, a number of packages available for
 installation, and various settings like build flags. It is called a

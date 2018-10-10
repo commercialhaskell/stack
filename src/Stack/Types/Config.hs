@@ -168,7 +168,7 @@ import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
-                  (.=), (..:), (..:?), (..!=), Value(Bool),
+                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
@@ -1431,7 +1431,7 @@ parseProjectAndConfigMonoid rootDir =
         let flags = unCabalStringMap <$> unCabalStringMap
                     (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
-        resolver <- jsonSubWarnings (o ..: "resolver")
+        resolver <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
         mcompiler <- o ..:? "compiler"
         msg <- o ..:? "user-message"
         config <- parseConfigMonoidObject rootDir o

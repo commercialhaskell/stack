@@ -56,6 +56,22 @@ hpackConfig =
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
+resolverConfig :: String
+resolverConfig =
+  "resolver: lts-2.10\n" ++
+  "packages: ['.']\n"
+
+snapshotConfig :: String
+snapshotConfig =
+  "snapshot: lts-2.10\n" ++
+  "packages: ['.']\n"
+
+resolverSnapshotConfig :: String
+resolverSnapshotConfig =
+  "resolver: lts-2.10\n" ++
+  "snapshot: lts-2.10\n" ++
+  "packages: ['.']\n"
+
 stackDotYaml :: Path Rel File
 stackDotYaml = either impureThrow id (parseRelFile "stack.yaml")
 
@@ -81,6 +97,38 @@ spec = beforeAll setup $ do
         let setVar = setEnv name newValue
         let resetVar = setEnv name originalValue
         bracket_ setVar resetVar action
+
+  describe "parseProjectAndConfigMonoid" $ do
+    let loadProject' fp inner =
+          withRunner logLevel True False ColorAuto mempty Nothing False $
+          \runner ->
+            runRIO runner $ do
+              iopc <- loadConfigYaml (
+                parseProjectAndConfigMonoid (parent fp)
+                ) fp
+              ProjectAndConfigMonoid project _ <- liftIO iopc
+              liftIO $ inner project
+
+        toAbsPath path = do
+          parentDir <- getCurrentDirectory >>= parseAbsDir
+          return (parentDir </> path)
+
+        loadProject config inner = do
+          yamlAbs <- toAbsPath stackDotYaml
+          writeFile (toFilePath yamlAbs) config
+          loadProject' yamlAbs inner
+
+    it "parses snapshot using 'resolver'" $ inTempDir $ do
+      loadProject resolverConfig $ \Project{..} ->
+        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+
+    it "parses snapshot using 'snapshot'" $ inTempDir $ do
+      loadProject snapshotConfig $ \Project{..} ->
+        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+
+    it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
+      loadProject resolverSnapshotConfig (const (return ()))
+        `shouldThrow` anyException
 
   describe "loadConfig" $ do
     let loadConfig' inner =
