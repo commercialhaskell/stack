@@ -237,7 +237,7 @@ do_centos_install() {
   if is_64_bit ; then
     install_dependencies
     case "$1" in
-      "6")
+      "6"*)
         print_bindist_notice "libgmp4"
         install_64bit_gmp4_linked_binary
         ;;
@@ -248,7 +248,7 @@ do_centos_install() {
     esac
   else
     case "$1" in
-      "6")
+      "6"*)
         die "Sorry, there is currently no Linux 32-bit gmp4 binary available."
         ;;
       *)
