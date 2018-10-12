@@ -405,7 +405,9 @@ getPackageCaches = do
             result <- liftM mconcat $ forM (clIndices cl) $ \index -> do
                 fp <- configPackageIndexCache (indexName index)
                 PackageCache pis <-
-#if MIN_VERSION_template_haskell(2,13,0)
+#if MIN_VERSION_template_haskell(2,14,0)
+                    $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "35_zXZ4b4CIWfrLXtjWteR4nb6o="
+#elif MIN_VERSION_template_haskell(2,13,0)
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "LLL6OCcimOqRm3r0JmsSlLHcaLE="
 #else
                     $(versionedDecodeOrLoad (storeVersionConfig "pkg-v5" "A607WaDwhg5VVvZTxNgU9g52DO8="

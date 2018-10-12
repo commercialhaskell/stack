@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -102,7 +103,11 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 snapshotDefVC :: VersionConfig SnapshotDef
+#if MIN_VERSION_template_haskell(2,14,0)
+snapshotDefVC = storeVersionConfig "sd-v1" "u-V-7pmU0YA-nXZFI0UBIST3JdY="
+#else
 snapshotDefVC = storeVersionConfig "sd-v1" "CKo7nln8EXkw07Gq-4ATxszNZiE="
+#endif
 
 -- | A relative file path including a unique string for the given
 -- snapshot.
@@ -310,7 +315,11 @@ instance Store LoadedSnapshot
 instance NFData LoadedSnapshot
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
+#if MIN_VERSION_template_haskell(2,14,0)
+loadedSnapshotVC = storeVersionConfig "ls-v5" "Rl-3KjZ1LqhIyGy-o0HCC-I6cRc="
+#else
 loadedSnapshotVC = storeVersionConfig "ls-v5" "CeSRWh1VU8v0__kwA__msbe6WlU="
+#endif
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

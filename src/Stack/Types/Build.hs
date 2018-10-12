@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -686,4 +687,8 @@ instance Store PrecompiledCache
 instance NFData PrecompiledCache
 
 precompiledCacheVC :: VersionConfig PrecompiledCache
+#if MIN_VERSION_template_haskell(2,14,0)
+precompiledCacheVC = storeVersionConfig "precompiled-v2" "1Q08F5_iKDGDMPCuBG0-Av9nEKk="
+#else
 precompiledCacheVC = storeVersionConfig "precompiled-v2" "55vMMtbIlS4UukKnSmjs1SrI01o="
+#endif

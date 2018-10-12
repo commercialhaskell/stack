@@ -377,9 +377,13 @@ lookupPackageIdentifierExact
   -> RIO env (Maybe ByteString)
 lookupPackageIdentifierExact identRev cache = do
   cl <- view cabalLoaderL
-  forM (lookupResolvedPackage cl identRev cache) $ \rp -> do
-    [bs] <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
-    return bs
+  case lookupResolvedPackage cl identRev cache of
+    Nothing -> return Nothing
+    Just rp -> do
+      bss <- withCabalFiles (indexName (rpIndex rp)) [(rp, ())] $ \_ _ bs -> return bs
+      case bss of
+        [bs] -> return (Just bs)
+        _ -> return Nothing
 
 data FuzzyResults
   = FRNameNotFound !(Maybe (NonEmpty T.Text))

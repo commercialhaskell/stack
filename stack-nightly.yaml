@@ -1,11 +1,25 @@
-resolver: nightly-2018-09-02
+resolver: nightly-2018-10-12
 
 extra-deps:
-- Cabal-2.4.0.0@rev:0
+- git: https://github.com/yesodweb/persistent.git
+  commit: e8e1b723403da2b45baf165dfbedf5abedc06178
+  subdirs:
+  - persistent
+  - persistent-sqlite
+  - persistent-template
 - cabal-install-2.4.0.0@rev:1
-- http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.6@rev:2
-- happy-1.19.9@rev:3
+- cryptohash-0.11.9@rev:0
+- cryptohash-sha256-0.11.101.0@rev:2
+- cryptonite-conduit-0.2.2@rev:0
+- ed25519-0.0.5.0@rev:2
+- hackage-security-0.5.3.0@rev:3
+- hpack-0.31.0@rev:0
+- infer-license-0.2.0@rev:0
+- project-template-0.2.0.1@rev:0
+- resolv-0.1.1.1@rev:0
+- store-0.5.0@rev:0
+- store-core-0.4.4@rev:0
+- th-utilities-0.2.0.1@rev:0
 
 # docker:
 #   enable: true
