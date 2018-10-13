@@ -70,6 +70,8 @@ main =
                      , shakeChange = ChangeModtimeAndDigestInput }
         options $
         \flags args -> do
+            -- build the default value of type Global, with predefined constants
+
             -- 'stack build --dry-run' just ensures that 'stack.cabal' is generated from hpack
             _ <- readProcess "stack" ["build", "--dry-run"] ""
             gStackPackageDescription <-
@@ -78,6 +80,7 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
+
             let gGpgKey = "0x575159689BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
@@ -89,16 +92,31 @@ main =
                 gProjectRoot = "" -- Set to real value velow.
                 gBuildArgs = []
                 gCertificateName = Nothing
-                global0 = foldl (flip id) Global{..} flags
+                globalDefault = Global{..}
+
+            -- modify our default value of type Global with env vars and command line args
+            envOptions <- envOptionsIO
+            let globalWithEnv = envOptions globalDefault
+                globalWithArgsEnv = foldl (flip id) globalWithEnv flags
+
             -- Need to get paths after options since the '--arch' argument can effect them.
-            projectRoot' <- getStackPath global0 "project-root"
-            let global = global0
+            projectRoot' <- getStackPath globalWithArgsEnv "project-root"
+            let global = globalWithArgsEnv
                     { gProjectRoot = projectRoot' }
             return $ Just $ rules global args
   where
     getStackPath global path = do
       out <- readProcess stackProgName (stackArgs global ++ ["path", "--" ++ path]) ""
       return $ trim $ fromMaybe out $ stripPrefix (path ++ ":") out
+
+-- | Env Vars to set some of the command-line options found below.
+envOptionsIO :: IO (Global -> Global)
+envOptionsIO = do
+    envVars <- getEnvironment
+    let modifyByEnv global (k, v) = case k of
+          "STACK_RELEASE_GPG_KEY" -> global{gGpgKey = v}
+          _ -> global
+    return $ \global -> foldl modifyByEnv global envVars
 
 -- | Additional command-line options.
 options :: [OptDescr (Either String (Global -> Global))]
@@ -185,7 +203,7 @@ rules global@Global{..} args = do
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
         withTempDir $ \tmpDir -> do
-            let cmd0 c = cmd (gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName)
+            let cmd0 c = cmd [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
                     (stackArgs global)
                     ["--local-bin-path=" ++ tmpDir]
                     c
