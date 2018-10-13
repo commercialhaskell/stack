@@ -359,10 +359,10 @@ michael@d30748af6d3d:~/helloworld$ stack build
 # build output ...
 ```
 
-Finally, to find out which versions of these libraries stack installed, we can ask stack to `list-dependencies`:
+Finally, to find out which versions of these libraries stack installed, we can ask stack to `ls dependencies`:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack list-dependencies
+michael@d30748af6d3d:~/helloworld$ stack ls dependencies
 # dependency output ...
 ```
 
@@ -1203,7 +1203,7 @@ what needs to be removed:
 
 ## exec
 
-We've already used `stack exec` used multiple times in this guide. As you've
+We've already used `stack exec` multiple times in this guide. As you've
 likely already guessed, it allows you to run executables, but with a slightly
 modified environment. In particular: `stack exec` looks for executables on
 stack's bin paths, and sets a few additional environment variables (like adding
