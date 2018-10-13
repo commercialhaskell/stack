@@ -1,26 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
-
-Major changes:
-
-* Upgrade to Cabal 2.4
-    * Note that, in this process, the behavior of file globbing has
-      been modified to match that of Cabal. In particular, this means
-      that for Cabal spec versions less than 2.4, `*.txt` will
-      match `foo.txt`, but not `foo.2.txt`.
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-
-## v1.9.0.1 (release candidate)
+## v1.9.1
 
 Release notes:
 
@@ -29,6 +10,11 @@ Release notes:
 
 Major changes:
 
+* Upgrade to Cabal 2.4
+    * Note that, in this process, the behavior of file globbing has
+      been modified to match that of Cabal. In particular, this means
+      that for Cabal spec versions less than 2.4, `*.txt` will
+      match `foo.txt`, but not `foo.2.txt`.
 * `GHCJS` support is being downgraded to 'experimental'. A warning notifying the user of the experimental status of `GHCJS` will be displayed.
 
 Behavior changes:
