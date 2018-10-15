@@ -98,6 +98,7 @@ import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              RIO.Process
+import              RIO.List
 import              Text.Printf (printf)
 
 #if !WINDOWS
@@ -622,6 +623,13 @@ getGhcBuilds = do
                         _ -> CompilerBuildSpecialized (intercalate "-" c))
                     libComponents
 #if !WINDOWS
+            Platform _ Cabal.FreeBSD -> do
+                let getMajorVer = readMaybe <=< headMaybe . (splitOn ".")
+                majorVer <- getMajorVer <$> sysRelease
+                if majorVer >= Just (12 :: Int) then
+                  useBuilds [CompilerBuildSpecialized "ino64"]
+                else
+                  useBuilds [CompilerBuildStandard]
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuilds [CompilerBuildSpecialized releaseStr]
