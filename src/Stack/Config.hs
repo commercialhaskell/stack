@@ -40,7 +40,6 @@ module Stack.Config
   ) where
 
 import           Control.Monad.Extra (firstJustM)
-import           Control.Monad.State.Strict      (execStateT, modify)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
@@ -48,6 +47,7 @@ import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
@@ -603,23 +603,32 @@ loadBuildConfig mproject maresolver mcompiler = do
       map (second (PLMutable . ppResolvedDir)) packages0 ++
       map (second dpLocation) deps0
 
-    let snPackages = snapshotPackages snapshot `Map.difference` Map.fromList packages0
+    let packages1 = Map.fromList packages0
+        snPackages = snapshotPackages snapshot `Map.difference` packages1
           `Map.difference` Map.fromList deps0
 
     snDeps <- Map.traverseWithKey snapToDepPackage snPackages
 
     let deps1 = Map.fromList deps0 `Map.union` snDeps
 
-    (packages, deps) <- flip execStateT (Map.fromList packages0, deps1) $ do
-      forM_ (Map.toList $ projectFlags project) $ \(package, flags) -> do
-        let setProjectFlags p = p{ppCommon=(ppCommon p){cpFlags=flags}}
-            setDepFlags d = d{dpCommon=(dpCommon d){cpFlags=flags}}
-        modify $ \(packages, deps) -> do
-          if Map.member package packages
-          then (Map.adjust setProjectFlags package packages, deps)
-          else if Map.member package deps
-               then (packages, Map.adjust setDepFlags package deps)
-               else error "TBD: Report it properly"
+    let mergeApply m1 m2 f =
+          MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
+        pFlags = projectFlags project
+        packages2 = mergeApply packages1 pFlags $
+          \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
+        deps2 = mergeApply deps1 pFlags $
+          \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
+        unusedFlags = pFlags `Map.restrictKeys` Map.keysSet packages1
+          `Map.restrictKeys` Map.keysSet deps1
+
+        -- FIXME:qrilka apply ghc options
+        deps = deps2
+        packages = packages2
+        yamlString = T.unpack . decodeUtf8Lenient . Yaml.encode
+
+    when (not $ Map.null unusedFlags) $
+      throwString $ "The following package flags were not used:\n" ++
+        yamlString (fmap toCabalStringMap $ toCabalStringMap unusedFlags)
 
     let wanted = SMWanted
           { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler

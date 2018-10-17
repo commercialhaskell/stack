@@ -222,10 +222,6 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) packageName
 
-{- FIXME:qrilka conflicts with the one in Stack.Types.SourceMap
-type SourceMap = Map PackageName PackageSource
--}
-
 -- | Where the package's source is located: local directory or package index
 data PackageSource
   = PSFilePath LocalPackage InstallLocation

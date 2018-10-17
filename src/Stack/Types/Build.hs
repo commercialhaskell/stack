@@ -640,7 +640,6 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       where
         PackageIdentifier name version' = ident
 
--- FIXME:qrilka should be removed
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
 wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted

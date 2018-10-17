@@ -262,7 +262,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 -- component.
 generatePkgDescOpts
     :: (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
-    => InstallMap -- Map PackageName PackageSource -- FIXME:qrilka SourceMap
+    => InstallMap
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
     -> [PackageName] -- ^ Packages to add to the "-package" flags

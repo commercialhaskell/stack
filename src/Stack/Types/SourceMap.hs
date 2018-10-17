@@ -84,7 +84,7 @@ data SMActual = SMActual
 
 -- | How a package is intended to be built
 data Target
-  = TargetAll !PackageType -- FIXME:qrilka shouldn't that get removed?
+  = TargetAll !PackageType
   -- ^ Build all of the default components.
   | TargetComps !(Set NamedComponent)
   -- ^ Only build specific components

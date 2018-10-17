@@ -87,10 +87,12 @@ flagCompleter = buildConfigCompleter $ \input -> do
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
              in (if flagEnabled name fl then "-" else "") ++ flname
+        prjFlags = maybe mempty (projectFlags . fst) $
+                   configMaybeProject (bcConfig bconfig)
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (C.flagName fl) $
-            Map.findWithDefault Map.empty name (error "bcFlags bconfig")
+            Map.findWithDefault Map.empty name prjFlags
     return $ filter (input `isPrefixOf`) $
         case input of
             ('*' : ':' : _) -> wildcardFlags
