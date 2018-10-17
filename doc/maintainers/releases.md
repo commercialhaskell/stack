@@ -16,6 +16,8 @@
 * Eventually remove `-nopie` variants from [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml).  stack-1.6 was the last release to use them, so wait a few major releases after that, and be sure to announce.
     * Also remove the `-nopie` variants from `etc/scripts/mirrog-ghc-bindists-to-github.sh`.
 * Remove workaround to [#4125](https://github.com/commercialhaskell/stack/issues/4125) from `stack.yaml` for next major version after 1.8.
+* Explicitly tag release candidates and prereleases in `stack --version` output.
+* Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
 
 ## Iterating on release process
 
@@ -118,9 +120,9 @@ Examples:
           "obvious" possible versions in sequence, and
           `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd).
           Note: do **not** update the Dockerfiles in `etc/dockerfiles/stack-build` yet; that will come later)
+            * Do __NOT__ update templates in `.github` to point at the new release version yet!
         * Look for any links to "latest" documentation, replace with version tag
     * Update `STACK_VERSION` in `etc/scripts/get-stack.sh` to the new release version (`X.Y.1`)
-    * Update `.github/ISSUE_TEMPLATE.md` to point at the new release version (`X.Y.1`).
     * Check if GHC version we're using has bindists using upgraded versions of operating systems (e.g. FreeBSD, Debian) and upgrade relevant Vagrantfiles in `etc/vagrant` and release shell script (`etc/scripts/*-release.sh`) to match.
     * Check that for any platform entries that need to be added to (or removed from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
@@ -150,7 +152,7 @@ for requirements to perform the release, and more details about the tool.
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
   with tag and name `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field.  check the *This is a pre-release* checkbox.  `[RC]`
 
-* On each machine you'll be releasing from, set environment variable `GITHUB_AUTHORIZATION_TOKEN`. `[RC]`
+* On each machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
 
 * [TODO (for below steps): All the `etc/scripts/*-releases.sh` should be integrated into `etc/scripts/release.hs`]
 
@@ -175,7 +177,7 @@ for requirements to perform the release, and more details about the tool.
 * On Linux ARM64 (aarch64): `[RC]`
     * Run `etc/scripts/linux-aarch64-release.sh`
 
-* Build a Linux static bindst `[RC]`
+* Build a Linux static bindist `[RC]`
     * Follow directions in the **Build Linux static binary distribution with Nix** section below.
 
 * Build sdist using `stack sdist .`, and upload it to the
@@ -192,13 +194,14 @@ for requirements to perform the release, and more details about the tool.
 
 * Upload `_release/stack-X.Y.Z-sdist-1.tar.gz` to the Github release similarly to the `sdist-0` above. `[RC]`
 
-  TODO: did this last time by copying to `_release` and then using `release.hs` to upload sigs and checksum -- should add all this logic to `release.hs` itself.  e.g.:
+* For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to keyserver:
 
   ```
-  stack ../stack/etc/scripts/release.hs _release/stack-1.9.0.1-sdist-1.tar.gz.upload _release/stack-1.9.0.1-sdist-1.tar.gz.asc.upload _release/stack-1.9.0.1-sdist-1.tar.gz.sha256.upload
+  gpg --sign-key -u 0x575159689BEFB442 <OTHER-KEY-ID>
+  gpg --send-keys <OTHER-KEY-ID>
   ```
 
-* Publish Github release. Include the changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
+* Publish Github release. Include the changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|LC_ALL=C sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
 
@@ -236,20 +239,24 @@ for requirements to perform the release, and more details about the tool.
 
 * Update [get.haskellstack.org /stable rewrite rules](https://gitlab.fpcomplete.com/fpco/devops/blob/develop/dockerfiles/nginx/prod-v2/etc/nginx/conf.d/haskellstack.conf) (be sure to change both places) to new released version, and update production cluster.
 
-* Delete the RC branch (locally and on origin).  E.g. `git branch -d vX.Y.Z; git push origin :vX.Y.Z`.
-
-* Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).  `[RC]`
+* Delete the RC branch (locally and on origin).  E.g. `git branch -d vX.Y; git push origin :vX.Y`.
 
 * Update fpco/stack-build Docker images with new version
     * Add `etc/dockerfiles/stack-build/lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
 
-        FROM fpco/stack-build:lts-X.Z
-        ARG STACK_VERSION=X.Y.Z
-        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_        VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+      ```
+      FROM fpco/stack-build:lts-X.Z
+      ARG STACK_VERSION=X.Y.Z
+      RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_        VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+      ```
 
     * Run the appropriate job for the LTS major version in [Gitlab pipelines](https://gitlab.fpcomplete.com/fpco-mirrors/stack/pipelines).
 
     * Check that the newly build Docker image has the new Stack version
+
+* Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).  `[RC]`
+
+* `master` branch: update templates in `.github` to point at the new release version (`X.Y.1`).
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the markdown for the release description from Github. `[RC]`
@@ -298,9 +305,10 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
 
 - Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/.stack-release/_release/bin/stack-X.Y.Z-linux-x86_64-static/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
 
-- Package, sign, and upload to Github using stack's release script:
+- Package, sign, and upload to Github using stack's release script in the stack directory:
 
   ```
+  cd ~/stack-release
   stack etc/scripts/release.hs --no-test-haddocks --binary-variant=static --build-args=--dry-run upload
   ```
 
@@ -387,7 +395,7 @@ Now continue to the **General Windows setup** subsection below.
 
 15. Run `C:\p\env.bat` (do this every time you open a new command prompt)
 
-16. `stack exec -- gpg --import`, and paste in the dev@fpcomplete.com secret key (must be done using `stack exec` because that uses the right keyring for the embedded msys GPG; you can get the key from another machine with `gpg --export-secret-keys --armor dev@fpcomplete.com`)
+16. `stack exec -- gpg --import`, and paste in the your GPG secret key (must be done using `stack exec` because that uses the right keyring for the embedded msys GPG; you can get the key from another machine with `gpg --export-secret-keys --armor <KEY ID>`)
 
 17. Run in command prompt (adjust the `user.email` and `user.name` settings):
 
@@ -434,7 +442,7 @@ Now continue to the **General Windows setup** subsection below.
     apt-get update && apt-get install -y unzip gpg
     ```
 
-8. Import `dev@fpcomplete.com` GPG key (`gpg --import` and paste the private key)
+8. Import your GPG key (`gpg --import` and paste the private key)
 
 9. Git settings (adjust for your preferences/email/name)
 
