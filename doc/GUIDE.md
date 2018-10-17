@@ -431,7 +431,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.19`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-11.22`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -448,7 +448,7 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.19, let's change our
+Let's explore package sets a bit further. Instead of lts-11.22, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
 this is currently 2018-07-25 - please see the resolve from the link above to get the latest.
 
@@ -464,8 +464,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.19 build
-Downloaded lts-11.19 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.22 build
+Downloaded lts-11.22 build plan.
 # build output ...
 ```
 

@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.4.3
+GHCVER=8.4.4
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -54,18 +54,18 @@ mirror () {
       echo "$0: Unsupported conversion: ${srcext} to ${destext}" >&2
       exit 1
     fi
-    curl -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
+    curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
     date >"$destfn.uploaded"
   fi
   while [[ $# -gt 0 ]]; do
     alias="$1"
-    echo "    $alias:" >>stack-setup.yaml
-    echo "        $GHCVER:" >>stack-setup.yaml
-    echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup.yaml
-    echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup.yaml
-    echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup.yaml
-    echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup.yaml
-    echo "" >>stack-setup.yaml
+    echo "    $alias:" >>stack-setup-$GHCVER.yaml
+    echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
+    echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
+    echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
+    echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
+    echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
+    echo "" >>stack-setup-$GHCVER.yaml
     shift
   done
 }
@@ -81,10 +81,10 @@ mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie linux64-n
 mirror x86_64-apple-darwin xz bz2 macosx
 mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
-#mirror x86_64-portbld-freebsd xz xz freebsd64-11
+mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
 #mirror aarch64-deb8-linux xz xz linux-aarch64
 
 set +x
 echo
-echo "DONE!  See 'stack-setup.yaml' for 'stack setup' to add to"
+echo "DONE!  See 'stack-setup-$GHCVER.yaml' for 'stack setup' to add to"
 echo "  https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml"

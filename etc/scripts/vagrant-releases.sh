@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -xe
+
+cd "$(dirname "$0")/../.."
+#TODO: set up gpg-agent forwarding for package signing (see http://superuser.com/questions/161973/how-can-i-forward-a-gpg-key-via-ssh-agent).
+gpg --export-secret-keys --armor "${STACK_RELEASE_GPG_KEY:-0x575159689BEFB442}" >"gpg-secret-key.asc~"
+
 "$(dirname "$0")/with-vagrant.sh" debian-7-amd64 "$* release"
 "$(dirname "$0")/with-vagrant.sh" centos-6-x86_64 "--binary-variant=gmp4 $* upload"
 "$(dirname "$0")/with-vagrant.sh" freebsd-11.0-amd64 "$* upload" "export LANG=en_US.UTF-8;"
