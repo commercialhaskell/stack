@@ -1,6 +1,7 @@
 {- stack script
-    --resolver lts-11.19
+    --resolver lts-11.22
     --install-ghc
+    --ghc-options -Wall
     --package Cabal
     --package aeson
     --package bytestring

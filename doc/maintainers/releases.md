@@ -2,12 +2,12 @@
 
 # Releases
 
-## Upcoming release taks:
+## Upcoming release tasks:
 
 * Add back support for building static Linux binaries (by popular demand), and update `get-stack.sh` to use it (see [#4088](https://github.com/commercialhaskell/stack/issues/4088)).
 * Check whether `persistent` still needs `monad-logger`; remove dependency if not
 * Check if workaround for https://github.com/commercialhaskell/stack/issues/3922 still needed in stack.yaml
-* Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket (be sure to announce first).  Directories, and last Stack version uploaded:
+* Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 1.11.x.  Directories, and last Stack version uploaded:
 	- `s3://download.fpcomplete.com/archlinux` (1.0.0)
 	- `s3://download.fpcomplete.com/centos` (1.5.1)
 	- `s3://download.fpcomplete.com/debian` (1.4.0)

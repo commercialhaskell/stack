@@ -1,6 +1,6 @@
 #!/usr/bin/env stack
 {- stack script
-    --resolver lts-11.19
+    --resolver lts-11.22
     --package base
     --package directory
     --package filepath
