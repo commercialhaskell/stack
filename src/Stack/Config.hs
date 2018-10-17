@@ -620,15 +620,24 @@ loadBuildConfig mproject maresolver mcompiler = do
           \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
         unusedFlags = pFlags `Map.restrictKeys` Map.keysSet packages1
           `Map.restrictKeys` Map.keysSet deps1
-
-        -- FIXME:qrilka apply ghc options
-        deps = deps2
-        packages = packages2
+        yamlString :: ToJSON a => a -> String
         yamlString = T.unpack . decodeUtf8Lenient . Yaml.encode
 
     when (not $ Map.null unusedFlags) $
       throwString $ "The following package flags were not used:\n" ++
         yamlString (fmap toCabalStringMap $ toCabalStringMap unusedFlags)
+
+    let pkgGhcOptions = configGhcOptionsByName config
+        deps = mergeApply deps2 pkgGhcOptions $
+          \_ d options -> d{dpCommon=(dpCommon d){cpGhcOptions=options}}
+        packages = mergeApply packages2 pkgGhcOptions $
+          \_ p options -> p{ppCommon=(ppCommon p){cpGhcOptions=options}}
+        unusedPkgGhcOptions = pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
+          `Map.restrictKeys` Map.keysSet deps2
+
+    when (not $ Map.null unusedPkgGhcOptions) $
+      throwString $ "The following package GHC options were not used:\n" ++
+        yamlString (toCabalStringMap unusedPkgGhcOptions)
 
     let wanted = SMWanted
           { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler

@@ -13,7 +13,6 @@ module Stack.Build.Source
     , loadLocalPackage
     , loadSourceMap
     , getLocalFlags
-    , getGhcOptions
     , addUnlistedToBuildCache
     ) where
 
@@ -77,7 +76,7 @@ loadSourceMap smt boptsCli sma = do
             let name = cpName common
                 flags = getLocalFlags boptsCli name
                 ghcOptions =
-                  getGhcOptions bconfig boptsCli name isTarget isProjectPackage
+                  generalGhcOptions bconfig boptsCli isTarget isProjectPackage
             in common
                { cpFlags =
                      if M.null flags
@@ -112,8 +111,8 @@ getLocalFlags boptsCli name = Map.unions
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.
-getGhcOptions :: BuildConfig -> BuildOptsCLI -> PackageName -> Bool -> Bool -> [Text]
-getGhcOptions bconfig boptsCli name isTarget isLocal = concat
+generalGhcOptions :: BuildConfig -> BuildOptsCLI -> Bool -> Bool -> [Text]
+generalGhcOptions bconfig boptsCli isTarget isLocal = concat
     [ Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
     , if isLocal
         then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
@@ -121,7 +120,6 @@ getGhcOptions bconfig boptsCli name isTarget isLocal = concat
     , if isTarget
         then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
         else []
-    , Map.findWithDefault [] name (configGhcOptionsByName config)
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
          then ["-fprof-auto","-fprof-cafs"]

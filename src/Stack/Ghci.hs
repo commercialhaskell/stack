@@ -624,14 +624,20 @@ loadGhciPkgDesc
     -> RIO env GhciPkgDesc
 loadGhciPkgDesc buildOptsCLI name cabalfp target = do
     econfig <- view envConfigL
-    bconfig <- view buildConfigL
     compilerVersion <- view actualCompilerVersionL
-    let config =
+    let SourceMap{..} = envConfigSourceMap econfig
+        -- FIXME:qrilka currently this source map is being build with
+        -- the default target
+        sourceMapGhcOptions = fromMaybe [] $
+          (cpGhcOptions . ppCommon <$> M.lookup name smProject)
+          <|>
+          (cpGhcOptions . dpCommon <$> M.lookup name smDeps)
+        config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = getLocalFlags buildOptsCLI name
-            , packageConfigGhcOptions = getGhcOptions bconfig buildOptsCLI name True True
+            , packageConfigGhcOptions = sourceMapGhcOptions
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }

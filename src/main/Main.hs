@@ -910,6 +910,7 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
   let boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = [] -- FIXME:qrilka really?
           , boptsCLIFlags = ghciFlags ghciOpts
+          , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
           }
   in withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
