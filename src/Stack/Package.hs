@@ -53,7 +53,6 @@ import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import qualified Distribution.Types.Version as Cabal
 import qualified Distribution.Verbosity as D
 import           Distribution.Version (mkVersion)
 import           Path as FL
