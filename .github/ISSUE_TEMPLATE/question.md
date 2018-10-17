@@ -9,14 +9,14 @@ This way your question will be more easily discoverable by other people with the
 
 Question related to stack project templates? Please report it at the [stack-templates](https://github.com/commercialhaskell/stack-templates) repository instead.
 
-if you still want to ask the question here instead, please make sure that you are using the latest release (current stack-1.7.1).
+if you still want to ask the question here instead, please make sure that you are using the latest release (current stack-1.9.1).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 ### Stack version
 
 ```
 $ stack --version
-Version 1.7.1, Git revision 63267f94d7c819cbecc2d59aa259d17240838e43 (4845 commits) x86_64 hpack-0.17.1
+Version 1.9.1, Git revision f9d0042c141660e1d38f797e1d426be4a99b2a3c (6168 commits) x86_64 hpack-0.31.0
 ```
 
 ### Method of installation

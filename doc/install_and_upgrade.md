@@ -52,8 +52,7 @@ starting" warning when you try to run the installer. If so, click on
 ## macOS
 
 We generally test on the current version of macOS, but Stack is known to work
-on Sierra, El Capitan, Yosemite and Mavericks as well, and may also work on older
-versions (YMMV).
+on High Sierra and Sierra as well, and may also work on older versions (YMMV).
 
 ### Installer script
 

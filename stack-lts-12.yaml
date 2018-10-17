@@ -1,4 +1,4 @@
-resolver: snapshot-nightly.yaml
+resolver: snapshot-lts-12.yaml
 
 packages:
 - .

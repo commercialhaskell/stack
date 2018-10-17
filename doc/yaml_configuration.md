@@ -501,7 +501,7 @@ keys mirrors the behavior for the
 command line parameters.
 
 NOTE: Prior to version 1.6.0, the `$locals`, `$targets`, and
-`$everything` keys were not support. Instead, you could use `"*"` for
+`$everything` keys were not supported. Instead, you could use `"*"` for
 the behavior represented now by `$everything`. It is highly
 recommended to switch to the new, more expressive, keys.
 

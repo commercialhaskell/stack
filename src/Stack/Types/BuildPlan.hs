@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -142,7 +143,11 @@ configuration. Otherwise, we don't cache.
 -}
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
+#if MIN_VERSION_template_haskell(2,14,0)
+loadedSnapshotVC = storeVersionConfig "ls-v6" "JMcGvLs8Fq-dMrejVfGy8552qqo="
+#else
 loadedSnapshotVC = storeVersionConfig "ls-v6" "KG2o7Yvkg0tAjIOSKjQ4fEM0BKY="
+#endif
 
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.

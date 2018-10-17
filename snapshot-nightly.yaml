@@ -1,9 +1,19 @@
-resolver: nightly-2018-09-02
-name: snapshot-for-building-stack-with-ghc-8.4.3
+resolver: nightly-2018-10-12
+name: snapshot-for-building-stack-with-ghc-8.6.1
 
 packages:
-- ansi-terminal-0.8.1@sha256:4cebbd2034dcd9029369c0a49c72666be8dacd11a2827d33bcfa539f2933614a,3116
-- Cabal-2.4.0.0@rev:0
-- http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.6@rev:2
-- unliftio-0.2.8.0@sha256:5a47f12ffcee837215c67b05abf35dffb792096564a6f81652d75a54668224cd,2250
+- cryptohash-0.11.9@rev:0
+- cryptohash-sha256-0.11.101.0@rev:2
+- cryptonite-conduit-0.2.2@rev:0
+- ed25519-0.0.5.0@rev:2
+- hackage-security-0.5.3.0@rev:3
+- hpack-0.31.0@rev:0
+- infer-license-0.2.0@rev:0
+- persistent-2.9.0@rev:0
+- persistent-sqlite-2.9.0@rev:0
+- persistent-template-2.5.4@rev:2
+- project-template-0.2.0.1@rev:0
+- rio-orphans-0.1.1.0@rev:0
+- store-0.5.0@rev:0
+- store-core-0.4.4@rev:0
+- th-utilities-0.2.0.1@rev:0

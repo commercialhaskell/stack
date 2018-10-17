@@ -450,6 +450,7 @@ instance FromJSON BlobKey where
     <*> o .: "size"
 
 newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
+  deriving (Show)
 instance PersistField PackageNameP where
   toPersistValue (PackageNameP pn) = PersistText $ T.pack $ packageNameString pn
   fromPersistValue v = do
@@ -461,6 +462,7 @@ instance PersistFieldSql PackageNameP where
   sqlType _ = SqlString
 
 newtype VersionP = VersionP Version
+  deriving (Show)
 instance PersistField VersionP where
   toPersistValue (VersionP v) = PersistText $ T.pack $ versionString v
   fromPersistValue v = do
