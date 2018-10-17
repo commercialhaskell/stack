@@ -236,16 +236,8 @@ do_centos_install() {
 
   if is_64_bit ; then
     install_dependencies
-    case "$1" in
-      "6"*)
-        print_bindist_notice "libgmp4"
-        install_64bit_gmp4_linked_binary
-        ;;
-      *)
-        print_bindist_notice
-        install_64bit_standard_binary
-        ;;
-    esac
+    print_bindist_notice
+    install_64bit_standard_binary
   else
     case "$1" in
       "6"*)
@@ -293,7 +285,8 @@ do_alpine_install() {
   }
   install_dependencies
   if is_64_bit ; then
-    die "Sorry, there is currently no 64-bit Alpine Linux binary available."
+    print_bindist_notice
+    install_64bit_standard_binary
   else
     die "Sorry, there is currently no 32-bit Alpine Linux binary available."
   fi
@@ -531,7 +524,7 @@ install_32bit_standard_binary() {
 }
 
 install_64bit_standard_binary() {
-  install_from_bindist "linux-x86_64.tar.gz"
+  install_from_bindist "linux-x86_64-static.tar.gz"
 }
 
 install_aarch64_binary() {
