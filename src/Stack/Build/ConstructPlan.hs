@@ -70,6 +70,7 @@ data PackageInfo
       -- | This indicates that the package is installed and we know
       -- where to find its source. We may want to reinstall from source.
     | PIBoth Source Installed
+    deriving (Show)
 
 combineSourceInstalled :: Source
                        -> (InstallLocation, Installed)
@@ -233,7 +234,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage sourceMap pp
-        return $ SourceLocal lp
+        return $ SourceLocal lp Local
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
@@ -245,7 +246,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             -- FIXME ^ is from Stack.Build.Source
             pp <- mkProjectPackage YesPrintWarnings dir
             lp <- loadLocalPackage sourceMap pp
-            return $ SourceLocal lp
+            return $ SourceLocal lp Snap
       return $ pPackages <> deps
 
 -- | State to be maintained during the calculation of local packages
@@ -400,7 +401,7 @@ addDep treatAsDep' name = do
                     return $ Left $ DependencyCycleDetected $ name : callStack ctx
                 else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
                     let mpackageInfo = Map.lookup name $ combinedMap ctx
-                    planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ "FIXME:qrilka show mpackageInfo"
+                    planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ show mpackageInfo
                     case mpackageInfo of
                         -- TODO look up in the package index and see if there's a
                         -- recommendation available
@@ -423,7 +424,7 @@ addDep treatAsDep' name = do
 
 -- FIXME what's the purpose of this? Add a Haddock!
 tellExecutables :: PackageName -> Source -> M ()
-tellExecutables _name (SourceLocal lp)
+tellExecutables _name (SourceLocal lp _)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
@@ -449,7 +450,7 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource s) -> goSource s
                 Just (PIBoth s _) -> goSource s
 
-        goSource (SourceLocal lp)
+        goSource (SourceLocal lp _)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
         goSource SourceRemote{} = Set.empty
@@ -474,7 +475,7 @@ installPackage treatAsDep name ps minstalled = do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True treatAsDep ps package minstalled
-        SourceLocal lp ->
+        SourceLocal lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -571,7 +572,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
             , taskPresent = present
             , taskType =
                 case ps of
-                    SourceLocal lp -> TTFilePath lp (Local <> minLoc)
+                    SourceLocal lp loc' -> TTFilePath lp (loc' <> minLoc)
                     SourceRemote pkgLoc _version _cp -> TTRemote package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
@@ -730,7 +731,7 @@ checkDirtiness ps installed package present wanted' = do
             (baseConfigOpts ctx)
             present
             (psLocal ps)
-            Local -- FIXME:qrilka (piiLocation ps) -- should be Local always
+            (sourceLocation ps) -- should be Local always
             package
         buildOpts = bcoBuildOpts (baseConfigOpts ctx)
         wantConfigCache = ConfigCache
@@ -738,7 +739,7 @@ checkDirtiness ps installed package present wanted' = do
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    SourceLocal lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    SourceLocal lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     SourceRemote{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted' (packageName package) ||
@@ -832,23 +833,23 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: Source -> Bool
-psForceDirty (SourceLocal lp) = lpForceDirty lp
+psForceDirty (SourceLocal lp _) = lpForceDirty lp
 psForceDirty SourceRemote{} = False
 
 psDirty :: MonadIO m => Source -> m (Maybe (Set FilePath))
-psDirty (SourceLocal lp) = runMemoized $ lpDirtyFiles lp
+psDirty (SourceLocal lp _) = runMemoized $ lpDirtyFiles lp
 psDirty SourceRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: Source -> Bool
-psLocal SourceLocal{} = True -- FIXME:qrilka determine what's going on here
+psLocal (SourceLocal _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
 psLocal SourceRemote{} = False
 
 sourceLocation :: Source -> InstallLocation
-sourceLocation SourceLocal{} = Local
+sourceLocation (SourceLocal _ loc) = loc
 sourceLocation SourceRemote{} = Snap
 
 sourceVersion :: Source -> Version
-sourceVersion (SourceLocal lp) = packageVersion $ lpPackage lp
+sourceVersion (SourceLocal lp _) = packageVersion $ lpPackage lp
 sourceVersion (SourceRemote _ version _) = version
 
 -- | Get all of the dependencies for a given package, including build

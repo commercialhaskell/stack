@@ -830,7 +830,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                            }
             withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
               unless (null targets) $
-                  Stack.Build.build Nothing lk boptsCLI -- FIXME:qrilka do we need to repeat?
+                  Stack.Build.build Nothing lk boptsCLI
 
               config <- view configL
               menv <- liftIO $ configProcessContextSettings config eoEnvSettings
@@ -973,7 +973,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
     withBuildConfigExt
         False
         go
-        AllowNoTargets -- FIXME:qrilka check if it's OK
+        NeedTargets
         defaultBuildOptsCLI
         Nothing
         (\lk ->
@@ -981,7 +981,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
                      Stack.Build.build
                          Nothing
                          lk
-                         defaultBuildOptsCLI -- FIXME:qrilka remove?
+                         defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 

@@ -55,7 +55,7 @@ import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.SourceMap hiding (SourceMap) -- FIXME:qrilka
+import           Stack.Types.SourceMap
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           RIO.Process

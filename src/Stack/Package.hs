@@ -327,7 +327,7 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
 
 -- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
-    { biInstallMap :: !InstallMap -- FIXME: qrilka
+    { biInstallMap :: !InstallMap
     , biInstalledMap :: !InstalledMap
     , biCabalDir :: !(Path Abs Dir)
     , biDistDir :: !(Path Abs Dir)

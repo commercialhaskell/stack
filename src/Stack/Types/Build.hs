@@ -404,13 +404,23 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 data Source
-    = SourceLocal LocalPackage
+    = SourceLocal LocalPackage InstallLocation
     | SourceRemote PackageLocationImmutable
                    Version
                    CommonPackage
 
+instance Show Source where
+    show (SourceLocal lp loc) = concat ["SourceLocal (", show lp, ") ", show loc]
+    show (SourceRemote pli v _) =
+        concat
+            [ "SourceRemote"
+            , "(", show pli, ")"
+            , "(", show v, ")"
+            , "<CommonPackage>"
+            ]
+
 toCachePkgSrc :: Source -> CachePkgSrc
-toCachePkgSrc (SourceLocal lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc (SourceLocal lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc SourceRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
