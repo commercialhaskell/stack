@@ -20,6 +20,7 @@ extra-deps:
 - store-0.5.0@rev:0
 - store-core-0.4.4@rev:0
 - th-utilities-0.2.0.1@rev:0
+- githash-0.1.2.0@rev:0
 
 # docker:
 #   enable: true

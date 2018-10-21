@@ -1,6 +1,15 @@
 # Changelog
 
 
+## v1.9.1.1
+
+Hackage-only release with no user facing changes.
+
+* Stack can now be compiled again inside a directory that does not
+  contain a `.git` directory, see
+  [#4364](https://github.com/commercialhaskell/stack/issues/4364#issuecomment-431600841)
+
+
 ## v1.9.1
 
 Release notes:
