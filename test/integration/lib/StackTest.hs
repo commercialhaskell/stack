@@ -28,6 +28,12 @@ run cmd args = do
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
+stackSrc :: IO String
+stackSrc = getEnv "SRC_DIR"
+
+testDir :: IO String
+testDir = getEnv "TEST_DIR"
+
 stack' :: HasCallStack => [String] -> IO ExitCode
 stack' args = do
     stackEnv <- stackExe
