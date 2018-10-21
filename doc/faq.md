@@ -526,3 +526,12 @@ Yes:
 * If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
 * You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
 * You can use the `with-hpack` configuration option to specify an Hpack executable to use instead of the Hpack bundled with Stack.
+
+## How do I resolve linker errors when running `stack setup` or `stack build` on macOS?
+
+This is likely to be caused by having a LLVM installation and default Apple
+Clang compiler both under the `PATH`. The symptom of this issue is a linker
+error "bad relocation (Invalid pointer diff)". The compiler picks up
+inconsistent versions of binaries and the mysterious error occurs.
+
+The workaround is to remove LLVM binaries from the `PATH`.
