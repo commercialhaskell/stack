@@ -1,26 +1,99 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import StackTest
 import System.Environment (getEnv)
 import System.Directory
 import System.FilePath
 import System.Process
 import System.Exit
+import Control.Exception.Base (bracket, bracket_)
+import Control.Monad (guard, when, unless, msum)
+import Control.Concurrent (threadDelay)
+import Data.List (isInfixOf, delete, repeat)
+
+wrun :: FilePath -> String -> IO ()
+wrun cmd args = run cmd $ words args
+
+createDockerVolume :: Int -> IO String
+createDockerVolume sizeInMB = do
+  (ec, stdout, stderr) <- runEx "docker" $ "volume create"
+    ++ " --driver local"
+    ++ " --opt type=tmpfs"
+    ++ " --opt device=tmpfs"
+    ++ " --opt o=size=" ++ show sizeInMB ++ "m"
+  unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+  return $ delete '\n' stdout
+
+removeDockerVolume :: Int -> String -> IO ()
+removeDockerVolume attempts name | attempts <= 0 =
+  error $ "Can't remove docker volume " ++ name
+removeDockerVolume attempts name | otherwise = do
+  (ec, _, stderr) <- runEx "docker" $ "volume rm --force " ++ name
+  let wasRemoved = (ec == ExitSuccess) || (isInfixOf "No such volume" stderr)
+  when (not wasRemoved) $
+    threadDelay 3000000 >> -- sometimes docker releases a volume slowly
+    removeDockerVolume (attempts - 1) name
+
+withDockerVolume :: Int -> (String -> IO a) -> IO a
+withDockerVolume sizeInMB =
+  bracket (createDockerVolume sizeInMB) (removeDockerVolume 5)
+
+withSourceDirectory :: IO () -> IO ()
+withSourceDirectory action = do
+  stackSrc <- stackSrc
+  currentDirectory <- getCurrentDirectory
+  let enterDir = setCurrentDirectory stackSrc
+      exitDir = setCurrentDirectory currentDirectory
+  bracket_ enterDir exitDir action
+
+buildDockerImageWithStackSourceInside :: String -> IO ()
+buildDockerImageWithStackSourceInside tag = withSourceDirectory $
+  testDir >>= (
+    \testDir -> wrun
+      "docker" $ "build"
+      ++ " --file " ++ (testDir </> "Dockerfile")
+      ++ " --tag " ++ tag
+      ++ " --memory-swap -1"
+      ++ " ."
+      )
+
+runDockerContainerWithVolume
+  :: String
+  -> String
+  -> String
+  -> String
+  -> IO (ExitCode, String, String)
+runDockerContainerWithVolume imageTag volumeName volumeLocation cmd =
+  runEx "docker" $ "run"
+    ++ " --rm"
+    ++ " --workdir " ++ volumeLocation
+    ++ " --mount type=volume,dst=" ++ volumeLocation ++ ",src=" ++ volumeName
+    ++ " " ++ imageTag
+    ++ " " ++ cmd
+
+validateSrderr :: String -> Bool
+validateSrderr stderr = isInfixOf "No space left on device" stderr
 
 imageTag :: String
 imageTag = "4085-fix"
 
-buildDockerImageWithStackSource :: IO ExitCode
-buildDockerImageWithStackSource = do
-  stackSrc <- stackSrc
-  testDir <- testDir
-  (Nothing, Nothing, Nothing, ph) <- createProcess (
-    proc "docker" ["build"
-                  , "-f", testDir </> "Dockerfile"
-                  , "-t", imageTag
-                  , "."]
-    ) {cwd = Just stackSrc}
-  waitForProcess ph
+spaceInMBJustEnoughToFailInTheExactMoment :: Int
+spaceInMBJustEnoughToFailInTheExactMoment = 2000
 
 main :: IO ()
-main = do
-  code <- buildDockerImageWithStackSource
-  return ()
+main = do  
+  buildDockerImageWithStackSourceInside imageTag
+  (ec, _, stderr) <- withDockerVolume
+    spaceInMBJustEnoughToFailInTheExactMoment
+    (\volumeName ->
+        runDockerContainerWithVolume imageTag volumeName "/app" $
+          "stack"
+          ++ " --stack-root /app"
+          ++ " --resolver nightly-2018-06-05"
+          ++ " --no-terminal"
+          ++ " --install-ghc"
+          ++ " test")
+  when (ec == ExitSuccess) $
+    error $ "stack process succeeded, but it shouldn't"
+  when (not . validateSrderr $ stderr) $
+    error $ "stderr validation failed"

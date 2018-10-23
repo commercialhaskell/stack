@@ -132,20 +132,23 @@ stackErrStderr args check = do
         then error "Stack process succeeded, but it shouldn't"
         else check err
 
-stackStdout :: [String] -> IO (ExitCode, String)
-stackStdout args = do
-    stackExe' <- stackExe
-    logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, out, err) <- readProcessWithExitCode stackExe' args ""
+runEx :: FilePath -> String -> IO (ExitCode, String, String)
+runEx cmd args = runEx' cmd $ words args
+
+runEx' :: FilePath -> [String] -> IO (ExitCode, String, String)
+runEx' cmd args = do
+    logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, out, err) <- readProcessWithExitCode cmd args ""
     putStr out
     hPutStr stderr err
-    return (ec, out)
+    return (ec, out, err)
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
 stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
-    (ec, out) <- stackStdout args
+    stackExe' <- stackExe
+    (ec, out, _) <- runEx' stackExe' args
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
         else check out
