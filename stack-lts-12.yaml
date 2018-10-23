@@ -1,0 +1,23 @@
+resolver: snapshot-lts-12.yaml
+
+packages:
+- .
+- subs/pantry
+- subs/curator
+
+# docker:
+#   enable: true
+#   repo: fpco/stack-full
+# image:
+#   containers:
+#     - base: "fpco/stack-base" # see ./etc/docker/stack-base/Dockerfile
+#       name: "fpco/stack-test"
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+
+ghc-options:
+   "$locals": -fhide-source-paths

@@ -71,26 +71,25 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
         dir = tmpdir </> suffix
         tarball = tmpdir </> "foo.tar"
 
-    let (commandName, cloneArgs, resetArgs, archiveArgs) =
+    let (commandName, resetArgs, submoduleArgs, archiveArgs) =
           case repoType' of
             RepoGit ->
               ( "git"
-              , ["--recursive"]
               , ["reset", "--hard", T.unpack commit]
+              , Just ["submodule", "update", "--init", "--recursive"]
               , ["archive", "-o", tarball, "HEAD"]
               )
             RepoHg ->
               ( "hg"
-              , []
               , ["update", "-C", T.unpack commit]
+              , Nothing
               , ["archive", tarball, "-X", ".hg_archival.txt"]
               )
 
+    let runCommand args = void $ proc commandName args readProcess_
+
     logInfo $ "Cloning " <> display commit <> " from " <> display url
-    void $ proc
-      commandName
-      ("clone" : cloneArgs ++ [T.unpack url, suffix])
-      readProcess_
+    runCommand ("clone" : [T.unpack url, suffix])
     -- On Windows 10, an upstream issue with the `git clone` command means that
     -- command clears, but does not then restore, the
     -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
@@ -100,8 +99,14 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
     unless created $ throwIO $ FailedToCloneRepo repo
 
     withWorkingDir dir $ do
-      void $ proc commandName resetArgs readProcess_
-      void $ proc commandName archiveArgs readProcess_
+      runCommand resetArgs
+      traverse_ runCommand submoduleArgs
+      -- On Windows 10, an upstream issue with the `git submodule` command means
+      -- that command clears, but does not then restore, the
+      -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+      -- folowing hack re-enables the lost ANSI-capability.
+      when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
+      runCommand archiveArgs
     abs' <- resolveFile' tarball
     getArchive
       (PLIRepo repo pm)

@@ -91,17 +91,26 @@ Bug fixes:
 * Fix `subdirs` for git repos in `extra-deps` to match whole directory names.
   Also fixes for `subdirs: .`. See
   [#4292](https://github.com/commercialhaskell/stack/issues/4292)
+* Fix for git packages to update submodules to the correct state. See
+  [#4314](https://github.com/commercialhaskell/stack/pull/4314)
+* Add `--cabal-files` flag to `stack ide targets` command.
 
 
-## v1.9.0.1 (release candidate)
+## v1.9.1
 
 Release notes:
 
+* Statically linked Linux bindists are back again, thanks to [@nh2](https://github.com/nh2).
 * We will be deleting the Ubuntu, Debian, CentOS, Fedora, and Arch package repos from `download.fpcomplete.com` soon.  These have been deprecated for over a year and have not received new releases, but were left in place for compatibility with older scripts.
 
 Major changes:
 
-* `GHCJS` support is being downgraded to 'experimental'. At time of writing the upcoming release is 1.8. A warning notifying the user of the experimental status of `GHCJS` will be incorporated into 1.8.
+* Upgrade to Cabal 2.4
+    * Note that, in this process, the behavior of file globbing has
+      been modified to match that of Cabal. In particular, this means
+      that for Cabal spec versions less than 2.4, `*.txt` will
+      match `foo.txt`, but not `foo.2.txt`.
+* `GHCJS` support is being downgraded to 'experimental'. A warning notifying the user of the experimental status of `GHCJS` will be displayed.
 
 Behavior changes:
 
@@ -167,14 +176,12 @@ Other enhancements:
 * The default retry strategy has changed to exponential backoff.
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
-* [#4039](https://github.com/commercialhaskell/stack/issues/4039)
-  `stack new` now allows template names of the form `username/foo` to
+* `stack new` now allows template names of the form `username/foo` to
   download from a user other than `commercialstack` on Github, and can be prefixed
-  with the service `github:`, `gitlab:`, or `bitbucket:`.
+  with the service `github:`, `gitlab:`, or `bitbucket:`.  [#4039](https://github.com/commercialhaskell/stack/issues/4039)
 * Switch to `githash` to include some unmerged bugfixes in `gitrev`
-* [#3685](https://github.com/commercialhaskell/stack/issues/3685)
   Suggestion to add `'allow-newer': true` now shows path to user config
-  file where this flag should be put into
+  file where this flag should be put into [#3685](https://github.com/commercialhaskell/stack/issues/3685)
 * `stack ghci` now asks which main target to load before doing the build,
   rather than after
 * Bump to hpack 0.29.0

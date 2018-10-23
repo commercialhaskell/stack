@@ -13,5 +13,5 @@ main = do
       run "cabal" ["install", "./acme-dont-1.1"]
       removeDirectoryRecursive "acme-dont-1.1"
       removeFileIgnore "stack.yaml"
-      stack ["--install-ghc", "init", "--solver"]
+      stack ["--install-ghc", "init", "--solver", defaultResolverArg]
       stack ["build"]

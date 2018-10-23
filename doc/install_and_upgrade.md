@@ -2,7 +2,7 @@
 
 # Install/upgrade
 
-For common Un*x operating systems (including macOS), all you need to do is run:
+For common Un\*x operating systems (including macOS), all you need to do is run:
 
     curl -sSL https://get.haskellstack.org/ | sh
 
@@ -51,9 +51,7 @@ starting" warning when you try to run the installer. If so, click on
 
 ## macOS
 
-We generally test on the current version of macOS, but Stack is known to work
-on Sierra, El Capitan, Yosemite and Mavericks as well, and may also work on older
-versions (YMMV).
+We generally test on the current version of macOS and do our best to keep it compatible with the three most recent major versions.  Stack may also work on older versions (YMMV).
 
 ### Installer script
 
