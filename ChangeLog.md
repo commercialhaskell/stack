@@ -11,6 +11,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Support KDE Neon distribution in installer.
+  [#4371](https://github.com/commercialhaskell/stack/pull/4371)
+
 Bug fixes:
 
 * Handle a change in GHC's hi-dump format around `addDependentFile`,
