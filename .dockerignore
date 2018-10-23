@@ -2,4 +2,3 @@
 /cabal*.config
 /dist
 /target
-/test/integration/tests/4085-*

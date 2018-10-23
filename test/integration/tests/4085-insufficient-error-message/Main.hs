@@ -81,19 +81,19 @@ spaceInMBJustEnoughToFailInTheExactMoment :: Int
 spaceInMBJustEnoughToFailInTheExactMoment = 2000
 
 main :: IO ()
-main = do  
+main = do
   buildDockerImageWithStackSourceInside imageTag
   (ec, _, stderr) <- withDockerVolume
     spaceInMBJustEnoughToFailInTheExactMoment
     (\volumeName ->
         runDockerContainerWithVolume imageTag volumeName "/app" $
           "stack"
-          ++ " --stack-root /app"
+          ++ " --stack-root " ++ "/app"
           ++ " --resolver nightly-2018-06-05"
           ++ " --no-terminal"
           ++ " --install-ghc"
           ++ " test")
-  when (ec == ExitSuccess) $
+  unless (ec /= ExitSuccess) $
     error $ "stack process succeeded, but it shouldn't"
-  when (not . validateSrderr $ stderr) $
+  unless (validateSrderr stderr) $
     error $ "stderr validation failed"

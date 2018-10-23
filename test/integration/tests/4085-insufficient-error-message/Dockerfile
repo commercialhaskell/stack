@@ -1,20 +1,19 @@
 FROM fpco/stack-build:lts
 
+WORKDIR ./src
+
 # we should pre-build stack dependencies before coping the rest of the source
-# so we will not build dependencies every time the source changes
-COPY *.yaml               /src/
-COPY subs/curator/*.yaml  /src/subs/curator/
-COPY subs/pantry/*.yaml   /src/subs/pantry/
-RUN cd ./src                                            && \
-    for i in $(stack ls dependencies | sed 's/ /-/g');  \
+# so we will not build the dependencies every time the source changes
+COPY *.yaml               ./
+COPY subs/curator/*.yaml  ./subs/curator/
+COPY subs/pantry/*.yaml   ./subs/pantry/
+RUN for i in $(stack ls dependencies | sed 's/ /-/g');  \
       do stack build --fast $i;                         \
       done
 
-COPY . /src/
+COPY . ./
+RUN stack build --fast
+# we can't use 'stack install' to install stack so we're installing it manually
+RUN cp -a $(dirname $(stack exec which stack))/. $(dirname $(which stack))
 
-RUN cd ./src                                            && \
-    stack build --fast
-
-# we can't use install to install stack so we are installing it manually
-RUN cd ./src                                            && \
-    cp -a $(dirname $(stack exec which stack))/. $(dirname $(which stack))
+WORKDIR ..
