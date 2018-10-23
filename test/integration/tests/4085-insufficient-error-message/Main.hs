@@ -27,10 +27,10 @@ createDockerVolume sizeInMB = do
 removeDockerVolume :: Int -> String -> IO ()
 removeDockerVolume attempts name | attempts <= 0 =
   error $ "Can't remove docker volume " ++ name
-removeDockerVolume attempts name | otherwise = do
+removeDockerVolume attempts name = do
   (ec, _, stderr) <- runEx "docker" $ "volume rm --force " ++ name
-  let wasRemoved = (ec == ExitSuccess) || (isInfixOf "No such volume" stderr)
-  when (not wasRemoved) $
+  let wasRemoved = (ec == ExitSuccess) || isInfixOf "No such volume" stderr
+  unless wasRemoved $
     threadDelay 3000000 >> -- sometimes docker releases a volume slowly
     removeDockerVolume (attempts - 1) name
 
@@ -72,7 +72,7 @@ runDockerContainerWithVolume imageTag volumeName volumeLocation cmd =
     ++ " " ++ cmd
 
 validateSrderr :: String -> Bool
-validateSrderr stderr = isInfixOf "No space left on device" stderr
+validateSrderr = isInfixOf "No space left on device"
 
 imageTag :: String
 imageTag = "4085-fix"
@@ -94,6 +94,6 @@ main = do
           ++ " --install-ghc"
           ++ " test")
   unless (ec /= ExitSuccess) $
-    error $ "stack process succeeded, but it shouldn't"
+    error "stack process succeeded, but it shouldn't"
   unless (validateSrderr stderr) $
-    error $ "stderr validation failed"
+    error "stderr validation failed"
