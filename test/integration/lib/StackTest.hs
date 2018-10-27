@@ -25,6 +25,13 @@ run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+runShell :: HasCallStack => String -> IO ()
+runShell cmd = do
+    logInfo $ "Running: " ++ cmd
+    (Nothing, Nothing, Nothing, ph) <- createProcess (shell cmd)
+    ec <- waitForProcess ph
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
@@ -251,3 +258,12 @@ removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
+
+-- | Changes working directory to Stack source directory
+withSourceDirectory :: IO () -> IO ()
+withSourceDirectory action = do
+  dir <- stackSrc
+  currentDirectory <- getCurrentDirectory
+  let enterDir = setCurrentDirectory dir
+      exitDir = setCurrentDirectory currentDirectory
+  bracket_ enterDir exitDir action

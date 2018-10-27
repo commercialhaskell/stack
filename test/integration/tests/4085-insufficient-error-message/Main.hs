@@ -11,9 +11,6 @@ import Control.Monad (guard, when, unless, msum)
 import Control.Concurrent (threadDelay)
 import Data.List (isInfixOf, delete, repeat)
 
-wrun :: FilePath -> String -> IO ()
-wrun cmd args = run cmd $ words args
-
 createDockerVolume :: Int -> IO String
 createDockerVolume sizeInMB = do
   (ec, stdout, stderr) <- runEx "docker" $ "volume create"
@@ -38,24 +35,19 @@ withDockerVolume :: Int -> (String -> IO a) -> IO a
 withDockerVolume sizeInMB =
   bracket (createDockerVolume sizeInMB) (removeDockerVolume 5)
 
-withSourceDirectory :: IO () -> IO ()
-withSourceDirectory action = do
-  stackSrc <- stackSrc
-  currentDirectory <- getCurrentDirectory
-  let enterDir = setCurrentDirectory stackSrc
-      exitDir = setCurrentDirectory currentDirectory
-  bracket_ enterDir exitDir action
-
 buildDockerImageWithStackSourceInside :: String -> IO ()
-buildDockerImageWithStackSourceInside tag = withSourceDirectory $
-  testDir >>= (
-    \testDir -> wrun
-      "docker" $ "build"
-      ++ " --file " ++ (testDir </> "Dockerfile")
-      ++ " --tag " ++ tag
-      ++ " --memory-swap -1"
-      ++ " ."
-      )
+buildDockerImageWithStackSourceInside tag = withSourceDirectory $ do
+  dir <- testDir
+  runShell ("docker build"
+            ++ " --file " ++ (dir </> "Dockerfile")
+            ++ " --tag " ++ tag
+            ++ " --memory-swap -1"
+            ++ " .")
+  removeDanglingImages
+
+removeDanglingImages :: IO ()
+removeDanglingImages =
+  runShell "docker rmi -f $(docker images --quiet --filter 'dangling=true')"
 
 runDockerContainerWithVolume
   :: String
