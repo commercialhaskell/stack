@@ -412,7 +412,7 @@ GETDISTRO
   fi
 
   case "$DISTRO" in
-    ubuntu|linuxmint|elementary)
+    ubuntu|linuxmint|elementary|neon)
       do_ubuntu_install "$VERSION"
       ;;
     debian|kali|raspbian)
