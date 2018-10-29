@@ -57,9 +57,8 @@ import           System.Terminal (fixCodePage)
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
-      -> BuildOptsCLI
       -> RIO env ()
-build msetLocalFiles mbuildLk boptsCli = do
+build msetLocalFiles mbuildLk = do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -87,6 +86,7 @@ build msetLocalFiles mbuildLk boptsCli = do
                          , getInstalledSymbols   = symbols }
                      installMap
 
+    boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 

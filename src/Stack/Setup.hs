@@ -22,6 +22,7 @@ module Stack.Setup
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars
+  , withNewLocalBuildTargets
 
   -- * Stack binary download
   , StackReleaseInfo
@@ -89,6 +90,7 @@ import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.Runner
+import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
@@ -215,8 +217,8 @@ setupEnv :: (HasBuildConfig env, HasGHCVariant env)
          -> RIO env EnvConfig
 setupEnv needTargets boptsCLI mResolveMissingGHC = do
     config <- view configL
-    bconfig <- view buildConfigL
-    let stackYaml = bcStackYaml bconfig
+    bc <- view buildConfigL
+    let stackYaml = bcStackYaml bc
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
     wc <- view $ wantedCompilerVersionL.to wantedToActual.whichCompilerL
@@ -253,16 +255,16 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
 
-    smActual <- toActual (bcSMWanted bconfig) compilerVer
+    smActual <- toActual (bcSMWanted bc) compilerVer
 
     logDebug "Resolving package entries"
-    bc <- view buildConfigL
 
     targets <- parseTargets needTargets boptsCLI smActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
+            , envConfigBuildOptsCLI = boptsCLI
             , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = compilerBuild
             }
@@ -341,19 +343,46 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
     envOverride <- liftIO $ getProcessContext' minimalEnvSettings
     return EnvConfig
-        { envConfigBuildConfig = bconfig
+        { envConfigBuildConfig = bc
             { bcConfig = maybe id addIncludeLib mghcBin
                        $ set processContextL envOverride
-                         (view configL bconfig)
+                         (view configL bc)
                 { configProcessContextSettings = getProcessContext'
                 }
             }
         , envConfigCabalVersion = cabalVer
+        , envConfigBuildOptsCLI = boptsCLI
         , envConfigSourceMap = sourceMap
         , envConfigCompilerBuild = compilerBuild
---        , envConfigLoadedSnapshot = ls
---        , envConfigSMActual = smActual
         }
+
+-- | special helper for GHCJS which needs an updated source map
+-- only project dependencies should get included otherwise source map hash will
+-- get changed and EnvConfig will become inconsistent
+rebuildEnv :: EnvConfig
+    -> NeedTargets
+    -> BuildOptsCLI
+    -> RIO env EnvConfig
+rebuildEnv envConfig needTargets boptsCLI = do
+    let bc = envConfigBuildConfig envConfig
+        compilerVer = smCompiler $ envConfigSourceMap envConfig
+    runRIO bc $ do
+        smActual <- toActual (bcSMWanted bc) compilerVer
+        targets <- parseTargets needTargets boptsCLI smActual
+        sourceMap <- loadSourceMap targets boptsCLI smActual
+        return $
+            envConfig
+            {envConfigSourceMap = sourceMap, envConfigBuildOptsCLI = boptsCLI}
+
+-- | Some commands (script, ghci and exec) set targets dynamically
+-- see also the note about only local targets for rebuildEnv
+withNewLocalBuildTargets :: HasEnvConfig  env => [Text] -> RIO env a -> RIO env a
+withNewLocalBuildTargets targets f = do
+    envConfig <- view $ envConfigL
+    let boptsCLI = envConfigBuildOptsCLI envConfig
+    envConfig' <- rebuildEnv envConfig NeedTargets $
+                  boptsCLI {boptsCLITargets = targets}
+    local (set envConfigL envConfig') f
 
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
@@ -1203,7 +1232,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
           _ -> return Nothing
 
       logSticky "Installing GHCJS (this will take a long time) ..."
-      buildInGhcjsEnv envConfig' defaultBuildOptsCLI
+      buildInGhcjsEnv envConfig'
       -- Copy over *.options files needed on windows.
       forM_ mwindowsInstallDir $ \dir -> do
           (_, files) <- listDir (dir </> relDirBin)
@@ -1299,7 +1328,9 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
           [ "happy" | shouldInstallHappy ]
     when (not (null bootDepsToInstall)) $ do
         logInfo $ "Building tools from source, needed for ghcjs-boot: " <> displayShow bootDepsToInstall
-        buildInGhcjsEnv envConfig $ defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
+        envConfig' <- rebuildEnv envConfig NeedTargets $
+                      defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
+        buildInGhcjsEnv envConfig'
         let failedToFindErr = do
                 logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
                 liftIO exitFailure
@@ -1344,14 +1375,14 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing -- FIXME:qrilka check if those are safe defaults
+        envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
 
-buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()
-buildInGhcjsEnv envConfig boptsCli = do
+buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> m ()
+buildInGhcjsEnv envConfig = do
     runRIO (set (buildOptsL.buildOptsInstallExesL) True $
             set (buildOptsL.buildOptsHaddockL) False envConfig) $
-        build Nothing Nothing boptsCli
+        build Nothing Nothing
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do

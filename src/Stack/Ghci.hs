@@ -40,6 +40,7 @@ import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.PrettyPrint
+import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -340,17 +341,13 @@ getAllNonLocalTargets targets = do
   return $ map fst $ filter (isNonLocal . snd) (M.toList targets)
 
 buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
-buildDepsAndInitialSteps GhciOpts{..} targets0 = do
-    let targets = targets0 ++ map T.pack ghciAdditionalPackages
+buildDepsAndInitialSteps GhciOpts{..} localTargets = do
+    let targets = localTargets ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
-        eres <- tryAny $ build Nothing Nothing defaultBuildOptsCLI
-            { boptsCLITargets = targets
-            , boptsCLIInitialBuildSteps = True
-            , boptsCLIFlags = ghciFlags
-            , boptsCLIGhcOptions = ghciGhcOptions
-            }
+        -- only new local targets could appear here
+        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing Nothing
         case eres of
             Right () -> return ()
             Left err -> do

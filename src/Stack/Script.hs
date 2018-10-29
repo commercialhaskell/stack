@@ -22,6 +22,7 @@ import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.PackageDump
 import           Stack.Options.ScriptParser
 import           Stack.Runners
+import           Stack.Setup                (withNewLocalBuildTargets)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -87,9 +88,8 @@ scriptCmd opts go' = do
                 then logDebug "All packages already installed"
                 else do
                     logDebug "Missing packages, performing installation"
-                    Stack.Build.build Nothing lk defaultBuildOptsCLI
-                        { boptsCLITargets = map (T.pack . packageNameString) $ Set.toList targetsSet
-                        }
+                    let targets = map (T.pack . packageNameString) $ Set.toList targetsSet
+                    withNewLocalBuildTargets targets $ Stack.Build.build Nothing lk
 
         let ghcArgs = concat
                 [ ["-hide-all-packages"]

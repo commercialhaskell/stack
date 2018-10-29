@@ -92,6 +92,7 @@ import qualified Stack.PrettyPrint as PP (style)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
+import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Snapshot (loadResolver)
@@ -654,7 +655,7 @@ buildCmd opts go = do
     NoFileWatch -> inner Nothing
   where
     inner setLocalFiles = withBuildConfigAndLock go' NeedTargets opts $ \lk ->
-        Stack.Build.build setLocalFiles lk opts
+        Stack.Build.build setLocalFiles lk
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
                Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) go
@@ -829,8 +830,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                            { boptsCLITargets = map T.pack targets
                            }
             withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
-              unless (null targets) $
-                  Stack.Build.build Nothing lk boptsCLI
+              unless (null targets) $ Stack.Build.build Nothing lk
 
               config <- view configL
               menv <- liftIO $ configProcessContextSettings config eoEnvSettings
@@ -877,7 +877,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                                 firstExe = listToMaybe executables
           case exe of
               Just (CExe exe') -> do
-                Stack.Build.build Nothing Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
+                withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing Nothing
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
@@ -908,7 +908,9 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   let boptsCLI = defaultBuildOptsCLI
-          { boptsCLITargets = [] -- FIXME:qrilka really?
+          -- using only additional packages, targets then get overriden in `ghci`
+          { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
+          , boptsCLIInitialBuildSteps = True
           , boptsCLIFlags = ghciFlags ghciOpts
           , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
           }
@@ -977,11 +979,7 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
         defaultBuildOptsCLI
         Nothing
         (\lk ->
-              do when rebuild $
-                     Stack.Build.build
-                         Nothing
-                         lk
-                         defaultBuildOptsCLI
+              do when rebuild $ Stack.Build.build Nothing lk
                  Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 

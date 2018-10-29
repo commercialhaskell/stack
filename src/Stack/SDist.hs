@@ -454,24 +454,12 @@ buildExtractedTarball pkgDir = do
   pp <- mkProjectPackage YesPrintWarnings pkgDir
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              { --envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
-                envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
+              { envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
               }
         in set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
         sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
-{-
-      updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = Map.insert (ppName pp) pp pathsToKeep
-        , bcConfig = (bcConfig buildConfig)
-                     { configBuild = defaultBuildOpts
-                       { boptsTests = True
-                       }
-                     }
-        }
--}
-  local adjustEnvForBuild $
-    build Nothing Nothing defaultBuildOptsCLI
+  local adjustEnvForBuild $ build Nothing Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.

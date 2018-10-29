@@ -516,6 +516,7 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
+    ,envConfigBuildOptsCLI :: !BuildOptsCLI
     ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !CompilerBuild
 --    ,envConfigSMActual :: !SMActual
