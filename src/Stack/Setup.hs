@@ -1101,7 +1101,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
           let logLines lvl = CB.lines .| CL.mapM_ (lvl . displayBytesUtf8)
               logStdout = logLines logDebug
               logStderr = logLines logError
-          _ <-  withWorkingDir (toFilePath wd) $
+          void $ withWorkingDir (toFilePath wd) $
                 withProcessContext menv' $
                 sinkProcessStderrStdout cmd args logStderr logStdout
                 `catchAny` \ex -> do
@@ -1125,7 +1125,6 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                     "For more information consider rerunning with --verbose flag"
                     <> line
                   liftIO exitFailure
-          return ()
 
     logSticky $
       "Unpacking GHC into " <>
