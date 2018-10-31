@@ -8,6 +8,7 @@
 module Stack.Clean
     (clean
     ,CleanOpts(..)
+    ,CleanCommand(..)
     ,StackCleanException(..)
     ) where
 
@@ -60,6 +61,11 @@ data CleanOpts
     -- should be cleaned.
     | CleanFull
     -- ^ Delete all work directories in the project.
+
+-- | Clean commands
+data CleanCommand
+    = Clean
+    | Purge
 
 -- | Exceptions during cleanup.
 newtype StackCleanException

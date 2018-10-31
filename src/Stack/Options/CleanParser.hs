@@ -2,13 +2,13 @@
 module Stack.Options.CleanParser where
 
 import           Options.Applicative
-import           Stack.Clean                       (CleanOpts (..))
+import           Stack.Clean                       (CleanCommand(..), CleanOpts (..))
 import           Stack.Prelude
 import           Stack.Types.PackageName
 
 -- | Command-line parser for the clean command.
-cleanOptsParser :: Parser CleanOpts
-cleanOptsParser = CleanShallow <$> packages <|> doFullClean
+cleanOptsParser :: CleanCommand -> Parser CleanOpts
+cleanOptsParser Clean = CleanShallow <$> packages <|> doFullClean
   where
     packages =
         many
@@ -20,3 +20,5 @@ cleanOptsParser = CleanShallow <$> packages <|> doFullClean
             CleanFull
             (long "full" <>
              help "Delete all work directories (.stack-work by default) in the project")
+
+cleanOptsParser Purge = pure CleanFull

@@ -53,7 +53,7 @@ import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (style)
 import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
-import           Stack.Clean (CleanOpts(..), clean)
+import           Stack.Clean (CleanCommand(..), CleanOpts(..), clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
@@ -405,7 +405,11 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addCommand' "clean"
                     "Clean the local packages"
                     cleanCmd
-                    cleanOptsParser
+                    (cleanOptsParser Clean)
+        addCommand' "purge"
+                    "Delete all work directories (.stack-work by default) in the project. Shortcut for 'stack clean --full'"
+                    cleanCmd
+                    (cleanOptsParser Purge)
         addCommand' "list-dependencies"
                     "List the dependencies"
                     (listDependenciesCmd True)
