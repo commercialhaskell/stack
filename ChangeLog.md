@@ -19,6 +19,7 @@ Bug fixes:
 * Handle a change in GHC's hi-dump format around `addDependentFile`,
   which now includes a hash. See
   [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
+* Allow variables to appear in template file names.
 
 
 ## v1.9.1

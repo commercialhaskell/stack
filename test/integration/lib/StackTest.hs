@@ -234,3 +234,10 @@ removeFileIgnore fp = removeFile fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
+
+-- | Remove a directory tree and ignore any warnings about missing files.
+removeDirectoryRecursiveIgnore :: FilePath -> IO ()
+removeDirectoryRecursiveIgnore fp = removeDirectoryRecursive fp `catch` \e ->
+  if isDoesNotExistError e
+    then return ()
+    else throwIO e
