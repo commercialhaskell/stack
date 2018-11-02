@@ -407,7 +407,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     cleanCmd
                     (cleanOptsParser Clean)
         addCommand' "purge"
-                    "Delete all work directories (.stack-work by default) in the project. Shortcut for 'stack clean --full'"
+                    "Delete the local stack working directory (.stack-work by default). Shortcut for 'stack clean --full'"
                     cleanCmd
                     (cleanOptsParser Purge)
         addCommand' "list-dependencies"
