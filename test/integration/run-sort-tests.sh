@@ -9,6 +9,8 @@ export STACK_ROOT=$HOME/.stack
 DIR=$(pwd)
 STACK=$(stack exec which stack)
 
+export SRC_DIR=$DIR/../../
+
 mkdir -p tests-success
 mkdir -p tests-fail
 mkdir -p logs
@@ -22,6 +24,7 @@ do
         mkdir -p "$f/files"
         cd "$f/files"
         echo Running test $f
+        export TEST_DIR=$DIR/tests/$f
         $STACK --stack-yaml $DIR/../../stack.yaml runghc --no-ghc-package-path -- -i../../../lib ../Main.hs > $DIR/logs/$f 2>&1
         RES=$?
         cd "$DIR/tests"

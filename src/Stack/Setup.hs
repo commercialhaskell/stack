@@ -1097,29 +1097,34 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
         "ghc-" ++ versionString version
 
     let runStep step wd env cmd args = do
-            menv' <- modifyEnvVars menv (Map.union env)
-            result <- do
-                let logLines = CB.lines .| CL.mapM_ (logDebug . displayBytesUtf8)
-                withWorkingDir (toFilePath wd)
-                  $ withProcessContext menv'
-                  $ try
-                  $ sinkProcessStderrStdout cmd args logLines logLines
-
-            case result of
-                Right ((), ()) -> return ()
-                Left ex -> do
-                    logError (displayShow (ex :: ProcessException))
-                    prettyError $
-                        hang 2
-                          ("Error encountered while" <+> step <+> "GHC with" <> line <>
-                           style Shell (fromString (unwords (cmd : args))) <> line <>
-                           -- TODO: Figure out how to insert \ in the appropriate spots
-                           -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
-                           "run in " <> pretty wd) <> line <> line <>
-                        "The following directories may now contain files, but won't be used by stack:" <> line <>
-                        "  -" <+> pretty tempDir <> line <>
-                        "  -" <+> pretty destDir <> line
-                    liftIO exitFailure
+          menv' <- modifyEnvVars menv (Map.union env)
+          let logLines lvl = CB.lines .| CL.mapM_ (lvl . displayBytesUtf8)
+              logStdout = logLines logDebug
+              logStderr = logLines logError
+          void $ withWorkingDir (toFilePath wd) $
+                withProcessContext menv' $
+                sinkProcessStderrStdout cmd args logStderr logStdout
+                `catchAny` \ex -> do
+                  logError $ displayShow ex
+                  prettyError $ hang 2 (
+                      "Error encountered while" <+> step <+> "GHC with"
+                      <> line <>
+                      style Shell (fromString (unwords (cmd : args)))
+                      <> line <>
+                      -- TODO: Figure out how to insert \ in the appropriate spots
+                      -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
+                      "run in " <> pretty wd
+                      )
+                    <> line <> line <>
+                    "The following directories may now contain files, but won't be used by stack:"
+                    <> line <>
+                    "  -" <+> pretty tempDir
+                    <> line <>
+                    "  -" <+> pretty destDir
+                    <> line <> line <>
+                    "For more information consider rerunning with --verbose flag"
+                    <> line
+                  liftIO exitFailure
 
     logSticky $
       "Unpacking GHC into " <>

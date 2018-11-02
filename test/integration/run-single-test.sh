@@ -10,6 +10,9 @@ unset GHC_PACKAGE_PATH
 DIR=$(pwd)
 STACK=$(stack exec which stack)
 
+export SRC_DIR=$DIR/../../
+export TEST_DIR=$DIR/tests/$1
+
 if [[ ! -d "tests/$1" ]]
 then
     echo Test does not exist: $1
