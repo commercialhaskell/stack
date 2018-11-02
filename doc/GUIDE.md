@@ -280,6 +280,23 @@ As you can see from that path (and as emphasized earlier), the installation is
 placed to not interfere with any other GHC installation, whether system-wide or
 even different GHC versions installed by stack.
 
+## Cleaning your project
+You can clean up build artifacts for your project using the `stack clean` and `stack purge`.
+
+### `stack clean`
+`stack clean` Deletes the local working directories containing compiler output. 
+(typically '.stack-work/dist' by default)
+
+Use `stack clean <specific-package>` to delete the output for a package specific-package only.
+
+### `stack purge`
+`stack purge` Deletes the local stack working directory, including extra-deps, git dependencies and the compiler output. 
+It does not delete any snapshot packages, compilers or installed programs. -- This essentially
+reverts your project to a completely fresh state, as if it had never been built. 
+`stack purge` is just a shortcut for `stack clean --full`
+
+- Note: `stack purge` is not available when used in docker
+
 ### The build command
 
 The build command is the heart and soul of stack. It is the engine that powers
