@@ -237,8 +237,8 @@ splitObjsWarning = unwords
      ]
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
-mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
-                 => BuildOptsCLI -> m BaseConfigOpts
+mkBaseConfigOpts :: (HasEnvConfig env)
+                 => BuildOptsCLI -> RIO env BaseConfigOpts
 mkBaseConfigOpts boptsCli = do
     bopts <- view buildOptsL
     snapDBPath <- packageDatabaseDeps

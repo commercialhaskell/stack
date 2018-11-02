@@ -18,11 +18,8 @@ module Stack.Types.SourceMap
   , CommonPackage (..)
   , GlobalPackage (..)
   , SourceMapHash (..)
-    -- * Functions
-  , hashSourceMap
   ) where
 
-import qualified Pantry.SHA256 as SHA256
 import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.NamedComponent
@@ -34,7 +31,7 @@ data CommonPackage = CommonPackage
   , cpName :: !PackageName
   , cpFlags :: !(Map FlagName Bool)
   -- ^ overrides default flags
-  , cpGhcOptions :: ![Text]
+  , cpGhcOptions :: ![Text] -- also lets us know if we're doing profiling
   }
 
 -- | A view of a dependency package, specified in stack.yaml
@@ -112,7 +109,3 @@ data SourceMap = SourceMap
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.
 newtype SourceMapHash = SourceMapHash SHA256
-
--- | Get a 'SourceMapHash' for a given 'SourceMap'
-hashSourceMap :: SourceMap -> SourceMapHash
-hashSourceMap _ = SourceMapHash $ SHA256.hashBytes "FIXME:qrilka"

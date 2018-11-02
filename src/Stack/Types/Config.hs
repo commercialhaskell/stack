@@ -220,7 +220,10 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
+import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable,
+                              proc, readProcess_)
+import qualified RIO.ByteString as B
+import qualified RIO.ByteString.Lazy as BL
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -1184,7 +1187,7 @@ globalHintsFile = do
   pure $ root </> relDirGlobalHints </> relFileGlobalHintsYaml
 
 -- | Installation root for dependencies
-installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+installationRootDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 installationRootDeps = do
     root <- view stackRootL
     -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
@@ -1192,7 +1195,7 @@ installationRootDeps = do
     return $ root </> relDirSnapshots </> psc
 
 -- | Installation root for locals
-installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+installationRootLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 installationRootLocal = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
@@ -1213,25 +1216,92 @@ bindirCompilerTools = do
         bindirSuffix
 
 -- | Hoogle directory.
-hoogleRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+hoogleRoot :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 hoogleRoot = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
     return $ workDir </> relDirHoogle </> psc
 
 -- | Get the hoogle database path.
-hoogleDatabasePath :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs File)
+hoogleDatabasePath :: (HasEnvConfig env) => RIO env (Path Abs File)
 hoogleDatabasePath = do
     dir <- hoogleRoot
     return (dir </> relFileDatabaseHoo)
 
+-- | Get a 'SourceMapHash' for a given 'SourceMap'
+--
+-- Basic rules:
+--
+-- * If someone modifies a GHC installation in any way after Stack
+--   looks at it, they voided the warranty. This includes installing a
+--   brand new build to the same directory, or registering new
+--   packages to the global database.
+--
+-- * We should include everything in the hash that would relate to
+--   immutable packages and identifying the compiler itself. Mutable
+--   packages (both project packages and dependencies) will never make
+--   it into the snapshot database, and can be ignored.
+--
+-- * Target information is only relevant insofar as it effects the
+--   dependency map. The actual current targets for this build are
+--   irrelevant to the cache mechanism, and can be ignored.
+--
+-- * Make sure things like profiling and haddocks are included in the hash
+--
+-- FIXME: move all caclucated in IO parts into the source map itself so
+-- this function could be made pure
+hashSourceMap
+    :: (HasConfig env)
+    => SourceMap
+    -> RIO env SourceMapHash
+hashSourceMap SourceMap {..} = do
+    let wc = whichCompiler smCompiler
+    path <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
+    let compilerExe =
+            case wc of
+                Ghc -> "ghc"
+                Ghcjs -> "ghcjs"
+    info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
+    immDeps <-
+        fmap B.concat . forM (Map.elems smDeps) $ depPackageHashableContent
+    return $ SourceMapHash (SHA256.hashBytes $ B.concat [path, info, immDeps])
+
+depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
+depPackageHashableContent DepPackage {..} = do
+    case dpLocation of
+        PLMutable _ -> return ""
+        PLImmutable pli -> do
+            pli' <- completePackageLocation pli
+            let flagToBs (f, enabled) =
+                    if enabled
+                        then ""
+                        else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
+                flags = map flagToBs $ Map.toList (cpFlags dpCommon)
+                locationTreeKey (PLIHackage _ (Just tk)) = Just tk
+                locationTreeKey (PLIArchive _ pm)
+                    | Just tk <- pmTreeKey pm = Just tk
+                locationTreeKey (PLIRepo _ pm)
+                    | Just tk <- pmTreeKey pm = Just tk
+                locationTreeKey _ = Nothing
+                treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
+                ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
+                -- FIXME:qrilka what about haddocks?
+            hash <-
+                case locationTreeKey pli' of
+                    Just tk -> pure (treeKeyToBs tk)
+                    Nothing ->
+                        throwString
+                            "Completing package location produced result with no Pantry tree key"
+            return $ B.concat ([hash] ++ flags ++ ghcOptions)
+
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
 platformSnapAndCompilerRel
-    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
-    => m (Path Rel Dir)
+    :: (HasEnvConfig env)
+    => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to hashSourceMap
+    sm <- view $ envConfigL.to envConfigSourceMap
+    SourceMapHash smh <- hashSourceMap sm
     platform <- platformGhcRelDir
     name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir
@@ -1302,13 +1372,13 @@ compilerVersionDir = do
         ACGhcjs {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
-packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+packageDatabaseDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
     return $ root </> relDirPkgdb
 
 -- | Package database for installing local packages into
-packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+packageDatabaseLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseLocal = do
     root <- installationRootLocal
     return $ root </> relDirPkgdb
@@ -1318,7 +1388,7 @@ packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir
 packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
 
 -- | Directory for holding flag cache information
-flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+flagCacheLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 flagCacheLocal = do
     root <- installationRootLocal
     return $ root </> relDirFlagCache
@@ -1349,8 +1419,8 @@ data GlobalInfoSource
   -- ^ Look up the actual information in the installed compiler
 
 -- | Where HPC reports and tix files get stored.
-hpcReportDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-             => m (Path Abs Dir)
+hpcReportDir :: (HasEnvConfig env)
+             => RIO env (Path Abs Dir)
 hpcReportDir = do
    root <- installationRootLocal
    return $ root </> relDirHpc
@@ -1358,8 +1428,8 @@ hpcReportDir = do
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals
-extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-             => m (Bool -> [Path Abs Dir])
+extraBinDirs :: (HasEnvConfig env)
+             => RIO env (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps
     local' <- installationRootLocal

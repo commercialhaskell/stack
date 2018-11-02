@@ -228,8 +228,8 @@ localSnaptoText :: [String] -> Text
 localSnaptoText xs = T.intercalate "\n" $ L.map T.pack xs
 
 handleLocal
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
-    => LsCmdOpts -> m ()
+    :: (HasEnvConfig env)
+    => LsCmdOpts -> RIO env ()
 handleLocal lsOpts = do
     (instRoot :: Path Abs Dir) <- installationRootDeps
     isStdoutTerminal <- view terminalL

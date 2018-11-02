@@ -270,14 +270,14 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             }
 
     -- extra installation bin directories
-    mkDirs <- runReaderT extraBinDirs envConfig0
+    mkDirs <- runRIO envConfig0 extraBinDirs
     let mpath = Map.lookup "PATH" env
     depsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs False) mpath
     localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
-    deps <- runReaderT packageDatabaseDeps envConfig0
+    deps <- runRIO envConfig0 packageDatabaseDeps
     withProcessContext menv $ createDatabase wc deps
-    localdb <- runReaderT packageDatabaseLocal envConfig0
+    localdb <- runRIO envConfig0 packageDatabaseLocal
     withProcessContext menv $ createDatabase wc localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
