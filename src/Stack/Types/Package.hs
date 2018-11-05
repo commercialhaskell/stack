@@ -260,6 +260,7 @@ data LocalPackage = LocalPackage
     -- either is asked for by the user.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
+    , lpBuildHaddocks :: !Bool
     , lpForceDirty    :: !Bool
     , lpDirtyFiles    :: !(Memoized (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if

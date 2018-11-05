@@ -308,6 +308,7 @@ readLocalPackage pkgDir = do
         , lpTestDeps = Map.empty
         , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
+        , lpBuildHaddocks = False
         , lpForceDirty = False
         , lpDirtyFiles = pure Nothing
         , lpNewBuildCaches = pure Map.empty
@@ -345,6 +346,7 @@ getSDistFileList lp =
             { tcoMissing = Set.empty
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
+        , taskBuildHaddock = False
         , taskPresent = Map.empty
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent $ lpCabalFile lp))
@@ -451,7 +453,7 @@ buildExtractedTarball pkgDir = do
     <- fmap Map.fromList
      $ flip filterM (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
      $ fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd
-  pp <- mkProjectPackage YesPrintWarnings pkgDir
+  pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               { envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)

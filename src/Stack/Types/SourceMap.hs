@@ -32,6 +32,7 @@ data CommonPackage = CommonPackage
   , cpFlags :: !(Map FlagName Bool)
   -- ^ overrides default flags
   , cpGhcOptions :: ![Text] -- also lets us know if we're doing profiling
+  , cpHaddocks :: !Bool
   }
 
 -- | A view of a dependency package, specified in stack.yaml
@@ -101,10 +102,24 @@ data SMTargets = SMTargets
 -- command line flags and GHC options.
 data SourceMap = SourceMap
   { smTargets :: !SMTargets
+    -- ^ Doesn't need to be included in the hash, does not affect the
+    -- source map.
   , smCompiler :: !ActualCompiler
+    -- ^ Need to hash the compiler version _and_ its installation
+    -- path.  Ideally there would be some kind of output from GHC
+    -- telling us some unique ID for the compiler itself.
   , smProject :: !(Map PackageName ProjectPackage)
+    -- ^ Doesn't need to be included in hash, doesn't affect any of
+    -- the packages that get stored in the snapshot database.
   , smDeps :: !(Map PackageName DepPackage)
+    -- ^ Need to hash all of the immutable dependencies, can ignore
+    -- the mutable dependencies.
   , smGlobal :: !(Map PackageName GlobalPackage)
+    -- ^ Doesn't actually need to be hashed, implicitly captured by
+    -- smCompiler. Can be broken if someone installs new global
+    -- packages. We can document that as not supported, _or_ we could
+    -- actually include all of this in the hash and make Stack more
+    -- resilient.
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.

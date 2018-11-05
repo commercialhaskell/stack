@@ -27,6 +27,7 @@ import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
 import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
+import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Target
 import              Stack.Package
 import              Stack.SourceMap
@@ -48,11 +49,12 @@ projectLocalPackages = do
 
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
+    bopts <- view $ configL.to configBuild
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
         case dpLocation dp of
             PLMutable dir -> do
-                pp <- mkProjectPackage YesPrintWarnings dir
+                pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
                 Just <$> loadLocalPackage sourceMap pp
             _ -> return Nothing
 
@@ -66,6 +68,7 @@ loadSourceMap :: HasBuildConfig env
 loadSourceMap smt boptsCli sma = do
     bconfig <- view buildConfigL
     let project = M.map applyOptsFlagsPP $ smaProject sma
+        bopts = configBuild (bcConfig bconfig)
         applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
           p{ppCommon = applyOptsFlags (M.member (cpName c) (smtTargets smt)) True c}
         deps0 = smtDeps smt <> smaDeps sma
@@ -86,6 +89,10 @@ loadSourceMap smt boptsCli sma = do
                      if null ghcOptions
                          then cpGhcOptions common
                          else ghcOptions
+               , cpHaddocks =
+                     if isTarget
+                         then boptsHaddock bopts
+                         else shouldHaddockDeps bopts
                }
         globals = smaGlobal sma `M.difference` smtDeps smt
     return
@@ -285,6 +292,7 @@ loadLocalPackage sm pp = do
         , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
         , lpTestBench = btpkg
         , lpComponentFiles = componentFiles
+        , lpBuildHaddocks = cpHaddocks (ppCommon pp)
         , lpForceDirty = boptsForceDirty bopts
         , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches

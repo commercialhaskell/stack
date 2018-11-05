@@ -197,7 +197,6 @@ data ExecuteEnv = ExecuteEnv
     -- ^ Compiled version of eeSetupHs
     , eeCabalPkgVer    :: !Version
     , eeTotalWanted    :: !Int
-    , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
     , eeGlobalDB       :: !(Path Abs Dir)
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () () ()))
@@ -359,7 +358,6 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = totalWanted
-            , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
             , eeGlobalDB = globalDB
             , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
@@ -784,8 +782,6 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                 case taskType of
                     TTFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTRemote{} -> Set.empty
-            , configCacheHaddock =
-                shouldHaddockPackage eeBuildOpts eeWanted (pkgName taskProvides)
             , configCachePkgSrc = taskCachePkgSrc
             }
         allDepsMap = Map.union missing' taskPresent
@@ -1254,9 +1250,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
   where
     pname = pkgName taskProvides
-    shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
     doHaddock mcurator package
-                      = shouldHaddockPackage' &&
+                      = taskBuildHaddock &&
                         not isFinalBuild &&
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
@@ -1293,7 +1288,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     getPrecompiled cache =
         case taskLocation task of
-            Snap | not shouldHaddockPackage' -> do
+            Snap -> do
                 mpc <-
                   case taskLocation task of
                     Snap -> fmap join $ for (ttPackageLocation taskType) $ \loc -> readPrecompiledCache

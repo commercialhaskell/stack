@@ -390,8 +390,6 @@ data ConfigCache = ConfigCache
       -- ^ The components to be built. It's a bit of a hack to include this in
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
-    , configCacheHaddock :: !Bool
-      -- ^ Are haddocks to be built?
     , configCachePkgSrc :: !CachePkgSrc
     }
     deriving (Generic, Eq, Show, Data, Typeable)
@@ -424,7 +422,7 @@ toCachePkgSrc (SourceLocal lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFil
 toCachePkgSrc SourceRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
+configCacheVC = storeVersionConfig "config-v4" "LbTeTCtFbU0Yc1mbmhAzsIXyPrQ="
 
 -- | A task to perform when building
 data Task = Task
@@ -433,6 +431,7 @@ data Task = Task
     , taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
+    , taskBuildHaddock    :: !Bool
     , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
     -- ^ GhcPkgIds of already-installed dependencies
     , taskAllInOne        :: !Bool

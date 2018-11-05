@@ -212,7 +212,7 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
           Nothing ->
             case Map.lookup pkgName (smDeps sourceMap) of
               Just DepPackage{dpLocation=PLMutable dir} -> do
-                pp <- mkProjectPackage YesPrintWarnings dir
+                pp <- mkProjectPackage YesPrintWarnings dir False
                 pkg <- loadCommonPackage (ppCommon pp)
                 pure (packageAllDeps pkg, payloadFromLocal pkg)
               Just dp@DepPackage{dpLocation=PLImmutable loc} -> do

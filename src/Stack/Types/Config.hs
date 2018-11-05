@@ -1285,14 +1285,14 @@ depPackageHashableContent DepPackage {..} = do
                 locationTreeKey _ = Nothing
                 treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
                 ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
-                -- FIXME:qrilka what about haddocks?
+                haddocks = if cpHaddocks dpCommon then "haddocks" else ""
             hash <-
                 case locationTreeKey pli' of
                     Just tk -> pure (treeKeyToBs tk)
                     Nothing ->
                         throwString
                             "Completing package location produced result with no Pantry tree key"
-            return $ B.concat ([hash] ++ flags ++ ghcOptions)
+            return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.

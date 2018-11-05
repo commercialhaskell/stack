@@ -21,8 +21,9 @@ mkProjectPackage ::
        forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => PrintWarnings
     -> ResolvedPath Dir
+    -> Bool
     -> RIO env ProjectPackage
-mkProjectPackage printWarnings dir = do
+mkProjectPackage printWarnings dir buildHaddocks = do
    (gpd, name, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
    return ProjectPackage
      { ppCabalFP = cabalfp
@@ -32,15 +33,17 @@ mkProjectPackage printWarnings dir = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpHaddocks = buildHaddocks
                   }
      }
 
 -- | Create a 'DepPackage' from a 'PackageLocation'
 mkDepPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocation
+  => Bool
+  -> PackageLocation
   -> RIO env DepPackage
-mkDepPackage pl = do
+mkDepPackage buildHaddocks pl = do
   (name, gpdio) <-
     case pl of
       PLMutable dir -> do
@@ -58,15 +61,17 @@ mkDepPackage pl = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpHaddocks = buildHaddocks
                   }
     }
 
 snapToDepPackage ::
        forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => PackageName
+    => Bool
+    -> PackageName
     -> SnapshotPackage
     -> RIO env DepPackage
-snapToDepPackage name SnapshotPackage{..} = do
+snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
   run <- askRunInIO
   return DepPackage
     { dpLocation = PLImmutable spLocation
@@ -76,6 +81,7 @@ snapToDepPackage name SnapshotPackage{..} = do
                   , cpName = name
                   , cpFlags = spFlags
                   , cpGhcOptions = spGhcOptions
+                  , cpHaddocks = buildHaddocks
                   }
     }
 

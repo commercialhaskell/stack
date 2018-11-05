@@ -235,6 +235,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage sourceMap pp
         return $ SourceLocal lp Local
+      bopts <- view $ configL.to configBuild
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
@@ -244,7 +245,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
           PLMutable dir -> do
             -- FIXME this is not correct, we don't want to treat all Mutable as local
             -- FIXME ^ is from Stack.Build.Source
-            pp <- mkProjectPackage YesPrintWarnings dir
+            pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage sourceMap pp
             return $ SourceLocal lp Snap
       return $ pPackages <> deps
@@ -343,8 +344,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> M ()
-addFinal lp package isAllInOne = do
+addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
+addFinal lp package isAllInOne buildHaddocks = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
@@ -363,6 +364,7 @@ addFinal lp package isAllInOne = do
                             True -- local
                             Local
                             package
+                , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
                 , taskType = TTFilePath lp Local -- FIXME we can rely on this being Local, right?
                 , taskAllInOne = isAllInOne
@@ -474,12 +476,12 @@ installPackage treatAsDep name ps minstalled = do
         SourceRemote pkgLoc _version cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
-            resolveDepsAndInstall True treatAsDep ps package minstalled
+            resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
         SourceLocal lp _ ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
@@ -494,10 +496,10 @@ installPackage treatAsDep name ps minstalled = do
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
-                          adr <- installPackageGivenDeps True ps tb minstalled deps
+                          adr <- installPackageGivenDeps True False ps tb minstalled deps
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb True
+                          addFinal lp tb True False
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -507,30 +509,32 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
                                 updateLibMap name res'
-                                addFinal lp tb False
+                                addFinal lp tb False False
                             return res'
 
 resolveDepsAndInstall :: Bool
+                      -> Bool
                       -> Bool
                       -> Source
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
+resolveDepsAndInstall isAllInOne treatAsDep buildHaddocks ps package minstalled = do
     res <- addPackageDeps treatAsDep package
     case res of
         Left err -> return $ Left err
-        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
+        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
 
 -- | Checks if we need to install the given 'Package', given the results
 -- of 'addPackageDeps'. If dependencies are missing, the package is
 -- dirty, or it's not installed, then it needs to be installed.
 installPackageGivenDeps :: Bool
+                        -> Bool
                         -> Source
                         -> Package
                         -> Maybe Installed
@@ -538,12 +542,12 @@ installPackageGivenDeps :: Bool
                            , Map PackageIdentifier GhcPkgId
                            , InstallLocation )
                         -> M AddDepRes
-installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minLoc) = do
+installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minLoc) = do
     let name = packageName package
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
-            shouldInstall <- checkDirtiness ps installed package present (wanted ctx)
+            shouldInstall <- checkDirtiness ps installed package present
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
@@ -569,6 +573,7 @@ installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minL
                         -- https://github.com/commercialhaskell/stack/issues/345
                         (assert (destLoc == loc) destLoc)
                         package
+            , taskBuildHaddock = buildHaddocks
             , taskPresent = present
             , taskType =
                 case ps of
@@ -721,9 +726,8 @@ checkDirtiness :: Source
                -> Installed
                -> Package
                -> Map PackageIdentifier GhcPkgId
-               -> Set PackageName
                -> M Bool
-checkDirtiness ps installed package present wanted' = do
+checkDirtiness ps installed package present = do
     ctx <- ask
     moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
@@ -733,7 +737,6 @@ checkDirtiness ps installed package present wanted' = do
             (psLocal ps)
             (sourceLocation ps) -- should be Local always
             package
-        buildOpts = bcoBuildOpts (baseConfigOpts ctx)
         wantConfigCache = ConfigCache
             { configCacheOpts = configOpts
             , configCacheDeps = Set.fromList $ Map.elems present
@@ -741,10 +744,6 @@ checkDirtiness ps installed package present wanted' = do
                 case ps of
                     SourceLocal lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     SourceRemote{} -> Set.empty
-            , configCacheHaddock =
-                shouldHaddockPackage buildOpts wanted' (packageName package) ||
-                -- Disabling haddocks when old config had haddocks doesn't make dirty.
-                maybe False configCacheHaddock moldOpts
             , configCachePkgSrc = toCachePkgSrc ps
             }
         config = view configL ctx
@@ -776,7 +775,6 @@ describeConfigDiff config old new
     | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
             (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
-    | not (configCacheHaddock old) && configCacheHaddock new = Just "rebuilding with haddocks"
     | oldOpts /= newOpts = Just $ T.pack $ concat
         [ "flags changed from "
         , show oldOpts

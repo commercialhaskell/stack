@@ -219,7 +219,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
             -- Try parsing targets before checking if both file and
             -- module targets are specified (see issue#3342).
             let boptsCLI = buildOptsCLI { boptsCLITargets = normalTargetsRaw }
-            normalTargets <- parseTargets AllowNoTargets boptsCLI sma
+            normalTargets <- parseTargets AllowNoTargets False boptsCLI sma
                 `catch` \ex -> case ex of
                     TargetParseException xs -> throwM (GhciTargetParseException xs)
                     _ -> throwM ex
@@ -234,7 +234,7 @@ parseMainIsTargets
      -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
      let boptsCLI = buildOptsCLI { boptsCLITargets = [target] }
-     targets <- parseTargets AllowNoTargets boptsCLI sma
+     targets <- parseTargets AllowNoTargets False boptsCLI sma
      return $ smtTargets targets
 
 -- | Display PackageName + NamedComponent

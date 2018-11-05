@@ -74,6 +74,7 @@ import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
+import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap)
 import              Stack.Build.Target (NeedTargets(..), parseTargets)
 import              Stack.Config (loadConfig)
@@ -259,7 +260,8 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
     logDebug "Resolving package entries"
 
-    targets <- parseTargets needTargets boptsCLI smActual
+    let haddockDeps = shouldHaddockDeps (configBuild config)
+    targets <- parseTargets needTargets haddockDeps boptsCLI smActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
@@ -361,14 +363,15 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 -- get changed and EnvConfig will become inconsistent
 rebuildEnv :: EnvConfig
     -> NeedTargets
+    -> Bool
     -> BuildOptsCLI
     -> RIO env EnvConfig
-rebuildEnv envConfig needTargets boptsCLI = do
+rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let bc = envConfigBuildConfig envConfig
         compilerVer = smCompiler $ envConfigSourceMap envConfig
     runRIO bc $ do
         smActual <- toActual (bcSMWanted bc) compilerVer
-        targets <- parseTargets needTargets boptsCLI smActual
+        targets <- parseTargets needTargets haddockDeps boptsCLI smActual
         sourceMap <- loadSourceMap targets boptsCLI smActual
         return $
             envConfig
@@ -379,8 +382,9 @@ rebuildEnv envConfig needTargets boptsCLI = do
 withNewLocalBuildTargets :: HasEnvConfig  env => [Text] -> RIO env a -> RIO env a
 withNewLocalBuildTargets targets f = do
     envConfig <- view $ envConfigL
+    haddockDeps <- view $ configL.to configBuild.to shouldHaddockDeps
     let boptsCLI = envConfigBuildOptsCLI envConfig
-    envConfig' <- rebuildEnv envConfig NeedTargets $
+    envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
                   boptsCLI {boptsCLITargets = targets}
     local (set envConfigL envConfig') f
 
@@ -1328,7 +1332,8 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
           [ "happy" | shouldInstallHappy ]
     when (not (null bootDepsToInstall)) $ do
         logInfo $ "Building tools from source, needed for ghcjs-boot: " <> displayShow bootDepsToInstall
-        envConfig' <- rebuildEnv envConfig NeedTargets $
+        let haddockDeps = False
+        envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
                       defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
         buildInGhcjsEnv envConfig'
         let failedToFindErr = do

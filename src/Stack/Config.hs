@@ -72,6 +72,7 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Config.Urls
 import           Stack.Constants
+import           Stack.Build.Haddock (shouldHaddockDeps)
 import qualified Stack.Image as Image
 import           Stack.SourceMap
 import           Stack.Types.Config
@@ -589,14 +590,16 @@ loadBuildConfig mproject maresolver mcompiler = do
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
+    let bopts = configBuild config
+
     packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      pp <- mkProjectPackage YesPrintWarnings resolved
+      pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
       pure (cpName $ ppCommon pp, pp)
 
     deps0 <- forM (projectDependencies project) $ \plp -> do
-      dp <- mkDepPackage plp
+      dp <- mkDepPackage (shouldHaddockDeps bopts) plp
       pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
@@ -607,7 +610,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         snPackages = snapshotPackages snapshot `Map.difference` packages1
           `Map.difference` Map.fromList deps0
 
-    snDeps <- Map.traverseWithKey snapToDepPackage snPackages
+    snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
 
     let deps1 = Map.fromList deps0 `Map.union` snDeps
 

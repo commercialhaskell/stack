@@ -432,10 +432,11 @@ combineResolveResults results = do
 
 parseTargets :: HasBuildConfig env
     => NeedTargets
+    -> Bool
     -> BuildOptsCLI
     -> SMActual
     -> RIO env SMTargets
-parseTargets needTargets boptscli smActual = do
+parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
@@ -465,7 +466,7 @@ parseTargets needTargets boptscli smActual = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  addedDeps' <- mapM (mkDepPackage . PLImmutable) addedDeps
+  addedDeps' <- mapM (mkDepPackage haddockDeps . PLImmutable) addedDeps
 
   return SMTargets
     { smtTargets = targets
