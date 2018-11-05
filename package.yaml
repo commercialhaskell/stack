@@ -271,7 +271,7 @@ executables:
     main: Main.hs
     source-dirs: src/main
     generated-other-modules:
-    - Build_stack,
+    - Build_stack
     - Paths_stack
     ghc-options:
     - -threaded
