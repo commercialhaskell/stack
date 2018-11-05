@@ -307,6 +307,27 @@ To get tab-completion of commands on bash, just run the following (or add it to
 
 For more information and other shells, see [the shell auto-completion page](shell_autocompletion.md)
 
+## China-based users
+
+If you're attempting to install stack from within China:
+
+* As of 2018-10-24, the download link has limited connectivity from within mainland China. If this is the case, please proceed by manually downloading (ideally via a VPN) and installing stack per the instructions found on this page pertinent to your OS.
+
+* After install, your ~/.stack/config.yaml will need to be configured before stack can download large files consistently from within China (without reliance on a VPN). Please add the following to the bottom of the ~/.stack/config.yaml file (for Windows: use the %STACK_ROOT%\config.yaml):
+
+```
+###ADD THIS IF YOU LIVE IN CHINA
+setup-info: "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
+urls:
+  latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
+  lts-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/lts-haskell/
+  nightly-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/stackage-nightly/
+package-indices:
+ - name: Tsinghua
+   download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/package/
+   http: http://mirrors.tuna.tsinghua.edu.cn/hackage/00-index.tar.gz
+```
+
 ## Upgrade
 
 There are essentially four different approaches to upgrade:
