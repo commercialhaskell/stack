@@ -1161,7 +1161,7 @@ showOptions whichCmd suggestSolver = unlines $ "\nThis may be resolved by:" : op
             IsNewCmd -> both)
     both = [omitPackages, useResolver]
     useSolver    = "    - Using '--solver' to ask cabal-install to generate extra-deps, atop the chosen snapshot."
-    omitPackages = "    - Using '--omit-packages to exclude mismatching package(s)."
+    omitPackages = "    - Using '--omit-packages' to exclude mismatching package(s)."
     useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
 
 data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
