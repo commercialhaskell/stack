@@ -120,6 +120,9 @@ data SourceMap = SourceMap
     -- packages. We can document that as not supported, _or_ we could
     -- actually include all of this in the hash and make Stack more
     -- resilient.
+  , smHash :: !SourceMapHash
+    -- ^ hash of the source map calculated once as an expensive
+    -- operation
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.

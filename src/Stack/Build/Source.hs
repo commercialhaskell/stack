@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -21,10 +22,12 @@ import qualified    Pantry.SHA256 as SHA256
 import qualified    Data.ByteString as S
 import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
+import qualified    Distribution.PackageDescription as C
 import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
+import qualified    Data.Text as T
 import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Haddock (shouldHaddockDeps)
@@ -32,6 +35,7 @@ import              Stack.Build.Target
 import              Stack.Package
 import              Stack.SourceMap
 import              Stack.Types.Build
+import              Stack.Types.Compiler (whichCompiler, WhichCompiler(..))
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
@@ -39,6 +43,9 @@ import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
+import qualified    RIO.ByteString as B
+import qualified    RIO.ByteString.Lazy as BL
+import              RIO.Process (proc, readProcess_)
 
 -- FIXME:qrilka move to a better place? Rename?
 projectLocalPackages :: HasEnvConfig env
@@ -67,7 +74,8 @@ loadSourceMap :: HasBuildConfig env
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
     bconfig <- view buildConfigL
-    let project = M.map applyOptsFlagsPP $ smaProject sma
+    let compiler = smaCompiler sma
+        project = M.map applyOptsFlagsPP $ smaProject sma
         bopts = configBuild (bcConfig bconfig)
         applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
           p{ppCommon = applyOptsFlags (M.member (cpName c) (smtTargets smt)) True c}
@@ -95,14 +103,80 @@ loadSourceMap smt boptsCli sma = do
                          else shouldHaddockDeps bopts
                }
         globals = smaGlobal sma `M.difference` smtDeps smt
+    smh <- hashSourceMapData (whichCompiler compiler) deps
     return
         SourceMap
         { smTargets = smt
-        , smCompiler = smaCompiler sma
+        , smCompiler = compiler
         , smProject = project
         , smDeps = deps
         , smGlobal = globals
+        , smHash = smh
         }
+
+-- | Get a 'SourceMapHash' for a given 'SourceMap'
+--
+-- Basic rules:
+--
+-- * If someone modifies a GHC installation in any way after Stack
+--   looks at it, they voided the warranty. This includes installing a
+--   brand new build to the same directory, or registering new
+--   packages to the global database.
+--
+-- * We should include everything in the hash that would relate to
+--   immutable packages and identifying the compiler itself. Mutable
+--   packages (both project packages and dependencies) will never make
+--   it into the snapshot database, and can be ignored.
+--
+-- * Target information is only relevant insofar as it effects the
+--   dependency map. The actual current targets for this build are
+--   irrelevant to the cache mechanism, and can be ignored.
+--
+-- * Make sure things like profiling and haddocks are included in the hash
+--
+hashSourceMapData
+    :: (HasConfig env)
+    => WhichCompiler
+    -> Map PackageName DepPackage
+    -> RIO env SourceMapHash
+hashSourceMapData wc smDeps = do
+    path <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
+    let compilerExe =
+            case wc of
+                Ghc -> "ghc"
+                Ghcjs -> "ghcjs"
+    info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
+    immDeps <-
+        fmap B.concat . forM (Map.elems smDeps) $ depPackageHashableContent
+    return $ SourceMapHash (SHA256.hashBytes $ B.concat [path, info, immDeps])
+
+depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
+depPackageHashableContent DepPackage {..} = do
+    case dpLocation of
+        PLMutable _ -> return ""
+        PLImmutable pli -> do
+            pli' <- completePackageLocation pli
+            let flagToBs (f, enabled) =
+                    if enabled
+                        then ""
+                        else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
+                flags = map flagToBs $ Map.toList (cpFlags dpCommon)
+                locationTreeKey (PLIHackage _ (Just tk)) = Just tk
+                locationTreeKey (PLIArchive _ pm)
+                    | Just tk <- pmTreeKey pm = Just tk
+                locationTreeKey (PLIRepo _ pm)
+                    | Just tk <- pmTreeKey pm = Just tk
+                locationTreeKey _ = Nothing
+                treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
+                ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
+                haddocks = if cpHaddocks dpCommon then "haddocks" else ""
+            hash <-
+                case locationTreeKey pli' of
+                    Just tk -> pure (treeKeyToBs tk)
+                    Nothing ->
+                        throwString
+                            "Completing package location produced result with no Pantry tree key"
+            return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
 
 -- | All flags for a local package.
 getLocalFlags

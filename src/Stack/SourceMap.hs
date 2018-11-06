@@ -4,10 +4,13 @@ module Stack.SourceMap
     ( mkProjectPackage
     , mkDepPackage
     , snapToDepPackage
+    , getPLIVersion
     , toActual
     ) where
 
 import qualified Data.Conduit.List as CL
+import Distribution.PackageDescription (GenericPackageDescription)
+import qualified Distribution.PackageDescription as PD
 import Pantry
 import qualified RIO.Map as Map
 import RIO.Process
@@ -84,6 +87,22 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
                   , cpHaddocks = buildHaddocks
                   }
     }
+
+getPLIVersion ::
+       MonadIO m
+    => PackageLocationImmutable
+    -> IO GenericPackageDescription
+    -> m Version
+getPLIVersion (PLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
+getPLIVersion (PLIArchive _ pm) loadGPD = versionMaybeFromPM pm loadGPD
+getPLIVersion (PLIRepo _ pm) loadGPD = versionMaybeFromPM pm loadGPD
+
+versionMaybeFromPM ::
+       MonadIO m => PackageMetadata -> IO GenericPackageDescription -> m Version
+versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
+versionMaybeFromPM _ loadGPD = do
+    gpd <- liftIO $ loadGPD
+    return $ pkgVersion $ PD.package $ PD.packageDescription gpd
 
 toActual ::
        (HasProcessContext env, HasLogFunc env)

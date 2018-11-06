@@ -220,10 +220,7 @@ import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable,
-                              proc, readProcess_)
-import qualified RIO.ByteString as B
-import qualified RIO.ByteString.Lazy as BL
+import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -1228,80 +1225,13 @@ hoogleDatabasePath = do
     dir <- hoogleRoot
     return (dir </> relFileDatabaseHoo)
 
--- | Get a 'SourceMapHash' for a given 'SourceMap'
---
--- Basic rules:
---
--- * If someone modifies a GHC installation in any way after Stack
---   looks at it, they voided the warranty. This includes installing a
---   brand new build to the same directory, or registering new
---   packages to the global database.
---
--- * We should include everything in the hash that would relate to
---   immutable packages and identifying the compiler itself. Mutable
---   packages (both project packages and dependencies) will never make
---   it into the snapshot database, and can be ignored.
---
--- * Target information is only relevant insofar as it effects the
---   dependency map. The actual current targets for this build are
---   irrelevant to the cache mechanism, and can be ignored.
---
--- * Make sure things like profiling and haddocks are included in the hash
---
--- FIXME: move all caclucated in IO parts into the source map itself so
--- this function could be made pure
-hashSourceMap
-    :: (HasConfig env)
-    => SourceMap
-    -> RIO env SourceMapHash
-hashSourceMap SourceMap {..} = do
-    let wc = whichCompiler smCompiler
-    path <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
-    let compilerExe =
-            case wc of
-                Ghc -> "ghc"
-                Ghcjs -> "ghcjs"
-    info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
-    immDeps <-
-        fmap B.concat . forM (Map.elems smDeps) $ depPackageHashableContent
-    return $ SourceMapHash (SHA256.hashBytes $ B.concat [path, info, immDeps])
-
-depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
-depPackageHashableContent DepPackage {..} = do
-    case dpLocation of
-        PLMutable _ -> return ""
-        PLImmutable pli -> do
-            pli' <- completePackageLocation pli
-            let flagToBs (f, enabled) =
-                    if enabled
-                        then ""
-                        else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
-                flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-                locationTreeKey (PLIHackage _ (Just tk)) = Just tk
-                locationTreeKey (PLIArchive _ pm)
-                    | Just tk <- pmTreeKey pm = Just tk
-                locationTreeKey (PLIRepo _ pm)
-                    | Just tk <- pmTreeKey pm = Just tk
-                locationTreeKey _ = Nothing
-                treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
-                ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
-                haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-            hash <-
-                case locationTreeKey pli' of
-                    Just tk -> pure (treeKeyToBs tk)
-                    Nothing ->
-                        throwString
-                            "Completing package location produced result with no Pantry tree key"
-            return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
-
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
 platformSnapAndCompilerRel
     :: (HasEnvConfig env)
     => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    sm <- view $ envConfigL.to envConfigSourceMap
-    SourceMapHash smh <- hashSourceMap sm
+    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to smHash
     platform <- platformGhcRelDir
     name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir

@@ -25,6 +25,7 @@ import           Stack.Build.Cache
 import           Stack.Constants
 import           Stack.PackageDump
 import           Stack.Prelude
+import           Stack.SourceMap (getPLIVersion)
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -54,7 +55,9 @@ toInstallMap sourceMap = do
         for (smDeps sourceMap) $ \dp ->
             case dpLocation dp of
                 PLMutable _ -> loadVersion Local (dpCommon dp)
-                PLImmutable _ -> loadVersion Snap (dpCommon dp)
+                PLImmutable pli -> do
+                    version <- getPLIVersion pli (cpGPD $ dpCommon dp)
+                    return (Snap, version)
     return $ projectInstalls <> depInstalls
 
 -- | Returns the new InstalledMap and all of the locally registered packages.

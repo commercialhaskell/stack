@@ -27,8 +27,6 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
-import           Distribution.Types.GenericPackageDescription (packageDescription)
-import qualified Distribution.Types.PackageDescription as PD
 import           Distribution.Types.PackageId (pkgVersion)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
@@ -239,8 +237,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
-            gpd <- liftIO $ cpGPD (dpCommon dp)
-            let version = pkgVersion $ PD.package $ packageDescription gpd
+            version <- getPLIVersion loc (cpGPD $ dpCommon dp)
             return $ SourceRemote loc version (dpCommon dp)
           PLMutable dir -> do
             -- FIXME this is not correct, we don't want to treat all Mutable as local
