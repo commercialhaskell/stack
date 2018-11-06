@@ -13,7 +13,7 @@ main = do
   createDirectory "binny"
 
   -- check assumptions on exec and the build flags and clean
-  stack ["build", "--flag", "*:build-baz"]
+  stack ["build", "--flag", "copy-compiler-tool-test:build-baz"]
   stack ["exec", "--", "baz-exe" ++ exeExt]
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stack ["clean", "--full"]
