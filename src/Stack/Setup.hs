@@ -256,7 +256,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
 
-    smActual <- toActual (bcSMWanted bc) compilerVer
+    smActual <- withProcessContext menv $ toActual (bcSMWanted bc) compilerVer
 
     logDebug "Resolving package entries"
 

@@ -234,6 +234,21 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         lp <- loadLocalPackage sourceMap pp
         return $ SourceLocal lp Local
       bopts <- view $ configL.to configBuild
+      env <- ask
+      let buildHaddocks = shouldHaddockDeps bopts
+          globalDeps = Map.mapMaybeWithKey globalToSource $ smGlobal sourceMap
+          globalToSource name gp | name `Set.member` wiredInPackages = Nothing
+                                 | otherwise =
+            let version = gpVersion gp
+                loc = PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                common = CommonPackage
+                  { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
+                  , cpName = name
+                  , cpFlags = mempty
+                  , cpGhcOptions = mempty
+                  , cpHaddocks = buildHaddocks
+                  }
+            in Just $ SourceRemote loc version common
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
@@ -245,7 +260,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage sourceMap pp
             return $ SourceLocal lp Snap
-      return $ pPackages <> deps
+      return $ pPackages <> deps <> globalDeps
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
