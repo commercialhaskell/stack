@@ -287,7 +287,7 @@ You can clean up build artifacts for your project using the `stack clean` and `s
 `stack clean` Deletes the local working directories containing compiler output. 
 (typically '.stack-work/dist' by default)
 
-Use `stack clean <specific-package>` to delete the output for a package specific-package only.
+Use `stack clean <specific-package>` to delete the output for a package _specific-package_ only.
 
 ### `stack purge`
 `stack purge` Deletes the local stack working directory, including extra-deps, git dependencies and the compiler output. 
