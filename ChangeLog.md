@@ -11,12 +11,17 @@ Behavior changes:
 
 Other enhancements:
 
+* Support KDE Neon distribution in installer.
+  [#4371](https://github.com/commercialhaskell/stack/pull/4371)
+
 Bug fixes:
 
 * Stack can now be compiled again inside a directory that does not
   contain a `.git` directory, see
   [#4364](https://github.com/commercialhaskell/stack/issues/4364#issuecomment-431600841)
-
+* Handle a change in GHC's hi-dump format around `addDependentFile`,
+  which now includes a hash. See
+  [yesodweb/yesod#1551](https://github.com/yesodweb/yesod/issues/1551)
 
 ## v1.9.1
 
@@ -71,7 +76,7 @@ Behavior changes:
 * In case there is a network connectivity issue while trying to
   download a template, stack will check whether that template had
   been downloaded before. In that case, the cached version will be
-  used. See [#3850](https://github.com/commercialhaskell/stack/issues/3739).
+  used. See [#3850](https://github.com/commercialhaskell/stack/issues/3850).
 
 Other enhancements:
 
@@ -148,7 +153,7 @@ Bug fixes:
 * `stack build` now succeeds in building packages which contain sublibraries
   which are dependencies of executables, tests or benchmarks but not of the
   main library. See
-  [#3787](https://github.com/commercialhaskell/stack/issues/3959).
+  [#3787](https://github.com/commercialhaskell/stack/issues/3787).
 * Sublibraries are now properly considered for coverage reports when the test
   suite depends on the internal library. Before, stack was erroring when
   trying to generate the coverage report, see
@@ -158,10 +163,10 @@ Bug fixes:
   was a package with a sublibrary in the snapshot resulted in broken builds.
   This is now fixed, see
   [#4071](https://github.com/commercialhaskell/stack/issues/4071).
-* [#4114] Stack pretty prints error messages with proper `error` logging
+* [#4114](https://github.com/commercialhaskell/stack/issues/4114) Stack pretty prints error messages with proper `error` logging
   level instead of `warning` now. This also fixes self-executing scripts
   not piping plan construction errors from runhaskell to terminal (issue
-  #3942).
+  [#3942](https://github.com/commercialhaskell/stack/issues/3942)).
 * Fix invalid "While building Setup.hs" when Cabal calls fail. See:
   [#3934](https://github.com/commercialhaskell/stack/issues/3934)
 * `stack upload` signs the package by default, as documented. `--no-signature`
