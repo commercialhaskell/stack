@@ -2,7 +2,7 @@ resolver: lts-12.12
 
 extra-deps:
 - Cabal-2.4.0.1@rev:0
-- githash-0.1.1.0@rev:0
+- githash-0.1.2.0@rev:0
 - hpack-0.31.0@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
