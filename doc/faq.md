@@ -535,3 +535,24 @@ error "bad relocation (Invalid pointer diff)". The compiler picks up
 inconsistent versions of binaries and the mysterious error occurs.
 
 The workaround is to remove LLVM binaries from the `PATH`.
+
+## How do I suppress `'-nopie'` warnings with `stack build` on macOS?
+
+```
+clang: warning: argument unused during compilation: '-nopie'
+ [-Wunused-command-line-argument]
+```
+
+This warning is shown when compiler support of `-no-pie` is expected.
+For `ghc-8.2.2`, the warning suppressing setting change
+would be;
+
+```
+# ~/.stack/programs/x86_64-osx/ghc-8.2.2/lib/ghc-8.2.2/settings
+
+-- ("C compiler supports -no-pie", "YES"),
+++ ("C compiler supports -no-pie", "NO"),
+```
+
+Make the change of expectation in stack's settings for the version of GHC that
+matches the resolver in use in the build.
