@@ -555,4 +555,5 @@ would be;
 ```
 
 Make the change of expectation in stack's settings for the version of GHC that
-matches the resolver in use in the build.
+matches the resolver in use in the build. The related issue is
+[#4009](https://github.com/commercialhaskell/stack/issues/4009).
