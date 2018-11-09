@@ -281,7 +281,7 @@ placed to not interfere with any other GHC installation, whether system-wide or
 even different GHC versions installed by stack.
 
 ## Cleaning your project
-You can clean up build artifacts for your project using the `stack clean` and `stack purge`.
+You can clean up build artifacts for your project using the `stack clean` and `stack purge` commands.
 
 ### `stack clean`
 `stack clean` Deletes the local working directories containing compiler output. 
