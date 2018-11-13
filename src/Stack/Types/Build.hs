@@ -130,7 +130,11 @@ data FlagSource = FSCommandLine | FSStackYaml
     deriving (Show, Eq, Ord)
 
 data UnusedFlags = UFNoPackage FlagSource PackageName
-                 | UFFlagsNotDefined FlagSource Package (Set FlagName)
+                 | UFFlagsNotDefined
+                       FlagSource
+                       PackageName
+                       (Set FlagName) -- defined in package
+                       (Set FlagName) -- not defined
                  | UFSnapshot PackageName
     deriving (Show, Eq, Ord)
 
@@ -249,7 +253,7 @@ instance Show StackBuildException where
             , "' not found"
             , showFlagSrc src
             ]
-        go (UFFlagsNotDefined src pkg flags) = concat
+        go (UFFlagsNotDefined src pname pkgFlags flags) = concat
             [ "- Package '"
             , name
             , "' does not define the following flags"
@@ -263,8 +267,7 @@ instance Show StackBuildException where
                           (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
                                (Set.toList pkgFlags))
             ]
-          where name = packageNameString (packageName pkg)
-                pkgFlags = packageDefinedFlags pkg
+          where name = packageNameString pname
         go (UFSnapshot name) = concat
             [ "- Attempted to set flag on snapshot package "
             , packageNameString name

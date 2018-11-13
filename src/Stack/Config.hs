@@ -75,6 +75,7 @@ import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
 import qualified Stack.Image as Image
 import           Stack.SourceMap
+import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -621,14 +622,10 @@ loadBuildConfig mproject maresolver mcompiler = do
           \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
         deps2 = mergeApply deps1 pFlags $
           \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
-        unusedFlags = pFlags `Map.restrictKeys` Map.keysSet packages1
-          `Map.restrictKeys` Map.keysSet deps1
         yamlString :: ToJSON a => a -> String
         yamlString = T.unpack . decodeUtf8Lenient . Yaml.encode
 
-    when (not $ Map.null unusedFlags) $
-      throwString $ "The following package flags were not used:\n" ++
-        yamlString (fmap toCabalStringMap $ toCabalStringMap unusedFlags)
+    checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
     let pkgGhcOptions = configGhcOptionsByName config
         deps = mergeApply deps2 pkgGhcOptions $

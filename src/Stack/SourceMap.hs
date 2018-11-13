@@ -6,6 +6,7 @@ module Stack.SourceMap
     , snapToDepPackage
     , getPLIVersion
     , toActual
+    , checkFlagsUsedThrowing
     ) where
 
 import qualified Data.Conduit.List as CL
@@ -13,9 +14,11 @@ import Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as PD
 import Pantry
 import qualified RIO.Map as Map
+import qualified RIO.Set as Set
 import RIO.Process
 import Stack.PackageDump
 import Stack.Prelude
+import Stack.Types.Build
 import Stack.Types.Compiler
 import Stack.Types.SourceMap
 
@@ -127,3 +130,45 @@ toActual smw compiler = do
         , smaDeps = smwDeps smw
         , smaGlobal = globals
         }
+
+checkFlagsUsedThrowing ::
+       (MonadIO m, MonadThrow m)
+    => Map PackageName (Map FlagName Bool)
+    -> FlagSource
+    -> Map PackageName ProjectPackage
+    -> Map PackageName DepPackage
+    -> m ()
+checkFlagsUsedThrowing packageFlags source prjPackages deps = do
+    unusedFlags <-
+        forMaybeM (Map.toList packageFlags) $ \(pname, flags) ->
+            checkFlagUsed (pname, flags) source prjPackages deps
+    unless (null unusedFlags) $
+        throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
+
+checkFlagUsed ::
+       MonadIO m
+    => (PackageName, Map FlagName Bool)
+    -> FlagSource
+    -> Map PackageName ProjectPackage
+    -> Map PackageName DepPackage
+    -> m (Maybe UnusedFlags)
+checkFlagUsed (name, userFlags) source prj deps =
+    let maybeCommon =
+          fmap ppCommon (Map.lookup name prj) <|>
+          fmap dpCommon (Map.lookup name deps)
+    in case maybeCommon  of
+        -- Package is not available as project or dependency
+        Nothing ->
+            pure $ Just $ UFNoPackage source name
+        -- Package exists, let's check if the flags are defined
+        Just common -> do
+            gpd <- liftIO $ cpGPD common
+            let pname = pkgName $ PD.package $ PD.packageDescription gpd
+                pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
+                unused = Set.difference (Map.keysSet userFlags)
+                         pkgFlags
+            if Set.null unused
+                    -- All flags are defined, nothing to do
+                    then pure Nothing
+                    -- Error about the undefined flags
+                    else pure $ Just $ UFFlagsNotDefined source pname pkgFlags unused

@@ -103,6 +103,12 @@ loadSourceMap smt boptsCli sma = do
                          else shouldHaddockDeps bopts
                }
         globals = smaGlobal sma `M.difference` smtDeps smt
+        packageCliFlags = Map.fromList $
+          mapMaybe maybeProjectFlags $
+          Map.toList (boptsCLIFlags boptsCli)
+        maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
+        maybeProjectFlags _ = Nothing
+    checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     smh <- hashSourceMapData (whichCompiler compiler) deps
     return
         SourceMap
