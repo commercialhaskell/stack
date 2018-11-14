@@ -238,11 +238,19 @@ applyTemplate project template nonceParams dir templateText = do
           -- Too large or too binary
           | otherwise = pure bytes
 
+    -- Apply Mustache templating to a string
+    -- template.
+    let applyMustacheStr str = do
+          let bs = LB.fromStrict . T.encodeUtf8 . T.pack $ str
+          r <- applyMustache bs
+          pure . T.unpack . T.decodeUtf8 . LB.toStrict $ r
+
     liftM
         M.fromList
         (mapM
              (\(fp,bytes) ->
-                   do path <- parseRelFile fp
+                   do path' <- applyMustacheStr fp
+                      path <- parseRelFile path'
                       bytes' <- applyMustache bytes
                       return (dir </> path, bytes'))
              (M.toList files))
