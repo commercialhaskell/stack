@@ -457,6 +457,11 @@ buildExtractedTarball pkgDir = do
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               { envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
+              , envConfigBuildConfig = updateBuildConfig (envConfigBuildConfig envConfig)
+              }
+            updateBuildConfig bc = bc
+              { bcConfig = (bcConfig bc)
+                 { configBuild = defaultBuildOpts { boptsTests = True } }
               }
         in set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
