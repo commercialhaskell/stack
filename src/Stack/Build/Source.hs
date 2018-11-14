@@ -94,9 +94,7 @@ loadSourceMap smt boptsCli sma = do
                          then cpFlags common
                          else flags
                , cpGhcOptions =
-                     if null ghcOptions
-                         then cpGhcOptions common
-                         else ghcOptions
+                     ghcOptions ++ cpGhcOptions common
                , cpHaddocks =
                      if isTarget
                          then boptsHaddock bopts
