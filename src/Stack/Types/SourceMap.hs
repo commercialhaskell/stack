@@ -13,6 +13,7 @@ module Stack.Types.SourceMap
   , SMTargets (..)
   , SourceMap (..)
     -- * Helper types
+  , FromSnapshot (..)
   , DepPackage (..)
   , ProjectPackage (..)
   , CommonPackage (..)
@@ -35,11 +36,19 @@ data CommonPackage = CommonPackage
   , cpHaddocks :: !Bool
   }
 
+-- | Flag showing if package comes from a snapshot
+-- needed to ignore dependency bounds between such packages
+data FromSnapshot
+    = FromSnapshot
+    | NotFromSnapshot
+    deriving (Show)
+
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
   { dpCommon :: !CommonPackage
   , dpLocation :: !PackageLocation
   , dpHidden :: !Bool
+  , dpFromSnapshot :: !FromSnapshot
   -- ^ Should the package be hidden after registering?
   }
 

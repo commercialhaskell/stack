@@ -408,15 +408,17 @@ data Source
     = SourceLocal LocalPackage InstallLocation
     | SourceRemote PackageLocationImmutable
                    Version
+                   FromSnapshot
                    CommonPackage
 
 instance Show Source where
     show (SourceLocal lp loc) = concat ["SourceLocal (", show lp, ") ", show loc]
-    show (SourceRemote pli v _) =
+    show (SourceRemote pli v fromSnapshot _) =
         concat
             [ "SourceRemote"
             , "(", show pli, ")"
             , "(", show v, ")"
+            , show fromSnapshot
             , "<CommonPackage>"
             ]
 

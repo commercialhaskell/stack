@@ -466,7 +466,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  addedDeps' <- mapM (mkDepPackage haddockDeps . PLImmutable) addedDeps
+  addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
   return SMTargets
     { smtTargets = targets

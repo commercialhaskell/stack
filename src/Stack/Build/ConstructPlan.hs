@@ -248,12 +248,12 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
                   , cpGhcOptions = mempty
                   , cpHaddocks = buildHaddocks
                   }
-            in Just $ SourceRemote loc version common
+            in Just $ SourceRemote loc version NotFromSnapshot common
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
             version <- getPLIVersion loc (cpGPD $ dpCommon dp)
-            return $ SourceRemote loc version (dpCommon dp)
+            return $ SourceRemote loc version (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             -- FIXME this is not correct, we don't want to treat all Mutable as local
             -- FIXME ^ is from Stack.Build.Source
@@ -443,7 +443,7 @@ tellExecutables _name (SourceLocal lp _)
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (SourceRemote pkgloc _version cp) =
+tellExecutables name (SourceRemote pkgloc _version _fromSnaphot cp) =
     tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
 
 tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
@@ -485,7 +485,7 @@ installPackage :: Bool -- ^ is this being used by a dependency?
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        SourceRemote pkgLoc _version cp -> do
+        SourceRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
@@ -589,8 +589,10 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
             , taskPresent = present
             , taskType =
                 case ps of
-                    SourceLocal lp loc' -> TTFilePath lp (loc' <> minLoc)
-                    SourceRemote pkgLoc _version _cp -> TTRemote package (loc <> minLoc) pkgLoc
+                    SourceLocal lp loc' ->
+                      TTFilePath lp (loc' <> minLoc)
+                    SourceRemote pkgLoc _version _fromSnaphot _cp ->
+                      TTRemote package (loc <> minLoc) pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
@@ -680,11 +682,18 @@ addPackageDeps treatAsDep package = do
                                 warn_ " (allow-newer enabled)"
                                 return True
                             else do
-                                -- FIXME:qrilka previously dependencies between snapshot
-                                -- packages were allowed to ignore bounds, MSS told an idea
-                                -- to tag explicitly dependencies for which bounds could be
-                                -- ignored and why
-                                return False
+                                -- TODO: dependencies between snapshot packages are allowed
+                                -- to ignore bounds, MSS told an idea to tag explicitly
+                                -- dependencies for which bounds could be ignored and why,
+                                -- this needs to be explored,
+                                -- the current designed is based on #3185 for Stackage
+                                x <- inSnapshot (packageName package) (packageVersion package)
+                                y <- inSnapshot depname (adrVersion adr)
+                                if x && y
+                                    then do
+                                        warn_ " (trusting snapshot over Hackage revisions)"
+                                        return True
+                                    else return False
                 if inRange
                     then case adr of
                         ADRToInstall task -> return $ Right
@@ -860,7 +869,7 @@ sourceLocation SourceRemote{} = Snap
 
 sourceVersion :: Source -> Version
 sourceVersion (SourceLocal lp _) = packageVersion $ lpPackage lp
-sourceVersion (SourceRemote _ version _) = version
+sourceVersion (SourceRemote _ version _ _) = version
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
@@ -913,6 +922,19 @@ stripNonDeps deps plan = plan
 
 markAsDep :: PackageName -> M ()
 markAsDep name = tell mempty { wDeps = Set.singleton name }
+
+-- | Is the given package/version combo defined in the snapshot?
+inSnapshot :: PackageName -> Version -> M Bool
+inSnapshot name version = do
+    ctx <- ask -- m <- asks combineMap
+    return $ fromMaybe False $ do
+        ps <- Map.lookup name (combinedMap ctx)
+        case ps of
+            PIOnlySource (SourceRemote _ srcVersion FromSnapshot _) ->
+                return $ srcVersion == version
+            PIBoth (SourceRemote _ srcVersion FromSnapshot _) _ ->
+                return $ srcVersion == version
+            _ -> return False
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]

@@ -2,8 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Stack.SourceMap
     ( mkProjectPackage
-    , mkDepPackage
     , snapToDepPackage
+    , additionalDepPackage
     , getPLIVersion
     , toActual
     , checkFlagsUsedThrowing
@@ -43,13 +43,14 @@ mkProjectPackage printWarnings dir buildHaddocks = do
                   }
      }
 
--- | Create a 'DepPackage' from a 'PackageLocation'
-mkDepPackage
+-- | Create a 'DepPackage' from a 'PackageLocation', from some additional
+-- to a snapshot setting (extra-deps or command line)
+additionalDepPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
   -> PackageLocation
   -> RIO env DepPackage
-mkDepPackage buildHaddocks pl = do
+additionalDepPackage buildHaddocks pl = do
   (name, gpdio) <-
     case pl of
       PLMutable dir -> do
@@ -62,6 +63,7 @@ mkDepPackage buildHaddocks pl = do
   return DepPackage
     { dpLocation = pl
     , dpHidden = False
+    , dpFromSnapshot = NotFromSnapshot
     , dpCommon = CommonPackage
                   { cpGPD = gpdio
                   , cpName = name
@@ -82,6 +84,7 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
   return DepPackage
     { dpLocation = PLImmutable spLocation
     , dpHidden = spHidden
+    , dpFromSnapshot = FromSnapshot
     , dpCommon = CommonPackage
                   { cpGPD = run $ loadCabalFileImmutable spLocation
                   , cpName = name

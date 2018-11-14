@@ -600,7 +600,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       pure (cpName $ ppCommon pp, pp)
 
     deps0 <- forM (projectDependencies project) $ \plp -> do
-      dp <- mkDepPackage (shouldHaddockDeps bopts) plp
+      dp <- additionalDepPackage (shouldHaddockDeps bopts) plp
       pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
