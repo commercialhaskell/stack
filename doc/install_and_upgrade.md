@@ -328,6 +328,18 @@ package-indices:
    http: http://mirrors.tuna.tsinghua.edu.cn/hackage/00-index.tar.gz
 ```
 
+## Using `stack install` behind a http proxy
+
+To use `stack install` behind a http proxy with ip address *IP* and port *PORT*, set up environment variable `http_proxy`.
+
+```
+$ export http_proxy=IP:PORT
+$ stack install
+```
+
+Please notice that on most operating systems, "system-wide" http proxy is not mandatory for programs to follow. Some programs, such as browsers, do honor this "system-wide" http proxy setting, while other programs, including bash, does not. That means configuring "http proxy setting" in your Control Panel (Windows) or System Preferences (Mac) would not result in `stack install` traffic going through proxy. 
+
+
 ## Upgrade
 
 There are essentially four different approaches to upgrade:
