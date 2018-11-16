@@ -543,17 +543,15 @@ clang: warning: argument unused during compilation: '-nopie'
  [-Wunused-command-line-argument]
 ```
 
-This warning is shown when compiler support of `-no-pie` is expected.
-For `ghc-8.2.2`, the warning suppressing setting change
-would be;
+This warning is shown when compiler support of `-no-pie` is expected but unavailable.
+It's possible to bypass the warning for a specific version of GHC by modifying a global setting:
 
 ```
 # ~/.stack/programs/x86_64-osx/ghc-8.2.2/lib/ghc-8.2.2/settings
-
 -- ("C compiler supports -no-pie", "YES"),
 ++ ("C compiler supports -no-pie", "NO"),
 ```
 
-Make the change of expectation in stack's settings for the version of GHC that
-matches the resolver in use in the build. The related issue is
-[#4009](https://github.com/commercialhaskell/stack/issues/4009).
+**Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.** You should apply this fix for the version of GHC that matches your resolver.
+
+Issue [#4009](https://github.com/commercialhaskell/stack/issues/4009) on GitHub goes into further detail.
