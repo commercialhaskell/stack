@@ -67,4 +67,8 @@ listDepsOptsParser = ListDepsOpts
                                 "license"
                                 "printing of dependency licenses instead of versions"
                                 idm
+                 <*> boolFlags False
+                                "tree"
+                                "printing of dependencies as a tree"
+                                idm
   where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
