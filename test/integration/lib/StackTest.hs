@@ -98,8 +98,10 @@ runRepl cmd args actions = do
     hSetBuffering rStderr NoBuffering
 
     _ <- forkIO $ withFile "/tmp/stderr" WriteMode
-        $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
-                  $ \e -> unless (isEOFError e) $ throw e
+        $ \err -> do
+            hSetBuffering err NoBuffering
+            forever $ catch (hGetChar rStderr >>= hPutChar err)
+                    $ \e -> unless (isEOFError e) $ throw e
 
     runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
     waitForProcess ph
