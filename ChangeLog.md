@@ -13,6 +13,8 @@ Other enhancements:
 
 * Support KDE Neon distribution in installer.
   [#4371](https://github.com/commercialhaskell/stack/pull/4371)
+* Document supression of `'nopie'` warning on macOS in FAQ.
+  [#4009](https://github.com/commercialhaskell/stack/issues/4009)
 
 Bug fixes:
 
