@@ -803,12 +803,16 @@ resolveComponentFiles component build names = do
 
 -- | Get all C sources and extra source files in a build.
 buildOtherSources :: BuildInfo -> RIO Ctx [DotCabalPath]
-buildOtherSources build =
-    do csources <- liftM (map DotCabalCFilePath)
-                       (mapMaybeM resolveFileOrWarn (cSources build))
-       jsources <- liftM (map DotCabalFilePath)
-                       (mapMaybeM resolveFileOrWarn (targetJsSources build))
-       return (csources <> jsources)
+buildOtherSources build = do
+    dir <- asks (parent . ctxFile)
+    -- TODO: add warnMissing here too
+    csources <-
+        forMaybeM (cSources build) $ \fp ->
+            findCandidate [dir] (DotCabalCFile fp)
+    jsources <-
+        forMaybeM (targetJsSources build) $ \fp ->
+            findCandidate [dir] (DotCabalFile fp)
+    return (csources <> jsources)
 
 -- | Get the target's JS sources.
 targetJsSources :: BuildInfo -> [FilePath]
