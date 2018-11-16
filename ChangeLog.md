@@ -96,7 +96,7 @@ Bug fixes:
 * Fix for git packages to update submodules to the correct state. See
   [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 * Add `--cabal-files` flag to `stack ide targets` command.
-
+* Don't download ghc when using `stack clean`.
 
 ## v1.9.1
 
