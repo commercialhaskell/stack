@@ -403,11 +403,11 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     evalCmd
                     (evalOptsParser "CODE")
         addCommand' "clean"
-                    "Clean the local packages"
+                    "Delete build artefacts for the project packages."
                     cleanCmd
                     (cleanOptsParser Clean)
         addCommand' "purge"
-                    "Delete the local stack working directory (.stack-work by default). Shortcut for 'stack clean --full'"
+                    "Delete the project stack working directories (.stack-work by default). Shortcut for 'stack clean --full'"
                     cleanCmd
                     (cleanOptsParser Purge)
         addCommand' "list-dependencies"
