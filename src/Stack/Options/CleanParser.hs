@@ -14,11 +14,11 @@ cleanOptsParser Clean = CleanShallow <$> packages <|> doFullClean
         many
             (packageNameArgument
                  (metavar "PACKAGE" <>
-                  help "If none specified, clean all local packages"))
+                  help "If none specified, clean all project packages"))
     doFullClean =
         flag'
             CleanFull
             (long "full" <>
-             help "Delete the local stack working directory (.stack-work by default).")
+             help "Delete the project’s stack working directories (.stack-work by default).")
 
 cleanOptsParser Purge = pure CleanFull
