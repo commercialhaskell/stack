@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Utilities for running stack commands.
 module Stack.Runners
@@ -261,14 +262,18 @@ munlockFile Nothing = return ()
 munlockFile (Just lk) = liftIO $ unlockFile lk
 
 -- Plumbing for --test and --bench flags
+-- Force enable --no-install-ghc and --skip-ghc-check flags
 withBuildConfigDot :: DotOpts -> GlobalOpts -> RIO EnvConfig () -> IO ()
-withBuildConfigDot opts go f = withBuildConfig go' f
+withBuildConfigDot opts go = withBuildConfig (updateGlobalOpts go)
   where
-    go' =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) $
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
-        $
-        (set (globalOptsL.configMonoidSkipGHCCheckL) (Just True))
-        $
-        (set (globalOptsL.configMonoidInstallGHCL) (Just False))
-        go
+    updateGlobalOpts
+      = updateOpts (dotTestTargets opts)  (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL)      (Just True)
+      . updateOpts (dotBenchTargets opts) (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
+      . updateOpts True                   (globalOptsL.configMonoidSkipGHCCheckL)                 (Just True)
+      . updateOpts True                   (globalOptsL.configMonoidInstallGHCL)                   (Just False)
+
+-- helper function for update some option
+updateOpts :: Bool -> Lens' opts v -> v -> opts -> opts
+updateOpts isRequired opt v
+  | isRequired = set opt v
+  | otherwise  = id
