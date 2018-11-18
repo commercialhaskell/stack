@@ -206,6 +206,17 @@ instance Show SetupException where
     show UnsupportedSetupConfiguration =
         "I don't know how to install GHC on your system configuration, please install manually"
 
+checkDownloadCompiler :: (HasConfig env, HasGHCVariant env)
+  => SetupOpts
+  -> WithDownloadCompiler
+  -> RIO env (Maybe ExtraDirs, Maybe CompilerBuild, Bool)
+checkDownloadCompiler _     SkipDownloadCompiler = return (Nothing, Nothing, False)
+checkDownloadCompiler sopts WithDownloadCompiler
+  | installIfMissing = ensureCompiler sopts
+  | otherwise = return (Nothing, Nothing, False)
+  where
+    installIfMissing = soptsInstallIfMissing sopts
+
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (HasBuildConfig env, HasGHCVariant env)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
@@ -234,10 +245,7 @@ setupEnv mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, mCompilerBuild, _) <-
-      case bcDownloadCompiler bconfig of
-        SkipDownloadCompiler -> return (Nothing, Nothing, False)
-        WithDownloadCompiler -> ensureCompiler sopts
+    (mghcBin, mCompilerBuild, _) <- checkDownloadCompiler sopts (bcDownloadCompiler bconfig)
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
