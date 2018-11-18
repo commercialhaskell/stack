@@ -163,6 +163,8 @@ module Stack.Types.Config
   ,loadedSnapshotL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
+  ,configMonoidSkipGHCCheckL
+  ,configMonoidInstallGHCL
   -- * Lens reexport
   ,view
   ,to
@@ -1984,3 +1986,13 @@ appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
 appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
   where f True = Just ghcColorForceFlag
         f False = Nothing
+
+configMonoidSkipGHCCheckL :: Lens' ConfigMonoid (Maybe Bool)
+configMonoidSkipGHCCheckL = 
+  lens (getFirst . configMonoidSkipGHCCheck)
+       (\configMonoid t -> configMonoid {configMonoidSkipGHCCheck = First t})
+
+configMonoidInstallGHCL :: Lens' ConfigMonoid (Maybe Bool)
+configMonoidInstallGHCL = 
+  lens (getFirst . configMonoidInstallGHC)
+       (\configMonoid t -> configMonoid {configMonoidInstallGHC = First t})
