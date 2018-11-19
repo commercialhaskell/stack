@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 -- | A sourcemap maps a package name to how it should be built,
 -- including source code, flags, options, etc. This module contains
 -- various stages of source map construction. See the
@@ -60,8 +59,8 @@ data ProjectPackage = ProjectPackage
   }
 
 -- | A view of a package installed in the global package database.
-data GlobalPackage = GlobalPackage
-  { gpVersion :: !Version
+newtype GlobalPackage = GlobalPackage
+  { gpVersion :: Version
   }
 
 -- | A source map with information on the wanted (but not actual)

@@ -107,7 +107,7 @@ versionMaybeFromPM ::
        MonadIO m => PackageMetadata -> IO GenericPackageDescription -> m Version
 versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
 versionMaybeFromPM _ loadGPD = do
-    gpd <- liftIO $ loadGPD
+    gpd <- liftIO loadGPD
     return $ pkgVersion $ PD.package $ PD.packageDescription gpd
 
 toActual ::

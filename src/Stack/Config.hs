@@ -635,7 +635,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         unusedPkgGhcOptions = pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
           `Map.restrictKeys` Map.keysSet deps2
 
-    when (not $ Map.null unusedPkgGhcOptions) $
+    unless (Map.null unusedPkgGhcOptions) $
       throwString $ "The following package GHC options were not used:\n" ++
         yamlString (toCabalStringMap unusedPkgGhcOptions)
 
