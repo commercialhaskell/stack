@@ -97,7 +97,10 @@ Bug fixes:
   [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 * Add `--cabal-files` flag to `stack ide targets` command.
 * Don't download ghc when using `stack clean`.
-* Support loading in GHCi definitions from symlinked C files. See
+* Support loading in GHCi definitions from symlinked C files. Without this
+  patch, Stack will try to find object files in the directory pointed to
+  by symlinks, while GCC will produce the object files in the original
+  directory. See
   [#4402](https://github.com/commercialhaskell/stack/pull/4402)
 
 ## v1.9.1

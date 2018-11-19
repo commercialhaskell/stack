@@ -1238,6 +1238,8 @@ findCandidate dirs name = do
                   (xs, ys) -> xs ++ ys
     resolveCandidate dir = fmap maybeToList . resolveDirFile dir
 
+-- | Resolve file as a child of a specified directory, symlinks
+-- don't get followed.
 resolveDirFile
     :: (MonadIO m, MonadThrow m)
     => Path Abs Dir -> FilePath.FilePath -> m (Maybe (Path Abs File))
