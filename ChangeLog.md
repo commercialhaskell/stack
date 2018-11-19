@@ -97,7 +97,7 @@ Bug fixes:
   [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 * Add `--cabal-files` flag to `stack ide targets` command.
 * Don't download ghc when using `stack clean`.
-* `dot` and `ls dependencies` commands is no longer require ghc installed. And, fix not respected `--no-install-ghc` flag. (See [#4390](https://github.com/commercialhaskell/stack/issues/4390))
+* `dot` and `ls dependencies` commands no longer require GHC to be installed. Also, ensures the `--no-install-ghc` flag is respected. See: [#4390](https://github.com/commercialhaskell/stack/issues/4390)
 
 ## v1.9.1
 
