@@ -94,6 +94,8 @@ Bug fixes:
 * Fix for git packages to update submodules to the correct state. See
   [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 * Add `--cabal-files` flag to `stack ide targets` command.
+* Support loading in GHCi definitions from symlinked C files. See
+  [#4402](https://github.com/commercialhaskell/stack/pull/4402)
 
 
 ## v1.9.1
