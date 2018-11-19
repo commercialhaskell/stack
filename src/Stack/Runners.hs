@@ -269,8 +269,8 @@ withBuildConfigDot opts go = withBuildConfig (updateGlobalOpts go)
     updateGlobalOpts
       = updateOpts (dotTestTargets opts)  (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL)      (Just True)
       . updateOpts (dotBenchTargets opts) (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
-      . updateOpts True                   (globalOptsL.configMonoidSkipGHCCheckL)                 (Just True)
-      . updateOpts True                   (globalOptsL.configMonoidInstallGHCL)                   (Just False)
+      . set (globalOptsL.configMonoidSkipGHCCheckL) (Just True)
+      . set (globalOptsL.configMonoidInstallGHCL)   (Just False)
 
 -- helper function for update some option
 updateOpts :: Bool -> Lens' opts v -> v -> opts -> opts
