@@ -139,6 +139,7 @@ toCopyRoot srcfp = any (`isSuffixOf` srcfp)
     -- FIXME command line parameters to control how many of these get
     -- copied, trade-off of runtime/bandwidth vs isolation of tests
     [ ".tar"
+    , ".tar.gz"
     , ".xz"
     -- , ".gz"
     , ".7z.exe"

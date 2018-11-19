@@ -803,12 +803,21 @@ resolveComponentFiles component build names = do
 
 -- | Get all C sources and extra source files in a build.
 buildOtherSources :: BuildInfo -> RIO Ctx [DotCabalPath]
-buildOtherSources build =
-    do csources <- liftM (map DotCabalCFilePath)
-                       (mapMaybeM resolveFileOrWarn (cSources build))
-       jsources <- liftM (map DotCabalFilePath)
-                       (mapMaybeM resolveFileOrWarn (targetJsSources build))
-       return (csources <> jsources)
+buildOtherSources build = do
+    cwd <- liftIO getCurrentDir
+    dir <- asks (parent . ctxFile)
+    file <- asks ctxFile
+    let resolveDirFiles files toCabalPath =
+            forMaybeM files $ \fp -> do
+                result <- resolveDirFile dir fp
+                case result of
+                    Nothing -> do
+                        warnMissingFile "File" cwd fp file
+                        return Nothing
+                    Just p -> return $ Just (toCabalPath p)
+    csources <- resolveDirFiles (cSources build) DotCabalCFilePath
+    jsources <- resolveDirFiles (targetJsSources build) DotCabalFilePath
+    return (csources <> jsources)
 
 -- | Get the target's JS sources.
 targetJsSources :: BuildInfo -> [FilePath]
@@ -1227,14 +1236,18 @@ findCandidate dirs name = do
 
                   -- Otherwise, return everything
                   (xs, ys) -> xs ++ ys
-    resolveCandidate
-        :: (MonadIO m, MonadThrow m)
-        => Path Abs Dir -> FilePath.FilePath -> m [Path Abs File]
-    resolveCandidate x y = do
-        -- The standard canonicalizePath does not work for this case
-        p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
-        exists <- doesFileExist p
-        return $ if exists then [p] else []
+    resolveCandidate dir = fmap maybeToList . resolveDirFile dir
+
+-- | Resolve file as a child of a specified directory, symlinks
+-- don't get followed.
+resolveDirFile
+    :: (MonadIO m, MonadThrow m)
+    => Path Abs Dir -> FilePath.FilePath -> m (Maybe (Path Abs File))
+resolveDirFile x y = do
+    -- The standard canonicalizePath does not work for this case
+    p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
+    exists <- doesFileExist p
+    return $ if exists then Just p else Nothing
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
@@ -1311,15 +1324,18 @@ resolveOrWarn subject resolver path =
      file <- asks ctxFile
      dir <- asks (parent . ctxFile)
      result <- resolver dir path
-     when (isNothing result) $
-       prettyWarnL
-           [ fromString . T.unpack $ subject -- TODO: needs style?
-           , flow "listed in"
-           , maybe (pretty file) pretty (stripProperPrefix cwd file)
-           , flow "file does not exist:"
-           , style Dir . fromString $ path
-           ]
+     when (isNothing result) $ warnMissingFile subject cwd path file
      return result
+
+warnMissingFile :: Text -> Path Abs Dir -> FilePath -> Path Abs File -> RIO Ctx ()
+warnMissingFile subject cwd path fromFile =
+    prettyWarnL
+        [ fromString . T.unpack $ subject -- TODO: needs style?
+        , flow "listed in"
+        , maybe (pretty fromFile) pretty (stripProperPrefix cwd fromFile)
+        , flow "file does not exist:"
+        , style Dir . fromString $ path
+        ]
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
