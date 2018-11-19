@@ -11,6 +11,8 @@ module Stack.Runners
     , withMiniConfigAndLock
     , withBuildConfigAndLock
     , withBuildConfigAndLockNoDocker
+    , withBuildConfigAndLockInClean
+    , withBuildConfigAndLockNoDockerInClean
     , withBuildConfig
     , withBuildConfigExt
     , withBuildConfigDot
@@ -127,7 +129,7 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt False go Nothing inner Nothing
+    withBuildConfigExt WithDocker WithDownloadCompiler go Nothing inner Nothing
 
 -- | See issue #2010 for why this exists. Currently just used for the
 -- specific case of "stack clean --full".
@@ -136,10 +138,27 @@ withBuildConfigAndLockNoDocker
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLockNoDocker go inner =
-    withBuildConfigExt True go Nothing inner Nothing
+    withBuildConfigExt SkipDocker WithDownloadCompiler go Nothing inner Nothing
+
+withBuildConfigAndLockInClean
+    :: GlobalOpts
+    -> (Maybe FileLock -> RIO EnvConfig ())
+    -> IO ()
+withBuildConfigAndLockInClean go inner =
+    withBuildConfigExt WithDocker SkipDownloadCompiler go Nothing inner Nothing
+
+-- | See issue #2010 for why this exists. Currently just used for the
+-- specific case of "stack clean --full".
+withBuildConfigAndLockNoDockerInClean
+    :: GlobalOpts
+    -> (Maybe FileLock -> RIO EnvConfig ())
+    -> IO ()
+withBuildConfigAndLockNoDockerInClean go inner =
+    withBuildConfigExt SkipDocker SkipDownloadCompiler go Nothing inner Nothing
 
 withBuildConfigExt
-    :: Bool
+    :: WithDocker
+    -> WithDownloadCompiler -- ^ bypassed download compiler if SkipDownloadCompiler.
     -> GlobalOpts
     -> Maybe (RIO Config ())
     -- ^ Action to perform before the build.  This will be run on the host
@@ -155,7 +174,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
+withBuildConfigExt skipDocker downloadCompiler go@GlobalOpts{..} mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -173,25 +192,26 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} mbefore inner mafter = loadConfi
 
       let inner'' lk = do
               bconfig <- lcLoadBuildConfig lc globalCompiler
-              envConfig <- runRIO bconfig (setupEnv Nothing)
+              let bconfig' = bconfig { bcDownloadCompiler = downloadCompiler }
+              envConfig <- runRIO bconfig' (setupEnv Nothing)
               runRIO envConfig (inner' lk)
 
       let getCompilerVersion = loadCompilerVersion go lc
-      if skipDocker
-          then runRIO (lcConfig lc) $ do
-              forM_ mbefore id
-              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0)
-              forM_ mafter id
-          else runRIO (lcConfig lc) $
-              Docker.reexecWithOptionalContainer
-                       (lcProjectRoot lc)
-                       mbefore
-                       (runRIO (lcConfig lc) $
-                          Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
-                       mafter
-                       (Just $ liftIO $
-                            do lk' <- readIORef curLk
-                               munlockFile lk')
+      runRIO (lcConfig lc) $
+        case skipDocker of
+          SkipDocker -> do
+            forM_ mbefore id
+            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0)
+            forM_ mafter id
+          WithDocker -> Docker.reexecWithOptionalContainer
+                          (lcProjectRoot lc)
+                          mbefore
+                          (runRIO (lcConfig lc) $
+                              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
+                          mafter
+                          (Just $ liftIO $
+                                do lk' <- readIORef curLk
+                                   munlockFile lk')
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.

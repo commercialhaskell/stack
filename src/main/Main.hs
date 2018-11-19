@@ -635,8 +635,8 @@ cleanCmd opts go =
   -- See issues #2010 and #3468 for why "stack clean --full" is not used
   -- within docker.
   case opts of
-    CleanFull{} -> withBuildConfigAndLockNoDocker go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLock go (const (clean opts))
+    CleanFull{} -> withBuildConfigAndLockNoDockerInClean go (const (clean opts))
+    CleanShallow{} -> withBuildConfigAndLockInClean go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -963,7 +963,8 @@ imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
 imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
     let mProjectRoot = lcProjectRoot lc
     withBuildConfigExt
-        False
+        WithDocker
+        WithDownloadCompiler
         go
         Nothing
         (\lk ->

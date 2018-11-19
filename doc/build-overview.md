@@ -91,7 +91,8 @@ specific package) and _general_ (general option `*` for flags is only available 
   snapshot packages that have been replaced.
 * Apply the `flags` and `ghc-options` by name to these packages overwriting
   any previous values coming from a snapshot. If any values are specified
-  but no matching package is found, it's an error.
+  but no matching package is found, it's an error. If a flag is not defined
+  in the corresponding package cabal file, it's an error.
 * We are now left with the following:
     * A wanted compiler version
     * A map from package name to immutable packages with package config (flags, GHC options, hidden)
@@ -157,7 +158,9 @@ is found, it's an error. Note that flag settings are added _on top of_
 previous settings in this case, and does not replace them. That is, if
 previously we have `singleton (FlagName "foo") True` and now add
 `singleton (FlagName "bar") True`, both `foo` and `bar` will now be
-true.
+true. If any flags are specified but no matching package is found,
+it's an error. If a flag is not defined in the corresponding package
+cabal file, it's an error.
 
 ## Apply CLI GHC options
 
