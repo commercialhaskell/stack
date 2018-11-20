@@ -850,8 +850,6 @@ The default configuration is
 ```yaml
 urls:
   latest-snapshot: https://www.stackage.org/download/snapshots.json
-  lts-build-plans: https://raw.githubusercontent.com/fpco/lts-haskell/master/
-  nightly-build-plans: https://raw.githubusercontent.com/fpco/stackage-nightly/master/
 ```
 
 **Note:** The `latest-snapshot-url` field has been deprecated in favor of `latest-snapshot`

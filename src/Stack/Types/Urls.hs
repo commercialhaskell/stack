@@ -11,8 +11,6 @@ import Stack.Prelude
 
 data Urls = Urls
     { urlsLatestSnapshot :: !Text
-    , urlsLtsBuildPlans :: !Text
-    , urlsNightlyBuildPlans :: !Text
     }
     deriving Show
 
@@ -21,13 +19,9 @@ instance FromJSON (WithJSONWarnings Urls) where
     parseJSON = withObjectWarnings "Urls" $ \o -> do
         Urls
             <$> o ..: "latest-snapshot"
-            <*> o ..: "lts-build-plans"
-            <*> o ..: "nightly-build-plans"
 
 data UrlsMonoid = UrlsMonoid
     { urlsMonoidLatestSnapshot :: !(First Text)
-    , urlsMonoidLtsBuildPlans :: !(First Text)
-    , urlsMonoidNightlyBuildPlans :: !(First Text)
     }
     deriving (Show, Generic)
 
@@ -35,8 +29,6 @@ instance FromJSON (WithJSONWarnings UrlsMonoid) where
     parseJSON = withObjectWarnings "UrlsMonoid" $ \o -> do
         UrlsMonoid
             <$> o ..: "latest-snapshot"
-            <*> o ..: "lts-build-plans"
-            <*> o ..: "nightly-build-plans"
 
 instance Semigroup UrlsMonoid where
     (<>) = mappenddefault
