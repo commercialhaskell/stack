@@ -101,6 +101,7 @@ import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Permissions (setFileExecutable)
 import              RIO.Process
+import              RIO.List
 import              Text.Printf (printf)
 
 #if !WINDOWS
@@ -240,7 +241,10 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, compilerBuild, _) <- ensureCompiler sopts
+    (mghcBin, mCompilerBuild, _) <-
+      case bcDownloadCompiler bc of
+        SkipDownloadCompiler -> return (Nothing, Nothing, False)
+        WithDownloadCompiler -> ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -268,7 +272,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , envConfigCabalVersion = cabalVer
             , envConfigBuildOptsCLI = boptsCLI
             , envConfigSourceMap = sourceMap
-            , envConfigCompilerBuild = compilerBuild
+            , envConfigCompilerBuild = mCompilerBuild
             }
 
     -- extra installation bin directories
@@ -355,7 +359,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         , envConfigCabalVersion = cabalVer
         , envConfigBuildOptsCLI = boptsCLI
         , envConfigSourceMap = sourceMap
-        , envConfigCompilerBuild = compilerBuild
+        , envConfigCompilerBuild = mCompilerBuild
         }
 
 -- | special helper for GHCJS which needs an updated source map
@@ -402,7 +406,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> RIO env (Maybe ExtraDirs, CompilerBuild, Bool)
+               -> RIO env (Maybe ExtraDirs, Maybe CompilerBuild, Bool)
 ensureCompiler sopts = do
     let wc = whichCompiler (wantedToActual (soptsWantedCompiler sopts))
     when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < mkVersion [7, 8]) $ do
@@ -560,7 +564,7 @@ ensureCompiler sopts = do
 
     when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck wc
 
-    return (mpaths, compilerBuild, needLocal)
+    return (mpaths, Just compilerBuild, needLocal)
 
 -- | Determine which GHC builds to use depending on which shared libraries are available
 -- on the system.
@@ -646,6 +650,13 @@ getGhcBuilds = do
                         _ -> CompilerBuildSpecialized (intercalate "-" c))
                     libComponents
 #if !WINDOWS
+            Platform _ Cabal.FreeBSD -> do
+                let getMajorVer = readMaybe <=< headMaybe . (splitOn ".")
+                majorVer <- getMajorVer <$> sysRelease
+                if majorVer >= Just (12 :: Int) then
+                  useBuilds [CompilerBuildSpecialized "ino64"]
+                else
+                  useBuilds [CompilerBuildStandard]
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuilds [CompilerBuildSpecialized releaseStr]
@@ -1121,29 +1132,34 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
         "ghc-" ++ versionString version
 
     let runStep step wd env cmd args = do
-            menv' <- modifyEnvVars menv (Map.union env)
-            result <- do
-                let logLines = CB.lines .| CL.mapM_ (logDebug . displayBytesUtf8)
-                withWorkingDir (toFilePath wd)
-                  $ withProcessContext menv'
-                  $ try
-                  $ sinkProcessStderrStdout cmd args logLines logLines
-
-            case result of
-                Right ((), ()) -> return ()
-                Left ex -> do
-                    logError (displayShow (ex :: ProcessException))
-                    prettyError $
-                        hang 2
-                          ("Error encountered while" <+> step <+> "GHC with" <> line <>
-                           style Shell (fromString (unwords (cmd : args))) <> line <>
-                           -- TODO: Figure out how to insert \ in the appropriate spots
-                           -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
-                           "run in " <> pretty wd) <> line <> line <>
-                        "The following directories may now contain files, but won't be used by stack:" <> line <>
-                        "  -" <+> pretty tempDir <> line <>
-                        "  -" <+> pretty destDir <> line
-                    liftIO exitFailure
+          menv' <- modifyEnvVars menv (Map.union env)
+          let logLines lvl = CB.lines .| CL.mapM_ (lvl . displayBytesUtf8)
+              logStdout = logLines logDebug
+              logStderr = logLines logError
+          void $ withWorkingDir (toFilePath wd) $
+                withProcessContext menv' $
+                sinkProcessStderrStdout cmd args logStderr logStdout
+                `catchAny` \ex -> do
+                  logError $ displayShow ex
+                  prettyError $ hang 2 (
+                      "Error encountered while" <+> step <+> "GHC with"
+                      <> line <>
+                      style Shell (fromString (unwords (cmd : args)))
+                      <> line <>
+                      -- TODO: Figure out how to insert \ in the appropriate spots
+                      -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
+                      "run in " <> pretty wd
+                      )
+                    <> line <> line <>
+                    "The following directories may now contain files, but won't be used by stack:"
+                    <> line <>
+                    "  -" <+> pretty tempDir
+                    <> line <>
+                    "  -" <+> pretty destDir
+                    <> line <> line <>
+                    "For more information consider rerunning with --verbose flag"
+                    <> line
+                  liftIO exitFailure
 
     logSticky $
       "Unpacking GHC into " <>

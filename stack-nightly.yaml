@@ -19,10 +19,5 @@ nix:
     - zlib
     - unzip
 
-flags:
-  # https://github.com/haskell/cabal/issues/4883
-  cabal-install:
-    native-dns: false
-
 ghc-options:
    "$locals": -fhide-source-paths

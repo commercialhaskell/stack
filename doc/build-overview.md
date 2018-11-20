@@ -65,7 +65,7 @@ This file is parsed to provide the following config values:
 * `ghc-options` (optional field, defaults to `{}`)
 
 `flags` and `ghc-options` break down into both _by name_ (applied to a
-specific package) and _general_.
+specific package) and _general_ (general option `*` for flags is only available in CLI).
 
 ## Wanted compiler, dependencies, and project packages
 
@@ -89,9 +89,10 @@ specific package) and _general_.
 * Perform a left biased union between the immutable `extra-deps`
   values and the snapshot packages. Ignore any settings in the
   snapshot packages that have been replaced.
-* Apply the `flags` and `ghc-options` by name to these packages. If
-  any values are specified but no matching package is found, it's an
-  error.
+* Apply the `flags` and `ghc-options` by name to these packages overwriting
+  any previous values coming from a snapshot. If any values are specified
+  but no matching package is found, it's an error. If a flag is not defined
+  in the corresponding package cabal file, it's an error.
 * We are now left with the following:
     * A wanted compiler version
     * A map from package name to immutable packages with package config (flags, GHC options, hidden)
@@ -157,12 +158,14 @@ is found, it's an error. Note that flag settings are added _on top of_
 previous settings in this case, and does not replace them. That is, if
 previously we have `singleton (FlagName "foo") True` and now add
 `singleton (FlagName "bar") True`, both `foo` and `bar` will now be
-true.
+true. If any flags are specified but no matching package is found,
+it's an error. If a flag is not defined in the corresponding package
+cabal file, it's an error.
 
 ## Apply CLI GHC options
 
-Apply GHC options from the command line to all _project package
-targets_. *FIXME* confirm that this is in fact the correct behavior.
+CLI GHC options are applied as general GHC options according to
+`apply-ghc-options` setting.
 
 ## Apply general flags from CLI
 
@@ -171,8 +174,19 @@ project package which uses that flag name.
 
 ## Apply general GHC options
 
-*FIXME* list out the various choices here and which packages they
-apply to.
+General options are divided into the following categories:
+
+* `$locals` is deprecated, it's now a synonym for `$project`
+* `$project` applies to all project packages, not to any dependencies
+* `$targets` applies to all project packages that are targets, not to any
+  dependencies or non-target project packages. This is the default option
+  for `apply-ghc-options`
+* `$everything` applies to all packages in the source map excluding
+  global packages
+
+These options get applied to any corresponding packages in
+the source map. If some GHC options already exist for such a package then
+they get prepended otherwise they get used as is.
 
 ## Determine snapshot hash
 

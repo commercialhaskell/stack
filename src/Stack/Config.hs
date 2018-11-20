@@ -657,6 +657,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                 LCSProject _ -> False
                 LCSNoConfig _ -> False
         , bcCurator = projectCurator project
+        , bcDownloadCompiler = WithDownloadCompiler
         }
   where
     getEmptyProject :: Maybe SnapshotLocation -> RIO Config Project

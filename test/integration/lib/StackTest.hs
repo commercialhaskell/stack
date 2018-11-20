@@ -25,8 +25,21 @@ run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+runShell :: HasCallStack => String -> IO ()
+runShell cmd = do
+    logInfo $ "Running: " ++ cmd
+    (Nothing, Nothing, Nothing, ph) <- createProcess (shell cmd)
+    ec <- waitForProcess ph
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
+
+stackSrc :: IO String
+stackSrc = getEnv "SRC_DIR"
+
+testDir :: IO String
+testDir = getEnv "TEST_DIR"
 
 stack' :: HasCallStack => [String] -> IO ExitCode
 stack' args = do
@@ -85,8 +98,10 @@ runRepl cmd args actions = do
     hSetBuffering rStderr NoBuffering
 
     _ <- forkIO $ withFile "/tmp/stderr" WriteMode
-        $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
-                  $ \e -> unless (isEOFError e) $ throw e
+        $ \err -> do
+            hSetBuffering err NoBuffering
+            forever $ catch (hGetChar rStderr >>= hPutChar err)
+                    $ \e -> unless (isEOFError e) $ throw e
 
     runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
     waitForProcess ph
@@ -126,20 +141,23 @@ stackErrStderr args check = do
         then error "Stack process succeeded, but it shouldn't"
         else check err
 
-stackStdout :: [String] -> IO (ExitCode, String)
-stackStdout args = do
-    stackExe' <- stackExe
-    logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, out, err) <- readProcessWithExitCode stackExe' args ""
+runEx :: FilePath -> String -> IO (ExitCode, String, String)
+runEx cmd args = runEx' cmd $ words args
+
+runEx' :: FilePath -> [String] -> IO (ExitCode, String, String)
+runEx' cmd args = do
+    logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, out, err) <- readProcessWithExitCode cmd args ""
     putStr out
     hPutStr stderr err
-    return (ec, out)
+    return (ec, out, err)
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
 stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
-    (ec, out) <- stackStdout args
+    stackExe' <- stackExe
+    (ec, out, _) <- runEx' stackExe' args
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
         else check out
@@ -227,7 +245,7 @@ isMacOSX = os == "darwin"
 -- the main @stack.yaml@.
 --
 defaultResolverArg :: String
-defaultResolverArg = "--resolver=lts-11.19"
+defaultResolverArg = "--resolver=lts-11.22"
 
 -- | Remove a file and ignore any warnings about missing files.
 removeFileIgnore :: FilePath -> IO ()
@@ -242,3 +260,12 @@ removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
+
+-- | Changes working directory to Stack source directory
+withSourceDirectory :: IO () -> IO ()
+withSourceDirectory action = do
+  dir <- stackSrc
+  currentDirectory <- getCurrentDirectory
+  let enterDir = setCurrentDirectory dir
+      exitDir = setCurrentDirectory currentDirectory
+  bracket_ enterDir exitDir action

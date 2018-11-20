@@ -81,6 +81,10 @@ module Stack.Types.Config
   ,defaultLogLevel
   -- ** LoadConfig
   ,LoadConfig(..)
+  -- ** WithDocker
+  ,WithDocker(..)
+  -- ** WithDownloadCompiler
+  ,WithDownloadCompiler(..)
 
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -497,7 +501,16 @@ data BuildConfig = BuildConfig
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
     , bcCurator :: !(Maybe Curator)
+    , bcDownloadCompiler :: !WithDownloadCompiler
     }
+
+data WithDocker
+  = SkipDocker
+  | WithDocker
+
+data WithDownloadCompiler
+  = SkipDownloadCompiler
+  | WithDownloadCompiler
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
 stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
@@ -518,7 +531,7 @@ data EnvConfig = EnvConfig
     -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigBuildOptsCLI :: !BuildOptsCLI
     ,envConfigSourceMap :: !SourceMap
-    ,envConfigCompilerBuild :: !CompilerBuild
+    ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
 --    ,envConfigSMActual :: !SMActual
 --    ,envConfigLoadedSnapshot :: !LoadedSnapshot
 --    -- ^ The fully resolved snapshot information.
@@ -1135,7 +1148,7 @@ showOptions whichCmd suggestSolver = unlines $ "\nThis may be resolved by:" : op
             IsNewCmd -> both)
     both = [omitPackages, useResolver]
     useSolver    = "    - Using '--solver' to ask cabal-install to generate extra-deps, atop the chosen snapshot."
-    omitPackages = "    - Using '--omit-packages to exclude mismatching package(s)."
+    omitPackages = "    - Using '--omit-packages' to exclude mismatching package(s)."
     useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
 
 data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
@@ -1243,9 +1256,9 @@ platformGhcRelDir
     => m (Path Rel Dir)
 platformGhcRelDir = do
     ec <- view envConfigL
+    let cbSuffix = maybe "" compilerBuildSuffix $ envConfigCompilerBuild ec
     verOnly <- platformGhcVerOnlyRelDirStr
-    parseRelDir (mconcat [ verOnly
-                         , compilerBuildSuffix (envConfigCompilerBuild ec)])
+    parseRelDir (mconcat [ verOnly, cbSuffix ])
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist build
 platformGhcVerOnlyRelDir

@@ -33,6 +33,7 @@ import           Test.Hspec
 
 main :: IO ()
 main = do
+    srcDir  <- canonicalizePath ""
     currDir <- canonicalizePath "test/integration"
 
     let findExe name = do
@@ -56,6 +57,7 @@ main = do
                  $ Map.insert "HOME" newHome
                  $ Map.insert "APPDATA" newHome
                  $ Map.insert "STACK_ROOT" newStackRoot
+                 $ Map.insert "SRC_DIR" srcDir
                  $ Map.delete "GHC_PACKAGE_PATH"
                  $ Map.fromList
                  $ map (first (map toUpper)) envOrig
@@ -90,7 +92,9 @@ test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ wit
                 , mainFile
                 ])
                 { cwd = Just dir
-                , env = Just env'
+                , env = Just (Map.toList
+                            $ Map.insert "TEST_DIR" testDir
+                            $ Map.fromList env')
                 }
 
     copyTree (const True) (testDir </> "files") dir
@@ -135,6 +139,7 @@ toCopyRoot srcfp = any (`isSuffixOf` srcfp)
     -- FIXME command line parameters to control how many of these get
     -- copied, trade-off of runtime/bandwidth vs isolation of tests
     [ ".tar"
+    , ".tar.gz"
     , ".xz"
     -- , ".gz"
     , ".7z.exe"
