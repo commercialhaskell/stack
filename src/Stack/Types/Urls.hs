@@ -9,8 +9,8 @@ import Data.Aeson.Extended
 import Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import Stack.Prelude
 
-data Urls = Urls
-    { urlsLatestSnapshot :: !Text
+newtype Urls = Urls
+    { urlsLatestSnapshot :: Text
     }
     deriving Show
 
@@ -20,8 +20,8 @@ instance FromJSON (WithJSONWarnings Urls) where
         Urls
             <$> o ..: "latest-snapshot"
 
-data UrlsMonoid = UrlsMonoid
-    { urlsMonoidLatestSnapshot :: !(First Text)
+newtype UrlsMonoid = UrlsMonoid
+    { urlsMonoidLatestSnapshot :: First Text
     }
     deriving (Show, Generic)
 

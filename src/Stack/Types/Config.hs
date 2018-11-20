@@ -678,8 +678,6 @@ data ConfigMonoid =
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading      :: !(First Bool)
     -- ^ See: 'configHideTHLoading'
-    , configMonoidLatestSnapshotUrl  :: !(First Text)
-    -- ^ Deprecated in favour of 'urlsMonoidLatestSnapshot'
     , configMonoidUrls               :: !UrlsMonoid
     -- ^ See: 'configUrls
     , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
@@ -789,7 +787,6 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- First <$> obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- First <$> obj ..:? configMonoidHideTHLoadingName
-    configMonoidLatestSnapshotUrl <- First <$> obj ..:? configMonoidLatestSnapshotUrlName
     configMonoidUrls <- jsonSubWarnings (obj ..:? configMonoidUrlsName ..!= mempty)
     configMonoidPackageIndices <- First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
     configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
@@ -899,9 +896,6 @@ configMonoidConnectionCountName = "connection-count"
 
 configMonoidHideTHLoadingName :: Text
 configMonoidHideTHLoadingName = "hide-th-loading"
-
-configMonoidLatestSnapshotUrlName :: Text
-configMonoidLatestSnapshotUrlName = "latest-snapshot-url"
 
 configMonoidUrlsName :: Text
 configMonoidUrlsName = "urls"
