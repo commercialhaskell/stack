@@ -111,8 +111,8 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
-    logInfo $ "Getting file list for " <> fromString pkgFp
     sourceMap <- view $ envConfigL.to envConfigSourceMap
+    logInfo $ "Getting file list for " <> fromString pkgFp
     (fileList, cabalfp) <- getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
@@ -164,7 +164,7 @@ getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
             -> Path Abs File -- ^ cabal file
-            -> SourceMap -- Map PackageName PackageSource
+            -> SourceMap
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
@@ -318,10 +318,7 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList ::
-       HasEnvConfig env
-    => LocalPackage
-    -> RIO env (String, Path Abs File)
+getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts

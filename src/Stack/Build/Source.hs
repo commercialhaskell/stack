@@ -46,13 +46,14 @@ import qualified    RIO.ByteString as B
 import qualified    RIO.ByteString.Lazy as BL
 import              RIO.Process (proc, readProcess_)
 
--- FIXME:qrilka move to a better place? Rename?
+-- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
               => RIO env [LocalPackage]
 projectLocalPackages = do
     sm <- view $ envConfigL.to envConfigSourceMap
     for (toList $ smProject sm) $ loadLocalPackage sm
 
+-- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
     bopts <- view $ configL.to configBuild

@@ -15,8 +15,7 @@ module Stack.Types.Build
     ,UnusedFlags(..)
     ,InstallLocation(..)
     ,Installed(..)
-    ,piiVersion
-    ,piiLocation
+    ,psVersion
     ,Task(..)
     ,taskIsTarget
     ,taskLocation
@@ -37,7 +36,6 @@ module Stack.Types.Build
     ,configCacheVC
     ,configureOpts
     ,CachePkgSrc (..)
-    ,Source(..)
     ,toCachePkgSrc
     ,isStackOpt
     ,wantedLocalPackages
@@ -71,7 +69,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Exit                     (ExitCode (ExitFailure))
 import           System.FilePath                 (pathSeparator)
@@ -118,6 +115,7 @@ data StackBuildException
         Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
+  | InvalidGhcOptionsSpecification [PackageName]
   | TargetParseException [Text]
   | SolverGiveUp String
   | SolverMissingCabalInstall
@@ -274,6 +272,15 @@ instance Show StackBuildException where
             , packageNameString name
             , ", please add to extra-deps"
             ]
+    show (InvalidGhcOptionsSpecification unused) = unlines
+        $ "Invalid GHC options specification:"
+        : map showGhcOptionSrc unused
+      where
+        showGhcOptionSrc name = concat
+            [ "- Package '"
+            , packageNameString name
+            , "' not found"
+            ]
     show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
     show (TargetParseException errs) = unlines
         $ "The following errors occurred while parsing the build targets:"
@@ -405,27 +412,9 @@ data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
 instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
-data Source
-    = SourceLocal LocalPackage InstallLocation
-    | SourceRemote PackageLocationImmutable
-                   Version
-                   FromSnapshot
-                   CommonPackage
-
-instance Show Source where
-    show (SourceLocal lp loc) = concat ["SourceLocal (", show lp, ") ", show loc]
-    show (SourceRemote pli v fromSnapshot _) =
-        concat
-            [ "SourceRemote"
-            , "(", show pli, ")"
-            , "(", show v, ")"
-            , show fromSnapshot
-            , "<CommonPackage>"
-            ]
-
-toCachePkgSrc :: Source -> CachePkgSrc
-toCachePkgSrc (SourceLocal lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
-toCachePkgSrc SourceRemote{} = CacheSrcUpstream
+toCachePkgSrc :: PackageSource -> CachePkgSrc
+toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
 configCacheVC = storeVersionConfig "config-v4" "LbTeTCtFbU0Yc1mbmhAzsIXyPrQ="

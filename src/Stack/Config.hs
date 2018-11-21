@@ -622,8 +622,6 @@ loadBuildConfig mproject maresolver mcompiler = do
           \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
         deps2 = mergeApply deps1 pFlags $
           \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
-        yamlString :: ToJSON a => a -> String
-        yamlString = T.unpack . decodeUtf8Lenient . Yaml.encode
 
     checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
@@ -636,8 +634,7 @@ loadBuildConfig mproject maresolver mcompiler = do
           `Map.restrictKeys` Map.keysSet deps2
 
     unless (Map.null unusedPkgGhcOptions) $
-      throwString $ "The following package GHC options were not used:\n" ++
-        yamlString (toCabalStringMap unusedPkgGhcOptions)
+      throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
     let wanted = SMWanted
           { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler

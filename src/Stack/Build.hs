@@ -68,14 +68,17 @@ build msetLocalFiles mbuildLk = do
 
     sourceMap <- view $ envConfigL.to envConfigSourceMap
     locals <- projectLocalPackages
+    depsLocals <- localDependencies
+    let allLocals = locals <> depsLocals
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do
-      depsLocals <- localDependencies
       files <- sequence
-        [lpFiles lp | lp <- locals ++ depsLocals]
+        [lpFiles lp | lp <- allLocals]
       liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
+
+    checkComponentsBuildable allLocals
 
     installMap <- toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
@@ -339,3 +342,13 @@ rawBuildInfo = do
             [ "version" .= CabalString (packageVersion p)
             , "path" .= toFilePath (parent $ lpCabalFile lp)
             ]
+
+checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
+checkComponentsBuildable lps =
+    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  where
+    unbuildable =
+        [ (packageName (lpPackage lp), c)
+        | lp <- lps
+        , c <- Set.toList (lpUnbuildable lp)
+        ]

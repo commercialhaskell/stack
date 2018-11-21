@@ -1868,7 +1868,7 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => SimpleGetter s WantedCompiler
+wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 -- | The version of the compiler which will actually be used. May be

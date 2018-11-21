@@ -630,9 +630,9 @@ solveExtraDeps modStackYaml = do
     (bundle, _) <- cabalPackagesCheck cabalDirs noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
-        oldFlags          = error "bcFlags bconfig"
+        oldFlags          = error "to be resolved in #4410"
     oldExtraVersions <- for deps $ fmap gpdVersion . liftIO . cpGPD . dpCommon
-    let sd                = error "bcSnapshotDef bconfig"
+    let sd                = error "to be resolved in #4410"
         resolver          = sdResolver sd
         oldSrcs           = gpdPackages gpds
         oldSrcFlags       = Map.intersection oldFlags oldSrcs

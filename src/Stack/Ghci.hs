@@ -290,8 +290,6 @@ findFileTargets locals fileTargets = do
                 associatedFiles
     return (targetMap, infoMap, extraFiles)
 
--- type SourceMap = Map PackageName PackageSource -- FIXME:qrilka
-
 getAllLocalTargets
     :: HasEnvConfig env
     => GhciOpts
@@ -623,8 +621,8 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
     econfig <- view envConfigL
     compilerVersion <- view actualCompilerVersionL
     let SourceMap{..} = envConfigSourceMap econfig
-        -- FIXME:qrilka currently this source map is being build with
-        -- the default target
+        -- Currently this source map is being build with
+        -- the default targets
         sourceMapGhcOptions = fromMaybe [] $
           (cpGhcOptions . ppCommon <$> M.lookup name smProject)
           <|>

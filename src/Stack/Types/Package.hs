@@ -25,6 +25,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -226,17 +227,24 @@ instance Eq Package where
 data PackageSource
   = PSFilePath LocalPackage InstallLocation
   -- ^ Package which exist on the filesystem
-  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocationImmutable PackageIdentifier
+  | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
   -- ^ Package which is downloaded remotely.
-    deriving Show
 
-piiVersion :: PackageSource -> Version
-piiVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
-piiVersion (PSRemote _ _ _ _ (PackageIdentifier _ v)) = v
+instance Show PackageSource where
+    show (PSFilePath lp loc) = concat ["PSFilePath (", show lp, ") ", show loc]
+    show (PSRemote pli v fromSnapshot _) =
+        concat
+            [ "PSRemote"
+            , "(", show pli, ")"
+            , "(", show v, ")"
+            , show fromSnapshot
+            , "<CommonPackage>"
+            ]
 
-piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSFilePath _ loc) = loc
-piiLocation (PSRemote loc _ _ _ _) = loc
+
+psVersion :: PackageSource -> Version
+psVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
+psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
