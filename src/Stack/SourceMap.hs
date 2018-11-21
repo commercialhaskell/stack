@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 module Stack.SourceMap
@@ -5,14 +6,19 @@ module Stack.SourceMap
     , snapToDepPackage
     , additionalDepPackage
     , getPLIVersion
+    , loadGlobalHints
     , toActual
     , checkFlagsUsedThrowing
     ) where
 
 import qualified Data.Conduit.List as CL
+import Data.Yaml (decodeFileThrow)
 import Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as PD
+import Network.HTTP.Download (download, redownload)
+import Network.HTTP.StackClient (parseRequest)
 import Pantry
+import qualified RIO
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import RIO.Process
@@ -20,6 +26,8 @@ import Stack.PackageDump
 import Stack.Prelude
 import Stack.Types.Build
 import Stack.Types.Compiler
+import Stack.Types.Config
+import Stack.Types.Runner (HasRunner)
 import Stack.Types.SourceMap
 
 -- | Create a 'ProjectPackage' from a directory containing a package.
@@ -110,12 +118,47 @@ versionMaybeFromPM _ loadGPD = do
     gpd <- liftIO loadGPD
     return $ pkgVersion $ PD.package $ PD.packageDescription gpd
 
-toActual ::
-       (HasProcessContext env, HasLogFunc env)
-    => SMWanted
-    -> ActualCompiler
-    -> RIO env SMActual
-toActual smw compiler = do
+
+-- | Load the global hints from Github.
+loadGlobalHints
+  :: HasRunner env
+  => Path Abs File -- ^ local cached file location
+  -> ActualCompiler
+  -> RIO env (Maybe (Map PackageName Version))
+loadGlobalHints dest ac =
+    inner False
+  where
+    inner alreadyDownloaded = do
+      req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
+      downloaded <- download req dest
+      eres <- tryAny inner2
+      mres <-
+        case eres of
+          Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
+          Right x -> pure x
+      case mres of
+        Nothing | not alreadyDownloaded && not downloaded -> do
+          logInfo $
+            "Could not find local global hints for " <>
+            RIO.display ac <>
+            ", forcing a redownload"
+          x <- redownload req dest
+          if x
+            then inner True
+            else do
+              logInfo "Redownload didn't happen"
+              pure Nothing
+        _ -> pure mres
+
+    inner2 = liftIO
+           $ Map.lookup ac . fmap (fmap unCabalString . unCabalStringMap)
+         <$> decodeFileThrow (toFilePath dest)
+
+globalsFromDump ::
+       (HasLogFunc env, HasProcessContext env)
+    => ActualCompiler
+    -> RIO env (Map PackageName GlobalPackage)
+globalsFromDump compiler = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
@@ -123,9 +166,34 @@ toActual smw compiler = do
         toGlobal d =
             ( pkgName $ dpPackageIdent d
             , GlobalPackage (pkgVersion $ dpPackageIdent d))
-    dumped <- toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
+    toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
+
+globalsFromHints ::
+       HasConfig env
+    => ActualCompiler
+    -> RIO env (Map PackageName GlobalPackage)
+globalsFromHints compiler = do
+    ghfp <- globalHintsFile
+    mglobalHints <- loadGlobalHints ghfp compiler
+    case mglobalHints of
+        Just hints -> pure $ Map.map GlobalPackage hints
+        Nothing -> do
+            logWarn $ "Unable to load global hints for " <> RIO.display compiler
+            pure mempty
+
+toActual ::
+       (HasConfig env)
+    => SMWanted
+    -> WithDownloadCompiler
+    -> ActualCompiler
+    -> RIO env SMActual
+toActual smw downloadCompiler compiler = do
+    allGlobals <-
+        case downloadCompiler of
+            WithDownloadCompiler -> globalsFromDump compiler
+            SkipDownloadCompiler -> globalsFromHints compiler
     let globals =
-            dumped `Map.difference` smwProject smw `Map.difference` smwDeps smw
+            allGlobals `Map.difference` smwProject smw `Map.difference` smwDeps smw
     return
         SMActual
         { smaCompiler = compiler

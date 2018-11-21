@@ -260,7 +260,8 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
 
-    smActual <- withProcessContext menv $ toActual (bcSMWanted bc) compilerVer
+    smActual <- withProcessContext menv $
+      toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
 
     logDebug "Resolving package entries"
 
@@ -374,7 +375,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let bc = envConfigBuildConfig envConfig
         compilerVer = smCompiler $ envConfigSourceMap envConfig
     runRIO bc $ do
-        smActual <- toActual (bcSMWanted bc) compilerVer
+        smActual <- toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
         targets <- parseTargets needTargets haddockDeps boptsCLI smActual
         sourceMap <- loadSourceMap targets boptsCLI smActual
         return $
