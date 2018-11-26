@@ -192,7 +192,7 @@ payloadText :: ListDepsOpts -> DotPayload -> Text
 payloadText opts payload =
   if listDepsLicense opts
     then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
-    else maybe "<unknown>" (Text.pack . show) (payloadVersion payload)
+    else maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans
