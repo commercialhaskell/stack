@@ -156,7 +156,6 @@ module Stack.Types.Config
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
   ,stackRootL
-  ,configUrlsL
   ,cabalVersionL
   ,whichCompilerL
   ,envOverrideSettingsL
@@ -220,7 +219,6 @@ import           Stack.Types.Runner
 import           Stack.Types.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
-import           Stack.Types.Urls
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
@@ -260,12 +258,8 @@ data Config =
          -- which will have an auto-detected default.
          ,configGHCBuild            :: !(Maybe CompilerBuild)
          -- ^ Override build of the compiler distribution (e.g. standard, gmp4, tinfo6)
-         ,configUrls                :: !Urls
-         -- ^ URLs for other files used by stack.
-         -- TODO: Better document
-         -- e.g. The latest snapshot file.
-         -- A build plan name (e.g. lts5.9.yaml) is appended when downloading
-         -- the build plan actually.
+         ,configLatestSnapshot      :: !Text
+         -- ^ URL of a JSON file providing the latest LTS and Nightly snapshots.
          ,configSystemGHC           :: !Bool
          -- ^ Should we use the system-installed GHC (on the PATH) if
          -- available? Can be overridden by command line options.
@@ -678,10 +672,8 @@ data ConfigMonoid =
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading      :: !(First Bool)
     -- ^ See: 'configHideTHLoading'
-    , configMonoidLatestSnapshotUrl  :: !(First Text)
-    -- ^ Deprecated in favour of 'urlsMonoidLatestSnapshot'
-    , configMonoidUrls               :: !UrlsMonoid
-    -- ^ See: 'configUrls
+    , configMonoidLatestSnapshot     :: !(First Text)
+    -- ^ See: 'configLatestSnapshot'
     , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
     -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
@@ -789,8 +781,16 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- First <$> obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- First <$> obj ..:? configMonoidHideTHLoadingName
-    configMonoidLatestSnapshotUrl <- First <$> obj ..:? configMonoidLatestSnapshotUrlName
-    configMonoidUrls <- jsonSubWarnings (obj ..:? configMonoidUrlsName ..!= mempty)
+
+    murls :: Maybe Value <- obj ..:? configMonoidUrlsName
+    configMonoidLatestSnapshot <-
+      case murls of
+        Nothing -> pure $ First Nothing
+        Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
+          "urls"
+          (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
+          urls
+
     configMonoidPackageIndices <- First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
     configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
     configMonoidInstallGHC <- First <$> obj ..:? configMonoidInstallGHCName
@@ -899,9 +899,6 @@ configMonoidConnectionCountName = "connection-count"
 
 configMonoidHideTHLoadingName :: Text
 configMonoidHideTHLoadingName = "hide-th-loading"
-
-configMonoidLatestSnapshotUrlName :: Text
-configMonoidLatestSnapshotUrlName = "latest-snapshot-url"
 
 configMonoidUrlsName :: Text
 configMonoidUrlsName = "urls"
@@ -1183,7 +1180,7 @@ data SuggestSolver = SuggestSolver | Don'tSuggestSolver
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
-askLatestSnapshotUrl = view $ configL.to configUrls.to urlsLatestSnapshot
+askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
 
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
@@ -1949,9 +1946,6 @@ globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL = globalOptsL.lens
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
-
-configUrlsL :: HasConfig env => Lens' env Urls
-configUrlsL = configL.lens configUrls (\x y -> x { configUrls = y })
 
 cabalVersionL :: HasEnvConfig env => Lens' env Version
 cabalVersionL = envConfigL.lens
