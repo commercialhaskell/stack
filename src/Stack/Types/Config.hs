@@ -583,12 +583,12 @@ data Project = Project
     , projectPackages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![PackageLocation]
+    , projectDependencies :: ![RawPackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
-    , projectResolver :: !SnapshotLocation
+    , projectResolver :: !RawSnapshotLocation
     -- ^ How we resolve which @SnapshotDef@ to use
     , projectCompiler :: !(Maybe WantedCompiler)
     -- ^ Override the compiler in 'projectResolver'
@@ -1016,7 +1016,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
+  | DuplicateLocalPackageNames ![(PackageName, [RawPackageLocation])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1460,7 +1460,7 @@ parseProjectAndConfigMonoid rootDir =
                   , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
                   , projectExtraPackageDBs = extraPackageDBs
                   , projectPackages = packages
-                  , projectDependencies = concatMap toList (deps' :: [NonEmpty PackageLocation])
+                  , projectDependencies = concatMap toList (deps' :: [NonEmpty RawPackageLocation])
                   , projectFlags = flags
                   , projectCurator = mcurator
                   }

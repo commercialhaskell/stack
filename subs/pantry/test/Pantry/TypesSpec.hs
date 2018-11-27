@@ -60,23 +60,23 @@ spec = do
       let bs = renderTree tree
       liftIO $ parseTree bs `shouldBe` Just tree
 
-  describe "SnapshotLayer" $ do
-    let parseSl :: String -> IO SnapshotLayer
+  describe "(Raw)SnapshotLayer" $ do
+    let parseSl :: String -> IO RawSnapshotLayer
         parseSl str = case Yaml.decodeThrow . S8.pack $ str of
           (Just (WithJSONWarnings x _)) -> resolvePaths Nothing x
-          Nothing -> fail "Can't parse SnapshotLayer"
+          Nothing -> fail "Can't parse RawSnapshotLayer"
 
     it "parses snapshot using 'resolver'" $ do
-      SnapshotLayer{..} <- parseSl $
+      RawSnapshotLayer{..} <- parseSl $
         "name: 'test'\n" ++
         "resolver: lts-2.10\n"
-      slParent `shouldBe` ltsSnapshotLocation 2 10
+      rslParent `shouldBe` ltsSnapshotLocation 2 10
 
     it "parses snapshot using 'snapshot'" $ do
-      SnapshotLayer{..} <- parseSl $
+      RawSnapshotLayer{..} <- parseSl $
         "name: 'test'\n" ++
         "snapshot: lts-2.10\n"
-      slParent `shouldBe` ltsSnapshotLocation 2 10
+      rslParent `shouldBe` ltsSnapshotLocation 2 10
 
     it "throws if both 'resolver' and 'snapshot' are present" $ do
       let go = parseSl $
@@ -90,7 +90,7 @@ spec = do
       go `shouldThrow` anyException
 
     it "works if no 'snapshot' specified" $ do
-      SnapshotLayer{..} <- parseSl $
+      RawSnapshotLayer{..} <- parseSl $
         "name: 'test'\n" ++
         "compiler: ghc-8.0.1\n"
-      slParent `shouldBe` SLCompiler (WCGhc (mkVersion [8, 0, 1]))
+      rslParent `shouldBe` RSLCompiler (WCGhc (mkVersion [8, 0, 1]))

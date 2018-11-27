@@ -107,12 +107,12 @@ initProject whichCmd currDir initOpts mresolver = do
         gpds = Map.elems $ fmap snd rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
-      PLImmutable <$> completePackageLocation (PLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+      PLImmutable <$> completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
             , projectPackages = RelFilePath . T.pack <$> pkgs
-            , projectDependencies = deps
+            , projectDependencies = map toRawPL deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = sdResolver sd
             , projectCompiler = Nothing
@@ -432,7 +432,7 @@ checkBundleResolver whichCmd initOpts bundle sd = do
         BuildPlanCheckPartial f e -> do
             shouldUseSolver <- case (resolver, initOpts) of
                 (_, InitOpts { useSolver = True }) -> return True
-                (SLCompiler _, _) -> do
+                (RSLCompiler _, _) -> do
                     logInfo "Using solver because a compiler resolver was specified."
                     return True
                 _ -> return False

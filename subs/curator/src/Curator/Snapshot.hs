@@ -13,18 +13,18 @@ makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
   -> Text -- ^ name
-  -> RIO env SnapshotLayer
+  -> RIO env RawSnapshotLayer
 makeSnapshot cons name = do
   locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
-  pure SnapshotLayer
-    { slParent = SLCompiler $ WCGhc $ consGhcVersion cons
-    , slCompiler = Nothing
-    , slName = name
-    , slLocations = catMaybes locs
-    , slDropPackages = mempty
-    , slFlags = Map.mapMaybe getFlags (consPackages cons)
-    , slHidden = Map.filter id (pcHide <$> consPackages cons)
-    , slGhcOptions = mempty
+  pure RawSnapshotLayer
+    { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
+    , rslCompiler = Nothing
+    , rslName = name
+    , rslLocations = catMaybes locs
+    , rslDropPackages = mempty
+    , rslFlags = Map.mapMaybe getFlags (consPackages cons)
+    , rslHidden = Map.filter id (pcHide <$> consPackages cons)
+    , rslGhcOptions = mempty
     }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
@@ -36,7 +36,7 @@ toLoc
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> PackageConstraints
-  -> RIO env (Maybe PackageLocationImmutable)
+  -> RIO env (Maybe RawPackageLocationImmutable)
 toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
@@ -70,7 +70,7 @@ toLoc name pc =
             case viewer revs of
               Nothing -> error $ "Impossible! No revisions found for " ++ show (name, version)
               Just (BlobKey sha size, _) -> pure $ CFIHash sha $ Just size
-          pure $ Just $ PLIHackage (PackageIdentifierRevision name version cfi) Nothing
+          pure $ Just $ RPLIHackage (PackageIdentifierRevision name version cfi) Nothing
 
 traverseValidate
   :: (MonadUnliftIO m, Traversable t)

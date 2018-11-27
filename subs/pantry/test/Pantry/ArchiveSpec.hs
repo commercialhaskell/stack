@@ -19,8 +19,8 @@ data TestArchive = TestArchive
   , testSubdir :: !Text
   }
 
-getPackageLocationIdent' :: TestArchive -> IO PackageIdentifier
-getPackageLocationIdent' TestArchive{..} = do
+getRawPackageLocationIdent' :: TestArchive -> IO PackageIdentifier
+getRawPackageLocationIdent' TestArchive{..} = do
   testLocation' <- case testLocation of
     TLFilePath relPath -> do
       absPath <- resolveFile' relPath
@@ -29,19 +29,19 @@ getPackageLocationIdent' TestArchive{..} = do
         , resolvedAbsolute = absPath
         }
     TLUrl url -> return $ ALUrl url
-  let archive = Archive
-        { archiveLocation = testLocation'
-        , archiveHash = Nothing
-        , archiveSize = Nothing
-        , archiveSubdir = testSubdir
+  let archive = RawArchive
+        { raLocation = testLocation'
+        , raHash = Nothing
+        , raSize = Nothing
+        , raSubdir = testSubdir
         }
-  runPantryApp $ getPackageLocationIdent $ PLIArchive archive metadata
+  runPantryApp $ getRawPackageLocationIdent $ RPLIArchive archive metadata
   where
-    metadata = PackageMetadata
-      { pmName = Nothing
-      , pmVersion = Nothing
-      , pmTreeKey = Nothing
-      , pmCabal = Nothing
+    metadata = RawPackageMetadata
+      { rpmName = Nothing
+      , rpmVersion = Nothing
+      , rpmTreeKey = Nothing
+      , rpmCabal = Nothing
       }
 
 parsePackageIdentifier' :: String -> PackageIdentifier
@@ -61,25 +61,25 @@ treeWithoutCabalFile _ = False
 spec :: Spec
 spec = do
   it "finds cabal file from tarball" $ do
-    ident <- getPackageLocationIdent' TestArchive
+    ident <- getRawPackageLocationIdent' TestArchive
       { testLocation = TLFilePath "attic/package-0.1.2.3.tar.gz"
       , testSubdir = ""
       }
     ident `shouldBe` parsePackageIdentifier' "package-0.1.2.3"
   it "finds cabal file from tarball with subdir '.'" $ do
-    ident <- getPackageLocationIdent' TestArchive
+    ident <- getRawPackageLocationIdent' TestArchive
       { testLocation = TLFilePath "attic/package-0.1.2.3.tar.gz"
       , testSubdir = "."
       }
     ident `shouldBe` parsePackageIdentifier' "package-0.1.2.3"
   it "finds cabal file from tarball with subdir 'subs/pantry/'" $ do
-    ident <- getPackageLocationIdent' TestArchive
+    ident <- getRawPackageLocationIdent' TestArchive
       { testLocation = urlToStackCommit "2b846ff4fda13a8cd095e7421ce76df0a08b10dc"
       , testSubdir = "subs/pantry/"
       }
     ident `shouldBe` parsePackageIdentifier' "pantry-0.1.0.0"
   it "matches whole directory name" $
-    getPackageLocationIdent' TestArchive
+    getRawPackageLocationIdent' TestArchive
       { testLocation = urlToStackCommit "2b846ff4fda13a8cd095e7421ce76df0a08b10dc"
       , testSubdir = "subs/pant"
       }

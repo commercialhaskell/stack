@@ -76,7 +76,7 @@ build = do
     (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
     runProcess_
 
-loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp SnapshotLayer
+loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp RawSnapshotLayer
 loadPantrySnapshotLayerFile fp = do
   abs' <- resolveFile' fp
   eres <- loadSnapshotLayer $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')

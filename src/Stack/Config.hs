@@ -60,7 +60,6 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -158,7 +157,7 @@ getSnapshots = do
 makeConcreteResolver
     :: HasConfig env
     => AbstractResolver
-    -> RIO env SnapshotLocation
+    -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
 makeConcreteResolver ar = do
     snapshots <- getSnapshots
@@ -186,7 +185,7 @@ makeConcreteResolver ar = do
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: HasConfig env => RIO env SnapshotLocation
+getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = uncurry ltsSnapshotLocation <$>
@@ -587,7 +586,7 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    snapshot <- loadSnapshot (projectResolver project)
+    snapshot <- loadSnapshotRaw $ projectResolver project
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -604,11 +603,11 @@ loadBuildConfig mproject maresolver mcompiler = do
       pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
-      map (second (PLMutable . ppResolvedDir)) packages0 ++
-      map (second dpLocation) deps0
+      map (second (RPLMutable . ppResolvedDir)) packages0 ++
+       map (second dpLocation) deps0
 
     let packages1 = Map.fromList packages0
-        snPackages = snapshotPackages snapshot `Map.difference` packages1
+        snPackages = rsPackages snapshot `Map.difference` packages1
           `Map.difference` Map.fromList deps0
 
     snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
@@ -637,7 +636,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
     let wanted = SMWanted
-          { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
+          { smwCompiler = fromMaybe (rsCompiler snapshot)  mcompiler
           , smwProject = packages
           , smwDeps = deps
           }
@@ -657,7 +656,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         , bcDownloadCompiler = WithDownloadCompiler
         }
   where
-    getEmptyProject :: Maybe SnapshotLocation -> RIO Config Project
+    getEmptyProject :: Maybe RawSnapshotLocation -> RIO Config Project
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do
@@ -680,7 +679,7 @@ loadBuildConfig mproject maresolver mcompiler = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocation)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, RawPackageLocation)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

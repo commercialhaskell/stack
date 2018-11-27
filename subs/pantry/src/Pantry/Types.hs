@@ -26,6 +26,7 @@ module Pantry.Types
   , PackageNameP (..)
   , VersionP (..)
   , PackageIdentifierRevision (..)
+  , pirForHash
   , FileType (..)
   , FileSize (..)
   , TreeEntry (..)
@@ -41,9 +42,15 @@ module Pantry.Types
   , resolvePaths
   , Package (..)
   -- , PackageTarball (..)
+  , RawPackageLocation (..)
   , PackageLocation (..)
+  , toRawPL
+  , RawPackageLocationImmutable (..)
   , PackageLocationImmutable (..)
+  , toRawPLI
+  , RawArchive (..)
   , Archive (..)
+  , toRawArchive
   , Repo (..)
   , RepoType (..)
   , parsePackageIdentifier
@@ -73,13 +80,21 @@ module Pantry.Types
   --, resolveSnapshotLocation
   , ltsSnapshotLocation
   , nightlySnapshotLocation
+  , RawSnapshotLocation (..)
   , SnapshotLocation (..)
-  , parseSnapshotLocation
+  , toRawSL
+  , parseRawSnapshotLocation
+  , RawSnapshotLayer (..)
   , SnapshotLayer (..)
+  , toRawSnapshotLayer
+  , RawSnapshot (..)
   , Snapshot (..)
+  , RawSnapshotPackage (..)
   , SnapshotPackage (..)
   , parseWantedCompiler
+  , RawPackageMetadata (..)
   , PackageMetadata (..)
+  , toRawPM
   , cabalFileName
   ) where
 
@@ -181,6 +196,8 @@ data PantryConfig = PantryConfig
   -- time. Start at @True@.
   , pcParsedCabalFilesImmutable :: !(IORef (Map PackageLocationImmutable GenericPackageDescription))
   -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
+  , pcParsedCabalFilesRawImmutable :: !(IORef (Map RawPackageLocationImmutable GenericPackageDescription))
+  -- ^ FIXME: to be removed
   , pcParsedCabalFilesMutable ::
       !(IORef
         (Map
@@ -243,6 +260,19 @@ instance Store (ResolvedPath File)
 
 -- | Location to load a package from. Can either be immutable (see
 -- 'PackageLocationImmutable') or a local directory which is expected
+-- to change over time. Raw version doesn't include exact package
+-- version (e.g. could refer to the latest revision on Hackage)
+--
+-- @since 0.1.0.0
+data RawPackageLocation
+  = RPLImmutable !RawPackageLocationImmutable
+  | RPLMutable !(ResolvedPath Dir)
+  deriving (Show, Eq, Data, Generic)
+instance NFData RawPackageLocation
+instance Store RawPackageLocation
+
+-- | Location to load a package from. Can either be immutable (see
+-- 'PackageLocationImmutable') or a local directory which is expected
 -- to change over time.
 --
 -- @since 0.1.0.0
@@ -257,11 +287,45 @@ instance Display PackageLocation where
   display (PLImmutable loc) = display loc
   display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
 
+-- | Convert `PackageLocation` to its "raw" equivalent
+--
+-- @since 0.1.0.0
+toRawPL :: PackageLocation -> RawPackageLocation
+toRawPL (PLImmutable im) = RPLImmutable (toRawPLI im)
+toRawPL (PLMutable m) = RPLMutable m
+
+-- | Location for remote packages or archives assumed to be immutable.
+-- as user specifies it i.e. not an exact location
+--
+-- @since 0.1.0.0
+data RawPackageLocationImmutable
+  = RPLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  | RPLIArchive !RawArchive !RawPackageMetadata
+  | RPLIRepo    !Repo !RawPackageMetadata
+  deriving (Show, Eq, Ord, Data, Generic)
+
+instance NFData RawPackageLocationImmutable
+instance Store RawPackageLocationImmutable
+
+instance Display RawPackageLocationImmutable where
+  display (RPLIHackage pir _tree) = display pir <> " (from Hackage)"
+  display (RPLIArchive archive _pm) =
+    "Archive from " <> display (raLocation archive) <>
+    (if T.null $ raSubdir archive
+       then mempty
+       else " in subdir " <> display (raSubdir archive))
+  display (RPLIRepo repo _pm) =
+    "Repo from " <> display (repoUrl repo) <>
+    ", commit " <> display (repoCommit repo) <>
+    (if T.null $ repoSubdir repo
+       then mempty
+       else " in subdir " <> display (repoSubdir repo))
+
 -- | Location for remote packages or archives assumed to be immutable.
 --
 -- @since 0.1.0.0
 data PackageLocationImmutable
-  = PLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
+  = PLIHackage !PackageIdentifier !BlobKey !TreeKey
   | PLIArchive !Archive !PackageMetadata
   | PLIRepo    !Repo !PackageMetadata
   deriving (Generic, Show, Eq, Ord, Data, Typeable)
@@ -269,7 +333,8 @@ instance NFData PackageLocationImmutable
 instance Store PackageLocationImmutable
 
 instance Display PackageLocationImmutable where
-  display (PLIHackage pir _tree) = display pir <> " (from Hackage)"
+  display (PLIHackage ident _cabalHash _tree) =
+    fromString (packageNameString $ pkgName ident) <> " (from Hackage)"
   display (PLIArchive archive _pm) =
     "Archive from " <> display (archiveLocation archive) <>
     (if T.null $ archiveSubdir archive
@@ -282,6 +347,52 @@ instance Display PackageLocationImmutable where
        then mempty
        else " in subdir " <> display (repoSubdir repo))
 
+instance ToJSON PackageLocationImmutable where
+  toJSON = toJSON . toRawPLI
+
+-- | Package identifier and revision with a specified cabal file hash
+--
+-- @since 0.1.0.0
+pirForHash :: PackageIdentifier -> BlobKey -> PackageIdentifierRevision
+pirForHash (PackageIdentifier name ver) (BlobKey sha size') =
+  let cfi = CFIHash sha (Just size')
+  in PackageIdentifierRevision name ver cfi
+
+-- | Convert `PackageLocationImmutable` to its "raw" equivalent
+--
+-- @since 0.1.0.0
+toRawPLI :: PackageLocationImmutable -> RawPackageLocationImmutable
+toRawPLI (PLIHackage ident cfKey treeKey) = RPLIHackage (pirForHash ident cfKey) (Just treeKey)
+toRawPLI (PLIArchive archive pm) = RPLIArchive (toRawArchive archive) (toRawPM pm)
+toRawPLI (PLIRepo repo pm) = RPLIRepo repo (toRawPM pm)
+
+-- | A raw package archive, specified by a user, could have no
+-- hash and file size information.
+--
+-- @since 0.1.0.0
+data RawArchive = RawArchive
+  { raLocation :: !ArchiveLocation
+  -- ^ Location of the archive
+  --
+  -- @since 0.1.0.0
+  , raHash :: !(Maybe SHA256)
+  -- ^ Cryptographic hash of the archive file
+  --
+  -- @since 0.1.0.0
+  , raSize :: !(Maybe FileSize)
+  -- ^ Size of the archive file
+  --
+  -- @since 0.1.0.0
+  , raSubdir :: !Text
+  -- ^ Subdirectory within the archive to get the package from.
+  --
+  -- @since 0.1.0.0
+  }
+    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+
+instance Store RawArchive
+instance NFData RawArchive
+
 -- | A package archive, could be from a URL or a local file
 -- path. Local file path archives are assumed to be unchanging
 -- over time, and so are allowed in custom snapshots.
@@ -292,11 +403,11 @@ data Archive = Archive
   -- ^ Location of the archive
   --
   -- @since 0.1.0.0
-  , archiveHash :: !(Maybe SHA256)
+  , archiveHash :: !SHA256
   -- ^ Cryptographic hash of the archive file
   --
   -- @since 0.1.0.0
-  , archiveSize :: !(Maybe FileSize)
+  , archiveSize :: !FileSize
   -- ^ Size of the archive file
   --
   -- @since 0.1.0.0
@@ -308,6 +419,14 @@ data Archive = Archive
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance Store Archive
 instance NFData Archive
+
+-- | Convert archive to its "raw" equivalent.
+--
+-- @since 0.1.0.0
+toRawArchive :: Archive -> RawArchive
+toRawArchive archive =
+  RawArchive (archiveLocation archive) (Just $ archiveHash archive)
+             (Just $ archiveSize archive) (archiveSubdir archive)
 
 -- | The type of a source control repository.
 --
@@ -587,12 +706,12 @@ data Mismatch a = Mismatch
 data PantryException
   = PackageIdentifierRevisionParseFail !Text
   | InvalidCabalFile
-      !(Either PackageLocationImmutable (Path Abs File))
+      !(Either RawPackageLocationImmutable (Path Abs File))
       !(Maybe Version)
       ![PError]
       ![PWarning]
-  | TreeWithoutCabalFile !PackageLocationImmutable
-  | TreeWithMultipleCabalFiles !PackageLocationImmutable ![SafeFilePath]
+  | TreeWithoutCabalFile !RawPackageLocationImmutable
+  | TreeWithMultipleCabalFiles !RawPackageLocationImmutable ![SafeFilePath]
   | MismatchedCabalName !(Path Abs File) !PackageName
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
@@ -600,17 +719,17 @@ data PantryException
   | InvalidSnapshotLocation !(Path Abs Dir) !Text
   | InvalidOverrideCompiler !WantedCompiler !WantedCompiler
   | InvalidFilePathSnapshot !Text
-  | InvalidSnapshot !SnapshotLocation !SomeException
+  | InvalidSnapshot !RawSnapshotLocation !SomeException
   | MismatchedPackageMetadata
-      !PackageLocationImmutable
-      !PackageMetadata
+      !RawPackageLocationImmutable
+      !RawPackageMetadata
       !(Maybe TreeKey)
       !BlobKey -- cabal file found
       !PackageIdentifier
   | Non200ResponseStatus !Status
   | InvalidBlobKey !(Mismatch BlobKey)
-  | Couldn'tParseSnapshot !SnapshotLocation !String
-  | WrongCabalFileName !PackageLocationImmutable !SafeFilePath !PackageName
+  | Couldn'tParseSnapshot !RawSnapshotLocation !String
+  | WrongCabalFileName !RawPackageLocationImmutable !SafeFilePath !PackageName
   | DownloadInvalidSHA256 !Text !(Mismatch SHA256)
   | DownloadInvalidSize !Text !(Mismatch FileSize)
   | DownloadTooLarge !Text !(Mismatch FileSize)
@@ -623,8 +742,8 @@ data PantryException
   | UnsupportedTarball !ArchiveLocation !Text
   | NoHackageCryptographicHash !PackageIdentifier
   | FailedToCloneRepo !Repo
-  | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
-  | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
+  | TreeReferencesMissingBlob !RawPackageLocationImmutable !SafeFilePath !BlobKey
+  | CompletePackageMetadataMismatch !RawPackageLocationImmutable !PackageMetadata
   | CRC32Mismatch !ArchiveLocation !FilePath !(Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
   | CannotCompleteRepoNonSHA1 !Repo
@@ -633,7 +752,7 @@ data PantryException
   | PackageNameParseFail !Text
   | PackageVersionParseFail !Text
   | InvalidCabalFilePath !(Path Abs File)
-  | DuplicatePackageNames !Utf8Builder ![(PackageName, [PackageLocationImmutable])]
+  | DuplicatePackageNames !Utf8Builder ![(PackageName, [RawPackageLocationImmutable])]
 
   deriving Typeable
 instance Exception PantryException where
@@ -1104,7 +1223,7 @@ moduleNameString = Distribution.Text.display
 
 data OptionalSubdirs
   = OSSubdirs !(NonEmpty Text)
-  | OSPackageMetadata !Text !PackageMetadata
+  | OSPackageMetadata !Text !RawPackageMetadata
   -- ^ subdirectory and package metadata
   deriving (Show, Eq, Data, Generic)
 instance NFData OptionalSubdirs
@@ -1116,20 +1235,49 @@ instance Store OptionalSubdirs
 -- has the expected information.
 --
 -- @since 0.1.0.0
-data PackageMetadata = PackageMetadata
-  { pmName :: !(Maybe PackageName)
+data RawPackageMetadata = RawPackageMetadata
+  { rpmName :: !(Maybe PackageName)
     -- ^ Package name in the cabal file
     --
     -- @since 0.1.0.0
-  , pmVersion :: !(Maybe Version)
+  , rpmVersion :: !(Maybe Version)
     -- ^ Package version in the cabal file
     --
     -- @since 0.1.0.0
-  , pmTreeKey :: !(Maybe TreeKey)
+  , rpmTreeKey :: !(Maybe TreeKey)
     -- ^ Tree key of the loaded up package
     --
     -- @since 0.1.0.0
-  , pmCabal :: !(Maybe BlobKey)
+  , rpmCabal :: !(Maybe BlobKey)
+    -- ^ Blob key containing the cabal file
+    --
+    -- @since 0.1.0.0
+  }
+  deriving (Show, Eq, Ord, Generic, Data, Typeable)
+instance Store RawPackageMetadata
+instance NFData RawPackageMetadata
+
+instance Display RawPackageMetadata where
+  display rpm = fold $ intersperse ", " $ catMaybes
+    [ (\name -> "name == " <> fromString (packageNameString name)) <$> rpmName rpm
+    , (\version -> "version == " <> fromString (versionString version)) <$> rpmVersion rpm
+    , (\tree -> "tree == " <> display tree) <$> rpmTreeKey rpm
+    , (\cabal -> "cabal file == " <> display cabal) <$> rpmCabal rpm
+    ]
+
+-- | Exact metadata specifying concrete package
+--
+-- @since 0.1.0.0
+data PackageMetadata = PackageMetadata
+  { pmIdent :: !PackageIdentifier
+    -- ^ Package identifier in the cabal file
+    --
+    -- @since 0.1.0.0
+  , pmTreeKey :: !TreeKey
+    -- ^ Tree key of the loaded up package
+    --
+    -- @since 0.1.0.0
+  , pmCabal :: !BlobKey
     -- ^ Blob key containing the cabal file
     --
     -- @since 0.1.0.0
@@ -1139,12 +1287,19 @@ instance Store PackageMetadata
 instance NFData PackageMetadata
 
 instance Display PackageMetadata where
-  display pm = fold $ intersperse ", " $ catMaybes
-    [ (\name -> "name == " <> fromString (packageNameString name)) <$> pmName pm
-    , (\version -> "version == " <> fromString (versionString version)) <$> pmVersion pm
-    , (\tree -> "tree == " <> display tree) <$> pmTreeKey pm
-    , (\cabal -> "cabal file == " <> display cabal) <$> pmCabal pm
+  display pm = fold $ intersperse ", " $
+    [ "ident == " <> fromString (packageIdentifierString $ pmIdent pm)
+    , "tree == " <> display (pmTreeKey pm)
+    , "cabal file == " <> display (pmCabal pm)
     ]
+
+-- | Conver package metadata to its "raw" equivalent.
+--
+-- @since 0.1.0.0
+toRawPM :: PackageMetadata -> RawPackageMetadata
+toRawPM pm = RawPackageMetadata (Just name) (Just version) (Just $ pmTreeKey pm) (Just $ pmCabal pm)
+  where
+    PackageIdentifier name version = pmIdent pm
 
 -- | File path relative to the configuration file it was parsed from
 --
@@ -1200,42 +1355,42 @@ validateFilePath t =
                pure $ ALFilePath $ ResolvedPath (RelFilePath t) abs'
     else fail $ "Does not have an archive file extension: " ++ T.unpack t
 
-instance ToJSON PackageLocation where
-  toJSON (PLImmutable pli) = toJSON pli
-  toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
-instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocation))) where
+instance ToJSON RawPackageLocation where
+  toJSON (RPLImmutable rpli) = toJSON rpli
+  toJSON (RPLMutable resolved) = toJSON (resolvedRelative resolved)
+instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocation))) where
   parseJSON v =
-    ((fmap.fmap.fmap.fmap) PLImmutable (parseJSON v)) <|>
+    ((fmap.fmap.fmap.fmap) RPLImmutable (parseJSON v)) <|>
     ((noJSONWarnings . mkMutable) <$> parseJSON v)
     where
-      mkMutable :: Text -> Unresolved (NonEmpty PackageLocation)
+      mkMutable :: Text -> Unresolved (NonEmpty RawPackageLocation)
       mkMutable t = Unresolved $ \mdir -> do
         case mdir of
           Nothing -> throwIO $ MutablePackageLocationFromUrl t
           Just dir -> do
             abs' <- resolveDir dir $ T.unpack t
-            pure $ pure $ PLMutable $ ResolvedPath (RelFilePath t) abs'
+            pure $ pure $ RPLMutable $ ResolvedPath (RelFilePath t) abs'
 
-instance ToJSON PackageLocationImmutable where
-  toJSON (PLIHackage pir mtree) = object $ concat
+instance ToJSON RawPackageLocationImmutable where
+  toJSON (RPLIHackage pir mtree) = object $ concat
     [ ["hackage" .= pir]
     , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
     ]
-  toJSON (PLIArchive (Archive loc msha msize subdir) pm) = object $ concat
+  toJSON (RPLIArchive (RawArchive loc msha msize subdir) rpm) = object $ concat
     [ case loc of
         ALUrl url -> ["url" .= url]
         ALFilePath resolved -> ["filepath" .= resolvedRelative resolved]
     , maybe [] (\sha -> ["sha256" .= sha]) msha
     , maybe [] (\size' -> ["size" .= size']) msize
     , if T.null subdir then [] else ["subdir" .= subdir]
-    , pmToPairs pm
+    , rpmToPairs rpm
     ]
-  toJSON (PLIRepo (Repo url commit typ subdir) pm) = object $ concat
+  toJSON (RPLIRepo (Repo url commit typ subdir) rpm) = object $ concat
     [ [ urlKey .= url
       , "commit" .= commit
       ]
     , if T.null subdir then [] else ["subdir" .= subdir]
-    , pmToPairs pm
+    , rpmToPairs rpm
     ]
     where
       urlKey =
@@ -1243,15 +1398,15 @@ instance ToJSON PackageLocationImmutable where
           RepoGit -> "git"
           RepoHg  -> "hg"
 
-pmToPairs :: PackageMetadata -> [(Text, Value)]
-pmToPairs (PackageMetadata mname mversion mtree mcabal) = concat
+rpmToPairs :: RawPackageMetadata -> [(Text, Value)]
+rpmToPairs (RawPackageMetadata mname mversion mtree mcabal) = concat
   [ maybe [] (\name -> ["name" .= CabalString name]) mname
   , maybe [] (\version -> ["version" .= CabalString version]) mversion
   , maybe [] (\tree -> ["pantry-tree" .= tree]) mtree
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
   ]
 
-instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) where
+instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where
   parseJSON v
       = http v
     <|> hackageText v
@@ -1261,24 +1416,24 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
     <|> github v
     <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
     where
-      http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
+      http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
       http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
         case parseArchiveLocationText t of
           Nothing -> fail $ "Invalid archive location: " ++ T.unpack t
           Just (Unresolved mkArchiveLocation) ->
             pure $ noJSONWarnings $ Unresolved $ \mdir -> do
-              archiveLocation <- mkArchiveLocation mdir
-              let archiveHash = Nothing
-                  archiveSize = Nothing
-                  archiveSubdir = T.empty
-              pure $ pure $ PLIArchive Archive {..} pmEmpty
+              raLocation <- mkArchiveLocation mdir
+              let raHash = Nothing
+                  raSize = Nothing
+                  raSubdir = T.empty
+              pure $ pure $ RPLIArchive RawArchive {..} rpmEmpty
 
       hackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
         case parsePackageIdentifierRevision t of
           Left e -> fail $ show e
-          Right pir -> pure $ noJSONWarnings $ pure $ pure $ PLIHackage pir Nothing
+          Right pir -> pure $ noJSONWarnings $ pure $ pure $ RPLIHackage pir Nothing
 
-      hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure.pure) <$> (PLIHackage
+      hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure.pure) <$> (RPLIHackage
         <$> o ..: "hackage"
         <*> o ..:? "pantry-tree")
 
@@ -1294,7 +1449,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
               Just x -> pure $ OSSubdirs x
           Nothing -> OSPackageMetadata
             <$> o ..:? "subdir" ..!= T.empty
-            <*> (PackageMetadata
+            <*> (RawPackageMetadata
                   <$> (fmap unCabalString <$> (o ..:? "name"))
                   <*> (fmap unCabalString <$> (o ..:? "version"))
                   <*> o ..:? "pantry-tree"
@@ -1306,39 +1461,39 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
           ((RepoHg, ) <$> o ..: "hg")
         repoCommit <- o ..: "commit"
         os <- optionalSubdirs o
-        pure $ pure $ NE.map (\(repoSubdir, pm) -> PLIRepo Repo {..} pm) (osToPms os)
+        pure $ pure $ NE.map (\(repoSubdir, pm) -> RPLIRepo Repo {..} pm) (osToRpms os)
 
       archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
         Unresolved mkArchiveLocation <- parseArchiveLocationObject o
-        archiveHash <- o ..:? "sha256"
-        archiveSize <- o ..:? "size"
+        raHash <- o ..:? "sha256"
+        raSize <- o ..:? "size"
         os <- optionalSubdirs o
         pure $ Unresolved $ \mdir -> do
-          archiveLocation <- mkArchiveLocation mdir
-          pure $ NE.map (\(archiveSubdir, pm) -> PLIArchive Archive {..} pm) (osToPms os)
+          raLocation <- mkArchiveLocation mdir
+          pure $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
 
       github = withObjectWarnings "PLArchive:github" $ \o -> do
         GitHubRepo ghRepo <- o ..: "github"
         commit <- o ..: "commit"
-        let archiveLocation = ALUrl $ T.concat
+        let raLocation = ALUrl $ T.concat
               [ "https://github.com/"
               , ghRepo
               , "/archive/"
               , commit
               , ".tar.gz"
               ]
-        archiveHash <- o ..:? "sha256"
-        archiveSize <- o ..:? "size"
+        raHash <- o ..:? "sha256"
+        raSize <- o ..:? "size"
         os <- optionalSubdirs o
-        pure $ pure $ NE.map (\(archiveSubdir, pm) -> PLIArchive Archive {..} pm) (osToPms os)
+        pure $ pure $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
 
 -- | Returns pairs of subdirectory and 'PackageMetadata'.
-osToPms :: OptionalSubdirs -> NonEmpty (Text, PackageMetadata)
-osToPms (OSSubdirs subdirs) = NE.map (, pmEmpty) subdirs
-osToPms (OSPackageMetadata subdir pm) = pure (subdir, pm)
+osToRpms :: OptionalSubdirs -> NonEmpty (Text, RawPackageMetadata)
+osToRpms (OSSubdirs subdirs) = NE.map (, rpmEmpty) subdirs
+osToRpms (OSPackageMetadata subdir rpm) = pure (subdir, rpm)
 
-pmEmpty :: PackageMetadata
-pmEmpty = PackageMetadata Nothing Nothing Nothing Nothing
+rpmEmpty :: RawPackageMetadata
+rpmEmpty = RawPackageMetadata Nothing Nothing Nothing Nothing
 
 -- | Newtype wrapper for easier JSON integration with Cabal types.
 --
@@ -1459,17 +1614,17 @@ parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
       pure $ WCGhcjs ghcjsV ghcV
     parseGhc = fmap WCGhc . parseVersion . T.unpack
 
-instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
+instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLocation)) where
   parseJSON v = text v <|> obj v
     where
-      text :: Value -> Parser (WithJSONWarnings (Unresolved SnapshotLocation))
-      text = withText "UnresolvedSnapshotLocation (Text)" $ pure . noJSONWarnings . parseSnapshotLocation
+      text :: Value -> Parser (WithJSONWarnings (Unresolved RawSnapshotLocation))
+      text = withText "UnresolvedSnapshotLocation (Text)" $ pure . noJSONWarnings . parseRawSnapshotLocation
 
-      obj :: Value -> Parser (WithJSONWarnings (Unresolved SnapshotLocation))
+      obj :: Value -> Parser (WithJSONWarnings (Unresolved RawSnapshotLocation))
       obj = withObjectWarnings "UnresolvedSnapshotLocation (Object)" $ \o ->
-        ((pure . SLCompiler) <$> o ..: "compiler") <|>
-        ((\x y -> pure $ SLUrl x y) <$> o ..: "url" <*> blobKey o) <|>
-        (parseSnapshotLocationPath <$> o ..: "filepath")
+        ((pure . RSLCompiler) <$> o ..: "compiler") <|>
+        ((\x y -> pure $ RSLUrl x y) <$> o ..: "url" <*> blobKey o) <|>
+        (parseRawSnapshotLocationPath <$> o ..: "filepath")
 
       blobKey o = do
         msha <- o ..:? "sha256"
@@ -1482,16 +1637,15 @@ instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
 
 instance Display SnapshotLocation where
   display (SLCompiler compiler) = display compiler
-  display (SLUrl url Nothing) = display url
-  display (SLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
+  display (SLUrl url blob) = display url <> " (" <> display blob <> ")"
   display (SLFilePath resolved) = display (resolvedRelative resolved)
 
--- | Parse a 'Text' into an 'Unresolved' 'SnapshotLocation'.
+-- | Parse a 'Text' into an 'Unresolved' 'RawSnapshotLocation'.
 --
 -- @since 0.1.0.0
-parseSnapshotLocation :: Text -> Unresolved SnapshotLocation
-parseSnapshotLocation t0 = fromMaybe (parseSnapshotLocationPath t0) $
-  (either (const Nothing) (Just . pure . SLCompiler) (parseWantedCompiler t0)) <|>
+parseRawSnapshotLocation :: Text -> Unresolved RawSnapshotLocation
+parseRawSnapshotLocation t0 = fromMaybe (parseRawSnapshotLocationPath t0) $
+  (either (const Nothing) (Just . pure . RSLCompiler) (parseWantedCompiler t0)) <|>
   parseLts <|>
   parseNightly <|>
   parseGithub <|>
@@ -1516,18 +1670,18 @@ parseSnapshotLocation t0 = fromMaybe (parseSnapshotLocationPath t0) $
       path <- T.stripPrefix ":" t4
       Just $ pure $ githubSnapshotLocation user repo path
 
-    parseUrl = parseRequest (T.unpack t0) $> pure (SLUrl t0 Nothing)
+    parseUrl = parseRequest (T.unpack t0) $> pure (RSLUrl t0 Nothing)
 
-parseSnapshotLocationPath :: Text -> Unresolved SnapshotLocation
-parseSnapshotLocationPath t =
+parseRawSnapshotLocationPath :: Text -> Unresolved RawSnapshotLocation
+parseRawSnapshotLocationPath t =
   Unresolved $ \mdir ->
   case mdir of
     Nothing -> throwIO $ InvalidFilePathSnapshot t
     Just dir -> do
       abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
-      pure $ SLFilePath $ ResolvedPath (RelFilePath t) abs'
+      pure $ RSLFilePath $ ResolvedPath (RelFilePath t) abs'
 
-githubSnapshotLocation :: Text -> Text -> Text -> SnapshotLocation
+githubSnapshotLocation :: Text -> Text -> Text -> RawSnapshotLocation
 githubSnapshotLocation user repo path =
   let url = T.concat
         [ "https://raw.githubusercontent.com/"
@@ -1537,7 +1691,7 @@ githubSnapshotLocation user repo path =
         , "/master/"
         , path
         ]
-   in SLUrl url Nothing
+   in RSLUrl url Nothing
 
 defUser :: Text
 defUser = "commercialhaskell"
@@ -1551,7 +1705,7 @@ defRepo = "stackage-snapshots"
 ltsSnapshotLocation
   :: Int -- ^ major version
   -> Int -- ^ minor version
-  -> SnapshotLocation
+  -> RawSnapshotLocation
 ltsSnapshotLocation x y =
   githubSnapshotLocation defUser defRepo $
   utf8BuilderToText $
@@ -1560,13 +1714,50 @@ ltsSnapshotLocation x y =
 -- | Location of a Stackage Nightly snapshot
 --
 -- @since 0.1.0.0
-nightlySnapshotLocation :: Day -> SnapshotLocation
+nightlySnapshotLocation :: Day -> RawSnapshotLocation
 nightlySnapshotLocation date =
   githubSnapshotLocation defUser defRepo $
   utf8BuilderToText $
   "nightly/" <> display year <> "/" <> display month <> "/" <> display day <> ".yaml"
   where
     (year, month, day) = toGregorian date
+
+-- | Where to load a snapshot from in raw form
+-- (RSUrl could have a missing BlobKey)
+--
+-- @since 0.1.0.0
+data RawSnapshotLocation
+  = RSLCompiler !WantedCompiler
+    -- ^ Don't use an actual snapshot, just a version of the compiler
+    -- with its shipped packages.
+    --
+    -- @since 0.1.0.0
+  | RSLUrl !Text !(Maybe BlobKey)
+    -- ^ Download the snapshot from the given URL. The optional
+    -- 'BlobKey' is used for reproducibility.
+    --
+    -- @since 0.1.0.0
+  | RSLFilePath !(ResolvedPath File)
+    -- ^ Snapshot at a local file path.
+    --
+    -- @since 0.1.0.0
+  deriving (Show, Eq, Data, Ord, Generic)
+
+instance Store RawSnapshotLocation
+instance NFData RawSnapshotLocation
+
+instance Display RawSnapshotLocation where
+  display (RSLCompiler compiler) = display compiler
+  display (RSLUrl url Nothing) = display url
+  display (RSLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
+  display (RSLFilePath resolved) = display (resolvedRelative resolved)
+
+instance ToJSON RawSnapshotLocation where
+  toJSON (RSLCompiler compiler) = object ["compiler" .= compiler]
+  toJSON (RSLUrl url mblob) = object
+    $ "url" .= url
+    : maybe [] blobKeyPairs mblob
+  toJSON (RSLFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
 
 -- | Where to load a snapshot from.
 --
@@ -1577,7 +1768,7 @@ data SnapshotLocation
     -- with its shipped packages.
     --
     -- @since 0.1.0.0
-  | SLUrl !Text !(Maybe BlobKey)
+  | SLUrl !Text !BlobKey
     -- ^ Download the snapshot from the given URL. The optional
     -- 'BlobKey' is used for reproducibility.
     --
@@ -1591,11 +1782,30 @@ instance Store SnapshotLocation
 instance NFData SnapshotLocation
 
 instance ToJSON SnapshotLocation where
-  toJSON (SLCompiler compiler) = object ["compiler" .= compiler]
-  toJSON (SLUrl url mblob) = object
-    $ "url" .= url
-    : maybe [] blobKeyPairs mblob
-  toJSON (SLFilePath resolved) = object ["filepath" .= resolvedRelative resolved]
+  toJSON sl = toJSON (toRawSL sl)
+
+-- | Convert snapshot location to its "raw" equivalent.
+--
+-- @since 0.1.0.0
+toRawSL :: SnapshotLocation -> RawSnapshotLocation
+toRawSL (SLCompiler c) = RSLCompiler c
+toRawSL (SLUrl url blob) = RSLUrl url (Just blob)
+toRawSL (SLFilePath fp) = RSLFilePath fp
+
+-- | A flattened representation of all the layers in a snapshot.
+--
+-- @since 0.1.0.0
+data RawSnapshot = RawSnapshot
+  { rsCompiler :: !WantedCompiler
+  -- ^ The compiler wanted for this snapshot.
+  , rsName :: !Text
+  -- ^ The 'slName' from the top 'SnapshotLayer'.
+  , rsPackages :: !(Map PackageName RawSnapshotPackage)
+  -- ^ Packages available in this snapshot for installation. This will be
+  -- applied on top of any globally available packages.
+  , rsDrop :: !(Set PackageName)
+  -- ^ Global packages that should be dropped/ignored.
+  }
 
 -- | A flattened representation of all the layers in a snapshot.
 --
@@ -1615,6 +1825,20 @@ data Snapshot = Snapshot
 -- | Settings for a package found in a snapshot.
 --
 -- @since 0.1.0.0
+data RawSnapshotPackage = RawSnapshotPackage
+  { rspLocation :: !RawPackageLocationImmutable
+  -- ^ Where to get the package from
+  , rspFlags :: !(Map FlagName Bool)
+  -- ^ Same as 'slFlags'
+  , rspHidden :: !Bool
+  -- ^ Same as 'slHidden'
+  , rspGhcOptions :: ![Text]
+  -- ^ Same as 'slGhcOptions'
+  }
+
+-- | Settings for a package found in a snapshot.
+--
+-- @since 0.1.0.0
 data SnapshotPackage = SnapshotPackage
   { spLocation :: !PackageLocationImmutable
   -- ^ Where to get the package from
@@ -1626,6 +1850,115 @@ data SnapshotPackage = SnapshotPackage
   -- ^ Same as 'slGhcOptions'
   }
   deriving Show
+
+-- | A single layer of a snapshot, i.e. a specific YAML configuration file.
+--
+-- @since 0.1.0.0
+data RawSnapshotLayer = RawSnapshotLayer
+  { rslParent :: !RawSnapshotLocation
+  -- ^ The sl to extend from. This is either a specific
+  -- compiler, or a @SnapshotLocation@ which gives us more information
+  -- (like packages). Ultimately, we'll end up with a
+  -- @CompilerVersion@.
+  --
+  -- @since 0.1.0.0
+  , rslCompiler :: !(Maybe WantedCompiler)
+  -- ^ Override the compiler specified in 'slParent'. Must be
+  -- 'Nothing' if using 'SLCompiler'.
+  --
+  -- @since 0.1.0.0
+  , rslName :: !Text
+  -- ^ A user-friendly way of referring to this resolver.
+  --
+  -- @since 0.1.0.0
+  , rslLocations :: ![RawPackageLocationImmutable]
+  -- ^ Where to grab all of the packages from.
+  --
+  -- @since 0.1.0.0
+  , rslDropPackages :: !(Set PackageName)
+  -- ^ Packages present in the parent which should not be included
+  -- here.
+  --
+  -- @since 0.1.0.0
+  , rslFlags :: !(Map PackageName (Map FlagName Bool))
+  -- ^ Flag values to override from the defaults
+  --
+  -- @since 0.1.0.0
+  , rslHidden :: !(Map PackageName Bool)
+  -- ^ Packages which should be hidden when registering. This will
+  -- affect, for example, the import parser in the script
+  -- command. We use a 'Map' instead of just a 'Set' to allow
+  -- overriding the hidden settings in a parent sl.
+  --
+  -- @since 0.1.0.0
+  , rslGhcOptions :: !(Map PackageName [Text])
+  -- ^ GHC options per package
+  --
+  -- @since 0.1.0.0
+  }
+  deriving (Show, Eq, Data, Generic)
+
+instance Store RawSnapshotLayer
+instance NFData RawSnapshotLayer
+
+instance ToJSON RawSnapshotLayer where
+  toJSON rsnap = object $ concat
+    [ ["resolver" .= rslParent rsnap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (rslCompiler rsnap)
+    , ["name" .= rslName rsnap]
+    , ["packages" .= rslLocations rsnap]
+    , if Set.null (rslDropPackages rsnap)
+        then []
+        else ["drop-packages" .= Set.map CabalString (rslDropPackages rsnap)]
+    , if Map.null (rslFlags rsnap)
+        then []
+        else ["flags" .= fmap toCabalStringMap (toCabalStringMap (rslFlags rsnap))]
+    , if Map.null (rslHidden rsnap)
+        then []
+        else ["hidden" .= toCabalStringMap (rslHidden rsnap)]
+    , if Map.null (rslGhcOptions rsnap)
+        then []
+        else ["ghc-options" .= toCabalStringMap (rslGhcOptions rsnap)]
+    ]
+
+instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
+  parseJSON = withObjectWarnings "Snapshot" $ \o -> do
+    mcompiler <- o ..:? "compiler"
+    mresolver <- jsonSubWarningsT $ o ...:? ["snapshot", "resolver"]
+    unresolvedSnapshotParent <-
+      case (mcompiler, mresolver) of
+        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
+        (Just compiler, Nothing) -> pure $ pure (RSLCompiler compiler, Nothing)
+        (_, Just (Unresolved usl)) -> pure $ Unresolved $ \mdir -> do
+          sl <- usl mdir
+          case (sl, mcompiler) of
+            (RSLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
+            _ -> pure (sl, mcompiler)
+
+    rslName <- o ..: "name"
+    unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
+    rslDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
+    rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
+    rslHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
+    rslGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    pure $ (\rslLocations (rslParent, rslCompiler) -> RawSnapshotLayer {..})
+      <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
+      <*> unresolvedSnapshotParent
+
+instance Store PackageIdentifierRevision where
+  size =
+    VarSize $ \(PackageIdentifierRevision name version cfi) ->
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f name) +
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f version) +
+    (case size of
+       ConstSize x -> x
+       VarSize f -> f cfi)
+  peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
+  poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
 
 -- | A single layer of a snapshot, i.e. a specific YAML configuration file.
 --
@@ -1673,12 +2006,11 @@ data SnapshotLayer = SnapshotLayer
   -- @since 0.1.0.0
   }
   deriving (Show, Eq, Data, Generic)
-instance Store SnapshotLayer
-instance NFData SnapshotLayer
+
 instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
-    , maybe [] (\compiler -> ["compiler" .= compiler]) (slCompiler snap)
+    , ["compiler" .= slCompiler snap]
     , ["name" .= slName snap]
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
@@ -1687,41 +2019,17 @@ instance ToJSON SnapshotLayer where
     , if Map.null (slGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (slGhcOptions snap)]
     ]
 
-instance FromJSON (WithJSONWarnings (Unresolved SnapshotLayer)) where
-  parseJSON = withObjectWarnings "Snapshot" $ \o -> do
-    mcompiler <- o ..:? "compiler"
-    mresolver <- jsonSubWarningsT $ o ...:? ["snapshot", "resolver"]
-    unresolvedSnapshotParent <-
-      case (mcompiler, mresolver) of
-        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
-        (Just compiler, Nothing) -> pure $ pure (SLCompiler compiler, Nothing)
-        (_, Just (Unresolved usl)) -> pure $ Unresolved $ \mdir -> do
-          sl <- usl mdir
-          case (sl, mcompiler) of
-            (SLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
-            _ -> pure (sl, mcompiler)
-
-    slName <- o ..: "name"
-    unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
-    slDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
-    slFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
-    slHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
-    slGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
-    pure $ (\slLocations (slParent, slCompiler) -> SnapshotLayer {..})
-      <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
-      <*> unresolvedSnapshotParent
-
-instance Store PackageIdentifierRevision where
-  size =
-    VarSize $ \(PackageIdentifierRevision name version cfi) ->
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f name) +
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f version) +
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f cfi)
-  peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
-  poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
+-- | Convert snapshot layer into its "raw" equivalent.
+--
+-- @since 0.1.0.0
+toRawSnapshotLayer :: SnapshotLayer -> RawSnapshotLayer
+toRawSnapshotLayer sl = RawSnapshotLayer
+  { rslParent = toRawSL (slParent sl)
+  , rslCompiler = slCompiler sl
+  , rslName = slName sl
+  , rslLocations = map toRawPLI (slLocations sl)
+  , rslDropPackages = slDropPackages sl
+  , rslFlags = slFlags sl
+  , rslHidden = slHidden sl
+  , rslGhcOptions = slGhcOptions sl
+  }

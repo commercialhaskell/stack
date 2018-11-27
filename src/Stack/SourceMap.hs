@@ -56,20 +56,20 @@ mkProjectPackage printWarnings dir buildHaddocks = do
 additionalDepPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
-  -> PackageLocation
+  -> RawPackageLocation
   -> RIO env DepPackage
-additionalDepPackage buildHaddocks pl = do
+additionalDepPackage buildHaddocks rpl = do
   (name, gpdio) <-
-    case pl of
-      PLMutable dir -> do
+    case rpl of
+      RPLMutable dir -> do
         (gpdio, name, _cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
         pure (name, gpdio NoPrintWarnings)
-      PLImmutable pli -> do
-        PackageIdentifier name _ <- getPackageLocationIdent pli
+      RPLImmutable rpli -> do
+        PackageIdentifier name _ <- getRawPackageLocationIdent rpli
         run <- askRunInIO
-        pure (name, run $ loadCabalFileImmutable pli)
+        pure (name, run $ loadCabalFileRawImmutable rpli)
   return DepPackage
-    { dpLocation = pl
+    { dpLocation = rpl
     , dpHidden = False
     , dpFromSnapshot = NotFromSnapshot
     , dpCommon = CommonPackage
@@ -85,35 +85,35 @@ snapToDepPackage ::
        forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Bool
     -> PackageName
-    -> SnapshotPackage
+    -> RawSnapshotPackage
     -> RIO env DepPackage
-snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
+snapToDepPackage buildHaddocks name RawSnapshotPackage{..} = do
   run <- askRunInIO
   return DepPackage
-    { dpLocation = PLImmutable spLocation
-    , dpHidden = spHidden
+    { dpLocation = RPLImmutable rspLocation
+    , dpHidden = rspHidden
     , dpFromSnapshot = FromSnapshot
     , dpCommon = CommonPackage
-                  { cpGPD = run $ loadCabalFileImmutable spLocation
+                  { cpGPD = run $ loadCabalFileRawImmutable rspLocation
                   , cpName = name
-                  , cpFlags = spFlags
-                  , cpGhcOptions = spGhcOptions
+                  , cpFlags = rspFlags
+                  , cpGhcOptions = rspGhcOptions
                   , cpHaddocks = buildHaddocks
                   }
     }
 
 getPLIVersion ::
        MonadIO m
-    => PackageLocationImmutable
+    => RawPackageLocationImmutable
     -> IO GenericPackageDescription
     -> m Version
-getPLIVersion (PLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
-getPLIVersion (PLIArchive _ pm) loadGPD = versionMaybeFromPM pm loadGPD
-getPLIVersion (PLIRepo _ pm) loadGPD = versionMaybeFromPM pm loadGPD
+getPLIVersion (RPLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
+getPLIVersion (RPLIArchive _ pm) loadGPD = versionMaybeFromPM pm loadGPD
+getPLIVersion (RPLIRepo _ pm) loadGPD = versionMaybeFromPM pm loadGPD
 
 versionMaybeFromPM ::
-       MonadIO m => PackageMetadata -> IO GenericPackageDescription -> m Version
-versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
+       MonadIO m => RawPackageMetadata -> IO GenericPackageDescription -> m Version
+versionMaybeFromPM rpm _ | Just v <- rpmVersion rpm = pure v
 versionMaybeFromPM _ loadGPD = do
     gpd <- liftIO loadGPD
     return $ pkgVersion $ PD.package $ PD.packageDescription gpd

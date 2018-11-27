@@ -19,20 +19,20 @@ import qualified RIO.Set as Set
 unpackSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
-  -> Snapshot
+  -> RawSnapshot
   -> Path Abs Dir
   -> RIO env ()
 unpackSnapshot cons snap root = do
   unpacked <- parseRelDir "unpacked"
-  (suffixes, flags, skipTest, skipBench, skipHaddock) <- fmap fold $ for (snapshotPackages snap) $ \sp -> do
-    let pl = spLocation sp
-    TreeKey (BlobKey sha _size) <- getPackageLocationTreeKey pl
-    PackageIdentifier name version <- getPackageLocationIdent pl
+  (suffixes, flags, skipTest, skipBench, skipHaddock) <- fmap fold $ for (rsPackages snap) $ \sp -> do
+    let pl = rspLocation sp
+    TreeKey (BlobKey sha _size) <- getRawPackageLocationTreeKey pl
+    PackageIdentifier name version <- getRawPackageLocationIdent pl
     pc <-
       case Map.lookup name $ consPackages cons of
         Nothing -> error $ "Package not found in constraints: " ++ packageNameString name
         Just pc -> pure pc
-    unless (pcFlags pc == spFlags sp) $ error "mismatched flags!"
+    unless (pcFlags pc == rspFlags sp) $ error "mismatched flags!"
     if pcSkipBuild pc
       then pure mempty
       else do

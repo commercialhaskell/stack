@@ -259,7 +259,7 @@ checkTestSuccess dir = do
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
 precompiledCacheFile :: HasEnvConfig env
-                     => PackageLocationImmutable
+                     => RawPackageLocationImmutable
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Path Abs File)
@@ -272,7 +272,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
   -- The goal here is to come up with a string representing the
   -- package location which is unique. Luckily @TreeKey@s are exactly
   -- that!
-  treeKey <- getPackageLocationTreeKey loc
+  treeKey <- getRawPackageLocationTreeKey loc
   pkg <- parseRelDir $ T.unpack $ utf8BuilderToText $ display treeKey
 
   platformRelDir <- platformGhcRelDir
@@ -307,7 +307,7 @@ precompiledCacheFile loc copts installedPackageIDs = do
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
                       => BaseConfigOpts
-                      -> PackageLocationImmutable
+                      -> RawPackageLocationImmutable
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
                       -> Installed -- ^ library
@@ -341,7 +341,7 @@ writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = d
 -- | Check the cache for a precompiled package matching the given
 -- configuration.
 readPrecompiledCache :: forall env. HasEnvConfig env
-                     => PackageLocationImmutable -- ^ target package
+                     => RawPackageLocationImmutable -- ^ target package
                      -> ConfigureOpts
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe PrecompiledCache)

@@ -227,7 +227,7 @@ instance Eq Package where
 data PackageSource
   = PSFilePath LocalPackage InstallLocation
   -- ^ Package which exist on the filesystem
-  | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
+  | PSRemote RawPackageLocationImmutable Version FromSnapshot CommonPackage
   -- ^ Package which is downloaded remotely.
 
 instance Show PackageSource where

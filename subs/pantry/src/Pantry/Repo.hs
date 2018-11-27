@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pantry.Repo
-  ( fetchRepos
+  ( fetchReposRaw
+  , fetchRepos
   , getRepo
   , getRepoKey
   ) where
@@ -20,25 +21,31 @@ import qualified RIO.Text as T
 import System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import System.Permissions (osIsWindows)
 
+fetchReposRaw
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => [(Repo, RawPackageMetadata)]
+  -> RIO env ()
+fetchReposRaw pairs = for_ pairs $ uncurry getRepo
+
 fetchRepos
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => [(Repo, PackageMetadata)]
   -> RIO env ()
 fetchRepos pairs = do
   -- TODO be more efficient, group together shared archives
-  for_ pairs $ uncurry getRepo
+  fetchReposRaw $ map (second toRawPM) pairs
 
 getRepoKey
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
-  -> PackageMetadata
+  -> RawPackageMetadata
   -> RIO env TreeKey
-getRepoKey repo pm = packageTreeKey <$> getRepo repo pm -- potential optimization
+getRepoKey repo rpm = packageTreeKey <$> getRepo repo rpm -- potential optimization
 
 getRepo
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
-  -> PackageMetadata
+  -> RawPackageMetadata
   -> RIO env Package
 getRepo repo pm =
   withCache $ getRepo' repo pm
@@ -62,9 +69,9 @@ getRepo repo pm =
 getRepo'
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Repo
-  -> PackageMetadata
+  -> RawPackageMetadata
   -> RIO env Package
-getRepo' repo@(Repo url commit repoType' subdir) pm =
+getRepo' repo@(Repo url commit repoType' subdir) rpm =
   withSystemTempDirectory "get-repo" $
   \tmpdir -> withWorkingDir tmpdir $ do
     let suffix = "cloned"
@@ -109,14 +116,14 @@ getRepo' repo@(Repo url commit repoType' subdir) pm =
       runCommand archiveArgs
     abs' <- resolveFile' tarball
     getArchive
-      (PLIRepo repo pm)
-      Archive
-        { archiveLocation = ALFilePath $ ResolvedPath
+      (RPLIRepo repo rpm)
+      RawArchive
+        { raLocation = ALFilePath $ ResolvedPath
             { resolvedRelative = RelFilePath $ T.pack tarball
             , resolvedAbsolute = abs'
             }
-        , archiveHash = Nothing
-        , archiveSize = Nothing
-        , archiveSubdir = subdir
+        , raHash = Nothing
+        , raSize = Nothing
+        , raSubdir = subdir
         }
-      pm
+      rpm

@@ -37,36 +37,40 @@ doFreeze p FreezeProject = do
       resolver = projectResolver p
       completePackageLocation' pl =
         case pl of
-          PLImmutable pli -> PLImmutable <$> completePackageLocation pli
-          plm@(PLMutable _) -> pure plm
+          RPLImmutable pli -> PLImmutable <$> completePackageLocation pli
+          RPLMutable m -> pure $ PLMutable m
   resolver' <- completeSnapshotLocation resolver
   deps' <- mapM completePackageLocation' deps
-  if deps' == deps && resolver' == resolver
+  let rawCompleted = map toRawPL deps'
+      rawResolver = toRawSL resolver'
+  if rawCompleted == deps && rawResolver == resolver
   then
     logInfo "No freezing is required for this project"
   else do
     logInfo "# Fields not mentioned below do not need to be updated"
 
-    if resolver' == resolver
+    if rawResolver == resolver
       then logInfo "# No update to resolver is needed"
       else do
         logInfo "# Frozen version of resolver"
-        B.putStr $ Yaml.encode $ object ["resolver" .= resolver']
+        B.putStr $ Yaml.encode $ object ["resolver" .= rawResolver]
 
-    if deps' == deps
+    if rawCompleted == deps
       then logInfo "# No update to extra-deps is needed"
       else do
         logInfo "# Frozen version of extra-deps"
-        B.putStr $ Yaml.encode $ object ["extra-deps" .= deps']
+        B.putStr $ Yaml.encode $ object ["extra-deps" .= rawCompleted]
 
 doFreeze p FreezeSnapshot = do
-  result <- loadSnapshotLayer $ projectResolver p
+  resolver <- completeSnapshotLocation $ projectResolver p
+  result <- loadSnapshotLayer resolver
   case result of
     Left _wc ->
       logInfo "No freezing is required for compiler resolver"
     Right (snap, _) -> do
       snap' <- completeSnapshotLayer snap
-      if snap' == snap
+      let rawCompleted = toRawSnapshotLayer snap'
+      if rawCompleted == snap
         then
         logInfo "No freezing is required for the snapshot of this project"
         else

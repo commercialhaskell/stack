@@ -36,11 +36,11 @@ addDefaultTag base mproject maresolver = do
           , show y
           ]
   case maresolver of
-    Just (ARResolver (SLUrl url _)) -> onUrl url
+    Just (ARResolver (RSLUrl url _)) -> onUrl url
     Just _aresolver -> exc
     Nothing ->
       case projectResolver <$> mproject of
-        Just (SLUrl url _) -> onUrl url
+        Just (RSLUrl url _) -> onUrl url
         _ -> exc
 
 -- | Interprets DockerOptsMonoid options.

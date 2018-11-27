@@ -60,7 +60,7 @@ localDependencies = do
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-            PLMutable dir -> do
+            RPLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
                 Just <$> loadLocalPackage sourceMap pp
             _ -> return Nothing
@@ -157,29 +157,21 @@ hashSourceMapData wc smDeps = do
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
 depPackageHashableContent DepPackage {..} = do
     case dpLocation of
-        PLMutable _ -> return ""
-        PLImmutable pli -> do
+        RPLMutable _ -> return ""
+        RPLImmutable pli -> do
             pli' <- completePackageLocation pli
             let flagToBs (f, enabled) =
                     if enabled
                         then ""
                         else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
                 flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-                locationTreeKey (PLIHackage _ (Just tk)) = Just tk
-                locationTreeKey (PLIArchive _ pm)
-                    | Just tk <- pmTreeKey pm = Just tk
-                locationTreeKey (PLIRepo _ pm)
-                    | Just tk <- pmTreeKey pm = Just tk
-                locationTreeKey _ = Nothing
+                locationTreeKey (PLIHackage _ _ tk) = tk
+                locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
+                locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
                 treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
                 ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-            hash <-
-                case locationTreeKey pli' of
-                    Just tk -> pure (treeKeyToBs tk)
-                    Nothing ->
-                        throwString
-                            "Completing package location produced result with no Pantry tree key"
+                hash = treeKeyToBs $ locationTreeKey pli'
             return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
 
 -- | All flags for a local package.

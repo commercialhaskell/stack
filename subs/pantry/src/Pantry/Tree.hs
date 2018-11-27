@@ -22,7 +22,7 @@ import Path (File)
 
 unpackTree
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocationImmutable -- for exceptions
+  => RawPackageLocationImmutable -- for exceptions
   -> Path Abs Dir -- ^ dest dir, will be created if necessary
   -> Tree
   -> RIO env ()
@@ -47,7 +47,7 @@ unpackTree loc (toFilePath -> dir) (TreeMap m) = do
 -- necessary.
 rawParseGPD
   :: MonadThrow m
-  => Either PackageLocationImmutable (Path Abs File)
+  => Either RawPackageLocationImmutable (Path Abs File)
   -> ByteString
   -> m ([PWarning], GenericPackageDescription)
 rawParseGPD loc bs =

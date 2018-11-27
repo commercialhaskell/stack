@@ -226,7 +226,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ versionString version
                 let dir = tmp </> suffix
-                unpackPackageLocation dir $ PLIHackage pir Nothing
+                unpackPackageLocation dir $ RPLIHackage pir Nothing
                 pure $ Just dir
 
     forM_ mdir $ \dir ->

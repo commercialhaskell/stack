@@ -47,8 +47,8 @@ import           Stack.Types.VersionIntervals
 -- snapshot load step we will resolve the contents of tarballs and
 -- repos, figure out package names, and assigned values appropriately.
 data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/commercialhaskell/stack/issues/3922
-    { sdResolver        :: !SnapshotLocation
-    , sdSnapshot        :: !(Maybe (SnapshotLayer, SnapshotDef))
+    { sdResolver        :: !RawSnapshotLocation
+    , sdSnapshot        :: !(Maybe (RawSnapshotLayer, SnapshotDef))
     , sdWantedCompilerVersion :: !WantedCompiler
     , sdUniqueHash :: !SHA256
     }
@@ -60,9 +60,9 @@ sdResolverName :: SnapshotDef -> Text
 sdResolverName sd =
   case sdSnapshot sd of
     Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
-    Just (snapshot, _) -> slName snapshot
+    Just (snapshot, _) -> rslName snapshot
 
-sdSnapshots :: SnapshotDef -> [SnapshotLayer]
+sdSnapshots :: SnapshotDef -> [RawSnapshotLayer]
 sdSnapshots sd =
   case sdSnapshot sd of
     Nothing -> []
@@ -84,7 +84,7 @@ newtype ExeName = ExeName { unExeName :: Text }
 data LoadedSnapshot = LoadedSnapshot
   { lsCompilerVersion :: !ActualCompiler
   , lsGlobals         :: !(Map PackageName (LoadedPackageInfo GhcPkgId))
-  , lsPackages        :: !(Map PackageName (LoadedPackageInfo PackageLocation))
+  , lsPackages        :: !(Map PackageName (LoadedPackageInfo RawPackageLocation))
   -- ^ Snapshots themselves may not have a filepath in them, but once
   -- we start adding in local configuration it's possible.
   }
@@ -146,7 +146,7 @@ loadedSnapshotVC :: VersionConfig LoadedSnapshot
 #if MIN_VERSION_template_haskell(2,14,0)
 loadedSnapshotVC = storeVersionConfig "ls-v6" "JMcGvLs8Fq-dMrejVfGy8552qqo="
 #else
-loadedSnapshotVC = storeVersionConfig "ls-v6" "KG2o7Yvkg0tAjIOSKjQ4fEM0BKY="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "BAaL0KUsgRTQy26PtlMz0TSt-Kw="
 #endif
 
 -- | Information on a single package for the 'LoadedSnapshot' which

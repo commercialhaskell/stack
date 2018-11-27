@@ -48,7 +48,7 @@ unpackPackages mSnapshotDef dest input = do
               pure (pir, dest </> suffix)
           )
           (map (\pir@(PackageIdentifierRevision name ver _) ->
-                  (PLIHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
+                  (RPLIHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
            locs2)
 
     alreadyUnpacked <- filterM doesDirExist $ Map.elems locs
@@ -66,7 +66,7 @@ unpackPackages mSnapshotDef dest input = do
   where
     toLoc = maybe toLocNoSnapshot toLocSnapshot mSnapshotDef
 
-    toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
+    toLocNoSnapshot :: PackageName -> RIO env (Either String (RawPackageLocationImmutable, PackageIdentifier))
     toLocNoSnapshot name = do
       mver1 <- getLatestHackageVersion name UsePreferredVersions
       mver <-
@@ -89,17 +89,17 @@ unpackPackages mSnapshotDef dest input = do
                 else ". Perhaps you meant: " ++ intercalate ", " (map packageNameString candidates)
             ]
         Just pir@(PackageIdentifierRevision _ ver _) -> pure $ Right
-          ( PLIHackage pir Nothing
+          ( RPLIHackage pir Nothing
           , PackageIdentifier name ver
           )
 
-    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
+    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (RawPackageLocationImmutable, PackageIdentifier))
     toLocSnapshot sd name =
-        go $ concatMap slLocations $ sdSnapshots sd
+        go $ concatMap rslLocations $ sdSnapshots sd
       where
         go [] = pure $ Left $ "Package does not appear in snapshot: " ++ packageNameString name
         go (loc:locs) = do
-          ident@(PackageIdentifier name' _) <- getPackageLocationIdent loc
+          ident@(PackageIdentifier name' _) <- getRawPackageLocationIdent loc
           if name == name'
             then pure $ Right (loc, ident)
             else go locs

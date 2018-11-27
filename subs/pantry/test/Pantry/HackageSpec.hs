@@ -12,7 +12,7 @@ spec = do
   it "update works" $ asIO $ void $ runPantryApp $ updateHackageIndex Nothing
   it "fuzzy lookup kicks in" $ do
     let pir = PackageIdentifierRevision "thisisnot-tobe-foundon-hackage-please" (mkVersion [1..3]) CFILatest
-    runPantryApp (loadPackage (PLIHackage pir Nothing))
+    runPantryApp (loadPackageRaw (RPLIHackage pir Nothing))
       `shouldThrow` \e ->
         case e of
           UnknownHackagePackage pir' _  -> pir == pir'

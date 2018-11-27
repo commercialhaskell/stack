@@ -463,19 +463,20 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
+    let rpli = RPLIHackage pir mtreeKey
     package <- getArchive
-      (PLIHackage pir mtreeKey)
-      Archive
-        { archiveLocation = ALUrl url
-        , archiveHash = Just sha
-        , archiveSize = Just size
-        , archiveSubdir = T.empty -- no subdirs on Hackage
+      rpli
+      RawArchive
+        { raLocation = ALUrl url
+        , raHash = Just sha
+        , raSize = Just size
+        , raSubdir = T.empty -- no subdirs on Hackage
         }
-      PackageMetadata
-        { pmName = Just name
-        , pmVersion = Just ver
-        , pmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
-        , pmCabal = Nothing -- cabal file in the tarball may be different!
+      RawPackageMetadata
+        { rpmName = Just name
+        , rpmVersion = Just ver
+        , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
+        , rpmCabal = Nothing -- cabal file in the tarball may be different!
         }
 
     case packageTree package of
@@ -492,7 +493,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             Nothing -> error $ "Invariant violated, cabal file key: " ++ show cabalFileKey
             Just bid -> loadBlobById bid
 
-        (_warnings, gpd) <- rawParseGPD (Left (PLIHackage pir mtreeKey)) cabalBS
+        (_warnings, gpd) <- rawParseGPD (Left rpli) cabalBS
         let gpdIdent = Cabal.package $ Cabal.packageDescription gpd
         when (ident /= gpdIdent) $ throwIO $
           MismatchedCabalFileForHackage pir Mismatch

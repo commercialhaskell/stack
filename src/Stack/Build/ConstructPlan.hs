@@ -123,7 +123,7 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
 
 data Ctx = Ctx
     { baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
+    , loadPackage    :: !(RawPackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -165,7 +165,7 @@ instance HasEnvConfig Ctx where
 constructPlan :: forall env. HasEnvConfig env
               => BaseConfigOpts
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
+              -> (RawPackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -240,9 +240,9 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
           globalToSource name gp | name `Set.member` wiredInPackages = Nothing
                                  | otherwise =
             let version = gpVersion gp
-                loc = PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                loc = RPLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
                 common = CommonPackage
-                  { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
+                  { cpGPD = runRIO env $ loadCabalFileRaw (RPLImmutable loc)
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
@@ -251,10 +251,10 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             in Just $ PSRemote loc version NotFromSnapshot common
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-          PLImmutable loc -> do
+          RPLImmutable loc -> do
             version <- getPLIVersion loc (cpGPD $ dpCommon dp)
             return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
-          PLMutable dir -> do
+          RPLMutable dir -> do
             -- FIXME this is not correct, we don't want to treat all Mutable as local
             -- FIXME ^ is from Stack.Build.Source
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
@@ -333,7 +333,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (dpLocation -> PLImmutable _) <- Map.lookup name (smDeps sourceMap)
+      | Just (dpLocation -> RPLImmutable _) <- Map.lookup name (smDeps sourceMap)
           -- FIXME:qrilka do git/archive count as snapshot installed?
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
@@ -426,7 +426,7 @@ addDep treatAsDep' name = do
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
                               name
-                              (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
+                              (RPLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
@@ -449,7 +449,7 @@ tellExecutables _name (PSFilePath lp _)
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
     tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream :: PackageName -> RawPackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream name pkgloc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do

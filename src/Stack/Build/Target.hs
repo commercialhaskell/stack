@@ -201,7 +201,7 @@ data ResolveResult = ResolveResult
   , rrRaw :: !RawInput
   , rrComponent :: !(Maybe NamedComponent)
   -- ^ Was a concrete component specified?
-  , rrAddedDep :: !(Maybe PackageLocationImmutable)
+  , rrAddedDep :: !(Maybe RawPackageLocationImmutable)
   -- ^ Only if we're adding this as a dependency
   , rrPackageType :: !PackageType
   }
@@ -330,7 +330,7 @@ resolveRawTarget sma (ri, rt) =
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just $ PLIHackage pir Nothing
+              , rrAddedDep = Just $ RPLIHackage pir Nothing
               , rrPackageType = PTDependency
               }
 
@@ -350,7 +350,7 @@ resolveRawTarget sma (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLImmutable (PLIHackage (PackageIdentifierRevision _name versionLoc _mcfi) _mtree)) -> Right ResolveResult
+            Just (RPLImmutable (RPLIHackage (PackageIdentifierRevision _name versionLoc _cfi) _treeKey)) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -360,7 +360,7 @@ resolveRawTarget sma (ri, rt) =
                         -- version we have
                         then Nothing
                         -- OK, we'll override it
-                        else Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                        else Just $ RPLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
                   , rrPackageType = PTDependency
                   }
             -- The package was coming from something besides the
@@ -377,15 +377,15 @@ resolveRawTarget sma (ri, rt) =
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+              , rrAddedDep = Just $ RPLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
               , rrPackageType = PTDependency
               }
 
       where
-        allLocs :: Map PackageName PackageLocation
+        allLocs :: Map PackageName RawPackageLocation
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' gp -> PLImmutable $ PLIHackage
+              (\name' gp -> RPLImmutable $ RPLIHackage
                   (PackageIdentifierRevision name' (gpVersion gp) CFILatest)
                   Nothing)
               globals
@@ -399,7 +399,7 @@ resolveRawTarget sma (ri, rt) =
 combineResolveResults
   :: forall env. HasLogFunc env
   => [ResolveResult]
-  -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocationImmutable)
+  -> RIO env ([Text], Map PackageName Target, Map PackageName RawPackageLocationImmutable)
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
@@ -466,7 +466,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
+  addedDeps' <- mapM (additionalDepPackage haddockDeps . RPLImmutable) addedDeps
 
   return SMTargets
     { smtTargets = targets

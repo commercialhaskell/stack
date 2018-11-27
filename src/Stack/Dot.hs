@@ -251,7 +251,7 @@ createDepLoader :: HasEnvConfig env
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
-                -> (PackageName -> Version -> PackageLocationImmutable ->
+                -> (PackageName -> Version -> RawPackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
                 -> RIO env (Set PackageName, DotPayload)
@@ -263,11 +263,11 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
             pure (packageAllDeps pkg, payloadFromLocal pkg)
           Nothing ->
             case Map.lookup pkgName (smDeps sourceMap) of
-              Just DepPackage{dpLocation=PLMutable dir} -> do
+              Just DepPackage{dpLocation=RPLMutable dir} -> do
                 pp <- mkProjectPackage YesPrintWarnings dir False
                 pkg <- loadCommonPackage (ppCommon pp)
                 pure (packageAllDeps pkg, payloadFromLocal pkg)
-              Just dp@DepPackage{dpLocation=PLImmutable loc} -> do
+              Just dp@DepPackage{dpLocation=RPLImmutable loc} -> do
                 let common = dpCommon dp
                 gpd <- liftIO $ cpGPD common
                 let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
