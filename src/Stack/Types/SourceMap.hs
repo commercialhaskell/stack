@@ -45,7 +45,7 @@ data FromSnapshot
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
   { dpCommon :: !CommonPackage
-  , dpLocation :: !RawPackageLocation
+  , dpLocation :: !PackageLocation
   , dpHidden :: !Bool
   , dpFromSnapshot :: !FromSnapshot
   -- ^ Should the package be hidden after registering?

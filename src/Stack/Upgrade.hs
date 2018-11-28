@@ -214,7 +214,7 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
         mversion <- getLatestHackageVersion "stack" UsePreferredVersions
-        pir@(PackageIdentifierRevision _ version _) <-
+        (PackageIdentifierRevision _ version _) <-
           case mversion of
             Nothing -> throwString "No stack found in package indices"
             Just version -> pure version
@@ -226,8 +226,13 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ versionString version
                 let dir = tmp </> suffix
-                unpackPackageLocation dir $ RPLIHackage pir Nothing
-                pure $ Just dir
+                mrev <- getLatestHackageRevision "stack" version
+                case mrev of
+                  Nothing -> throwString "Latest version with no revision"
+                  Just (_rev, cfKey, treeKey) -> do
+                    let ident = PackageIdentifier "stack" version
+                    unpackPackageLocation dir $ PLIHackage ident cfKey treeKey
+                    pure $ Just dir
 
     forM_ mdir $ \dir ->
       loadConfig

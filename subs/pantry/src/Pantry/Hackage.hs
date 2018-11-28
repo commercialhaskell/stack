@@ -10,6 +10,7 @@ module Pantry.Hackage
   , getHackageTarballKey
   , getHackageCabalFile
   , getHackagePackageVersions
+  , getHackagePackageVersionRevisions
   , getHackageTypoCorrections
   , UsePreferredVersions (..)
   ) where
@@ -402,6 +403,21 @@ getHackagePackageVersions usePreferred name = do
           vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
           Just $ \v _ -> withinRange v vr
     Map.filterWithKey predicate <$> loadHackagePackageVersions name
+
+-- | Returns the versions of the package available on Hackage.
+--
+-- @since 0.1.0.0
+getHackagePackageVersionRevisions
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName -- ^ package name
+  -> Version -- ^ package version
+  -> RIO env (Map Revision BlobKey)
+getHackagePackageVersionRevisions name version = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+  withStorage $
+    Map.map snd <$> loadHackagePackageVersion name version
 
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env)

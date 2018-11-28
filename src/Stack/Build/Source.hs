@@ -60,7 +60,7 @@ localDependencies = do
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-            RPLMutable dir -> do
+            PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
                 Just <$> loadLocalPackage sourceMap pp
             _ -> return Nothing
@@ -157,9 +157,8 @@ hashSourceMapData wc smDeps = do
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
 depPackageHashableContent DepPackage {..} = do
     case dpLocation of
-        RPLMutable _ -> return ""
-        RPLImmutable pli -> do
-            pli' <- completePackageLocation pli
+        PLMutable _ -> return ""
+        PLImmutable pli -> do
             let flagToBs (f, enabled) =
                     if enabled
                         then ""
@@ -171,7 +170,7 @@ depPackageHashableContent DepPackage {..} = do
                 treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
                 ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-                hash = treeKeyToBs $ locationTreeKey pli'
+                hash = treeKeyToBs $ locationTreeKey pli
             return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
 
 -- | All flags for a local package.

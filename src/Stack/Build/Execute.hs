@@ -104,7 +104,7 @@ preFetch plan
         logDebug $
             "Prefetching: " <>
             mconcat (intersperse ", " (RIO.display <$> Set.toList pkgLocs))
-        fetchPackagesRaw pkgLocs
+        fetchPackages pkgLocs
   where
     pkgLocs = Set.unions $ map toPkgLoc $ Map.elems $ planTasks plan
 
@@ -2116,6 +2116,6 @@ addGlobalPackages deps globals0 =
     -- and return our results
     loop _ [] gids = gids
 
-ttPackageLocation :: TaskType -> Maybe RawPackageLocationImmutable
+ttPackageLocation :: TaskType -> Maybe PackageLocationImmutable
 ttPackageLocation TTFilePath{} = Nothing
 ttPackageLocation (TTRemote _ _ pkgloc) = Just pkgloc

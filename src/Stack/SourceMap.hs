@@ -13,7 +13,6 @@ module Stack.SourceMap
 
 import qualified Data.Conduit.List as CL
 import Data.Yaml (decodeFileThrow)
-import Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as PD
 import Network.HTTP.Download (download, redownload)
 import Network.HTTP.StackClient (parseRequest)
@@ -56,20 +55,20 @@ mkProjectPackage printWarnings dir buildHaddocks = do
 additionalDepPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
-  -> RawPackageLocation
+  -> PackageLocation
   -> RIO env DepPackage
-additionalDepPackage buildHaddocks rpl = do
+additionalDepPackage buildHaddocks pl = do
   (name, gpdio) <-
-    case rpl of
-      RPLMutable dir -> do
+    case pl of
+      PLMutable dir -> do
         (gpdio, name, _cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
         pure (name, gpdio NoPrintWarnings)
-      RPLImmutable rpli -> do
-        PackageIdentifier name _ <- getRawPackageLocationIdent rpli
+      PLImmutable pli -> do
+        PackageIdentifier name _ <- getPackageLocationIdent pli
         run <- askRunInIO
-        pure (name, run $ loadCabalFileRawImmutable rpli)
+        pure (name, run $ loadCabalFileImmutable pli)
   return DepPackage
-    { dpLocation = rpl
+    { dpLocation = pl
     , dpHidden = False
     , dpFromSnapshot = NotFromSnapshot
     , dpCommon = CommonPackage
@@ -85,39 +84,27 @@ snapToDepPackage ::
        forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Bool
     -> PackageName
-    -> RawSnapshotPackage
+    -> SnapshotPackage
     -> RIO env DepPackage
-snapToDepPackage buildHaddocks name RawSnapshotPackage{..} = do
+snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
   run <- askRunInIO
   return DepPackage
-    { dpLocation = RPLImmutable rspLocation
-    , dpHidden = rspHidden
+    { dpLocation = PLImmutable spLocation
+    , dpHidden = spHidden
     , dpFromSnapshot = FromSnapshot
     , dpCommon = CommonPackage
-                  { cpGPD = run $ loadCabalFileRawImmutable rspLocation
+                  { cpGPD = run $ loadCabalFileImmutable spLocation
                   , cpName = name
-                  , cpFlags = rspFlags
-                  , cpGhcOptions = rspGhcOptions
+                  , cpFlags = spFlags
+                  , cpGhcOptions = spGhcOptions
                   , cpHaddocks = buildHaddocks
                   }
     }
 
-getPLIVersion ::
-       MonadIO m
-    => RawPackageLocationImmutable
-    -> IO GenericPackageDescription
-    -> m Version
-getPLIVersion (RPLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
-getPLIVersion (RPLIArchive _ pm) loadGPD = versionMaybeFromPM pm loadGPD
-getPLIVersion (RPLIRepo _ pm) loadGPD = versionMaybeFromPM pm loadGPD
-
-versionMaybeFromPM ::
-       MonadIO m => RawPackageMetadata -> IO GenericPackageDescription -> m Version
-versionMaybeFromPM rpm _ | Just v <- rpmVersion rpm = pure v
-versionMaybeFromPM _ loadGPD = do
-    gpd <- liftIO loadGPD
-    return $ pkgVersion $ PD.package $ PD.packageDescription gpd
-
+getPLIVersion :: PackageLocationImmutable -> Version
+getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
+getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
+getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 -- | Load the global hints from Github.
 loadGlobalHints

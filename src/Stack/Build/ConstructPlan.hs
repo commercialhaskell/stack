@@ -123,7 +123,7 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
 
 data Ctx = Ctx
     { baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(RawPackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
+    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -165,7 +165,7 @@ instance HasEnvConfig Ctx where
 constructPlan :: forall env. HasEnvConfig env
               => BaseConfigOpts
               -> [DumpPackage () () ()] -- ^ locally registered
-              -> (RawPackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
+              -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -236,25 +236,26 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       bopts <- view $ configL.to configBuild
       env <- ask
       let buildHaddocks = shouldHaddockDeps bopts
-          globalDeps = Map.mapMaybeWithKey globalToSource $ smGlobal sourceMap
-          globalToSource name gp | name `Set.member` wiredInPackages = Nothing
-                                 | otherwise =
+          globalToSource name gp | name `Set.member` wiredInPackages = pure Nothing
+                                 | otherwise = do
             let version = gpVersion gp
-                loc = RPLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
-                common = CommonPackage
-                  { cpGPD = runRIO env $ loadCabalFileRaw (RPLImmutable loc)
-                  , cpName = name
-                  , cpFlags = mempty
-                  , cpGhcOptions = mempty
-                  , cpHaddocks = buildHaddocks
-                  }
-            in Just $ PSRemote loc version NotFromSnapshot common
+            mrev <- getLatestHackageRevision name version
+            forM mrev $ \(_rev, cfKey, treeKey) ->
+                let loc = PLIHackage (PackageIdentifier name version) cfKey treeKey
+                    common = CommonPackage
+                      { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
+                      , cpName = name
+                      , cpFlags = mempty
+                      , cpGhcOptions = mempty
+                      , cpHaddocks = buildHaddocks
+                      }
+                in pure $ PSRemote loc version NotFromSnapshot common
+      globalDeps <- Map.traverseMaybeWithKey globalToSource $ smGlobal sourceMap
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-          RPLImmutable loc -> do
-            version <- getPLIVersion loc (cpGPD $ dpCommon dp)
-            return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
-          RPLMutable dir -> do
+          PLImmutable loc ->
+            return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
+          PLMutable dir -> do
             -- FIXME this is not correct, we don't want to treat all Mutable as local
             -- FIXME ^ is from Stack.Build.Source
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
@@ -333,7 +334,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (dpLocation -> RPLImmutable _) <- Map.lookup name (smDeps sourceMap)
+      | Just (dpLocation -> PLImmutable _) <- Map.lookup name (smDeps sourceMap)
           -- FIXME:qrilka do git/archive count as snapshot installed?
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
@@ -424,11 +425,16 @@ addDep treatAsDep' name = do
                             -- FIXME Slightly hacky, no flags since
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
-                            tellExecutablesUpstream
-                              name
-                              (RPLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
-                              loc
-                              Map.empty
+                            let version = installedVersion installed
+                            mrev <- liftRIO $ getLatestHackageRevision name version
+                            case mrev of
+                              Nothing -> return () -- FIXME:qrilka report an error?
+                              Just (_rev, cfKey, treeKey) ->
+                                tellExecutablesUpstream
+                                  name
+                                  (PLIHackage (PackageIdentifier name version) cfKey treeKey)
+                                  loc
+                                  Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
@@ -449,7 +455,7 @@ tellExecutables _name (PSFilePath lp _)
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
     tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> RawPackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream name pkgloc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do

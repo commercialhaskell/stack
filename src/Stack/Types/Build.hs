@@ -468,7 +468,7 @@ instance Show TaskConfigOpts where
 -- package index (upstream)
 data TaskType
   = TTFilePath LocalPackage InstallLocation
-  | TTRemote Package InstallLocation RawPackageLocationImmutable
+  | TTRemote Package InstallLocation PackageLocationImmutable
     deriving Show
 
 taskIsTarget :: Task -> Bool

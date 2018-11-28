@@ -54,10 +54,8 @@ toInstallMap sourceMap = do
     depInstalls <-
         for (smDeps sourceMap) $ \dp ->
             case dpLocation dp of
-                RPLMutable _ -> loadVersion Local (dpCommon dp)
-                RPLImmutable pli -> do
-                    version <- getPLIVersion pli (cpGPD $ dpCommon dp)
-                    return (Snap, version)
+                PLMutable _ -> loadVersion Local (dpCommon dp)
+                PLImmutable pli -> pure (Snap, getPLIVersion pli)
     return $ projectInstalls <> depInstalls
 
 -- | Returns the new InstalledMap and all of the locally registered packages.

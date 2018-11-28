@@ -194,10 +194,8 @@ data PantryConfig = PantryConfig
   -- ^ Want to try updating the index once during a single run for missing
   -- package identifiers. We also want to ensure we only update once at a
   -- time. Start at @True@.
-  , pcParsedCabalFilesImmutable :: !(IORef (Map PackageLocationImmutable GenericPackageDescription))
-  -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
   , pcParsedCabalFilesRawImmutable :: !(IORef (Map RawPackageLocationImmutable GenericPackageDescription))
-  -- ^ FIXME: to be removed
+  -- ^ Cache of previously parsed cabal files, to save on slow parsing time.
   , pcParsedCabalFilesMutable ::
       !(IORef
         (Map

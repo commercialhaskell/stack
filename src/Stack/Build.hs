@@ -262,7 +262,7 @@ mkBaseConfigOpts boptsCli = do
 -- | Provide a function for loading package information from the package index
 loadPackage
   :: HasEnvConfig env
-  => RawPackageLocationImmutable
+  => PackageLocationImmutable
   -> Map FlagName Bool
   -> [Text]
   -> RIO env Package
@@ -277,7 +277,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }
-  resolvePackage pkgConfig <$> loadCabalFileRawImmutable loc
+  resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 
 -- | Query information about the build and print the result to stdout in YAML format.
 queryBuildInfo :: HasEnvConfig env

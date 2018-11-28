@@ -1016,7 +1016,7 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoLocalConfig
   | InvalidResolverForNoLocalConfig String
-  | DuplicateLocalPackageNames ![(PackageName, [RawPackageLocation])]
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat

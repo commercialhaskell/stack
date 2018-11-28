@@ -51,7 +51,7 @@ unpackSnapshot cons snap root = do
           ignoringAbsence $ removeDirRecur destTmp
           ensureDir destTmp
           logInfo $ "Unpacking " <> display pl
-          unpackPackageLocation destTmp pl
+          unpackPackageLocationRaw destTmp pl
           renameDir destTmp dest
         pure
           ( Set.singleton suffix

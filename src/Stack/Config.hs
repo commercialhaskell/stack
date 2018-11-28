@@ -586,7 +586,8 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    snapshot <- loadSnapshotRaw $ projectResolver project
+    resolver <- completeSnapshotLocation $ projectResolver project
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -598,16 +599,20 @@ loadBuildConfig mproject maresolver mcompiler = do
       pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
       pure (cpName $ ppCommon pp, pp)
 
-    deps0 <- forM (projectDependencies project) $ \plp -> do
-      dp <- additionalDepPackage (shouldHaddockDeps bopts) plp
+    let completeLocation (RPLMutable m) = pure $ PLMutable m
+        completeLocation (RPLImmutable im) = PLImmutable <$> completePackageLocation im
+
+    deps0 <- forM (projectDependencies project) $ \rpl -> do
+      pl <- completeLocation rpl
+      dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
       pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
-      map (second (RPLMutable . ppResolvedDir)) packages0 ++
-       map (second dpLocation) deps0
+      map (second (PLMutable . ppResolvedDir)) packages0 ++
+      map (second dpLocation) deps0
 
     let packages1 = Map.fromList packages0
-        snPackages = rsPackages snapshot `Map.difference` packages1
+        snPackages = snapshotPackages snapshot `Map.difference` packages1
           `Map.difference` Map.fromList deps0
 
     snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
@@ -636,7 +641,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
     let wanted = SMWanted
-          { smwCompiler = fromMaybe (rsCompiler snapshot)  mcompiler
+          { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
           , smwProject = packages
           , smwDeps = deps
           }
@@ -679,7 +684,7 @@ loadBuildConfig mproject maresolver mcompiler = do
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
-checkDuplicateNames :: MonadThrow m => [(PackageName, RawPackageLocation)] -> m ()
+checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocation)] -> m ()
 checkDuplicateNames locals =
     case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second return) locals of
         [] -> return ()

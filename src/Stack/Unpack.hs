@@ -57,7 +57,7 @@ unpackPackages mSnapshotDef dest input = do
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
     forM_ (Map.toList locs) $ \(loc, dest') -> do
-      unpackPackageLocation dest' loc
+      unpackPackageLocationRaw dest' loc
       logInfo $
         "Unpacked " <>
         display loc <>
