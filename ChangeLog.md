@@ -102,6 +102,8 @@ Bug fixes:
   by symlinks, while GCC will produce the object files in the original
   directory. See
   [#4402](https://github.com/commercialhaskell/stack/pull/4402)
+* Fix handling of GitHub and URL templates on Windows. See
+  [commercialhaskell/stack#4394](https://github.com/commercialhaskell/stack/issues/4394)
 
 ## v1.9.1
 
