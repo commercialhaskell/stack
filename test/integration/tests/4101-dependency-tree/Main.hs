@@ -74,3 +74,45 @@ main = do
                            ]
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
+
+  stackCheckStdout ["ls", "dependencies", "--json"] $ \stdOut -> do
+    let expected = unlines [ "["
+                           , "    {"
+                           , "        \"name\": \"transformers\","
+                           , "        \"version\": \"0.5.2.0\","
+                           , "        \"license\": \"BSD3\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"rts\","
+                           , "        \"version\": \"1.0\","
+                           , "        \"license\": \"BSD3\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"mtl\","
+                           , "        \"version\": \"2.2.2\","
+                           , "        \"license\": \"BSD3\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"integer-gmp\","
+                           , "        \"version\": \"1.0.1.0\","
+                           , "        \"license\": \"BSD3\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"ghc-prim\","
+                           , "        \"version\": \"0.5.1.1\","
+                           , "        \"license\": \"BSD3\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"files\","
+                           , "        \"version\": \"0.1.0.0\","
+                           , "        \"license\": \"AllRightsReserved\""
+                           , "    },"
+                           , "    {"
+                           , "        \"name\": \"base\","
+                           , "        \"version\": \"4.10.1.0\","
+                           , "        \"license\": \"BSD3\""
+                           , "    }"
+                           , "]"
+                           ]
+    when (stdOut /= expected) $
+      error $ unlines [ "Expected:", expected, "Actual:", stdOut ]

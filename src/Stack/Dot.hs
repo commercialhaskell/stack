@@ -14,6 +14,9 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
+import           Data.Aeson
+import           Data.Aeson.Encode.Pretty
+import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -76,6 +79,8 @@ data ListDepsOpts = ListDepsOpts
     -- ^ Print dependency licenses instead of versions.
     , listDepsTree :: !Bool
     -- ^ Print dependency tree.
+    , listDepsJson :: !Bool
+    -- ^ Print dependencies as json
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -142,13 +147,33 @@ listDependencies
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
-  if listDepsTree opts then
-    do
-      liftIO $ Text.putStrLn "Packages"
-      liftIO $ printTree opts 0 [] (treeRoots opts pkgs) resultGraph
+  liftIO $
+    if listDepsTree opts then
+        Text.putStrLn "Packages" >>
+          printTree opts 0 [] (treeRoots opts pkgs) resultGraph
+    else if listDepsJson opts then printJSON pkgs resultGraph
     else
       void (Map.traverseWithKey go (snd <$> resultGraph))
-      where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
+      where go name payload = Text.putStrLn $ listDepsLine opts name payload
+
+data DependencyTree = DependencyTree (Set PackageName) (Map PackageName (Set PackageName, DotPayload))
+
+instance ToJSON DependencyTree where
+  toJSON (DependencyTree _ dependencyMap) =
+    toJSON $ foldToList dependencyToJSON dependencyMap
+
+foldToList :: (k -> a -> b) -> Map k a -> [b]
+foldToList f = Map.foldrWithKey (\k a bs -> bs ++ [f k a]) []
+
+dependencyToJSON :: PackageName -> (Set PackageName, DotPayload) -> Value
+dependencyToJSON pkg (_, payload) =  object [ "name" .= packageNameString pkg
+                                            , "version" .= versionText payload
+                                            , "license" .= licenseText payload]
+
+printJSON :: Set PackageName
+          -> Map PackageName (Set PackageName, DotPayload)
+          -> IO ()
+printJSON pkgs dependencyMap = LBC8.putStrLn $ encodePretty $ DependencyTree pkgs dependencyMap
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
@@ -207,8 +232,14 @@ listDepsLine opts name payload = Text.pack (packageNameString name) <> listDepsS
 payloadText :: ListDepsOpts -> DotPayload -> Text
 payloadText opts payload =
   if listDepsLicense opts
-    then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
-    else maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
+    then licenseText payload
+    else versionText payload
+
+licenseText :: DotPayload -> Text
+licenseText payload = maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
+
+versionText :: DotPayload -> Text
+versionText payload = maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans

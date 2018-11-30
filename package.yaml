@@ -47,6 +47,7 @@ ghc-options:
 dependencies:
 - Cabal
 - aeson
+- aeson-pretty
 - annotated-wl-pprint
 - ansi-terminal
 - array

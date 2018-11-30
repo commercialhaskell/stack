@@ -76,4 +76,8 @@ listDepsOptsParser = ListDepsOpts
                                 "tree"
                                 "printing of dependencies as a tree"
                                 idm
+                 <*> boolFlags False
+                                "json"
+                                "printing of dependencies as json"
+                                idm
   where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
