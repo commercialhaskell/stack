@@ -29,13 +29,13 @@ matrix:
       compiler: ": #stack 8.2.2"
       addons: {apt: {packages: [ghc-8.2.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.4.3 STACK_YAML=stack-lts-12.yaml
-      compiler: ": #stack 8.4.3"
-      addons: {apt: {packages: [ghc-8.4.3, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=8.4.4 STACK_YAML=stack-lts-12.yaml
+      compiler: ": #stack 8.4.4"
+      addons: {apt: {packages: [ghc-8.4.4, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=8.6.1 STACK_YAML=stack-nightly.yaml
-      compiler: ": #stack 8.6.1"
-      addons: {apt: {packages: [ghc-8.6.1, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=8.6.2 STACK_YAML=stack-nightly.yaml
+      compiler: ": #stack 8.6.2"
+      addons: {apt: {packages: [ghc-8.6.2, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
     - env: BUILD=stack GHCVER=8.2.2 STACK_YAML=stack.yaml
       compiler: ": #stack 8.2.2 osx"
