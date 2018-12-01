@@ -9,7 +9,7 @@ This way your question will be more easily discoverable by other people with the
 
 Question related to stack project templates? Please report it at the [stack-templates](https://github.com/commercialhaskell/stack-templates) repository instead.
 
-if you still want to ask the question here instead, please make sure that you are using the latest release (current stack-1.9.1).
+if you still want to ask the question here instead, please make sure that you are using the latest release (current stack-1.9.3).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 ### Stack version
