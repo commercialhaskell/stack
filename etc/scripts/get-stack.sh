@@ -19,7 +19,7 @@
 # https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh
 #
 
-STACK_VERSION="1.9.1"
+STACK_VERSION="1.9.3"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 DEST=""
