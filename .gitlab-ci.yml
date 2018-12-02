@@ -1,4 +1,4 @@
-image: registry.gitlab.fpcomplete.com/fpco/default-build-image:4297
+image: registry.gitlab.com/commercialhaskell/pipeline-base-image:35231570
 
 cache:
   key: "$CI_BUILD_NAME"

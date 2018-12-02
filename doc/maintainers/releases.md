@@ -18,6 +18,7 @@
 * Remove workaround to [#4125](https://github.com/commercialhaskell/stack/issues/4125) from `stack.yaml` for next major version after 1.8.
 * Explicitly tag release candidates and prereleases in `stack --version` output.
 * Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
+* If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
 
 ## Iterating on release process
 
