@@ -505,7 +505,7 @@ calcFci modTime' fp = liftIO $
             }
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
+getPackageConfig :: (MonadReader env m, HasEnvConfig env)
   => Map FlagName Bool
   -> [Text]
   -> m PackageConfig
