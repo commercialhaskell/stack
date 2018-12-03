@@ -213,7 +213,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
         collect
             [ (exe,pkgName')
             | (pkgName',task) <- Map.toList (planTasks plan)
-            , TTFilePath lp _ <- [taskType task]
+            , TTLocalMutable lp <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
     localExes :: Map Text (NonEmpty PackageName)

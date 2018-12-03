@@ -232,7 +232,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage sourceMap pp
-        return $ PSFilePath lp Local
+        return $ PSFilePath lp
       bopts <- view $ configL.to configBuild
       env <- ask
       let buildHaddocks = shouldHaddockDeps bopts
@@ -255,11 +255,9 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             version <- getPLIVersion loc (cpGPD $ dpCommon dp)
             return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
-            -- FIXME this is not correct, we don't want to treat all Mutable as local
-            -- FIXME ^ is from Stack.Build.Source
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage sourceMap pp
-            return $ PSFilePath lp Snap
+            return $ PSFilePath lp
       return $ pPackages <> deps <> globalDeps
 
 -- | State to be maintained during the calculation of local packages
@@ -374,11 +372,11 @@ addFinal lp package isAllInOne buildHaddocks = do
                             (baseConfigOpts ctx)
                             allDeps
                             True -- local
-                            Local
+                            Mutable
                             package
                 , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
-                , taskType = TTFilePath lp Local -- FIXME we can rely on this being Local, right?
+                , taskType = TTLocalMutable lp
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
@@ -441,7 +439,7 @@ addDep treatAsDep' name = do
 
 -- FIXME what's the purpose of this? Add a Haddock!
 tellExecutables :: PackageName -> PackageSource -> M ()
-tellExecutables _name (PSFilePath lp _)
+tellExecutables _name (PSFilePath lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
@@ -467,7 +465,7 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSFilePath lp _)
+        goSource (PSFilePath lp)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
         goSource PSRemote{} = Set.empty
@@ -492,7 +490,7 @@ installPackage treatAsDep name ps minstalled = do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
-        PSFilePath lp _ ->
+        PSFilePath lp ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -555,9 +553,9 @@ installPackageGivenDeps :: Bool
                         -> Maybe Installed
                         -> ( Set PackageIdentifier
                            , Map PackageIdentifier GhcPkgId
-                           , InstallLocation )
+                           , IsMutable )
                         -> M AddDepRes
-installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minLoc) = do
+installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minMutable) = do
     let name = packageName package
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
@@ -570,6 +568,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
             return Nothing
         (Nothing, _) -> return Nothing
     let loc = psLocation ps
+        mutable = installLocationIsMutable loc <> minMutable
     return $ case mRightVersionInstalled of
         Just installed -> ADRFound loc installed
         Nothing -> ADRToInstall Task
@@ -578,24 +577,21 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
                 (packageVersion package)
             , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                 let allDeps = Map.union present missing'
-                    destLoc = loc <> minLoc
                  in configureOpts
                         (view envConfigL ctx)
                         (baseConfigOpts ctx)
                         allDeps
                         (psLocal ps)
-                        -- An assertion to check for a recurrence of
-                        -- https://github.com/commercialhaskell/stack/issues/345
-                        (assert (destLoc == loc) destLoc)
+                        mutable
                         package
             , taskBuildHaddock = buildHaddocks
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSFilePath lp loc' ->
-                      TTFilePath lp (loc' <> minLoc)
+                    PSFilePath lp ->
+                      TTLocalMutable lp
                     PSRemote pkgLoc _version _fromSnaphot _cp ->
-                      TTRemote package (loc <> minLoc) pkgLoc
+                      TTRemotePackage mutable package pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
@@ -630,7 +626,7 @@ addEllipsis t
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -700,11 +696,11 @@ addPackageDeps treatAsDep package = do
                 if inRange
                     then case adr of
                         ADRToInstall task -> return $ Right
-                            (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
+                            (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
                         ADRFound loc (Executable _) -> return $ Right
-                            (Set.empty, Map.empty, loc)
+                            (Set.empty, Map.empty, installLocationIsMutable loc)
                         ADRFound loc (Library ident gid _) -> return $ Right
-                            (Set.empty, Map.singleton ident gid, loc)
+                            (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
                     else do
                         mlatestApplicable <- getLatestApplicableVersionAndRev
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
@@ -735,8 +731,8 @@ addPackageDeps treatAsDep package = do
     taskHasLibrary :: Task -> Bool
     taskHasLibrary task =
       case taskType task of
-        TTFilePath lp _ -> packageHasLibrary $ lpPackage lp
-        TTRemote p _ _ -> packageHasLibrary p
+        TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
+        TTRemotePackage _ p _ -> packageHasLibrary p
 
     -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
@@ -759,14 +755,14 @@ checkDirtiness ps installed package present = do
             (baseConfigOpts ctx)
             present
             (psLocal ps)
-            (psLocation ps) -- should be Local always
+            (installLocationIsMutable $ psLocation ps) -- should be Local i.e. mutable always
             package
         wantConfigCache = ConfigCache
             { configCacheOpts = configOpts
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    PSFilePath lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSRemote{} -> Set.empty
             , configCachePkgSrc = toCachePkgSrc ps
             }
@@ -855,19 +851,19 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSFilePath lp _) = lpForceDirty lp
+psForceDirty (PSFilePath lp) = lpForceDirty lp
 psForceDirty PSRemote{} = False
 
 psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp _) = runMemoized $ lpDirtyFiles lp
+psDirty (PSFilePath lp) = runMemoized $ lpDirtyFiles lp
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSFilePath _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal (PSFilePath _ ) = True
 psLocal PSRemote{} = False
 
 psLocation :: PackageSource -> InstallLocation
-psLocation (PSFilePath _ loc) = loc
+psLocation (PSFilePath _) = Local
 psLocation PSRemote{} = Snap
 
 -- | Get all of the dependencies for a given package, including build
