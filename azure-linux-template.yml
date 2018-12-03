@@ -21,7 +21,7 @@ jobs:
       pedantic:
         BUILD: pedantic
         STACK_YAML: stack.yaml
-    maxParallel: 2
+    maxParallel: 5
   steps:
   - script: |
       echo $OS_NAME
