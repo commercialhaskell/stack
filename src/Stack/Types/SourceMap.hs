@@ -47,8 +47,11 @@ data DepPackage = DepPackage
   { dpCommon :: !CommonPackage
   , dpLocation :: !PackageLocation
   , dpHidden :: !Bool
-  , dpFromSnapshot :: !FromSnapshot
   -- ^ Should the package be hidden after registering?
+  -- Affects the script interpreter's module name import parser.
+  , dpFromSnapshot :: !FromSnapshot
+  -- ^ Needed to ignore bounds between snapshot packages
+  -- See https://github.com/commercialhaskell/stackage/issues/3185
   }
 
 -- | A view of a project package needed for resolving components
