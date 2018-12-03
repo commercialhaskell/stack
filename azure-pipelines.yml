@@ -1,16 +1,25 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+variables:
+  BASE_BRANCH: "master"
+  CACHE_S3_PREFIX: "stack"
+  CACHE_S3_VERSION: "v0.1.4"
+  S3_BUCKET: "azure-wsm-cache-ci-cache"
+  AWS_REGION: "us-east-1"
 
-pool:
-  vmImage: 'Ubuntu 16.04'
+jobs:
+- template: azure-pipeline-template.yml
+  parameters:
+    name: macOS
+    vmImage: macOS-10.13
+    os: osx
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- template: azure-pipeline-template.yml
+  parameters:
+    name: Linux
+    vmImage: ubuntu-16.04
+    os: linux
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- template: azure-windows-template.yml
+  parameters:
+   name: Windows
+   vmImage: vs2017-win2016
+   os: windows
