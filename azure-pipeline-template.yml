@@ -9,13 +9,7 @@ jobs:
       stack-def:
         BUILD: stack
         STACK_YAML: stack.yaml
-      stack-lts-12:
-        BUILD: stack
-        STACK_YAML: stack-lts-12.yaml
-      nightly:
-        BUILD: stack
-        STACK_YAML: stack-nightly.yaml
-    maxParallel: 2
+    maxParallel: 1
   steps:
   - script: |
       echo $OS_NAME
