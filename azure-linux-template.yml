@@ -26,7 +26,8 @@ jobs:
   - script: |
       echo test
       echo $OS_NAME
-      echo $AWS_ACCESS_KEY_ID
+      export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
+      export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       echo $STACK_ROOT
       mkdir -p ~/.local/bin
