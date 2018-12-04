@@ -29,12 +29,12 @@ jobs:
       # cp /tmp/hg.exe /usr/bin/hg.exe
       # hg --version
       # export PATH=$HOME/.local/bin:$PATH;
-      cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
-      cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
-      curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
-      unzip -o /usr/bin/stack.zip -d /usr/bin/
-      stack setup
-      stack --no-terminal test --jobs 1
+      # cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
+      # cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
+      # curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
+      # unzip -o /usr/bin/stack.zip -d /usr/bin/
+      # stack setup
+      # stack --no-terminal test --jobs 1
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: 'Installation ${{parameters.os}}'
@@ -43,11 +43,10 @@ jobs:
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       export PATH=$HOME/.local/bin:$PATH;
-      cache-s3 --version
       if [ "$(Build.SourceBranchName)" = "${BASE_BRANCH}" ]; then
-        cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack;
+        /tmp/cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack;
       fi;
-      cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack work
+      /tmpcache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack work
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: 'Cache data'
