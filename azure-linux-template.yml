@@ -1,6 +1,8 @@
 jobs:
 - job: ${{ parameters.name }}
   timeoutInMinutes: 120
+  variables:
+  - group: AWS_Keys
   pool:
     vmImage: ${{ parameters.vmImage }}
   strategy:
@@ -21,7 +23,7 @@ jobs:
       #   STACK_YAML: stack.yaml
     maxParallel: 5
   steps:
-  - bash: |
+  - script: |
       echo $OS_NAME
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       echo $STACK_ROOT
