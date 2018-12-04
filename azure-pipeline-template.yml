@@ -12,7 +12,6 @@ jobs:
     maxParallel: 1
   steps:
   - script: |
-      ./.travis-setup.sh
       export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
@@ -21,6 +20,7 @@ jobs:
       export PATH=$HOME/.local/bin:$PATH;
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
+      ./.travis-setup.sh
       case "$BUILD" in
         style)
           export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH
