@@ -29,12 +29,12 @@ jobs:
       # cp /tmp/hg.exe /usr/bin/hg.exe
       # hg --version
       # export PATH=$HOME/.local/bin:$PATH;
-      # cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
-      # cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
-      # curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
-      # unzip -o /usr/bin/stack.zip -d /usr/bin/
-      # stack setup
-      # stack --no-terminal test --jobs 1
+      /tmp/cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
+      /tmp/cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
+      curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
+      unzip -o /usr/bin/stack.zip -d /usr/bin/
+      stack setup
+      stack --no-terminal test --jobs 1
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: 'Installation ${{parameters.os}}'
