@@ -44,7 +44,7 @@ jobs:
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       export PATH=$HOME/.local/bin:$PATH;
-      /tmp/cache-s3 --version
+      cache-s3 --version
       if [ "$(Build.SourceBranchName)" = "${BASE_BRANCH}" ]; then
         cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack;
       fi;
