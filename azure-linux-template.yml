@@ -23,18 +23,18 @@ jobs:
       #   STACK_YAML: stack.yaml
     maxParallel: 5
   steps:
-  - task: |
-      displayName: 'Load Cache'
-      inputs:
-        AWS_ACCESS_KEY_ID
-        AWS_SECRET_ACCESS_KEY
-      script: |
-        mkdir -p ~/.local/bin
-        curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.tar.gz" -o ~/.local/bin/cache-s3.tar.gz
-        tar xzf ~/.local/bin/cache-s3.tar.gz -C ~/.local/bin
-        export PATH=$HOME/.local/bin:$PATH;
-        cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
-        cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
+  - task: LoadCache@0
+    displayName: 'Load Cache'
+    inputs:
+      AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY
+    script: |
+      mkdir -p ~/.local/bin
+      curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.tar.gz" -o ~/.local/bin/cache-s3.tar.gz
+      tar xzf ~/.local/bin/cache-s3.tar.gz -C ~/.local/bin
+      export PATH=$HOME/.local/bin:$PATH;
+      cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
+      cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
 
   - script: |
       echo $OS_NAME
