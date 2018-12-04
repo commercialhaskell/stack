@@ -14,7 +14,7 @@ jobs:
   steps:
   - powershell: |
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile D:\\usr\bin/cache-s3.zip
+      Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile D:\\
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: Download binaries
