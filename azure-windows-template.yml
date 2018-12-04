@@ -23,7 +23,7 @@ jobs:
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       # curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.zip" -o /usr/bin/cache-s3.zip
-      unzip -o /d/usr/bin/cache-s3.zip -d /usr/bin
+      unzip -o /d/cache-s3.zip -d /usr/bin
       curl -f -L "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -o /usr/bin/hg.exe
       hg --version
       export PATH=$HOME/.local/bin:$PATH;
