@@ -15,6 +15,7 @@ jobs:
   - powershell: |
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile $env:TEMP\cache-s3.zip
+      Expand-Archive $env:TEMP\cache-s3.zip -DestinationPath $env:TEMP\
       Invoke-WebRequest -Uri "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -OutFile $env:TEMP\hg.exe
     env:
       OS_NAME: ${{ parameters.os }}
