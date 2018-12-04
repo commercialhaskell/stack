@@ -1,8 +1,6 @@
 jobs:
 - job: ${{ parameters.name }}
   timeoutInMinutes: 120
-  variables:
-  - group: AWS_Keys
   pool:
     vmImage: ${{ parameters.vmImage }}
   strategy:
