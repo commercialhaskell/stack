@@ -7,7 +7,7 @@ jobs:
   strategy:
     matrix:
       stack-def:
-        BUILD: stack
+        BUILD: style
         STACK_YAML: stack.yaml
     maxParallel: 1
   steps:
