@@ -17,6 +17,8 @@ jobs:
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.zip" -o /usr/bin/cache-s3.zip
       unzip -o /usr/bin/cache-s3.zip -d /usr/bin
+      curl -f -L "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -o /usr/bin/hg.exe
+      hg --version
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
       curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip

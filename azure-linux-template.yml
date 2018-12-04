@@ -10,17 +10,17 @@ jobs:
       stack-def:
         BUILD: stack
         STACK_YAML: stack.yaml
-      # stack-lts-12:
-      #   BUILD: stack
-      #   STACK_YAML: stack-lts-12.yaml
-      # nightly:
-      #   BUILD: stack
-      #   STACK_YAML: stack-nightly.yaml
+      stack-lts-12:
+        BUILD: stack
+        STACK_YAML: stack-lts-12.yaml
+      nightly:
+        BUILD: stack
+        STACK_YAML: stack-nightly.yaml
       style:
         BUILD: style
-      # pedantic:
-      #   BUILD: pedantic
-      #   STACK_YAML: stack.yaml
+      pedantic:
+        BUILD: pedantic
+        STACK_YAML: stack.yaml
     maxParallel: 5
   steps:
   - script: |
