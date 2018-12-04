@@ -15,6 +15,7 @@ jobs:
   - powershell: |
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile $env:TEMP\cache-s3.zip
+      Invoke-WebRequest -Uri "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -OutFile $env:TEMP\hg.exe
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: Download binaries
@@ -24,8 +25,8 @@ jobs:
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       echo $TEMP
       # curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.zip" -o /usr/bin/cache-s3.zip
-      unzip -o /d/cache-s3.zip -d /usr/bin
-      curl -f -L "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -o /usr/bin/hg.exe
+      unzip -o /tmp/cache-s3.zip -d /usr/bin
+      cp /tmp/hg.exe /usr/bin/hg.exe
       hg --version
       export PATH=$HOME/.local/bin:$PATH;
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
