@@ -7,9 +7,9 @@ jobs:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     matrix:
-      # stack-def:
-      #   BUILD: stack
-      #   STACK_YAML: stack.yaml
+      stack-def:
+        BUILD: stack
+        STACK_YAML: stack.yaml
       # stack-lts-12:
       #   BUILD: stack
       #   STACK_YAML: stack-lts-12.yaml
