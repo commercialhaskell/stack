@@ -20,12 +20,13 @@ jobs:
       unzip -o /usr/bin/cache-s3.zip -d /usr/bin
       curl -f -L "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -o /usr/bin/hg.exe
       hg --version
+      export PATH=$HOME/.local/bin:$PATH;
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
       curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
       unzip -o /usr/bin/stack.zip -d /usr/bin/
-      stack setup
-      stack --no-terminal test --jobs 1
+      # stack setup
+      # stack --no-terminal test --jobs 1
     env:
       OS_NAME: ${{ parameters.os }}
 
@@ -34,6 +35,7 @@ jobs:
       export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
+      export PATH=$HOME/.local/bin:$PATH;
       if [ "$(Build.SourceBranchName)" = "${BASE_BRANCH}" ]; then
         cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack;
       fi;
