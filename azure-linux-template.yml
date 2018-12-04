@@ -24,7 +24,6 @@ jobs:
     maxParallel: 5
   steps:
   - script: |
-      echo test
       echo $OS_NAME
       export TEST=$(TEST_GR)
       echo $TEST
