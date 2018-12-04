@@ -21,6 +21,7 @@ jobs:
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack --base-branch="${BASE_BRANCH}"
       cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" restore stack work --base-branch="${BASE_BRANCH}"
       ./.travis-setup.sh
+      brew install mercurial
       case "$BUILD" in
         style)
           export PATH="$TRAVIS_BUILD_DIR"/hlint:$PATH
