@@ -26,6 +26,7 @@ jobs:
       stack --no-terminal test --jobs 1
     env:
       OS_NAME: ${{ parameters.os }}
+
     displayName: 'Installation ${{parameters.os}}'
   - bash: |
       export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
