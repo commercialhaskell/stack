@@ -14,7 +14,7 @@ jobs:
   steps:
   - powershell: |
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile D:\\
+      Invoke-WebRequest -Uri "https://github.com/fpco/cache-s3/releases/download/$env:CACHE_S3_VERSION/cache-s3-$env:CACHE_S3_VERSION-$env:OS_NAME-x86_64.zip" -OutFile $env:TEMP\cache-s3.zip
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: Download binaries
@@ -22,6 +22,7 @@ jobs:
       export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
       export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
+      echo $TEMP
       # curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.zip" -o /usr/bin/cache-s3.zip
       unzip -o /d/cache-s3.zip -d /usr/bin
       curl -f -L "https://mercurial-scm.org/release/windows/Mercurial-4.8-x64.exe" -o /usr/bin/hg.exe
@@ -35,7 +36,6 @@ jobs:
       # stack --no-terminal test --jobs 1
     env:
       OS_NAME: ${{ parameters.os }}
-
     displayName: 'Installation ${{parameters.os}}'
   - bash: |
       export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
