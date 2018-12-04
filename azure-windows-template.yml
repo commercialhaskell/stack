@@ -46,7 +46,7 @@ jobs:
       if [ "$(Build.SourceBranchName)" = "${BASE_BRANCH}" ]; then
         /tmp/cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack;
       fi;
-      /tmpcache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack work
+      /tmp/cache-s3 --prefix="${CACHE_S3_PREFIX}" --git-branch="$(Build.SourceBranchName)" --suffix="${OS_NAME}" save stack work
     env:
       OS_NAME: ${{ parameters.os }}
     displayName: 'Cache data'
