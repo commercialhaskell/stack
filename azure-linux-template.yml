@@ -7,26 +7,27 @@ jobs:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     matrix:
-      stack-def:
-        BUILD: stack
-        STACK_YAML: stack.yaml
-      stack-lts-12:
-        BUILD: stack
-        STACK_YAML: stack-lts-12.yaml
-      nightly:
-        BUILD: stack
-        STACK_YAML: stack-nightly.yaml
+      # stack-def:
+      #   BUILD: stack
+      #   STACK_YAML: stack.yaml
+      # stack-lts-12:
+      #   BUILD: stack
+      #   STACK_YAML: stack-lts-12.yaml
+      # nightly:
+      #   BUILD: stack
+      #   STACK_YAML: stack-nightly.yaml
       style:
         BUILD: style
-      pedantic:
-        BUILD: pedantic
-        STACK_YAML: stack.yaml
+      # pedantic:
+      #   BUILD: pedantic
+      #   STACK_YAML: stack.yaml
     maxParallel: 5
   steps:
   - script: |
       echo $OS_NAME
-      export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)";
-      export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
+      # export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID)";
+      # export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)";
+      echo $AWS_ACCESS_KEY_ID
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       echo $STACK_ROOT
       curl -f -L "https://github.com/fpco/cache-s3/releases/download/${CACHE_S3_VERSION}/cache-s3-${CACHE_S3_VERSION}-${OS_NAME}-x86_64.tar.gz" | tar xz -C ~/.local/bin 'cache-s3';
