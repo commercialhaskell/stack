@@ -4,7 +4,7 @@ variables:
   CACHE_S3_VERSION: "v0.1.4"
   S3_BUCKET: "commericalhaskell-gitlab-runner-pipeline-cache"
   AWS_REGION: "us-east-1"
-
+  - group: AWS_Keys
 jobs:
 # - template: azure-pipeline-template.yml
 #   parameters:
@@ -13,8 +13,6 @@ jobs:
 #     os: osx
 
 - template: azure-linux-template.yml
-  variables:
-  - group: AWS_Keys
   parameters:
     name: Linux
     vmImage: ubuntu-16.04
