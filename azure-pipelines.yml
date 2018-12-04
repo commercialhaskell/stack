@@ -13,6 +13,8 @@ jobs:
 #     os: osx
 
 - template: azure-linux-template.yml
+  variables:
+  - group: AWS_Keys
   parameters:
     name: Linux
     vmImage: ubuntu-16.04
