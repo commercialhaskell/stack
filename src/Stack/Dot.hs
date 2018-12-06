@@ -9,6 +9,7 @@ module Stack.Dot (dot
                  ,DotOpts(..)
                  ,DotPayload(..)
                  ,ListDepsOpts(..)
+                 ,ListDepsFormat(..)
                  ,resolveDependencies
                  ,printGraph
                  ,pruneGraph
@@ -70,17 +71,23 @@ data DotOpts = DotOpts
     -- ^ Use global hints instead of relying on an actual GHC installation.
     }
 
+data ListDepsFormat = ListDepsText { listDepsSep :: !Text
+                                   -- ^ Separator between the package name and details.
+                                   , listDepsLicense :: !Bool
+                                   -- ^ Print dependency licenses instead of versions.
+                                   }
+                    | ListDepsTree { listDepsSep :: !Text
+                                   -- ^ Separator between the package name and details.
+                                   , listDepsLicense :: !Bool
+                                   -- ^ Print dependency licenses instead of versions.
+                                   }
+                    | ListDepsJSON
+
 data ListDepsOpts = ListDepsOpts
-    { listDepsDotOpts :: !DotOpts
+    { listDepsFormat :: !ListDepsFormat
+    -- ^ Format of printing dependencies
+    , listDepsDotOpts :: !DotOpts
     -- ^ The normal dot options.
-    , listDepsSep :: !Text
-    -- ^ Separator between the package name and details.
-    , listDepsLicense :: !Bool
-    -- ^ Print dependency licenses instead of versions.
-    , listDepsTree :: !Bool
-    -- ^ Print dependency tree.
-    , listDepsJson :: !Bool
-    -- ^ Print dependencies as json
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -147,14 +154,11 @@ listDependencies
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
-  liftIO $
-    if listDepsTree opts then
-        Text.putStrLn "Packages" >>
-          printTree opts 0 [] (treeRoots opts pkgs) resultGraph
-    else if listDepsJson opts then printJSON pkgs resultGraph
-    else
-      void (Map.traverseWithKey go (snd <$> resultGraph))
-      where go name payload = Text.putStrLn $ listDepsLine opts name payload
+  liftIO $ case listDepsFormat opts of
+      treeOpts@(ListDepsTree{}) -> Text.putStrLn "Packages" >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
+      ListDepsJSON -> printJSON pkgs resultGraph
+      textOpts@(ListDepsText{}) -> void (Map.traverseWithKey go (snd <$> resultGraph))
+        where go name payload = Text.putStrLn $ listDepsLine textOpts name payload
 
 data DependencyTree = DependencyTree (Set PackageName) (Map PackageName (Set PackageName, DotPayload))
 
@@ -182,13 +186,14 @@ treeRoots opts projectPackages' =
         then projectPackages'
         else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
-printTree :: ListDepsOpts
+printTree :: ListDepsFormat
+          -> DotOpts
           -> Int
           -> [Int]
           -> Set PackageName
           -> Map PackageName (Set PackageName, DotPayload)
           -> IO ()
-printTree opts depth remainingDepsCounts packages dependencyMap =
+printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
   F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
   where
     toSeq = Seq.fromList . Set.toList
@@ -196,22 +201,23 @@ printTree opts depth remainingDepsCounts packages dependencyMap =
                      in
                       case Map.lookup name dependencyMap of
                         Just (deps, payload) -> do
-                          printTreeNode opts depth newDepsCounts deps payload name
-                          if Just depth == dotDependencyDepth (listDepsDotOpts opts)
+                          printTreeNode opts dotOpts depth newDepsCounts deps payload name
+                          if Just depth == dotDependencyDepth dotOpts
                              then return ()
-                             else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+                             else printTree opts dotOpts (depth + 1) newDepsCounts deps dependencyMap
                         -- TODO: Define this behaviour, maybe return an error?
                         Nothing -> return ()
 
-printTreeNode :: ListDepsOpts
+printTreeNode :: ListDepsFormat
+              -> DotOpts
               -> Int
               -> [Int]
               -> Set PackageName
               -> DotPayload
               -> PackageName
               -> IO ()
-printTreeNode opts depth remainingDepsCounts deps payload name =
-  let remainingDepth = fromMaybe 999 (dotDependencyDepth (listDepsDotOpts opts)) - depth
+printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
+  let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
       hasDeps = not $ null deps
    in Text.putStrLn $ treeNodePrefix "" remainingDepsCounts hasDeps  remainingDepth  <> " " <> listDepsLine opts name payload
 
@@ -226,10 +232,10 @@ treeNodePrefix t [_] False _ = t <> "├──"
 treeNodePrefix t (0:ns) d remainingDepth = treeNodePrefix (t <> "  ") ns d remainingDepth
 treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d remainingDepth
 
-listDepsLine :: ListDepsOpts -> PackageName -> DotPayload -> Text
+listDepsLine :: ListDepsFormat -> PackageName -> DotPayload -> Text
 listDepsLine opts name payload = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText opts payload
 
-payloadText :: ListDepsOpts -> DotPayload -> Text
+payloadText :: ListDepsFormat -> DotPayload -> Text
 payloadText opts payload =
   if listDepsLicense opts
     then licenseText payload

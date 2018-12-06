@@ -3,7 +3,7 @@ import StackTest
 
 main :: IO ()
 main = do
-  stackCheckStdout ["ls", "dependencies", "--tree"] $ \stdOut -> do
+  stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
                            , "│ ├─┬ base 4.10.1.0"
@@ -49,7 +49,7 @@ main = do
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
 
-  stackCheckStdout ["ls", "dependencies", "--tree", "--depth=1"] $ \stdOut -> do
+  stackCheckStdout ["ls", "dependencies", "tree", "--depth=1"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
                            , "│ ├── base 4.10.1.0"
@@ -75,7 +75,7 @@ main = do
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
 
-  stackCheckStdout ["ls", "dependencies", "--json"] $ \stdOut -> do
+  stackCheckStdout ["ls", "dependencies", "json"] $ \stdOut -> do
     let expected = unlines [ "["
                            , "    {"
                            , "        \"name\": \"transformers\","
