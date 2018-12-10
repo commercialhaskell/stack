@@ -1,10 +1,8 @@
-cabal-version: 1.12
-
--- This file has been generated from package.yaml by hpack version 0.30.0.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc4bfcec8fa396290c6a92012ae46cae07ca2bd329e9ae0ca7aaec18202474f
+-- hash: 6c31147cae2b0b82e16fec64c28619c9210233c2ae4c6b0cd3f70696317d654d
 
 name:           pantry
 version:        0.1.0.0
@@ -18,10 +16,11 @@ maintainer:     michael@snoyman.com
 copyright:      2018 FP Complete
 license:        MIT
 build-type:     Simple
+cabal-version:  >= 1.10
 extra-source-files:
-    README.md
-    ChangeLog.md
     attic/package-0.1.2.3.tar.gz
+    ChangeLog.md
+    README.md
 
 source-repository head
   type: git
@@ -31,6 +30,7 @@ library
   exposed-modules:
       Pantry
       Pantry.SHA256
+      Pantry.HPack
       Pantry.Internal
       Pantry.Internal.StaticBytes
       Data.Aeson.Extended
