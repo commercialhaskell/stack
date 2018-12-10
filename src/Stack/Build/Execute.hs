@@ -47,6 +47,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Tuple
+import           Pantry (findOrGenerateCabalFile)
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
@@ -989,6 +990,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
     withCabal package pkgDir outputType inner = do
+        _ <- findOrGenerateCabalFile pkgDir
         config <- view configL
 
         unless (configAllowDifferentUser config) $
@@ -1229,7 +1231,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 --
 -- * Generates haddocks
 --
--- * Registers the library and copiesthe built executables into the
+-- * Registers the library and copies the built executables into the
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
