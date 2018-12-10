@@ -126,6 +126,7 @@ module Pantry
   , loadCabalFile
   , loadCabalFileImmutable
   , loadCabalFilePath
+  , findOrGenerateCabalFile
   , PrintWarnings (..)
 
     -- * Hackage index
@@ -304,9 +305,13 @@ loadCabalFileImmutable
   -> RIO env GenericPackageDescription
 loadCabalFileImmutable loc = withCache $ do
   logDebug $ "Parsing cabal file for " <> display loc
-  bs <- loadCabalFileBytes loc
+  (bs, btype) <- loadCabalFileBytes loc
+  logDebug $ displayShow btype
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
-  (_warnings, gpd) <- rawParseGPD (Left loc) bs
+  cabalBs <- if btype == CabalFile
+             then return bs
+             else getCabalBS bs
+  (_warnings, gpd) <- rawParseGPD (Left loc) cabalBs
   let pm =
         case loc of
           PLIHackage (PackageIdentifierRevision name version cfi) mtree -> PackageMetadata
@@ -500,23 +505,25 @@ gpdVersion = pkgVersion . gpdPackageIdentifier
 loadCabalFileBytes
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
-  -> RIO env ByteString
+  -> RIO env (ByteString, BuildFileType)
 
 -- Just ignore the mtree for this. Safe assumption: someone who filled
 -- in the TreeKey also filled in the cabal file hash, and that's a
 -- more efficient lookup mechanism.
-loadCabalFileBytes (PLIHackage pir _mtree) = getHackageCabalFile pir
+loadCabalFileBytes (PLIHackage pir _mtree) = do
+  bs <- getHackageCabalFile pir
+  return $ (bs, CabalFile)
 
 loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
-      TreeEntry cabalBlobKey _ft = packageCabalEntry package
+      cabalBlobKey = getPCBlobKey (packageCabalEntry package)
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
       -- TODO when we have pantry wire, try downloading
       throwIO $ TreeReferencesMissingBlob pl sfp cabalBlobKey
-    Just bs -> pure bs
+    Just bs -> pure (bs, getPCBuildType (packageCabalEntry package))
 
 -- | Load a 'Package' from a 'PackageLocationImmutable'.
 --
@@ -580,7 +587,7 @@ completePM plOrig pm
             { pmName = Just $ pkgName $ packageIdent package
             , pmVersion = Just $ pkgVersion $ packageIdent package
             , pmTreeKey = Just $ packageTreeKey package
-            , pmCabal = Just $ teBlob $ packageCabalEntry package
+            , pmCabal = Just $ teBlob $ getPCTreeEntry $ packageCabalEntry package
             }
 
           isSame (Just x) (Just y) = x == y
