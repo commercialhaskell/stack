@@ -8,6 +8,7 @@ module Pantry.Archive
   , getArchiveKey
   , fetchArchives
   , withArchiveLoc
+  , getCabalBS
   ) where
 
 import RIO
@@ -15,15 +16,20 @@ import qualified Pantry.SHA256 as SHA256
 import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
+import RIO.Process
 import Pantry.Internal (normalizeParents, makeTarRelative)
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
 import qualified RIO.List as List
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
+import qualified RIO.ByteString as B
 import qualified RIO.Set as Set
+import qualified Hpack.Config as Hpack
+import Pantry.HPack (findOrGenerateCabalFile)
+import qualified RIO.FilePath as FilePath
 import Data.Bits ((.&.), shiftR)
-import Path (toFilePath)
+import Path (toFilePath, fromAbsDir, fromAbsFile, parseAbsDir)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Digest.CRC32 as CRC32
 import Distribution.PackageDescription (packageDescription, package)
@@ -34,7 +40,7 @@ import qualified Data.Conduit.Tar as Tar
 import Pantry.HTTP
 
 fetchArchives
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => [(Archive, PackageMetadata)]
   -> RIO env ()
 fetchArchives pairs = do
@@ -42,7 +48,7 @@ fetchArchives pairs = do
   for_ pairs $ \(a, pm) -> getArchive (PLIArchive a pm) a pm
 
 getArchiveKey
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable -- ^ for exceptions
   -> Archive
   -> PackageMetadata
@@ -50,7 +56,7 @@ getArchiveKey
 getArchiveKey pli archive pm = packageTreeKey <$> getArchive pli archive pm -- potential optimization
 
 getArchive
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable -- ^ for exceptions
   -> Archive
   -> PackageMetadata
@@ -145,7 +151,7 @@ checkPackageMetadata pl pm pa = do
               pl
               pm
               (Just (packageTreeKey pa))
-              (teBlob $ packageCabalEntry pa)
+              (teBlob $ getPCTreeEntry $ packageCabalEntry pa)
               (packageIdent pa)
       test (Just x) y = x == y
       test Nothing _ = True
@@ -154,7 +160,7 @@ checkPackageMetadata pl pm pa = do
         [ test (pmTreeKey pm) (packageTreeKey pa)
         , test (pmName pm) (pkgName $ packageIdent pa)
         , test (pmVersion pm) (pkgVersion $ packageIdent pa)
-        , test (pmCabal pm) (teBlob $ packageCabalEntry pa)
+        , test (pmCabal pm) (teBlob $ getPCTreeEntry $ packageCabalEntry pa)
         ]
 
    in if and tests then Right pa else Left err
@@ -294,6 +300,7 @@ data SimpleEntry = SimpleEntry
   }
   deriving Show
 
+
 -- | Attempt to parse the contents of the given archive in the given
 -- subdir into a 'Tree'. This will not consult any caches. It will
 -- ensure that:
@@ -304,7 +311,7 @@ data SimpleEntry = SimpleEntry
 --
 -- * The name inside the cabal file matches the name of the cabal file itself
 parseArchive
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> Archive
   -> FilePath -- ^ file holding the archive
@@ -319,8 +326,7 @@ parseArchive pli archive fp = do
             logDebug $ "parseArchive of " <> display at <> ": " <> displayShow e
             getFiles ats
           Right files -> pure (at, Map.fromList $ map (mePath &&& id) $ files [])
-  (at, files) <- getFiles [minBound..maxBound]
-
+  (at :: ArchiveType, files :: Map FilePath MetaEntry) <- getFiles [minBound..maxBound]
   let toSimple :: MetaEntry -> Either String SimpleEntry
       toSimple me =
         case meType me of
@@ -375,7 +381,7 @@ parseArchive pli archive fp = do
         Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
         Right safeFiles -> do
           let toSave = Set.fromList $ map (seSource . snd) safeFiles
-          blobs <-
+          (blobs :: Map FilePath BlobKey)  <- --come here
             foldArchive loc fp at mempty $ \m me ->
               if mePath me `Set.member` toSave
                 then do
@@ -387,41 +393,60 @@ parseArchive pli archive fp = do
             case Map.lookup (seSource se) blobs of
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
-
           -- parse the cabal file and ensure it has the right name
-          (cabalPath, cabalEntry@(TreeEntry cabalBlobKey _)) <- findCabalFile pli tree
+          (cabalPath, cabalEntry@(TreeEntry cabalBlobKey _), btype) <- findCabalOrHpackFile pli tree
           mbs <- withStorage $ loadBlob cabalBlobKey
           bs <-
             case mbs of
               Nothing -> throwIO $ TreeReferencesMissingBlob pli cabalPath cabalBlobKey
               Just bs -> pure bs
-          (_warnings, gpd) <- rawParseGPD (Left pli) bs
+          cabalBs <- if btype == CabalFile
+                     then return bs
+                     else do
+                       getCabalBS bs
+          (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
-          when (cabalPath /= cabalFileName name) $
+          when (cabalPath /= cabalFileName name && btype == CabalFile) $
             throwIO $ WrongCabalFileName pli cabalPath name
 
           -- It's good! Store the tree, let's bounce
-          (_tid, treeKey) <- withStorage $ storeTree ident tree cabalEntry
+          (_tid, treeKey) <- withStorage $ storeTree ident tree cabalEntry btype
+          let tentry = if btype == CabalFile
+                       then PCCabalFile cabalEntry
+                       else PCHpack cabalEntry
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree
-            , packageCabalEntry = cabalEntry
+            , packageCabalEntry = tentry
             , packageIdent = ident
             }
 
-findCabalFile
+findCabalOrHpackFile
   :: MonadThrow m
   => PackageLocationImmutable -- ^ for exceptions
   -> Tree
-  -> m (SafeFilePath, TreeEntry)
-findCabalFile loc (TreeMap m) = do
-  let isCabalFile (sfp, _) =
+  -> m (SafeFilePath, TreeEntry, BuildFileType)
+findCabalOrHpackFile loc (TreeMap m) = do
+  let isCabalOrHpackFile (sfp, _) =
         let txt = unSafeFilePath sfp
-         in not ("/" `T.isInfixOf` txt) && ".cabal" `T.isSuffixOf` txt
-  case filter isCabalFile $ Map.toList m of
+         in not ("/" `T.isInfixOf` txt) && (".cabal" `T.isSuffixOf` txt || "package.yaml" == txt)
+      isCabalFile (sfp, _) =
+        let txt = unSafeFilePath sfp
+         in not ("/" `T.isInfixOf` txt) && (".cabal" `T.isSuffixOf` txt)
+      isHpackFile (sfp, _) =
+        let txt = unSafeFilePath sfp
+         in not ("/" `T.isInfixOf` txt) && ("package.yaml" == txt)
+  case filter isCabalOrHpackFile $ Map.toList m of
     [] -> throwM $ TreeWithoutCabalFile loc
-    [(key, te)] -> pure (key, te)
-    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
+    [v@(key, te)] -> if isHpackFile v
+                     then pure (key, te, HPackFile)
+                     else pure (key, te, CabalFile)
+    xs -> case (filter isCabalFile xs, filter isHpackFile xs) of
+            ([],[]) -> throwM $ TreeWithoutCabalFile loc
+            ([(key,te)],_) -> return (key, te, CabalFile)
+            ([],[(key,te)]) -> return (key, te, HPackFile)
+            ([],xs) -> throwM $ TreeWithMultipleHPackFiles loc $ map fst xs
+            (xs,_) -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
 
 -- | If all files have a shared prefix, strip it off
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]
@@ -443,3 +468,15 @@ takeSubdir subdir = mapMaybe $ \(fp, a) -> do
   where
     splitDirs = List.dropWhile (== ".") . filter (/= "") . T.splitOn "/"
     subdirs = splitDirs subdir
+
+getCabalBS :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+           => ByteString -- Hpack's content
+           -> RIO env ByteString
+getCabalBS hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWorkingDir tmpdir $ do
+               B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
+               tdir <- parseAbsDir tmpdir
+               -- (file:_) <- filter (flip hasExtension "cabal" . toFilePath) . snd <$> listDir tdir
+               -- tfile <- par
+               (_, cfile) <- findOrGenerateCabalFile tdir
+               B.readFile (fromAbsFile cfile)
+    where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
