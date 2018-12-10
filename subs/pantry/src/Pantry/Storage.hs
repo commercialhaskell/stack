@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -147,6 +148,7 @@ Tree
     key BlobId
     cabal BlobId
     cabalType FileType
+    buildType P.BuildFileType
     name PackageNameId
     version VersionId
     UniqueTree key
@@ -442,8 +444,9 @@ storeTree
   -> P.Tree
   -> P.TreeEntry
   -- ^ cabal file
+  -> P.BuildFileType
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey cabal _) cabalType) = do
+storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey cabal _) cabalType) btype = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
   mcabalid <- loadBlobBySHA cabal
   cabalid <-
@@ -456,6 +459,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.
     { treeKey = bid
     , treeCabal = cabalid
     , treeCabalType = cabalType
+    , treeBuildType = btype
     , treeName = nameid
     , treeVersion = versionid
     }
@@ -502,15 +506,15 @@ loadPackageById
   => TreeId
   -> ReaderT SqlBackend (RIO env) Package
 loadPackageById tid = do
-  mts <- get tid
+  (mts :: Maybe Tree) <- get tid
   ts <-
     case mts of
       Nothing -> error $ "loadPackageById: invalid foreign key " ++ show tid
       Just ts -> pure ts
-  tree <- loadTreeByEnt $ Entity tid ts
-  key <- getBlobKey $ treeKey ts
+  (tree :: P.Tree) <- loadTreeByEnt $ Entity tid ts
+  (key :: BlobKey) <- getBlobKey $ treeKey ts
 
-  mname <- get $ treeName ts
+  (mname :: Maybe PackageName) <- get $ treeName ts
   name <-
     case mname of
       Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeName ts)
@@ -524,11 +528,13 @@ loadPackageById tid = do
 
   cabalKey <- getBlobKey $ treeCabal ts
   let ident = P.PackageIdentifier name version
-  let cabalEntry = P.TreeEntry cabalKey (treeCabalType ts)
+  let pentry = if (treeBuildType ts) == P.CabalFile
+               then P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts)
+               else P.PCHpack $ P.TreeEntry cabalKey (treeCabalType ts)
   pure Package
     { packageTreeKey = P.TreeKey key
     , packageTree = tree
-    , packageCabalEntry = cabalEntry
+    , packageCabalEntry = pentry
     , packageIdent = ident
     }
 
