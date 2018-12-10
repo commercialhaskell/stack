@@ -27,6 +27,7 @@ module Pantry.Types
   , VersionP (..)
   , PackageIdentifierRevision (..)
   , FileType (..)
+  , BuildFileType (..)
   , FileSize (..)
   , TreeEntry (..)
   , SafeFilePath
@@ -40,6 +41,7 @@ module Pantry.Types
   , Unresolved
   , resolvePaths
   , Package (..)
+  , PackageCabal (..)
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -137,7 +139,7 @@ data Package = Package
   -- ^ The 'Tree' containing this package.
   --
   -- @since 0.1.0.0
-  , packageCabalEntry :: !TreeEntry
+  , packageCabalEntry :: !PackageCabal
   -- ^ Information on the cabal file inside this package.
   --
   -- @since 0.1.0.0
@@ -147,6 +149,10 @@ data Package = Package
   -- @since 0.1.0.0
   }
   deriving (Show, Eq)
+
+data PackageCabal = PCCabalFile !TreeEntry
+                  | PCHpack !TreeEntry
+                    deriving (Show, Eq)
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
@@ -593,6 +599,7 @@ data PantryException
       ![PWarning]
   | TreeWithoutCabalFile !PackageLocationImmutable
   | TreeWithMultipleCabalFiles !PackageLocationImmutable ![SafeFilePath]
+  | TreeWithMultipleHPackFiles !PackageLocationImmutable ![SafeFilePath]
   | MismatchedCabalName !(Path Abs File) !PackageName
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
@@ -676,6 +683,9 @@ instance Display PantryException where
   display (TreeWithoutCabalFile pl) = "No cabal file found for " <> display pl
   display (TreeWithMultipleCabalFiles pl sfps) =
     "Multiple cabal files found for " <> display pl <> ": " <>
+    fold (intersperse ", " (map display sfps))
+  display (TreeWithMultipleHPackFiles pl sfps) =
+    "Multiple package.yaml files found for " <> display pl <> ": " <>
     fold (intersperse ", " (map display sfps))
   display (MismatchedCabalName fp name) =
     "cabal file path " <>
@@ -854,6 +864,22 @@ cabalSpecLatestVersion =
     CabalSpecV2_0 -> error "this cannot happen"
     CabalSpecV2_2 -> error "this cannot happen"
     CabalSpecV2_4 -> mkVersion [2, 4]
+
+data BuildFileType = CabalFile | HPackFile
+  deriving (Show, Eq, Enum, Bounded)
+
+instance PersistField BuildFileType where
+  toPersistValue CabalFile = PersistInt64 1
+  toPersistValue HPackFile = PersistInt64 2
+
+  fromPersistValue v = do
+    i <- fromPersistValue v
+    case i :: Int64 of
+      1 -> Right CabalFile
+      2 -> Right HPackFile
+      _ -> Left $ "Invalid BuildFileType: " <> tshow i
+instance PersistFieldSql BuildFileType where
+  sqlType _ = SqlInt32
 
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)
