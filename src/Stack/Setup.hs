@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Setup
   ( setupEnv
@@ -588,18 +589,18 @@ getGhcBuilds = do
                             -- Cannot parse /usr/lib on Windows
                             return False
                         | otherwise = do
-                            let extraPaths = ["/usr/lib","/usr/lib64"]
                         -- This is a workaround for the fact that libtinfo.so.x doesn't appear in
                         -- the 'ldconfig -p' output on Arch or Slackware even when it exists.
                         -- There doesn't seem to be an easy way to get the true list of directories
                         -- to scan for shared libs, but this works for our particular cases.
-                            usrLibs <- forM extraPaths (\p -> liftM ((,)p) $ parseAbsDir p)
-                            matches <- forM usrLibs (\(p,dir) -> liftM ((,)p) $ doesFileExist (dir </> lib))
-                            let e = find (snd) matches
-                            case e of
-                                Just (dir,_) -> logDebug ("Found shared library " <> libD <> " in " <> fromString dir)
-                                Nothing -> logDebug ("Did not find shared library " <> libD)
-                            return (isJust e)
+                            let extraPaths = [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+                            matches <- filterM (doesFileExist .(</> lib)) extraPaths
+                            case matches of
+                                [] -> logDebug ("Did not find shared library " <> libD)
+                                    >> return False
+                                (path:_) -> logDebug ("Found shared library " <> libD
+                                        <> " in " <> fromString (Path.toFilePath path))
+                                    >> return True
                       where
                         libT = T.pack (toFilePath lib)
                         libD = fromString (toFilePath lib)
