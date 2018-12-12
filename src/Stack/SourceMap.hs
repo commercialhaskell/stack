@@ -212,18 +212,18 @@ checkFlagsUsedThrowing ::
 checkFlagsUsedThrowing packageFlags source prjPackages deps = do
     unusedFlags <-
         forMaybeM (Map.toList packageFlags) $ \(pname, flags) ->
-            checkFlagUsed (pname, flags) source prjPackages deps
+            getUnusedPackageFlags (pname, flags) source prjPackages deps
     unless (null unusedFlags) $
         throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
 
-checkFlagUsed ::
+getUnusedPackageFlags ::
        MonadIO m
     => (PackageName, Map FlagName Bool)
     -> FlagSource
     -> Map PackageName ProjectPackage
     -> Map PackageName DepPackage
     -> m (Maybe UnusedFlags)
-checkFlagUsed (name, userFlags) source prj deps =
+getUnusedPackageFlags (name, userFlags) source prj deps =
     let maybeCommon =
           fmap ppCommon (Map.lookup name prj) <|>
           fmap dpCommon (Map.lookup name deps)
@@ -236,8 +236,7 @@ checkFlagUsed (name, userFlags) source prj deps =
             gpd <- liftIO $ cpGPD common
             let pname = pkgName $ PD.package $ PD.packageDescription gpd
                 pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
-                unused = Set.difference (Map.keysSet userFlags)
-                         pkgFlags
+                unused = Map.keysSet $ Map.withoutKeys userFlags pkgFlags
             if Set.null unused
                     -- All flags are defined, nothing to do
                     then pure Nothing

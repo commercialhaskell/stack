@@ -532,9 +532,6 @@ data EnvConfig = EnvConfig
     ,envConfigBuildOptsCLI :: !BuildOptsCLI
     ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
---    ,envConfigSMActual :: !SMActual
---    ,envConfigLoadedSnapshot :: !LoadedSnapshot
---    -- ^ The fully resolved snapshot information.
     }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
