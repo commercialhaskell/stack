@@ -11,6 +11,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Travis no longer builds using `sudo: false` as that behaviour is due to be deprecated.
+
 Bug fixes:
 
 
