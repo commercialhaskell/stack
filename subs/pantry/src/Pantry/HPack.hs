@@ -2,15 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Pantry.HPack (findOrGenerateCabalFile, hpack) where
+module Pantry.HPack (findOrGenerateCabalFile, hpack, hpackVersion, hpackToCabal) where
 
 import RIO
 import RIO.Process
+import qualified RIO.ByteString as B
 import Pantry.Types
+import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified RIO.List as List
 import qualified RIO.FilePath as FilePath
 import qualified Hpack
 import qualified Hpack.Config as Hpack
+import Data.Char (isSpace, isDigit)
 import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile, fromAbsFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 
@@ -46,13 +49,20 @@ findOrGenerateCabalFile pkgDir = do
         _:_ -> throwIO $ MultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
--- getCabalBS :: ByteString -> IO ByteString
--- getCabalBS hpackBS = do
---   withSystemTempDirectory "temp-hpack-dir" $
---                               \tmpdir -> withWorkingDir tmpdir $ do
---                                            B.writeFile Hpack.packageConfig hpackBS
---                                            hpack undefined
-
+hpackVersion
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => RIO env Version
+hpackVersion = do
+  he <- view $ pantryConfigL.to pcHpackExecutable
+  case he of
+    HpackBundled -> do
+                 version <- BL.unpack <$> (proc "stack" ["--hpack-numeric-version"] readProcessStdout_)
+                 parseVersionThrowing $ filter (not . isSpace) version
+    HpackCommand command -> do
+                 version <- BL.unpack <$> proc command ["--version"] readProcessStdout_
+                 let version' = dropWhile (not . isDigit) version
+                     version'' = filter (not . isSpace) version'
+                 parseVersionThrowing version''
 
 -- | Generate .cabal file from package.yaml, if necessary.
 hpack
@@ -90,3 +100,14 @@ hpack pkgDir = do
             HpackCommand command ->
                 withWorkingDir (toFilePath pkgDir) $
                 proc command [] runProcess_
+
+
+hpackToCabal :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+           => ByteString -- Hpack's content
+           -> RIO env ByteString
+hpackToCabal hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWorkingDir tmpdir $ do
+               B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
+               tdir <- parseAbsDir tmpdir
+               (_, cfile) <- findOrGenerateCabalFile tdir
+               B.readFile (fromAbsFile cfile)
+    where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
