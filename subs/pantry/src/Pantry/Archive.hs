@@ -8,7 +8,6 @@ module Pantry.Archive
   , getArchiveKey
   , fetchArchives
   , withArchiveLoc
-  , getCabalBS
   ) where
 
 import RIO
@@ -26,7 +25,7 @@ import qualified RIO.Map as Map
 import qualified RIO.ByteString as B
 import qualified RIO.Set as Set
 import qualified Hpack.Config as Hpack
-import Pantry.HPack (findOrGenerateCabalFile)
+import Pantry.HPack (findOrGenerateCabalFile, hpackToCabal)
 import qualified RIO.FilePath as FilePath
 import Data.Bits ((.&.), shiftR)
 import Path (toFilePath, fromAbsDir, fromAbsFile, parseAbsDir)
@@ -92,7 +91,7 @@ storeCache archive sha size pa =
     ALFilePath _ -> pure () -- TODO cache local as well
 
 loadCache
-  :: forall env. (HasPantryConfig env, HasLogFunc env)
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Archive
   -> RIO env (Maybe Package)
 loadCache archive =
@@ -394,26 +393,26 @@ parseArchive pli archive fp = do
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
           -- parse the cabal file and ensure it has the right name
-          (cabalPath, cabalEntry@(TreeEntry cabalBlobKey _), btype) <- findCabalOrHpackFile pli tree
-          mbs <- withStorage $ loadBlob cabalBlobKey
+          (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), btype) <- findCabalOrHpackFile pli tree
+          mbs <- withStorage $ loadBlob buildFileBlobKey
           bs <-
             case mbs of
-              Nothing -> throwIO $ TreeReferencesMissingBlob pli cabalPath cabalBlobKey
+              Nothing -> throwIO $ TreeReferencesMissingBlob pli buildFilePath buildFileBlobKey
               Just bs -> pure bs
           cabalBs <- if btype == CabalFile
                      then return bs
                      else do
-                       getCabalBS bs
+                       hpackToCabal bs
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
-          when (cabalPath /= cabalFileName name && btype == CabalFile) $
-            throwIO $ WrongCabalFileName pli cabalPath name
+          when (buildFilePath /= cabalFileName name && btype == CabalFile) $
+            throwIO $ WrongCabalFileName pli buildFilePath name
 
           -- It's good! Store the tree, let's bounce
-          (_tid, treeKey) <- withStorage $ storeTree ident tree cabalEntry btype
+          (_tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry btype
           let tentry = if btype == CabalFile
-                       then PCCabalFile cabalEntry
-                       else PCHpack cabalEntry
+                       then PCCabalFile buildFileEntry
+                       else PCHpack buildFileEntry
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree
@@ -468,15 +467,3 @@ takeSubdir subdir = mapMaybe $ \(fp, a) -> do
   where
     splitDirs = List.dropWhile (== ".") . filter (/= "") . T.splitOn "/"
     subdirs = splitDirs subdir
-
-getCabalBS :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-           => ByteString -- Hpack's content
-           -> RIO env ByteString
-getCabalBS hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWorkingDir tmpdir $ do
-               B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
-               tdir <- parseAbsDir tmpdir
-               -- (file:_) <- filter (flip hasExtension "cabal" . toFilePath) . snd <$> listDir tdir
-               -- tfile <- par
-               (_, cfile) <- findOrGenerateCabalFile tdir
-               B.readFile (fromAbsFile cfile)
-    where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
