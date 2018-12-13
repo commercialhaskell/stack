@@ -150,7 +150,7 @@ hashSourceMapData wc smDeps = do
                 Ghc -> "ghc"
                 Ghcjs -> "ghcjs"
     info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
-    immDeps <- forM (Map.elems smDeps) $ depPackageHashableContent
+    immDeps <- forM (Map.elems smDeps) depPackageHashableContent
     return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks (path:info:immDeps))
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
