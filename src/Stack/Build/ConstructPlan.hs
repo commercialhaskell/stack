@@ -226,7 +226,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , ctxEnvConfig = econfig
         , callStack = []
         , wanted = Map.keysSet (smtTargets $ smTargets sourceMap)
-        , localNames = Map.keysSet (smProject sourceMap) -- Set.fromList $ map (packageName . lpPackage) locals
+        , localNames = Map.keysSet (smProject sourceMap)
         }
 
     getSources = do
@@ -252,7 +252,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc -> do
-            version <- getPLIVersion loc (cpGPD $ dpCommon dp)
+            version <- getPLIVersion loc (loadVersion $ dpCommon dp)
             return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)

@@ -19,13 +19,12 @@ import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import           Data.List
 import qualified Data.Map.Strict as Map
-import qualified Distribution.PackageDescription as PD
 import           Path
 import           Stack.Build.Cache
 import           Stack.Constants
 import           Stack.PackageDump
 import           Stack.Prelude
-import           Stack.SourceMap (getPLIVersion)
+import           Stack.SourceMap (getPLIVersion, loadVersion)
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -46,17 +45,18 @@ data GetInstalledOpts = GetInstalledOpts
 
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
-    let loadVersion loc common = do
-            gpd <- liftIO $ cpGPD common
-            return (loc, pkgVersion $ PD.package $ PD.packageDescription gpd)
     projectInstalls <-
-        for (smProject sourceMap) $ \pp -> loadVersion Local (ppCommon pp)
+        for (smProject sourceMap) $ \pp -> do
+            version <- loadVersion (ppCommon pp)
+            return (Local, version)
     depInstalls <-
         for (smDeps sourceMap) $ \dp ->
             case dpLocation dp of
-                PLMutable _ -> loadVersion Local (dpCommon dp)
+                PLMutable _ -> do
+                    version <- loadVersion (dpCommon dp)
+                    return (Local, version)
                 PLImmutable pli -> do
-                    version <- getPLIVersion pli (cpGPD $ dpCommon dp)
+                    version <- getPLIVersion pli (loadVersion $ dpCommon dp)
                     return (Snap, version)
     return $ projectInstalls <> depInstalls
 

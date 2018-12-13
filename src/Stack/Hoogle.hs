@@ -67,10 +67,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
                            (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
                            (Just True)
                            go)
-                      (\lk ->
-                            Stack.Build.build
-                                Nothing
-                                lk))
+                      (Stack.Build.build Nothing))
                  (\(_ :: ExitCode) ->
                        return ()))
     hooglePackageName = mkPackageName "hoogle"
@@ -117,8 +114,8 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
                  (withBuildConfigAndLock
                       go
                       NeedTargets
-                      boptsCLI
-                      (\lk -> Stack.Build.build Nothing lk)
+                      boptsCLI $
+                      Stack.Build.build Nothing
                  )
                  (\(e :: ExitCode) ->
                        case e of

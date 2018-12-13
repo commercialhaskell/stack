@@ -5,6 +5,7 @@ module Stack.SourceMap
     ( mkProjectPackage
     , snapToDepPackage
     , additionalDepPackage
+    , loadVersion
     , getPLIVersion
     , loadGlobalHints
     , toActual
@@ -13,7 +14,6 @@ module Stack.SourceMap
 
 import qualified Data.Conduit.List as CL
 import Data.Yaml (decodeFileThrow)
-import Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as PD
 import Network.HTTP.Download (download, redownload)
 import Network.HTTP.StackClient (parseRequest)
@@ -102,22 +102,24 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
                   }
     }
 
+loadVersion :: MonadIO m => CommonPackage -> m Version
+loadVersion common = do
+    gpd <- liftIO $ cpGPD common
+    return (pkgVersion $ PD.package $ PD.packageDescription gpd)
+
 getPLIVersion ::
        MonadIO m
     => PackageLocationImmutable
-    -> IO GenericPackageDescription
+    -> IO Version
     -> m Version
 getPLIVersion (PLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
-getPLIVersion (PLIArchive _ pm) loadGPD = versionMaybeFromPM pm loadGPD
-getPLIVersion (PLIRepo _ pm) loadGPD = versionMaybeFromPM pm loadGPD
+getPLIVersion (PLIArchive _ pm) loadVer = versionMaybeFromPM pm loadVer
+getPLIVersion (PLIRepo _ pm) loadVer = versionMaybeFromPM pm loadVer
 
 versionMaybeFromPM ::
-       MonadIO m => PackageMetadata -> IO GenericPackageDescription -> m Version
+       MonadIO m => PackageMetadata -> IO Version -> m Version
 versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
-versionMaybeFromPM _ loadGPD = do
-    gpd <- liftIO loadGPD
-    return $ pkgVersion $ PD.package $ PD.packageDescription gpd
-
+versionMaybeFromPM _ loadVer = liftIO loadVer
 
 -- | Load the global hints from Github.
 loadGlobalHints
