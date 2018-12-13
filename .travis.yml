@@ -8,7 +8,6 @@
 # use cabal without any Stackage snapshots.
 #
 language: generic
-sudo: false
 
 cache:
     directories:
