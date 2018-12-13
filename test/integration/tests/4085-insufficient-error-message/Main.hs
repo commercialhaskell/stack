@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{--
+
 import StackTest
 import System.Environment (getEnv)
 import System.Directory
@@ -74,6 +76,7 @@ spaceInMBJustEnoughToFailInTheExactMoment = 2000
 
 main :: IO ()
 main = do
+  -- @@@ DISABLE THIS TEST, AND MAKE AN ISSUE TO MAKE IT MORE EFFICIENT (https://fpcomplete.slack.com/archives/C24MGQG6S/p1543775070005000)
   buildDockerImageWithStackSourceInside imageTag
   (ec, _, stderr) <- withDockerVolume
     spaceInMBJustEnoughToFailInTheExactMoment
@@ -89,3 +92,8 @@ main = do
     error "stack process succeeded, but it shouldn't"
   unless (validateSrderr stderr) $
     error "stderr validation failed"
+
+// --}
+
+main :: IO ()
+main = putStrLn "This test is disabled (see https://github.com/commercialhaskell/stack/issues/4427)."

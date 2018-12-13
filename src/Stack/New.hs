@@ -241,8 +241,12 @@ applyTemplate project template nonceParams dir templateText = do
     liftM
         M.fromList
         (mapM
-             (\(fp,bytes) ->
-                   do path <- parseRelFile fp
+             (\(fpOrig,bytes) ->
+                   do -- Apply the mustache template to the filenames
+                      -- as well, so that we can have file names
+                      -- depend on the project name.
+                      fp <- applyMustache $ TLE.encodeUtf8 $ TL.pack fpOrig
+                      path <- parseRelFile $ TL.unpack $ TLE.decodeUtf8 fp
                       bytes' <- applyMustache bytes
                       return (dir </> path, bytes'))
              (M.toList files))

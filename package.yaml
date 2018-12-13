@@ -28,6 +28,9 @@ extra-source-files:
 - test/package-dump/ghc-7.10.txt
 - test/package-dump/ghc-7.8.4-osx.txt
 - test/package-dump/ghc-7.8.txt
+- test/package-dump/ghc-head.txt
+- src/test/Stack/Untar/test1.tar.gz
+- src/test/Stack/Untar/test2.tar.gz
 ghc-options:
 - -Wall
 - -fwarn-tabs
@@ -162,7 +165,6 @@ library:
   - Stack.Clean
   - Stack.Config
   - Stack.Config.Build
-  - Stack.Config.Urls
   - Stack.Config.Docker
   - Stack.Config.Nix
   - Stack.ConfigCmd
@@ -233,7 +235,6 @@ library:
   - Stack.Types.Build
   - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild
-  - Stack.Types.Urls
   - Stack.Types.Compiler
   - Stack.Types.Config
   - Stack.Types.Config.Build

@@ -6,8 +6,8 @@ packages:
 - Cabal-2.4.0.1@rev:0
 - cabal-install-2.4.0.0@rev:1
 - infer-license-0.2.0@rev:0 #for hpack-0.31
-- hpack-0.31.0@rev:0
-- githash-0.1.1.0@rev:0
+- hpack-0.31.1@rev:0
+- githash-0.1.3.0@rev:0
 - rio-orphans-0.1.1.0@sha256:15600084c56ef4e1f22ac2091d10fa6ed62f01f531d819c6a5a19492212a76c9
 - persistent-sqlite-2.8.2@sha256:6874958eb2943c4567c30bc0069ce4868b2813c490402c22bb2e0efa5b4c4c71,3873
 - yaml-0.10.4.0@rev:0 #for hpack-0.31

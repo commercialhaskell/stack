@@ -15,7 +15,7 @@ import RIO
 import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
 import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import Data.Aeson.Extended (WithJSONWarnings (..))
 import qualified Data.ByteString.Char8 as S8
 
 hh :: HasCallStack => String -> Property -> Spec

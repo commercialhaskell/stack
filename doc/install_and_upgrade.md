@@ -307,6 +307,38 @@ To get tab-completion of commands on bash, just run the following (or add it to
 
 For more information and other shells, see [the shell auto-completion page](shell_autocompletion.md)
 
+## China-based users
+
+If you're attempting to install stack from within China:
+
+* As of 2018-10-24, the download link has limited connectivity from within mainland China. If this is the case, please proceed by manually downloading (ideally via a VPN) and installing stack per the instructions found on this page pertinent to your OS.
+
+* After install, your ~/.stack/config.yaml will need to be configured before stack can download large files consistently from within China (without reliance on a VPN). Please add the following to the bottom of the ~/.stack/config.yaml file (for Windows: use the %STACK_ROOT%\config.yaml):
+
+```
+###ADD THIS IF YOU LIVE IN CHINA
+setup-info: "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
+urls:
+  latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
+  lts-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/lts-haskell/
+  nightly-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/stackage-nightly/
+package-indices:
+ - name: Tsinghua
+   download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/package/
+   http: http://mirrors.tuna.tsinghua.edu.cn/hackage/00-index.tar.gz
+```
+
+## Using an http proxy
+
+To use `stack` behind a http proxy with ip address *IP* and port *PORT*, first set up an environment variable `http_proxy` and then run the stack command. _e.g._
+
+```
+$ export http_proxy=IP:PORT
+$ stack install
+```
+
+Note that on most operating systems, it is not mandatory for programs to follow the "system-wide" http proxy. Some programs, such as browsers, do honor this "system-wide" http proxy setting, while other programs, including bash, do not. That means configuring "http proxy setting" in your Control Panel (Windows) or System Preferences (Mac) would not result in `stack` traffic going through the proxy. 
+
 ## Upgrade
 
 There are essentially four different approaches to upgrade:

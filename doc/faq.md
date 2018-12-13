@@ -3,7 +3,7 @@
 # FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [Architecture](architecture.md) page. The goal of the answers
+below, see the [Build overview](build-overview.md) page. The goal of the answers
 here is to be as helpful and concise as possible.
 
 ## What version of GHC is used when I run something like `stack ghci`?
@@ -526,3 +526,32 @@ Yes:
 * If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
 * You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
 * You can use the `with-hpack` configuration option to specify an Hpack executable to use instead of the Hpack bundled with Stack.
+
+## How do I resolve linker errors when running `stack setup` or `stack build` on macOS?
+
+This is likely to be caused by having a LLVM installation and default Apple
+Clang compiler both under the `PATH`. The symptom of this issue is a linker
+error "bad relocation (Invalid pointer diff)". The compiler picks up
+inconsistent versions of binaries and the mysterious error occurs.
+
+The workaround is to remove LLVM binaries from the `PATH`.
+
+## How do I suppress `'-nopie'` warnings with `stack build` on macOS?
+
+```
+clang: warning: argument unused during compilation: '-nopie'
+ [-Wunused-command-line-argument]
+```
+
+This warning is shown when compiler support of `-no-pie` is expected but unavailable.
+It's possible to bypass the warning for a specific version of GHC by modifying a global setting:
+
+```
+# ~/.stack/programs/x86_64-osx/ghc-8.2.2/lib/ghc-8.2.2/settings
+-- ("C compiler supports -no-pie", "YES"),
+++ ("C compiler supports -no-pie", "NO"),
+```
+
+**Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.** You should apply this fix for the version of GHC that matches your resolver.
+
+Issue [#4009](https://github.com/commercialhaskell/stack/issues/4009) on GitHub goes into further detail.
