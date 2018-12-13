@@ -153,6 +153,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
+import Pantry.HPack (hpackToCabal)
 import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
@@ -310,7 +311,7 @@ loadCabalFileImmutable loc = withCache $ do
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
   cabalBs <- if btype == CabalFile
              then return bs
-             else getCabalBS bs
+             else hpackToCabal bs
   (_warnings, gpd) <- rawParseGPD (Left loc) cabalBs
   let pm =
         case loc of
