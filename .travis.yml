@@ -8,6 +8,7 @@
 # use cabal without any Stackage snapshots.
 #
 language: generic
+dist: xenial
 
 cache:
     directories:
