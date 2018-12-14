@@ -104,10 +104,11 @@ hpack pkgDir = do
 
 hpackToCabal :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
            => ByteString -- Hpack's content
-           -> RIO env ByteString
+           -> RIO env (PackageName, ByteString)
 hpackToCabal hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWorkingDir tmpdir $ do
                B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
                tdir <- parseAbsDir tmpdir
-               (_, cfile) <- findOrGenerateCabalFile tdir
-               B.readFile (fromAbsFile cfile)
+               (pkgName, cfile) <- findOrGenerateCabalFile tdir
+               bs <- B.readFile (fromAbsFile cfile)
+               return (pkgName, bs)
     where hasExtension fp x = FilePath.takeExtension fp == "." ++ x

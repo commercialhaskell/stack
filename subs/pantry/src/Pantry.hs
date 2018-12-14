@@ -305,14 +305,19 @@ loadCabalFileImmutable
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
 loadCabalFileImmutable loc = withCache $ do
+  logDebug $ "loadcabalFileImmutable: 0 "
   logDebug $ "Parsing cabal file for " <> display loc
   (bs, btype) <- loadCabalFileBytes loc
   logDebug $ displayShow btype
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
-  cabalBs <- if btype == CabalFile
-             then return bs
-             else hpackToCabal bs
-  (_warnings, gpd) <- rawParseGPD (Left loc) cabalBs
+  -- cabalBs
+  -- cabalBs <- if btype == CabalFile
+  --            then return bs
+  --            else do
+  --              (_, bs) <- hpackToCabal bs
+  --              return bs
+  logDebug $ "loadcabalFileImmutable: 10 "
+  (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let pm =
         case loc of
           PLIHackage (PackageIdentifierRevision name version cfi) mtree -> PackageMetadata
@@ -370,6 +375,7 @@ loadCabalFilePath
        , Path Abs File
        )
 loadCabalFilePath dir = do
+  logDebug "loadCabalFilePath: 0"
   ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
   mcached <- Map.lookup dir <$> readIORef ref
   case mcached of

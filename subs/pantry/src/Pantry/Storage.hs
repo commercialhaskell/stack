@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -57,6 +58,8 @@ module Pantry.Storage
   ) where
 
 import RIO hiding (FilePath)
+import RIO.Process
+import qualified Prelude as Pr
 import qualified RIO.ByteString as B
 import qualified Pantry.Types as P
 import Database.Persist
@@ -69,6 +72,7 @@ import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Data.Pool (destroyAllResources)
+import Pantry.HPack (hpackToCabal, hpackVersion)
 import Conduit
 import Data.Acquire (with)
 import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
@@ -146,12 +150,19 @@ CacheUpdate
 -- table.
 Tree
     key BlobId
-    cabal BlobId
+    cabal BlobId Maybe
     cabalType FileType
-    buildType P.BuildFileType
     name PackageNameId
     version VersionId
     UniqueTree key
+
+HPack
+   tree TreeId
+   version VersionId
+   -- Corresponding cabal file of hpack
+   cabal BlobId
+   path FilePathId
+   UniqueHPack tree version
 
 -- An individual file within a Tree.
 TreeEntry
@@ -438,32 +449,109 @@ loadHackageTarballInfo name version = do
   where
     go (Entity _ ht) = (hackageTarballSha ht, hackageTarballSize ht)
 
+getKey dat = case dat of
+               Left (Entity key _) -> key
+               Right key -> key
+
+storeCabalFile :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => ByteString -> P.PackageName -> TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) BlobId
+storeCabalFile cabalBS pkgName tid tentry = do
+  liftIO $ Pr.print "storeCabalFile: 0"
+  (bid, _) <- storeBlob cabalBS
+  let cabalFile = P.cabalFileName pkgName
+  liftIO $ Pr.print "storeCabalFile: 1"
+  fid <- insertBy FilePath { filePathPath = cabalFile }
+  liftIO $ Pr.print "storeCabalFile: 2"
+  -- tid <- insert $ TreeEntry {
+  --                treeEntryTree = tid,
+  --                treeEntryPath = getKey fid,
+  --                treeEntryBlob = bid,
+  --                treeEntryType = (P.teType tentry)
+  --              }
+  liftIO $ Pr.print "storeCabalFile: 10"
+  return bid
+
+-- getCabalOfHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+--                 => TreeEntry -- ^ TreeEntry of package.yaml file
+--                 -> ReaderT SqlBackend (RIO env) TreeEntry -- ^ TreeEntry of corresponding cabal file
+-- getCabalOfHPack tentry = do
+--   vid <- hpackVersionId
+--   (hpack :: Maybe (Entity HPack)) <- getBy $ UniqueHPack (treeEntryTree tentry) vid
+--   let tentryId = case hpack of
+--                    Nothing -> error "getCabalOfHPack: Cabal file not present for package.yaml"
+--                    Just hpackEnt -> hPackCabal $ entityVal hpackEnt
+--   getJust tentryId
+
+generateHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> VersionId -> ReaderT SqlBackend (RIO env) ()
+generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
+  liftIO $ Pr.print "generateHPack: 0"
+  hpackId <- loadBlobBySHA hpackSha
+  hpack' <- case hpackId of
+             Just hpack -> pure hpack
+             Nothing -> error $ "generateHPack:  BlobKey not found: " ++ show (tree, hpackSha)
+  hpackBS <- loadBlobById hpack'
+  (pkgName, cabalBS) <- lift $ hpackToCabal hpackBS
+  bid <- storeCabalFile cabalBS pkgName tid tree
+  let cabalFile = P.cabalFileName pkgName
+  fid <- insertBy FilePath { filePathPath = cabalFile }
+  let hpackRecord = HPack {
+                      hPackTree = tid,
+                      hPackVersion = vid,
+                      hPackCabal = bid,
+                      hPackPath = getKey fid
+                    }
+  insertBy hpackRecord
+  liftIO $ Pr.print "generateHPack: 10"
+  return ()
+
+hpackVersionId :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => ReaderT SqlBackend (RIO env) VersionId
+hpackVersionId = do
+  hpackSoftwareVersion <- lift $ hpackVersion
+  hid <- insertBy $ Version { versionVersion = P.VersionP hpackSoftwareVersion }
+  let vid = case hid of
+              Left (Entity versionId _) -> versionId
+              Right key -> key
+  return vid
+
+storeHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) ()
+storeHPack tid tentry = do
+  liftIO $ Pr.print "storeHPack: 0"
+  vid <- hpackVersionId
+  hpackRecord <- getBy (UniqueHPack tid vid)
+  case hpackRecord of
+    Nothing -> generateHPack tid tentry vid
+    Just _ -> return ()
+  liftIO $ Pr.print "storeHPack: 10"
+
+
 storeTree
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => P.PackageIdentifier
   -> P.Tree
   -> P.TreeEntry
   -- ^ cabal file
   -> P.BuildFileType
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey cabal _) cabalType) btype = do
+storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEntry (P.BlobKey btypeSha _) fileType) btype = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
-  mcabalid <- loadBlobBySHA cabal
-  cabalid <-
-    case mcabalid of
-      Just cabalid -> pure cabalid
-      Nothing -> error $ "storeTree: cabal BlobKey not found: " ++ show (tree, cabal)
+  buildTypeid <- loadBlobBySHA btypeSha
+  buildid <-
+    case buildTypeid of
+      Just buildId -> pure buildId
+      Nothing -> error $ "storeTree: " ++ (show btype) ++ " BlobKey not found: " ++ show (tree, btypeSha)
   nameid <- getPackageNameId name
   versionid <- getVersionId version
+  let cabalid' = case btype of
+                   P.HPackFile -> Nothing
+                   P.CabalFile -> Just buildid
   etid <- insertBy Tree
     { treeKey = bid
-    , treeCabal = cabalid
-    , treeCabalType = cabalType
-    , treeBuildType = btype
+    , treeCabal = cabalid'
+    , treeCabalType = fileType
     , treeName = nameid
     , treeVersion = versionid
     }
-  case etid of
+
+  (tid, treeKey) <- case etid of
     Left (Entity tid _) -> pure (tid, P.TreeKey blobKey) -- already in database, assume it matches
     Right tid -> do
       for_ (Map.toList m) $ \(sfp, P.TreeEntry blobKey' ft) -> do
@@ -480,6 +568,10 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.
           , treeEntryType = ft
           }
       pure (tid, P.TreeKey blobKey)
+  case btype of
+    P.CabalFile -> return ()
+    P.HPackFile -> storeHPack tid tentry
+  return (tid, treeKey)
 
 loadTree
   :: (HasPantryConfig env, HasLogFunc env)
@@ -502,7 +594,7 @@ getTreeForKey (P.TreeKey key) = do
     Just bid -> getBy $ UniqueTree bid
 
 loadPackageById
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => TreeId
   -> ReaderT SqlBackend (RIO env) Package
 loadPackageById tid = do
@@ -526,17 +618,36 @@ loadPackageById tid = do
       Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeVersion ts)
       Just (Version (P.VersionP version)) -> pure version
 
-  cabalKey <- getBlobKey $ treeCabal ts
   let ident = P.PackageIdentifier name version
-  let pentry = if (treeBuildType ts) == P.CabalFile
-               then P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts)
-               else P.PCHpack $ P.TreeEntry cabalKey (treeCabalType ts)
+  (pentry, mtree) <- case (treeCabal ts) of
+                 Just key -> do
+                        cabalKey <- getBlobKey key
+                        return (P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
+                 Nothing -> do
+                        -- todo: Fix this so that it actually loads hpacks cabalKey. Right now it loads cabal's cabalkey.
+                        hpackVid <- hpackVersionId
+                        hpackRecord <- getBy (UniqueHPack tid hpackVid)
+                        case hpackRecord of
+                          Nothing -> error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
+                          Just (Entity _ item) -> do
+                                           -- let htree = tree
+                                           cabalKey <- getBlobKey (hPackCabal item)
+                                           let cabalFile = P.cabalFileName name -- come here
+                                               tent = P.TreeEntry cabalKey (treeCabalType ts)
+                                               (P.TreeMap tmap) = tree
+                                               tree' = P.TreeMap $ Map.insert cabalFile tent tmap
+                                           return $ (P.PCHpack $ P.TreeEntry cabalKey (treeCabalType ts), tree')
   pure Package
     { packageTreeKey = P.TreeKey key
-    , packageTree = tree
+    , packageTree = mtree
     , packageCabalEntry = pentry
     , packageIdent = ident
     }
+
+-- loadHPackTreeEntry   :: (HasPantryConfig env, HasLogFunc env)
+--   => TreeId
+--   -> ReaderT SqlBackend (RIO env) TreeEntry
+-- lo
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
@@ -601,7 +712,7 @@ loadHackageTreeKey name ver sha = do
       pure $ Just $ P.TreeKey $ P.BlobKey treesha size
 
 loadHackageTree
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => P.PackageName
   -> P.Version
   -> BlobId

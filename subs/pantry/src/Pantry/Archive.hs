@@ -402,7 +402,8 @@ parseArchive pli archive fp = do
           cabalBs <- if btype == CabalFile
                      then return bs
                      else do
-                       hpackToCabal bs
+                       (_, cabalbs) <- hpackToCabal bs
+                       return cabalbs
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
           when (buildFilePath /= cabalFileName name && btype == CabalFile) $
