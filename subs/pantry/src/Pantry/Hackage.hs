@@ -401,7 +401,7 @@ getHackagePackageVersions usePreferred name = withStorage $ do
   Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 withCachedTree
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
