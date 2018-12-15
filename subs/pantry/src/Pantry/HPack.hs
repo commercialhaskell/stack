@@ -105,7 +105,7 @@ hpack pkgDir = do
 hpackToCabal :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
            => ByteString -- Hpack's content
            -> RIO env (PackageName, ByteString)
-hpackToCabal hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWorkingDir tmpdir $ do
+hpackToCabal hpackBs = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> withWorkingDir tmpdir $ do
                B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
                tdir <- parseAbsDir tmpdir
                (pkgName, cfile) <- findOrGenerateCabalFile tdir

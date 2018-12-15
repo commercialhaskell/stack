@@ -26,9 +26,8 @@ import qualified RIO.ByteString as B
 import qualified RIO.Set as Set
 import qualified Hpack.Config as Hpack
 import Pantry.HPack (findOrGenerateCabalFile, hpackToCabal)
-import qualified RIO.FilePath as FilePath
 import Data.Bits ((.&.), shiftR)
-import Path (toFilePath, fromAbsDir, fromAbsFile)
+import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Digest.CRC32 as CRC32
 import Distribution.PackageDescription (packageDescription, package)

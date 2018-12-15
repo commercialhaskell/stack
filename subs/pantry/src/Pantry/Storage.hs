@@ -483,10 +483,9 @@ hpackVersionId :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) =
 hpackVersionId = do
   hpackSoftwareVersion <- lift $ hpackVersion
   hid <- insertBy $ Version { versionVersion = P.VersionP hpackSoftwareVersion }
-  let vid = case hid of
-              Left (Entity versionId _) -> versionId
-              Right key -> key
-  return vid
+  case hid of
+    Left (Entity versionId _) -> return versionId
+    Right key -> return key
 
 storeHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) ()
 storeHPack tid tentry = do
@@ -593,22 +592,23 @@ loadPackageById tid = do
       Just (Version (P.VersionP version)) -> pure version
 
   let ident = P.PackageIdentifier name version
-  (pentry, mtree) <- case (treeCabal ts) of
-                 Just key -> do
-                        cabalKey <- getBlobKey key
-                        return (P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
-                 Nothing -> do
-                        hpackVid <- hpackVersionId
-                        hpackRecord <- getBy (UniqueHPack tid hpackVid)
-                        let (P.TreeMap tmap) = tree
-                        case hpackRecord of
-                          Nothing -> error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
-                          Just (Entity _ item) -> do
-                                           cabalKey <- getBlobKey (hPackCabal item)
-                                           let cabalFile = P.cabalFileName name
-                                               tent = P.TreeEntry cabalKey (treeCabalType ts)
-                                               tree' = P.TreeMap $ Map.insert cabalFile tent tmap
-                                           return $ (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree')
+  (pentry, mtree) <-
+      case (treeCabal ts) of
+        Just key -> do
+          cabalKey <- getBlobKey key
+          return (P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
+        Nothing -> do
+          hpackVid <- hpackVersionId
+          hpackRecord <- getBy (UniqueHPack tid hpackVid)
+          let (P.TreeMap tmap) = tree
+          case hpackRecord of
+            Nothing -> error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
+            Just (Entity _ item) -> do
+                             cabalKey <- getBlobKey (hPackCabal item)
+                             let cabalFile = P.cabalFileName name
+                                 tent = P.TreeEntry cabalKey (treeCabalType ts)
+                                 tree' = P.TreeMap $ Map.insert cabalFile tent tmap
+                             return $ (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree')
   pure Package
     { packageTreeKey = P.TreeKey key
     , packageTree = mtree
