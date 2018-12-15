@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.28.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6c31147cae2b0b82e16fec64c28619c9210233c2ae4c6b0cd3f70696317d654d
+-- hash: 9aa9dc2a6e0ba8f758c3030c25895c97c17b20da6c23db38a8e6aad5d5a3ce22
 
 name:           pantry
 version:        0.1.0.0
@@ -16,11 +18,10 @@ maintainer:     michael@snoyman.com
 copyright:      2018 FP Complete
 license:        MIT
 build-type:     Simple
-cabal-version:  >= 1.10
 extra-source-files:
-    attic/package-0.1.2.3.tar.gz
-    ChangeLog.md
     README.md
+    ChangeLog.md
+    attic/package-0.1.2.3.tar.gz
 
 source-repository head
   type: git

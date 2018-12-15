@@ -153,7 +153,6 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Pantry.HPack (hpackToCabal)
 import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
@@ -366,7 +365,6 @@ loadCabalFilePath
        , Path Abs File
        )
 loadCabalFilePath dir = do
-  logDebug "loadCabalFilePath: 0"
   ref <- view $ pantryConfigL.to pcParsedCabalFilesMutable
   mcached <- Map.lookup dir <$> readIORef ref
   case mcached of
@@ -508,9 +506,7 @@ loadCabalFileBytes
 -- Just ignore the mtree for this. Safe assumption: someone who filled
 -- in the TreeKey also filled in the cabal file hash, and that's a
 -- more efficient lookup mechanism.
-loadCabalFileBytes (PLIHackage pir _mtree) = do
-  bs <- getHackageCabalFile pir
-  return bs
+loadCabalFileBytes (PLIHackage pir _mtree) = getHackageCabalFile pir
 
 loadCabalFileBytes pl = do
   package <- loadPackage pl

@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -455,35 +454,13 @@ getKey dat = case dat of
 
 storeCabalFile :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => ByteString -> P.PackageName -> TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) BlobId
 storeCabalFile cabalBS pkgName tid tentry = do
-  liftIO $ Pr.print "storeCabalFile: 0"
   (bid, _) <- storeBlob cabalBS
   let cabalFile = P.cabalFileName pkgName
-  liftIO $ Pr.print "storeCabalFile: 1"
   fid <- insertBy FilePath { filePathPath = cabalFile }
-  liftIO $ Pr.print "storeCabalFile: 2"
-  -- tid <- insert $ TreeEntry {
-  --                treeEntryTree = tid,
-  --                treeEntryPath = getKey fid,
-  --                treeEntryBlob = bid,
-  --                treeEntryType = (P.teType tentry)
-  --              }
-  liftIO $ Pr.print "storeCabalFile: 10"
   return bid
-
--- getCabalOfHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
---                 => TreeEntry -- ^ TreeEntry of package.yaml file
---                 -> ReaderT SqlBackend (RIO env) TreeEntry -- ^ TreeEntry of corresponding cabal file
--- getCabalOfHPack tentry = do
---   vid <- hpackVersionId
---   (hpack :: Maybe (Entity HPack)) <- getBy $ UniqueHPack (treeEntryTree tentry) vid
---   let tentryId = case hpack of
---                    Nothing -> error "getCabalOfHPack: Cabal file not present for package.yaml"
---                    Just hpackEnt -> hPackCabal $ entityVal hpackEnt
---   getJust tentryId
 
 generateHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> VersionId -> ReaderT SqlBackend (RIO env) ()
 generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
-  liftIO $ Pr.print "generateHPack: 0"
   hpackId <- loadBlobBySHA hpackSha
   hpack' <- case hpackId of
              Just hpack -> pure hpack
@@ -500,7 +477,6 @@ generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
                       hPackPath = getKey fid
                     }
   insertBy hpackRecord
-  liftIO $ Pr.print "generateHPack: 10"
   return ()
 
 hpackVersionId :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => ReaderT SqlBackend (RIO env) VersionId
@@ -514,13 +490,11 @@ hpackVersionId = do
 
 storeHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) ()
 storeHPack tid tentry = do
-  liftIO $ Pr.print "storeHPack: 0"
   vid <- hpackVersionId
   hpackRecord <- getBy (UniqueHPack tid vid)
   case hpackRecord of
     Nothing -> generateHPack tid tentry vid
     Just _ -> return ()
-  liftIO $ Pr.print "storeHPack: 10"
 
 
 storeTree
@@ -630,9 +604,8 @@ loadPackageById tid = do
                         case hpackRecord of
                           Nothing -> error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
                           Just (Entity _ item) -> do
-                                           -- let htree = tree
                                            cabalKey <- getBlobKey (hPackCabal item)
-                                           let cabalFile = P.cabalFileName name -- come here
+                                           let cabalFile = P.cabalFileName name
                                                tent = P.TreeEntry cabalKey (treeCabalType ts)
                                                tree' = P.TreeMap $ Map.insert cabalFile tent tmap
                                            return $ (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree')

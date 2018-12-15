@@ -313,7 +313,6 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> RIO env a
 withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
     createTempDirFunction stackProgName $ \tmpdir -> do
-      -- todo: look here
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -991,13 +990,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
     withCabal package pkgDir outputType inner = do
-        logDebug $ "withCabal: 0"
-        -- _ <- findOrGenerateCabalFile pkgDir
         config <- view configL
-        logDebug $ "withCabal: 1"
         unless (configAllowDifferentUser config) $
             checkOwnership (pkgDir </> configWorkDir config)
-        logDebug $ "withCabal: 2"
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False
@@ -1006,9 +1001,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 , esKeepGhcRts = False
                 }
         menv <- liftIO $ configProcessContextSettings config envSettings
-        logDebug $ "withCabal: 3"
         distRelativeDir' <- distRelativeDir
-        logDebug $ "withCabal: 4"
         esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build
             -- types, see:
@@ -1016,7 +1009,6 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             case (packageBuildType package, eeSetupExe) of
                 (C.Simple, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ Right <$> getSetupHs pkgDir
-        logDebug $ "withCabal: 5"
         inner $ \stripTHLoading args -> do
             let cabalPackageArg
                     -- Omit cabal package dependency when building
