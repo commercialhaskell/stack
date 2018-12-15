@@ -28,7 +28,7 @@ import qualified Hpack.Config as Hpack
 import Pantry.HPack (findOrGenerateCabalFile, hpackToCabal)
 import qualified RIO.FilePath as FilePath
 import Data.Bits ((.&.), shiftR)
-import Path (toFilePath, fromAbsDir, fromAbsFile, parseAbsDir)
+import Path (toFilePath, fromAbsDir, fromAbsFile)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Digest.CRC32 as CRC32
 import Distribution.PackageDescription (packageDescription, package)
@@ -380,7 +380,7 @@ parseArchive pli archive fp = do
         Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
         Right safeFiles -> do
           let toSave = Set.fromList $ map (seSource . snd) safeFiles
-          (blobs :: Map FilePath BlobKey)  <- --come here
+          (blobs :: Map FilePath BlobKey)  <-
             foldArchive loc fp at mempty $ \m me ->
               if mePath me `Set.member` toSave
                 then do
@@ -393,31 +393,31 @@ parseArchive pli archive fp = do
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
           -- parse the cabal file and ensure it has the right name
-          (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), btype) <- findCabalOrHpackFile pli tree
+          (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), buildFileType) <- findCabalOrHpackFile pli tree
           mbs <- withStorage $ loadBlob buildFileBlobKey
           bs <-
             case mbs of
               Nothing -> throwIO $ TreeReferencesMissingBlob pli buildFilePath buildFileBlobKey
               Just bs -> pure bs
-          cabalBs <- if btype == CabalFile
+          cabalBs <- if buildFileType == CabalFile
                      then return bs
                      else do
                        (_, cabalbs) <- hpackToCabal bs
                        return cabalbs
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
-          when (buildFilePath /= cabalFileName name && btype == CabalFile) $
+          when (buildFilePath /= cabalFileName name && buildFileType == CabalFile) $
             throwIO $ WrongCabalFileName pli buildFilePath name
 
           -- It's good! Store the tree, let's bounce
-          (_tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry btype
-          let tentry = if btype == CabalFile
-                       then PCCabalFile buildFileEntry
-                       else PCHpack buildFileEntry
+          (_tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry buildFileType
+          let packageCabal = if buildFileType == CabalFile
+                             then PCCabalFile buildFileEntry
+                             else PCHpack buildFileEntry
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree
-            , packageCabalEntry = tentry
+            , packageCabalEntry = packageCabal
             , packageIdent = ident
             }
 
@@ -427,26 +427,18 @@ findCabalOrHpackFile
   -> Tree
   -> m (SafeFilePath, TreeEntry, BuildFileType)
 findCabalOrHpackFile loc (TreeMap m) = do
-  let isCabalOrHpackFile (sfp, _) =
-        let txt = unSafeFilePath sfp
-         in not ("/" `T.isInfixOf` txt) && (".cabal" `T.isSuffixOf` txt || "package.yaml" == txt)
-      isCabalFile (sfp, _) =
+  let isCabalFile (sfp, _) =
         let txt = unSafeFilePath sfp
          in not ("/" `T.isInfixOf` txt) && (".cabal" `T.isSuffixOf` txt)
       isHpackFile (sfp, _) =
         let txt = unSafeFilePath sfp
-         in not ("/" `T.isInfixOf` txt) && ("package.yaml" == txt)
-  case filter isCabalOrHpackFile $ Map.toList m of
+         in T.pack (Hpack.packageConfig) == txt
+  case filter (\f -> isCabalFile f || isHpackFile f) $ Map.toList m of
     [] -> throwM $ TreeWithoutCabalFile loc
     [v@(key, te)] -> if isHpackFile v
                      then pure (key, te, HPackFile)
                      else pure (key, te, CabalFile)
-    xs -> case (filter isCabalFile xs, filter isHpackFile xs) of
-            ([],[]) -> throwM $ TreeWithoutCabalFile loc
-            ([(key,te)],_) -> return (key, te, CabalFile)
-            ([],[(key,te)]) -> return (key, te, HPackFile)
-            ([],xs) -> throwM $ TreeWithMultipleHPackFiles loc $ map fst xs
-            (xs,_) -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
+    xs -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
 
 -- | If all files have a shared prefix, strip it off
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]

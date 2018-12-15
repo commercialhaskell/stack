@@ -612,7 +612,6 @@ data PantryException
       ![PWarning]
   | TreeWithoutCabalFile !PackageLocationImmutable
   | TreeWithMultipleCabalFiles !PackageLocationImmutable ![SafeFilePath]
-  | TreeWithMultipleHPackFiles !PackageLocationImmutable ![SafeFilePath]
   | MismatchedCabalName !(Path Abs File) !PackageName
   | NoCabalFileFound !(Path Abs Dir)
   | MultipleCabalFilesFound !(Path Abs Dir) ![Path Abs File]
@@ -696,9 +695,6 @@ instance Display PantryException where
   display (TreeWithoutCabalFile pl) = "No cabal file found for " <> display pl
   display (TreeWithMultipleCabalFiles pl sfps) =
     "Multiple cabal files found for " <> display pl <> ": " <>
-    fold (intersperse ", " (map display sfps))
-  display (TreeWithMultipleHPackFiles pl sfps) =
-    "Multiple package.yaml files found for " <> display pl <> ": " <>
     fold (intersperse ", " (map display sfps))
   display (MismatchedCabalName fp name) =
     "cabal file path " <>

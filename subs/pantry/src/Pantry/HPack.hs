@@ -30,7 +30,7 @@ findOrGenerateCabalFile
     -> RIO env (PackageName, Path Abs File)
 findOrGenerateCabalFile pkgDir = do
     hpack pkgDir
-    files <- filter (flip hasExtension "cabal" . toFilePath) . snd
+    files <- filter (hasExtension "cabal" . toFilePath) . snd
          <$> listDir pkgDir
     -- If there are multiple files, ignore files that start with
     -- ".". On unixlike environments these are hidden, and this
@@ -48,6 +48,7 @@ findOrGenerateCabalFile pkgDir = do
             parsePackageName
         _:_ -> throwIO $ MultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
+
 
 hpackVersion
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -72,8 +73,7 @@ hpack
 hpack pkgDir = do
     packageConfigRelFile <- parseRelFile Hpack.packageConfig
     let hpackFile = pkgDir Path.</> packageConfigRelFile
-    exists <- liftIO $ doesFileExist hpackFile
-    when exists $ do
+    whenM (doesFileExist hpackFile) $ do
         logDebug $ "Running hpack on " <> fromString (toFilePath hpackFile)
 
         he <- view $ pantryConfigL.to pcHpackExecutable
@@ -111,4 +111,3 @@ hpackToCabal hpackBs = withSystemTempDirectory "hpack-repo" $ \tmpdir -> withWor
                (pkgName, cfile) <- findOrGenerateCabalFile tdir
                bs <- B.readFile (fromAbsFile cfile)
                return (pkgName, bs)
-    where hasExtension fp x = FilePath.takeExtension fp == "." ++ x

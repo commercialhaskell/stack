@@ -624,7 +624,6 @@ loadPackageById tid = do
                         cabalKey <- getBlobKey key
                         return (P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
                  Nothing -> do
-                        -- todo: Fix this so that it actually loads hpacks cabalKey. Right now it loads cabal's cabalkey.
                         hpackVid <- hpackVersionId
                         hpackRecord <- getBy (UniqueHPack tid hpackVid)
                         let (P.TreeMap tmap) = tree
@@ -643,11 +642,6 @@ loadPackageById tid = do
     , packageCabalEntry = pentry
     , packageIdent = ident
     }
-
--- loadHPackTreeEntry   :: (HasPantryConfig env, HasLogFunc env)
---   => TreeId
---   -> ReaderT SqlBackend (RIO env) TreeEntry
--- lo
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
