@@ -627,6 +627,7 @@ loadPackageById tid = do
                         -- todo: Fix this so that it actually loads hpacks cabalKey. Right now it loads cabal's cabalkey.
                         hpackVid <- hpackVersionId
                         hpackRecord <- getBy (UniqueHPack tid hpackVid)
+                        let (P.TreeMap tmap) = tree
                         case hpackRecord of
                           Nothing -> error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
                           Just (Entity _ item) -> do
@@ -634,9 +635,8 @@ loadPackageById tid = do
                                            cabalKey <- getBlobKey (hPackCabal item)
                                            let cabalFile = P.cabalFileName name -- come here
                                                tent = P.TreeEntry cabalKey (treeCabalType ts)
-                                               (P.TreeMap tmap) = tree
                                                tree' = P.TreeMap $ Map.insert cabalFile tent tmap
-                                           return $ (P.PCHpack $ P.TreeEntry cabalKey (treeCabalType ts), tree')
+                                           return $ (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree')
   pure Package
     { packageTreeKey = P.TreeKey key
     , packageTree = mtree

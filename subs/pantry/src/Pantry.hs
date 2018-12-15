@@ -305,18 +305,9 @@ loadCabalFileImmutable
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
 loadCabalFileImmutable loc = withCache $ do
-  logDebug $ "loadcabalFileImmutable: 0 "
   logDebug $ "Parsing cabal file for " <> display loc
-  (bs, btype) <- loadCabalFileBytes loc
-  logDebug $ displayShow btype
+  bs <- loadCabalFileBytes loc
   let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
-  -- cabalBs
-  -- cabalBs <- if btype == CabalFile
-  --            then return bs
-  --            else do
-  --              (_, bs) <- hpackToCabal bs
-  --              return bs
-  logDebug $ "loadcabalFileImmutable: 10 "
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let pm =
         case loc of
@@ -512,25 +503,27 @@ gpdVersion = pkgVersion . gpdPackageIdentifier
 loadCabalFileBytes
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
-  -> RIO env (ByteString, BuildFileType)
+  -> RIO env ByteString
 
 -- Just ignore the mtree for this. Safe assumption: someone who filled
 -- in the TreeKey also filled in the cabal file hash, and that's a
 -- more efficient lookup mechanism.
 loadCabalFileBytes (PLIHackage pir _mtree) = do
   bs <- getHackageCabalFile pir
-  return $ (bs, CabalFile)
+  return bs
 
 loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
-      cabalBlobKey = getPCBlobKey (packageCabalEntry package)
+  cabalBlobKey <- case (packageCabalEntry package) of
+                       PCHpack _ -> throwIO $ TreeWithoutCabalFile pl
+                       _ -> return $ getPCBlobKey (packageCabalEntry package)
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
       -- TODO when we have pantry wire, try downloading
       throwIO $ TreeReferencesMissingBlob pl sfp cabalBlobKey
-    Just bs -> pure (bs, getPCBuildType (packageCabalEntry package))
+    Just bs -> pure bs
 
 -- | Load a 'Package' from a 'PackageLocationImmutable'.
 --

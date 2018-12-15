@@ -44,7 +44,6 @@ module Pantry.Types
   , PackageCabal (..)
   , getPCBlobKey
   , getPCTreeEntry
-  , getPCBuildType
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -153,21 +152,20 @@ data Package = Package
   }
   deriving (Show, Eq)
 
-data PackageCabal = PCCabalFile !TreeEntry
-                  | PCHpack !TreeEntry
+data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
+                  | PCHpack !TreeEntry -- ^ TreeEntry of HPack file
+                  | PCHpackCabalFile !TreeEntry -- ^ TreeEntry of Cabal file produced via HPack
                     deriving (Show, Eq)
 
 getPCBlobKey :: PackageCabal -> BlobKey
 getPCBlobKey (PCCabalFile (TreeEntry cabalBlobKey _)) = cabalBlobKey
 getPCBlobKey (PCHpack (TreeEntry hpackBlobKey _)) = hpackBlobKey
+getPCBlobKey (PCHpackCabalFile (TreeEntry cabalBlobKey _)) = cabalBlobKey
 
 getPCTreeEntry :: PackageCabal -> TreeEntry
 getPCTreeEntry (PCCabalFile tentry) = tentry
 getPCTreeEntry (PCHpack tentry) = tentry
-
-getPCBuildType :: PackageCabal -> BuildFileType
-getPCBuildType (PCCabalFile _) = CabalFile
-getPCBuildType (PCHpack _) = HPackFile
+getPCTreeEntry (PCHpackCabalFile tentry) = tentry
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
