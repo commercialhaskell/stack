@@ -47,7 +47,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Tuple
-import           Pantry (findOrGenerateCabalFile)
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
