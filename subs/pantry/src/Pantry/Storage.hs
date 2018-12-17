@@ -67,11 +67,13 @@ import Database.Persist.TH
 import RIO.Orphans ()
 import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
+import qualified RIO.Text as T
 import RIO.Time (UTCTime, getCurrentTime)
 import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackToCabal, hpackVersion)
+import qualified Hpack.Config as Hpack
 import Conduit
 import Data.Acquire (with)
 import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
@@ -458,13 +460,26 @@ storeCabalFile ::
     => ByteString
     -> P.PackageName
     -> TreeId
-    -> P.TreeEntry
     -> ReaderT SqlBackend (RIO env) BlobId
-storeCabalFile cabalBS pkgName tid tentry = do
+storeCabalFile cabalBS pkgName tid = do
     (bid, _) <- storeBlob cabalBS
     let cabalFile = P.cabalFileName pkgName
     fid <- insertBy FilePath {filePathPath = cabalFile}
     return bid
+
+loadFilePath ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => SafeFilePath
+    -> ReaderT SqlBackend (RIO env) (Entity FilePath)
+loadFilePath path = do
+    fp <- getBy $ UniqueSfp path
+    case fp of
+        Nothing ->
+            error $
+            "loadFilePathId: No row found for " <>
+            (T.unpack $ P.unSafeFilePath path)
+        Just record -> return record
+
 
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -473,16 +488,16 @@ generateHPack ::
     -> VersionId
     -> ReaderT SqlBackend (RIO env) ()
 generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
-    hpackId <- loadBlobBySHA hpackSha
-    hpack' <-
-        case hpackId of
-            Just hpack -> pure hpack
-            Nothing ->
-                error $
-                "generateHPack:  BlobKey not found: " ++ show (tree, hpackSha)
-    hpackBS <- loadBlobById hpack'
+    let hpackPath = maybe (error "generateHPack: Not able to convert hpack file to SafeFilePath") id $ P.mkSafeFilePath (T.pack Hpack.packageConfig)
+    filepath <- loadFilePath hpackPath
+    let filePathId :: FilePathId = entityKey filepath
+    hpackTreeEntry <- selectFirst [TreeEntryTree ==. tid, TreeEntryPath ==. filePathId] []
+    hpackEntity <- case hpackTreeEntry of
+                     Nothing -> error $ "generateHPack: No package.yaml file found in TreeEntry for TreeId:  " ++ (show tid)
+                     Just record -> return record
+    hpackBS <- loadBlobById (treeEntryBlob $ entityVal hpackEntity)
     (pkgName, cabalBS) <- lift $ hpackToCabal hpackBS
-    bid <- storeCabalFile cabalBS pkgName tid tree
+    bid <- storeCabalFile cabalBS pkgName tid
     let cabalFile = P.cabalFileName pkgName
     fid <- insertBy FilePath {filePathPath = cabalFile}
     let hpackRecord =
