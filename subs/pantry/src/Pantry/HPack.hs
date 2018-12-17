@@ -30,7 +30,7 @@ findOrGenerateCabalFile
     -> RIO env (PackageName, Path Abs File)
 findOrGenerateCabalFile pkgDir = do
     hpack pkgDir
-    files <- filter (hasExtension "cabal" . toFilePath) . snd
+    files <- filter (flip hasExtension "cabal" . toFilePath) . snd
          <$> listDir pkgDir
     -- If there are multiple files, ignore files that start with
     -- ".". On unixlike environments these are hidden, and this
