@@ -448,6 +448,7 @@ loadHackageTarballInfo name version = do
   where
     go (Entity _ ht) = (hackageTarballSha ht, hackageTarballSize ht)
 
+getKey :: Either (Entity record) (Key record) -> Key record
 getKey dat = case dat of
                Left (Entity key _) -> key
                Right key -> key
@@ -483,18 +484,13 @@ hpackVersionId :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) =
 hpackVersionId = do
   hpackSoftwareVersion <- lift $ hpackVersion
   hid <- insertBy $ Version { versionVersion = P.VersionP hpackSoftwareVersion }
-  case hid of
-    Left (Entity versionId _) -> return versionId
-    Right key -> return key
+  return $ getKey hid
 
 storeHPack :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env) => TreeId -> P.TreeEntry -> ReaderT SqlBackend (RIO env) ()
 storeHPack tid tentry = do
   vid <- hpackVersionId
   hpackRecord <- getBy (UniqueHPack tid vid)
-  case hpackRecord of
-    Nothing -> generateHPack tid tentry vid
-    Just _ -> return ()
-
+  when (isNothing hpackRecord) (generateHPack tid tentry vid)
 
 storeTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -541,9 +537,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEn
           , treeEntryType = ft
           }
       pure (tid, P.TreeKey blobKey)
-  case btype of
-    P.CabalFile -> return ()
-    P.HPackFile -> storeHPack tid tentry
+  when (btype == P.HPackFile) (storeHPack tid tentry)
   return (tid, treeKey)
 
 loadTree
