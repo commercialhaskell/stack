@@ -14,8 +14,8 @@ import qualified RIO.FilePath as FilePath
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import Data.Char (isSpace, isDigit)
-import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile, fromAbsFile)
-import Path.IO (doesFileExist, resolveDir', listDir)
+import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parseRelFile, fromAbsFile)
+import Path.IO (doesFileExist, listDir)
 
 -- | Get the filename for the cabal file in the given directory.
 --
@@ -108,6 +108,6 @@ hpackToCabal :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessCont
 hpackToCabal hpackBs = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> withWorkingDir tmpdir $ do
                B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
                tdir <- parseAbsDir tmpdir
-               (pkgName, cfile) <- findOrGenerateCabalFile tdir
+               (packageName, cfile) <- findOrGenerateCabalFile tdir
                bs <- B.readFile (fromAbsFile cfile)
-               return (pkgName, bs)
+               return (packageName, bs)

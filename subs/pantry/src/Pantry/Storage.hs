@@ -58,7 +58,6 @@ module Pantry.Storage
 
 import RIO hiding (FilePath)
 import RIO.Process
-import qualified Prelude as Pr
 import qualified RIO.ByteString as B
 import qualified Pantry.Types as P
 import Database.Persist
@@ -459,12 +458,11 @@ storeCabalFile ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => ByteString
     -> P.PackageName
-    -> TreeId
     -> ReaderT SqlBackend (RIO env) BlobId
-storeCabalFile cabalBS pkgName tid = do
+storeCabalFile cabalBS pkgName = do
     (bid, _) <- storeBlob cabalBS
     let cabalFile = P.cabalFileName pkgName
-    fid <- insertBy FilePath {filePathPath = cabalFile}
+    _ <- insertBy FilePath {filePathPath = cabalFile}
     return bid
 
 loadFilePath ::
@@ -505,7 +503,7 @@ generateHPack tid vid = do
             Just record -> return record
     hpackBS <- loadBlobById (treeEntryBlob $ entityVal hpackEntity)
     (pkgName, cabalBS) <- lift $ hpackToCabal hpackBS
-    bid <- storeCabalFile cabalBS pkgName tid
+    bid <- storeCabalFile cabalBS pkgName
     let cabalFile = P.cabalFileName pkgName
     fid <- insertBy FilePath {filePathPath = cabalFile}
     let hpackRecord =
@@ -546,7 +544,7 @@ storeTree
   -- ^ cabal file
   -> P.BuildFileType
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEntry (P.BlobKey btypeSha _) fileType) btype = do
+storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey btypeSha _) fileType) btype = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
   buildTypeid <- loadBlobBySHA btypeSha
   buildid <-
@@ -566,7 +564,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEn
     , treeVersion = versionid
     }
 
-  (tid, treeKey) <- case etid of
+  (tid, pTreeKey) <- case etid of
     Left (Entity tid _) -> pure (tid, P.TreeKey blobKey) -- already in database, assume it matches
     Right tid -> do
       for_ (Map.toList m) $ \(sfp, P.TreeEntry blobKey' ft) -> do
@@ -584,7 +582,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEn
           }
       pure (tid, P.TreeKey blobKey)
   when (btype == P.HPackFile) (storeHPack tid >> return ())
-  return (tid, treeKey)
+  return (tid, pTreeKey)
 
 loadTree
   :: (HasPantryConfig env, HasLogFunc env)
@@ -618,7 +616,7 @@ loadPackageById tid = do
                 error $ "loadPackageById: invalid foreign key " ++ show tid
             Just ts -> pure ts
     (tree :: P.Tree) <- loadTreeByEnt $ Entity tid ts
-    (key :: BlobKey) <- getBlobKey $ treeKey ts
+    (blobKey :: BlobKey) <- getBlobKey $ treeKey ts
     (mname :: Maybe PackageName) <- get $ treeName ts
     name <-
         case mname of
@@ -636,31 +634,31 @@ loadPackageById tid = do
     let ident = P.PackageIdentifier name version
     (pentry, mtree) <-
         case (treeCabal ts) of
-            Just key -> do
-                cabalKey <- getBlobKey key
+            Just keyBlob -> do
+                cabalKey <- getBlobKey keyBlob
                 return
                     ( P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts)
                     , tree)
             Nothing -> do
                 hpackVid <- hpackVersionId
-                hpackRecord <- getBy (UniqueHPack tid hpackVid)
+                hpackEntity <- getBy (UniqueHPack tid hpackVid)
                 let (P.TreeMap tmap) = tree
                     cabalFile = P.cabalFileName name
-                case hpackRecord of
+                case hpackEntity of
                     Nothing
                         -- This case will happen when you either
                         -- update stack with a new hpack version or
                         -- use different hpack version via
                         -- --with-hpack option.
                      -> do
-                        hpackId <- storeHPack tid
+                        (hpackId :: HPackId) <- storeHPack tid
                         hpackRecord <- getJust hpackId
                         getHPackCabalFile hpackRecord ts tmap cabalFile
                     Just (Entity _ item) ->
                         getHPackCabalFile item ts tmap cabalFile
     pure
         Package
-            { packageTreeKey = P.TreeKey key
+            { packageTreeKey = P.TreeKey blobKey
             , packageTree = mtree
             , packageCabalEntry = pentry
             , packageIdent = ident

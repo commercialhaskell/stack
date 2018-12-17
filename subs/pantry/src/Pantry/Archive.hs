@@ -22,7 +22,6 @@ import qualified RIO.Text.Partial as T
 import qualified RIO.List as List
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
-import qualified RIO.ByteString as B
 import qualified RIO.Set as Set
 import qualified Hpack.Config as Hpack
 import Pantry.HPack (hpackToCabal)
@@ -440,7 +439,7 @@ findCabalOrHpackFile loc (TreeMap m) = do
     xs -> case (filter isCabalFile xs) of
             [] -> throwM $ TreeWithoutCabalFile loc
             [(key, te)] -> pure (key, te, CabalFile)
-            xs' -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs
+            xs' -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs'
 
 -- | If all files have a shared prefix, strip it off
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]
