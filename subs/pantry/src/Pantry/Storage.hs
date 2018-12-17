@@ -480,20 +480,29 @@ loadFilePath path = do
             (T.unpack $ P.unSafeFilePath path)
         Just record -> return record
 
-
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => TreeId
     -> VersionId
     -> ReaderT SqlBackend (RIO env) (Key HPack)
 generateHPack tid vid = do
-    let hpackPath = maybe (error "generateHPack: Not able to convert hpack file to SafeFilePath") id $ P.mkSafeFilePath (T.pack Hpack.packageConfig)
+    let hpackPath =
+            maybe
+                (error
+                     "generateHPack: Not able to convert hpack file to SafeFilePath")
+                id $
+            P.mkSafeFilePath (T.pack Hpack.packageConfig)
     filepath <- loadFilePath hpackPath
     let filePathId :: FilePathId = entityKey filepath
-    hpackTreeEntry <- selectFirst [TreeEntryTree ==. tid, TreeEntryPath ==. filePathId] []
-    hpackEntity <- case hpackTreeEntry of
-                     Nothing -> error $ "generateHPack: No package.yaml file found in TreeEntry for TreeId:  " ++ (show tid)
-                     Just record -> return record
+    hpackTreeEntry <-
+        selectFirst [TreeEntryTree ==. tid, TreeEntryPath ==. filePathId] []
+    hpackEntity <-
+        case hpackTreeEntry of
+            Nothing ->
+                error $
+                "generateHPack: No package.yaml file found in TreeEntry for TreeId:  " ++
+                (show tid)
+            Just record -> return record
     hpackBS <- loadBlobById (treeEntryBlob $ entityVal hpackEntity)
     (pkgName, cabalBS) <- lift $ hpackToCabal hpackBS
     bid <- storeCabalFile cabalBS pkgName tid
@@ -508,6 +517,7 @@ generateHPack tid vid = do
                 }
     val <- insertBy hpackRecord
     return $ getKey val
+
 
 hpackVersionId ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -596,58 +606,66 @@ getTreeForKey (P.TreeKey key) = do
     Nothing -> pure Nothing
     Just bid -> getBy $ UniqueTree bid
 
-loadPackageById
-  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => TreeId
-  -> ReaderT SqlBackend (RIO env) Package
+loadPackageById ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => TreeId
+    -> ReaderT SqlBackend (RIO env) Package
 loadPackageById tid = do
-  (mts :: Maybe Tree) <- get tid
-  ts <-
-    case mts of
-      Nothing -> error $ "loadPackageById: invalid foreign key " ++ show tid
-      Just ts -> pure ts
-  (tree :: P.Tree) <- loadTreeByEnt $ Entity tid ts
-  (key :: BlobKey) <- getBlobKey $ treeKey ts
-
-  (mname :: Maybe PackageName) <- get $ treeName ts
-  name <-
-    case mname of
-      Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeName ts)
-      Just (PackageName (P.PackageNameP name)) -> pure name
-
-  mversion <- get $ treeVersion ts
-  version <-
-    case mversion of
-      Nothing -> error $ "loadPackageByid: invalid foreign key " ++ show (treeVersion ts)
-      Just (Version (P.VersionP version)) -> pure version
-
-  let ident = P.PackageIdentifier name version
-  (pentry, mtree) <-
-      case (treeCabal ts) of
-        Just key -> do
-          cabalKey <- getBlobKey key
-          return (P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
-        Nothing -> do
-          hpackVid <- hpackVersionId
-          hpackRecord <- getBy (UniqueHPack tid hpackVid)
-          let (P.TreeMap tmap) = tree
-              cabalFile = P.cabalFileName name
-          case hpackRecord of
+    (mts :: Maybe Tree) <- get tid
+    ts <-
+        case mts of
+            Nothing ->
+                error $ "loadPackageById: invalid foreign key " ++ show tid
+            Just ts -> pure ts
+    (tree :: P.Tree) <- loadTreeByEnt $ Entity tid ts
+    (key :: BlobKey) <- getBlobKey $ treeKey ts
+    (mname :: Maybe PackageName) <- get $ treeName ts
+    name <-
+        case mname of
+            Nothing ->
+                error $
+                "loadPackageByid: invalid foreign key " ++ show (treeName ts)
+            Just (PackageName (P.PackageNameP name)) -> pure name
+    mversion <- get $ treeVersion ts
+    version <-
+        case mversion of
+            Nothing ->
+                error $
+                "loadPackageByid: invalid foreign key " ++ show (treeVersion ts)
+            Just (Version (P.VersionP version)) -> pure version
+    let ident = P.PackageIdentifier name version
+    (pentry, mtree) <-
+        case (treeCabal ts) of
+            Just key -> do
+                cabalKey <- getBlobKey key
+                return
+                    ( P.PCCabalFile $ P.TreeEntry cabalKey (treeCabalType ts)
+                    , tree)
             Nothing -> do
+                hpackVid <- hpackVersionId
+                hpackRecord <- getBy (UniqueHPack tid hpackVid)
+                let (P.TreeMap tmap) = tree
+                    cabalFile = P.cabalFileName name
+                case hpackRecord of
+                    Nothing
                         -- This case will happen when you either
                         -- update stack with a new hpack version or
                         -- use different hpack version via
                         -- --with-hpack option.
+                     -> do
                         hpackId <- storeHPack tid
                         hpackRecord <- getJust hpackId
                         getHPackCabalFile hpackRecord ts tmap cabalFile
-            Just (Entity _ item) -> getHPackCabalFile item ts tmap cabalFile
-  pure Package
-    { packageTreeKey = P.TreeKey key
-    , packageTree = mtree
-    , packageCabalEntry = pentry
-    , packageIdent = ident
-    }
+                    Just (Entity _ item) ->
+                        getHPackCabalFile item ts tmap cabalFile
+    pure
+        Package
+            { packageTreeKey = P.TreeKey key
+            , packageTree = mtree
+            , packageCabalEntry = pentry
+            , packageIdent = ident
+            }
+
 
 getHPackCabalFile :: (HasPantryConfig env, HasLogFunc env)
     => HPack
