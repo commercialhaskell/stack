@@ -210,10 +210,11 @@ loadLocalPackage isLocal boptsCli targets (name, pp) = do
               let hasLibrary =
                     case packageLibraries pkg of
                       NoLibraries -> False
-                      HasLibraries _ -> True
+                      HasLibraries libs ->
+                        not (Set.null $ filterSkippedComponents libs)
                in hasLibrary
                || not (Set.null nonLibComponents)
-               || not (Set.null $ packageInternalLibraries pkg)
+               || not (Set.null $ filterSkippedComponents $ packageInternalLibraries pkg)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
