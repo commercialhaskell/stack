@@ -484,10 +484,9 @@ loadFilePath path = do
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => TreeId
-    -> P.TreeEntry
     -> VersionId
-    -> ReaderT SqlBackend (RIO env) ()
-generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
+    -> ReaderT SqlBackend (RIO env) (Key HPack)
+generateHPack tid vid = do
     let hpackPath = maybe (error "generateHPack: Not able to convert hpack file to SafeFilePath") id $ P.mkSafeFilePath (T.pack Hpack.packageConfig)
     filepath <- loadFilePath hpackPath
     let filePathId :: FilePathId = entityKey filepath
@@ -507,8 +506,8 @@ generateHPack tid tree@(P.TreeEntry (P.BlobKey hpackSha _) _) vid = do
                 , hPackCabal = bid
                 , hPackPath = getKey fid
                 }
-    insertBy hpackRecord
-    return ()
+    val <- insertBy hpackRecord
+    return $ getKey val
 
 hpackVersionId ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -521,13 +520,13 @@ hpackVersionId = do
 storeHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => TreeId
-    -> P.TreeEntry
-    -> ReaderT SqlBackend (RIO env) ()
-storeHPack tid tentry = do
+    -> ReaderT SqlBackend (RIO env) (Key HPack)
+storeHPack tid = do
     vid <- hpackVersionId
     hpackRecord <- getBy (UniqueHPack tid vid)
-    when (isNothing hpackRecord) (generateHPack tid tentry vid)
-
+    case hpackRecord of
+      Nothing -> generateHPack tid vid
+      Just record -> return $ entityKey record
 
 storeTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -574,7 +573,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) tentry@(P.TreeEn
           , treeEntryType = ft
           }
       pure (tid, P.TreeKey blobKey)
-  when (btype == P.HPackFile) (storeHPack tid tentry)
+  when (btype == P.HPackFile) (storeHPack tid >> return ())
   return (tid, treeKey)
 
 loadTree
@@ -632,26 +631,37 @@ loadPackageById tid = do
           hpackVid <- hpackVersionId
           hpackRecord <- getBy (UniqueHPack tid hpackVid)
           let (P.TreeMap tmap) = tree
+              cabalFile = P.cabalFileName name
           case hpackRecord of
             Nothing -> do
                         -- This case will happen when you either
                         -- update stack with a new hpack version or
                         -- use different hpack version via
                         -- --with-hpack option.
-                        -- (storeHPack tid (tentry :: P.TreeEntry)
-                        error $ "loadPackagebyid: No hpack entry found for tree " ++ (show tid)
-            Just (Entity _ item) -> do
-                             cabalKey <- getBlobKey (hPackCabal item)
-                             let cabalFile = P.cabalFileName name
-                                 tent = P.TreeEntry cabalKey (treeCabalType ts)
-                                 tree' = P.TreeMap $ Map.insert cabalFile tent tmap
-                             return $ (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree')
+                        hpackId <- storeHPack tid
+                        hpackRecord <- getJust hpackId
+                        getHPackCabalFile hpackRecord ts tmap cabalFile
+            Just (Entity _ item) -> getHPackCabalFile item ts tmap cabalFile
   pure Package
     { packageTreeKey = P.TreeKey key
     , packageTree = mtree
     , packageCabalEntry = pentry
     , packageIdent = ident
     }
+
+getHPackCabalFile :: (HasPantryConfig env, HasLogFunc env)
+    => HPack
+    -> Tree
+    -> Map SafeFilePath P.TreeEntry
+    -> SafeFilePath
+    -> ReaderT SqlBackend (RIO env) (P.PackageCabal, P.Tree)
+getHPackCabalFile hpackRecord ts tmap cabalFile = do
+    cabalKey <- getBlobKey (hPackCabal hpackRecord)
+    let treeEntry = P.TreeEntry cabalKey (treeCabalType ts)
+        tree = P.TreeMap $ Map.insert cabalFile treeEntry tmap
+    return $
+        (P.PCHpackCabalFile $ P.TreeEntry cabalKey (treeCabalType ts), tree)
+
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)
