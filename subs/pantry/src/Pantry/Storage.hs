@@ -485,11 +485,10 @@ generateHPack ::
     -> ReaderT SqlBackend (RIO env) (Key HPack)
 generateHPack tid vid = do
     let hpackPath =
-            maybe
+            fromMaybe
                 (error
                      "generateHPack: Not able to convert hpack file to SafeFilePath")
-                id $
-            P.mkSafeFilePath (T.pack Hpack.packageConfig)
+                (P.mkSafeFilePath (T.pack Hpack.packageConfig))
     filepath <- loadFilePath hpackPath
     let filePathId :: FilePathId = entityKey filepath
     hpackTreeEntry <-
@@ -544,16 +543,16 @@ storeTree
   -- ^ cabal file
   -> P.BuildFileType
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey btypeSha _) fileType) btype = do
+storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.BlobKey btypeSha _) fileType) buildFileType = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
   buildTypeid <- loadBlobBySHA btypeSha
   buildid <-
     case buildTypeid of
       Just buildId -> pure buildId
-      Nothing -> error $ "storeTree: " ++ (show btype) ++ " BlobKey not found: " ++ show (tree, btypeSha)
+      Nothing -> error $ "storeTree: " ++ (show buildFileType) ++ " BlobKey not found: " ++ show (tree, btypeSha)
   nameid <- getPackageNameId name
   versionid <- getVersionId version
-  let cabalid' = case btype of
+  let cabalid' = case buildFileType of
                    P.HPackFile -> Nothing
                    P.CabalFile -> Just buildid
   etid <- insertBy Tree
@@ -581,7 +580,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) (P.TreeEntry (P.
           , treeEntryType = ft
           }
       pure (tid, P.TreeKey blobKey)
-  when (btype == P.HPackFile) (storeHPack tid >> return ())
+  when (buildFileType == P.HPackFile) (storeHPack tid >> return ())
   return (tid, pTreeKey)
 
 loadTree
