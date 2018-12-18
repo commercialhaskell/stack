@@ -474,7 +474,7 @@ loadFilePath path = do
     case fp of
         Nothing ->
             error $
-            "loadFilePathId: No row found for " <>
+            "loadFilePath: No row found for " <>
             (T.unpack $ P.unSafeFilePath path)
         Just record -> return record
 
