@@ -20,6 +20,7 @@ module Pantry
   , PantryApp
   , runPantryApp
   , runPantryAppClean
+  , runPantryAppWithCustomHpack
 
     -- * Types
 
@@ -153,7 +154,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
+import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile, fromAbsFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
@@ -1000,6 +1001,27 @@ runPantryApp f = runSimpleApp $ do
     root
     defaultHackageSecurityConfig
     HpackBundled
+    8
+    $ \pc ->
+      runRIO
+        PantryApp
+          { paSimpleApp = sa
+          , paPantryConfig = pc
+          }
+        f
+
+-- | Like 'runPantryApp', but you can give the custom HPack executable to it.
+--
+-- @since 0.1.0.0
+runPantryAppWithCustomHpack :: MonadIO m => Path Abs File -> RIO PantryApp a -> m a
+runPantryAppWithCustomHpack fp f = runSimpleApp $ do
+  sa <- ask
+  stack <- getAppUserDataDirectory "stack"
+  root <- parseAbsDir $ stack FilePath.</> "pantry"
+  withPantryConfig
+    root
+    defaultHackageSecurityConfig
+    (HpackCommand (fromAbsFile fp))
     8
     $ \pc ->
       runRIO
