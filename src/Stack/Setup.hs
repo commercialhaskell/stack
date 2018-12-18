@@ -593,7 +593,10 @@ getGhcBuilds = do
                         -- the 'ldconfig -p' output on Arch or Slackware even when it exists.
                         -- There doesn't seem to be an easy way to get the true list of directories
                         -- to scan for shared libs, but this works for our particular cases.
-                            let extraPaths = [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+                            let extraPaths = []
+#if !WINDOWS
+                                 ++ [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+#endif
                             matches <- filterM (doesFileExist .(</> lib)) extraPaths
                             case matches of
                                 [] -> logDebug ("Did not find shared library " <> libD)
