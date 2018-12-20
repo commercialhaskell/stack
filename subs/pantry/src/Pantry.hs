@@ -513,8 +513,8 @@ loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
   cabalBlobKey <- case (packageCabalEntry package) of
-                       PCHpack _ -> throwIO $ TreeWithoutCabalFile pl
-                       _ -> return $ getPCBlobKey (packageCabalEntry package)
+                       PCHpack _ (TreeEntry blobKey _) _ -> pure blobKey
+                       PCCabalFile (TreeEntry blobKey _) -> pure blobKey
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
