@@ -110,8 +110,8 @@ preFetch plan
 
     toPkgLoc task =
         case taskType task of
-            TTFilePath{} -> Set.empty
-            TTRemote _ _ pkgloc -> Set.singleton pkgloc
+            TTLocalMutable{} -> Set.empty
+            TTRemotePackage _ _ pkgloc -> Set.singleton pkgloc
 
 -- | Print a description of build plan for human consumption.
 printPlan :: HasRunner env => Plan -> RIO env ()
@@ -172,8 +172,8 @@ displayTask task =
         Local -> "local") <>
     ", source=" <>
     (case taskType task of
-        TTFilePath lp _ -> fromString $ toFilePath $ parent $ lpCabalFile lp
-        TTRemote _ _ pl -> RIO.display pl) <>
+        TTLocalMutable lp -> fromString $ toFilePath $ parent $ lpCabalFile lp
+        TTRemotePackage _ _ pl -> RIO.display pl) <>
     (if Set.null missing
         then ""
         else ", after: " <>
@@ -197,7 +197,6 @@ data ExecuteEnv = ExecuteEnv
     -- ^ Compiled version of eeSetupHs
     , eeCabalPkgVer    :: !Version
     , eeTotalWanted    :: !Int
-    , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
     , eeGlobalDB       :: !(Path Abs Dir)
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () () ()))
@@ -359,7 +358,6 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = totalWanted
-            , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
             , eeGlobalDB = globalDB
             , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
@@ -751,13 +749,13 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             -- 'stack test'. See:
             -- https://github.com/commercialhaskell/stack/issues/805
             case taskType of
-                TTFilePath lp _ ->
+                TTLocalMutable lp ->
                   -- FIXME: make this work with exact-configuration.
                   -- Not sure how to plumb the info atm. See
                   -- https://github.com/commercialhaskell/stack/issues/2049
                   [ "--enable-tests" | enableTest || (not useExactConf && depsPresent installedMap (lpTestDeps lp))] ++
                   [ "--enable-benchmarks" | enableBench || (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
-                TTRemote{} -> []
+                TTRemotePackage{} -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
@@ -782,10 +780,8 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             , configCacheDeps = allDeps
             , configCacheComponents =
                 case taskType of
-                    TTFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
-                    TTRemote{} -> Set.empty
-            , configCacheHaddock =
-                shouldHaddockPackage eeBuildOpts eeWanted (pkgName taskProvides)
+                    TTLocalMutable lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    TTRemotePackage{} -> Set.empty
             , configCachePkgSrc = taskCachePkgSrc
             }
         allDepsMap = Map.union missing' taskPresent
@@ -914,8 +910,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     wanted =
         case taskType of
-            TTFilePath lp _ -> lpWanted lp
-            TTRemote{} -> False
+            TTLocalMutable lp -> lpWanted lp
+            TTRemotePackage{} -> False
 
     -- Output to the console if this is the last task, and the user
     -- asked to build it specifically. When the action is a
@@ -933,8 +929,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
     withPackage inner =
         case taskType of
-            TTFilePath lp _ -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
-            TTRemote package _ pkgloc -> do
+            TTLocalMutable lp -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
+            TTRemotePackage _ package pkgloc -> do
                 suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
                 let dir = eeTempDir </> suffix
                 unpackPackageLocation dir pkgloc
@@ -976,7 +972,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 
             -- We only want to dump logs for local non-dependency packages
             case taskType of
-                TTFilePath lp _ | lpWanted lp ->
+                TTLocalMutable lp | lpWanted lp ->
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
@@ -1033,7 +1029,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
-                        (TTFilePath lp Local, C.Custom) | lpWanted lp -> do
+                        (TTLocalMutable lp, C.Custom) | lpWanted lp -> do
                             prettyWarnL
                                 [ flow "Package"
                                 , fromString $ packageNameString $ packageName package
@@ -1254,9 +1250,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
   where
     pname = pkgName taskProvides
-    shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
     doHaddock mcurator package
-                      = shouldHaddockPackage' &&
+                      = taskBuildHaddock &&
                         not isFinalBuild &&
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
@@ -1278,7 +1273,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             , ["bench" | enableBenchmarks]
             ]
         (hasLib, hasSubLib, hasExe) = case taskType of
-            TTFilePath lp Local ->
+            TTLocalMutable lp ->
               let package = lpPackage lp
                   hasLibrary =
                     case packageLibraries package of
@@ -1292,15 +1287,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             _ -> (False, False, False)
 
     getPrecompiled cache =
-        case taskLocation task of
-            Snap | not shouldHaddockPackage' -> do
-                mpc <-
-                  case taskLocation task of
-                    Snap -> fmap join $ for (ttPackageLocation taskType) $ \loc -> readPrecompiledCache
-                      loc
-                      (configCacheOpts cache)
-                      (configCacheDeps cache)
-                    _ -> return Nothing
+        case taskType of
+            TTRemotePackage Immutable _ loc -> do
+                mpc <- readPrecompiledCache
+                       loc
+                       (configCacheOpts cache)
+                       (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
                     -- Only pay attention to precompiled caches that refer to packages within
@@ -1331,8 +1323,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -- snapshot, in case it was built with different flags.
         let
           subLibNames = map T.unpack . Set.toList $ case taskType of
-            TTFilePath lp _ -> packageInternalLibraries $ lpPackage lp
-            TTRemote p _ _ -> packageInternalLibraries p
+            TTLocalMutable lp -> packageInternalLibraries $ lpPackage lp
+            TTRemotePackage _ p _ -> packageInternalLibraries p
           PackageIdentifier name version = taskProvides
           mainLibName = packageNameString name
           mainLibVersion = versionString version
@@ -1434,19 +1426,19 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
-            TTFilePath lp _ -> do
+            TTLocalMutable lp -> do
                 when enableTests $ unsetTestSuccess pkgDir
                 caches <- runMemoized $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList caches)
-            TTRemote{} -> return ()
+            TTRemotePackage{} -> return ()
 
         -- FIXME: only output these if they're in the build plan.
 
         preBuildTime <- liftIO epochTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
-                    TTFilePath lp Local -> do
+                    TTLocalMutable lp -> do
                         warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
                         -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
@@ -1477,10 +1469,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTFilePath lp _, False, False) -> primaryComponentOptions executableBuildStatuses lp
-                (TTFilePath lp _, False, True) -> finalComponentOptions lp
-                (TTFilePath lp _, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
-                (TTRemote{}, _, _) -> [])
+                (TTLocalMutable lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
+                (TTLocalMutable lp, False, True) -> finalComponentOptions lp
+                (TTLocalMutable lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
+                (TTRemotePackage{}, _, _) -> [])
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
               _ -> throwM ex
@@ -1595,8 +1587,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return (Executable ident, []) -- don't return sublibs in this case
 
-        case taskLocation task of
-            Snap -> for_ (ttPackageLocation taskType) $ \loc ->
+        case taskType of
+            TTRemotePackage Immutable _ loc ->
               writePrecompiledCache
                 eeBaseConfigOpts
                 loc
@@ -1609,10 +1601,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- For packages from a package index, pkgDir is in the tmp
             -- directory. We eagerly delete it if no other tasks
             -- require it, to reduce space usage in tmp (#3018).
-            TTRemote{} -> do
+            TTRemotePackage{} -> do
                 let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
                 when (null remaining) $ removeDirRecur pkgDir
-            TTFilePath{} -> return ()
+            TTLocalMutable{} -> return ()
 
         return mpkgid
 
@@ -1677,7 +1669,7 @@ checkExeStatus compiler platform distDir name = do
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> CTime -> Path Abs Dir -> RIO env [PackageWarning]
-checkForUnlistedFiles (TTFilePath lp _) preBuildTime pkgDir = do
+checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
     caches <- runMemoized $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
@@ -1691,7 +1683,7 @@ checkForUnlistedFiles (TTFilePath lp _) preBuildTime pkgDir = do
         writeBuildCache pkgDir component $
             Map.unions (cache : newToCache)
     return warnings
-checkForUnlistedFiles TTRemote{} _ _ = return []
+checkForUnlistedFiles TTRemotePackage{} _ _ = return []
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
@@ -2044,8 +2036,8 @@ finalComponentOptions lp =
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =
     case taskType task of
-        TTFilePath lp _ -> lpComponents lp -- FIXME probably just want lpWanted
-        TTRemote{} -> Set.empty
+        TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpWanted
+        TTRemotePackage{} -> Set.empty
 
 -- | Take the given list of package dependencies and the contents of the global
 -- package database, and construct a set of installed package IDs that:
@@ -2120,7 +2112,3 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
-
-ttPackageLocation :: TaskType -> Maybe PackageLocationImmutable
-ttPackageLocation TTFilePath{} = Nothing
-ttPackageLocation (TTRemote _ _ pkgloc) = Just pkgloc

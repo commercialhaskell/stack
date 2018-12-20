@@ -49,14 +49,15 @@ import           Path.IO hiding (getModificationTime, getPermissions, withSystem
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (loadSourceMap)
-import           Stack.Build.Target hiding (PackageType (..))
+import           Stack.Build.Source (projectLocalPackages)
 import           Stack.PrettyPrint
 import           Stack.Package
+import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
@@ -110,8 +111,9 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
     logInfo $ "Getting file list for " <> fromString pkgFp
-    (fileList, cabalfp) <-  getSDistFileList lp
+    (fileList, cabalfp) <- getSDistFileList lp
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
@@ -138,13 +140,13 @@ getSDistTarball mpvpBounds pkgDir = do
             -- This is a cabal file, we're going to tweak it, but only
             -- tweak it as a revision.
             | tweakCabal && isCabalFp fp && asRevision = do
-                lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp
+                lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp sourceMap
                 liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
                 packWith packFileEntry False fp
             -- Same, except we'll include the cabal file in the
             -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
-                (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp
+                (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp sourceMap
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
                 tp <- liftIO $ tarPath False fp
                 return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
@@ -162,23 +164,24 @@ getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
             -> Path Abs File -- ^ cabal file
+            -> SourceMap
             -> RIO env (PackageIdentifier, L.ByteString)
-getCabalLbs pvpBounds mrev cabalfp = do
+getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
     gpd <- liftIO $ gpdio NoPrintWarnings
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
-    (_, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOptsCLI
+    installMap <- toInstallMap sourceMap
     (installedMap, _, _, _) <- getInstalled GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 , getInstalledSymbols = False
                                 }
-                                sourceMap
+                                installMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
           map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
-        gpd' = gtraverseT (addBounds internalPackages sourceMap installedMap) gpd
+        gpd' = gtraverseT (addBounds internalPackages installMap installedMap) gpd
         gpd'' =
           case mrev of
             Nothing -> gpd'
@@ -250,8 +253,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
   where
-    addBounds :: Set PackageName -> SourceMap -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages sourceMap installedMap dep@(Dependency name range) =
+    addBounds :: Set PackageName -> InstallMap -> InstalledMap -> Dependency -> Dependency
+    addBounds internalPackages installMap installedMap dep@(Dependency name range) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
@@ -262,8 +265,8 @@ getCabalLbs pvpBounds mrev cabalfp = do
               range
       where
         foundVersion =
-          case Map.lookup name sourceMap of
-              Just ps -> Just (piiVersion ps)
+          case Map.lookup name installMap of
+              Just (_, version) -> Just version
               Nothing ->
                   case Map.lookup name installedMap of
                       Just (_, installed) -> Just (installedVersion installed)
@@ -305,6 +308,7 @@ readLocalPackage pkgDir = do
         , lpTestDeps = Map.empty
         , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
+        , lpBuildHaddocks = False
         , lpForceDirty = False
         , lpDirtyFiles = pure Nothing
         , lpNewBuildCaches = pure Map.empty
@@ -320,7 +324,7 @@ getSDistFileList lp =
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        (locals, _) <- loadSourceMap NeedTargets boptsCli
+        locals <- projectLocalPackages
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
@@ -334,11 +338,12 @@ getSDistFileList lp =
     ac = ActionContext Set.empty [] ConcurrencyAllowed
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
-        , taskType = TTFilePath lp Local
+        , taskType = TTLocalMutable lp
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
+        , taskBuildHaddock = False
         , taskPresent = Map.empty
         , taskAllInOne = True
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent $ lpCabalFile lp))
@@ -443,24 +448,22 @@ buildExtractedTarball pkgDir = do
         return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
   pathsToKeep
     <- fmap Map.fromList
-     $ flip filterM (Map.toList (bcPackages (envConfigBuildConfig envConfig)))
+     $ flip filterM (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
      $ fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd
-  pp <- mkProjectPackage YesPrintWarnings pkgDir
+  pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              {envConfigBuildConfig = updatePackageInBuildConfig (envConfigBuildConfig envConfig)
+              { envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
+              , envConfigBuildConfig = updateBuildConfig (envConfigBuildConfig envConfig)
+              }
+            updateBuildConfig bc = bc
+              { bcConfig = (bcConfig bc)
+                 { configBuild = defaultBuildOpts { boptsTests = True } }
               }
         in set envConfigL updatedEnvConfig env
-      updatePackageInBuildConfig buildConfig = buildConfig
-        { bcPackages = Map.insert (ppName pp) pp pathsToKeep
-        , bcConfig = (bcConfig buildConfig)
-                     { configBuild = defaultBuildOpts
-                       { boptsTests = True
-                       }
-                     }
-        }
-  local adjustEnvForBuild $
-    build Nothing Nothing defaultBuildOptsCLI
+      updatePackagesInSourceMap sm =
+        sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
+  local adjustEnvForBuild $ build Nothing Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.

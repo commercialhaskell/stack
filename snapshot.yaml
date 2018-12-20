@@ -16,6 +16,7 @@ packages:
 - http-api-data-0.3.8.1@rev:1
 - cabal-doctest-1.0.6@rev:2
 - unliftio-0.2.8.0@sha256:5a47f12ffcee837215c67b05abf35dffb792096564a6f81652d75a54668224cd,2250
+- happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f,4667
 
 flags:
   cabal-install:

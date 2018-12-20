@@ -1,11 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Stack.SnapshotSpec (spec) where
+module Stack.SourceMapSpec (spec) where
 
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Version (mkVersion)
 import Stack.Prelude
-import Stack.Snapshot (loadGlobalHints)
+import Stack.SourceMap (loadGlobalHints)
+import Stack.Types.Compiler (ActualCompiler(..))
 import Stack.Types.Runner (withRunner, ColorWhen (ColorNever))
 import Test.Hspec
 import qualified RIO.Map as Map
@@ -22,10 +23,10 @@ spec = do
           withRunner LevelError False False ColorNever mempty Nothing False $ \runner ->
             runRIO runner $ inner abs'
     it' "unknown compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])
+      mmap <- loadGlobalHints fp $ ACGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])
       liftIO $ mmap `shouldBe` Nothing
     it' "known compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [8, 4, 3])
+      mmap <- loadGlobalHints fp $ ACGhc (mkVersion [8, 4, 3])
       case mmap of
         Nothing -> error "not found"
         Just m -> liftIO $ do
@@ -34,7 +35,7 @@ spec = do
           Map.lookup (mkPackageName "bytestring") m `shouldBe` Just (mkVersion [0, 10, 8, 2])
           Map.lookup (mkPackageName "acme-missiles") m `shouldBe` Nothing
     it' "older known compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [7, 8, 4])
+      mmap <- loadGlobalHints fp $ ACGhc (mkVersion [7, 8, 4])
       case mmap of
         Nothing -> error "not found"
         Just m -> liftIO $ do

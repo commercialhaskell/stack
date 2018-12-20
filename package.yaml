@@ -230,6 +230,7 @@ library:
   - Stack.Sig.Sign
   - Stack.Snapshot
   - Stack.Solver
+  - Stack.SourceMap
   - Stack.StoreTH
   - Stack.Types.Build
   - Stack.Types.BuildPlan
@@ -249,6 +250,7 @@ library:
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
+  - Stack.Types.SourceMap
   - Stack.Types.StylesUpdate
   - Stack.Types.TemplateName
   - Stack.Types.Version

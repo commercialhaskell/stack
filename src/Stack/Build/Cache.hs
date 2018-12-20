@@ -55,14 +55,14 @@ import qualified System.FilePath as FP
 import           System.PosixCompat.Files (modificationTime, getFileStatus, setFileTimes)
 
 -- | Directory containing files to mark an executable as installed
-exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
-                => InstallLocation -> m (Path Abs Dir)
+exeInstalledDir :: (HasEnvConfig env)
+                => InstallLocation -> RIO env (Path Abs Dir)
 exeInstalledDir Snap = (</> relDirInstalledPackages) `liftM` installationRootDeps
 exeInstalledDir Local = (</> relDirInstalledPackages) `liftM` installationRootLocal
 
 -- | Get all of the installed executables
-getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
-                 => InstallLocation -> m [PackageIdentifier]
+getInstalledExes :: (HasEnvConfig env)
+                 => InstallLocation -> RIO env [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
     (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
@@ -77,8 +77,8 @@ getInstalledExes loc = do
         mapMaybe (parsePackageIdentifier . toFilePath . filename) files
 
 -- | Mark the given executable as installed
-markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
-                 => InstallLocation -> PackageIdentifier -> m ()
+markExeInstalled :: (HasEnvConfig env)
+                 => InstallLocation -> PackageIdentifier -> RIO env ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     ensureDir dir
@@ -95,8 +95,8 @@ markExeInstalled loc ident = do
     liftIO $ B.writeFile fp "Installed"
 
 -- | Mark the given executable as not installed
-markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
-                    => InstallLocation -> PackageIdentifier -> m ()
+markExeNotInstalled :: (HasEnvConfig env)
+                    => InstallLocation -> PackageIdentifier -> RIO env ()
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
     ident' <- parseRelFile $ packageIdentifierString ident
@@ -182,9 +182,9 @@ deleteCaches dir = do
     cfp <- configCacheFile dir
     liftIO $ ignoringAbsence (removeFile cfp)
 
-flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
+flagCacheFile :: (HasEnvConfig env)
               => Installed
-              -> m (Path Abs File)
+              -> RIO env (Path Abs File)
 flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of

@@ -18,6 +18,7 @@ import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 
 data ListPackagesCmd = ListPackageNames
                      | ListPackageCabalFiles
@@ -25,7 +26,7 @@ data ListPackagesCmd = ListPackageNames
 -- | List the packages inside the current project.
 listPackages :: HasBuildConfig env => ListPackagesCmd -> RIO env ()
 listPackages flag = do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   let strs = case flag of
         ListPackageNames ->
           map packageNameString (Map.keys packages)
@@ -36,7 +37,7 @@ listPackages flag = do
 -- | List the targets in the current project.
 listTargets :: forall env. HasBuildConfig env => RIO env ()
 listTargets = do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   logInfo $ display $ T.intercalate "\n" $
     map renderPkgComponent pairs

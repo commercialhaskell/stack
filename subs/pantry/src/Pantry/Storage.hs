@@ -40,6 +40,7 @@ module Pantry.Storage
   , storePreferredVersion
   , loadPreferredVersion
   , sinkHackagePackageNames
+  , countHackageCabals
 
     -- avoid warnings
   , BlobId
@@ -727,3 +728,16 @@ sinkHackagePackageNames predicate sink = do
     checkOnHackage nameid = do
       cnt <- count [HackageCabalName ==. nameid]
       pure $ cnt > 0
+
+countHackageCabals
+  :: (HasPantryConfig env, HasLogFunc env)
+  => ReaderT SqlBackend (RIO env) Int
+countHackageCabals = do
+  res <- rawSql
+    "SELECT COUNT(*)\n\
+    \FROM hackage_cabal"
+    []
+  case res of
+    [] -> pure 0
+    (Single n):_ ->
+      pure n

@@ -386,18 +386,22 @@ getHackagePackageVersions
   => UsePreferredVersions
   -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getHackagePackageVersions usePreferred name = withStorage $ do
-  mpreferred <-
-    case usePreferred of
-      UsePreferredVersions -> loadPreferredVersion name
-      IgnorePreferredVersions -> pure Nothing
-  let predicate :: Version -> Map Revision BlobKey -> Bool
-      predicate = fromMaybe (\_ _ -> True) $ do
-        preferredT1 <- mpreferred
-        preferredT2 <- T.stripPrefix (T.pack $ packageNameString name) preferredT1
-        vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
-        Just $ \v _ -> withinRange v vr
-  Map.filterWithKey predicate <$> loadHackagePackageVersions name
+getHackagePackageVersions usePreferred name = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+  withStorage $ do
+    mpreferred <-
+      case usePreferred of
+        UsePreferredVersions -> loadPreferredVersion name
+        IgnorePreferredVersions -> pure Nothing
+    let predicate :: Version -> Map Revision BlobKey -> Bool
+        predicate = fromMaybe (\_ _ -> True) $ do
+          preferredT1 <- mpreferred
+          preferredT2 <- T.stripPrefix (T.pack $ packageNameString name) preferredT1
+          vr <- Distribution.Text.simpleParse $ T.unpack preferredT2
+          Just $ \v _ -> withinRange v vr
+    Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env)
