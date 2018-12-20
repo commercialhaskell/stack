@@ -24,7 +24,7 @@ import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import qualified Hpack.Config as Hpack
-import Pantry.HPack (hpackToCabal)
+import Pantry.HPack (hpackToCabal, hpackVersion)
 import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
@@ -391,25 +391,35 @@ parseArchive pli archive fp = do
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
           -- parse the cabal file and ensure it has the right name
-          (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), buildFileType) <- findCabalOrHpackFile pli tree
+          buildFile <- findCabalOrHpackFile pli tree
+-- (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), buildFileType) <- findCabalOrHpackFile pli tree
+          (buildFilePath, buildFileBlobKey, buildFileEntry) <- case buildFile of
+                                                                 BFCabal fpath te@(TreeEntry key _) -> pure (fpath, key, te)
+                                                                 BFHpack te@(TreeEntry key _) -> pure (hpackSafeFilePath, key, te)
           mbs <- withStorage $ loadBlob buildFileBlobKey
           bs <-
             case mbs of
               Nothing -> throwIO $ TreeReferencesMissingBlob pli buildFilePath buildFileBlobKey
               Just bs -> pure bs
-          cabalBs <- if buildFileType == CabalFile
+          cabalBs <- if isCabalBuildFile buildFile
                      then return bs
                      else snd <$> hpackToCabal bs
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
-          when (buildFilePath /= cabalFileName name && buildFileType == CabalFile) $
+          when (buildFilePath /= cabalFileName name && isCabalBuildFile buildFile) $
             throwIO $ WrongCabalFileName pli buildFilePath name
 
           -- It's good! Store the tree, let's bounce
-          (_tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry buildFileType
-          let packageCabal = if buildFileType == CabalFile
-                             then PCCabalFile buildFileEntry
-                             else PCHpack buildFileEntry
+          (tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry buildFile
+          packageCabal <- if isCabalBuildFile buildFile
+                          then pure $ PCCabalFile buildFileEntry
+                          else do
+                            hpackKey <- withStorage $ do
+                                         hpackId <- storeHPack tid
+                                         getHPackBlobKeyById hpackId
+                            hpackSoftwareVersion <- hpackVersion
+                            let hpackTreeEntry = TreeEntry hpackKey (teType buildFileEntry)
+                            pure $ PCHpack buildFileEntry hpackTreeEntry hpackSoftwareVersion
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree
@@ -421,7 +431,8 @@ findCabalOrHpackFile
   :: MonadThrow m
   => PackageLocationImmutable -- ^ for exceptions
   -> Tree
-  -> m (SafeFilePath, TreeEntry, BuildFileType)
+  -> m BuildFile
+-- (SafeFilePath, TreeEntry, BuildFileType)
 findCabalOrHpackFile loc (TreeMap m) = do
   let isCabalFile (sfp, _) =
         let txt = unSafeFilePath sfp
@@ -432,11 +443,11 @@ findCabalOrHpackFile loc (TreeMap m) = do
   case filter (\f -> isCabalFile f || isHpackFile f) $ Map.toList m of
     [] -> throwM $ TreeWithoutCabalFile loc
     [v@(key, te)] -> if isHpackFile v
-                     then pure (key, te, HPackFile)
-                     else pure (key, te, CabalFile)
+                     then pure $ BFHpack te
+                     else pure $ BFCabal key te
     xs -> case (filter isCabalFile xs) of
             [] -> throwM $ TreeWithoutCabalFile loc
-            [(key, te)] -> pure (key, te, CabalFile)
+            [(key, te)] -> pure $ BFCabal key te
             xs' -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs'
 
 -- | If all files have a shared prefix, strip it off
