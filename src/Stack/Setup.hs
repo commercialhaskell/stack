@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Setup
   ( setupEnv
@@ -626,16 +627,21 @@ getGhcBuilds = do
                             -- Cannot parse /usr/lib on Windows
                             return False
                         | otherwise = do
-                            -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
-                            -- the 'ldconfig -p' output on Arch even when it exists.
-                            -- There doesn't seem to be an easy way to get the true list of directories
-                            -- to scan for shared libs, but this works for our particular case.
-                            usrLib <- parseAbsDir "/usr/lib"
-                            e <- doesFileExist (usrLib </> lib)
-                            if e
-                                then logDebug ("Found shared library " <> libD <> " in /usr/lib")
-                                else logDebug ("Did not find shared library " <> libD)
-                            return e
+                        -- This is a workaround for the fact that libtinfo.so.x doesn't appear in
+                        -- the 'ldconfig -p' output on Arch or Slackware even when it exists.
+                        -- There doesn't seem to be an easy way to get the true list of directories
+                        -- to scan for shared libs, but this works for our particular cases.
+                            let extraPaths = []
+#if !WINDOWS
+                                 ++ [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+#endif
+                            matches <- filterM (doesFileExist .(</> lib)) extraPaths
+                            case matches of
+                                [] -> logDebug ("Did not find shared library " <> libD)
+                                    >> return False
+                                (path:_) -> logDebug ("Found shared library " <> libD
+                                        <> " in " <> fromString (Path.toFilePath path))
+                                    >> return True
                       where
                         libT = T.pack (toFilePath lib)
                         libD = fromString (toFilePath lib)

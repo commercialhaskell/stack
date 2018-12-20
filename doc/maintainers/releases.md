@@ -1,10 +1,9 @@
-<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
 # Releases
 
 ## Upcoming release tasks:
 
-* Add back support for building static Linux binaries (by popular demand), and update `get-stack.sh` to use it (see [#4088](https://github.com/commercialhaskell/stack/issues/4088)).
 * Check whether `persistent` still needs `monad-logger`; remove dependency if not
 * Check if workaround for https://github.com/commercialhaskell/stack/issues/3922 still needed in stack.yaml
 * Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 1.11.x.  Directories, and last Stack version uploaded:
@@ -19,6 +18,7 @@
 * Explicitly tag release candidates and prereleases in `stack --version` output.
 * Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
 * If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
+
 
 ## Iterating on release process
 
