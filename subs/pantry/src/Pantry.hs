@@ -580,11 +580,14 @@ completePM plOrig pm
   | isCompletePM pm = pure pm
   | otherwise = do
       package <- loadPackage plOrig
-      let pmNew = PackageMetadata
+      let pkgCabal = case packageCabalEntry package of
+                       PCCabalFile tentry -> tentry
+                       PCHpack _ tentry _ -> tentry
+          pmNew = PackageMetadata
             { pmName = Just $ pkgName $ packageIdent package
             , pmVersion = Just $ pkgVersion $ packageIdent package
             , pmTreeKey = Just $ packageTreeKey package
-            , pmCabal = Just $ teBlob $ getPCTreeEntry $ packageCabalEntry package
+            , pmCabal = Just $ teBlob pkgCabal
             }
 
           isSame (Just x) (Just y) = x == y
