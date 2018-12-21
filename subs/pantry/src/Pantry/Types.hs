@@ -27,12 +27,16 @@ module Pantry.Types
   , VersionP (..)
   , PackageIdentifierRevision (..)
   , FileType (..)
-  , BuildFileType (..)
+  , BuildFile (..)
+  , isHPackBuildFile
+  , isCabalBuildFile
   , FileSize (..)
   , TreeEntry (..)
   , SafeFilePath
   , unSafeFilePath
   , mkSafeFilePath
+  , safeFilePathtoPath
+  , hpackSafeFilePath
   , TreeKey (..)
   , Tree (..)
   , renderTree
@@ -42,8 +46,6 @@ module Pantry.Types
   , resolvePaths
   , Package (..)
   , PackageCabal (..)
-  , getPCBlobKey
-  , getPCTreeEntry
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -115,13 +117,14 @@ import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
+import qualified Hpack.Config as Hpack
 import Distribution.ModuleName (ModuleName)
 import Distribution.Types.Version (Version, mkVersion)
 import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Path, Abs, Dir, File, toFilePath, filename)
+import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile)
 import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
@@ -153,19 +156,11 @@ data Package = Package
   deriving (Show, Eq)
 
 data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
-                  | PCHpack !TreeEntry -- ^ TreeEntry of HPack file
-                  | PCHpackCabalFile !TreeEntry -- ^ TreeEntry of Cabal file produced via HPack
+                  | PCHpack
+                    !TreeEntry -- ^ Original hpack file
+                    !TreeEntry -- ^ Generated Cabal file
+                    !Version -- ^ version of Hpack used
                     deriving (Show, Eq)
-
-getPCBlobKey :: PackageCabal -> BlobKey
-getPCBlobKey (PCCabalFile (TreeEntry cabalBlobKey _)) = cabalBlobKey
-getPCBlobKey (PCHpack (TreeEntry hpackBlobKey _)) = hpackBlobKey
-getPCBlobKey (PCHpackCabalFile (TreeEntry cabalBlobKey _)) = cabalBlobKey
-
-getPCTreeEntry :: PackageCabal -> TreeEntry
-getPCTreeEntry (PCCabalFile tentry) = tentry
-getPCTreeEntry (PCHpack tentry) = tentry
-getPCTreeEntry (PCHpackCabalFile tentry) = tentry
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
@@ -643,6 +638,7 @@ data PantryException
   | NoHackageCryptographicHash !PackageIdentifier
   | FailedToCloneRepo !Repo
   | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
+  | TreeReferencesMissing !SafeFilePath !BlobKey
   | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
   | CRC32Mismatch !ArchiveLocation !FilePath !(Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
@@ -792,6 +788,10 @@ instance Display PantryException where
     " needs blob " <> display key <>
     " for file path " <> display sfp <>
     ", but the blob is not available"
+  display (TreeReferencesMissing sfp key) =
+    "The package needs blob " <> display key <>
+    " for file path " <> display sfp <>
+    ", but the blob is not available"
   display (CompletePackageMetadataMismatch loc pm) =
     "When completing package metadata for " <> display loc <>
     ", some values changed in the new package metadata: " <>
@@ -874,21 +874,17 @@ cabalSpecLatestVersion =
     CabalSpecV2_2 -> error "this cannot happen"
     CabalSpecV2_4 -> mkVersion [2, 4]
 
-data BuildFileType = CabalFile | HPackFile
-  deriving (Show, Eq, Enum, Bounded)
+data BuildFile = BFCabal !SafeFilePath !TreeEntry
+               | BFHpack !TreeEntry -- We don't need SafeFilePath for Hpack since it has to be package.yaml file
+  deriving (Show, Eq)
 
-instance PersistField BuildFileType where
-  toPersistValue CabalFile = PersistInt64 1
-  toPersistValue HPackFile = PersistInt64 2
+isHPackBuildFile :: BuildFile -> Bool
+isHPackBuildFile (BFHpack _) = True
+isHPackBuildFile (BFCabal _ _) = False
 
-  fromPersistValue v = do
-    i <- fromPersistValue v
-    case i :: Int64 of
-      1 -> Right CabalFile
-      2 -> Right HPackFile
-      _ -> Left $ "Invalid BuildFileType: " <> tshow i
-instance PersistFieldSql BuildFileType where
-  sqlType _ = SqlInt32
+isCabalBuildFile :: BuildFile -> Bool
+isCabalBuildFile (BFCabal _ _) = True
+isCabalBuildFile (BFHpack _) = False
 
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)
@@ -925,6 +921,11 @@ instance PersistFieldSql SafeFilePath where
 unSafeFilePath :: SafeFilePath -> Text
 unSafeFilePath (SafeFilePath t) = t
 
+safeFilePathtoPath :: Path Abs Dir -> SafeFilePath -> IO (Path Abs File)
+safeFilePathtoPath dir (SafeFilePath path) = do
+  fpath <- parseRelFile (T.unpack path)
+  return $ dir </> fpath
+
 mkSafeFilePath :: Text -> Maybe SafeFilePath
 mkSafeFilePath t = do
   guard $ not $ "\\" `T.isInfixOf` t
@@ -938,6 +939,13 @@ mkSafeFilePath t = do
   guard $ all (not . T.all (== '.')) $ T.split (== '/') t
 
   Just $ SafeFilePath t
+
+hpackSafeFilePath :: SafeFilePath
+hpackSafeFilePath =
+    let fpath = mkSafeFilePath (T.pack Hpack.packageConfig)
+    in case fpath of
+         Nothing -> error $ "hpackSafeFilePath: Not able to encode " <> (Hpack.packageConfig)
+         Just sfp -> sfp
 
 -- | The hash of the binary representation of a 'Tree'.
 --
