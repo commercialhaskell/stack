@@ -497,7 +497,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             , mismatchActual = gpdIdent
             }
 
-        (_tid, treeKey') <- withStorage $ storeTree ident tree' cabalEntry (BFCabal (cabalFileName name) cabalEntry)
+        (_tid, treeKey') <- withStorage $ storeTree ident tree' (BFCabal (cabalFileName name) cabalEntry)
         pure Package
           { packageTreeKey = treeKey'
           , packageTree = tree'
