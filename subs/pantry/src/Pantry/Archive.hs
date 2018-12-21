@@ -24,7 +24,7 @@ import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import qualified Hpack.Config as Hpack
-import Pantry.HPack (hpackToCabal, hpackVersion)
+import Pantry.HPack (hpackVersion)
 import Data.Bits ((.&.), shiftR)
 import Path (toFilePath)
 import qualified Codec.Archive.Zip as Zip
@@ -144,11 +144,15 @@ checkPackageMetadata
   -> Package
   -> Either PantryException Package
 checkPackageMetadata pl pm pa = do
-  let err = MismatchedPackageMetadata
+  let
+      pkgCabal = case packageCabalEntry pa of
+                       PCCabalFile tentry -> tentry
+                       PCHpack _ tentry _ -> tentry
+      err = MismatchedPackageMetadata
               pl
               pm
               (Just (packageTreeKey pa))
-              (teBlob $ getPCTreeEntry $ packageCabalEntry pa)
+              (teBlob pkgCabal)
               (packageIdent pa)
       test (Just x) y = x == y
       test Nothing _ = True
@@ -157,7 +161,7 @@ checkPackageMetadata pl pm pa = do
         [ test (pmTreeKey pm) (packageTreeKey pa)
         , test (pmName pm) (pkgName $ packageIdent pa)
         , test (pmVersion pm) (pkgVersion $ packageIdent pa)
-        , test (pmCabal pm) (teBlob $ getPCTreeEntry $ packageCabalEntry pa)
+        , test (pmCabal pm) (teBlob pkgCabal)
         ]
 
    in if and tests then Right pa else Left err
@@ -401,25 +405,27 @@ parseArchive pli archive fp = do
             case mbs of
               Nothing -> throwIO $ TreeReferencesMissingBlob pli buildFilePath buildFileBlobKey
               Just bs -> pure bs
-          cabalBs <- if isCabalBuildFile buildFile
-                     then return bs
-                     else snd <$> hpackToCabal bs
+          cabalBs <- case buildFile of
+            BFCabal _ _ -> pure bs
+            BFHpack _ -> do
+              logDebug "BFHpack"
+              snd <$> hpackToCabal bs tree
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
           when (buildFilePath /= cabalFileName name && isCabalBuildFile buildFile) $
             throwIO $ WrongCabalFileName pli buildFilePath name
 
           -- It's good! Store the tree, let's bounce
-          (tid, treeKey) <- withStorage $ storeTree ident tree buildFileEntry buildFile
-          packageCabal <- if isCabalBuildFile buildFile
-                          then pure $ PCCabalFile buildFileEntry
-                          else do
-                            hpackKey <- withStorage $ do
-                                         hpackId <- storeHPack tid
-                                         getHPackBlobKeyById hpackId
-                            hpackSoftwareVersion <- hpackVersion
-                            let hpackTreeEntry = TreeEntry hpackKey (teType buildFileEntry)
-                            pure $ PCHpack buildFileEntry hpackTreeEntry hpackSoftwareVersion
+          (tid, treeKey) <- withStorage $ storeTree ident tree buildFile
+          packageCabal <- case buildFile of
+                            BFCabal _ _ -> pure $ PCCabalFile buildFileEntry
+                            BFHpack _ -> do
+                              hpackKey <- withStorage $ do
+                                            hpackId <- storeHPack tid
+                                            getHPackBlobKeyById hpackId
+                              hpackSoftwareVersion <- hpackVersion
+                              let hpackTreeEntry = TreeEntry hpackKey (teType buildFileEntry)
+                              pure $ PCHpack buildFileEntry hpackTreeEntry hpackSoftwareVersion
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree
