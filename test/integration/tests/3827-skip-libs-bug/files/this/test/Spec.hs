@@ -1,2 +1,2 @@
 main :: IO ()
-main = skjdsjdhjsh
+main = compilationError
