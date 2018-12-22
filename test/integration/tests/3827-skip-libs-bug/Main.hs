@@ -3,7 +3,16 @@ import StackTest
 main :: IO ()
 main = do
 
-  -- The lib, exe, and test components of "this" package will fail if built.
-  -- But they should be skipped
-  stack ["build", "--skip", "this-exe", "--skip", "this"]
+  stack ["clean", "--full"]
+
+  -- Nothing should be built here
+  stack ["build", "--skip", "this", "--skip", "this-exe", "this"]
+  doesNotExist "./that/.stack-work"
+  doesNotExist "./this/.stack-work"
+
+  -- "That" should be built, but "this" should be skipped
+  stack ["build", "--skip", "this", "--skip", "this-exe"]
   stack ["test", "--skip", "this-test", "--skip", "this-exe", "--skip", "this"]
+
+  doesExist "./that/.stack-work"
+  doesNotExist "./this/.stack-work"

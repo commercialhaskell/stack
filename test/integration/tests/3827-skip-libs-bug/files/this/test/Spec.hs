@@ -1,2 +1,4 @@
+import Lib
+
 main :: IO ()
-main = compilationError
+main = someFunc

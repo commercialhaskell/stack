@@ -3,4 +3,4 @@ module Lib
     ) where
 
 someFunc :: IO ()
-someFunc = compilationError
+someFunc = putStrLn "someFunc"
