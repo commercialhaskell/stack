@@ -38,6 +38,7 @@ import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
+import           Lens.Micro ((?~))
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
@@ -613,7 +614,13 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 pathCmd :: [Text] -> GlobalOpts -> IO ()
-pathCmd keys go = withDefaultBuildConfig go (Stack.Path.path keys)
+pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
+  where
+    withoutHaddocks = withDefaultBuildConfig goWithout
+    goWithout = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ False
+    withHaddocks = withDefaultBuildConfig goWith
+    goWith = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
+
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
