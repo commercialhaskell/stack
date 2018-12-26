@@ -7,9 +7,6 @@ module Pantry.Tree
   ) where
 
 import RIO
-import RIO.Process
-import qualified RIO.FilePath as FilePath
-import qualified Hpack.Config as Hpack
 import qualified RIO.Map as Map
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
@@ -17,7 +14,7 @@ import Pantry.Storage
 import Pantry.Types
 import RIO.FilePath ((</>), takeDirectory)
 import RIO.Directory (createDirectoryIfMissing, setPermissions, getPermissions, setOwnerExecutable)
-import Path (Path, Abs, Dir, toFilePath, parseAbsDir, fromAbsFile)
+import Path (Path, Abs, Dir, toFilePath)
 import Distribution.Parsec.Common (PWarning (..))
 import Distribution.PackageDescription (GenericPackageDescription)
 import Distribution.PackageDescription.Parsec

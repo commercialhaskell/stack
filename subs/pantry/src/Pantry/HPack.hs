@@ -10,16 +10,13 @@ module Pantry.HPack
 
 import RIO
 import RIO.Process
-import qualified RIO.ByteString as B
 import Pantry.Types
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified RIO.List as List
-import qualified RIO.FilePath as FilePath
 import qualified Hpack
 import qualified Hpack.Config as Hpack
 import Data.Char (isSpace, isDigit)
-import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parseRelFile, fromAbsFile)
-import Path.IO (doesFileExist, listDir)
+import Path (Path, Abs, toFilePath, Dir, (</>), filename, parseRelFile)
+import Path.IO (doesFileExist)
 
 
 hpackVersion

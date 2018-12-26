@@ -62,7 +62,6 @@ module Pantry.Storage
   ) where
 
 import RIO hiding (FilePath)
-import qualified Prelude as Pr
 import RIO.Process
 import qualified RIO.ByteString as B
 import qualified Pantry.Types as P
@@ -976,8 +975,7 @@ unpackTreeToDir
   -> P.Tree
   -> ReaderT SqlBackend (RIO env) ()
 unpackTreeToDir (toFilePath -> dir) (P.TreeMap m) = do
-  let map = Map.toList m
-  for_ map $ \(sfp, P.TreeEntry blobKey ft) -> do
+  for_  (Map.toList m) $ \(sfp, P.TreeEntry blobKey ft) -> do
     let dest = dir </> T.unpack (P.unSafeFilePath sfp)
     createDirectoryIfMissing True $ takeDirectory dest
     mbs <- loadBlob blobKey
