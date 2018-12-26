@@ -616,9 +616,12 @@ interpreterHandler currentDir args f = do
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
   where
-    withoutHaddocks = withDefaultBuildConfig goWithout
+    continueOnSuccess f = catch f ignoreSuccess
+    ignoreSuccess ExitSuccess = return ()
+    ignoreSuccess ex = throwIO ex
+    withoutHaddocks = continueOnSuccess . withDefaultBuildConfig goWithout
     goWithout = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ False
-    withHaddocks = withDefaultBuildConfig goWith
+    withHaddocks = continueOnSuccess . withDefaultBuildConfig goWith
     goWith = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
 
 
