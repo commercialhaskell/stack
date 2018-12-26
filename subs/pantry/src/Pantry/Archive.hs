@@ -406,9 +406,7 @@ parseArchive pli archive fp = do
               Just bs -> pure bs
           cabalBs <- case buildFile of
             BFCabal _ _ -> pure bs
-            BFHpack _ -> do
-              logDebug "BFHpack"
-              snd <$> hpackToCabal bs tree
+            BFHpack _ -> snd <$> hpackToCabal bs tree
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
           when (buildFilePath /= cabalFileName name && isCabalBuildFile buildFile) $
