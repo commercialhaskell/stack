@@ -83,7 +83,6 @@ import Path.IO (ensureDir, listDir, createTempDir, getTempDir, removeDirRecur)
 import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackVersion, hpack)
 import qualified Hpack.Config as Hpack
--- import Pantry.Tree (hpackToCabal)
 import Conduit
 import Data.Acquire (with)
 import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
@@ -943,6 +942,7 @@ findOrGenerateCabalFile pkgDir = do
         _:_ -> throwIO $ P.MultipleCabalFilesFound pkgDir files
       where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
+-- | Similar to 'hpackToCabal' but doesn't require a new connection to database.
 hpackToCabalS :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
               => ByteString -- Hpack's content
               -> P.Tree

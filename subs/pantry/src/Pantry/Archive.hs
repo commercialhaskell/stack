@@ -396,7 +396,6 @@ parseArchive pli archive fp = do
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
           -- parse the cabal file and ensure it has the right name
           buildFile <- findCabalOrHpackFile pli tree
--- (buildFilePath, buildFileEntry@(TreeEntry buildFileBlobKey _), buildFileType) <- findCabalOrHpackFile pli tree
           (buildFilePath, buildFileBlobKey, buildFileEntry) <- case buildFile of
                                                                  BFCabal fpath te@(TreeEntry key _) -> pure (fpath, key, te)
                                                                  BFHpack te@(TreeEntry key _) -> pure (hpackSafeFilePath, key, te)
@@ -438,7 +437,6 @@ findCabalOrHpackFile
   => PackageLocationImmutable -- ^ for exceptions
   -> Tree
   -> m BuildFile
--- (SafeFilePath, TreeEntry, BuildFileType)
 findCabalOrHpackFile loc (TreeMap m) = do
   let isCabalFile (sfp, _) =
         let txt = unSafeFilePath sfp
