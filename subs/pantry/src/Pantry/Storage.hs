@@ -520,19 +520,12 @@ generateHPack ::
     -> VersionId
     -> ReaderT SqlBackend (RIO env) (Key HPack)
 generateHPack tid vid = do
-    liftIO $ Pr.print "generateHpack: 0"
     hpackEntity <- loadHPackTreeEntity tid
-    liftIO $ Pr.print "generateHpack: 1"
     hpackBS <- loadBlobById (treeEntryBlob $ entityVal hpackEntity)
-    liftIO $ Pr.print "generateHpack: 2"
     tree <- getTree tid
-    liftIO $ Pr.print "generateHpack: 3"
     (pkgName, cabalBS) <- hpackToCabalS hpackBS tree
-    liftIO $ Pr.print "generateHpack: 4"
     bid <- storeCabalFile cabalBS pkgName
-    liftIO $ Pr.print "generateHpack: 5"
     let cabalFile = P.cabalFileName pkgName
-    liftIO $ Pr.print "generateHpack: 6"
     fid <- insertBy FilePath {filePathPath = cabalFile}
     let hpackRecord =
             HPack
@@ -970,17 +963,11 @@ hpackToCabal :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
            -> P.Tree
            -> RIO env (P.PackageName, ByteString)
 hpackToCabal hpackBs tree = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> do
-               logDebug "hpackToCabal: 0"
                B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
-               logDebug "hpackToCabal: 2"
                tdir <- parseAbsDir tmpdir
-               logDebug "hpackToCabal: 3"
                withStorage $ unpackTreeToDir tdir tree
-               logDebug "hpackToCabal: 4"
                (packageName, cfile) <- findOrGenerateCabalFile tdir
-               logDebug "hpackToCabal: 5"
                bs <- B.readFile (fromAbsFile cfile)
-               logDebug "hpackToCabal: 6"
                return (packageName, bs)
 
 unpackTreeToDir
@@ -989,21 +976,11 @@ unpackTreeToDir
   -> P.Tree
   -> ReaderT SqlBackend (RIO env) ()
 unpackTreeToDir (toFilePath -> dir) (P.TreeMap m) = do
-  liftIO $ Pr.print "unpackTreeToDir: -3"
   let map = Map.toList m
-  liftIO $ Pr.print "unpackTreeToDir: -2"
-  liftIO $ Pr.print $ List.length map
-  liftIO $ Pr.print "unpackTreeToDir: -1"
   for_ map $ \(sfp, P.TreeEntry blobKey ft) -> do
-    liftIO $ Pr.print "unpackTreeToDir: -11"
     let dest = dir </> T.unpack (P.unSafeFilePath sfp)
-    liftIO $ Pr.print "unpackTreeToDir: 0"
-    liftIO $ Pr.print dest
-    liftIO $ Pr.print $ takeDirectory dest
     createDirectoryIfMissing True $ takeDirectory dest
-    liftIO $ Pr.print "unpackTreeToDir: 1"
     mbs <- loadBlob blobKey
-    liftIO $ Pr.print "unpackTreeToDir: 2"
     case mbs of
       Nothing -> do
         -- TODO when we have pantry wire stuff, try downloading
