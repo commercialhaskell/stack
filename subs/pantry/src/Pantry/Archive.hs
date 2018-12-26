@@ -442,15 +442,24 @@ findCabalOrHpackFile loc (TreeMap m) = do
       isHpackFile (sfp, _) =
         let txt = unSafeFilePath sfp
          in T.pack (Hpack.packageConfig) == txt
-  case filter (\f -> isCabalFile f || isHpackFile f) $ Map.toList m of
+      isBFCabal (BFCabal _ _) = True
+      isBFCabal _ = False
+      sfpBuildFile (BFCabal sfp _) = sfp
+      sfpBuildFile (BFHpack _) = hpackSafeFilePath
+      toBuildFile xs@(sfp, te) = let cbFile = if (isCabalFile xs)
+                                              then Just $ BFCabal sfp te
+                                              else Nothing
+                                     hpFile = if (isHpackFile xs)
+                                              then Just $ BFHpack te
+                                              else Nothing
+                                 in cbFile <|> hpFile
+  case mapMaybe toBuildFile $ Map.toList m of
     [] -> throwM $ TreeWithoutCabalFile loc
-    [v@(key, te)] -> if isHpackFile v
-                     then pure $ BFHpack te
-                     else pure $ BFCabal key te
-    xs -> case (filter isCabalFile xs) of
+    [bfile] -> pure bfile
+    xs -> case (filter isBFCabal xs) of
             [] -> throwM $ TreeWithoutCabalFile loc
-            [(key, te)] -> pure $ BFCabal key te
-            xs' -> throwM $ TreeWithMultipleCabalFiles loc $ map fst xs'
+            [bfile] -> pure bfile
+            xs' -> throwM $ TreeWithMultipleCabalFiles loc $ map sfpBuildFile xs'
 
 -- | If all files have a shared prefix, strip it off
 stripCommonPrefix :: [(FilePath, a)] -> [(FilePath, a)]
