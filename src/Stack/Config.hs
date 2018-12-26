@@ -47,6 +47,7 @@ import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
@@ -59,6 +60,7 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
+import           Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -69,14 +71,16 @@ import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
+import           Stack.Build.Haddock (shouldHaddockDeps)
 import qualified Stack.Image as Image
-import           Stack.Package (mkProjectPackage, mkDepPackage)
-import           Stack.Snapshot
+import           Stack.SourceMap
+import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
@@ -578,33 +582,67 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    sd <- runRIO config $ loadResolver (projectResolver project) mcompiler
+    snapshot <- loadSnapshot (projectResolver project)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    packages <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
+    let bopts = configBuild config
+
+    packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
       abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
       let resolved = ResolvedPath fp abs'
-      pp <- mkProjectPackage YesPrintWarnings resolved
-      pure (ppName pp, pp)
+      pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
+      pure (cpName $ ppCommon pp, pp)
 
-    deps <- forM (projectDependencies project) $ \plp -> do
-      dp <- mkDepPackage plp
-      pure (dpName dp, dp)
+    deps0 <- forM (projectDependencies project) $ \plp -> do
+      dp <- additionalDepPackage (shouldHaddockDeps bopts) plp
+      pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
-      map (second (PLMutable . ppResolvedDir)) packages ++
-      map (second dpLocation) deps
+      map (second (PLMutable . ppResolvedDir)) packages0 ++
+      map (second dpLocation) deps0
+
+    let packages1 = Map.fromList packages0
+        snPackages = snapshotPackages snapshot `Map.difference` packages1
+          `Map.difference` Map.fromList deps0
+
+    snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
+
+    let deps1 = Map.fromList deps0 `Map.union` snDeps
+
+    let mergeApply m1 m2 f =
+          MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
+        pFlags = projectFlags project
+        packages2 = mergeApply packages1 pFlags $
+          \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
+        deps2 = mergeApply deps1 pFlags $
+          \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
+
+    checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
+
+    let pkgGhcOptions = configGhcOptionsByName config
+        deps = mergeApply deps2 pkgGhcOptions $
+          \_ d options -> d{dpCommon=(dpCommon d){cpGhcOptions=options}}
+        packages = mergeApply packages2 pkgGhcOptions $
+          \_ p options -> p{ppCommon=(ppCommon p){cpGhcOptions=options}}
+        unusedPkgGhcOptions = pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
+          `Map.restrictKeys` Map.keysSet deps2
+
+    unless (Map.null unusedPkgGhcOptions) $
+      throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
+
+    let wanted = SMWanted
+          { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
+          , smwProject = packages
+          , smwDeps = deps
+          }
 
     return BuildConfig
         { bcConfig = config
-        , bcSnapshotDef = sd
+        , bcSMWanted = wanted
         , bcGHCVariant = configGHCVariantDefault config
-        , bcPackages = Map.fromList packages
-        , bcDependencies = Map.fromList deps
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
-        , bcFlags = projectFlags project
         , bcImplicitGlobal =
             case mproject of
                 LCSNoProject -> True

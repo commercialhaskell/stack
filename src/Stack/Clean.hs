@@ -17,6 +17,7 @@ import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.Config
+import           Stack.Types.SourceMap
 import           System.Exit (exitFailure)
 
 -- | Deletes build artifacts in the current project.
@@ -35,7 +36,7 @@ clean cleanOpts = do
 
 dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
-    packages <- view $ buildConfigL.to bcPackages
+    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps

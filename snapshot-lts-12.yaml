@@ -1,10 +1,10 @@
-resolver: lts-12.12
-name: snapshot-for-building-stack-with-ghc-8.4.3
+resolver: lts-12.20
+name: snapshot-for-building-stack-with-ghc-8.4.4
 
 packages:
 - Cabal-2.4.0.1@rev:0
-- githash-0.1.1.0@rev:0
-- hpack-0.31.0@rev:0
+- githash-0.1.3.0@rev:0
+- hpack-0.31.1@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
-- tar-conduit-0.3.0@rev:0
+- tar-conduit-0.3.1@rev:0
 - yaml-0.10.4.0@rev:0 #for hpack-0.31

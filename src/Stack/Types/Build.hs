@@ -15,11 +15,11 @@ module Stack.Types.Build
     ,UnusedFlags(..)
     ,InstallLocation(..)
     ,Installed(..)
-    ,piiVersion
-    ,piiLocation
+    ,psVersion
     ,Task(..)
     ,taskIsTarget
     ,taskLocation
+    ,taskTargetIsMutable
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
@@ -30,6 +30,8 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
+    ,IsMutable(..)
+    ,installLocationIsMutable
     ,TaskConfigOpts(..)
     ,BuildCache(..)
     ,buildCacheVC
@@ -116,6 +118,7 @@ data StackBuildException
         Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
+  | InvalidGhcOptionsSpecification [PackageName]
   | TargetParseException [Text]
   | SolverGiveUp String
   | SolverMissingCabalInstall
@@ -129,7 +132,11 @@ data FlagSource = FSCommandLine | FSStackYaml
     deriving (Show, Eq, Ord)
 
 data UnusedFlags = UFNoPackage FlagSource PackageName
-                 | UFFlagsNotDefined FlagSource Package (Set FlagName)
+                 | UFFlagsNotDefined
+                       FlagSource
+                       PackageName
+                       (Set FlagName) -- defined in package
+                       (Set FlagName) -- not defined
                  | UFSnapshot PackageName
     deriving (Show, Eq, Ord)
 
@@ -248,7 +255,7 @@ instance Show StackBuildException where
             , "' not found"
             , showFlagSrc src
             ]
-        go (UFFlagsNotDefined src pkg flags) = concat
+        go (UFFlagsNotDefined src pname pkgFlags flags) = concat
             [ "- Package '"
             , name
             , "' does not define the following flags"
@@ -262,12 +269,20 @@ instance Show StackBuildException where
                           (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
                                (Set.toList pkgFlags))
             ]
-          where name = packageNameString (packageName pkg)
-                pkgFlags = packageDefinedFlags pkg
+          where name = packageNameString pname
         go (UFSnapshot name) = concat
             [ "- Attempted to set flag on snapshot package "
             , packageNameString name
             , ", please add to extra-deps"
+            ]
+    show (InvalidGhcOptionsSpecification unused) = unlines
+        $ "Invalid GHC options specification:"
+        : map showGhcOptionSrc unused
+      where
+        showGhcOptionSrc name = concat
+            [ "- Package '"
+            , packageNameString name
+            , "' not found"
             ]
     show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
     show (TargetParseException errs) = unlines
@@ -389,8 +404,6 @@ data ConfigCache = ConfigCache
       -- ^ The components to be built. It's a bit of a hack to include this in
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
-    , configCacheHaddock :: !Bool
-      -- ^ Are haddocks to be built?
     , configCachePkgSrc :: !CachePkgSrc
     }
     deriving (Generic, Eq, Show, Data, Typeable)
@@ -403,11 +416,11 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc (PSFilePath lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v3" "z7N_NxX7Gbz41Gi9AGEa1zoLE-4="
+configCacheVC = storeVersionConfig "config-v4" "LbTeTCtFbU0Yc1mbmhAzsIXyPrQ="
 
 -- | A task to perform when building
 data Task = Task
@@ -416,6 +429,7 @@ data Task = Task
     , taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
+    , taskBuildHaddock    :: !Bool
     , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
     -- ^ GhcPkgIds of already-installed dependencies
     , taskAllInOne        :: !Bool
@@ -456,21 +470,46 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType
-  = TTFilePath LocalPackage InstallLocation
-  | TTRemote Package InstallLocation PackageLocationImmutable
+  = TTLocalMutable LocalPackage
+  | TTRemotePackage IsMutable Package PackageLocationImmutable
     deriving Show
+
+data IsMutable
+    = Mutable
+    | Immutable
+    deriving (Eq, Show)
+
+instance Semigroup IsMutable where
+    Mutable <> _ = Mutable
+    _ <> Mutable = Mutable
+    Immutable <> Immutable = Immutable
+
+instance Monoid IsMutable where
+    mempty = Immutable
+    mappend = (<>)
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTFilePath lp _ -> lpWanted lp
+        TTLocalMutable lp -> lpWanted lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
-        TTFilePath _ loc -> loc
-        TTRemote _ loc _ -> loc
+        TTLocalMutable _ -> Local
+        TTRemotePackage Mutable _ _ -> Local
+        TTRemotePackage Immutable _ _ -> Snap
+
+taskTargetIsMutable :: Task -> IsMutable
+taskTargetIsMutable task =
+    case taskType task of
+        TTLocalMutable _ -> Mutable
+        TTRemotePackage mutable _ _ -> mutable
+
+installLocationIsMutable :: InstallLocation -> IsMutable
+installLocationIsMutable Snap = Immutable
+installLocationIsMutable Local = Mutable
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
@@ -501,11 +540,11 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ local non-extra-dep?
-              -> InstallLocation
+              -> IsMutable
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps isLocal loc package = ConfigureOpts
-    { coDirs = configureOptsDirs bco loc package
+configureOpts econfig bco deps isLocal isMutable package = ConfigureOpts
+    { coDirs = configureOptsDirs bco isMutable package
     , coNoDirs = configureOptsNoDir econfig bco deps isLocal package
     }
 
@@ -535,14 +574,14 @@ isStackOpt t = any (`T.isPrefixOf` t)
     ] || t == "--user"
 
 configureOptsDirs :: BaseConfigOpts
-                  -> InstallLocation
+                  -> IsMutable
                   -> Package
                   -> [String]
-configureOptsDirs bco loc package = concat
+configureOptsDirs bco isMutable package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
-    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case loc of
-        Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
-        Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
+    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
+        Immutable -> bcoExtraDBs bco ++ [bcoSnapDB bco]
+        Mutable -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
     , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLib)
       , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
       , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> relDirShare)
@@ -554,9 +593,9 @@ configureOptsDirs bco loc package = concat
     ]
   where
     installRoot =
-        case loc of
-            Snap -> bcoSnapInstallRoot bco
-            Local -> bcoLocalInstallRoot bco
+        case isMutable of
+            Immutable -> bcoSnapInstallRoot bco
+            Mutable -> bcoLocalInstallRoot bco
     docDir =
         case pkgVerDir of
             Nothing -> installRoot </> docDirSuffix

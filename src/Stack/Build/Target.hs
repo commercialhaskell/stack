@@ -74,16 +74,14 @@ import           Stack.Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.PackageDescription (GenericPackageDescription)
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
-import           Stack.Snapshot (calculatePackagePromotion)
+import           Stack.SourceMap
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
-import           Stack.Types.GhcPkgId
+import           Stack.Types.SourceMap
 
 -- | Do we need any targets? For example, `stack build` will fail if
 -- no targets are provided.
@@ -210,17 +208,17 @@ data ResolveResult = ResolveResult
 
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
-resolveRawTarget
-  :: forall env. HasConfig env
-  => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-  -> Map PackageName (LoadedPackageInfo PackageLocation) -- ^ snapshot
-  -> Map PackageName DepPackage -- ^ local deps
-  -> Map PackageName ProjectPackage -- ^ project packages
-  -> (RawInput, RawTarget)
-  -> RIO env (Either Text ResolveResult)
-resolveRawTarget globals snap deps locals (ri, rt) =
-    go rt
+resolveRawTarget ::
+       (HasLogFunc env, HasPantryConfig env)
+    => SMActual
+    -> (RawInput, RawTarget)
+    -> RIO env (Either Text ResolveResult)
+resolveRawTarget sma (ri, rt) =
+  go rt
   where
+    locals = smaProject sma
+    deps = smaDeps sma
+    globals = smaGlobal sma
     -- Helper function: check if a 'NamedComponent' matches the given 'ComponentName'
     isCompNamed :: ComponentName -> NamedComponent -> Bool
     isCompNamed _ CLib = False
@@ -305,7 +303,6 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrPackageType = PTProject
           }
       | Map.member name deps ||
-        Map.member name snap ||
         Map.member name globals = return $ Right ResolveResult
           { rrName = name
           , rrRaw = ri
@@ -388,27 +385,16 @@ resolveRawTarget globals snap deps locals (ri, rt) =
         allLocs :: Map PackageName PackageLocation
         allLocs = Map.unions
           [ Map.mapWithKey
-              (\name' lpi -> PLImmutable $ PLIHackage
-                  (PackageIdentifierRevision name' (lpiVersion lpi) CFILatest)
+              (\name' gp -> PLImmutable $ PLIHackage
+                  (PackageIdentifierRevision name' (gpVersion gp) CFILatest)
                   Nothing)
               globals
-          , Map.map lpiLocation snap
           , Map.map dpLocation deps
           ]
 
 ---------------------------------------------------------------------------------
 -- Combine the ResolveResults
 ---------------------------------------------------------------------------------
-
--- | How a package is intended to be built
-data Target
-  = TargetAll !PackageType
-  -- ^ Build all of the default components.
-  | TargetComps !(Set NamedComponent)
-  -- ^ Only build specific components
-
-data PackageType = PTProject | PTDependency
-  deriving (Eq, Show)
 
 combineResolveResults
   :: forall env. HasLogFunc env
@@ -444,31 +430,24 @@ combineResolveResults results = do
 -- OK, let's do it!
 ---------------------------------------------------------------------------------
 
-parseTargets
-    :: HasEnvConfig env
+parseTargets :: HasBuildConfig env
     => NeedTargets
+    -> Bool
     -> BuildOptsCLI
-    -> RIO env
-         ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
-         , Map PackageName (LoadedPackageInfo PackageLocation) -- all local deps
-         , Map PackageName Target
-         )
-parseTargets needTargets boptscli = do
+    -> SMActual
+    -> RIO env SMTargets
+parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
-  ls0 <- view loadedSnapshotL
   workingDir <- getCurrentDir
-  locals <- view $ buildConfigL.to bcPackages
-  deps <- view $ buildConfigL.to bcDependencies
-  let globals = lsGlobals ls0
-      snap = lsPackages ls0
-      (textTargets', rawInput) = getRawInput boptscli locals
+  locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  let (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget globals snap deps locals
+    resolveRawTarget smActual
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
@@ -487,58 +466,9 @@ parseTargets needTargets boptscli = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  let flags = Map.unionWith Map.union
-        (boptsCLIFlagsByName boptscli)
-        (bcFlags bconfig)
-      hides = Map.empty -- not supported to add hidden packages
+  addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
-      -- We promote packages to the local database if the GHC options
-      -- are added to them by name. See:
-      -- https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095.
-      --
-      -- GHC options applied to all packages are handled by getGhcOptions.
-      options = configGhcOptionsByName (bcConfig bconfig)
-
-      drops = Set.empty -- not supported to add drops
-
-  (globals', snapshots, locals') <- do
-    addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- loadCabalFileImmutable loc
-      return (name, (gpd, PLImmutable loc, Nothing))
-
-    -- Calculate a list of all of the locals, based on the project
-    -- packages, local dependencies, and added deps found from the
-    -- command line
-    projectPackages' <- for locals $ \pp -> do
-      gpd <- ppGPD pp
-      pure (gpd, PLMutable $ ppResolvedDir pp, Just pp)
-    deps' <- for deps $ \dp -> do
-      gpd <- liftIO $ dpGPD' dp
-      pure (gpd, dpLocation dp, Nothing)
-    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocation, Maybe ProjectPackage)
-        allLocals = Map.unions
-          [ -- project packages
-            projectPackages'
-          , -- added deps take precendence over local deps
-            addedDeps'
-          , deps'
-          ]
-
-    calculatePackagePromotion
-      ls0 (Map.elems allLocals)
-      flags hides options drops
-
-  let ls = LoadedSnapshot
-        { lsCompilerVersion = lsCompilerVersion ls0
-        , lsGlobals = globals'
-        , lsPackages = snapshots
-        }
-
-      localDeps = Map.fromList $ flip mapMaybe (Map.toList locals') $ \(name, lpi) ->
-        -- We want to ignore any project packages, but grab the local
-        -- deps and upgraded snapshot deps
-        case lpiLocation lpi of
-          (_, Just (Just _localPackageView)) -> Nothing -- project package
-          (loc, _) -> Just (name, lpi { lpiLocation = loc }) -- upgraded or local dep
-
-  return (ls, localDeps, targets)
+  return SMTargets
+    { smtTargets = targets
+    , smtDeps = addedDeps'
+    }

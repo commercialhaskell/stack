@@ -32,7 +32,7 @@ import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
 #ifdef USE_GIT_INFO
-import           GitHash (giCommitCount, giHash, tGitInfoCwd)
+import           GitHash (giCommitCount, giHash, tGitInfoCwdTry)
 #endif
 import           Distribution.System (buildArch)
 import qualified Distribution.Text as Cabal (display)
@@ -50,6 +50,7 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Build
+import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Clean (CleanOpts(..), clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -91,6 +92,7 @@ import qualified Stack.PrettyPrint as PP (style)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
+import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
 import           Stack.Snapshot (loadResolver)
@@ -100,6 +102,7 @@ import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
+import           Stack.Types.SourceMap
 import           Stack.Unpack
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
@@ -129,20 +132,21 @@ versionString' = concat $ concat
     [ [$(simpleVersion Meta.version)]
       -- Leave out number of commits for --depth=1 clone
       -- See https://github.com/commercialhaskell/stack/issues/792
-    , [" (" ++ show commitCount ++ " commits)" | commitCount /= 1]
+    , case giCommitCount <$> $$tGitInfoCwdTry of
+        Left _ -> []
+        Right 1 -> []
+        Right count -> [" (", show count, " commits)"]
     , [" ", Cabal.display buildArch]
     , [depsString, warningString]
     ]
-  where
-    commitCount = giCommitCount $$tGitInfoCwd
 #else
 versionString' =
     showVersion Meta.version
     ++ ' ' : Cabal.display buildArch
     ++ depsString
     ++ warningString
-  where
 #endif
+  where
 #ifdef HIDE_DEP_VERSIONS
     depsString = " hpack-" ++ VERSION_hpack
 #else
@@ -602,7 +606,7 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 pathCmd :: [Text] -> GlobalOpts -> IO ()
-pathCmd keys go = withBuildConfig go (Stack.Path.path keys)
+pathCmd keys go = withDefaultBuildConfig go (Stack.Path.path keys)
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
@@ -651,8 +655,8 @@ buildCmd opts go = do
     FileWatch -> fileWatch stderr (inner . Just)
     NoFileWatch -> inner Nothing
   where
-    inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
-        Stack.Build.build setLocalFiles lk opts
+    inner setLocalFiles = withBuildConfigAndLock go' NeedTargets opts $ \lk ->
+        Stack.Build.build setLocalFiles lk
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
                Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) go
@@ -687,7 +691,7 @@ upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
     upgrade (globalConfigMonoid go)
             (globalResolver go)
 #ifdef USE_GIT_INFO
-            (Just (giHash $$tGitInfoCwd))
+            (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
 #else
             Nothing
 #endif
@@ -709,7 +713,7 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    withBuildConfigAndLock go $ \_ -> do
+    withDefaultBuildConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
@@ -762,11 +766,11 @@ uploadCmd sdistOpts go = do
 
 sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
 sdistCmd sdistOpts go =
-    withBuildConfig go $ do -- No locking needed.
+    withDefaultBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
-                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . bcPackages)
+                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
                 when (null dirs) $ do
                     stackYaml <- view stackYamlL
                     prettyErrorL
@@ -808,7 +812,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (withBuildConfigAndLock go $ \buildLock -> do
+                    (withDefaultBuildConfigAndLock go $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
                         withProcessContext menv $ do
@@ -821,13 +825,13 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                             Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
-        ExecOptsEmbellished {..} ->
-            withBuildConfigAndLock go $ \lk -> do
-              let targets = concatMap words eoPackages
-              unless (null targets) $
-                  Stack.Build.build Nothing lk defaultBuildOptsCLI
-                      { boptsCLITargets = map T.pack targets
-                      }
+        ExecOptsEmbellished {..} -> do
+            let targets = concatMap words eoPackages
+                boptsCLI = defaultBuildOptsCLI
+                           { boptsCLITargets = map T.pack targets
+                           }
+            withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
+              unless (null targets) $ Stack.Build.build Nothing lk
 
               config <- view configL
               menv <- liftIO $ configProcessContextSettings config eoEnvSettings
@@ -862,7 +866,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
           map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
 
       getRunCmd args = do
-          packages <- view $ buildConfigL.to bcPackages
+          packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
           pkgComponents <- for (Map.elems packages) ppComponents
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
@@ -874,7 +878,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                                 firstExe = listToMaybe executables
           case exe of
               Just (CExe exe') -> do
-                Stack.Build.build Nothing Nothing defaultBuildOptsCLI{boptsCLITargets = [T.cons ':' exe']}
+                withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing Nothing
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
@@ -904,7 +908,14 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
-  withBuildConfigAndLock go $ \lk -> do
+  let boptsCLI = defaultBuildOptsCLI
+          -- using only additional packages, targets then get overriden in `ghci`
+          { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
+          , boptsCLIInitialBuildSteps = True
+          , boptsCLIFlags = ghciFlags ghciOpts
+          , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
+          }
+  in withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
@@ -918,12 +929,12 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
 -- | List packages in the project.
 idePackagesCmd :: IDE.ListPackagesCmd -> GlobalOpts -> IO ()
 idePackagesCmd cmd go =
-    withBuildConfig go (IDE.listPackages cmd) -- TODO don't need EnvConfig any more
+    withDefaultBuildConfig go (IDE.listPackages cmd) -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: () -> GlobalOpts -> IO ()
 ideTargetsCmd () go =
-    withBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
+    withDefaultBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
@@ -966,13 +977,11 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
         WithDocker
         WithDownloadCompiler
         go
+        NeedTargets
+        defaultBuildOptsCLI
         Nothing
         (\lk ->
-              do when rebuild $
-                     Stack.Build.build
-                         Nothing
-                         lk
-                         defaultBuildOptsCLI
+              do when rebuild $ Stack.Build.build Nothing lk
                  Image.stageContainerImageArtifacts mProjectRoot images)
         (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
@@ -1000,7 +1009,7 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
+    withDefaultBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
@@ -1008,15 +1017,20 @@ dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
-queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors go = withDefaultBuildConfig go $ queryBuildInfo $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
-hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
+hpcReportCmd hropts go = do
+    let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+        boptsCLI = defaultBuildOptsCLI
+          { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
+    withBuildConfig go AllowNoTargets boptsCLI $
+        generateHpcReportForTargets hropts tixFiles targetNames
 
 freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
 freezeCmd freezeOpts go =
-  withBuildConfig go $ freeze freezeOpts
+  withDefaultBuildConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | UpgradeCabalUnusable

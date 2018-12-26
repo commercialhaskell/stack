@@ -38,12 +38,12 @@ import           Stack.Build.Execute
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Build.Target
 import           Stack.Package
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
+import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.FileLock (FileLock, unlockFile)
@@ -57,9 +57,8 @@ import           System.Terminal (fixCodePage)
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> Maybe FileLock
-      -> BuildOptsCLI
       -> RIO env ()
-build msetLocalFiles mbuildLk boptsCli = do
+build msetLocalFiles mbuildLk = do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -67,29 +66,32 @@ build msetLocalFiles mbuildLk boptsCli = do
     let profiling = boptsLibProfile bopts || boptsExeProfile bopts
     let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
 
-    (targets, ls, locals, extraToBuild, sourceMap) <- loadSourceMapFull NeedTargets boptsCli
+    sourceMap <- view $ envConfigL.to envConfigSourceMap
+    locals <- projectLocalPackages
+    depsLocals <- localDependencies
+    let allLocals = locals <> depsLocals
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
-    for_ msetLocalFiles $ \setLocalFiles -> liftIO $ do
+    for_ msetLocalFiles $ \setLocalFiles -> do
       files <- sequence
-        -- The `locals` value above only contains local project
-        -- packages, not local dependencies. This will get _all_
-        -- of the local files we're interested in
-        -- watching.
-        [lpFiles lp | PSFilePath lp _ <- Map.elems sourceMap]
-      setLocalFiles $ Set.insert stackYaml $ Set.unions files
+        [lpFiles lp | lp <- allLocals]
+      liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
+    checkComponentsBuildable allLocals
+
+    installMap <- toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
                          , getInstalledHaddock   = shouldHaddockDeps bopts
                          , getInstalledSymbols   = symbols }
-                     sourceMap
+                     installMap
 
+    boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan ls baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -120,7 +122,7 @@ build msetLocalFiles mbuildLk boptsCli = do
                          snapshotDumpPkgs
                          localDumpPkgs
                          installedMap
-                         targets
+                         (smtTargets $ smTargets sourceMap)
                          plan
 
 -- | If all the tasks are local, they don't mutate anything outside of our local directory.
@@ -211,7 +213,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
         collect
             [ (exe,pkgName')
             | (pkgName',task) <- Map.toList (planTasks plan)
-            , TTFilePath lp _ <- [taskType task]
+            , TTLocalMutable lp <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]
     localExes :: Map Text (NonEmpty PackageName)
@@ -238,8 +240,8 @@ splitObjsWarning = unwords
      ]
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
-mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
-                 => BuildOptsCLI -> m BaseConfigOpts
+mkBaseConfigOpts :: (HasEnvConfig env)
+                 => BuildOptsCLI -> RIO env BaseConfigOpts
 mkBaseConfigOpts boptsCli = do
     bopts <- view buildOptsL
     snapDBPath <- packageDatabaseDeps
@@ -321,7 +323,7 @@ queryBuildInfo selectors0 =
 -- | Get the raw build information object
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
-    (locals, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
+    locals <- projectLocalPackages
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
     return $ object
@@ -340,3 +342,13 @@ rawBuildInfo = do
             [ "version" .= CabalString (packageVersion p)
             , "path" .= toFilePath (parent $ lpCabalFile lp)
             ]
+
+checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
+checkComponentsBuildable lps =
+    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  where
+    unbuildable =
+        [ (packageName (lpPackage lp), c)
+        | lp <- lps
+        , c <- Set.toList (lpUnbuildable lp)
+        ]

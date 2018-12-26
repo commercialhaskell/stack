@@ -159,7 +159,6 @@ module Stack.Types.Config
   ,cabalVersionL
   ,whichCompilerL
   ,envOverrideSettingsL
-  ,loadedSnapshotL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
   -- * Lens reexport
@@ -216,6 +215,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
@@ -480,17 +480,9 @@ readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 -- These are the components which know nothing about local configuration.
 data BuildConfig = BuildConfig
     { bcConfig     :: !Config
-    , bcSnapshotDef :: !SnapshotDef
-      -- ^ Build plan wanted for this build
+    , bcSMWanted :: !SMWanted
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcPackages :: !(Map PackageName ProjectPackage)
-      -- ^ Local packages
-    , bcDependencies :: !(Map PackageName DepPackage)
-      -- ^ Extra dependencies specified in configuration.
-      --
-      -- These dependencies will not be installed to a shared location, and
-      -- will override packages provided by the resolver.
     , bcExtraPackageDBs :: ![Path Abs Dir]
       -- ^ Extra package databases
     , bcStackYaml  :: !(Path Abs File)
@@ -499,8 +491,6 @@ data BuildConfig = BuildConfig
       -- Note: if the STACK_YAML environment variable is used, this may be
       -- different from projectRootL </> "stack.yaml" if a different file
       -- name is used.
-    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
-      -- ^ Per-package flag overrides
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
@@ -533,32 +523,13 @@ data EnvConfig = EnvConfig
     -- Note that this is not necessarily the same version as the one that stack
     -- depends on as a library and which is displayed when running
     -- @stack list-dependencies | grep Cabal@ in the stack project.
-    ,envConfigCompilerVersion :: !ActualCompiler
-    -- ^ The actual version of the compiler to be used, as opposed to
-    -- 'wantedCompilerL', which provides the version specified by the
-    -- build plan.
+    ,envConfigBuildOptsCLI :: !BuildOptsCLI
+    ,envConfigSourceMap :: !SourceMap
     ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
-    ,envConfigLoadedSnapshot :: !LoadedSnapshot
-    -- ^ The fully resolved snapshot information.
-    }
-
--- | A view of a dependency package, specified in stack.yaml
-data DepPackage = DepPackage
-  { dpGPD' :: !(IO GenericPackageDescription)
-  , dpName :: !PackageName
-  , dpLocation :: !PackageLocation
-  }
-
--- | A view of a project package needed for resolving components
-data ProjectPackage = ProjectPackage
-    { ppCabalFP    :: !(Path Abs File)
-    , ppResolvedDir :: !(ResolvedPath Dir)
-    , ppGPD' :: !(IO GenericPackageDescription)
-    , ppName :: !PackageName
     }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . ppGPD'
+ppGPD = liftIO . cpGPD . ppCommon
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
@@ -1220,7 +1191,7 @@ globalHintsFile = do
   pure $ root </> relDirGlobalHints </> relFileGlobalHintsYaml
 
 -- | Installation root for dependencies
-installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+installationRootDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 installationRootDeps = do
     root <- view stackRootL
     -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
@@ -1228,7 +1199,7 @@ installationRootDeps = do
     return $ root </> relDirSnapshots </> psc
 
 -- | Installation root for locals
-installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+installationRootLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 installationRootLocal = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
@@ -1239,7 +1210,7 @@ bindirCompilerTools :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m 
 bindirCompilerTools = do
     config <- view configL
     platform <- platformGhcRelDir
-    compilerVersion <- envConfigCompilerVersion <$> view envConfigL
+    compilerVersion <- view actualCompilerVersionL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
     return $
         view stackRootL config </>
@@ -1249,14 +1220,14 @@ bindirCompilerTools = do
         bindirSuffix
 
 -- | Hoogle directory.
-hoogleRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+hoogleRoot :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 hoogleRoot = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
     return $ workDir </> relDirHoogle </> psc
 
 -- | Get the hoogle database path.
-hoogleDatabasePath :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs File)
+hoogleDatabasePath :: (HasEnvConfig env) => RIO env (Path Abs File)
 hoogleDatabasePath = do
     dir <- hoogleRoot
     return (dir </> relFileDatabaseHoo)
@@ -1264,12 +1235,12 @@ hoogleDatabasePath = do
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
 platformSnapAndCompilerRel
-    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
-    => m (Path Rel Dir)
+    :: (HasEnvConfig env)
+    => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    sd <- view snapshotDefL
+    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to smHash
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ SHA256.toHexText $ sdUniqueHash sd
+    name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
@@ -1338,13 +1309,13 @@ compilerVersionDir = do
         ACGhcjs {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
-packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+packageDatabaseDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
     return $ root </> relDirPkgdb
 
 -- | Package database for installing local packages into
-packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+packageDatabaseLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseLocal = do
     root <- installationRootLocal
     return $ root </> relDirPkgdb
@@ -1354,7 +1325,7 @@ packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir
 packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
 
 -- | Directory for holding flag cache information
-flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
+flagCacheLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 flagCacheLocal = do
     root <- installationRootLocal
     return $ root </> relDirFlagCache
@@ -1385,8 +1356,8 @@ data GlobalInfoSource
   -- ^ Look up the actual information in the installed compiler
 
 -- | Where HPC reports and tix files get stored.
-hpcReportDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-             => m (Path Abs Dir)
+hpcReportDir :: (HasEnvConfig env)
+             => RIO env (Path Abs Dir)
 hpcReportDir = do
    root <- installationRootLocal
    return $ root </> relDirHpc
@@ -1394,8 +1365,8 @@ hpcReportDir = do
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals
-extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-             => m (Bool -> [Path Abs Dir])
+extraBinDirs :: (HasEnvConfig env)
+             => RIO env (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps
     local' <- installationRootLocal
@@ -1892,20 +1863,13 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
-wantedCompilerVersionL = snapshotDefL.to sdWantedCompilerVersion
+wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfig s => Lens' s ActualCompiler
-actualCompilerVersionL = envConfigL.lens
-    envConfigCompilerVersion
-    (\x y -> x { envConfigCompilerVersion = y })
-
-snapshotDefL :: HasBuildConfig s => Lens' s SnapshotDef
-snapshotDefL = buildConfigL.lens
-    bcSnapshotDef
-    (\x y -> x { bcSnapshotDef = y })
+actualCompilerVersionL :: HasEnvConfig s => SimpleGetter s ActualCompiler
+actualCompilerVersionL = envConfigL.to (smCompiler . envConfigSourceMap)
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
@@ -1951,11 +1915,6 @@ cabalVersionL :: HasEnvConfig env => Lens' env Version
 cabalVersionL = envConfigL.lens
     envConfigCabalVersion
     (\x y -> x { envConfigCabalVersion = y })
-
-loadedSnapshotL :: HasEnvConfig env => Lens' env LoadedSnapshot
-loadedSnapshotL = envConfigL.lens
-    envConfigLoadedSnapshot
-    (\x y -> x { envConfigLoadedSnapshot = y })
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler

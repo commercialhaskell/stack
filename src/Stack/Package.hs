@@ -24,8 +24,6 @@ module Stack.Package
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageDependencies
-  ,mkProjectPackage
-  ,mkDepPackage
   ) where
 
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -64,7 +62,6 @@ import           Stack.Constants.Config
 import           Stack.Prelude hiding (Display (..))
 import           Stack.PrettyPrint
 import qualified Stack.PrettyPrint as PP (Style (Module))
-import           Stack.Types.Build
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -167,14 +164,14 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     -- This is an action used to collect info needed for "stack ghci".
     -- This info isn't usually needed, so computation of it is deferred.
     , packageOpts = GetPackageOpts $
-      \sourceMap installedMap omitPkgs addPkgs cabalfp ->
+      \installMap installedMap omitPkgs addPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
               let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
               excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
               mungedInternals <- mapM (parsePackageNameThrowing . T.unpack .
                                        toInternalPackageMungedName) internals
               componentsOpts <-
-                  generatePkgDescOpts sourceMap installedMap
+                  generatePkgDescOpts installMap installedMap
                   (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
                   cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts)
@@ -265,7 +262,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 -- component.
 generatePkgDescOpts
     :: (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
-    => SourceMap
+    => InstallMap
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
     -> [PackageName] -- ^ Packages to add to the "-package" flags
@@ -273,14 +270,14 @@ generatePkgDescOpts
     -> PackageDescription
     -> Map NamedComponent [DotCabalPath]
     -> m (Map NamedComponent BuildInfoOpts)
-generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
+generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
     config <- view configL
     cabalVer <- view cabalVersionL
     distDir <- distDirFromDir cabalDir
     let generate namedComponent binfo =
             ( namedComponent
             , generateBuildInfoOpts BioInput
-                { biSourceMap = sourceMap
+                { biInstallMap = installMap
                 , biInstalledMap = installedMap
                 , biCabalDir = cabalDir
                 , biDistDir = distDir
@@ -330,7 +327,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componen
 
 -- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
-    { biSourceMap :: !SourceMap
+    { biInstallMap :: !InstallMap
     , biInstalledMap :: !InstalledMap
     , biCabalDir :: !(Path Abs Dir)
     , biDistDir :: !(Path Abs Dir)
@@ -369,6 +366,7 @@ generateBuildInfoOpts BioInput {..} =
                   makeObjectFilePathFromC biCabalDir biComponentName biDistDir)
                  cfiles
     cfiles = mapMaybe dotCabalCFilePath biDotCabalPaths
+    installVersion = snd
     -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     deps =
         concat
@@ -376,8 +374,8 @@ generateBuildInfoOpts BioInput {..} =
                 Just (_, Stack.Types.Package.Library _ident ipid _) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> packageNameString name <>
                  maybe "" -- This empty case applies to e.g. base.
-                     ((("-" <>) . versionString) . piiVersion)
-                     (M.lookup name biSourceMap)]
+                     ((("-" <>) . versionString) . installVersion)
+                     (M.lookup name biInstallMap)]
             | name <- pkgs]
     pkgs =
         biAddPackages ++
@@ -1351,6 +1349,7 @@ resolveDirOrWarn :: FilePath.FilePath
 resolveDirOrWarn = resolveOrWarn "Directory" f
   where f p x = liftIO (forgivingAbsence (resolveDir p x)) >>= rejectMissingDir
 
+    {- FIXME
 -- | Create a 'ProjectPackage' from a directory containing a package.
 mkProjectPackage
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -1386,3 +1385,5 @@ mkDepPackage pl = do
     , dpLocation = pl
     , dpName = name
     }
+
+    -}

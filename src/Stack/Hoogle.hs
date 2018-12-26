@@ -16,6 +16,7 @@ import           Distribution.Version (mkVersion)
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
+import           Stack.Build.Target (NeedTargets(NeedTargets))
 import           Stack.Runners
 import           Stack.Types.Config
 import           System.Exit
@@ -23,7 +24,7 @@ import           RIO.Process
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
+hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
@@ -61,16 +62,12 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
     buildHaddocks =
         liftIO
             (catch
-                 (withBuildConfigAndLock
+                 (withDefaultBuildConfigAndLock
                       (set
                            (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
                            (Just True)
                            go)
-                      (\lk ->
-                            Stack.Build.build
-                                Nothing
-                                lk
-                                defaultBuildOptsCLI))
+                      (Stack.Build.build Nothing))
                  (\(_ :: ExitCode) ->
                        return ()))
     hooglePackageName = mkPackageName "hoogle"
@@ -104,22 +101,22 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
               " in your index, installing it."
         config <- view configL
         menv <- liftIO $ configProcessContextSettings config envSettings
+        let boptsCLI = defaultBuildOptsCLI
+                { boptsCLITargets =
+                    pure $
+                    either
+                    (T.pack . packageIdentifierString)
+                    (utf8BuilderToText . display)
+                    hooglePackageIdentifier
+                }
         liftIO
             (catch
                  (withBuildConfigAndLock
                       go
-                      (\lk ->
-                            Stack.Build.build
-                                Nothing
-                                lk
-                                defaultBuildOptsCLI
-                                { boptsCLITargets =
-                                    pure $
-                                    either
-                                     (T.pack . packageIdentifierString)
-                                     (utf8BuilderToText . display)
-                                     hooglePackageIdentifier
-                                }))
+                      NeedTargets
+                      boptsCLI $
+                      Stack.Build.build Nothing
+                 )
                  (\(e :: ExitCode) ->
                        case e of
                            ExitSuccess -> runRIO menv resetExeCache

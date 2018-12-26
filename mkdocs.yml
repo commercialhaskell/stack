@@ -32,8 +32,9 @@ pages:
   - Custom snapshots: custom_snapshot.md
   - Code coverage: coverage.md
   - GHCi: ghci.md
+  - Pantry: pantry.md
 - Advanced documentation:
-  - Architecture: architecture.md
+  - Build overview: build-overview.md
 - Project documentation:
   - Contributors guide: CONTRIBUTING.md
   - Maintainer guide:

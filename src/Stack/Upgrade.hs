@@ -17,6 +17,7 @@ import           Options.Applicative
 import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
+import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Config
 import           Stack.Constants
 import           Stack.PrettyPrint
@@ -234,10 +235,11 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
       mresolver
       (SYLOverride $ dir </> stackDotYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig1 <- runRIO bconfig $ setupEnv $ Just $
+        let boptsCLI = defaultBuildOptsCLI
+                { boptsCLITargets = ["stack"]
+                }
+        envConfig1 <- runRIO bconfig $ setupEnv AllowNoTargets boptsCLI $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
         runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
-            build Nothing Nothing defaultBuildOptsCLI
-                { boptsCLITargets = ["stack"]
-                }
+            build Nothing Nothing

@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Setup
   ( setupEnv
@@ -22,6 +23,7 @@ module Stack.Setup
   , SetupOpts (..)
   , defaultSetupInfoYaml
   , removeHaskellEnvVars
+  , withNewLocalBuildTargets
 
   -- * Stack binary download
   , StackReleaseInfo
@@ -73,20 +75,24 @@ import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
 import              Stack.Build (build)
+import              Stack.Build.Haddock (shouldHaddockDeps)
+import              Stack.Build.Source (loadSourceMap)
+import              Stack.Build.Target (NeedTargets(..), parseTargets)
 import              Stack.Config (loadConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.PrettyPrint
+import              Stack.SourceMap
 import              Stack.Setup.Installed
-import              Stack.Snapshot (loadSnapshot)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
 import              Stack.Types.Runner
+import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
@@ -208,12 +214,14 @@ instance Show SetupException where
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (HasBuildConfig env, HasGHCVariant env)
-         => Maybe Text -- ^ Message to give user when necessary GHC is not available
+         => NeedTargets
+         -> BuildOptsCLI
+         -> Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> RIO env EnvConfig
-setupEnv mResolveMissingGHC = do
+setupEnv needTargets boptsCLI mResolveMissingGHC = do
     config <- view configL
-    bconfig <- view buildConfigL
-    let stackYaml = bcStackYaml bconfig
+    bc <- view buildConfigL
+    let stackYaml = bcStackYaml bc
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
     wc <- view $ wantedCompilerVersionL.to wantedToActual.whichCompilerL
@@ -235,7 +243,7 @@ setupEnv mResolveMissingGHC = do
             }
 
     (mghcBin, mCompilerBuild, _) <-
-      case bcDownloadCompiler bconfig of
+      case bcDownloadCompiler bc of
         SkipDownloadCompiler -> return (Nothing, Nothing, False)
         WithDownloadCompiler -> ensureCompiler sopts
 
@@ -254,34 +262,35 @@ setupEnv mResolveMissingGHC = do
         <*> Concurrently (getGlobalDB wc)
 
     logDebug "Resolving package entries"
-    bc <- view buildConfigL
 
     -- Set up a modified environment which includes the modified PATH
     -- that GHC can be found on. This is needed for looking up global
-    -- package information in loadSnapshot.
+    -- package information.
     let bcPath :: BuildConfig
         bcPath = set processContextL menv bc
+    smActual <- runRIO bcPath $
+      toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
 
-    ls <- runRIO bcPath $ loadSnapshot
-      (Just compilerVer)
-      (bcSnapshotDef bc)
+    let haddockDeps = shouldHaddockDeps (configBuild config)
+    targets <- parseTargets needTargets haddockDeps boptsCLI smActual
+    sourceMap <- loadSourceMap targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = compilerVer
+            , envConfigBuildOptsCLI = boptsCLI
+            , envConfigSourceMap = sourceMap
             , envConfigCompilerBuild = mCompilerBuild
-            , envConfigLoadedSnapshot = ls
             }
 
     -- extra installation bin directories
-    mkDirs <- runReaderT extraBinDirs envConfig0
+    mkDirs <- runRIO envConfig0 extraBinDirs
     let mpath = Map.lookup "PATH" env
     depsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs False) mpath
     localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
-    deps <- runReaderT packageDatabaseDeps envConfig0
+    deps <- runRIO envConfig0 packageDatabaseDeps
     withProcessContext menv $ createDatabase wc deps
-    localdb <- runReaderT packageDatabaseLocal envConfig0
+    localdb <- runRIO envConfig0 packageDatabaseLocal
     withProcessContext menv $ createDatabase wc localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
@@ -347,18 +356,48 @@ setupEnv mResolveMissingGHC = do
 
     envOverride <- liftIO $ getProcessContext' minimalEnvSettings
     return EnvConfig
-        { envConfigBuildConfig = bconfig
+        { envConfigBuildConfig = bc
             { bcConfig = maybe id addIncludeLib mghcBin
                        $ set processContextL envOverride
-                         (view configL bconfig)
+                         (view configL bc)
                 { configProcessContextSettings = getProcessContext'
                 }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigCompilerVersion = compilerVer
+        , envConfigBuildOptsCLI = boptsCLI
+        , envConfigSourceMap = sourceMap
         , envConfigCompilerBuild = mCompilerBuild
-        , envConfigLoadedSnapshot = ls
         }
+
+-- | special helper for GHCJS which needs an updated source map
+-- only project dependencies should get included otherwise source map hash will
+-- get changed and EnvConfig will become inconsistent
+rebuildEnv :: EnvConfig
+    -> NeedTargets
+    -> Bool
+    -> BuildOptsCLI
+    -> RIO env EnvConfig
+rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
+    let bc = envConfigBuildConfig envConfig
+        compilerVer = smCompiler $ envConfigSourceMap envConfig
+    runRIO bc $ do
+        smActual <- toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
+        targets <- parseTargets needTargets haddockDeps boptsCLI smActual
+        sourceMap <- loadSourceMap targets boptsCLI smActual
+        return $
+            envConfig
+            {envConfigSourceMap = sourceMap, envConfigBuildOptsCLI = boptsCLI}
+
+-- | Some commands (script, ghci and exec) set targets dynamically
+-- see also the note about only local targets for rebuildEnv
+withNewLocalBuildTargets :: HasEnvConfig  env => [Text] -> RIO env a -> RIO env a
+withNewLocalBuildTargets targets f = do
+    envConfig <- view $ envConfigL
+    haddockDeps <- view $ configL.to configBuild.to shouldHaddockDeps
+    let boptsCLI = envConfigBuildOptsCLI envConfig
+    envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
+                  boptsCLI {boptsCLITargets = targets}
+    local (set envConfigL envConfig') f
 
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
@@ -588,16 +627,21 @@ getGhcBuilds = do
                             -- Cannot parse /usr/lib on Windows
                             return False
                         | otherwise = do
-                            -- This is a workaround for the fact that libtinfo.so.6 doesn't appear in
-                            -- the 'ldconfig -p' output on Arch even when it exists.
-                            -- There doesn't seem to be an easy way to get the true list of directories
-                            -- to scan for shared libs, but this works for our particular case.
-                            usrLib <- parseAbsDir "/usr/lib"
-                            e <- doesFileExist (usrLib </> lib)
-                            if e
-                                then logDebug ("Found shared library " <> libD <> " in /usr/lib")
-                                else logDebug ("Did not find shared library " <> libD)
-                            return e
+                        -- This is a workaround for the fact that libtinfo.so.x doesn't appear in
+                        -- the 'ldconfig -p' output on Arch or Slackware even when it exists.
+                        -- There doesn't seem to be an easy way to get the true list of directories
+                        -- to scan for shared libs, but this works for our particular cases.
+                            let extraPaths = []
+#if !WINDOWS
+                                 ++ [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+#endif
+                            matches <- filterM (doesFileExist .(</> lib)) extraPaths
+                            case matches of
+                                [] -> logDebug ("Did not find shared library " <> libD)
+                                    >> return False
+                                (path:_) -> logDebug ("Found shared library " <> libD
+                                        <> " in " <> fromString (Path.toFilePath path))
+                                    >> return True
                       where
                         libT = T.pack (toFilePath lib)
                         libD = fromString (toFilePath lib)
@@ -1220,7 +1264,7 @@ installGHCJS si archiveFile archiveType _tempDir destDir = do
           _ -> return Nothing
 
       logSticky "Installing GHCJS (this will take a long time) ..."
-      buildInGhcjsEnv envConfig' defaultBuildOptsCLI
+      buildInGhcjsEnv envConfig'
       -- Copy over *.options files needed on windows.
       forM_ mwindowsInstallDir $ \dir -> do
           (_, files) <- listDir (dir </> relDirBin)
@@ -1316,7 +1360,10 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
           [ "happy" | shouldInstallHappy ]
     when (not (null bootDepsToInstall)) $ do
         logInfo $ "Building tools from source, needed for ghcjs-boot: " <> displayShow bootDepsToInstall
-        buildInGhcjsEnv envConfig $ defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
+        let haddockDeps = False
+        envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
+                      defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
+        buildInGhcjsEnv envConfig'
         let failedToFindErr = do
                 logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
                 liftIO exitFailure
@@ -1361,14 +1408,14 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
         bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig <- runRIO bconfig $ setupEnv Nothing
+        envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
 
-buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> BuildOptsCLI -> m ()
-buildInGhcjsEnv envConfig boptsCli = do
+buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> m ()
+buildInGhcjsEnv envConfig = do
     runRIO (set (buildOptsL.buildOptsInstallExesL) True $
             set (buildOptsL.buildOptsHaddockL) False envConfig) $
-        build Nothing Nothing boptsCli
+        build Nothing Nothing
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do

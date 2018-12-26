@@ -22,22 +22,24 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Distribution.Text (display)
+import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
-import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
+import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..), toInstallMap)
 import           Stack.Build.Source
-import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
 import qualified Stack.Prelude (pkgName)
+import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
+import           Stack.Types.SourceMap
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -93,7 +95,7 @@ createPrunedDependencyGraph :: HasEnvConfig env
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = do
-  localNames <- view $ buildConfigL.to (Map.keysSet . bcPackages)
+  localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
                        then dotPrune dotOpts
@@ -109,13 +111,12 @@ createDependencyGraph :: HasEnvConfig env
                        => DotOpts
                        -> RIO env (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  (locals, sourceMap) <- loadSourceMap NeedTargets defaultBuildOptsCLI
-      { boptsCLITargets = dotTargets dotOpts
-      , boptsCLIFlags = dotFlags dotOpts
-      }
-  let graph = Map.fromList (localDependencies dotOpts (filter lpWanted locals))
+  sourceMap <- view $ envConfigL.to envConfigSourceMap
+  locals <- projectLocalPackages
+  let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
+  installMap <- toInstallMap sourceMap
   (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
-                                                   sourceMap
+                                                   installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
@@ -245,26 +246,36 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: Applicative m
-                => Map PackageName PackageSource
+createDepLoader :: HasEnvConfig env
+                => SourceMap
                 -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
-                    Map FlagName Bool -> [Text] -> m (Set PackageName, DotPayload))
+                    Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
-                -> m (Set PackageName, DotPayload)
+                -> RIO env (Set PackageName, DotPayload)
 createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
   if not (pkgName `Set.member` wiredInPackages)
-      then case Map.lookup pkgName sourceMap of
-          Just (PSFilePath lp _) -> pure (packageAllDeps pkg, payloadFromLocal pkg)
-            where
-              pkg = localPackageToPackage lp
-          Just (PSRemote _ flags ghcOptions loc ident) ->
-              -- FIXME pretty certain this could be cleaned up a lot by including more info in PackageSource
-              let PackageIdentifier name version = ident
-               in assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
-          Nothing -> pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+      then case Map.lookup pkgName (smProject sourceMap) of
+          Just pp -> do
+            pkg <- loadCommonPackage (ppCommon pp)
+            pure (packageAllDeps pkg, payloadFromLocal pkg)
+          Nothing ->
+            case Map.lookup pkgName (smDeps sourceMap) of
+              Just DepPackage{dpLocation=PLMutable dir} -> do
+                pp <- mkProjectPackage YesPrintWarnings dir False
+                pkg <- loadCommonPackage (ppCommon pp)
+                pure (packageAllDeps pkg, payloadFromLocal pkg)
+              Just dp@DepPackage{dpLocation=PLImmutable loc} -> do
+                let common = dpCommon dp
+                gpd <- liftIO $ cpGPD common
+                let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
+                    flags = cpFlags common
+                    ghcOptions = cpGhcOptions common
+                assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
+              Nothing ->
+                pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
       else case Map.lookup pkgName globalDumpMap of
           Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
@@ -282,9 +293,9 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
             _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
--- | Resolve the direct (depth 0) external dependencies of the given local packages
-localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
-localDependencies dotOpts locals =
+-- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
+projectPackageDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
+projectPackageDependencies dotOpts locals =
     map (\lp -> let pkg = localPackageToPackage lp
                  in (packageName pkg, (deps pkg, lpPayload pkg)))
         locals

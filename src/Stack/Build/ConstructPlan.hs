@@ -27,6 +27,7 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
+import           Distribution.Types.PackageId (pkgVersion)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -39,6 +40,7 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.SourceMap
 import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -48,6 +50,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Runner
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.IO (putStrLn)
 import           RIO.Process (findExecutable, HasProcessContext (..))
@@ -71,8 +74,8 @@ combineSourceInstalled :: PackageSource
                        -> (InstallLocation, Installed)
                        -> PackageInfo
 combineSourceInstalled ps (location, installed) =
-    assert (piiVersion ps == installedVersion installed) $
-    assert (piiLocation ps == location) $
+    assert (psVersion ps == installedVersion installed) $
+    assert (psLocation ps == location) $
     case location of
         -- Always trust something in the snapshot
         Snap -> PIOnlyInstalled location installed
@@ -80,7 +83,7 @@ combineSourceInstalled ps (location, installed) =
 
 type CombinedMap = Map PackageName PackageInfo
 
-combineMap :: SourceMap -> InstalledMap -> CombinedMap
+combineMap :: Map PackageName PackageSource -> InstalledMap -> CombinedMap
 combineMap = Map.mergeWithKey
     (\_ s i -> Just $ combineSourceInstalled s i)
     (fmap PIOnlySource)
@@ -119,13 +122,11 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     IO
 
 data Ctx = Ctx
-    { ls             :: !LoadedSnapshot
-    , baseConfigOpts :: !BaseConfigOpts
+    { baseConfigOpts :: !BaseConfigOpts
     , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
-    , extraToBuild   :: !(Set PackageName)
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     }
@@ -162,29 +163,25 @@ instance HasEnvConfig Ctx where
 -- 3) It will only rebuild a local package if its files are dirty or
 -- some of its dependencies have changed.
 constructPlan :: forall env. HasEnvConfig env
-              => LoadedSnapshot
-              -> BaseConfigOpts
-              -> [LocalPackage]
-              -> Set PackageName -- ^ additional packages that must be built
+              => BaseConfigOpts
               -> [DumpPackage () () ()] -- ^ locally registered
               -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
               -> RIO env Plan
-constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
     logDebug "Constructing the build plan"
 
-    bconfig <- view buildConfigL
-    when (hasBaseInDeps bconfig) $
+    when hasBaseInDeps $
       prettyWarn $ flow "You are trying to upgrade/downgrade base, which is almost certainly not what you really want. Please, consider using another GHC version if you need a certain version of base, or removing base from extra-deps. See more at https://github.com/commercialhaskell/stack/issues/3940." <> line
 
     econfig <- view envConfigL
-    let onWanted = void . addDep False . packageName . lpPackage
-    let inner = do
-            mapM_ onWanted $ filter lpWanted locals
-            mapM_ (addDep False) $ Set.toList extraToBuild0
-    let ctx = mkCtx econfig
+    sources <- getSources
+
+    let onTarget = void . addDep False
+    let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
+    let ctx = mkCtx econfig sources
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -220,19 +217,48 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             prettyErrorNoIndent $ pprintExceptions errs stackYaml stackRoot parents (wanted ctx)
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
-    hasBaseInDeps bconfig = Map.member (mkPackageName "base") (bcDependencies bconfig)
+    hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
-    mkCtx econfig = Ctx
-        { ls = ls0
-        , baseConfigOpts = baseConfigOpts0
+    mkCtx econfig sources = Ctx
+        { baseConfigOpts = baseConfigOpts0
         , loadPackage = \x y z -> runRIO econfig $ loadPackage0 x y z
-        , combinedMap = combineMap sourceMap installedMap
+        , combinedMap = combineMap sources installedMap
         , ctxEnvConfig = econfig
         , callStack = []
-        , extraToBuild = extraToBuild0
-        , wanted = wantedLocalPackages locals <> extraToBuild0
-        , localNames = Set.fromList $ map (packageName . lpPackage) locals
+        , wanted = Map.keysSet (smtTargets $ smTargets sourceMap)
+        , localNames = Map.keysSet (smProject sourceMap)
         }
+
+    getSources = do
+      pPackages <- for (smProject sourceMap) $ \pp -> do
+        lp <- loadLocalPackage sourceMap pp
+        return $ PSFilePath lp
+      bopts <- view $ configL.to configBuild
+      env <- ask
+      let buildHaddocks = shouldHaddockDeps bopts
+          globalDeps = Map.mapMaybeWithKey globalToSource $ smGlobal sourceMap
+          globalToSource name gp | name `Set.member` wiredInPackages = Nothing
+                                 | otherwise =
+            let version = gpVersion gp
+                loc = PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                common = CommonPackage
+                  { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
+                  , cpName = name
+                  , cpFlags = mempty
+                  , cpGhcOptions = mempty
+                  , cpHaddocks = buildHaddocks
+                  }
+            in Just $ PSRemote loc version NotFromSnapshot common
+      deps <- for (smDeps sourceMap) $ \dp ->
+        case dpLocation dp of
+          PLImmutable loc -> do
+            version <- getPLIVersion loc (loadVersion $ dpCommon dp)
+            return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
+          PLMutable dir -> do
+            pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
+            lp <- loadLocalPackage sourceMap pp
+            return $ PSFilePath lp
+      return $ pPackages <> deps <> globalDeps
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -305,7 +331,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
       -- Check if we're no longer using the local version
-      | Just (piiLocation -> Snap) <- Map.lookup name sourceMap
+      | Just (dpLocation -> PLImmutable _) <- Map.lookup name (smDeps sourceMap)
+          -- FIXME:qrilka do git/archive count as snapshot installed?
           = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
@@ -327,8 +354,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> M ()
-addFinal lp package isAllInOne = do
+addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
+addFinal lp package isAllInOne buildHaddocks = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
@@ -345,10 +372,11 @@ addFinal lp package isAllInOne = do
                             (baseConfigOpts ctx)
                             allDeps
                             True -- local
-                            Local
+                            Mutable
                             package
+                , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
-                , taskType = TTFilePath lp Local -- FIXME we can rely on this being Local, right?
+                , taskType = TTLocalMutable lp
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
@@ -395,34 +423,34 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             tellExecutablesUpstream
-                              (PackageIdentifier name (installedVersion installed))
+                              name
                               (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
                               loc
                               Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
-                            tellExecutables ps
+                            tellExecutables name ps
                             installPackage treatAsDep name ps Nothing
                         Just (PIBoth ps installed) -> do
-                            tellExecutables ps
+                            tellExecutables name ps
                             installPackage treatAsDep name ps (Just installed)
             updateLibMap name res
             return res
 
 -- FIXME what's the purpose of this? Add a Haddock!
-tellExecutables :: PackageSource -> M ()
-tellExecutables (PSFilePath lp _)
+tellExecutables :: PackageName -> PackageSource -> M ()
+tellExecutables _name (PSFilePath lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables (PSRemote loc flags _ghcOptions pkgloc ident) =
-    tellExecutablesUpstream ident pkgloc loc flags
+tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
+    tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageIdentifier -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream (PackageIdentifier name _) pkgloc loc flags = do
+tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream name pkgloc loc flags = do
     ctx <- ask
-    when (name `Set.member` extraToBuild ctx) $ do
+    when (name `Set.member` wanted ctx) $ do
         p <- loadPackage ctx pkgloc flags []
         tellExecutablesPackage loc p
 
@@ -437,7 +465,7 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSFilePath lp _)
+        goSource (PSFilePath lp)
             | lpWanted lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
         goSource PSRemote{} = Set.empty
@@ -458,15 +486,15 @@ installPackage :: Bool -- ^ is this being used by a dependency?
 installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     case ps of
-        PSRemote _ flags ghcOptions pkgLoc _version -> do
+        PSRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- loadPackage ctx pkgLoc flags ghcOptions
-            resolveDepsAndInstall True treatAsDep ps package minstalled
-        PSFilePath lp _ ->
+            package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
+            resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
+        PSFilePath lp ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True treatAsDep ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
@@ -481,10 +509,10 @@ installPackage treatAsDep name ps minstalled = do
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
-                          adr <- installPackageGivenDeps True ps tb minstalled deps
+                          adr <- installPackageGivenDeps True False ps tb minstalled deps
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb True
+                          addFinal lp tb True False
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -494,72 +522,76 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
                                 updateLibMap name res'
-                                addFinal lp tb False
+                                addFinal lp tb False False
                             return res'
 
 resolveDepsAndInstall :: Bool
+                      -> Bool
                       -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne treatAsDep ps package minstalled = do
+resolveDepsAndInstall isAllInOne treatAsDep buildHaddocks ps package minstalled = do
     res <- addPackageDeps treatAsDep package
     case res of
         Left err -> return $ Left err
-        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne ps package minstalled deps
+        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
 
 -- | Checks if we need to install the given 'Package', given the results
 -- of 'addPackageDeps'. If dependencies are missing, the package is
 -- dirty, or it's not installed, then it needs to be installed.
 installPackageGivenDeps :: Bool
+                        -> Bool
                         -> PackageSource
                         -> Package
                         -> Maybe Installed
                         -> ( Set PackageIdentifier
                            , Map PackageIdentifier GhcPkgId
-                           , InstallLocation )
+                           , IsMutable )
                         -> M AddDepRes
-installPackageGivenDeps isAllInOne ps package minstalled (missing, present, minLoc) = do
+installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minMutable) = do
     let name = packageName package
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
-            shouldInstall <- checkDirtiness ps installed package present (wanted ctx)
+            shouldInstall <- checkDirtiness ps installed package present
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
             tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
+    let loc = psLocation ps
+        mutable = installLocationIsMutable loc <> minMutable
     return $ case mRightVersionInstalled of
-        Just installed -> ADRFound (piiLocation ps) installed
+        Just installed -> ADRFound loc installed
         Nothing -> ADRToInstall Task
             { taskProvides = PackageIdentifier
                 (packageName package)
                 (packageVersion package)
             , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                 let allDeps = Map.union present missing'
-                    destLoc = piiLocation ps <> minLoc
                  in configureOpts
                         (view envConfigL ctx)
                         (baseConfigOpts ctx)
                         allDeps
                         (psLocal ps)
-                        -- An assertion to check for a recurrence of
-                        -- https://github.com/commercialhaskell/stack/issues/345
-                        (assert (destLoc == piiLocation ps) destLoc)
+                        mutable
                         package
+            , taskBuildHaddock = buildHaddocks
             , taskPresent = present
             , taskType =
                 case ps of
-                    PSFilePath lp loc -> TTFilePath lp (loc <> minLoc)
-                    PSRemote loc _ _ pkgLoc _version -> TTRemote package (loc <> minLoc) pkgLoc
+                    PSFilePath lp ->
+                      TTLocalMutable lp
+                    PSRemote pkgLoc _version _fromSnaphot _cp ->
+                      TTRemotePackage mutable package pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps
             , taskAnyMissing = not $ Set.null missing
@@ -594,7 +626,7 @@ addEllipsis t
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -649,6 +681,11 @@ addPackageDeps treatAsDep package = do
                                 warn_ " (allow-newer enabled)"
                                 return True
                             else do
+                                -- TODO: dependencies between snapshot packages are allowed
+                                -- to ignore bounds, MSS told an idea to tag explicitly
+                                -- dependencies for which bounds could be ignored and why,
+                                -- this needs to be explored,
+                                -- the current designed is based on #3185 for Stackage
                                 x <- inSnapshot (packageName package) (packageVersion package)
                                 y <- inSnapshot depname (adrVersion adr)
                                 if x && y
@@ -659,11 +696,11 @@ addPackageDeps treatAsDep package = do
                 if inRange
                     then case adr of
                         ADRToInstall task -> return $ Right
-                            (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
+                            (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
                         ADRFound loc (Executable _) -> return $ Right
-                            (Set.empty, Map.empty, loc)
+                            (Set.empty, Map.empty, installLocationIsMutable loc)
                         ADRFound loc (Library ident gid _) -> return $ Right
-                            (Set.empty, Map.singleton ident gid, loc)
+                            (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
                     else do
                         mlatestApplicable <- getLatestApplicableVersionAndRev
                         return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
@@ -694,8 +731,8 @@ addPackageDeps treatAsDep package = do
     taskHasLibrary :: Task -> Bool
     taskHasLibrary task =
       case taskType task of
-        TTFilePath lp _ -> packageHasLibrary $ lpPackage lp
-        TTRemote p _ _ -> packageHasLibrary p
+        TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
+        TTRemotePackage _ p _ -> packageHasLibrary p
 
     -- make sure we consider internal libraries as libraries too
     packageHasLibrary :: Package -> Bool
@@ -709,9 +746,8 @@ checkDirtiness :: PackageSource
                -> Installed
                -> Package
                -> Map PackageIdentifier GhcPkgId
-               -> Set PackageName
                -> M Bool
-checkDirtiness ps installed package present wanted' = do
+checkDirtiness ps installed package present = do
     ctx <- ask
     moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
@@ -719,20 +755,15 @@ checkDirtiness ps installed package present wanted' = do
             (baseConfigOpts ctx)
             present
             (psLocal ps)
-            (piiLocation ps) -- should be Local always
+            (installLocationIsMutable $ psLocation ps) -- should be Local i.e. mutable always
             package
-        buildOpts = bcoBuildOpts (baseConfigOpts ctx)
         wantConfigCache = ConfigCache
             { configCacheOpts = configOpts
             , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
-                    PSFilePath lp _ -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+                    PSFilePath lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSRemote{} -> Set.empty
-            , configCacheHaddock =
-                shouldHaddockPackage buildOpts wanted' (packageName package) ||
-                -- Disabling haddocks when old config had haddocks doesn't make dirty.
-                maybe False configCacheHaddock moldOpts
             , configCachePkgSrc = toCachePkgSrc ps
             }
         config = view configL ctx
@@ -764,7 +795,6 @@ describeConfigDiff config old new
     | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
             (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
-    | not (configCacheHaddock old) && configCacheHaddock new = Just "rebuilding with haddocks"
     | oldOpts /= newOpts = Just $ T.pack $ concat
         [ "flags changed from "
         , show oldOpts
@@ -821,16 +851,20 @@ describeConfigDiff config old new
     pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSFilePath lp _) = lpForceDirty lp
+psForceDirty (PSFilePath lp) = lpForceDirty lp
 psForceDirty PSRemote{} = False
 
 psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp _) = runMemoized $ lpDirtyFiles lp
+psDirty (PSFilePath lp) = runMemoized $ lpDirtyFiles lp
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool
-psLocal (PSFilePath _ loc) = loc == Local -- FIXME this is probably not the right logic, see configureOptsNoDir. We probably want to check if this appears in packages:
+psLocal (PSFilePath _ ) = True
 psLocal PSRemote{} = False
+
+psLocation :: PackageSource -> InstallLocation
+psLocation (PSFilePath _) = Local
+psLocation PSRemote{} = Snap
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
@@ -887,12 +921,15 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 -- | Is the given package/version combo defined in the snapshot?
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
-    p <- asks ls
-    ls' <- asks localNames
+    ctx <- ask
     return $ fromMaybe False $ do
-        guard $ not $ name `Set.member` ls'
-        lpi <- Map.lookup name (lsPackages p)
-        return $ lpiVersion lpi == version
+        ps <- Map.lookup name (combinedMap ctx)
+        case ps of
+            PIOnlySource (PSRemote _ srcVersion FromSnapshot _) ->
+                return $ srcVersion == version
+            PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->
+                return $ srcVersion == version
+            _ -> return False
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]

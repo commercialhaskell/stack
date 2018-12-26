@@ -19,6 +19,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
 import           Stack.Runners (loadConfigWithOpts)
@@ -26,6 +27,7 @@ import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
@@ -53,12 +55,12 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
             let go = go' { globalLogLevel = LevelOther "silent" }
             loadConfigWithOpts go $ \lc -> do
               bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
-              envConfig <- runRIO bconfig (setupEnv Nothing)
+              envConfig <- runRIO bconfig (setupEnv AllowNoTargets defaultBuildOptsCLI Nothing)
               runRIO envConfig (inner input)
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   comps <- for packages ppComponents
   pure
     $ filter (input `isPrefixOf`)
@@ -71,7 +73,7 @@ targetCompleter = buildConfigCompleter $ \input -> do
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
     bconfig <- view buildConfigL
-    gpds <- for (bcPackages bconfig) ppGPD
+    gpds <- for (smwProject $ bcSMWanted bconfig) ppGPD
     let wildcardFlags
             = nubOrd
             $ concatMap (\(name, gpd) ->
@@ -85,10 +87,12 @@ flagCompleter = buildConfigCompleter $ \input -> do
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
              in (if flagEnabled name fl then "-" else "") ++ flname
+        prjFlags = maybe mempty (projectFlags . fst) $
+                   configMaybeProject (bcConfig bconfig)
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (C.flagName fl) $
-            Map.findWithDefault Map.empty name (bcFlags bconfig)
+            Map.findWithDefault Map.empty name prjFlags
     return $ filter (input `isPrefixOf`) $
         case input of
             ('*' : ':' : _) -> wildcardFlags
@@ -97,7 +101,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to bcPackages
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   gpds <- Map.traverseWithKey (const ppGPD) packages
   pure
     $ filter (input `isPrefixOf`)

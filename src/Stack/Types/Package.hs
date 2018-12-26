@@ -25,6 +25,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -142,11 +143,13 @@ packageIdentifier pkg =
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+type InstallMap = Map PackageName (InstallLocation, Version)
+
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env. HasEnvConfig env
-                     => SourceMap
+                     => InstallMap
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]
@@ -220,23 +223,28 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) packageName
 
-type SourceMap = Map PackageName PackageSource
-
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-  = PSFilePath LocalPackage InstallLocation
+  = PSFilePath LocalPackage
   -- ^ Package which exist on the filesystem
-  | PSRemote InstallLocation (Map FlagName Bool) [Text] PackageLocationImmutable PackageIdentifier
+  | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
   -- ^ Package which is downloaded remotely.
-    deriving Show
 
-piiVersion :: PackageSource -> Version
-piiVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
-piiVersion (PSRemote _ _ _ _ (PackageIdentifier _ v)) = v
+instance Show PackageSource where
+    show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
+    show (PSRemote pli v fromSnapshot _) =
+        concat
+            [ "PSRemote"
+            , "(", show pli, ")"
+            , "(", show v, ")"
+            , show fromSnapshot
+            , "<CommonPackage>"
+            ]
 
-piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSFilePath _ loc) = loc
-piiLocation (PSRemote loc _ _ _ _) = loc
+
+psVersion :: PackageSource -> Version
+psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
+psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -260,6 +268,7 @@ data LocalPackage = LocalPackage
     -- either is asked for by the user.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
+    , lpBuildHaddocks :: !Bool
     , lpForceDirty    :: !Bool
     , lpDirtyFiles    :: !(Memoized (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if

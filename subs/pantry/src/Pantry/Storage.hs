@@ -45,6 +45,7 @@ module Pantry.Storage
   , loadPreferredVersion
   , sinkHackagePackageNames
   , hpackToCabal
+  , countHackageCabals
 
     -- avoid warnings
   , BlobId
@@ -917,6 +918,7 @@ sinkHackagePackageNames predicate sink = do
       cnt <- count [HackageCabalName ==. nameid]
       pure $ cnt > 0
 
+<<<<<<< HEAD
 -- | Get the filename for the cabal file in the given directory.
 --
 -- If no .cabal file is present, or more than one is present, an exception is
@@ -1014,3 +1016,16 @@ unpackTreeToDir (toFilePath -> dir) (P.TreeMap m) = do
           FTExecutable -> liftIO $ do
             perms <- getPermissions dest
             setPermissions dest $ setOwnerExecutable True perms
+
+countHackageCabals
+  :: (HasPantryConfig env, HasLogFunc env)
+  => ReaderT SqlBackend (RIO env) Int
+countHackageCabals = do
+  res <- rawSql
+    "SELECT COUNT(*)\n\
+    \FROM hackage_cabal"
+    []
+  case res of
+    [] -> pure 0
+    (Single n):_ ->
+      pure n

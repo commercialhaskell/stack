@@ -1,6 +1,9 @@
 name:    curator
 version: 2.0.0.0
 
+ghc-options:
+- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
+
 dependencies:
 - base
 - rio
