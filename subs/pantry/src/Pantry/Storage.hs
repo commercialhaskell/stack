@@ -918,7 +918,6 @@ sinkHackagePackageNames predicate sink = do
       cnt <- count [HackageCabalName ==. nameid]
       pure $ cnt > 0
 
-<<<<<<< HEAD
 -- | Get the filename for the cabal file in the given directory.
 --
 -- If no .cabal file is present, or more than one is present, an exception is
