@@ -77,6 +77,8 @@ Other enhancements:
   [#4095](https://github.com/commercialhaskell/stack/issues/4095)
 * Add `--tree` to `ls dependencies` to list dependencies as tree.
   [#4101](https://github.com/commercialhaskell/stack/issues/4101)
+* Add `--pedantic` to `ghci` to run with `-Wall` and `-Werror`
+  [#4463](https://github.com/commercialhaskell/stack/issues/4463)
 
 Bug fixes:
 
