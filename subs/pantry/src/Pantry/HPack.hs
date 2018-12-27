@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Pantry.HPack
     (
@@ -26,8 +27,8 @@ hpackVersion = do
   he <- view $ pantryConfigL.to pcHpackExecutable
   case he of
     HpackBundled -> do
-                 version <- BL.unpack <$> (proc "stack" ["--hpack-numeric-version"] readProcessStdout_)
-                 parseVersionThrowing $ filter (not . isSpace) version
+                 let bundledHpackVersion :: String = VERSION_hpack
+                 parseVersionThrowing bundledHpackVersion
     HpackCommand command -> do
                  version <- BL.unpack <$> proc command ["--version"] readProcessStdout_
                  let version' = dropWhile (not . isDigit) version
