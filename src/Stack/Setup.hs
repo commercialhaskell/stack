@@ -265,15 +265,16 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
     -- Set up a modified environment which includes the modified PATH
     -- that GHC can be found on. This is needed for looking up global
-    -- package information.
+    -- package information and ghc fingerprint (result from 'ghc --info').
     let bcPath :: BuildConfig
-        bcPath = set processContextL menv bc
-    smActual <- runRIO bcPath $
-      toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
+        bcPath = set envOverrideSettingsL (\_ -> return menv) $
+                 set processContextL menv bc
+    sourceMap <- runRIO bcPath $ do
+      smActual <- toActual (bcSMWanted bc) (bcDownloadCompiler bc) compilerVer
+      let haddockDeps = shouldHaddockDeps (configBuild config)
+      targets <- parseTargets needTargets haddockDeps boptsCLI smActual
+      loadSourceMap targets boptsCLI smActual
 
-    let haddockDeps = shouldHaddockDeps (configBuild config)
-    targets <- parseTargets needTargets haddockDeps boptsCLI smActual
-    sourceMap <- loadSourceMap targets boptsCLI smActual
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
