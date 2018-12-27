@@ -6,7 +6,8 @@
 
 -- | Functions for IDEs.
 module Stack.IDE
-    ( listPackages
+    ( ListPackagesCmd(..)
+    , listPackages
     , listTargets
     ) where
 
@@ -19,16 +20,26 @@ import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 
+data ListPackagesCmd = ListPackageNames
+                     | ListPackageCabalFiles
+
 -- | List the packages inside the current project.
-listPackages :: HasEnvConfig env => RIO env ()
-listPackages = do
+listPackages :: HasEnvConfig env => ListPackagesCmd -> RIO env ()
+listPackages flag = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
     -- the directory.
-    packageDirs <- liftM (map lpvRoot . Map.elems . lpProject) getLocalPackages
-    forM_ packageDirs $ \dir -> do
-        (gpd, _) <- readPackageUnresolvedDir dir False
-        (logInfo . display) (gpdPackageName gpd)
+    packages <- liftM (Map.elems . lpProject) getLocalPackages
+    forM_ packages $ \pkg -> do
+        let dir = lpvRoot pkg
+            cabal_file = toFilePath $ lpvCabalFP pkg
+            cabal_file :: FilePath
+        case flag of
+          ListPackageNames -> do
+            (gpd, _) <- readPackageUnresolvedDir dir False
+            logInfo $ display $ gpdPackageName gpd
+          ListPackageCabalFiles ->
+            logInfo $ fromString cabal_file
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()
