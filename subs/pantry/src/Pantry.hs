@@ -20,7 +20,7 @@ module Pantry
   , PantryApp
   , runPantryApp
   , runPantryAppClean
-  , runPantryAppWithCustomHpack
+  , hpackExecutableL
 
     -- * Types
 
@@ -983,6 +983,9 @@ data PantryApp = PantryApp
 simpleAppL :: Lens' PantryApp SimpleApp
 simpleAppL = lens paSimpleApp (\x y -> x { paSimpleApp = y })
 
+hpackExecutableL :: Lens' PantryConfig HpackExecutable
+hpackExecutableL k pconfig = fmap (\hpExe -> pconfig { pcHpackExecutable = hpExe }) (k (pcHpackExecutable pconfig))
+
 instance HasLogFunc PantryApp where
   logFuncL = simpleAppL.logFuncL
 instance HasPantryConfig PantryApp where
@@ -1004,27 +1007,6 @@ runPantryApp f = runSimpleApp $ do
     root
     defaultHackageSecurityConfig
     HpackBundled
-    8
-    $ \pc ->
-      runRIO
-        PantryApp
-          { paSimpleApp = sa
-          , paPantryConfig = pc
-          }
-        f
-
--- | Like 'runPantryApp', but you can give the custom HPack executable to it.
---
--- @since 0.1.0.0
-runPantryAppWithCustomHpack :: MonadIO m => Path Abs File -> RIO PantryApp a -> m a
-runPantryAppWithCustomHpack fp f = runSimpleApp $ do
-  sa <- ask
-  stack <- getAppUserDataDirectory "stack"
-  root <- parseAbsDir $ stack FilePath.</> "pantry"
-  withPantryConfig
-    root
-    defaultHackageSecurityConfig
-    (HpackCommand (fromAbsFile fp))
     8
     $ \pc ->
       runRIO
