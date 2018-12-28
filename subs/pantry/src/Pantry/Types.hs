@@ -157,10 +157,10 @@ data Package = Package
 
 data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
                   | PCHpack
-                    !TreeEntry -- ^ Original hpack file
-                    !TreeEntry -- ^ Generated Cabal file
-                    !Version -- ^ version of Hpack used
-                    deriving (Show, Eq)
+                    !TreeEntry -- Original hpack file
+                    !TreeEntry -- Generated Cabal file
+                    !Version   -- version of Hpack used
+                  deriving (Show, Eq)
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
