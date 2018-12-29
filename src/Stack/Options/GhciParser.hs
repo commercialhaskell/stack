@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Stack.Options.GhciParser where
 
 import           Options.Applicative
@@ -23,10 +24,16 @@ ghciOptsParser = GhciOpts
                                versionString stackMinorVersion <>
                                "/build_command/#target-syntax for details. " <>
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
-             <*> fmap concat (many (argsOption (long "ghci-options" <>
+             <*> ((\x y -> x ++ concat y)
+                 <$> flag
+                     []
+                     ["-Wall", "-Werror"]
+                     (long "pedantic" <> help "Turn on -Wall and -Werror")
+                 <*> many (argsOption (long "ghci-options" <>
                                     metavar "OPTIONS" <>
                                     completer ghcOptsCompleter <>
-                                    help "Additional options passed to GHCi")))
+                                    help "Additional options passed to GHCi"))
+             )
              <*> many
                      (textOption
                           (long "ghc-options" <>
