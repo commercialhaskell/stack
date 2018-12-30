@@ -14,6 +14,7 @@ module Stack.IDE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           System.IO (putStrLn)
 import           Stack.Config (getLocalPackages)
 import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
@@ -39,7 +40,7 @@ listPackages flag = do
             (gpd, _) <- readPackageUnresolvedDir dir False
             logInfo $ display $ gpdPackageName gpd
           ListPackageCabalFiles ->
-            logInfo $ fromString cabal_file
+            liftIO $ putStrLn $ fromString cabal_file
 
 -- | List the targets in the current project.
 listTargets :: HasEnvConfig env => RIO env ()
