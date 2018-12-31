@@ -79,6 +79,7 @@ Other enhancements:
   [#4101](https://github.com/commercialhaskell/stack/issues/4101)
 * Add `--pedantic` to `ghci` to run with `-Wall` and `-Werror`
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
+* Add `--cabal-files` flag to `stack ide targets` command.
 
 Bug fixes:
 

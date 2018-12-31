@@ -23,6 +23,9 @@ import           Stack.Types.SourceMap
 data ListPackagesCmd = ListPackageNames
                      | ListPackageCabalFiles
 
+data ListPackagesCmd = ListPackageNames
+                     | ListPackageCabalFiles
+
 -- | List the packages inside the current project.
 listPackages :: HasBuildConfig env => ListPackagesCmd -> RIO env ()
 listPackages flag = do
