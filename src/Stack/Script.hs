@@ -11,6 +11,7 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
+import qualified Distribution.PackageDescription as PD
 import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
@@ -220,9 +221,20 @@ getModuleInfo = do
             , getInstalledSymbols = False
             }
             installMap
-    return $
-        toModuleInfo (notHidden $ smDeps sourceMap) snapshotDumpPkgs <>
-        toModuleInfo (smGlobal sourceMap) globalDumpPkgs
+    let globals = toModuleInfo (smGlobal sourceMap) globalDumpPkgs
+        notHiddenDeps = notHidden $ smDeps sourceMap
+        installedDeps = toModuleInfo notHiddenDeps snapshotDumpPkgs
+        dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
+        notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
+    otherDeps <- liftIO $
+                 fmap (Map.fromListWith mappend . concat) $
+                 forM (Map.toList notInstalledDeps) $ \(pname, dep) -> do
+        gpd <- cpGPD (dpCommon dep)
+        let modules = maybe [] PD.exposedModules $
+              maybe (PD.library $ PD.packageDescription gpd) (Just . PD.condTreeData) $
+              PD.condLibrary gpd
+        return [ (m, Set.singleton pname) | m <- modules ]
+    return $ globals <> installedDeps <> ModuleInfo otherDeps
   where
     notHidden = Map.filter (not . dpHidden)
     toModuleInfo pkgs dumpPkgs =
