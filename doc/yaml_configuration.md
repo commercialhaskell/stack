@@ -1,4 +1,4 @@
-<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
 # YAML Configuration
 
@@ -319,12 +319,6 @@ Default: `8`
 Strip out the "Loading ..." lines from GHC build output, produced when using Template Haskell
 
 Default: `true`
-
-### latest-snapshot-url
-
-URL providing a JSON with information on the latest LTS and Nightly snapshots, used for automatic project configuration.
-
-Default: `https://www.stackage.org/download/snapshots.json`
 
 ### local-bin-path
 
@@ -850,12 +844,7 @@ The default configuration is
 ```yaml
 urls:
   latest-snapshot: https://www.stackage.org/download/snapshots.json
-  lts-build-plans: https://raw.githubusercontent.com/fpco/lts-haskell/master/
-  nightly-build-plans: https://raw.githubusercontent.com/fpco/stackage-nightly/master/
 ```
-
-**Note:** The `latest-snapshot-url` field has been deprecated in favor of `latest-snapshot`
-and will be removed in a future version of `stack`.
 
 ### jobs
 

@@ -1,19 +1,2 @@
-resolver: nightly-2018-10-12
-name: snapshot-for-building-stack-with-ghc-8.6.1
-
-packages:
-- cryptohash-0.11.9@rev:0
-- cryptohash-sha256-0.11.101.0@rev:2
-- cryptonite-conduit-0.2.2@rev:0
-- ed25519-0.0.5.0@rev:2
-- hackage-security-0.5.3.0@rev:3
-- hpack-0.31.0@rev:0
-- infer-license-0.2.0@rev:0
-- persistent-2.9.0@rev:0
-- persistent-sqlite-2.9.0@rev:0
-- persistent-template-2.5.4@rev:2
-- project-template-0.2.0.1@rev:0
-- rio-orphans-0.1.1.0@rev:0
-- store-0.5.0@rev:0
-- store-core-0.4.4@rev:0
-- th-utilities-0.2.0.1@rev:0
+resolver: nightly-2018-12-01
+name: snapshot-for-building-stack-with-ghc-8.6.2

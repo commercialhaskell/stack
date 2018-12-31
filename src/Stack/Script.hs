@@ -221,13 +221,14 @@ getModuleInfo = do
             }
             installMap
     return $
-        toModuleInfo (smDeps sourceMap) snapshotDumpPkgs <>
+        toModuleInfo (notHidden $ smDeps sourceMap) snapshotDumpPkgs <>
         toModuleInfo (smGlobal sourceMap) globalDumpPkgs
   where
+    notHidden = Map.filter (not . dpHidden)
     toModuleInfo pkgs dumpPkgs =
         let pnames = Map.keysSet pkgs `Set.difference` blacklist
             modules =
-                Map.fromList
+                Map.fromListWith mappend
                     [ (m, Set.singleton pn)
                     | DumpPackage {..} <- dumpPkgs
                     , let PackageIdentifier pn _ = dpPackageIdent

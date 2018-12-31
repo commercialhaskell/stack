@@ -19,6 +19,7 @@ module Stack.Types.Build
     ,Task(..)
     ,taskIsTarget
     ,taskLocation
+    ,taskTargetIsMutable
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
@@ -29,6 +30,8 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
+    ,IsMutable(..)
+    ,installLocationIsMutable
     ,TaskConfigOpts(..)
     ,BuildCache(..)
     ,buildCacheVC
@@ -413,7 +416,7 @@ instance Store CachePkgSrc
 instance NFData CachePkgSrc
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFilePath lp _) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+toCachePkgSrc (PSFilePath lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 configCacheVC :: VersionConfig ConfigCache
@@ -467,21 +470,46 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType
-  = TTFilePath LocalPackage InstallLocation
-  | TTRemote Package InstallLocation PackageLocationImmutable
+  = TTLocalMutable LocalPackage
+  | TTRemotePackage IsMutable Package PackageLocationImmutable
     deriving Show
+
+data IsMutable
+    = Mutable
+    | Immutable
+    deriving (Eq, Show)
+
+instance Semigroup IsMutable where
+    Mutable <> _ = Mutable
+    _ <> Mutable = Mutable
+    Immutable <> Immutable = Immutable
+
+instance Monoid IsMutable where
+    mempty = Immutable
+    mappend = (<>)
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTFilePath lp _ -> lpWanted lp
+        TTLocalMutable lp -> lpWanted lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
-        TTFilePath _ loc -> loc
-        TTRemote _ loc _ -> loc
+        TTLocalMutable _ -> Local
+        TTRemotePackage Mutable _ _ -> Local
+        TTRemotePackage Immutable _ _ -> Snap
+
+taskTargetIsMutable :: Task -> IsMutable
+taskTargetIsMutable task =
+    case taskType task of
+        TTLocalMutable _ -> Mutable
+        TTRemotePackage mutable _ _ -> mutable
+
+installLocationIsMutable :: InstallLocation -> IsMutable
+installLocationIsMutable Snap = Immutable
+installLocationIsMutable Local = Mutable
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
@@ -512,11 +540,11 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ local non-extra-dep?
-              -> InstallLocation
+              -> IsMutable
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps isLocal loc package = ConfigureOpts
-    { coDirs = configureOptsDirs bco loc package
+configureOpts econfig bco deps isLocal isMutable package = ConfigureOpts
+    { coDirs = configureOptsDirs bco isMutable package
     , coNoDirs = configureOptsNoDir econfig bco deps isLocal package
     }
 
@@ -546,14 +574,14 @@ isStackOpt t = any (`T.isPrefixOf` t)
     ] || t == "--user"
 
 configureOptsDirs :: BaseConfigOpts
-                  -> InstallLocation
+                  -> IsMutable
                   -> Package
                   -> [String]
-configureOptsDirs bco loc package = concat
+configureOptsDirs bco isMutable package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
-    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case loc of
-        Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
-        Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
+    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
+        Immutable -> bcoExtraDBs bco ++ [bcoSnapDB bco]
+        Mutable -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
     , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLib)
       , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
       , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> relDirShare)
@@ -565,9 +593,9 @@ configureOptsDirs bco loc package = concat
     ]
   where
     installRoot =
-        case loc of
-            Snap -> bcoSnapInstallRoot bco
-            Local -> bcoLocalInstallRoot bco
+        case isMutable of
+            Immutable -> bcoSnapInstallRoot bco
+            Mutable -> bcoLocalInstallRoot bco
     docDir =
         case pkgVerDir of
             Nothing -> installRoot </> docDirSuffix

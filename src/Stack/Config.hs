@@ -69,7 +69,6 @@ import qualified Paths_stack as Meta
 import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
-import           Stack.Config.Urls
 import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
 import qualified Stack.Image as Image
@@ -81,7 +80,6 @@ import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.SourceMap
-import           Stack.Types.Urls
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
@@ -232,13 +230,10 @@ configFromConfigMonoid
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
      configWorkDir0 <- maybe (return relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
-     -- This code is to handle the deprecation of latest-snapshot-url
-     configUrls <- case (getFirst configMonoidLatestSnapshotUrl, getFirst (urlsMonoidLatestSnapshot configMonoidUrls)) of
-         (Just url, Nothing) -> do
-             logWarn "The latest-snapshot-url field is deprecated in favor of 'urls' configuration"
-             return (urlsFromMonoid configMonoidUrls) { urlsLatestSnapshot = url }
-         _ -> return (urlsFromMonoid configMonoidUrls)
-     let clConnectionCount = fromFirst 8 configMonoidConnectionCount
+         configLatestSnapshot = fromFirst
+           "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
+           configMonoidLatestSnapshot
+         clConnectionCount = fromFirst 8 configMonoidConnectionCount
          configHideTHLoading = fromFirst True configMonoidHideTHLoading
 
          configGHCVariant0 = getFirst configMonoidGHCVariant

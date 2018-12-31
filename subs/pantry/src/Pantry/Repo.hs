@@ -84,7 +84,7 @@ getRepo' repo@(Repo url commit repoType' subdir) rpm =
               ( "git"
               , ["reset", "--hard", T.unpack commit]
               , Just ["submodule", "update", "--init", "--recursive"]
-              , ["archive", "-o", tarball, "HEAD"]
+              , ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
               )
             RepoHg ->
               ( "hg"

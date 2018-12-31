@@ -225,13 +225,13 @@ instance Eq Package where
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-  = PSFilePath LocalPackage InstallLocation
+  = PSFilePath LocalPackage
   -- ^ Package which exist on the filesystem
   | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
   -- ^ Package which is downloaded remotely.
 
 instance Show PackageSource where
-    show (PSFilePath lp loc) = concat ["PSFilePath (", show lp, ") ", show loc]
+    show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
     show (PSRemote pli v fromSnapshot _) =
         concat
             [ "PSRemote"
@@ -243,7 +243,7 @@ instance Show PackageSource where
 
 
 psVersion :: PackageSource -> Version
-psVersion (PSFilePath lp _) = packageVersion $ lpPackage lp
+psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
 psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code

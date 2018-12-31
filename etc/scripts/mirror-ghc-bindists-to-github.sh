@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.4.4
+GHCVER=8.6.2
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -32,7 +32,7 @@ if [[ -z "$UPLOAD_URL" ]]; then
   echo "$0: Could not get upload URL from Github" >&2
   exit 1
 fi
-echo 'ghc:' >stack-setup.yaml
+echo 'ghc:' >stack-setup-$GHCVER.yaml
 
 mirror () {
   suffix="$1"; shift
@@ -81,8 +81,8 @@ mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie linux64-n
 mirror x86_64-apple-darwin xz bz2 macosx
 mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
-mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
-#mirror aarch64-deb8-linux xz xz linux-aarch64
+#mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
+mirror aarch64-deb8-linux xz xz linux-aarch64
 
 set +x
 echo

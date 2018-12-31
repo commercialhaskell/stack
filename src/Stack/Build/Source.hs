@@ -150,9 +150,8 @@ hashSourceMapData wc smDeps = do
                 Ghc -> "ghc"
                 Ghcjs -> "ghcjs"
     info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
-    immDeps <-
-        fmap B.concat . forM (Map.elems smDeps) $ depPackageHashableContent
-    return $ SourceMapHash (SHA256.hashBytes $ B.concat [path, info, immDeps])
+    immDeps <- forM (Map.elems smDeps) depPackageHashableContent
+    return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks (path:info:immDeps))
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
 depPackageHashableContent DepPackage {..} = do
@@ -496,7 +495,7 @@ calcFci modTime' fp = liftIO $
             }
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
+getPackageConfig :: (MonadReader env m, HasEnvConfig env)
   => Map FlagName Bool
   -> [Text]
   -> m PackageConfig
