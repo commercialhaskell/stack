@@ -6,7 +6,7 @@ main :: IO ()
 main = do
   stack ["clean"]
   stack ["build"]
-  res <- getCoverageLines . snd <$> stackStderr ["test", "--coverage"]
+  res <- getCoverageLines . snd <$> stackStderr ["test", "--coverage", "--color", "never"]
   case res of
     _:exprs:_ -> unless ("2/2" `isInfixOf` exprs) testFail
     _ -> testFail
