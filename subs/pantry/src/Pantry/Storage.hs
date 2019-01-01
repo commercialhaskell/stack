@@ -77,7 +77,7 @@ import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import qualified RIO.Text as T
 import RIO.Time (UTCTime, getCurrentTime)
-import Path (Path, Abs, File, Dir, toFilePath, parent, filename, parseAbsDir, fromAbsFile, fromAbsDir)
+import Path (Path, Abs, File, Dir, toFilePath, parent, filename, parseAbsDir, fromAbsFile, fromAbsDir, fromRelFile)
 import Path.IO (ensureDir, listDir, createTempDir, getTempDir, removeDirRecur)
 import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackVersion, hpack)
@@ -159,6 +159,10 @@ CacheUpdate
 -- table.
 Tree
     key BlobId
+
+    -- If the treeCabal field is Nothing, it means the Haskell package
+    -- doesn't have a corresponding cabal file for it. This may be the case
+    -- for haskell package referenced by git repository with only a hpack file.
     cabal BlobId Maybe
     cabalType FileType
     name PackageNameId
@@ -931,7 +935,7 @@ findOrGenerateCabalFile pkgDir = do
     -- https://github.com/commercialhaskell/stack/issues/1897.
     let isHidden ('.':_) = True
         isHidden _ = False
-    case filter (not . isHidden . toFilePath . filename) files of
+    case filter (not . isHidden . fromRelFile . filename) files of
         [] -> throwIO $ P.NoCabalFileFound pkgDir
         [x] -> maybe
           (throwIO $ P.InvalidCabalFilePath x)
