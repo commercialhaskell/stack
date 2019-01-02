@@ -144,7 +144,7 @@ configuration. Otherwise, we don't cache.
 
 loadedSnapshotVC :: VersionConfig LoadedSnapshot
 #if MIN_VERSION_template_haskell(2,14,0)
-loadedSnapshotVC = storeVersionConfig "ls-v6" "JMcGvLs8Fq-dMrejVfGy8552qqo="
+loadedSnapshotVC = storeVersionConfig "ls-v6" "RV5MidVhkF2v-PlFB5-tfpcX5xQ="
 #else
 loadedSnapshotVC = storeVersionConfig "ls-v6" "BAaL0KUsgRTQy26PtlMz0TSt-Kw="
 #endif
