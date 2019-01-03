@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/commercialhaskell/stack.svg?branch=master)](https://travis-ci.org/commercialhaskell/stack)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/c1c7uvmw6x1dupcl?svg=true)](https://ci.appveyor.com/project/snoyberg/stack)
+[![Build Status](https://dev.azure.com/commercialhaskell/stack/_apis/build/status/commercialhaskell.stack?branchName=master)](https://dev.azure.com/commercialhaskell/stack/_build/latest?definitionId=1?branchName=master)
 [![Release](https://img.shields.io/github/release/commercialhaskell/stack.svg)](https://github.com/commercialhaskell/stack/releases)
 [![Join the chat at https://gitter.im/commercialhaskell/stack](https://badges.gitter.im/commercialhaskell/stack.svg)](https://gitter.im/commercialhaskell/stack?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
