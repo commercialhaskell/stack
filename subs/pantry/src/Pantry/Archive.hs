@@ -147,7 +147,7 @@ checkPackageMetadata pl pm pa = do
   let
       pkgCabal = case packageCabalEntry pa of
                        PCCabalFile tentry -> tentry
-                       PCHpack _ tentry _ -> tentry
+                       PCHpack phpack -> phGenerated phpack
       err = MismatchedPackageMetadata
               pl
               pm
@@ -417,12 +417,12 @@ parseArchive pli archive fp = do
           packageCabal <- case buildFile of
                             BFCabal _ _ -> pure $ PCCabalFile buildFileEntry
                             BFHpack _ -> do
-                              hpackKey <- withStorage $ do
+                              cabalKey <- withStorage $ do
                                             hpackId <- storeHPack tid
-                                            getHPackBlobKeyById hpackId
+                                            loadCabalBlobKey hpackId
                               hpackSoftwareVersion <- hpackVersion
-                              let hpackTreeEntry = TreeEntry hpackKey (teType buildFileEntry)
-                              pure $ PCHpack buildFileEntry hpackTreeEntry hpackSoftwareVersion
+                              let cabalTreeEntry = TreeEntry cabalKey (teType buildFileEntry)
+                              pure $ PCHpack $ PHpack { phOriginal = buildFileEntry, phGenerated = cabalTreeEntry, phVersion = hpackSoftwareVersion}
           pure Package
             { packageTreeKey = treeKey
             , packageTree = tree

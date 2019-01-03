@@ -46,6 +46,7 @@ module Pantry.Types
   , resolvePaths
   , Package (..)
   , PackageCabal (..)
+  , PHpack (..)
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -155,11 +156,15 @@ data Package = Package
   }
   deriving (Show, Eq)
 
+data PHpack = PHpack
+    {
+      phOriginal :: !TreeEntry, -- ^ Original hpack file
+      phGenerated :: !TreeEntry, -- ^ Generated Cabal file
+      phVersion :: !Version -- ^ Version of Hpack used
+    } deriving (Show, Eq)
+
 data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
-                  | PCHpack
-                    !TreeEntry -- Original hpack file
-                    !TreeEntry -- Generated Cabal file
-                    !Version   -- version of Hpack used
+                  | PCHpack PHpack
                   deriving (Show, Eq)
 
 cabalFileName :: PackageName -> SafeFilePath

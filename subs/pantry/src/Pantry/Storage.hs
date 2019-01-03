@@ -44,6 +44,7 @@ module Pantry.Storage
   , storePreferredVersion
   , loadPreferredVersion
   , sinkHackagePackageNames
+  , loadCabalBlobKey
   , hpackToCabal
   , countHackageCabals
 
@@ -516,6 +517,12 @@ storeHPack tid = do
       Nothing -> generateHPack tid vid
       Just record -> return $ entityKey record
 
+loadCabalBlobKey :: (HasPantryConfig env, HasLogFunc env) => HPackId -> ReaderT SqlBackend (RIO env) BlobKey
+loadCabalBlobKey hpackId = do
+  hpackRecord <- getJust hpackId
+  let cabalBlobId = hPackCabal hpackRecord
+  getBlobKey cabalBlobId
+
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => TreeId
@@ -699,7 +706,8 @@ getHPackBlobKeyById hpackId = do
   getHPackBlobKey hpackRecord
 
 
-getHPackCabalFile :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+getHPackCabalFile ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => (HPack, HPackId)
     -> Tree
     -> Map SafeFilePath P.TreeEntry
@@ -714,8 +722,13 @@ getHPackCabalFile (hpackRecord, _) ts tmap cabalFile = do
         hpackTreeEntry = P.TreeEntry hpackKey fileType
         tree = P.TreeMap $ Map.insert cabalFile cbTreeEntry tmap
     return $
-        (P.PCHpack hpackTreeEntry cbTreeEntry hpackSoftwareVersion, tree)
-
+        ( P.PCHpack $
+          P.PHpack
+              { P.phOriginal = hpackTreeEntry
+              , P.phGenerated = cbTreeEntry
+              , P.phVersion = hpackSoftwareVersion
+              }
+        , tree)
 
 loadTreeByEnt
   :: (HasPantryConfig env, HasLogFunc env)

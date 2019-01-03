@@ -513,7 +513,7 @@ loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
   cabalBlobKey <- case (packageCabalEntry package) of
-                       PCHpack _ (TreeEntry blobKey _) _ -> pure blobKey
+                       PCHpack pcHpack -> pure $ teBlob . phGenerated $ pcHpack
                        PCCabalFile (TreeEntry blobKey _) -> pure blobKey
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
@@ -582,7 +582,7 @@ completePM plOrig pm
       package <- loadPackage plOrig
       let pkgCabal = case packageCabalEntry package of
                        PCCabalFile tentry -> tentry
-                       PCHpack _ tentry _ -> tentry
+                       PCHpack phpack -> phGenerated phpack
           pmNew = PackageMetadata
             { pmName = Just $ pkgName $ packageIdent package
             , pmVersion = Just $ pkgVersion $ packageIdent package
