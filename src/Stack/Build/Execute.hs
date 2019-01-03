@@ -1240,7 +1240,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     minstalled <-
         case mprecompiled of
             Just precompiled -> copyPreCompiled precompiled
-            Nothing -> realConfigAndBuild cache allDepsMap
+            Nothing -> do
+                mcurator <- view $ buildConfigL.to bcCurator
+                realConfigAndBuild cache mcurator allDepsMap
     case minstalled of
         Nothing -> return ()
         Just installed -> do
@@ -1256,6 +1258,15 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         packageHasExposedModules package &&
                         -- Special help for the curator tool to avoid haddocks that are known to fail
                         maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
+    expectHaddockFailure mcurator =
+        maybe False (Set.member pname . curatorExpectHaddockFailure) mcurator
+    fulfillHaddockExpectations mcurator action | expectHaddockFailure mcurator = do
+        eres <- tryAny action
+        case eres of
+          Right () -> logWarn $ fromString (packageNameString pname) <> ": unexpected Haddock success"
+          Left _ -> return ()
+    fulfillHaddockExpectations _ action = do
+        action
 
     buildingFinals = isFinalBuild || taskAllInOne
     enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -1378,7 +1389,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
-    realConfigAndBuild cache allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
+    realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal announce _outputType -> do
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
@@ -1405,7 +1416,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
                     initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
-                _ -> liftM Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
+                _ -> fulfillTestExpectations pname mcurator Nothing $
+                     fmap Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
@@ -1509,7 +1521,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
                     _ -> []
 
-            cabal KeepTHLoading $ concat
+            fulfillHaddockExpectations mcurator $ cabal KeepTHLoading $ concat
                 [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
@@ -1706,6 +1718,9 @@ singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+    mcurator <- view $ buildConfigL.to bcCurator
+    let pname = pkgName $ taskProvides task
+        expectFailure = expectTestFailure pname mcurator
     withSingleContext ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce outputType -> do
         config <- view configL
         let needHpc = toCoverage topts
@@ -1774,8 +1789,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                     , esLocaleUtf8 = False
                     , esKeepGhcRts = False
                     }
+                let emptyResult = Map.singleton testName Nothing
                 withProcessContext menv $ if exists
-                    then do
+                    then fulfillTestExpectations pname mcurator emptyResult $ do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
                             tixexists <- doesFileExist tixPath
@@ -1837,12 +1853,12 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 announceResult "failed"
                                 return $ Map.singleton testName (Just ec)
                     else do
-                        logError $ displayShow $ TestSuiteExeMissing
+                        unless expectFailure $ logError $ displayShow $ TestSuiteExeMissing
                             (packageBuildType package == C.Simple)
                             exeName
                             (packageNameString (packageName package))
                             (T.unpack testName)
-                        return $ Map.singleton testName Nothing
+                        return emptyResult
 
             when needHpc $ do
                 let testsToRun' = map f testsToRun
@@ -1859,7 +1875,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         hClose h
                         S.readFile $ toFilePath logFile
 
-            unless (Map.null errs) $ throwM $ TestSuiteFailure
+            unless (Map.null errs || expectFailure) $ throwM $ TestSuiteFailure
                 (taskProvides task)
                 errs
                 (case outputType of
@@ -2128,3 +2144,25 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
+
+
+expectTestFailure :: PackageName -> Maybe Curator -> Bool
+expectTestFailure pname mcurator =
+    maybe False (Set.member pname . curatorExpectTestFailure) mcurator
+
+fulfillTestExpectations ::
+       (HasLogFunc env)
+    => PackageName
+    -> Maybe Curator
+    -> b
+    -> RIO env b
+    -> RIO env b
+fulfillTestExpectations pname mcurator defValue action | expectTestFailure pname mcurator = do
+    eres <- tryAny action
+    case eres of
+      Right res -> do
+          logWarn $ fromString (packageNameString pname) <> ": unexpected test success"
+          return res
+      Left _ -> return defValue
+fulfillTestExpectations _ _ _ action = do
+    action
