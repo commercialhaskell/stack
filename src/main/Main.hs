@@ -410,20 +410,27 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addSubCommands'
             "ide"
             "IDE-specific commands"
-            (do addCommand'
+            (let outputFlag = flag
+                   IDE.OutputLogInfo
+                   IDE.OutputStdout
+                   (long "stdout" <>
+                    help "Send output to stdout instead of the default, stderr")
+                 cabalFileFlag = flag
+                   IDE.ListPackageNames
+                   IDE.ListPackageCabalFiles
+                   (long "cabal-files" <>
+                    help "Print paths to package cabal-files instead of package names")
+             in
+             do addCommand'
                     "packages"
                     "List all available local loadable packages"
                     idePackagesCmd
-                    (flag
-                         IDE.ListPackageNames
-                         IDE.ListPackageCabalFiles
-                         (long "cabal-files" <>
-                          help "Print paths to package cabal-files instead of package names"))
+                    ((,) <$> outputFlag <*> cabalFileFlag)
                 addCommand'
                     "targets"
                     "List all available stack targets"
                     ideTargetsCmd
-                    (pure ()))
+                    outputFlag)
         addSubCommands'
           Docker.dockerCmdName
           "Subcommands specific to Docker use"
@@ -911,14 +918,14 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           (ghci ghciOpts)
 
 -- | List packages in the project.
-idePackagesCmd :: IDE.ListPackagesCmd -> GlobalOpts -> IO ()
-idePackagesCmd cmd go =
-    withBuildConfig go (IDE.listPackages cmd)
+idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> GlobalOpts -> IO ()
+idePackagesCmd (stream, cmd) go =
+    withBuildConfig go (IDE.listPackages stream cmd)
 
 -- | List targets in the project.
-ideTargetsCmd :: () -> GlobalOpts -> IO ()
-ideTargetsCmd () go =
-    withBuildConfig go IDE.listTargets
+ideTargetsCmd :: IDE.OutputStream -> GlobalOpts -> IO ()
+ideTargetsCmd stream go =
+    withBuildConfig go (IDE.listTargets stream)
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
