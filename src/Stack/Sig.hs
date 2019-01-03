@@ -2,7 +2,7 @@
 {-|
 Module      : Stack.Sig
 Description : GPG Signatures for Stack
-Copyright   : (c) 2015-2018, Stack contributors
+Copyright   : (c) 2015-2019, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental
