@@ -15,7 +15,7 @@ homepage:       https://github.com/commercialhaskell/pantry#readme
 bug-reports:    https://github.com/commercialhaskell/pantry/issues
 author:         Michael Snoyman
 maintainer:     michael@snoyman.com
-copyright:      2018 FP Complete
+copyright:      2018-2019 FP Complete
 license:        MIT
 build-type:     Simple
 extra-source-files:

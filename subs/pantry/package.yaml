@@ -5,7 +5,7 @@ description: Please see the README and documentation at <https://www.stackage.or
 category:    Development
 author:      Michael Snoyman
 maintainer:  michael@snoyman.com
-copyright:   2018 FP Complete
+copyright:   2018-2019 FP Complete
 license:     MIT
 github:      commercialhaskell/pantry # TODO move to this repo!
 
