@@ -6,7 +6,8 @@
 
 -- | Functions for IDEs.
 module Stack.IDE
-    ( ListPackagesCmd(..)
+    ( OutputStream(..)
+    , ListPackagesCmd(..)
     , listPackages
     , listTargets
     ) where
@@ -19,13 +20,22 @@ import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
+import           Stack.Types.PackageName (packageNameString)
+import           System.IO (putStrLn)
+
+data OutputStream = OutputLogInfo
+                  | OutputStdout
 
 data ListPackagesCmd = ListPackageNames
                      | ListPackageCabalFiles
 
+outputFunc :: HasLogFunc env => OutputStream -> String -> RIO env ()
+outputFunc OutputLogInfo = logInfo . fromString
+outputFunc OutputStdout  = liftIO . putStrLn
+
 -- | List the packages inside the current project.
-listPackages :: HasEnvConfig env => ListPackagesCmd -> RIO env ()
-listPackages flag = do
+listPackages :: HasEnvConfig env => OutputStream -> ListPackagesCmd -> RIO env ()
+listPackages stream flag = do
     -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
     -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
     -- the directory.
@@ -37,15 +47,15 @@ listPackages flag = do
         case flag of
           ListPackageNames -> do
             (gpd, _) <- readPackageUnresolvedDir dir False
-            logInfo $ display $ gpdPackageName gpd
+            outputFunc stream $ packageNameString $ gpdPackageName gpd
           ListPackageCabalFiles ->
-            logInfo $ fromString cabal_file
+            outputFunc stream cabal_file
 
 -- | List the targets in the current project.
-listTargets :: HasEnvConfig env => RIO env ()
-listTargets =
+listTargets :: HasEnvConfig env => OutputStream -> RIO env ()
+listTargets stream =
     do rawLocals <- lpProject <$> getLocalPackages
-       logInfo $ display
+       outputFunc stream $ T.unpack
            (T.intercalate
                 "\n"
                 (map
