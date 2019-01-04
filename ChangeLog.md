@@ -80,6 +80,7 @@ Other enhancements:
 * Add `--pedantic` to `ghci` to run with `-Wall` and `-Werror`
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
 * Add `--cabal-files` flag to `stack ide targets` command.
+* Add `--stdout` flag to all `stack ide` subcommands.
 
 Bug fixes:
 
