@@ -21,19 +21,19 @@ spec =
         pathOf "http://www.com/file"  `shouldBe` UrlPath "http://www.com/file"
         pathOf "https://www.com/file" `shouldBe` UrlPath "https://www.com/file"
 
-        pathOf "name"                 `shouldBe` (RelPath $ Path "name.hsfiles")
-        pathOf "name.hsfile"          `shouldBe` (RelPath $ Path "name.hsfile.hsfiles")
-        pathOf "name.hsfiles"         `shouldBe` (RelPath $ Path "name.hsfiles")
-        pathOf ""                     `shouldBe` (RelPath $ Path ".hsfiles")
+        pathOf "name"                 `shouldBe` (RelPath "name.hsfiles"        $ Path "name.hsfiles")
+        pathOf "name.hsfile"          `shouldBe` (RelPath "name.hsfile.hsfiles" $ Path "name.hsfile.hsfiles")
+        pathOf "name.hsfiles"         `shouldBe` (RelPath "name.hsfiles"        $ Path "name.hsfiles")
+        pathOf ""                     `shouldBe` (RelPath ".hsfiles"            $ Path ".hsfiles")
 
         if os == "mingw32"
         then do
           pathOf "//home/file"          `shouldBe` (AbsPath $ Path "\\\\home\\file.hsfiles")
-          pathOf "/home/file"           `shouldBe` (RelPath $ Path "\\home\\file.hsfiles")
-          pathOf "/home/file.hsfiles"   `shouldBe` (RelPath $ Path "\\home\\file.hsfiles")
+          pathOf "/home/file"           `shouldBe` (RelPath "/home/file.hsfiles" $ Path "\\home\\file.hsfiles")
+          pathOf "/home/file.hsfiles"   `shouldBe` (RelPath "/home/file.hsfiles" $ Path "\\home\\file.hsfiles")
 
-          pathOf "c:\\home\\file"       `shouldBe` (AbsPath $ Path "C:\\home\\file.hsfiles")
-          pathOf "with/slash"           `shouldBe` (RelPath $ Path "with\\slash.hsfiles")
+          pathOf "c:\\home\\file"       `shouldBe` (AbsPath                      $ Path "C:\\home\\file.hsfiles")
+          pathOf "with/slash"           `shouldBe` (RelPath "with/slash.hsfiles" $ Path "with\\slash.hsfiles")
 
           let colonAction =
                 do
@@ -45,7 +45,7 @@ spec =
           pathOf "/home/file"           `shouldBe` (AbsPath $ Path "/home/file.hsfiles")
           pathOf "/home/file.hsfiles"   `shouldBe` (AbsPath $ Path "/home/file.hsfiles")
 
-          pathOf "c:\\home\\file"       `shouldBe` (RelPath $ Path "c:\\home\\file.hsfiles")
-          pathOf "with/slash"           `shouldBe` (RelPath $ Path "with/slash.hsfiles")
-          pathOf "with:colon"           `shouldBe` (RelPath $ Path "with:colon.hsfiles")
+          pathOf "c:\\home\\file"       `shouldBe` (RelPath "c:\\home\\file.hsfiles" $ Path "c:\\home\\file.hsfiles")
+          pathOf "with/slash"           `shouldBe` (RelPath "with/slash.hsfiles"     $ Path "with/slash.hsfiles")
+          pathOf "with:colon"           `shouldBe` (RelPath "with:colon.hsfiles"     $ Path "with:colon.hsfiles")
 
