@@ -17,6 +17,7 @@ Other enhancements:
 
 Bug fixes:
 
+- Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
 
 ## v1.9.3
 
