@@ -57,6 +57,65 @@ directory. None of this should affect any existing Haskell tools at all.
   there may be more options here for new projects in the future (see issue
   [253](https://github.com/commercialhaskell/stack/issues/253))
 
+### Cabal-the-library
+
+The relationship between stack and Cabal-the-library is complicated.
+
+1. Stack itself builds against a version of the Cabal library, which it uses for parsing Cabal files.
+
+2. Stack wraps functionality from a version of the Cabal library in order to build packages.
+
+    i. For packages with `build-type: Simple`, Stack uses a setup executable compiled with a version of the Cabal library to perform builds. All packages using the same compiler and Cabal version are built with the same executable. These executables are cached in the `setup-exe-cache` configuration directory.
+
+    ii. For packages with `build-type: Custom`, Stack compiles `Setup.hs` against a version of the Cabal library and uses that setup executable to perform builds. The executable is stored TODO
+
+3. Packages themselves may depend on the Cabal library.
+
+There are three (nearly) corresponding versions of the Cabal library which are relevant to a build.
+
+1. The version used to compile stack, which is not necessarily present on stack users’ machines.
+
+   Stack will always be compiled using the most recent stable version of Cabal-the-library.
+
+2. The [boot version used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory), which is globally available to stack.
+
+   This version is used to compile the `build-type: Simple` setup executable.
+   Build artefacts are placed in corresponding `.stack-work/dist/Cabal-xxxxx` directory.
+
+3. The snapshot version (which may be overridden using `extra-deps`).
+
+   This is the version on which a package may depend.
+
+   However, it is also used to compile any `build-type: Custom` setup executables.
+
+In addition, the Cabal version required by `custom-build` will be installed, if necessary.
+
+Note that these versions may be the same.
+
+There are a number of consequences of this design.
+
+1. Snapshot packages only depend on the GHC compiler version, not the Cabal library version (with the exception of `build-type: Custom` packages).
+
+2. The most recent stack can always read the most recent Cabal files.
+
+3. However, stack may not be able to build packages defined using those files.
+
+   This occurs when
+
+   i. The package uses `build-type: Simple` and the Cabal file format requires a more recent version of Cabal than the global (boot) version for the compiler.
+
+      e.g. Stack lts-11.22 uses GHC 8.2.2, corresponding to Cabal 2.0.1.0.
+      A library using `build-type: Simple` and SPDX license identifiers (introduced in Cabal 2.2) will not build, though stack will process the Cabal file correctly.
+
+          Cabal-simple_mPHDZzAJ_2.0.1.0_ghc-8.2.2: ./file.cabal:7: Parse of field 'license' failed.
+
+4. Stack only occasionally needs to build Cabal-the-library.
+   This is a resource intensive build, so avoiding it improves performance.
+
+5. Stack uses `ghc-pkg` to identify the Cabal version it should use for the setup executable for a build.
+   The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the Cabal version used to compile the setup executable.
+   Together, this means it is only possible to know for sure which Cabal version ought to be used if the corresponding compiler is installed.
+
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
 You can make tweaks to a snapshot by modifying the `extra-deps` configuration value in your `stack.yaml` file, e.g.:
