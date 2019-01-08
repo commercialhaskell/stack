@@ -484,6 +484,12 @@ instance Display Repo where
     (if T.null subdir
       then mempty
       else " in subdirectory " <> display subdir)
+instance FromJSON (WithJSONWarnings Repo) where
+  parseJSON = withObjectWarnings "Repo" $ \o -> do
+    repoSubdir <- o ..: "subdir"
+    repoCommit <- o ..: "commit"
+    (repoType, repoUrl) <- (o ..: "git" >>= \url -> pure (RepoGit, url)) <|> (o ..: "hg" >>= \url -> pure (RepoHg, url))
+    pure Repo {..}
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
