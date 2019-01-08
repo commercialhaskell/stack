@@ -485,11 +485,15 @@ instance Display Repo where
       then mempty
       else " in subdirectory " <> display subdir)
 instance FromJSON (WithJSONWarnings Repo) where
-  parseJSON = withObjectWarnings "Repo" $ \o -> do
-    repoSubdir <- o ..: "subdir"
-    repoCommit <- o ..: "commit"
-    (repoType, repoUrl) <- (o ..: "git" >>= \url -> pure (RepoGit, url)) <|> (o ..: "hg" >>= \url -> pure (RepoHg, url))
-    pure Repo {..}
+    parseJSON =
+        withObjectWarnings "Repo" $ \o -> do
+            repoSubdir <- o ..: "subdir"
+            repoCommit <- o ..: "commit"
+            (repoType, repoUrl) <-
+                (o ..: "git" >>= \url -> pure (RepoGit, url)) <|>
+                (o ..: "hg" >>= \url -> pure (RepoHg, url))
+            pure Repo {..}
+
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
@@ -1296,6 +1300,18 @@ instance Display PackageMetadata where
     , "tree == " <> display (pmTreeKey pm)
     , "cabal file == " <> display (pmCabal pm)
     ]
+
+instance FromJSON (WithJSONWarnings PackageMetadata) where
+    parseJSON =
+        withObjectWarnings "PackageMetadata" $ \o -> do
+            pmCabal :: BlobKey  <- o ..: "cabal-file"
+            pantryTree :: BlobKey <- o ..: "pantry-tree"
+            CabalString pkgName  <- o ..: "name" -- come here
+            CabalString pkgVersion <- o ..: "version"
+            let pmTreeKey = TreeKey pantryTree
+                pmIdent = PackageIdentifier {..}
+            pure PackageMetadata {..}
+
 
 -- | Conver package metadata to its "raw" equivalent.
 --
