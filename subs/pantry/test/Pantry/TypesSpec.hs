@@ -18,6 +18,7 @@ import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..))
+import Distribution.Types.PackageName (mkPackageName)
 import qualified Data.ByteString.Char8 as S8
 import Data.String.Quote
 
@@ -125,3 +126,20 @@ spec = do
                   }
 
       repValue `shouldBe` repoValue
+
+    it "FromJSON instance for PackageMetadata" $ do
+      pkgMeta <- case Yaml.decodeThrow samplePLIRepo of
+        Just (WithJSONWarnings x _) -> pure x
+        Nothing -> fail "Can't parse Repo"
+      let cabalSha = SHA256.fromHexBytes "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+          pantrySha = SHA256.fromHexBytes "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2"
+      (csha, psha) <- case (cabalSha, pantrySha) of
+                        (Right csha , Right psha) -> pure (csha, psha)
+                        _ -> fail "Failed decoding sha256"
+      let pkgValue = PackageMetadata {
+                                    pmIdent = PackageIdentifier (mkPackageName "wai") (mkVersion [3,2,1,2]),
+                                    pmTreeKey = TreeKey (BlobKey psha (FileSize 714)),
+                                    pmCabal = BlobKey csha (FileSize 1765)
+                                  }
+
+      pkgMeta `shouldBe` pkgValue
