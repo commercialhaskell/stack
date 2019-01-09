@@ -36,4 +36,9 @@ testOptsParser hide0 =
                     (long "no-run-tests" <>
                      help "Disable running of tests. (Tests will still be built.)" <>
                      hide))
+        <*> optionalFirst
+                (option (fmap Just $ auto)
+                    (long "test-suite-timeout" <>
+                     help "Maximum test suite run time in seconds." <>
+                     hide))
    where hide = hideMods hide0

@@ -18,6 +18,7 @@ packages:
 - unliftio-0.2.8.0@sha256:5a47f12ffcee837215c67b05abf35dffb792096564a6f81652d75a54668224cd,2250
 - happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f,4667
 - fsnotify-0.3.0.1@rev:1
+- process-1.6.3.0@sha256:fc77cfe75a9653b8c54ae455ead8c06cb8adc4d7a340984d84d8ca880b579919,2370 #because of https://github.com/haskell/process/pull/101
 
 flags:
   cabal-install:

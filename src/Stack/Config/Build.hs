@@ -109,6 +109,7 @@ testOptsFromMonoid TestOptsMonoid{..} madditional =
     , toAdditionalArgs = fromMaybe [] madditional <> toMonoidAdditionalArgs
     , toCoverage = fromFirst (toCoverage defaultTestOpts) toMonoidCoverage
     , toDisableRun = fromFirst (toDisableRun defaultTestOpts) toMonoidDisableRun
+    , toMaximumTimeSeconds = fromFirst (toMaximumTimeSeconds defaultTestOpts) toMonoidMaximumTimeSeconds
     }
 
 benchmarkOptsFromMonoid :: BenchmarkOptsMonoid -> Maybe [String] -> BenchmarkOpts

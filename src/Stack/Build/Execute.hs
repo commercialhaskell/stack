@@ -35,10 +35,7 @@ import           Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Filesystem as CF
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed
-                    (ExitCodeException (..), waitExitCode,
-                     useHandleOpen, setStdin, setStdout, setStderr,
-                     runProcess_, getStdout, getStderr, createSource)
+import           Data.Conduit.Process.Typed (createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
 import qualified Data.Map.Strict as M
@@ -1818,9 +1815,16 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 case outputType of
                                     OTConsole _ -> id
                                     OTLogFile _ h -> setter (useHandleOpen h)
+                            optionalTimeout action
+                                | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
+                                    mres <- timeout (maxSecs * 1000000) action
+                                    case mres of
+                                      Nothing -> throwString "test suite timed out"
+                                      Just res -> return res
+                                | otherwise = action
 
                         ec <- withWorkingDir (toFilePath pkgDir) $
-                          proc (toFilePath exePath) args $ \pc0 -> do
+                          optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
                             stdinBS <-
                               if isTestTypeLib
                                 then do
