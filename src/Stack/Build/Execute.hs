@@ -1413,7 +1413,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
                     initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
-                _ -> fulfillTestExpectations pname mcurator Nothing $
+                _ -> fulfillCuratorExpectations pname mcurator enableTests enableBenchmarks Nothing $
                      fmap Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
@@ -1788,7 +1788,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                     }
                 let emptyResult = Map.singleton testName Nothing
                 withProcessContext menv $ if exists
-                    then fulfillTestExpectations pname mcurator emptyResult $ do
+                    then fulfillCuratorExpectations pname mcurator True False emptyResult $ do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
                             tixexists <- doesFileExist tixPath
@@ -2154,19 +2154,34 @@ expectTestFailure :: PackageName -> Maybe Curator -> Bool
 expectTestFailure pname mcurator =
     maybe False (Set.member pname . curatorExpectTestFailure) mcurator
 
-fulfillTestExpectations ::
+expectBenchmarkFailure :: PackageName -> Maybe Curator -> Bool
+expectBenchmarkFailure pname mcurator =
+    maybe False (Set.member pname . curatorExpectBenchmarkFailure) mcurator
+
+fulfillCuratorExpectations ::
        (HasLogFunc env)
     => PackageName
     -> Maybe Curator
+    -> Bool
+    -> Bool
     -> b
     -> RIO env b
     -> RIO env b
-fulfillTestExpectations pname mcurator defValue action | expectTestFailure pname mcurator = do
+fulfillCuratorExpectations pname mcurator enableTests _ defValue action | enableTests &&
+                                                                          expectTestFailure pname mcurator = do
     eres <- tryAny action
     case eres of
       Right res -> do
           logWarn $ fromString (packageNameString pname) <> ": unexpected test success"
           return res
       Left _ -> return defValue
-fulfillTestExpectations _ _ _ action = do
+fulfillCuratorExpectations pname mcurator _ enableBench defValue action | enableBench &&
+                                                                          expectBenchmarkFailure pname mcurator = do
+    eres <- tryAny action
+    case eres of
+      Right res -> do
+          logWarn $ fromString (packageNameString pname) <> ": unexpected benchmark success"
+          return res
+      Left _ -> return defValue
+fulfillCuratorExpectations _ _ _ _ _ action = do
     action

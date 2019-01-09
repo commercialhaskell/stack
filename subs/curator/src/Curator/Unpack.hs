@@ -24,7 +24,7 @@ unpackSnapshot
   -> RIO env ()
 unpackSnapshot cons snap root = do
   unpacked <- parseRelDir "unpacked"
-  (suffixes, flags, (skipTest, expectTestFailure), skipBench,
+  (suffixes, flags, (skipTest, expectTestFailure), (skipBench, expectBenchmarkFailure),
    (skipHaddock, expectHaddockFailure)) <- fmap fold $ for (rsPackages snap) $ \sp -> do
     let pl = rspLocation sp
     TreeKey (BlobKey sha _size) <- getRawPackageLocationTreeKey pl
@@ -68,9 +68,9 @@ unpackSnapshot cons snap root = do
               CAExpectFailure -> (mempty, Set.singleton name)
               CASkip ->  (Set.singleton name, mempty)
           , case bench of
-              CASkip -> Set.singleton name
-              _ -> mempty -- FIXME maybe we want to differentiate skip and expect failure but
-                          -- we don't run benchmarks, only compile them
+              CAExpectSuccess -> mempty
+              CAExpectFailure -> (mempty, Set.singleton name)
+              CASkip -> (Set.singleton name, mempty)
           , case haddock of
               CAExpectSuccess -> mempty
               CAExpectFailure -> (mempty, Set.singleton name)
@@ -86,6 +86,7 @@ unpackSnapshot cons snap root = do
         [ "skip-test" .= Set.map CabalString skipTest
         , "expect-test-failure" .= Set.map CabalString expectTestFailure
         , "skip-bench" .= Set.map CabalString skipBench
+        , "expect-benchmark-failure" .= Set.map CabalString expectBenchmarkFailure
         , "skip-haddock" .= Set.map CabalString skipHaddock
         , "expect-haddock-failure" .= Set.map CabalString expectHaddockFailure
         ]
