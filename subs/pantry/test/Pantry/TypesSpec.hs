@@ -10,6 +10,7 @@ import Test.Hspec
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import qualified RIO.HashMap as HM
 import Pantry
 import qualified Pantry.SHA256 as SHA256
 import Pantry.Internal (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafeFilePath)
@@ -17,10 +18,13 @@ import RIO
 import Distribution.Types.Version (mkVersion)
 import qualified RIO.Text as T
 import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended (WithJSONWarnings (..))
+import Data.Aeson.Extended
 import Distribution.Types.PackageName (mkPackageName)
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.String.Quote
+import qualified Data.Vector as Vector
 
 hh :: HasCallStack => String -> Property -> Spec
 hh name p = it name $ do
@@ -143,3 +147,111 @@ spec = do
                                   }
 
       pkgMeta `shouldBe` pkgValue
+
+    it "parseHackageText parses" $ do
+      let txt = "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
+          hsha = SHA256.fromHexBytes "df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1"
+      sha <- case hsha of
+        Right sha' -> pure sha'
+        _ -> fail "parseHackagetext: failed decoding the sha256"
+      let Right (pkgIdentifier, blobKey) = parseHackageText txt
+      blobKey `shouldBe` (BlobKey sha (FileSize 5058))
+      pkgIdentifier `shouldBe` PackageIdentifier (mkPackageName "persistent") (mkVersion [2,8,2])
+
+    it "parses PackageLocationImmutable" $ do
+       let lockFile :: ByteString
+           lockFile = [s|#some
+dependencies:
+- complete:
+  - size: 285152
+    subdir: wai
+    url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+    cabal-file:
+      size: 1717
+      sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
+    name: wai
+    version: 3.0.2.3
+    sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
+    pantry-tree:
+      size: 710
+      sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+
+       let x = 3
+-- parseLockFile :: Value -> Yaml.Parser (WithJSONWarnings (IO [PackageLocationImmutable]))
+--            parseLockFile value = withObjectWarnings "PackageLocationimmutable" (\obj -> do
+--                                   (deps :: Value) <- obj ..: "dependencies"
+--                                   val :: [Unresolved (NonEmpty PackageLocationImmutable)] <- undefined
+--                                   undefined) value
+--                                   -- return $ do
+--                                   --   val' :: [NonEmpty PackageLocationImmutable] <- mapM (resolvePaths Nothing) val
+--                                   --   pure $ (concatMap toList val')) value
+
+           -- parseLockFile ::
+           --        Value -> Yaml.Parser [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]
+           -- parseLockFile value = do
+           --     (WithJSONWarnings val _) <- withObjectWarnings
+           --             "PackageLocationimmutable"
+           --             (\obj -> do
+           --                  deps@(Array depe) <- obj ..: "dependencies"
+           --                  let origAndComplete :: [Value] = Vector.toList depe
+           --                      origAndComplete' :: Yaml.Parser [Maybe Value]= sequence $ map (withObject "complete" (\obj -> obj .:? "complete")) origAndComplete
+           --                  lift $ withArray "PackageLocationimmutable.complete (Array)" (\array -> do
+           --                                                                                   let array' :: [Value] = Vector.toList array
+           --                                                                                       array'' :: [ Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))] = map (parseJSON) array'
+           --                                                                                   sequence array'') deps
+           --             ) value
+           --     let val' :: [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]  = map (\(WithJSONWarnings item warn) -> WithJSONWarnings (resolvePaths Nothing item) warn) val
+           --     pure val'
+
+       -- Object (fromList [("dependencies",Array [Object (fromList [("complete",Array [Object (fromList [("size",Number 285152.0),("subdir",String "wai"),("url",String "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"),("cabal-file",Object (fromList [("size",Number 1717.0),("sha256",String "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056")])),("name",String "wai"),("version",String "3.0.2.3"),("sha256",String "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"),("pantry-tree",Object (fromList [("size",Number 710.0),("sha256",String "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")]))])])])]),("sha256",String "7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a"),("resolver",Array [Object (fromList [("original",Object (fromList [("url",String "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml")]))]),Object (fromList [("complete",Object (fromList [("size",Number 527801.0),("url",String "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml")]))])])])))
+
+
+
+
+           getCompleteObject :: Value -> Value
+           getCompleteObject (Array deps) = Array $ Vector.filter isCompleteObject deps
+           getCompleteObject arr = error $ "Expected Array but received " <> show arr
+
+           isCompleteObject :: Value -> Bool
+           isCompleteObject obj@(Object xs) = HM.member "complete" xs
+           isCompleteObject _ = False
+
+           parseLockFile ::
+                  Value -> Yaml.Parser [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]
+           parseLockFile value = do
+               (WithJSONWarnings val _) <- withObjectWarnings
+                       "PackageLocationimmutable"
+                       (\obj -> do
+                            deps@(Array depe) <- obj ..: "dependencies"
+                            let origAndComplete :: [Value] = Vector.toList depe
+                                origAndComplete' :: Yaml.Parser [Maybe Value] = sequence $ map (withObject "complete" (\obj -> obj .: "complete")) origAndComplete
+                            pure origAndComplete'
+                       ) value
+               v :: [Maybe Value] <- val
+               let v1 :: [Value] = catMaybes v
+                   v2 :: [ Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))] = map parseJSON v1
+               v3 <- sequence v2
+               let v4 :: [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))] = map (\(WithJSONWarnings item warn) -> WithJSONWarnings (resolvePaths Nothing item) warn) v3
+               pure v4
+
+
+       pkgImm <- case Yaml.decodeThrow lockFile of
+         Just (pkgIm :: Value) -> do
+           case Yaml.parseMaybe parseLockFile pkgIm of
+             Nothing -> fail $ "Can't parse PackageLocationImmutable - 1" <> (show pkgIm)
+             Just xs -> do
+               let xs' :: [IO (NonEmpty PackageLocationImmutable)] = map (\(WithJSONWarnings item _) -> item )xs
+                   xs'' :: IO [NonEmpty PackageLocationImmutable] = sequence xs'
+               xs''' :: [NonEmpty PackageLocationImmutable] <- xs''
+               let xs'''' = concat $ map NonEmpty.toList xs'''
+               pure xs''''
+         Nothing -> fail "Can't parse PackageLocationImmutable - 2"
+       pkgImm `shouldBe` ([] :: [PackageLocationImmutable])
