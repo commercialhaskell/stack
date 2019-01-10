@@ -275,23 +275,36 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
                     ghcOptions = cpGhcOptions common
                 assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
               Nothing ->
-                pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+                -- If package is in global dump map. load deps from there (#4324)
+                case Map.lookup pkgName globalDumpMap of
+                  Nothing ->
+                    pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+                  dp ->
+                    getDepsFromDump dp
       -- For wired-in-packages, use information from ghc-pkg (see #3084)
-      else case Map.lookup pkgName globalDumpMap of
-          Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
-          Just dp -> pure (Set.fromList deps, payloadFromDump dp)
-            where
-              deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
-                                          Stack.Prelude.pkgName
-                                          (Map.lookup depId globalIdMap))
-                         (dpDepends dp)
-  where
+      else
+          getDepsFromDump $ Map.lookup pkgName globalDumpMap
+    where
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
     payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
         case maybePkg of
             Just (_, Library _ _ mlicense) -> mlicense
             _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
+
+    getDepsFromDump dump =
+      case dump of
+          Nothing ->
+            let errText = "Invariant violated: Expected to find wired-in-package "
+            in error (errText ++ packageNameString pkgName ++ " in global DB")
+          Just dp -> pure (Set.fromList deps, payloadFromDump dp)
+            where
+              deps = map ghcIdToPackageName (dpDepends dp)
+              ghcIdToPackageName depId =
+                let errText = "Invariant violated: Expected to find "
+                in maybe (error (errText ++ ghcPkgIdString depId ++ " in global DB"))
+                   Stack.Prelude.pkgName
+                   (Map.lookup depId globalIdMap)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
 projectPackageDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
