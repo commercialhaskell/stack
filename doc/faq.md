@@ -407,7 +407,7 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 ## I get strange `ld` errors about recompiling with "-fPIC"
 
-(Updated in December 2017)
+(Updated in January 2019)
 
 This is related to more recent versions of Linux distributions that have GCC
 with PIE enabled by default.  The continuously-updated distros like Arch, in
@@ -430,6 +430,12 @@ will no longer be necessary for stack >= 1.7).
 If you are experiencing this with GHC >= 8.0.2, try running `stack setup
 --reinstall` if you've upgraded your Linux distribution or you set up GHC
 before late December 2017.
+
+If GHC doesn't recognize your C compiler as being able to use `-no-pie`,
+this can happen even with GCC and Clang, it might be necessary to enable 
+this feature manually. To do this, just change
+`("C compiler supports -no-pie", "NO"),` to `("C compiler supports -no-pie", "YES"),`
+in the file `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-VER/settings`.
 
 If you are still having trouble after trying the above, check the following
 for more possible workarounds:
