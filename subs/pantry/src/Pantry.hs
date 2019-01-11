@@ -103,6 +103,8 @@ module Pantry
   , parseWantedCompiler
   , parseRawSnapshotLocation
   , parsePackageIdentifierRevision
+  , parseHackageText
+  , parseLockFile
 
     -- ** Cabal values
   , parsePackageIdentifier

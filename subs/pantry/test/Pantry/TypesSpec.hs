@@ -34,6 +34,14 @@ hh name p = it name $ do
   result <- check p
   unless result $ throwString "Hedgehog property failed" :: IO ()
 
+decodeSHA :: ByteString -> SHA256
+decodeSHA string = case SHA256.fromHexBytes string of
+                     Right csha -> csha
+                     Left err -> error $ "Failed decoding. Error:  " <> show err
+
+toBlobKey :: ByteString -> Word -> BlobKey
+toBlobKey string size = BlobKey (decodeSHA string) (FileSize size)
+
 genBlobKey :: Gen BlobKey
 genBlobKey = BlobKey <$> genSha256 <*> (FileSize <$> (Gen.word (Range.linear 1 10000)))
 
@@ -121,35 +129,33 @@ spec = do
         "compiler: ghc-8.0.1\n"
       rslParent `shouldBe` RSLCompiler (WCGhc (mkVersion [8, 0, 1]))
 
-    -- it "FromJSON instance for Repo" $ do
-    --   repValue <- case Yaml.decodeThrow samplePLIRepo of
-    --     Just (WithJSONWarnings x _) -> pure x
-    --     Nothing -> fail "Can't parse Repo"
-    --   let repoValue = Repo {
-    --                 repoSubdir = "wai",
-    --                 repoType = RepoGit,
-    --                 repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0",
-    --                 repoUrl = "https://github.com/yesodweb/wai.git"
-    --               }
+    it "FromJSON instance for Repo" $ do
+      repValue <- case Yaml.decodeThrow samplePLIRepo of
+        Just x -> pure x
+        Nothing -> fail "Can't parse Repo"
+      let repoValue = Repo {
+                    repoSubdir = "wai",
+                    repoType = RepoGit,
+                    repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0",
+                    repoUrl = "https://github.com/yesodweb/wai.git"
+                  }
+      repValue `shouldBe` repoValue
 
-    --   repValue `shouldBe` repoValue
-
-    -- it "FromJSON instance for PackageMetadata" $ do
-    --   pkgMeta <- case Yaml.decodeThrow samplePLIRepo of
-    --     Just (WithJSONWarnings x _) -> pure x
-    --     Nothing -> fail "Can't parse Repo"
-    --   let cabalSha = SHA256.fromHexBytes "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
-    --       pantrySha = SHA256.fromHexBytes "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2"
-    --   (csha, psha) <- case (cabalSha, pantrySha) of
-    --                     (Right csha , Right psha) -> pure (csha, psha)
-    --                     _ -> fail "Failed decoding sha256"
-    --   let pkgValue = PackageMetadata {
-    --                                 pmIdent = PackageIdentifier (mkPackageName "wai") (mkVersion [3,2,1,2]),
-    --                                 pmTreeKey = TreeKey (BlobKey psha (FileSize 714)),
-    --                                 pmCabal = BlobKey csha (FileSize 1765)
-    --                               }
-
-    --   pkgMeta `shouldBe` pkgValue
+    it "FromJSON instance for PackageMetadata" $ do
+      pkgMeta <- case Yaml.decodeThrow samplePLIRepo of
+        Just x -> pure x
+        Nothing -> fail "Can't parse Repo"
+      let cabalSha = SHA256.fromHexBytes "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+          pantrySha = SHA256.fromHexBytes "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2"
+      (csha, psha) <- case (cabalSha, pantrySha) of
+                        (Right csha , Right psha) -> pure (csha, psha)
+                        _ -> fail "Failed decoding sha256"
+      let pkgValue = PackageMetadata {
+                                    pmIdent = PackageIdentifier (mkPackageName "wai") (mkVersion [3,2,1,2]),
+                                    pmTreeKey = TreeKey (BlobKey psha (FileSize 714)),
+                                    pmCabal = BlobKey csha (FileSize 1765)
+                                  }
+      pkgMeta `shouldBe` pkgValue
 
     it "parseHackageText parses" $ do
       let txt = "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
@@ -186,81 +192,6 @@ resolver:
 sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
 |]
 
-       let x = 3
--- parseLockFile :: Value -> Yaml.Parser (WithJSONWarnings (IO [PackageLocationImmutable]))
---            parseLockFile value = withObjectWarnings "PackageLocationimmutable" (\obj -> do
---                                   (deps :: Value) <- obj ..: "dependencies"
---                                   val :: [Unresolved (NonEmpty PackageLocationImmutable)] <- undefined
---                                   undefined) value
---                                   -- return $ do
---                                   --   val' :: [NonEmpty PackageLocationImmutable] <- mapM (resolvePaths Nothing) val
---                                   --   pure $ (concatMap toList val')) value
-
-           -- parseLockFile ::
-           --        Value -> Yaml.Parser [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]
-           -- parseLockFile value = do
-           --     (WithJSONWarnings val _) <- withObjectWarnings
-           --             "PackageLocationimmutable"
-           --             (\obj -> do
-           --                  deps@(Array depe) <- obj ..: "dependencies"
-           --                  let origAndComplete :: [Value] = Vector.toList depe
-           --                      origAndComplete' :: Yaml.Parser [Maybe Value]= sequence $ map (withObject "complete" (\obj -> obj .:? "complete")) origAndComplete
-           --                  lift $ withArray "PackageLocationimmutable.complete (Array)" (\array -> do
-           --                                                                                   let array' :: [Value] = Vector.toList array
-           --                                                                                       array'' :: [ Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))] = map (parseJSON) array'
-           --                                                                                   sequence array'') deps
-           --             ) value
-           --     let val' :: [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]  = map (\(WithJSONWarnings item warn) -> WithJSONWarnings (resolvePaths Nothing item) warn) val
-           --     pure val'
-
-       -- Object (fromList [("dependencies",Array [Object (fromList [("complete",Array [Object (fromList [("size",Number 285152.0),("subdir",String "wai"),("url",String "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"),("cabal-file",Object (fromList [("size",Number 1717.0),("sha256",String "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056")])),("name",String "wai"),("version",String "3.0.2.3"),("sha256",String "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"),("pantry-tree",Object (fromList [("size",Number 710.0),("sha256",String "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")]))])])])]),("sha256",String "7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a"),("resolver",Array [Object (fromList [("original",Object (fromList [("url",String "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml")]))]),Object (fromList [("complete",Object (fromList [("size",Number 527801.0),("url",String "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml")]))])])])))
-
-
-           isCompleteObject :: Value -> Bool
-           isCompleteObject obj@(Object xs) = HM.member "complete" xs
-           isCompleteObject _ = False
-
-           appendPLI :: WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)) -> WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)) -> WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))
-           appendPLI (WithJSONWarnings item1 warn1) (WithJSONWarnings item2 warn2) = WithJSONWarnings (item1 <> item2) (warn1 <> warn2)
-
-           parseLockFile ::
-                  Value
-               -> Yaml.Parser (WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)))
-           parseLockFile value = do
-               (WithJSONWarnings val _) <-
-                   withObjectWarnings
-                       "PackageLocationimmutable"
-                       (\obj -> do
-                            deps <- obj ..: "dependencies"
-                            lift $
-                                withArray
-                                    "Dependencies (Array)"
-                                    (\vector -> do
-                                         let vector' :: Array =
-                                                 Vector.filter isCompleteObject vector
-                                         let pli :: Vector (Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))) =
-                                                 Vector.map
-                                                     (\(Object o) -> do
-                                                          complete <- o .: "complete"
-                                                          pl :: (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) <-
-                                                              parseJSON complete
-                                                          pure pl)
-                                                     vector'
-                                             pliSeq = sequence pli
-                                         pli' <- pliSeq
-                                         pure pli')
-                                    deps)
-                       value
-               let pli :: Vector (WithJSONWarnings (Unresolved (NonEmpty (PackageLocationImmutable)))) =
-                       val
-                   pliResolve :: Vector (WithJSONWarnings (IO (NonEmpty (PackageLocationImmutable)))) =
-                       Vector.map
-                           (\(WithJSONWarnings item warn) ->
-                                (WithJSONWarnings (resolvePaths Nothing item) warn))
-                           pli
-               pure $ Vector.foldr1 appendPLI pliResolve
-
-
        pkgImm <- case Yaml.decodeThrow lockFile of
          Just (pkgIm :: Value) -> do
            case Yaml.parseEither parseLockFile pkgIm of
@@ -269,9 +200,5 @@ sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
                let (WithJSONWarnings iopli _) = xs
                pli <- iopli
                pure $ NonEmpty.toList pli
---                    xs'' :: IO [NonEmpty PackageLocationImmutable] = sequence xs'
---                xs''' :: [NonEmpty PackageLocationImmutable] <- xs''
---                let xs'''' = concat $ map NonEmpty.toList xs'''
---                pure xs''''
          Nothing -> fail "Can't parse PackageLocationImmutable - 2"
-       pkgImm `shouldBe` ([] :: [PackageLocationImmutable])
+       pkgImm `shouldBe` [PLIRepo (Repo {repoUrl = "https://github.com/yesodweb/wai.git", repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0", repoSubdir = "wai", repoType = RepoGit}) (PackageMetadata {pmIdent = PackageIdentifier {pkgName = mkPackageName "wai", pkgVersion = mkVersion [3,2,1,2]}, pmTreeKey = TreeKey (BlobKey (decodeSHA "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2") (FileSize 714)), pmCabal = toBlobKey "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410" 1765})]
