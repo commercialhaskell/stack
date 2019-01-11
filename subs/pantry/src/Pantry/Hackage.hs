@@ -4,10 +4,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pantry.Hackage
   ( updateHackageIndex
+  , forceUpdateHackageIndex
   , DidUpdateOccur (..)
   , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackageTarball
+  , getHackageTarballOnGPD
   , getHackageTarballKey
   , getHackageCabalFile
   , getHackagePackageVersions
@@ -28,7 +30,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import Pantry.Archive
 import Pantry.Types hiding (FileType (..))
-import Pantry.Storage
+import Pantry.Storage hiding (TreeEntry, PackageName, Version)
 import Pantry.Tree
 import qualified Pantry.SHA256 as SHA256
 import Network.URI (parseURI)
@@ -39,6 +41,7 @@ import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text.Metrics (damerauLevenshtein)
+import Distribution.PackageDescription (GenericPackageDescription)
 import Distribution.Types.Version (versionNumbers)
 import Distribution.Types.VersionRange (withinRange)
 
@@ -80,7 +83,26 @@ updateHackageIndex
   :: (HasPantryConfig env, HasLogFunc env)
   => Maybe Utf8Builder -- ^ reason for updating, if any
   -> RIO env DidUpdateOccur
-updateHackageIndex mreason = do
+updateHackageIndex = updateHackageIndexInternal False
+
+-- | Same as `updateHackageIndex`, but force the database update even if hackage
+-- security tells that there is no change.  This can be useful in order to make
+-- sure the database is in sync with the locally downloaded tarball
+--
+-- @since 0.1.0.0
+forceUpdateHackageIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Maybe Utf8Builder
+  -> RIO env DidUpdateOccur
+forceUpdateHackageIndex = updateHackageIndexInternal True
+
+
+updateHackageIndexInternal
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Bool -- ^ Force the database update.
+  -> Maybe Utf8Builder -- ^ reason for updating, if any
+  -> RIO env DidUpdateOccur
+updateHackageIndexInternal forceUpdate mreason = do
   storage <- view $ pantryConfigL.to pcStorage
   gateUpdate $ withWriteLock_ storage $ do
     for_ mreason logInfo
@@ -118,6 +140,9 @@ updateHackageIndex mreason = do
         HS.checkForUpdates repo maybeNow
 
     case didUpdate of
+      _ | forceUpdate -> do
+            logInfo "Forced package update is initialized"
+            updateCache tarball
       HS.NoUpdates -> do
         x <- needsCacheUpdate tarball
         if x
@@ -200,11 +225,13 @@ updateHackageIndex mreason = do
               if oldHash == oldHashCheck
                 then oldSize <$ logInfo "Updating preexisting cache, should be quick"
                 else 0 <$ do
-                  logInfo "Package index change detected, that's pretty unusual"
-                  logInfo $ "Old size: " <> display oldSize
-                  logInfo $ "Old hash (orig) : " <> display oldHash
-                  logInfo $ "New hash (check): " <> display oldHashCheck
-                  logInfo "Forcing a recache"
+                  logWarn $ mconcat [
+                    "Package index change detected, that's pretty unusual: "
+                    , "\n    Old size: " <> display oldSize
+                    , "\n    Old hash (orig) : " <> display oldHash
+                    , "\n    New hash (check): " <> display oldHashCheck
+                    , "\n    Forcing a recache"
+                    ]
             pure (offset, newHash, newSize)
 
       lift $ logInfo $ "Populating cache from file size " <> display newSize <> ", hash " <> display newHash
@@ -503,11 +530,22 @@ getHackageTarball
   => PackageIdentifierRevision
   -> Maybe TreeKey
   -> RIO env Package
-getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
+getHackageTarball = getHackageTarballOnGPD (\ _ _ -> pure ())
+
+-- | Same as `getHackageTarball`, but allows an extra action to be performed on the parsed
+-- `GenericPackageDescription` and newly created `TreeId`.
+getHackageTarballOnGPD
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => (TreeId -> GenericPackageDescription -> RIO env ())
+  -> PackageIdentifierRevision
+  -> Maybe TreeKey
+  -> RIO env Package
+getHackageTarballOnGPD onGPD pir mtreeKey = do
+  let PackageIdentifierRevision name ver _cfi = pir
   cabalFile <- resolveCabalFileInfo pir
-  cabalFileKey <- withStorage $ getBlobKey cabalFile
   let rpli = RPLIHackage pir mtreeKey
   withCachedTree rpli name ver cabalFile $ do
+    cabalFileKey <- withStorage $ getBlobKey cabalFile
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
       case mpair of
@@ -569,7 +607,8 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             , mismatchActual = gpdIdent
             }
 
-        (_tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        (tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        onGPD tid gpd
         pure Package
           { packageTreeKey = treeKey'
           , packageTree = tree'

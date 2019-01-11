@@ -29,3 +29,4 @@ tags
 /etc/scripts/stack-scripts.cabal
 .hspec-failures
 better-cache/
+/subs/*/*.cabal
