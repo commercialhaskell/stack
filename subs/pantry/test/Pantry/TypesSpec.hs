@@ -167,7 +167,7 @@ spec = do
       blobKey `shouldBe` (BlobKey sha (FileSize 5058))
       pkgIdentifier `shouldBe` PackageIdentifier (mkPackageName "persistent") (mkVersion [2,8,2])
 
-    it "parses PackageLocationImmutable" $ do
+    it "parses PackageLocationImmutable (Repo)" $ do
        let lockFile :: ByteString
            lockFile = [s|#some
 dependencies:
@@ -201,4 +201,125 @@ sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
                pli <- iopli
                pure $ NonEmpty.toList pli
          Nothing -> fail "Can't parse PackageLocationImmutable - 2"
-       pkgImm `shouldBe` [PLIRepo (Repo {repoUrl = "https://github.com/yesodweb/wai.git", repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0", repoSubdir = "wai", repoType = RepoGit}) (PackageMetadata {pmIdent = PackageIdentifier {pkgName = mkPackageName "wai", pkgVersion = mkVersion [3,2,1,2]}, pmTreeKey = TreeKey (BlobKey (decodeSHA "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2") (FileSize 714)), pmCabal = toBlobKey "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410" 1765})]
+       pkgImm `shouldBe`
+           [ PLIRepo
+                 (Repo
+                      { repoUrl = "https://github.com/yesodweb/wai.git"
+                      , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                      , repoSubdir = "wai"
+                      , repoType = RepoGit
+                      })
+                 (PackageMetadata
+                      { pmIdent =
+                            PackageIdentifier
+                                { pkgName = mkPackageName "wai"
+                                , pkgVersion = mkVersion [3, 2, 1, 2]
+                                }
+                      , pmTreeKey =
+                            TreeKey
+                                (BlobKey
+                                     (decodeSHA
+                                          "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2")
+                                     (FileSize 714))
+                      , pmCabal =
+                            toBlobKey
+                                "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+                                1765
+                      })
+           ]
+
+    it "parses PackageLocationImmutable (Multiple Repos)" $ do
+       let lockFile :: ByteString
+           lockFile = [s|#some
+dependencies:
+- complete:
+  - subdir: wai
+    cabal-file:
+      size: 1765
+      sha256: eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410
+    name: wai
+    version: 3.2.1.2
+    git: https://github.com/yesodweb/wai.git
+    pantry-tree:
+      size: 714
+      sha256: ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2
+    commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
+  - subdir: warp
+    cabal-file:
+      size: 10725
+      sha256: cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758
+    name: warp
+    version: 3.2.25
+    git: https://github.com/yesodweb/wai.git
+    pantry-tree:
+      size: 5103
+      sha256: f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a
+    commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+
+       pkgImm <- case Yaml.decodeThrow lockFile of
+         Just (pkgIm :: Value) -> do
+           case Yaml.parseEither parseLockFile pkgIm of
+             Left str -> fail $ "Can't parse PackageLocationImmutable - 1" <> str
+             Right xs -> do
+               let (WithJSONWarnings iopli _) = xs
+               pli <- iopli
+               pure $ NonEmpty.toList pli
+         Nothing -> fail "Can't parse PackageLocationImmutable - 2"
+       pkgImm `shouldBe`
+           [ PLIRepo
+                 (Repo
+                      { repoUrl = "https://github.com/yesodweb/wai.git"
+                      , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                      , repoSubdir = "wai"
+                      , repoType = RepoGit
+                      })
+                 (PackageMetadata
+                      { pmIdent =
+                            PackageIdentifier
+                                { pkgName = mkPackageName "wai"
+                                , pkgVersion = mkVersion [3, 2, 1, 2]
+                                }
+                      , pmTreeKey =
+                            TreeKey
+                                (BlobKey
+                                     (decodeSHA
+                                          "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2")
+                                     (FileSize 714))
+                      , pmCabal =
+                            toBlobKey
+                                "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+                                1765
+                      }),
+             PLIRepo
+                 (Repo
+                      { repoUrl = "https://github.com/yesodweb/wai.git"
+                      , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                      , repoSubdir = "warp"
+                      , repoType = RepoGit
+                      })
+                 (PackageMetadata
+                      { pmIdent =
+                            PackageIdentifier
+                                { pkgName = mkPackageName "warp"
+                                , pkgVersion = mkVersion [3, 2, 25]
+                                }
+                      , pmTreeKey =
+                            TreeKey
+                                (BlobKey
+                                     (decodeSHA
+                                      "f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a")
+                                     (FileSize 5103))
+                      , pmCabal =
+                            toBlobKey
+                                "cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758"
+                                10725
+                      })
+           ]
