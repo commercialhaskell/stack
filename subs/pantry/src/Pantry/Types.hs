@@ -233,6 +233,12 @@ newtype Unresolved a = Unresolved (Maybe (Path Abs Dir) -> IO a)
 instance Applicative Unresolved where
   pure = Unresolved . const . pure
   Unresolved f <*> Unresolved x = Unresolved $ \mdir -> f mdir <*> x mdir
+instance Monad Unresolved where
+    return = pure
+    (Unresolved f) >>= f1 = Unresolved $ \mdir -> do
+                              y <- (f mdir)
+                              let (Unresolved f2) = f1 y
+                              f2 mdir
 
 -- | Resolve all of the file paths in an 'Unresolved' relative to the
 -- given directory.
@@ -1531,21 +1537,26 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
             pm <- parseJSON value
             pure $ PLIRepo repo pm
 
+          archiveObject :: Value -> Parser (Unresolved PackageLocationImmutable)
+          archiveObject value@(Object _) = do
+            pm <- parseJSON value
+            (WithJSONWarnings pli _) <- withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
+              Unresolved mkArchiveLocation <- parseArchiveLocationObject o
+              archiveHash <- o ..: "sha256"
+              archiveSize <- o ..: "size"
+              archiveSubdir <- o ..: "subdir"
+              pure $ Unresolved $ \mdir -> do
+                archiveLocation <- mkArchiveLocation mdir
+                pure $ PLIArchive Archive {..} pm
+              ) value
+            pure pli
 
-
-     -- archiveObject :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
-      -- archiveObject value = do
-      --   (WithJSONWarnings pm _) <- parseJSON value
-      --   withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
-      --     Unresolved mkArchiveLocation <- parseArchiveLocationObject o
-      --     archiveHash <- o ..: "sha256"
-      --     archiveSize <- o ..: "size"
-      --     archiveSubdir <- o ..: "subdir"
-      --     pure $ Unresolved $ \mdir -> do
-      --       archiveLocation <- mkArchiveLocation mdir
-      --       pure $ pure $ PLIArchive Archive {..} pm
-      --     ) value
-
+          archiveArray :: Value -> Parser (Unresolved (NonEmpty PackageLocationImmutable))
+          archiveArray value@(Array arr) = do
+            let xs :: [Parser (Unresolved PackageLocationImmutable)] = Vector.toList $ Vector.map archiveObject arr
+                xs' = sequence xs
+            pli :: [Unresolved PackageLocationImmutable] <- xs'
+            pure (sequence $ NonEmpty.fromList pli)
       -- github :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
       -- github value = do
       --   (WithJSONWarnings pm _) <- parseJSON value
