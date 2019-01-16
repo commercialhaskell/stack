@@ -59,6 +59,7 @@ dependencies:
 - zip-archive
 - text-metrics
 - resourcet
+- rio-prettyprint
 
 # FIXME remove when we drop store
 - integer-gmp

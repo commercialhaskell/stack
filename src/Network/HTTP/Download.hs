@@ -23,7 +23,6 @@ module Network.HTTP.Download
     ) where
 
 import           Stack.Prelude
-import           Stack.Types.Runner
 import qualified Data.ByteString.Lazy        as L
 import           Conduit                     (yield, withSinkFileCautious, withSourceFile)
 import qualified Data.Conduit.Binary         as CB
@@ -35,6 +34,8 @@ import           Path.IO                     (doesFileExist)
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
 import           System.FilePath             (takeDirectory, (<.>))
+import           RIO.PrettyPrint
+
 
 -- | Download the given URL to the given location. If the file already exists,
 -- no download is performed. Otherwise, creates the parent directory, downloads
@@ -42,7 +43,7 @@ import           System.FilePath             (takeDirectory, (<.>))
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: HasRunner env
+download :: HasTerm env
          => Request
          -> Path Abs File -- ^ destination
          -> RIO env Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
@@ -59,7 +60,7 @@ download req destpath = do
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: HasRunner env
+redownload :: HasTerm env
            => Request
            -> Path Abs File -- ^ destination
            -> RIO env Bool

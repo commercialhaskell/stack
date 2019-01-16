@@ -3,9 +3,9 @@
 For the most part, the data constructors of 'Style' do not clash with other
 names. When they do, import the module qualified. For example:
 
-> import qualified Stack.Types.PrettyPrint as PP
+> import qualified RIO.PrettyPrint.Types.PrettyPrint as PP
 -}
-module Stack.Types.PrettyPrint
+module RIO.PrettyPrint.Types
   (
     Style (..)
   , Styles
@@ -15,10 +15,10 @@ module Stack.Types.PrettyPrint
 import Data.Array.IArray (Array)
 import Data.Ix (Ix)
 import Data.Text (Text)
-import Stack.Prelude
+import RIO
 import System.Console.ANSI.Types (SGR)
 
--- |A style of stack's output.
+-- |A style of rio-prettyprint's output.
 data Style
   = Error    -- Should be used sparingly, not to style entire long messages. For
              -- example, it's used to style the "Error:" label for an error

@@ -1,18 +1,18 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.DefaultStyles
+module RIO.PrettyPrint.DefaultStyles
   (
     defaultStyles
   ) where
 
 import Data.Array.IArray (array)
-import Stack.Prelude
-import Stack.Types.PrettyPrint (Style (..), Styles)
+import RIO
+import RIO.PrettyPrint.Types (Style (..), Styles)
 import System.Console.ANSI.Codes (Color (..), ColorIntensity (..),
   ConsoleIntensity (..), ConsoleLayer (..), SGR (..))
 
--- |Default styles for stack's output.
+-- | Default styles for rio-prettyprint output.
 defaultStyles :: Styles
 defaultStyles = array (minBound, maxBound)
   [ (Error, ("error", [SetColor Foreground Vivid Red]))

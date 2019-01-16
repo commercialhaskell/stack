@@ -98,6 +98,7 @@ dependencies:
 - resourcet
 - retry >= 0.7
 - rio
+- rio-prettyprint
 - semigroups
 - split
 - stm
@@ -172,7 +173,6 @@ library:
   - Stack.Constants.Config
   - Stack.Coverage
   - Stack.DefaultColorWhen
-  - Stack.DefaultStyles
   - Stack.Docker
   - Stack.Docker.GlobalDB
   - Stack.Dot
@@ -218,7 +218,6 @@ library:
   - Stack.PackageDump
   - Stack.Path
   - Stack.Prelude
-  - Stack.PrettyPrint
   - Stack.Runners
   - Stack.Script
   - Stack.SDist
@@ -246,19 +245,16 @@ library:
   - Stack.Types.Package
   - Stack.Types.PackageDump
   - Stack.Types.PackageName
-  - Stack.Types.PrettyPrint
   - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.Sig
   - Stack.Types.SourceMap
-  - Stack.Types.StylesUpdate
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
   - Stack.Unpack
   - Stack.Upgrade
   - Stack.Upload
-  - Text.PrettyPrint.Leijen.Extended
   - System.Permissions
   - System.Process.PagerEditor
   - System.Terminal

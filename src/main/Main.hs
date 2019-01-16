@@ -49,6 +49,8 @@ import           Options.Applicative.Types (ParserHelp(..))
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
+import           RIO.PrettyPrint
+import qualified RIO.PrettyPrint as PP (style)
 import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Clean (CleanOpts(..), clean)
@@ -87,8 +89,6 @@ import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.Path
-import           Stack.PrettyPrint
-import qualified Stack.PrettyPrint as PP (style)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))

@@ -22,12 +22,12 @@ import qualified RIO
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import RIO.Process
+import RIO.PrettyPrint
 import Stack.PackageDump
 import Stack.Prelude
 import Stack.Types.Build
 import Stack.Types.Compiler
 import Stack.Types.Config
-import Stack.Types.Runner (HasRunner)
 import Stack.Types.SourceMap
 
 -- | Create a 'ProjectPackage' from a directory containing a package.
@@ -123,7 +123,7 @@ versionMaybeFromPM _ loadVer = liftIO loadVer
 
 -- | Load the global hints from Github.
 loadGlobalHints
-  :: HasRunner env
+  :: HasTerm env
   => Path Abs File -- ^ local cached file location
   -> ActualCompiler
   -> RIO env (Maybe (Map PackageName Version))

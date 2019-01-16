@@ -43,8 +43,7 @@ import              Data.Text.Encoding.Error (lenientDecode)
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
 import              Network.HTTP.StackClient (Request, HttpException, httpSink, getUri, path, getResponseHeaders, hContentLength, hContentMD5)
 import              Path
-import              Stack.Types.Runner
-import              Stack.PrettyPrint
+import              RIO.PrettyPrint
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
 
@@ -189,7 +188,7 @@ hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteStr
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- 'Control.Retry.recovering' customized for HTTP failures
-recoveringHttp :: forall env a. HasRunner env => RetryPolicy -> RIO env a -> RIO env a
+recoveringHttp :: forall env a. HasTerm env => RetryPolicy -> RIO env a -> RIO env a
 recoveringHttp retryPolicy =
     helper $ \run -> recovering retryPolicy (handlers run) . const
   where
@@ -240,7 +239,7 @@ recoveringHttp retryPolicy =
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
 verifiedDownload
-         :: HasRunner env
+         :: HasTerm env
          => DownloadRequest
          -> Path Abs File -- ^ destination
          -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ()) -- ^ custom hook to observe progress

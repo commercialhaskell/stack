@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.30.0.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc4bfcec8fa396290c6a92012ae46cae07ca2bd329e9ae0ca7aaec18202474f
+-- hash: 81fc63dbe63a0529c1d0424669ffed3a904a13647f67f6195e18c6dcafeed814
 
 name:           pantry
 version:        0.1.0.0
@@ -92,6 +92,7 @@ library
     , resourcet
     , rio
     , rio-orphans
+    , rio-prettyprint
     , safe
     , store-core
     , syb
@@ -189,6 +190,7 @@ test-suite spec
     , resourcet
     , rio
     , rio-orphans
+    , rio-prettyprint
     , safe
     , store-core
     , syb
