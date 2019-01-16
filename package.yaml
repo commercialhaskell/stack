@@ -71,6 +71,7 @@ dependencies:
 - http-client
 - http-client-tls
 - http-conduit
+- http-download
 - http-types
 - memory
 - microlens
@@ -145,8 +146,6 @@ library:
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
   - Data.Monoid.Map
-  - Network.HTTP.Download
-  - Network.HTTP.Download.Verified
   - Network.HTTP.StackClient
   - Options.Applicative.Args
   - Options.Applicative.Builder.Extra

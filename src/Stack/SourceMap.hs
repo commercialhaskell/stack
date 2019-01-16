@@ -15,8 +15,7 @@ module Stack.SourceMap
 import qualified Data.Conduit.List as CL
 import Data.Yaml (decodeFileThrow)
 import qualified Distribution.PackageDescription as PD
-import Network.HTTP.Download (download, redownload)
-import Network.HTTP.StackClient (parseRequest)
+import Network.HTTP.StackClient (download, parseRequest, redownload)
 import Pantry
 import qualified RIO
 import qualified RIO.Map as Map

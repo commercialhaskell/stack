@@ -1,10 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 module Network.HTTP.Download
-    ( verifiedDownload
-    , DownloadRequest(..)
+    ( DownloadRequest(..)
     , drRetryPolicyDefault
     , HashCheck(..)
     , DownloadException(..)
@@ -14,27 +12,22 @@ module Network.HTTP.Download
 
     , download
     , redownload
-    , httpJSON
-    , httpLbs
-    , parseRequest
-    , parseUrlThrow
-    , setGithubHeaders
-    , withResponse
+    , verifiedDownload
     ) where
 
-import           Stack.Prelude
 import qualified Data.ByteString.Lazy        as L
-import           Conduit                     (yield, withSinkFileCautious, withSourceFile)
+import           Conduit
 import qualified Data.Conduit.Binary         as CB
-import           Data.Text.Encoding.Error    (lenientDecode)
-import           Data.Text.Encoding          (decodeUtf8With)
 import           Network.HTTP.Download.Verified
-import           Network.HTTP.StackClient    (Request, Response, HttpException, httpJSON, httpLbs, withResponse, path, checkResponse, parseUrlThrow, parseRequest, setRequestHeader, getResponseHeaders, requestHeaders, getResponseBody, getResponseStatusCode)
+import           Network.HTTP.Client         (HttpException, Request, Response, checkResponse, path, requestHeaders)
+import           Network.HTTP.Simple         (getResponseBody, getResponseHeaders, getResponseStatusCode, withResponse)
+import           Path                        (Path, Abs, File, toFilePath)
 import           Path.IO                     (doesFileExist)
+import           RIO
+import           RIO.PrettyPrint
 import           System.Directory            (createDirectoryIfMissing,
                                               removeFile)
 import           System.FilePath             (takeDirectory, (<.>))
-import           RIO.PrettyPrint
 
 
 -- | Download the given URL to the given location. If the file already exists,
@@ -115,7 +108,3 @@ data DownloadException = RedownloadInvalidResponse Request (Path Abs File) (Resp
                        
     deriving (Show, Typeable)
 instance Exception DownloadException
-
--- | Set the user-agent request header
-setGithubHeaders :: Request -> Request
-setGithubHeaders = setRequestHeader "Accept" ["application/vnd.github.v3+json"]

@@ -19,17 +19,13 @@ module Network.HTTP.Download.Verified
   ) where
 
 import qualified    Data.List as List
-import qualified    Data.ByteString as ByteString
 import qualified    Data.ByteString.Base64 as B64
 import              Conduit (withSinkFile)
 import qualified    Data.Conduit.Binary as CB
 import qualified    Data.Conduit.List as CL
-import qualified    Data.Text as Text
-import qualified    Data.Text.Encoding as Text
 
 import              Control.Monad
 import              Control.Monad.Catch (Handler (..)) -- would be nice if retry exported this itself
-import              Stack.Prelude hiding (Handler (..))
 import              Control.Retry (recovering,limitRetries,RetryPolicy,exponentialBackoff,RetryStatus(..))
 import              Crypto.Hash
 import              Crypto.Hash.Conduit (sinkHash)
@@ -38,12 +34,16 @@ import              Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import              Data.ByteString.Char8 (readInteger)
 import              Data.Conduit
 import              Data.Conduit.Binary (sourceHandle)
-import              Data.Text.Encoding (decodeUtf8With)
-import              Data.Text.Encoding.Error (lenientDecode)
+import              Data.Monoid (Sum(..))
 import              GHC.IO.Exception (IOException(..),IOErrorType(..))
-import              Network.HTTP.StackClient (Request, HttpException, httpSink, getUri, path, getResponseHeaders, hContentLength, hContentMD5)
+import              Network.HTTP.Client (Request, HttpException, getUri, path)
+import              Network.HTTP.Simple (getResponseHeaders, httpSink)
+import              Network.HTTP.Types (hContentLength, hContentMD5)
 import              Path
+import              RIO hiding (Handler)
 import              RIO.PrettyPrint
+import qualified    RIO.ByteString as ByteString
+import qualified    RIO.Text as Text
 import              System.Directory
 import qualified    System.FilePath as FP ((<.>))
 
@@ -133,7 +133,7 @@ instance Exception VerifyFileException
 -- Show a ByteString that is known to be UTF8 encoded.
 displayByteString :: ByteString -> String
 displayByteString =
-    Text.unpack . Text.strip . Text.decodeUtf8
+    Text.unpack . Text.strip . decodeUtf8Lenient
 
 -- Show a CheckHexDigest in human-readable format.
 displayCheckHexDigest :: CheckHexDigest -> String
@@ -247,7 +247,7 @@ verifiedDownload
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
     whenM' (liftIO getShouldDownload) $ do
-        logDebug $ "Downloading " <> Stack.Prelude.display (decodeUtf8With lenientDecode (path req))
+        logDebug $ "Downloading " <> display (decodeUtf8With lenientDecode (path req))
         liftIO $ createDirectoryIfMissing True dir
         recoveringHttp drRetryPolicy $
             withSinkFile fptmp $ httpSink req . go

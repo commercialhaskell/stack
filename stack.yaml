@@ -4,6 +4,7 @@ packages:
 - .
 - subs/pantry
 - subs/curator
+- subs/http-download
 - subs/rio-prettyprint
 
 # docker:

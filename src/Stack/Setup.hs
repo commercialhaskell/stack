@@ -66,8 +66,10 @@ import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
 import              Lens.Micro (set)
-import              Network.HTTP.StackClient (getResponseBody, getResponseStatusCode)
-import              Network.HTTP.Download
+import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
+                                              drRetryPolicyDefault, getResponseBody, getResponseStatusCode,
+                                              httpLbs, httpJSON, parseRequest, parseUrlThrow, setGithubHeaders,
+                                              verifiedDownload, withResponse)
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
