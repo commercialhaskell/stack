@@ -116,3 +116,4 @@ tests:
     - exceptions
     - hedgehog
     - QuickCheck
+    - string-quote

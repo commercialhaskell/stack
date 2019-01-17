@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.30.0.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc4bfcec8fa396290c6a92012ae46cae07ca2bd329e9ae0ca7aaec18202474f
+-- hash: c31488cb66292515d13ca79288eefcbb015bcc109ed18812cac158abde6a0685
 
 name:           pantry
 version:        0.1.0.0
@@ -191,6 +191,7 @@ test-suite spec
     , rio-orphans
     , safe
     , store-core
+    , string-quote
     , syb
     , tar-conduit >=0.3.0
     , template-haskell

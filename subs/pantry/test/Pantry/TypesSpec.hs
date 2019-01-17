@@ -323,3 +323,39 @@ sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
                                 10725
                       })
            ]
+    it "parses PackageLocationImmutable (RPLIArchive)" $ do
+       let lockFile :: ByteString
+           lockFile = [s|#some
+dependencies:
+- complete:
+  - size: 285152
+    subdir: wai
+    url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+    cabal-file:
+      size: 1717
+      sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
+    name: wai
+    version: 3.0.2.3
+    sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
+    pantry-tree:
+      size: 710
+      sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+
+       pkgImm <- case Yaml.decodeThrow lockFile of
+         Just (pkgIm :: Value) -> do
+           case Yaml.parseEither parseLockFile pkgIm of
+             Left str -> fail $ "Can't parse PackageLocationImmutable - 1" <> str
+             Right xs -> do
+               let (WithJSONWarnings iopli _) = xs
+               pli <- iopli
+               pure $ NonEmpty.toList pli
+         Nothing -> fail "Can't parse PackageLocationImmutable"
+       pkgImm `shouldBe` []
