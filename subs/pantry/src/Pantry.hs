@@ -135,6 +135,7 @@ module Pantry
   , getHackagePackageVersions
   , getLatestHackageVersion
   , getHackageTypoCorrections
+  , loadGlobalHints
   ) where
 
 import RIO
@@ -159,6 +160,8 @@ import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
+import Network.HTTP.Download
+import RIO.PrettyPrint
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
@@ -1026,3 +1029,40 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
           , paPantryConfig = pc
           }
         f
+
+-- | Load the global hints from Github.
+--
+-- @since 0.1.0.0
+loadGlobalHints
+  :: HasTerm env
+  => Path Abs File -- ^ local cached file location
+  -> WantedCompiler
+  -> RIO env (Maybe (Map PackageName Version))
+loadGlobalHints dest wc =
+    inner False
+  where
+    inner alreadyDownloaded = do
+      req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
+      downloaded <- download req dest
+      eres <- tryAny inner2
+      mres <-
+        case eres of
+          Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
+          Right x -> pure x
+      case mres of
+        Nothing | not alreadyDownloaded && not downloaded -> do
+          logInfo $
+            "Could not find local global hints for " <>
+            RIO.display wc <>
+            ", forcing a redownload"
+          x <- redownload req dest
+          if x
+            then inner True
+            else do
+              logInfo "Redownload didn't happen"
+              pure Nothing
+        _ -> pure mres
+
+    inner2 = liftIO
+           $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
+         <$> Yaml.decodeFileThrow (toFilePath dest)

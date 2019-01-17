@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 81fc63dbe63a0529c1d0424669ffed3a904a13647f67f6195e18c6dcafeed814
+-- hash: cf2c888c043cbf74e8b15a2b1f270b83808302d01579efdbb04095f1cf19502b
 
 name:           pantry
 version:        0.1.0.0
@@ -76,6 +76,7 @@ library
     , http-client
     , http-client-tls
     , http-conduit
+    , http-download
     , http-types
     , integer-gmp
     , memory
@@ -173,6 +174,7 @@ test-suite spec
     , http-client
     , http-client-tls
     , http-conduit
+    , http-download
     , http-types
     , integer-gmp
     , memory

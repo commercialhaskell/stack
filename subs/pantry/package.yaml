@@ -32,6 +32,7 @@ dependencies:
 - unliftio
 - http-conduit
 - http-client-tls
+- http-download
 - http-types
 - http-client
 - conduit

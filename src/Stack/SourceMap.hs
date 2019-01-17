@@ -13,15 +13,12 @@ module Stack.SourceMap
     ) where
 
 import qualified Data.Conduit.List as CL
-import Data.Yaml (decodeFileThrow)
 import qualified Distribution.PackageDescription as PD
-import Network.HTTP.StackClient (download, parseRequest, redownload)
 import Pantry
 import qualified RIO
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import RIO.Process
-import RIO.PrettyPrint
 import Stack.PackageDump
 import Stack.Prelude
 import Stack.Types.Build
@@ -120,41 +117,6 @@ versionMaybeFromPM ::
 versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
 versionMaybeFromPM _ loadVer = liftIO loadVer
 
--- | Load the global hints from Github.
-loadGlobalHints
-  :: HasTerm env
-  => Path Abs File -- ^ local cached file location
-  -> ActualCompiler
-  -> RIO env (Maybe (Map PackageName Version))
-loadGlobalHints dest ac =
-    inner False
-  where
-    inner alreadyDownloaded = do
-      req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
-      downloaded <- download req dest
-      eres <- tryAny inner2
-      mres <-
-        case eres of
-          Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
-          Right x -> pure x
-      case mres of
-        Nothing | not alreadyDownloaded && not downloaded -> do
-          logInfo $
-            "Could not find local global hints for " <>
-            RIO.display ac <>
-            ", forcing a redownload"
-          x <- redownload req dest
-          if x
-            then inner True
-            else do
-              logInfo "Redownload didn't happen"
-              pure Nothing
-        _ -> pure mres
-
-    inner2 = liftIO
-           $ Map.lookup ac . fmap (fmap unCabalString . unCabalStringMap)
-         <$> decodeFileThrow (toFilePath dest)
-
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env)
     => ActualCompiler
@@ -171,7 +133,7 @@ globalsFromDump compiler = do
 
 globalsFromHints ::
        HasConfig env
-    => ActualCompiler
+    => WantedCompiler
     -> RIO env (Map PackageName GlobalPackage)
 globalsFromHints compiler = do
     ghfp <- globalHintsFile
@@ -188,16 +150,16 @@ toActual ::
     -> WithDownloadCompiler
     -> ActualCompiler
     -> RIO env SMActual
-toActual smw downloadCompiler compiler = do
+toActual smw downloadCompiler ac = do
     allGlobals <-
         case downloadCompiler of
-            WithDownloadCompiler -> globalsFromDump compiler
-            SkipDownloadCompiler -> globalsFromHints compiler
+            WithDownloadCompiler -> globalsFromDump ac
+            SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
     let globals =
             allGlobals `Map.difference` smwProject smw `Map.difference` smwDeps smw
     return
         SMActual
-        { smaCompiler = compiler
+        { smaCompiler = ac
         , smaProject = smwProject smw
         , smaDeps = smwDeps smw
         , smaGlobal = globals
