@@ -115,13 +115,13 @@ createDependencyGraph dotOpts = do
   locals <- projectLocalPackages
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   installMap <- toInstallMap sourceMap
-  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
-                                                   installMap
+  (_, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
+                                         installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
-  let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
+  let depLoader = createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
@@ -248,24 +248,16 @@ resolveDependencies limit graph loadPackageDeps = do
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
 createDepLoader :: HasEnvConfig env
                 => SourceMap
-                -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName (DumpPackage () () ())
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
                 -> RIO env (Set PackageName, DotPayload)
-createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName = do
-  case projectPackageDeps <|> dependencyDeps <|> globalDeps of
-    Just x -> x
-    Nothing ->
-      if isWiredInPackage then
-        let errText = "Invariant violated: Expected to find wired-in-package "
-        in error (errText ++ packageNameString pkgName ++ " in global DB")
-      else
-        pure noDeps
+createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
+  fromMaybe noDepsErr
+    (projectPackageDeps <|> dependencyDeps <|> globalDeps)
   where
-    isWiredInPackage = pkgName `Set.member` wiredInPackages
     projectPackageDeps =
       fmap loadDeps $ Map.lookup pkgName (smProject sourceMap)
       where
@@ -276,21 +268,20 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
     dependencyDeps =
       fmap loadDeps $ Map.lookup pkgName (smDeps sourceMap)
       where
-        loadDeps dp =
-          case dp of
-            DepPackage{dpLocation=PLMutable dir} -> do
+        loadDeps DepPackage{dpLocation=PLMutable dir} = do
               pp <- mkProjectPackage YesPrintWarnings dir False
               pkg <- loadCommonPackage (ppCommon pp)
               pure (packageAllDeps pkg, payloadFromLocal pkg)
-            DepPackage{dpLocation=PLImmutable loc} -> do
-              let common = dpCommon dp
-              gpd <- liftIO $ cpGPD common
-              let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
-                  flags = cpFlags common
-                  ghcOptions = cpGhcOptions common
-              assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
 
-    -- If package is a wired-in-package or a global package, use info from ghc-pkg (#4324, #3084)
+        loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
+          let common = dpCommon dp
+          gpd <- liftIO $ cpGPD common
+          let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
+              flags = cpFlags common
+              ghcOptions = cpGhcOptions common
+          assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
+
+    -- If package is a global package, use info from ghc-pkg (#4324, #3084)
     globalDeps =
       fmap (pure . getDepsFromDump) $ Map.lookup pkgName globalDumpMap
       where
@@ -304,13 +295,10 @@ createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pk
                  Stack.Prelude.pkgName
                  (Map.lookup depId globalIdMap)
 
-    noDeps = (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
+    noDepsErr = error ("Invariant violated: Expected to find "
+                ++ packageNameString pkgName ++ " in global DB")
 
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
-        case maybePkg of
-            Just (_, Library _ _ mlicense) -> mlicense
-            _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
