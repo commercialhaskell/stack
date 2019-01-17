@@ -60,7 +60,7 @@ getArchive
   -> RIO env Package
 getArchive pli archive pm = do
   -- Check if the value is in the archive, and use it if possible
-  mpa <- loadCache archive
+  mpa <- loadCache pli archive
   pa <-
     case mpa of
       Just pa -> pure pa
@@ -90,9 +90,10 @@ storeCache archive sha size pa =
 
 loadCache
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Archive
+  => PackageLocationImmutable
+  -> Archive
   -> RIO env (Maybe Package)
-loadCache archive =
+loadCache pli archive =
   case loc of
     ALFilePath _ -> pure Nothing -- TODO can we do something intelligent here?
     ALUrl url -> withStorage (loadArchiveCache url (archiveSubdir archive)) >>= loop
@@ -102,7 +103,7 @@ loadCache archive =
     msize = archiveSize archive
 
     loadFromCache :: TreeId -> RIO env (Maybe Package)
-    loadFromCache tid = fmap Just $ withStorage $ loadPackageById tid
+    loadFromCache tid = fmap Just $ withStorage $ loadPackageById pli tid
 
     loop [] = pure Nothing
     loop ((sha, size, tid):rest) =
@@ -406,19 +407,19 @@ parseArchive pli archive fp = do
               Just bs -> pure bs
           cabalBs <- case buildFile of
             BFCabal _ _ -> pure bs
-            BFHpack _ -> snd <$> hpackToCabal tree
+            BFHpack _ -> snd <$> hpackToCabal pli tree
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
           case buildFile of
             BFCabal _ _ -> when (buildFilePath /= cabalFileName name) $ throwIO $ WrongCabalFileName pli buildFilePath name
             _ -> return ()
           -- It's good! Store the tree, let's bounce
-          (tid, treeKey) <- withStorage $ storeTree ident tree buildFile
+          (tid, treeKey) <- withStorage $ storeTree pli ident tree buildFile
           packageCabal <- case buildFile of
                             BFCabal _ _ -> pure $ PCCabalFile buildFileEntry
                             BFHpack _ -> do
                               cabalKey <- withStorage $ do
-                                            hpackId <- storeHPack tid
+                                            hpackId <- storeHPack pli tid
                                             loadCabalBlobKey hpackId
                               hpackSoftwareVersion <- hpackVersion
                               let cabalTreeEntry = TreeEntry cabalKey (teType buildFileEntry)

@@ -502,19 +502,20 @@ loadHPackTreeEntity tid = do
   hpackEntity <-
       case hpackTreeEntry of
         Nothing ->
-            error $ "generateHPack: No package.yaml file found in TreeEntry for TreeId:  " ++ (show tid)
+            error $ "loadHPackTreeEntity: No package.yaml file found in TreeEntry for TreeId:  " ++ (show tid)
         Just record -> return record
   return hpackEntity
 
 storeHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => TreeId
+    => P.PackageLocationImmutable
+    -> TreeId
     -> ReaderT SqlBackend (RIO env) (Key HPack)
-storeHPack tid = do
+storeHPack pli tid = do
     vid <- hpackVersionId
     hpackRecord <- getBy (UniqueHPack tid vid)
     case hpackRecord of
-      Nothing -> generateHPack tid vid
+      Nothing -> generateHPack pli tid vid
       Just record -> return $ entityKey record
 
 loadCabalBlobKey :: (HasPantryConfig env, HasLogFunc env) => HPackId -> ReaderT SqlBackend (RIO env) BlobKey
@@ -525,12 +526,13 @@ loadCabalBlobKey hpackId = do
 
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => TreeId
+    => P.PackageLocationImmutable -- ^ for exceptions
+    -> TreeId
     -> VersionId
     -> ReaderT SqlBackend (RIO env) (Key HPack)
-generateHPack tid vid = do
+generateHPack pli tid vid = do
     tree <- getTree tid
-    (pkgName, cabalBS) <- hpackToCabalS tree
+    (pkgName, cabalBS) <- hpackToCabalS pli tree
     bid <- storeCabalFile cabalBS pkgName
     let cabalFile = P.cabalFileName pkgName
     fid <- insertBy FilePath {filePathPath = cabalFile}
@@ -555,11 +557,12 @@ hpackVersionId = do
 
 storeTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => P.PackageIdentifier
+  => P.PackageLocationImmutable -- ^ for exceptions
+  -> P.PackageIdentifier
   -> P.Tree
   -> P.BuildFile
   -> ReaderT SqlBackend (RIO env) (TreeId, P.TreeKey)
-storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) buildFile = do
+storeTree pli (P.PackageIdentifier name version) tree@(P.TreeMap m) buildFile = do
   (bid, blobKey) <- storeBlob $ P.renderTree tree
   (cabalid, ftype) <- case buildFile of
                 P.BFHpack (P.TreeEntry _ ftype) -> pure (Nothing, ftype)
@@ -598,7 +601,7 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) buildFile = do
           }
       pure (tid, P.TreeKey blobKey)
   case buildFile of
-    P.BFHpack _ -> storeHPack tid >> return ()
+    P.BFHpack _ -> storeHPack pli tid >> return ()
     P.BFCabal _ _ -> return ()
   return (tid, pTreeKey)
 
@@ -636,9 +639,10 @@ getTreeForKey (P.TreeKey key) = do
 
 loadPackageById ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => TreeId
+    => P.PackageLocationImmutable -- ^ for exceptions
+    -> TreeId
     -> ReaderT SqlBackend (RIO env) Package
-loadPackageById tid = do
+loadPackageById pli tid = do
     (mts :: Maybe Tree) <- get tid
     ts <-
         case mts of
@@ -681,7 +685,7 @@ loadPackageById tid = do
                         -- use different hpack version via
                         -- --with-hpack option.
                      -> do
-                        (hpackId :: HPackId) <- storeHPack tid
+                        (hpackId :: HPackId) <- storeHPack pli tid
                         hpackRecord <- getJust hpackId
                         getHPackCabalFile (hpackRecord, hpackId) ts tmap cabalFile
                     Just (Entity hkey item) ->
@@ -794,11 +798,12 @@ loadHackageTreeKey name ver sha = do
 
 loadHackageTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => P.PackageName
+  => P.PackageLocationImmutable -- ^ for exceptions
+  -> P.PackageName
   -> P.Version
   -> BlobId
   -> ReaderT SqlBackend (RIO env) (Maybe Package)
-loadHackageTree name ver bid = do
+loadHackageTree pli name ver bid = do
   nameid <- getPackageNameId name
   versionid <- getVersionId ver
   ment <- selectFirst
@@ -813,7 +818,7 @@ loadHackageTree name ver bid = do
     Just (Entity _ hc) ->
       case hackageCabalTree hc of
         Nothing -> assert False $ pure Nothing
-        Just tid -> Just <$> loadPackageById tid
+        Just tid -> Just <$> loadPackageById pli tid
 
 storeArchiveCache
   :: (HasPantryConfig env, HasLogFunc env)
@@ -960,34 +965,37 @@ findOrGenerateCabalFile pkgDir = do
 
 -- | Similar to 'hpackToCabal' but doesn't require a new connection to database.
 hpackToCabalS :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-              => P.Tree
+              => P.PackageLocationImmutable -- ^ for exceptions
+              -> P.Tree
               -> ReaderT SqlBackend (RIO env) (P.PackageName, ByteString)
-hpackToCabalS tree = do
+hpackToCabalS pli tree = do
   tmpDir <- lift $ do
               tdir <- getTempDir
               createTempDir tdir "hpack-pkg-dir"
-  unpackTreeToDir tmpDir tree
+  unpackTreeToDir pli tmpDir tree
   (packageName, cfile) <- lift $ findOrGenerateCabalFile tmpDir
   !bs <- lift $ B.readFile (fromAbsFile cfile)
   lift $ removeDirRecur tmpDir
   return $ (packageName, bs)
 
 hpackToCabal :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-           => P.Tree
+           => P.PackageLocationImmutable -- ^ for exceptions
+           -> P.Tree
            -> RIO env (P.PackageName, ByteString)
-hpackToCabal tree = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> do
+hpackToCabal pli tree = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> do
                tdir <- parseAbsDir tmpdir
-               withStorage $ unpackTreeToDir tdir tree
+               withStorage $ unpackTreeToDir pli tdir tree
                (packageName, cfile) <- findOrGenerateCabalFile tdir
                bs <- B.readFile (fromAbsFile cfile)
                return (packageName, bs)
 
 unpackTreeToDir
   :: (HasPantryConfig env, HasLogFunc env)
-  => Path Abs Dir -- ^ dest dir, will be created if necessary
+  => P.PackageLocationImmutable -- ^ for exceptions
+  -> Path Abs Dir -- ^ dest dir, will be created if necessary
   -> P.Tree
   -> ReaderT SqlBackend (RIO env) ()
-unpackTreeToDir (toFilePath -> dir) (P.TreeMap m) = do
+unpackTreeToDir pli (toFilePath -> dir) (P.TreeMap m) = do
   for_  (Map.toList m) $ \(sfp, P.TreeEntry blobKey ft) -> do
     let dest = dir </> T.unpack (P.unSafeFilePath sfp)
     createDirectoryIfMissing True $ takeDirectory dest
@@ -995,7 +1003,7 @@ unpackTreeToDir (toFilePath -> dir) (P.TreeMap m) = do
     case mbs of
       Nothing -> do
         -- TODO when we have pantry wire stuff, try downloading
-        throwIO $ P.TreeReferencesMissing sfp blobKey
+        throwIO $ P.TreeReferencesMissingBlob pli sfp blobKey
       Just bs -> do
         B.writeFile dest bs
         case ft of

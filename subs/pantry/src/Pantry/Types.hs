@@ -641,7 +641,6 @@ data PantryException
   | NoHackageCryptographicHash !PackageIdentifier
   | FailedToCloneRepo !Repo
   | TreeReferencesMissingBlob !PackageLocationImmutable !SafeFilePath !BlobKey
-  | TreeReferencesMissing !SafeFilePath !BlobKey
   | CompletePackageMetadataMismatch !PackageLocationImmutable !PackageMetadata
   | CRC32Mismatch !ArchiveLocation !FilePath !(Mismatch Word32)
   | UnknownHackagePackage !PackageIdentifierRevision !FuzzyResults
@@ -789,10 +788,6 @@ instance Display PantryException where
   display (TreeReferencesMissingBlob loc sfp key) =
     "The package " <> display loc <>
     " needs blob " <> display key <>
-    " for file path " <> display sfp <>
-    ", but the blob is not available"
-  display (TreeReferencesMissing sfp key) =
-    "The package needs blob " <> display key <>
     " for file path " <> display sfp <>
     ", but the blob is not available"
   display (CompletePackageMetadataMismatch loc pm) =
