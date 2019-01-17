@@ -406,12 +406,12 @@ parseArchive pli archive fp = do
               Just bs -> pure bs
           cabalBs <- case buildFile of
             BFCabal _ _ -> pure bs
-            BFHpack _ -> snd <$> hpackToCabal bs tree
+            BFHpack _ -> snd <$> hpackToCabal tree
           (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
-          when (buildFilePath /= cabalFileName name && isCabalBuildFile buildFile) $
-            throwIO $ WrongCabalFileName pli buildFilePath name
-
+          case buildFile of
+            BFCabal _ _ -> when (buildFilePath /= cabalFileName name) $ throwIO $ WrongCabalFileName pli buildFilePath name
+            _ -> return ()
           -- It's good! Store the tree, let's bounce
           (tid, treeKey) <- withStorage $ storeTree ident tree buildFile
           packageCabal <- case buildFile of

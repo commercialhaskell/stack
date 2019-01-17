@@ -28,8 +28,6 @@ module Pantry.Types
   , PackageIdentifierRevision (..)
   , FileType (..)
   , BuildFile (..)
-  , isHPackBuildFile
-  , isCabalBuildFile
   , FileSize (..)
   , TreeEntry (..)
   , SafeFilePath
@@ -164,7 +162,7 @@ data PHpack = PHpack
     } deriving (Show, Eq)
 
 data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
-                  | PCHpack PHpack
+                  | PCHpack !PHpack
                   deriving (Show, Eq)
 
 cabalFileName :: PackageName -> SafeFilePath
@@ -883,14 +881,6 @@ data BuildFile = BFCabal !SafeFilePath !TreeEntry
                | BFHpack !TreeEntry -- We don't need SafeFilePath for Hpack since it has to be package.yaml file
   deriving (Show, Eq)
 
-isHPackBuildFile :: BuildFile -> Bool
-isHPackBuildFile (BFHpack _) = True
-isHPackBuildFile (BFCabal _ _) = False
-
-isCabalBuildFile :: BuildFile -> Bool
-isCabalBuildFile (BFCabal _ _) = True
-isCabalBuildFile (BFHpack _) = False
-
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)
 instance PersistField FileType where
@@ -926,7 +916,7 @@ instance PersistFieldSql SafeFilePath where
 unSafeFilePath :: SafeFilePath -> Text
 unSafeFilePath (SafeFilePath t) = t
 
-safeFilePathtoPath :: Path Abs Dir -> SafeFilePath -> IO (Path Abs File)
+safeFilePathtoPath :: (MonadThrow m) => Path Abs Dir -> SafeFilePath -> m (Path Abs File)
 safeFilePathtoPath dir (SafeFilePath path) = do
   fpath <- parseRelFile (T.unpack path)
   return $ dir </> fpath
@@ -945,6 +935,7 @@ mkSafeFilePath t = do
 
   Just $ SafeFilePath t
 
+-- | SafeFilePath for `package.yaml` file.
 hpackSafeFilePath :: SafeFilePath
 hpackSafeFilePath =
     let fpath = mkSafeFilePath (T.pack Hpack.packageConfig)

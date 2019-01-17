@@ -174,7 +174,7 @@ HPack
    tree TreeId
    version VersionId
    -- Corresponding cabal file of hpack
-   cabal BlobId
+   cabalPath BlobId
    path FilePathId
    UniqueHPack tree version
 
@@ -520,7 +520,7 @@ storeHPack tid = do
 loadCabalBlobKey :: (HasPantryConfig env, HasLogFunc env) => HPackId -> ReaderT SqlBackend (RIO env) BlobKey
 loadCabalBlobKey hpackId = do
   hpackRecord <- getJust hpackId
-  let cabalBlobId = hPackCabal hpackRecord
+  let cabalBlobId = hPackCabalPath hpackRecord
   getBlobKey cabalBlobId
 
 generateHPack ::
@@ -529,10 +529,8 @@ generateHPack ::
     -> VersionId
     -> ReaderT SqlBackend (RIO env) (Key HPack)
 generateHPack tid vid = do
-    hpackEntity <- loadHPackTreeEntity tid
-    hpackBS <- loadBlobById (treeEntryBlob $ entityVal hpackEntity)
     tree <- getTree tid
-    (pkgName, cabalBS) <- hpackToCabalS hpackBS tree
+    (pkgName, cabalBS) <- hpackToCabalS tree
     bid <- storeCabalFile cabalBS pkgName
     let cabalFile = P.cabalFileName pkgName
     fid <- insertBy FilePath {filePathPath = cabalFile}
@@ -540,7 +538,7 @@ generateHPack tid vid = do
             HPack
                 { hPackTree = tid
                 , hPackVersion = vid
-                , hPackCabal = bid
+                , hPackCabalPath = bid
                 , hPackPath = getKey fid
                 }
     val <- insertBy hpackRecord
@@ -599,7 +597,9 @@ storeTree (P.PackageIdentifier name version) tree@(P.TreeMap m) buildFile = do
           , treeEntryType = ft
           }
       pure (tid, P.TreeKey blobKey)
-  when (P.isHPackBuildFile buildFile) (storeHPack tid >> return ())
+  case buildFile of
+    P.BFHpack _ -> storeHPack tid >> return ()
+    P.BFCabal _ _ -> return ()
   return (tid, pTreeKey)
 
 getTree :: (HasPantryConfig env, HasLogFunc env)
@@ -714,7 +714,7 @@ getHPackCabalFile ::
     -> SafeFilePath
     -> ReaderT SqlBackend (RIO env) (P.PackageCabal, P.Tree)
 getHPackCabalFile (hpackRecord, _) ts tmap cabalFile = do
-    cabalKey <- getBlobKey (hPackCabal hpackRecord)
+    cabalKey <- getBlobKey (hPackCabalPath hpackRecord)
     hpackKey <- getHPackBlobKey hpackRecord
     hpackSoftwareVersion <- lift hpackVersion
     let fileType = treeCabalType ts
@@ -960,26 +960,22 @@ findOrGenerateCabalFile pkgDir = do
 
 -- | Similar to 'hpackToCabal' but doesn't require a new connection to database.
 hpackToCabalS :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-              => ByteString -- Hpack's content
-              -> P.Tree
+              => P.Tree
               -> ReaderT SqlBackend (RIO env) (P.PackageName, ByteString)
-hpackToCabalS hpackBs tree = do
+hpackToCabalS tree = do
   tmpDir <- lift $ do
               tdir <- getTempDir
               createTempDir tdir "hpack-pkg-dir"
   unpackTreeToDir tmpDir tree
-  lift $ B.writeFile (fromAbsDir tmpDir </> Hpack.packageConfig) hpackBs
   (packageName, cfile) <- lift $ findOrGenerateCabalFile tmpDir
   !bs <- lift $ B.readFile (fromAbsFile cfile)
   lift $ removeDirRecur tmpDir
   return $ (packageName, bs)
 
 hpackToCabal :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-           => ByteString -- Hpack's content
-           -> P.Tree
+           => P.Tree
            -> RIO env (P.PackageName, ByteString)
-hpackToCabal hpackBs tree = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> do
-               B.writeFile (tmpdir FilePath.</> Hpack.packageConfig) hpackBs
+hpackToCabal tree = withSystemTempDirectory "hpack-pkg-dir" $ \tmpdir -> do
                tdir <- parseAbsDir tmpdir
                withStorage $ unpackTreeToDir tdir tree
                (packageName, cfile) <- findOrGenerateCabalFile tdir
