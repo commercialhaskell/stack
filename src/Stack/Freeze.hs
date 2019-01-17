@@ -1,18 +1,25 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Stack.Freeze
     ( freeze
     , FreezeOpts (..)
     , FreezeMode (..)
+    , hasLockFile
+    , isLockFileOutdated
     ) where
 
+import qualified Prelude as Prelude
 import           Data.Aeson ((.=), object)
 import qualified Data.Yaml as Yaml
 import           RIO.Process
 import qualified RIO.ByteString as B
 import           Stack.Prelude
 import           Stack.Types.Config
+import Stack.Config (loadConfigYaml)
+import Path (addFileExtension, parent, fromAbsFile)
+import Path.IO (doesFileExist)
 
 data FreezeMode = FreezeProject | FreezeSnapshot
 
@@ -27,20 +34,25 @@ freeze (FreezeOpts mode) = do
     Just (p, _) -> doFreeze p mode
     Nothing -> logWarn "No project was found: nothing to freeze"
 
+completePackageLocation' :: (HasProcessContext env, HasLogFunc env, HasPantryConfig env, HasEnvConfig env) => RawPackageLocation -> RIO env PackageLocation
+completePackageLocation' pl =
+    case pl of
+      RPLImmutable pli -> PLImmutable <$> completePackageLocation pli
+      RPLMutable m -> pure $ PLMutable m
+
 doFreeze ::
-       (HasProcessContext env, HasLogFunc env, HasPantryConfig env)
+       (HasProcessContext env, HasLogFunc env, HasPantryConfig env, HasEnvConfig env)
     => Project
     -> FreezeMode
     -> RIO env ()
 doFreeze p FreezeProject = do
-  let deps = projectDependencies p
-      resolver = projectResolver p
-      completePackageLocation' pl =
-        case pl of
-          RPLImmutable pli -> PLImmutable <$> completePackageLocation pli
-          RPLMutable m -> pure $ PLMutable m
-  resolver' <- completeSnapshotLocation resolver
-  deps' <- mapM completePackageLocation' deps
+  envConfig <- view envConfigL
+  let bconfig = envConfigBuildConfig envConfig
+  generateLockFile bconfig
+  let deps :: [RawPackageLocation] = projectDependencies p
+      resolver :: RawSnapshotLocation = projectResolver p
+  resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
+  deps' :: [PackageLocation] <- mapM completePackageLocation' deps
   let rawCompleted = map toRawPL deps'
       rawResolver = toRawSL resolver'
   if rawCompleted == deps && rawResolver == resolver
@@ -75,3 +87,51 @@ doFreeze p FreezeSnapshot = do
         logInfo "No freezing is required for the snapshot of this project"
         else
         liftIO $ B.putStr $ Yaml.encode snap'
+
+-- BuildConfig is in Types/Config.hs
+generateLockFile :: HasEnvConfig env => BuildConfig -> RIO env ()
+generateLockFile bconfig = do
+  let stackFile = bcStackYaml bconfig
+  lockFile <- liftIO $ addFileExtension "lock" stackFile
+  iosc <- loadConfigYaml (parseStackYamlConfig (parent stackFile)) stackFile
+  StackYamlConfig deps resolver <- liftIO iosc
+  resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
+  deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+  liftIO $ Prelude.print deps'
+  let deps'' = map toRawPL deps'
+  let depsObject = Yaml.object [
+                            ("resolver",
+                                       Yaml.array
+                                           [
+                                            object [("original", Yaml.toJSON resolver)],
+                                            object [("complete", Yaml.toJSON resolver')]
+                                           ]
+                            ),
+                            ("dependencies",
+                                           Yaml.array
+                                                   [
+                                                    object [("original", Yaml.toJSON deps)],
+                                                    object [("complete", Yaml.toJSON deps'')]
+                                                   ]
+                            )]
+  B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
+
+
+hasLockFile :: HasEnvConfig env => BuildConfig -> RIO env Bool
+hasLockFile bconfig = do
+  let stackFile = bcStackYaml bconfig
+  lockFile <- liftIO $ addFileExtension "lock" stackFile
+  liftIO $ doesFileExist lockFile
+
+isLockFileOutdated :: HasEnvConfig env => BuildConfig -> RIO env Bool
+isLockFileOutdated bconfig = do
+  let stackFile = bcStackYaml bconfig
+  lockFile <- liftIO $ addFileExtension "lock" stackFile
+  iosc <- loadConfigYaml (parseStackYamlConfig (parent stackFile)) stackFile
+  StackYamlConfig deps resolver <- liftIO iosc
+  resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
+  deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+  let deps'' = map toRawPL deps'
+      rawResolver = toRawSL resolver'
+      isUpdated = (deps'' == deps) && (resolver == rawResolver)
+  pure $ not isUpdated

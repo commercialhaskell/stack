@@ -59,6 +59,7 @@ build :: HasEnvConfig env
       -> Maybe FileLock
       -> RIO env ()
 build msetLocalFiles mbuildLk = do
+  logDebug $ "build: 0"
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -73,6 +74,8 @@ build msetLocalFiles mbuildLk = do
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
+    logDebug $ "build: 1"
+    logDebug $ displayShow $ toFilePath stackYaml
     for_ msetLocalFiles $ \setLocalFiles -> do
       files <- sequence
         [lpFiles lp | lp <- allLocals]
@@ -92,8 +95,9 @@ build msetLocalFiles mbuildLk = do
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
-
+    logDebug $ "build: 2"
     allowLocals <- view $ configL.to configAllowLocals
+    logDebug $ "build: 3"
     unless allowLocals $ case justLocals plan of
       [] -> return ()
       localsIdents -> throwM $ LocalPackagesPresent localsIdents
@@ -107,14 +111,14 @@ build msetLocalFiles mbuildLk = do
       (Just lk,True) -> do logDebug "All installs are local; releasing snapshot lock early."
                            liftIO $ unlockFile lk
       _ -> return ()
-
+    logDebug $ "build: 4"
     checkCabalVersion
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
-
+    logDebug $ "build: 5"
     when (boptsPreFetch bopts) $
         preFetch plan
-
+    logDebug $ "build: 6"
     if boptsCLIDryrun boptsCli
         then printPlan plan
         else executePlan boptsCli baseConfigOpts locals

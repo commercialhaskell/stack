@@ -91,6 +91,8 @@ module Stack.Types.Config
   ,Curator(..)
   ,ProjectAndConfigMonoid(..)
   ,parseProjectAndConfigMonoid
+  ,StackYamlConfig(..)
+  ,parseStackYamlConfig
   -- ** PvpBounds
   ,PvpBounds(..)
   ,PvpBoundsType(..)
@@ -169,10 +171,12 @@ module Stack.Types.Config
 import           Control.Monad.Writer (tell)
 import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
+import qualified Data.Aeson.Types as Aeson
+import qualified Data.Vector as Vector
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
-                  withObjectWarnings, WarningParser, Object, jsonSubWarnings,
+                  withObjectWarnings, WarningParser, Object, jsonSubWarnings, unWarningParser,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -223,7 +227,7 @@ import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
-
+import           Data.Aeson (withArray, (.:))
 -- Re-exports
 import           Stack.Types.Config.Build as X
 
@@ -1430,11 +1434,50 @@ getCompilerPath wc = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
+data StackYamlConfig = StackYamlConfig {
+      sycDeps :: [RawPackageLocation],
+      sycResolver :: RawSnapshotLocation
+}
+
+data StackLockConfig = StackLockConfig {
+      slcDeps :: [PackageLocation],
+      slcResolver :: SnapshotLocation
+}
+
+-- tr :: Aeson.Parser a -> WarningParser a
+
+
+-- myParser :: Value -> Yaml.Parser (WithJSONWarnings [PackageLocationImmutable])
+parseLockFile ::
+       Value -> Yaml.Parser [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]
+parseLockFile value = do
+    (WithJSONWarnings val _) <- withObjectWarnings
+            "PackageLocationimmutable"
+            (\obj -> do
+                 (deps :: Value) <- obj ..: "dependencies"
+                 lift $ withArray "PackageLocationimmutable.complete (Array)" (\array -> do
+                                                                                  let array' :: [Value] = Vector.toList array
+                                                                                      array'' :: [ Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))] = map (parseJSON) array'
+                                                                                  sequence array'') deps
+            ) value
+    let val' :: [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]  = map (\(WithJSONWarnings item warn) -> WithJSONWarnings (resolvePaths Nothing item) warn) val
+    pure val'
+
+
+parseStackYamlConfig :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO StackYamlConfig))
+parseStackYamlConfig rootDir = withObjectWarnings "StackYamlConfig" $ \o -> do
+                         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
+                         resolver <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
+                         return $ do
+                           (deps' :: [NonEmpty RawPackageLocation]) <- mapM (resolvePaths (Just rootDir)) deps
+                           resolver' <- resolvePaths (Just rootDir) resolver
+                           pure $ StackYamlConfig { sycResolver = resolver', sycDeps = concatMap toList deps' }
+
 parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO ProjectAndConfigMonoid))
 parseProjectAndConfigMonoid rootDir =
     withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
-        packages <- o ..:? "packages" ..!= [RelFilePath "."]
-        deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
+        (packages :: [RelFilePath]) <- o ..:? "packages" ..!= [RelFilePath "."]
+        (deps :: [Unresolved (NonEmpty RawPackageLocation)]) <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
         flags' <- o ..:? "flags" ..!= mempty
         let flags = unCabalStringMap <$> unCabalStringMap
                     (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
