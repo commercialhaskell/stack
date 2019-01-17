@@ -78,11 +78,10 @@ import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import qualified RIO.Text as T
 import RIO.Time (UTCTime, getCurrentTime)
-import Path (Path, Abs, File, Dir, toFilePath, parent, filename, parseAbsDir, fromAbsFile, fromAbsDir, fromRelFile)
+import Path (Path, Abs, File, Dir, toFilePath, parent, filename, parseAbsDir, fromAbsFile, fromRelFile)
 import Path.IO (ensureDir, listDir, createTempDir, getTempDir, removeDirRecur)
 import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackVersion, hpack)
-import qualified Hpack.Config as Hpack
 import Conduit
 import Data.Acquire (with)
 import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
