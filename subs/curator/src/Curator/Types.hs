@@ -124,7 +124,7 @@ data ComponentAction
   = CAExpectSuccess
   | CAExpectFailure
   | CASkip
-  deriving Show
+  deriving (Eq, Show)
 instance ToJSON ComponentAction where
   toJSON CAExpectSuccess = toJSON ("expect-success" :: Text)
   toJSON CAExpectFailure = toJSON ("expect-failure" :: Text)
