@@ -96,6 +96,7 @@ library:
   exposed-modules:
   - Pantry
   - Pantry.SHA256
+  - Pantry.HPack
 
   # For testing
   - Pantry.Internal
