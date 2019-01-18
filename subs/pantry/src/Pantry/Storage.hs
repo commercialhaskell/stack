@@ -463,11 +463,6 @@ loadHackageTarballInfo name version = do
   where
     go (Entity _ ht) = (hackageTarballSha ht, hackageTarballSize ht)
 
-getKey :: Either (Entity record) (Key record) -> Key record
-getKey dat = case dat of
-               Left (Entity key _) -> key
-               Right key -> key
-
 storeCabalFile ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => ByteString
@@ -540,10 +535,9 @@ generateHPack pli tid vid = do
                 { hPackTree = tid
                 , hPackVersion = vid
                 , hPackCabalPath = bid
-                , hPackPath = getKey fid
+                , hPackPath = either entityKey id fid
                 }
-    val <- insertBy hpackRecord
-    return $ getKey val
+    either entityKey id <$> insertBy hpackRecord
 
 
 hpackVersionId ::
@@ -551,8 +545,9 @@ hpackVersionId ::
     => ReaderT SqlBackend (RIO env) VersionId
 hpackVersionId = do
     hpackSoftwareVersion <- lift $ hpackVersion
-    hid <- insertBy $ Version {versionVersion = P.VersionP hpackSoftwareVersion}
-    return $ getKey hid
+    fmap (either entityKey id) $
+      insertBy $
+      Version {versionVersion = P.VersionP hpackSoftwareVersion}
 
 storeTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
