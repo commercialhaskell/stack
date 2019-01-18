@@ -282,11 +282,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     newCmd
                     newOptsParser
         addCommand' "templates"
-         (unwords [ "List the templates available for `stack new'."
-                  , "Templates are drawn from"
-                  , "https://github.com/commercialhaskell/stack-templates"
-                  , "Note: `stack new' can also accept a template from a"
-                  , "local file or a remote URL."
+         (unwords [ "Show how to find templates available for `stack new'."
+                  , "`stack new' can accept a template from a remote repository"
+                  , "(default: github), local file or remote URL."
+                  , "Note: this downloads the help file."
                   ] )
                     templatesCmd
                     (pure ())
@@ -992,7 +991,7 @@ newCmd (newOpts,initOpts) go@GlobalOpts{..} =
         when (forceOverwrite initOpts || not exists) $
             initProject IsNewCmd dir initOpts globalResolver
 
--- | List the available templates.
+-- | Display instructions for how to use templates
 templatesCmd :: () -> GlobalOpts -> IO ()
 templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go templatesHelp
 

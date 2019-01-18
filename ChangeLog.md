@@ -18,6 +18,8 @@ Other enhancements:
 Bug fixes:
 
 - Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
+- Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
+  downloads and shows a help file, rather than listing available templates.
 
 ## v1.9.3
 
