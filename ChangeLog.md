@@ -108,6 +108,9 @@ Bug fixes:
   [#4402](https://github.com/commercialhaskell/stack/pull/4402)
 * Fix handling of GitHub and URL templates on Windows. See
   [commercialhaskell/stack#4394](https://github.com/commercialhaskell/stack/issues/4394)
+* Fix `--file-watch` not responding to file modifications when running
+  inside docker on Mac. See
+  [#4506](https://github.com/commercialhaskell/stack/issues/4506)
 
 ## v1.9.3
 
