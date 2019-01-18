@@ -8,6 +8,7 @@ module Curator.Types
   , Maintainer
   , Revisions (..)
   , ComponentAction (..)
+  , Component (..)
   ) where
 
 import RIO
@@ -22,6 +23,7 @@ type Maintainer = Text
 data Constraints = Constraints
   { consGhcVersion :: !Version
   , consPackages :: !(Map PackageName PackageConstraints)
+  , consGithubUsers :: !(Map Text (Set Text))
   }
   deriving Show
 
@@ -29,11 +31,13 @@ instance ToJSON Constraints where
   toJSON c = object
     [ "ghc-version" .= CabalString (consGhcVersion c)
     , "packages" .= toCabalStringMap (consPackages c)
+    , "github-users" .= consGithubUsers c
     ]
 instance FromJSON Constraints where
   parseJSON = withObject "Constraints" $ \o -> Constraints
     <$> fmap unCabalString (o .: "ghc-version")
     <*> fmap unCabalStringMap (o .: "packages")
+    <*> o .: "github-users"
 
 data PackageConstraints = PackageConstraints
   { pcMaintainers :: !(Set Maintainer)
@@ -151,3 +155,10 @@ instance FromJSON Revisions where
       "use-revisions" -> pure UseRevisions
       "no-revisions" -> pure NoRevisions
       _ -> fail $ "Invalid revisions: " ++ show t
+
+data Component
+  = CompLibrary
+  | CompExecutable
+  | CompTestSuite
+  | CompBenchmark
+  deriving Eq
