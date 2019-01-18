@@ -171,10 +171,14 @@ Tree
 
 HPack
    tree TreeId
+
+   -- hpack version used for generating this cabal file
    version VersionId
-   -- Corresponding cabal file of hpack
-   cabalPath BlobId
-   path FilePathId
+
+   -- Generated cabal file for the given tree and hpack version
+   cabalBlob BlobId
+   cabalPath FilePathId
+
    UniqueHPack tree version
 
 -- An individual file within a Tree.
@@ -515,8 +519,7 @@ storeHPack pli tid = do
 loadCabalBlobKey :: (HasPantryConfig env, HasLogFunc env) => HPackId -> ReaderT SqlBackend (RIO env) BlobKey
 loadCabalBlobKey hpackId = do
   hpackRecord <- getJust hpackId
-  let cabalBlobId = hPackCabalPath hpackRecord
-  getBlobKey cabalBlobId
+  getBlobKey $ hPackCabalBlob hpackRecord
 
 generateHPack ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -534,8 +537,8 @@ generateHPack pli tid vid = do
             HPack
                 { hPackTree = tid
                 , hPackVersion = vid
-                , hPackCabalPath = bid
-                , hPackPath = either entityKey id fid
+                , hPackCabalBlob = bid
+                , hPackCabalPath = either entityKey id fid
                 }
     either entityKey id <$> insertBy hpackRecord
 
@@ -681,9 +684,9 @@ loadPackageById pli tid = do
                      -> do
                         (hpackId :: HPackId) <- storeHPack pli tid
                         hpackRecord <- getJust hpackId
-                        getHPackCabalFile (hpackRecord, hpackId) ts tmap cabalFile
-                    Just (Entity hkey item) ->
-                        getHPackCabalFile (item,hkey) ts tmap cabalFile
+                        getHPackCabalFile hpackRecord ts tmap cabalFile
+                    Just (Entity _ item) ->
+                        getHPackCabalFile item ts tmap cabalFile
     pure
         Package
             { packageTreeKey = P.TreeKey blobKey
@@ -706,13 +709,13 @@ getHPackBlobKeyById hpackId = do
 
 getHPackCabalFile ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => (HPack, HPackId)
+    => HPack
     -> Tree
     -> Map SafeFilePath P.TreeEntry
     -> SafeFilePath
     -> ReaderT SqlBackend (RIO env) (P.PackageCabal, P.Tree)
-getHPackCabalFile (hpackRecord, _) ts tmap cabalFile = do
-    cabalKey <- getBlobKey (hPackCabalPath hpackRecord)
+getHPackCabalFile hpackRecord ts tmap cabalFile = do
+    cabalKey <- getBlobKey (hPackCabalBlob hpackRecord)
     hpackKey <- getHPackBlobKey hpackRecord
     hpackSoftwareVersion <- lift hpackVersion
     let fileType = treeCabalType ts
