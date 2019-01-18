@@ -15,6 +15,7 @@ module Pantry.Hackage
   ) where
 
 import RIO
+import RIO.Process
 import Data.Aeson
 import Conduit
 import Data.Conduit.Tar
@@ -404,14 +405,15 @@ getHackagePackageVersions usePreferred name = do
     Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
 withCachedTree
-  :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => PackageLocationImmutable
+  -> PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
   -> RIO env Package
   -> RIO env Package
-withCachedTree name ver bid inner = do
-  mres <- withStorage $ loadHackageTree name ver bid
+withCachedTree pli name ver bid inner = do
+  mres <- withStorage $ loadHackageTree pli name ver bid
   case mres of
     Just package -> pure package
     Nothing -> do
@@ -420,7 +422,7 @@ withCachedTree name ver bid inner = do
       pure package
 
 getHackageTarballKey
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageIdentifierRevision
   -> RIO env TreeKey
 getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
@@ -431,14 +433,15 @@ getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize
 getHackageTarballKey pir = packageTreeKey <$> getHackageTarball pir Nothing
 
 getHackageTarball
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageIdentifierRevision
   -> Maybe TreeKey
   -> RIO env Package
 getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
-  withCachedTree name ver cabalFile $ do
+  let pli = PLIHackage pir mtreeKey
+  withCachedTree pli name ver cabalFile $ do
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
       case mpair of
@@ -480,7 +483,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
 
     case packageTree package of
       TreeMap m -> do
-        let TreeEntry _ ft = packageCabalEntry package
+        let (PCCabalFile (TreeEntry _ ft)) = packageCabalEntry package
             cabalEntry = TreeEntry cabalFileKey ft
             tree' = TreeMap $ Map.insert (cabalFileName name) cabalEntry m
             ident = PackageIdentifier name ver
@@ -500,10 +503,10 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             , mismatchActual = gpdIdent
             }
 
-        (_tid, treeKey') <- withStorage $ storeTree ident tree' cabalEntry
+        (_tid, treeKey') <- withStorage $ storeTree pli ident tree' (BFCabal (cabalFileName name) cabalEntry)
         pure Package
           { packageTreeKey = treeKey'
           , packageTree = tree'
           , packageIdent = ident
-          , packageCabalEntry = cabalEntry
+          , packageCabalEntry = PCCabalFile cabalEntry
           }
