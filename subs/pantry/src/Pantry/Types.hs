@@ -27,11 +27,14 @@ module Pantry.Types
   , VersionP (..)
   , PackageIdentifierRevision (..)
   , FileType (..)
+  , BuildFile (..)
   , FileSize (..)
   , TreeEntry (..)
   , SafeFilePath
   , unSafeFilePath
   , mkSafeFilePath
+  , safeFilePathtoPath
+  , hpackSafeFilePath
   , TreeKey (..)
   , Tree (..)
   , renderTree
@@ -40,6 +43,8 @@ module Pantry.Types
   , Unresolved
   , resolvePaths
   , Package (..)
+  , PackageCabal (..)
+  , PHpack (..)
   -- , PackageTarball (..)
   , PackageLocation (..)
   , PackageLocationImmutable (..)
@@ -111,13 +116,14 @@ import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
 import qualified Distribution.Text
+import qualified Hpack.Config as Hpack
 import Distribution.ModuleName (ModuleName)
 import Distribution.Types.Version (Version, mkVersion)
 import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Path, Abs, Dir, File, toFilePath, filename)
+import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile)
 import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
@@ -137,7 +143,7 @@ data Package = Package
   -- ^ The 'Tree' containing this package.
   --
   -- @since 0.1.0.0
-  , packageCabalEntry :: !TreeEntry
+  , packageCabalEntry :: !PackageCabal
   -- ^ Information on the cabal file inside this package.
   --
   -- @since 0.1.0.0
@@ -147,6 +153,17 @@ data Package = Package
   -- @since 0.1.0.0
   }
   deriving (Show, Eq)
+
+data PHpack = PHpack
+    {
+      phOriginal :: !TreeEntry, -- ^ Original hpack file
+      phGenerated :: !TreeEntry, -- ^ Generated Cabal file
+      phVersion :: !Version -- ^ Version of Hpack used
+    } deriving (Show, Eq)
+
+data PackageCabal = PCCabalFile !TreeEntry -- ^ TreeEntry of Cabal file
+                  | PCHpack !PHpack
+                  deriving (Show, Eq)
 
 cabalFileName :: PackageName -> SafeFilePath
 cabalFileName name =
@@ -855,6 +872,10 @@ cabalSpecLatestVersion =
     CabalSpecV2_2 -> error "this cannot happen"
     CabalSpecV2_4 -> mkVersion [2, 4]
 
+data BuildFile = BFCabal !SafeFilePath !TreeEntry
+               | BFHpack !TreeEntry -- We don't need SafeFilePath for Hpack since it has to be package.yaml file
+  deriving (Show, Eq)
+
 data FileType = FTNormal | FTExecutable
   deriving (Show, Eq, Enum, Bounded)
 instance PersistField FileType where
@@ -890,6 +911,11 @@ instance PersistFieldSql SafeFilePath where
 unSafeFilePath :: SafeFilePath -> Text
 unSafeFilePath (SafeFilePath t) = t
 
+safeFilePathtoPath :: (MonadThrow m) => Path Abs Dir -> SafeFilePath -> m (Path Abs File)
+safeFilePathtoPath dir (SafeFilePath path) = do
+  fpath <- parseRelFile (T.unpack path)
+  return $ dir </> fpath
+
 mkSafeFilePath :: Text -> Maybe SafeFilePath
 mkSafeFilePath t = do
   guard $ not $ "\\" `T.isInfixOf` t
@@ -903,6 +929,14 @@ mkSafeFilePath t = do
   guard $ all (not . T.all (== '.')) $ T.split (== '/') t
 
   Just $ SafeFilePath t
+
+-- | SafeFilePath for `package.yaml` file.
+hpackSafeFilePath :: SafeFilePath
+hpackSafeFilePath =
+    let fpath = mkSafeFilePath (T.pack Hpack.packageConfig)
+    in case fpath of
+         Nothing -> error $ "hpackSafeFilePath: Not able to encode " <> (Hpack.packageConfig)
+         Just sfp -> sfp
 
 -- | The hash of the binary representation of a 'Tree'.
 --

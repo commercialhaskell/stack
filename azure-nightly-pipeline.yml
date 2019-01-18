@@ -1,3 +1,7 @@
+trigger:
+- master
+- stable
+
 variables:
   BASE_BRANCH: "master"
   CACHE_S3_PREFIX: "stack"

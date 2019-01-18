@@ -986,10 +986,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -> RIO env a
     withCabal package pkgDir outputType inner = do
         config <- view configL
-
         unless (configAllowDifferentUser config) $
             checkOwnership (pkgDir </> configWorkDir config)
-
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False
@@ -1225,7 +1223,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 --
 -- * Generates haddocks
 --
--- * Registers the library and copiesthe built executables into the
+-- * Registers the library and copies the built executables into the
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.

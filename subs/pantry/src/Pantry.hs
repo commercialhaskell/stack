@@ -20,6 +20,7 @@ module Pantry
   , PantryApp
   , runPantryApp
   , runPantryAppClean
+  , hpackExecutableL
 
     -- * Types
 
@@ -126,6 +127,7 @@ module Pantry
   , loadCabalFile
   , loadCabalFileImmutable
   , loadCabalFilePath
+  , findOrGenerateCabalFile
   , PrintWarnings (..)
 
     -- * Hackage index
@@ -513,7 +515,9 @@ loadCabalFileBytes (PLIHackage pir _mtree) = getHackageCabalFile pir
 loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
-      TreeEntry cabalBlobKey _ft = packageCabalEntry package
+  cabalBlobKey <- case (packageCabalEntry package) of
+                       PCHpack pcHpack -> pure $ teBlob . phGenerated $ pcHpack
+                       PCCabalFile (TreeEntry blobKey _) -> pure blobKey
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
@@ -579,11 +583,14 @@ completePM plOrig pm
   | isCompletePM pm = pure pm
   | otherwise = do
       package <- loadPackage plOrig
-      let pmNew = PackageMetadata
+      let pkgCabal = case packageCabalEntry package of
+                       PCCabalFile tentry -> tentry
+                       PCHpack phpack -> phGenerated phpack
+          pmNew = PackageMetadata
             { pmName = Just $ pkgName $ packageIdent package
             , pmVersion = Just $ pkgVersion $ packageIdent package
             , pmTreeKey = Just $ packageTreeKey package
-            , pmCabal = Just $ teBlob $ packageCabalEntry package
+            , pmCabal = Just $ teBlob pkgCabal
             }
 
           isSame (Just x) (Just y) = x == y
@@ -978,6 +985,9 @@ data PantryApp = PantryApp
 
 simpleAppL :: Lens' PantryApp SimpleApp
 simpleAppL = lens paSimpleApp (\x y -> x { paSimpleApp = y })
+
+hpackExecutableL :: Lens' PantryConfig HpackExecutable
+hpackExecutableL k pconfig = fmap (\hpExe -> pconfig { pcHpackExecutable = hpExe }) (k (pcHpackExecutable pconfig))
 
 instance HasLogFunc PantryApp where
   logFuncL = simpleAppL.logFuncL

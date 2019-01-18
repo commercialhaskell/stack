@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cf2c888c043cbf74e8b15a2b1f270b83808302d01579efdbb04095f1cf19502b
+-- hash: 097f1c956c3050b63f58c0a2ce38f9eebb02d7e1bfabc081d945a42936608f8b
 
 name:           pantry
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
   exposed-modules:
       Pantry
       Pantry.SHA256
+      Pantry.HPack
       Pantry.Internal
       Pantry.Internal.StaticBytes
       Data.Aeson.Extended
@@ -135,6 +136,7 @@ test-suite spec
       Pantry.CabalSpec
       Pantry.FileSpec
       Pantry.HackageSpec
+      Pantry.HPackSpec
       Pantry.Internal.StaticBytesSpec
       Pantry.InternalSpec
       Pantry.TreeSpec
