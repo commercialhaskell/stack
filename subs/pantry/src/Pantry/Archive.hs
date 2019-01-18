@@ -336,7 +336,12 @@ parseArchive pli archive fp = do
           METExecutable -> Right $ SimpleEntry (mePath me) FTExecutable
           METLink relDest -> do
             case relDest of
-              '/':_ -> Left $ "Cannot have an absolute relative dest: " ++ relDest
+              '/':_ -> Left $ concat
+                         [ "File located at "
+                         , show $ mePath me
+                         , " is a symbolic link to absolute path "
+                         , relDest
+                         ]
               _ -> Right ()
             dest0 <-
               case makeTarRelative (mePath me) relDest of
