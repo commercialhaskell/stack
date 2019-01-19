@@ -1,5 +1,8 @@
 resolver: lts-11.22
 
+packages:
+- .
+
 # docker:
 #   enable: true
 #   repo: fpco/stack-full
