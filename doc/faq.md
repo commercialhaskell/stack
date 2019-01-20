@@ -63,7 +63,7 @@ The relationship between stack and Cabal-the-library is complicated.
 
 1. Stack itself builds against a version of the Cabal library, which it uses for parsing Cabal files.
 
-2. Stack wraps functionality from a version of the Cabal library in order to build packages.
+2. Stack builds a `Setup.hs` file against a version of the Cabal library, in order to build packages.
 
     i. For packages with `build-type: Simple`, Stack uses a setup executable compiled with a version of the Cabal library to perform builds. All packages using the same compiler and Cabal version are built with the same executable. These executables are cached in the `setup-exe-cache` configuration directory.
 
@@ -75,7 +75,7 @@ There are three (nearly) corresponding versions of the Cabal library which are r
 
 1. The version used to compile stack, which is not necessarily present on stack users’ machines.
 
-   Stack will always be compiled using the most recent stable version of Cabal-the-library.
+   Stack releases will be compiled using the most recent version of Cabal-the-library where possible, in order to support the most recent versions of the Cabal file format.
 
 2. The [boot version used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory), which is globally available to stack.
 
@@ -96,7 +96,7 @@ There are a number of consequences of this design.
 
 1. Snapshot packages only depend on the GHC compiler version, not the Cabal library version (with the exception of `build-type: Custom` packages).
 
-2. The most recent stack can always read the most recent Cabal files.
+2. The most recent stack can usually read the most recent Cabal files.
 
 3. However, stack may not be able to build packages defined using those files.
 
@@ -115,6 +115,8 @@ There are a number of consequences of this design.
 5. Stack uses `ghc-pkg` to identify the Cabal version it should use for the setup executable for a build.
    The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the Cabal version used to compile the setup executable.
    Together, this means it is only possible to know for sure which Cabal version ought to be used if the corresponding compiler is installed.
+
+   This behaviour will change with `stack` 2.0.
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
