@@ -81,6 +81,8 @@ Other enhancements:
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
 * Add `--cabal-files` flag to `stack ide targets` command.
 * Add `--stdout` flag to all `stack ide` subcommands.
+* Show resolver being used when `stack ghci` is invoked outside of a project directory. See
+  [#3651](https://github.com/commercialhaskell/stack/issues/3651)
 
 Bug fixes:
 
