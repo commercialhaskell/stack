@@ -61,36 +61,39 @@ directory. None of this should affect any existing Haskell tools at all.
 
 The relationship between stack and Cabal-the-library is complicated.
 
-1. Stack itself builds against a version of the Cabal library, which it uses for parsing Cabal files.
+#### Parsing Cabal files
 
-2. Stack builds a `Setup.hs` file against a version of the Cabal library, in order to build packages.
+Stack itself builds against a version of the Cabal library, which it uses for parsing Cabal files.
 
-    i. For packages with `build-type: Simple`, Stack uses a setup executable compiled with a version of the Cabal library to perform builds. All packages using the same compiler and Cabal version are built with the same executable. These executables are cached in the `setup-exe-cache` configuration directory.
+This version is not necessarily present on stack users’ machines.
 
-    ii. For packages with `build-type: Custom`, Stack compiles `Setup.hs` against a version of the Cabal library and uses that setup executable to perform builds. The executable is stored TODO
+This version determines which version of the Cabal file format stack is able to parse.
+Where possible, releases of stack will be compiled using the most recent version of
+Cabal-the-library, in order to support the most recent versions of the Cabal file format.
 
-3. Packages themselves may depend on the Cabal library.
+#### Building packages
 
-There are three (nearly) corresponding versions of the Cabal library which are relevant to a build.
+Stack builds a `Setup.hs` file against a version of the Cabal library, in order to build packages.
 
-1. The version used to compile stack, which is not necessarily present on stack users’ machines.
+The [boot version used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory),
+which is globally available to stack, is used to compile the `build-type: Simple` setup executable.
+All packages using the same compiler and Cabal version are built with the same executable.
+These executables are cached in the `setup-exe-cache` configuration directory.
 
-   Stack releases will be compiled using the most recent version of Cabal-the-library where possible, in order to support the most recent versions of the Cabal file format.
+Build artefacts are placed in the corresponding `.stack-work/dist/Cabal-xxxxx` directory.
 
-2. The [boot version used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory), which is globally available to stack.
+For packages with `build-type: Custom`, Stack compiles `Setup.hs` against the version of the Cabal
+library present in the snapshot (which may be overridden using `extra-deps`), and uses that
+setup executable to perform builds. This treats Cabal as any other dependency package.
+The executable is stored TODO
 
-   This version is used to compile the `build-type: Simple` setup executable.
-   Build artefacts are placed in corresponding `.stack-work/dist/Cabal-xxxxx` directory.
+#### Importing Cabal as a library
 
-3. The snapshot version (which may be overridden using `extra-deps`).
+Packages may themselves depend on the Cabal library.
 
-   This is the version on which a package may depend.
+As any other dependency, they will use the snapshot version (which may be overridden using `extra-deps`).
 
-   However, it is also used to compile any `build-type: Custom` setup executables.
-
-In addition, the Cabal version required by `custom-build` will be installed, if necessary.
-
-Note that these versions may be the same.
+#### ⁂
 
 There are a number of consequences of this design.
 
@@ -116,7 +119,7 @@ There are a number of consequences of this design.
    The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the Cabal version used to compile the setup executable.
    Together, this means it is only possible to know for sure which Cabal version ought to be used if the corresponding compiler is installed.
 
-   This behaviour will change with `stack` 2.0.
+   This behaviour will change with stack 2.0.
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
