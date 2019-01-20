@@ -21,6 +21,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.List
 import qualified Data.Map.Strict as M
+import           Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
@@ -41,7 +42,9 @@ import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.PrettyPrint
 import           Stack.Setup (withNewLocalBuildTargets)
+import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Build
+import           Stack.Types.BuildPlan (SnapshotDef, sdResolverName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -186,8 +189,12 @@ ghci opts@GhciOpts{..} = do
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
     stackYaml <- view stackYamlL
+
+    mproject <- view $ configL.to configMaybeProject
+
     buildDepsAndInitialSteps opts (map (T.pack . packageNameString . fst) localTargets)
-    targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
+
+    targetWarnings stackYaml localTargets nonLocalTargets mfileTargets mproject
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
     pkgs <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
@@ -836,13 +843,14 @@ checkForDuplicateModules pkgs = do
       pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
 targetWarnings
-  :: HasRunner env
+  :: HasEnvConfig env
   => Path Abs File
   -> [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
+  -> Maybe (Project, Path Abs File)
   -> RIO env ()
-targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
+targetWarnings stackYaml localTargets nonLocalTargets mfileTargets mproject = do
   unless (null nonLocalTargets) $
     prettyWarnL
       [ flow "Some targets"
@@ -853,9 +861,15 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
       , "."
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
-  when (null localTargets && isNothing mfileTargets) $
+
+  when (null localTargets && isNothing mfileTargets) $ do
+      let project = fst $ fromJust mproject
+      resolver <- loadResolver (projectResolver project) (projectCompiler project)
+
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
+          , ""
+          , flow $ "You are using resolver: " ++ (T.unpack $ sdResolverName resolver)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""
