@@ -44,7 +44,7 @@ import           Stack.PrettyPrint
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (SnapshotDef, sdResolverName)
+import           Stack.Types.BuildPlan (sdResolverName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
