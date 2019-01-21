@@ -188,13 +188,8 @@ ghci opts@GhciOpts{..} = do
               pkgs0 <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
-    stackYaml <- view stackYamlL
-
-    mproject <- view $ configL.to configMaybeProject
-
     buildDepsAndInitialSteps opts (map (T.pack . packageNameString . fst) localTargets)
-
-    targetWarnings stackYaml localTargets nonLocalTargets mfileTargets mproject
+    targetWarnings localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
     pkgs <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
@@ -844,13 +839,11 @@ checkForDuplicateModules pkgs = do
 
 targetWarnings
   :: HasEnvConfig env
-  => Path Abs File
-  -> [(PackageName, (Path Abs File, Target))]
+  => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
-  -> Maybe (Project, Path Abs File)
   -> RIO env ()
-targetWarnings stackYaml localTargets nonLocalTargets mfileTargets mproject = do
+targetWarnings localTargets nonLocalTargets mfileTargets = do
   unless (null nonLocalTargets) $
     prettyWarnL
       [ flow "Some targets"
@@ -861,11 +854,11 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets mproject = do
       , "."
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
-
   when (null localTargets && isNothing mfileTargets) $ do
+      stackYaml <- view stackYamlL
+      mproject <- view $ configL.to configMaybeProject
       let project = fst $ fromJust mproject
       resolver <- loadResolver (projectResolver project) (projectCompiler project)
-
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
