@@ -1,5 +1,6 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module Curator.Snapshot
   ( makeSnapshot
   , checkDependencyGraph
@@ -7,16 +8,20 @@ module Curator.Snapshot
 
 import Curator.GithubPings
 import Curator.Types
+import Distribution.Compiler (CompilerFlavor(..))
 import qualified Distribution.PackageDescription as C
+import Distribution.System (Arch(..), OS(..))
 import qualified Distribution.Text as DT
-import Distribution.Types.Dependency (depPkgName, depVerRange, Dependency)
+import qualified Distribution.Types.CondTree as C
+import Distribution.Types.Dependency (depPkgName, depVerRange, Dependency(..))
+import Distribution.Types.ExeDependency (ExeDependency(..))
 import Distribution.Types.UnqualComponentName (unqualComponentNameToPackageName)
 import Distribution.Types.VersionRange (withinRange, VersionRange)
 import Pantry
 import Path.IO (resolveFile')
 import RIO hiding (display)
 import qualified RIO
-import RIO.List (find)
+import RIO.List (find, partition)
 import qualified RIO.Map as Map
 import RIO.PrettyPrint
 import RIO.Process
@@ -144,10 +149,11 @@ checkDependencyGraph constraints snapshot = do
       Just Nothing ->
         cabalError "Cabal version in snapshot is not defined"
       Just (Just cabalVersion) -> do
-        pkgInfos <- Map.traverseWithKey (getPkgInfo constraints) (snapshotPackages snapshot)
+        pkgInfos <- Map.traverseWithKey (getPkgInfo constraints compilerVer)
+                    (snapshotPackages snapshot)
         let depTree =
               Map.map (piVersion &&& piTreeDeps) pkgInfos
-              <> Map.map (\mv -> (mv, [])) ghcBootPackages
+              <> Map.map (, []) ghcBootPackages
         return $ Map.mapWithKey (validateDeps constraints depTree cabalVersion) pkgInfos
     let (rangeErrors, otherErrors) = splitErrors pkgErrors
     unless (Map.null rangeErrors && Map.null otherErrors) $ do
@@ -161,7 +167,7 @@ checkDependencyGraph constraints snapshot = do
 pkgBoundsError ::
        PackageName
     -> Set Text
-    -> (Maybe Version)
+    -> Maybe Version
     -> Map DependingPackage DepBounds
     -> Text
 pkgBoundsError dep maintainers mdepVer users =
@@ -253,7 +259,6 @@ data PkgInfo = PkgInfo
   , piAllDeps :: ![(Component, [Dependency])]
   , piTreeDeps :: ![PackageName]
   , piCabalVersion :: !Version
-  , piSublibraries :: !(Set PackageName)
   , piMaintainers :: !(Set Maintainer)
   , piGithubPings :: !(Set Text)
   }
@@ -274,26 +279,76 @@ splitErrors = Map.foldrWithKey go (mempty, mempty)
         res
       , oes)
 
+checkConditions ::
+       (Monad m)
+    => Version
+    -> PackageName
+    -> Map FlagName Bool
+    -> C.ConfVar
+    -> m Bool
+checkConditions compilerVer pname flags confVar =
+    let targetOS = Linux
+        targetArch = X86_64
+        targetFlavor = GHC
+    in case confVar of
+           C.OS os -> return $ os == targetOS
+           C.Arch arch -> return $ arch == targetArch
+           C.Flag flag ->
+               case Map.lookup flag flags of
+                   Nothing ->
+                       error $
+                       "Flag " <> show flag <> " for " <> show pname <>
+                       " is not defined"
+                   Just b -> return b
+           C.Impl flavor range ->
+             return $ (flavor == targetFlavor) && (compilerVer `withinRange` range)
+
 getPkgInfo ::
        (HasProcessContext env, HasLogFunc env, HasPantryConfig env)
     => Constraints
+    -> Version
     -> PackageName
     -> SnapshotPackage
     -> RIO env PkgInfo
-getPkgInfo constraints pname sp = do
+getPkgInfo constraints compilerVer pname sp = do
     gpd <- loadCabalFileImmutable (spLocation sp)
+    logDebug $ "Extracting deps for " <> displayShow pname
     let mpc = Map.lookup pname (consPackages constraints)
         skipBuild = maybe False pcSkipBuild mpc
-        skipTest = skipBuild || (maybe False ((== CASkip) . pcTests) mpc)
-        skipBench = skipBuild || (maybe False ((== CASkip) . pcBenchmarks) mpc)
-        toCheck skip comp condTree = (skip, comp, C.condTreeConstraints condTree)
-        sublibraries = Set.fromList $
-          map (unqualComponentNameToPackageName. fst) (C.condSubLibraries gpd)
+        skipTest = skipBuild || maybe False ((== CASkip) . pcTests) mpc
+        skipBench = skipBuild || maybe False ((== CASkip) . pcBenchmarks) mpc
+        setupDepends = maybe mempty C.setupDepends $
+                       C.setupBuildInfo (C.packageDescription gpd)
+        -- TODO: we should also check executable names, not only their packages
+        buildInfoDeps = map (\(ExeDependency p _ vr) -> Dependency p vr) . C.buildToolDepends
+        gpdFlags = Map.fromList $ map (C.flagName &&& C.flagDefault) (C.genPackageFlags gpd)
+        checkCond = checkConditions compilerVer pname $ maybe mempty pcFlags mpc <> gpdFlags
+        collectDeps0 :: Monoid a
+                     => C.CondTree C.ConfVar [Dependency] a
+                     -> (a -> C.BuildInfo)
+                     -> [Dependency]
+        collectDeps0 tree getBuildInfo =
+          let (deps, a) = C.simplifyCondTree checkCond tree
+          in buildInfoDeps (getBuildInfo a) <> setupDepends <> deps
+        sublibraries =
+          Map.fromList [ ( unqualComponentNameToPackageName un
+                         , collectDeps0 ct C.libBuildInfo
+                         )
+                       | (un, ct) <- C.condSubLibraries gpd
+                       ]
+        collectDeps tree getBI =
+          let deps0 = collectDeps0 tree getBI
+              (sublibs, otherDeps) =
+                partition (\d -> Map.member (depPkgName d) sublibraries)  deps0
+              sublibDeps = Map.foldr (<>) mempty $
+                Map.restrictKeys sublibraries (Set.fromList $ map depPkgName sublibs)
+          in sublibDeps <> otherDeps
+        toCheck skip comp getBI condTree = (skip, comp, collectDeps condTree getBI)
         checks =
-          maybe [] (\ltree -> [toCheck skipBuild CompLibrary ltree]) (C.condLibrary gpd) ++
-          map (toCheck skipBuild CompExecutable . snd) (C.condExecutables gpd) ++
-          map (toCheck skipTest CompTestSuite . snd) (C.condTestSuites gpd) ++
-          map (toCheck skipBench CompBenchmark . snd) (C.condBenchmarks gpd)
+          maybe [] (\ltree -> [toCheck skipBuild CompLibrary C.libBuildInfo ltree]) (C.condLibrary gpd) ++
+          map (toCheck skipBuild CompExecutable C.buildInfo . snd) (C.condExecutables gpd) ++
+          map (toCheck skipTest CompTestSuite C.testBuildInfo . snd) (C.condTestSuites gpd) ++
+          map (toCheck skipBench CompBenchmark C.benchmarkBuildInfo . snd) (C.condBenchmarks gpd)
         allDeps = [ (component, deps)
                   | (False, component, deps) <- checks]
         treeDeps = [ depPkgName dep
@@ -302,7 +357,6 @@ getPkgInfo constraints pname sp = do
                    , dep <- deps ]
     return PkgInfo
       { piVersion = snapshotVersion (spLocation sp)
-      , piSublibraries = sublibraries
       , piAllDeps = allDeps
       , piTreeDeps = treeDeps
       , piCabalVersion = C.specVersion $ C.packageDescription gpd
@@ -351,9 +405,7 @@ validateDeps constraints depTree cabalVersion pname pkg =
                   }
               , redDependingBounds = DepBounds depRange (Set.singleton component)
               }
-      in if Set.member depName (piSublibraries pkg)
-         then Nothing
-         else case Map.lookup depName depTree of
+      in case Map.lookup depName depTree of
           Nothing ->
             rangeError Nothing
           Just (mversion, _) ->
