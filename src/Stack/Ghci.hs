@@ -857,14 +857,21 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
   when (null localTargets && isNothing mfileTargets) $ do
       stackYaml <- view stackYamlL
       mproject <- view $ configL.to configMaybeProject
-      let project = fst $ fromJust mproject
-      resolver <- loadResolver (projectResolver project) (projectCompiler project)
-      prettyNote $ vsep
+      resolverMsg <-
+        case mproject of
+            Just (p, _) -> do
+              resolver <- loadResolver (projectResolver p) (projectCompiler p)
+              return [ flow $ "You are using resolver: " ++ T.unpack (sdResolverName resolver)
+                     , ""
+                     ]
+            Nothing ->
+              return []
+      prettyNote $ vsep $
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          , flow $ "You are using resolver: " ++ T.unpack (sdResolverName resolver)
-          , ""
-          , flow "If you want to use package hiding and options, then you can try one of the following:"
+          ] ++
+          resolverMsg ++
+          [ flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""
           , bulletedList
               [ fillSep
