@@ -16,7 +16,6 @@ import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
-import Stack.DefaultStyles (defaultStyles)
 import Stack.Prelude hiding (Snapshot (..))
 import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
@@ -31,12 +30,13 @@ import qualified Options.Applicative as OA
 import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
+import RIO.PrettyPrint.DefaultStyles (defaultStyles)
+import RIO.PrettyPrint.Types (StyleSpec)
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
 import Stack.Dot
 import Stack.Runners (loadConfigWithOpts, withDefaultBuildConfig, withBuildConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
-import Stack.Types.PrettyPrint (StyleSpec)
-import Stack.Types.StylesUpdate (StylesUpdate (..))
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)

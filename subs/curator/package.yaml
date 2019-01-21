@@ -8,16 +8,17 @@ dependencies:
 - base
 - rio
 - pantry
-- Cabal
 - yaml
-- path
 - path-io
-- optparse-generic
+- rio-prettyprint
 
 library:
   source-dirs: src
   exposed-modules:
   - Curator
+  dependencies:
+  - Cabal
+  - path
 
 executables:
   curator:
@@ -25,3 +26,4 @@ executables:
     main: Main.hs
     dependencies:
     - curator
+    - optparse-generic

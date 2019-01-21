@@ -111,15 +111,15 @@ module Text.PrettyPrint.Leijen.Extended
 
 import Control.Monad.Reader (runReader, local)
 import Data.Array.IArray ((!), (//))
-import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Distribution.ModuleName (ModuleName)
 import qualified Distribution.Text (display)
-import Stack.DefaultStyles (defaultStyles)
-import Stack.Prelude
-import Stack.Types.PrettyPrint (Style (Dir, File), Styles)
-import Stack.Types.Runner (HasRunner, stylesUpdateL)
-import Stack.Types.StylesUpdate (StylesUpdate (..))
+import Path
+import RIO
+import qualified RIO.Map as M
+import RIO.PrettyPrint.DefaultStyles (defaultStyles)
+import RIO.PrettyPrint.Types (Style (Dir, File), Styles)
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), HasStylesUpdate, stylesUpdateL)
 import System.Console.ANSI (ConsoleLayer (..), SGR (..), setSGRCode)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen
@@ -194,8 +194,8 @@ toAnsiDoc styles = go
     go (SAnnotStop d) = SAnnotStop (go d)
 
 displayPlain
-    :: (Pretty a, HasRunner env, HasLogFunc env, MonadReader env m,
-        HasCallStack)
+    :: (Pretty a, HasLogFunc env, HasStylesUpdate env,
+        MonadReader env m, HasCallStack)
     => Int -> a -> m Utf8Builder
 displayPlain w =
     displayAnsiSimple . renderDefault w . fmap (const mempty) . unStyleDoc . pretty
@@ -207,7 +207,7 @@ renderDefault :: Int -> Doc a -> SimpleDoc a
 renderDefault = P.renderPretty 1
 
 displayAnsi
-    :: (Pretty a, HasRunner env, HasLogFunc env,
+    :: (Pretty a, HasLogFunc env, HasStylesUpdate env,
         MonadReader env m, HasCallStack)
     => Int -> a -> m Utf8Builder
 displayAnsi w = do
@@ -225,7 +225,7 @@ hDisplayAnsi h w x = liftIO $ do
 -}
 
 displayAnsiSimple
-    :: (HasRunner env, HasLogFunc env, MonadReader env m, HasCallStack)
+    :: (HasLogFunc env, HasStylesUpdate env, MonadReader env m, HasCallStack)
     => SimpleDoc StyleAnn -> m Utf8Builder
 displayAnsiSimple doc = do
     update <- view stylesUpdateL

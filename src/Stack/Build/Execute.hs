@@ -72,7 +72,6 @@ import           Stack.Coverage
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -88,6 +87,7 @@ import qualified System.FilePath as FP
 import           System.IO (hPutStr, stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
+import           RIO.PrettyPrint
 import           RIO.Process
 
 -- | Has an executable been built or not?

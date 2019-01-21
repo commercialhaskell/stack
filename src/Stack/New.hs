@@ -29,8 +29,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.Download
-import           Network.HTTP.StackClient (Request, HttpException, getResponseStatusCode, getResponseBody)
+import           Network.HTTP.StackClient (DownloadException (..), Request, HttpException,
+                                           getResponseStatusCode, getResponseBody, httpLbs,
+                                           parseRequest, parseUrlThrow, redownload, setGithubHeaders)
 import           Path
 import           Path.IO
 import           Stack.Constants

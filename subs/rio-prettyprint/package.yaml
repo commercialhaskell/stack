@@ -1,0 +1,25 @@
+name:        rio-prettyprint
+version:     0.1.0.0
+synopsis:    Pretty-printing for RIO
+category:    Development
+author:      Michael Snoyman
+maintainer:  michael@snoyman.com
+copyright:   2018-2019 FP Complete
+license:     MIT
+github:      commercialhaskell/rio-prettyprint # TODO move to this repo!
+
+dependencies:
+- base
+- Cabal
+- aeson
+- annotated-wl-pprint
+- ansi-terminal
+- array
+- colour
+- mtl
+- path
+- rio
+- text
+
+library:
+  source-dirs: src/

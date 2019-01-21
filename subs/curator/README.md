@@ -71,6 +71,19 @@ generate `snapshot.yaml` with all of this information. This file
 should _never be manually edited_, instead edits should occur at the
 `snapshot-incomplete.yaml` and `constraints.yaml` phases.
 
+The `snapshot.yaml` file gets checked for its consistency ensuring the
+following:
+
+* All package dependencies are explicitly specified in constraints files
+
+* Dependency bounds of all snapshot packages are properly satisfied
+
+* There are no dependency cycles in the snapshot (only libraries and
+  executables are included into checked dependency tree as test suites and
+  benchmarks are allowed to create cycles)
+
+* The snapshot contains Cabal version suitable to build all packages
+
 We unpack all of the package specified by `snapshot.yaml` into a local
 directory, and generate a `stack.yaml` that gives instructions to
 build all of those packages.

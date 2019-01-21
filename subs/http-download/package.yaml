@@ -1,0 +1,42 @@
+name:        http-download
+version:     0.1.0.0
+synopsis:    Verified downloads with retries
+category:    Development
+author:      Michael Snoyman
+maintainer:  michael@snoyman.com
+copyright:   2018-2019 FP Complete
+license:     MIT
+github:      commercialhaskell/http-download # TODO move to this repo!
+
+dependencies:
+- base
+- cryptonite
+- http-client
+- path
+- path-io
+- retry
+- rio
+- rio-prettyprint
+
+library:
+  source-dirs: src/
+  dependencies:
+  - base64-bytestring
+  - bytestring
+  - conduit
+  - conduit-extra
+  - cryptonite-conduit
+  - directory
+  - exceptions
+  - filepath
+  - http-conduit
+  - http-types
+  - memory
+
+tests:
+  spec:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - http-download
+    - hspec

@@ -3,10 +3,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.PrettyPrint
+module RIO.PrettyPrint
     (
+      -- * Type classes for optionally colored terminal output
+      HasTerm (..), HasStylesUpdate (..)
       -- * Pretty printing functions
-      displayPlain, displayWithColor
+    , displayPlain, displayWithColor
       -- * Logging based on pretty-print typeclass
     , prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
     , prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
@@ -29,16 +31,15 @@ module Stack.PrettyPrint
     , fill, fillBreak
     , enclose, squotes, dquotes, parens, angles, braces, brackets
     , indentAfterLabel, wordDocs, flow
-      -- * Re-exports from "Stack.Types.PrettyPrint"
+      -- * Re-exports from "RIO.PrettyPrint.Types.PrettyPrint"
     , Style (..)
     ) where
 
-import qualified RIO
-import           Stack.Prelude hiding (Display (..))
-import           Data.List (intersperse)
-import           Stack.Types.PrettyPrint (Style (..))
-import           Stack.Types.Runner
-import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
+import Data.List (intersperse)
+import RIO
+import RIO.PrettyPrint.StylesUpdate (HasStylesUpdate (..))
+import RIO.PrettyPrint.Types (Style (..))
+import Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
                      StyleAnn (..), StyleDoc, (<+>), align,
                      angles, braces, brackets, cat,
                      displayAnsi, displayPlain, dquotes, enclose, encloseSep,
@@ -47,18 +48,21 @@ import           Text.PrettyPrint.Leijen.Extended (Pretty (pretty),
                      nest, parens, punctuate, sep, softbreak, softline, squotes,
                      styleAnn, vcat, vsep)
 
+class (HasLogFunc env, HasStylesUpdate env) => HasTerm env where
+  useColorL :: Lens' env Bool
+  termWidthL :: Lens' env Int
+
 displayWithColor
-    :: (HasRunner env, Pretty a,
-        MonadReader env m, HasLogFunc env, HasCallStack)
+    :: (HasTerm env, Pretty a, MonadReader env m, HasCallStack)
     => a -> m Utf8Builder
 displayWithColor x = do
     useAnsi <- view useColorL
-    termWidth <- view $ runnerL.to runnerTermWidth
+    termWidth <- view termWidthL
     (if useAnsi then displayAnsi else displayPlain) termWidth x
 
 -- TODO: switch to using implicit callstacks once 7.8 support is dropped
 
-prettyWith :: (HasRunner env, HasCallStack, Pretty b,
+prettyWith :: (HasTerm env, HasCallStack, Pretty b,
                MonadReader env m, MonadIO m)
            => LogLevel -> (a -> b) -> a -> m ()
 prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
@@ -67,7 +71,7 @@ prettyWith level f = logGeneric "" level . RIO.display <=< displayWithColor . f
 -- worth keeping the alignment in place.
 
 prettyDebugWith, prettyInfoWith, prettyNoteWith, prettyWarnWith, prettyErrorWith, prettyWarnNoIndentWith, prettyErrorNoIndentWith
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
+  :: (HasCallStack, HasTerm env, MonadReader env m, MonadIO m)
   => (a -> StyleDoc) -> a -> m ()
 prettyDebugWith = prettyWith LevelDebug
 prettyInfoWith  = prettyWith LevelInfo
@@ -86,7 +90,7 @@ prettyErrorNoIndentWith f = prettyWith LevelError
                                   ((line <>) . (style Error   "Error:" <+>) . f)
 
 prettyDebug, prettyInfo, prettyNote, prettyWarn, prettyError, prettyWarnNoIndent, prettyErrorNoIndent
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
+  :: (HasCallStack, HasTerm env, MonadReader env m, MonadIO m)
   => StyleDoc -> m ()
 prettyDebug         = prettyDebugWith         id
 prettyInfo          = prettyInfoWith          id
@@ -97,7 +101,7 @@ prettyWarnNoIndent  = prettyWarnNoIndentWith  id
 prettyErrorNoIndent = prettyErrorNoIndentWith id
 
 prettyDebugL, prettyInfoL, prettyNoteL, prettyWarnL, prettyErrorL, prettyWarnNoIndentL, prettyErrorNoIndentL
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
+  :: (HasCallStack, HasTerm env, MonadReader env m, MonadIO m)
   => [StyleDoc] -> m ()
 prettyDebugL         = prettyDebugWith         fillSep
 prettyInfoL          = prettyInfoWith          fillSep
@@ -108,7 +112,7 @@ prettyWarnNoIndentL  = prettyWarnNoIndentWith  fillSep
 prettyErrorNoIndentL = prettyErrorNoIndentWith fillSep
 
 prettyDebugS, prettyInfoS, prettyNoteS, prettyWarnS, prettyErrorS, prettyWarnNoIndentS, prettyErrorNoIndentS
-  :: (HasCallStack, HasRunner env, MonadReader env m, MonadIO m)
+  :: (HasCallStack, HasTerm env, MonadReader env m, MonadIO m)
   => String -> m ()
 prettyDebugS         = prettyDebugWith         flow
 prettyInfoS          = prettyInfoWith          flow
@@ -135,7 +139,7 @@ wordDocs = map fromString . words
 flow :: String -> StyleDoc
 flow = fillSep . wordDocs
 
-debugBracket :: (HasCallStack, HasRunner env, MonadReader env m,
+debugBracket :: (HasCallStack, HasTerm env, MonadReader env m,
                  MonadIO m, MonadUnliftIO m) => StyleDoc -> m a -> m a
 debugBracket msg f = do
   let output = logDebug . RIO.display <=< displayWithColor

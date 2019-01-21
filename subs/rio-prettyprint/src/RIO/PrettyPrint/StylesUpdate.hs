@@ -1,21 +1,19 @@
-{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 
-module Stack.Types.StylesUpdate
+module RIO.PrettyPrint.StylesUpdate
   (
     StylesUpdate (..)
   , parseStylesUpdateFromString
+  , HasStylesUpdate (..)
   ) where
 
-import Data.Aeson.Extended (FromJSON (..), WithJSONWarnings, noJSONWarnings,
-         withText)
+import Data.Aeson (FromJSON(..), withText)
 import Data.Array.IArray (assocs)
 import Data.Colour.SRGB (Colour, sRGB24)
 import Data.Text as T (pack, unpack)
-import Data.Text (Text)
-import Stack.DefaultStyles (defaultStyles)
-import Stack.Prelude
-import Stack.Types.PrettyPrint (Style, StyleSpec)
+import RIO
+import RIO.PrettyPrint.DefaultStyles (defaultStyles)
+import RIO.PrettyPrint.Types (Style, StyleSpec)
 import System.Console.ANSI.Types (BlinkSpeed (..), Color (..),
          ColorIntensity (..), ConsoleIntensity (..), ConsoleLayer (..),
          SGR (..), Underlining (..))
@@ -40,9 +38,6 @@ instance Monoid StylesUpdate where
 instance FromJSON StylesUpdate where
   parseJSON = withText "StylesUpdate" $
     return . parseStylesUpdateFromString . T.unpack
-
-instance FromJSON (WithJSONWarnings StylesUpdate) where
-  parseJSON v = noJSONWarnings <$> parseJSON v
 
 -- |Parse a string that is a colon-delimited sequence of key=value, where 'key'
 -- is a style name and 'value' is a semicolon-delimited list of 'ANSI' SGR
@@ -160,3 +155,11 @@ codeToRGB :: [Word8] -> (Maybe (Colour Float), [Word8])
 codeToRGB [] = (Nothing, [])
 codeToRGB (2:r:g:b:cs) = (Just $ sRGB24 r g b, cs)
 codeToRGB cs = (Nothing, cs)
+
+-- | Environment values with a styles update.
+--
+-- @since 0.1.0.0
+class HasStylesUpdate env where
+  stylesUpdateL :: Lens' env StylesUpdate
+instance HasStylesUpdate StylesUpdate where
+  stylesUpdateL = id
