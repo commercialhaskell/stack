@@ -60,8 +60,6 @@ import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Prelude hiding (Display (..))
-import           Stack.PrettyPrint
-import qualified Stack.PrettyPrint as PP (Style (Module))
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -75,6 +73,8 @@ import           System.FilePath (replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
 import           RIO.Process
+import           RIO.PrettyPrint
+import qualified RIO.PrettyPrint as PP (Style (Module))
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
@@ -87,6 +87,11 @@ instance HasLogFunc Ctx where
     logFuncL = configL.logFuncL
 instance HasRunner Ctx where
     runnerL = configL.runnerL
+instance HasStylesUpdate Ctx where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasTerm Ctx where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
 instance HasConfig Ctx
 instance HasPantryConfig Ctx where
     pantryConfigL = configL.pantryConfigL
@@ -1274,7 +1279,7 @@ warnMultiple name candidate rest =
 -- For example: .erb for a Ruby file might exist in one of the
 -- directories.
 logPossibilities
-    :: HasRunner env
+    :: HasTerm env
     => [Path Abs Dir] -> ModuleName -> RIO env ()
 logPossibilities dirs mn = do
     possibilities <- liftM concat (makePossibilities mn)

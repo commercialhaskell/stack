@@ -29,8 +29,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.Download
-import           Network.HTTP.StackClient (Request, HttpException, getResponseStatusCode, getResponseBody)
+import           Network.HTTP.StackClient (DownloadException (..), Request, HttpException,
+                                           getResponseStatusCode, getResponseBody, httpLbs,
+                                           parseRequest, parseUrlThrow, redownload, setGithubHeaders)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -117,13 +118,13 @@ loadTemplate name logIt = do
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> downloadFromUrl s templateDir
-        RelPath relFile ->
+        RelPath rawParam relFile ->
             catch
                 (do f <- loadLocalFile relFile
                     logIt LocalTemp
                     return f)
                 (\(e :: NewException) ->
-                      case relRequest relFile of
+                      case relRequest rawParam of
                         Just req -> downloadTemplate req
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
@@ -141,9 +142,9 @@ loadTemplate name logIt = do
         if exists
             then readFileUtf8 (toFilePath path)
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: Path Rel File -> Maybe Request
-    relRequest rel = do
-        rtp <- parseRepoPathWithService defaultRepoService (T.pack (toFilePath rel))
+    relRequest :: String -> Maybe Request
+    relRequest req = do
+        rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
         let url = urlFromRepoTemplatePath rtp
         parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text

@@ -85,6 +85,7 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
+import           RIO.PrettyPrint
 import           RIO.Process
 
 -- | If deprecated path exists, use it and print a warning.
@@ -419,6 +420,11 @@ instance HasRunner MiniConfig where
     runnerL = configL.runnerL
 instance HasLogFunc MiniConfig where
     logFuncL = configL.logFuncL
+instance HasStylesUpdate MiniConfig where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasTerm MiniConfig where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig :: Config -> MiniConfig

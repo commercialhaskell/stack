@@ -25,21 +25,20 @@ import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
+import           RIO.PrettyPrint
 import           Stack.Constants
 import           Stack.PackageDump
-import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           RIO.Process
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: HasRunner env
+    :: HasTerm env
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project

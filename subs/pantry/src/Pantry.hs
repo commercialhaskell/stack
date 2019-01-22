@@ -20,6 +20,7 @@ module Pantry
   , PantryApp
   , runPantryApp
   , runPantryAppClean
+  , hpackExecutableL
 
     -- * Types
 
@@ -145,6 +146,7 @@ module Pantry
   , loadCabalFileRawImmutable
   , loadCabalFileImmutable
   , loadCabalFilePath
+  , findOrGenerateCabalFile
   , PrintWarnings (..)
 
     -- * Hackage index
@@ -156,6 +158,7 @@ module Pantry
   , getLatestHackageLocation
   , getLatestHackageRevision
   , getHackageTypoCorrections
+  , loadGlobalHints
   ) where
 
 import RIO
@@ -180,6 +183,8 @@ import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
+import Network.HTTP.Download
+import RIO.PrettyPrint
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
@@ -645,7 +650,9 @@ loadCabalFileBytes (PLIHackage pident cfHash _mtree) = getHackageCabalFile (pirF
 loadCabalFileBytes pl = do
   package <- loadPackage pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
-      TreeEntry cabalBlobKey _ft = packageCabalEntry package
+  cabalBlobKey <- case (packageCabalEntry package) of
+                       PCHpack pcHpack -> pure $ teBlob . phGenerated $ pcHpack
+                       PCCabalFile (TreeEntry blobKey _) -> pure blobKey
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
@@ -748,11 +755,15 @@ completePM plOrig rpm@(RawPackageMetadata mn mv mtk mc)
   | Just n <- mn, Just v <- mv, Just tk <- mtk, Just c <- mc =
       pure $ PackageMetadata (PackageIdentifier n v) tk c
   | otherwise = do
-      package <- loadPackageRaw plOrig
-      let pm = PackageMetadata
-            { pmIdent = packageIdent package
-            , pmTreeKey = packageTreeKey package
-            , pmCabal = teBlob $ packageCabalEntry package
+      package <- loadPackage plOrig
+      let pkgCabal = case packageCabalEntry package of
+                       PCCabalFile tentry -> tentry
+                       PCHpack phpack -> phGenerated phpack
+          pmNew = PackageMetadata
+            { pmName = Just $ pkgName $ packageIdent package
+            , pmVersion = Just $ pkgVersion $ packageIdent package
+            , pmTreeKey = Just $ packageTreeKey package
+            , pmCabal = Just $ teBlob pkgCabal
             }
 
           isSame x (Just y) = x == y
@@ -1366,6 +1377,9 @@ data PantryApp = PantryApp
 simpleAppL :: Lens' PantryApp SimpleApp
 simpleAppL = lens paSimpleApp (\x y -> x { paSimpleApp = y })
 
+hpackExecutableL :: Lens' PantryConfig HpackExecutable
+hpackExecutableL k pconfig = fmap (\hpExe -> pconfig { pcHpackExecutable = hpExe }) (k (pcHpackExecutable pconfig))
+
 instance HasLogFunc PantryApp where
   logFuncL = simpleAppL.logFuncL
 instance HasPantryConfig PantryApp where
@@ -1416,3 +1430,40 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
           , paPantryConfig = pc
           }
         f
+
+-- | Load the global hints from Github.
+--
+-- @since 0.1.0.0
+loadGlobalHints
+  :: HasTerm env
+  => Path Abs File -- ^ local cached file location
+  -> WantedCompiler
+  -> RIO env (Maybe (Map PackageName Version))
+loadGlobalHints dest wc =
+    inner False
+  where
+    inner alreadyDownloaded = do
+      req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
+      downloaded <- download req dest
+      eres <- tryAny inner2
+      mres <-
+        case eres of
+          Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
+          Right x -> pure x
+      case mres of
+        Nothing | not alreadyDownloaded && not downloaded -> do
+          logInfo $
+            "Could not find local global hints for " <>
+            RIO.display wc <>
+            ", forcing a redownload"
+          x <- redownload req dest
+          if x
+            then inner True
+            else do
+              logInfo "Redownload didn't happen"
+              pure Nothing
+        _ -> pure mres
+
+    inner2 = liftIO
+           $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
+         <$> Yaml.decodeFileThrow (toFilePath dest)

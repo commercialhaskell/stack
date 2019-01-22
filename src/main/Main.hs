@@ -49,6 +49,8 @@ import           Options.Applicative.Types (ParserHelp(..))
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
+import           RIO.PrettyPrint
+import qualified RIO.PrettyPrint as PP (style)
 import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Clean (CleanOpts(..), clean)
@@ -87,8 +89,6 @@ import           Stack.Options.SDistParser
 import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.Path
-import           Stack.PrettyPrint
-import qualified Stack.PrettyPrint as PP (style)
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -417,20 +417,27 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addSubCommands'
             "ide"
             "IDE-specific commands"
-            (do addCommand'
+            (let outputFlag = flag
+                   IDE.OutputLogInfo
+                   IDE.OutputStdout
+                   (long "stdout" <>
+                    help "Send output to stdout instead of the default, stderr")
+                 cabalFileFlag = flag
+                   IDE.ListPackageNames
+                   IDE.ListPackageCabalFiles
+                   (long "cabal-files" <>
+                    help "Print paths to package cabal-files instead of package names")
+             in
+             do addCommand'
                     "packages"
                     "List all available local loadable packages"
                     idePackagesCmd
-                    (flag
-                         IDE.ListPackageNames
-                         IDE.ListPackageCabalFiles
-                         (long "cabal-files" <>
-                          help "Print paths to package cabal-files instead of package names"))
+                    ((,) <$> outputFlag <*> cabalFileFlag)
                 addCommand'
                     "targets"
                     "List all available stack targets"
                     ideTargetsCmd
-                    (pure ()))
+                    outputFlag)
         addSubCommands'
           Docker.dockerCmdName
           "Subcommands specific to Docker use"
@@ -927,14 +934,14 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           (ghci ghciOpts)
 
 -- | List packages in the project.
-idePackagesCmd :: IDE.ListPackagesCmd -> GlobalOpts -> IO ()
-idePackagesCmd cmd go =
-    withDefaultBuildConfig go (IDE.listPackages cmd) -- TODO don't need EnvConfig any more
+idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> GlobalOpts -> IO ()
+idePackagesCmd (stream, cmd) go =
+    withDefaultBuildConfig go (IDE.listPackages stream cmd) -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
-ideTargetsCmd :: () -> GlobalOpts -> IO ()
-ideTargetsCmd () go =
-    withDefaultBuildConfig go IDE.listTargets -- TODO don't need EnvConfig any more
+ideTargetsCmd :: IDE.OutputStream -> GlobalOpts -> IO ()
+ideTargetsCmd stream go =
+    withDefaultBuildConfig go (IDE.listTargets stream) -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

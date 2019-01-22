@@ -1,15 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Network.HTTP.Download.VerifiedSpec where
+module Network.HTTP.Download.VerifiedSpec (spec) where
 
 import           Control.Retry                  (limitRetries)
 import           Crypto.Hash
-import           Network.HTTP.StackClient
+import           Network.HTTP.Client
 import           Network.HTTP.Download.Verified
 import           Path
-import           Path.IO hiding (withSystemTempDir)
-import           Stack.Prelude
-import           Stack.Types.Runner
+import           Path.IO -- hiding (withSystemTempDir)
 import           System.IO (writeFile, readFile)
+import           RIO
+import           RIO.PrettyPrint
+import           RIO.PrettyPrint.StylesUpdate
 import           Test.Hspec
 
 -- TODO: share across test files
@@ -61,14 +62,25 @@ isWrongDigest :: VerifiedDownloadException -> Bool
 isWrongDigest WrongDigest{} = True
 isWrongDigest _ = False
 
+data TestTerm = TestTerm
+
+instance HasLogFunc TestTerm where
+  -- ingoring output for now
+  logFuncL = lens (const $ mkLogFunc mempty) (\t _ -> t)
+
+instance HasStylesUpdate TestTerm where
+  stylesUpdateL = lens (const $ StylesUpdate []) (\t _ -> t)
+
+instance HasTerm TestTerm where
+  useColorL = lens (const False) (\t _ -> t)
+  termWidthL = lens (const 80) (\t _ -> t)
+
 spec :: Spec
 spec = do
   let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
-    let run func =
-          withRunner LevelError True True ColorNever mempty Nothing False
-                 $ \runner -> runRIO runner func
+    let run func = runRIO TestTerm func
     -- Preconditions:
     -- * the exampleReq server is running
     -- * the test runner has working internet access to it

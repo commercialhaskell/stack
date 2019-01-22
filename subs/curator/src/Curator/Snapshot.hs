@@ -1,13 +1,35 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module Curator.Snapshot
   ( makeSnapshot
+  , checkDependencyGraph
   ) where
 
-import RIO
-import RIO.Process
+import Curator.GithubPings
 import Curator.Types
+import Distribution.Compiler (CompilerFlavor(..))
+import qualified Distribution.PackageDescription as C
+import Distribution.System (Arch(..), OS(..))
+import qualified Distribution.Text as DT
+import qualified Distribution.Types.CondTree as C
+import Distribution.Types.Dependency (depPkgName, depVerRange, Dependency(..))
+import Distribution.Types.ExeDependency (ExeDependency(..))
+import Distribution.Types.UnqualComponentName (unqualComponentNameToPackageName)
+import Distribution.Types.VersionRange (withinRange, VersionRange)
 import Pantry
+import Path.IO (resolveFile')
+import RIO hiding (display)
+import qualified RIO
+import RIO.List (find, partition)
 import qualified RIO.Map as Map
-import Distribution.Types.VersionRange (withinRange)
+import RIO.PrettyPrint
+import RIO.Process
+import qualified RIO.Set as Set
+import RIO.Seq (Seq)
+import qualified RIO.Seq as Seq
+import qualified RIO.Text as T
+import qualified RIO.Text.Partial as TP
 
 makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -26,6 +48,7 @@ makeSnapshot cons name = do
     , rslHidden = Map.filter id (pcHide <$> consPackages cons)
     , rslGhcOptions = mempty
     }
+
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
 getFlags pc
@@ -88,7 +111,338 @@ traverseValidate f t = do
     [] -> pure res
     [x] -> throwIO x
     _ -> throwIO $ TraverseValidateExceptions errs
-  
+
 newtype TraverseValidateExceptions = TraverseValidateExceptions [SomeException]
   deriving (Show, Typeable)
 instance Exception TraverseValidateExceptions
+
+checkDependencyGraph ::
+       (HasTerm env, HasProcessContext env, HasPantryConfig env)
+    => Constraints
+    -> Snapshot
+    -> RIO env ()
+checkDependencyGraph constraints snapshot = do
+    globalHintsYaml <- resolveFile' "global-hints.yaml"
+    let compiler = snapshotCompiler snapshot
+        compilerVer = case compiler of
+          WCGhc v -> v
+          WCGhcjs _ _ -> error "GHCJS is not supported"
+    mhints <- loadGlobalHints globalHintsYaml compiler
+    ghcBootPackages <- case mhints of
+      Nothing ->
+        error $ "Cannot load global hints for GHC " <> DT.display compilerVer
+      Just hints ->
+        return $ Map.map Just hints
+    let declared =
+            Map.fromList
+                [ (pn, snapshotVersion (spLocation sp))
+                | (pn, sp) <- Map.toList (snapshotPackages snapshot)
+                ] <>
+            ghcBootPackages
+        cabalName = "Cabal"
+        cabalError err = pure . Map.singleton cabalName $ [OtherError err]
+    pkgErrors <- case Map.lookup cabalName declared of
+      Nothing ->
+        cabalError "Cabal not found in snapshot"
+      Just Nothing ->
+        cabalError "Cabal version in snapshot is not defined"
+      Just (Just cabalVersion) -> do
+        pkgInfos <- Map.traverseWithKey (getPkgInfo constraints compilerVer)
+                    (snapshotPackages snapshot)
+        let depTree =
+              Map.map (piVersion &&& piTreeDeps) pkgInfos
+              <> Map.map (, []) ghcBootPackages
+        return $ Map.mapWithKey (validateDeps constraints depTree cabalVersion) pkgInfos
+    let (rangeErrors, otherErrors) = splitErrors pkgErrors
+    unless (Map.null rangeErrors && Map.null otherErrors) $ do
+      logWarn "Errors in snapshot:"
+      void $ flip Map.traverseWithKey rangeErrors $ \(dep, maintainers, mver) users -> do
+        logWarn $ RIO.display (pkgBoundsError dep maintainers mver users)
+      void $ flip Map.traverseWithKey otherErrors $ \pname errors -> do
+        logWarn $ fromString (packageNameString pname)
+        forM_ errors $ \err -> logWarn $ "    " <> fromString err
+
+pkgBoundsError ::
+       PackageName
+    -> Set Text
+    -> Maybe Version
+    -> Map DependingPackage DepBounds
+    -> Text
+pkgBoundsError dep maintainers mdepVer users =
+    T.unlines $ ""
+              : showDepVer
+              : map showUser (Map.toList users)
+  where
+    showDepVer | Just version <- mdepVer =
+                   T.concat [ display dep , "-" , display version
+                            , displayMaintainers maintainers
+                            , " is out of bounds for:"
+                            ]
+               | otherwise =
+                   T.concat [ display dep, displayMaintainers maintainers
+                            , " (not present) depended on by:"
+                            ]
+
+    displayMaintainers ms | Set.null ms = ""
+                          | otherwise = T.concat [" (", T.intercalate ", " (Set.toList ms), ")"]
+
+    showUser :: (DependingPackage, DepBounds) -> Text
+    showUser (dp, db) = T.concat
+            [ "- [ ] "
+            , depPackageShow1 dp
+            , " ("
+            -- add a space after < to avoid confusing Markdown processors (like
+            -- Github's issue tracker)
+            , TP.replace "<" "< " $ display (dbRange db)
+            , "). "
+            , depPackageShow2 dp
+            , ". Used by: "
+            , T.intercalate ", " $ map compToText $ Set.toList (dbComponents db)
+            ]
+
+    depPackageShow1 :: DependingPackage -> Text
+    depPackageShow1 DependingPackage {..}
+      | Just v <- dpVersion = display dpName <> "-" <> display v
+      | otherwise = display dpName
+
+    depPackageShow2 :: DependingPackage -> Text
+    depPackageShow2 DependingPackage {..} = T.intercalate ". " $
+        ( if null dpMaintainers
+          then "No maintainer"
+          else T.intercalate ", " (Set.toList dpMaintainers)
+        ) :
+        if null dpGithubPings
+        then []
+        else [T.concat (map (T.cons '@') (Set.toList dpGithubPings))]
+
+    compToText :: Component -> Text
+    compToText CompLibrary = "library"
+    compToText CompExecutable = "executable"
+    compToText CompTestSuite = "test-suite"
+    compToText CompBenchmark = "benchmark"
+
+    display :: DT.Text a => a -> Text
+    display = T.pack . DT.display
+
+snapshotVersion :: PackageLocationImmutable -> Maybe Version
+snapshotVersion (PLIHackage (PackageIdentifierRevision _ v _) _) = Just v
+snapshotVersion _ = Nothing
+
+data DependencyError =
+  RangeError RangeErrorData
+  | OtherError String
+
+data RangeErrorData = RangeErrorData
+    { redPackageName :: !PackageName
+    , redMaintainers :: !(Set Maintainer)
+    , redPackageVersion :: !(Maybe Version)
+    , redDependingPackage :: !DependingPackage
+    , redDependingBounds :: !DepBounds
+    }
+
+data DependingPackage = DependingPackage
+  { dpName :: !PackageName
+  , dpVersion :: !(Maybe Version)
+  , dpMaintainers :: !(Set Maintainer)
+  , dpGithubPings :: !(Set Text)
+  } deriving (Eq, Ord)
+
+data DepBounds = DepBounds
+  { dbRange :: !VersionRange
+  , dbComponents :: !(Set Component)
+  }
+
+data PkgInfo = PkgInfo
+  { piVersion :: !(Maybe Version)
+  , piAllDeps :: ![(Component, [Dependency])]
+  , piTreeDeps :: ![PackageName]
+  , piCabalVersion :: !Version
+  , piMaintainers :: !(Set Maintainer)
+  , piGithubPings :: !(Set Text)
+  }
+
+splitErrors ::
+       Map PackageName [DependencyError]
+    -> ( Map (PackageName, Set Maintainer, Maybe Version) (Map DependingPackage DepBounds)
+       , Map PackageName (Seq String))
+splitErrors = Map.foldrWithKey go (mempty, mempty)
+  where
+    go pname errors (res, oes) = foldr (go' pname) (res, oes) errors
+    go' pname (OtherError oe) (res, oes) =
+      (res, Map.insertWith (<>) pname (Seq.singleton oe) oes)
+    go' _pname (RangeError red) (res, oes) =
+      ( Map.insertWith (<>)
+        (redPackageName red, redMaintainers red, redPackageVersion red)
+        (Map.singleton (redDependingPackage red) (redDependingBounds red))
+        res
+      , oes)
+
+checkConditions ::
+       (Monad m)
+    => Version
+    -> PackageName
+    -> Map FlagName Bool
+    -> C.ConfVar
+    -> m Bool
+checkConditions compilerVer pname flags confVar =
+    let targetOS = Linux
+        targetArch = X86_64
+        targetFlavor = GHC
+    in case confVar of
+           C.OS os -> return $ os == targetOS
+           C.Arch arch -> return $ arch == targetArch
+           C.Flag flag ->
+               case Map.lookup flag flags of
+                   Nothing ->
+                       error $
+                       "Flag " <> show flag <> " for " <> show pname <>
+                       " is not defined"
+                   Just b -> return b
+           C.Impl flavor range ->
+             return $ (flavor == targetFlavor) && (compilerVer `withinRange` range)
+
+getPkgInfo ::
+       (HasProcessContext env, HasLogFunc env, HasPantryConfig env)
+    => Constraints
+    -> Version
+    -> PackageName
+    -> SnapshotPackage
+    -> RIO env PkgInfo
+getPkgInfo constraints compilerVer pname sp = do
+    gpd <- loadCabalFileImmutable (spLocation sp)
+    logDebug $ "Extracting deps for " <> displayShow pname
+    let mpc = Map.lookup pname (consPackages constraints)
+        skipBuild = maybe False pcSkipBuild mpc
+        skipTest = skipBuild || maybe False ((== CASkip) . pcTests) mpc
+        skipBench = skipBuild || maybe False ((== CASkip) . pcBenchmarks) mpc
+        setupDepends = maybe mempty C.setupDepends $
+                       C.setupBuildInfo (C.packageDescription gpd)
+        -- TODO: we should also check executable names, not only their packages
+        buildInfoDeps = map (\(ExeDependency p _ vr) -> Dependency p vr) . C.buildToolDepends
+        gpdFlags = Map.fromList $ map (C.flagName &&& C.flagDefault) (C.genPackageFlags gpd)
+        checkCond = checkConditions compilerVer pname $ maybe mempty pcFlags mpc <> gpdFlags
+        collectDeps0 :: Monoid a
+                     => C.CondTree C.ConfVar [Dependency] a
+                     -> (a -> C.BuildInfo)
+                     -> [Dependency]
+        collectDeps0 tree getBuildInfo =
+          let (deps, a) = C.simplifyCondTree checkCond tree
+          in buildInfoDeps (getBuildInfo a) <> setupDepends <> deps
+        sublibraries =
+          Map.fromList [ ( unqualComponentNameToPackageName un
+                         , collectDeps0 ct C.libBuildInfo
+                         )
+                       | (un, ct) <- C.condSubLibraries gpd
+                       ]
+        collectDeps tree getBI =
+          let deps0 = collectDeps0 tree getBI
+              (sublibs, otherDeps) =
+                partition (\d -> Map.member (depPkgName d) sublibraries)  deps0
+              sublibDeps = Map.foldr (<>) mempty $
+                Map.restrictKeys sublibraries (Set.fromList $ map depPkgName sublibs)
+          in sublibDeps <> otherDeps
+        toCheck skip comp getBI condTree = (skip, comp, collectDeps condTree getBI)
+        checks =
+          maybe [] (\ltree -> [toCheck skipBuild CompLibrary C.libBuildInfo ltree]) (C.condLibrary gpd) ++
+          map (toCheck skipBuild CompExecutable C.buildInfo . snd) (C.condExecutables gpd) ++
+          map (toCheck skipTest CompTestSuite C.testBuildInfo . snd) (C.condTestSuites gpd) ++
+          map (toCheck skipBench CompBenchmark C.benchmarkBuildInfo . snd) (C.condBenchmarks gpd)
+        allDeps = [ (component, deps)
+                  | (False, component, deps) <- checks]
+        treeDeps = [ depPkgName dep
+                   | (comp, deps) <- allDeps
+                   , comp == CompLibrary || comp == CompExecutable
+                   , dep <- deps ]
+    return PkgInfo
+      { piVersion = snapshotVersion (spLocation sp)
+      , piAllDeps = allDeps
+      , piTreeDeps = treeDeps
+      , piCabalVersion = C.specVersion $ C.packageDescription gpd
+      , piMaintainers = maybe mempty pcMaintainers mpc
+      , piGithubPings = applyGithubMapping constraints $ getGithubPings gpd
+      }
+
+validateDeps ::
+       Constraints
+    -> Map PackageName (Maybe Version, [PackageName])
+    -> Version
+    -> PackageName
+    -> PkgInfo
+    -> [DependencyError]
+validateDeps constraints depTree cabalVersion pname pkg =
+    checkCabalVersion <> checkCycles <>
+    catMaybes [ checkDependency component dep
+              | (component, deps) <- piAllDeps pkg
+              , dep <- deps ]
+  where
+    checkCabalVersion
+        | cabalVersion < piCabalVersion pkg =
+            [ OtherError $
+              "Cabal version " <> DT.display cabalVersion <>
+              " not sufficient for " <>
+              DT.display (piCabalVersion pkg)
+            ]
+        | otherwise = []
+    checkCycles =
+      occursCheck depTree pname (piTreeDeps pkg) mempty
+    checkDependency :: Component -> Dependency -> Maybe DependencyError
+    checkDependency component dep =
+      let depName = depPkgName dep
+          depRange = depVerRange dep
+          mdeppc = Map.lookup depName (consPackages constraints)
+          rangeError mv = Just $ RangeError RangeErrorData
+              { redPackageName = depName
+              , redMaintainers = maybe mempty pcMaintainers mdeppc
+              , redPackageVersion = mv
+              , redDependingPackage =
+                  DependingPackage
+                  { dpName = pname
+                  , dpVersion = piVersion pkg
+                  , dpMaintainers = piMaintainers pkg --maybe mempty pcMaintainers mpc
+                  , dpGithubPings = piGithubPings pkg --pings
+                  }
+              , redDependingBounds = DepBounds depRange (Set.singleton component)
+              }
+      in case Map.lookup depName depTree of
+          Nothing ->
+            rangeError Nothing
+          Just (mversion, _) ->
+            case mversion of
+              Just version ->
+                if version `withinRange` depRange
+                then Nothing
+                else rangeError (Just version)
+              Nothing ->
+                Nothing
+
+-- | Check whether the package(s) occurs within its own dependency
+-- tree.
+occursCheck
+    :: Map PackageName (Maybe Version, [PackageName])
+    -- ^ All packages.
+    -> PackageName
+    -- ^ Starting package to check for cycles in.
+    -> [PackageName]
+    -- ^ Dependencies of the package (only library and executable dependencies
+    -- get checked).
+    -> Set PackageName
+    -- ^ Previously seen packages up the dependency tree.
+    -> [DependencyError]
+occursCheck allPackages = go
+    where
+        go pname deps seen =
+            case find (flip Set.member seen) deps of
+                Just cyclic ->
+                    let mv = fst =<< Map.lookup cyclic allPackages
+                    in [ OtherError $
+                         "Dependency cycle detected with loop closing at " <>
+                         DT.display cyclic <> maybe "" (("-" <>) . DT.display) mv
+                       ]
+                Nothing ->
+                    flip concatMap deps $
+                    \pname' ->
+                         case Map.lookup pname' allPackages of
+                             Just (_ver, deps')
+                                 | pname' /= pname -> go pname' deps' seen'
+                             _ -> []
+            where seen' = Set.insert pname seen

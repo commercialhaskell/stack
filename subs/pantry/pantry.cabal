@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.30.0.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bfc4bfcec8fa396290c6a92012ae46cae07ca2bd329e9ae0ca7aaec18202474f
+-- hash: 097f1c956c3050b63f58c0a2ce38f9eebb02d7e1bfabc081d945a42936608f8b
 
 name:           pantry
 version:        0.1.0.0
@@ -15,7 +15,7 @@ homepage:       https://github.com/commercialhaskell/pantry#readme
 bug-reports:    https://github.com/commercialhaskell/pantry/issues
 author:         Michael Snoyman
 maintainer:     michael@snoyman.com
-copyright:      2018 FP Complete
+copyright:      2018-2019 FP Complete
 license:        MIT
 build-type:     Simple
 extra-source-files:
@@ -31,6 +31,7 @@ library
   exposed-modules:
       Pantry
       Pantry.SHA256
+      Pantry.HPack
       Pantry.Internal
       Pantry.Internal.StaticBytes
       Data.Aeson.Extended
@@ -76,6 +77,7 @@ library
     , http-client
     , http-client-tls
     , http-conduit
+    , http-download
     , http-types
     , integer-gmp
     , memory
@@ -92,6 +94,7 @@ library
     , resourcet
     , rio
     , rio-orphans
+    , rio-prettyprint
     , safe
     , store-core
     , syb
@@ -133,6 +136,7 @@ test-suite spec
       Pantry.CabalSpec
       Pantry.FileSpec
       Pantry.HackageSpec
+      Pantry.HPackSpec
       Pantry.Internal.StaticBytesSpec
       Pantry.InternalSpec
       Pantry.TreeSpec
@@ -172,6 +176,7 @@ test-suite spec
     , http-client
     , http-client-tls
     , http-conduit
+    , http-download
     , http-types
     , integer-gmp
     , memory
@@ -189,6 +194,7 @@ test-suite spec
     , resourcet
     , rio
     , rio-orphans
+    , rio-prettyprint
     , safe
     , store-core
     , syb

@@ -79,6 +79,8 @@ Other enhancements:
   [#4101](https://github.com/commercialhaskell/stack/issues/4101)
 * Add `--pedantic` to `ghci` to run with `-Wall` and `-Werror`
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
+* Add `--cabal-files` flag to `stack ide targets` command.
+* Add `--stdout` flag to all `stack ide` subcommands.
 
 Bug fixes:
 
@@ -104,6 +106,11 @@ Bug fixes:
   by symlinks, while GCC will produce the object files in the original
   directory. See
   [#4402](https://github.com/commercialhaskell/stack/pull/4402)
+* Fix handling of GitHub and URL templates on Windows. See
+  [commercialhaskell/stack#4394](https://github.com/commercialhaskell/stack/issues/4394)
+* Fix `--file-watch` not responding to file modifications when running
+  inside docker on Mac. See
+  [#4506](https://github.com/commercialhaskell/stack/issues/4506)
 
 ## v1.9.3
 
