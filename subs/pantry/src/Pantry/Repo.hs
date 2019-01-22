@@ -56,7 +56,7 @@ getRepo repo pm =
     withCache inner = do
       mtid <- withStorage (loadRepoCache repo (repoSubdir repo))
       case mtid of
-        Just tid -> withStorage $ loadPackageById (PLIRepo repo pm) tid
+        Just tid -> withStorage $ loadPackageById (RPLIRepo repo pm) tid
         Nothing -> do
           package <- inner
           withStorage $ do

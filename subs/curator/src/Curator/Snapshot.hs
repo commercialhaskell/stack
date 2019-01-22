@@ -225,7 +225,7 @@ pkgBoundsError dep maintainers mdepVer users =
     display = T.pack . DT.display
 
 snapshotVersion :: PackageLocationImmutable -> Maybe Version
-snapshotVersion (PLIHackage (PackageIdentifierRevision _ v _) _) = Just v
+snapshotVersion (PLIHackage (PackageIdentifier _ v) _ _) = Just v
 snapshotVersion _ = Nothing
 
 data DependencyError =

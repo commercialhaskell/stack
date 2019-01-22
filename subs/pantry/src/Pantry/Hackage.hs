@@ -422,14 +422,14 @@ getHackagePackageVersionRevisions name version = do
 
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
+  => RawPackageLocationImmutable
   -> PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
   -> RIO env Package
   -> RIO env Package
-withCachedTree pli name ver bid inner = do
-  mres <- withStorage $ loadHackageTree pli name ver bid
+withCachedTree rpli name ver bid inner = do
+  mres <- withStorage $ loadHackageTree rpli name ver bid
   case mres of
     Just package -> pure package
     Nothing -> do
@@ -456,8 +456,8 @@ getHackageTarball
 getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
-  let pli = PLIHackage pir mtreeKey
-  withCachedTree pli name ver cabalFile $ do
+  let rpli = RPLIHackage pir mtreeKey
+  withCachedTree rpli name ver cabalFile $ do
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
       case mpair of
@@ -482,7 +482,6 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    let rpli = RPLIHackage pir mtreeKey
     package <- getArchive
       rpli
       RawArchive
@@ -520,7 +519,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             , mismatchActual = gpdIdent
             }
 
-        (_tid, treeKey') <- withStorage $ storeTree pli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        (_tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
         pure Package
           { packageTreeKey = treeKey'
           , packageTree = tree'

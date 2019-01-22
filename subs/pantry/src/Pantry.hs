@@ -297,7 +297,7 @@ getLatestHackageLocation name preferred = do
 --
 -- @since 0.1.0.0
 getLatestHackageRevision
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageName -- ^ package name
   -> Version
   -> RIO env (Maybe (Revision, BlobKey, TreeKey))
@@ -674,7 +674,9 @@ loadRawCabalFileBytes (RPLIHackage pir _mtree) = getHackageCabalFile pir
 loadRawCabalFileBytes pl = do
   package <- loadPackageRaw pl
   let sfp = cabalFileName $ pkgName $ packageIdent package
-      TreeEntry cabalBlobKey _ft = packageCabalEntry package
+      TreeEntry cabalBlobKey _ft = case packageCabalEntry package of
+                                     PCCabalFile cabalTE -> cabalTE
+                                     PCHpack hpackCE -> phGenerated hpackCE
   mbs <- withStorage $ loadBlob cabalBlobKey
   case mbs of
     Nothing -> do
@@ -755,15 +757,13 @@ completePM plOrig rpm@(RawPackageMetadata mn mv mtk mc)
   | Just n <- mn, Just v <- mv, Just tk <- mtk, Just c <- mc =
       pure $ PackageMetadata (PackageIdentifier n v) tk c
   | otherwise = do
-      package <- loadPackage plOrig
-      let pkgCabal = case packageCabalEntry package of
-                       PCCabalFile tentry -> tentry
-                       PCHpack phpack -> phGenerated phpack
-          pmNew = PackageMetadata
-            { pmName = Just $ pkgName $ packageIdent package
-            , pmVersion = Just $ pkgVersion $ packageIdent package
-            , pmTreeKey = Just $ packageTreeKey package
-            , pmCabal = Just $ teBlob pkgCabal
+      package <- loadPackageRaw plOrig
+      let pm = PackageMetadata
+            { pmIdent = packageIdent package
+            , pmTreeKey = packageTreeKey package
+            , pmCabal = teBlob $ case packageCabalEntry package of
+                                   PCCabalFile cfile -> cfile
+                                   PCHpack hfile -> phGenerated hfile
             }
 
           isSame x (Just y) = x == y
