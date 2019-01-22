@@ -839,6 +839,7 @@ checkForDuplicateModules pkgs = do
 
 targetWarnings
   :: HasEnvConfig env
+  => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
   -> RIO env ()
