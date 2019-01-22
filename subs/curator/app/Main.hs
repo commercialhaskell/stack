@@ -64,7 +64,7 @@ snapshot = do
   complete <- completeSnapshotLayer incomplete
   liftIO $ encodeFile "snapshot.yaml" complete
 
-loadSnapshotYaml :: RIO PantryApp Pantry.Snapshot
+loadSnapshotYaml :: RIO PantryApp Pantry.RawSnapshot
 loadSnapshotYaml = do
   let fp = "snapshot.yaml"
   abs' <- resolveFile' fp
