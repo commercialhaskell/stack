@@ -77,6 +77,7 @@ import qualified Data.Text as T
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
+import           RIO.Process (HasProcessContext)
 import           Stack.SourceMap
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -209,7 +210,7 @@ data ResolveResult = ResolveResult
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
 resolveRawTarget ::
-       (HasLogFunc env, HasPantryConfig env)
+       (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
     => SMActual
     -> Map PackageName PackageLocation
     -> (RawInput, RawTarget)

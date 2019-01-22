@@ -73,13 +73,13 @@ spec = do
       }
     ident `shouldBe` parsePackageIdentifier' "package-0.1.2.3"
   it "finds cabal file from tarball with a package.yaml" $ do
-    ident <- getPackageLocationIdent' TestArchive
+    ident <- getRawPackageLocationIdent' TestArchive
       { testLocation = TLFilePath "attic/hpack-0.1.2.3.tar.gz"
       , testSubdir = ""
       }
     ident `shouldBe` parsePackageIdentifier' "hpack-0.1.2.3"
   it "finds cabal file from tarball with subdir '.' with a package.yaml" $ do
-    ident <- getPackageLocationIdent' TestArchive
+    ident <- getRawPackageLocationIdent' TestArchive
       { testLocation = TLFilePath "attic/hpack-0.1.2.3.tar.gz"
       , testSubdir = "."
       }
