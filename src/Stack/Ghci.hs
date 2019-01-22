@@ -21,7 +21,6 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.List
 import qualified Data.Map.Strict as M
-import           Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
