@@ -431,7 +431,7 @@ addDep treatAsDep' name = do
                             let version = installedVersion installed
                             mrev <- liftRIO $ getLatestHackageRevision name version
                             case mrev of
-                              Nothing -> logError $ "No package revision found for: " <> (displayShow name)
+                              Nothing -> error $ "No package revision found for: " <> (show name)
                               Just (_rev, cfKey, treeKey) ->
                                 tellExecutablesUpstream
                                   name
