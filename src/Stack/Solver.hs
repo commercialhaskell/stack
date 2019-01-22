@@ -47,7 +47,6 @@ import           Stack.Build.Target (gpdVersion)
 import           Stack.BuildPlan
 import           Stack.Config (loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
-import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Snapshot (loadSnapshot)
@@ -58,6 +57,7 @@ import           Stack.Types.Config
 import           Stack.Types.SourceMap
 import qualified System.Directory as D
 import qualified System.FilePath as FP
+import           RIO.PrettyPrint
 import           RIO.Process
 import           Text.Regex.Applicative.Text (match, sym, psym, anySym, few)
 

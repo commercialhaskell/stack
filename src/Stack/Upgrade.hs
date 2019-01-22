@@ -20,13 +20,13 @@ import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Config
 import           Stack.Constants
-import           Stack.PrettyPrint
 import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
+import           RIO.PrettyPrint
 import           RIO.Process
 
 upgradeOpts :: Parser UpgradeOpts

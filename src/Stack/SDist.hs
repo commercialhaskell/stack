@@ -46,11 +46,11 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
+import           RIO.PrettyPrint
 import           Stack.Build (mkBaseConfigOpts, build)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (projectLocalPackages)
-import           Stack.PrettyPrint
 import           Stack.Package
 import           Stack.SourceMap
 import           Stack.Types.Build

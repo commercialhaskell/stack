@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -38,6 +39,7 @@ import Data.Text (unpack)
 import qualified Data.Text as T
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import RIO
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate)
 
 -- | Extends @.:@ warning to include field name.
 (.:) :: FromJSON a => Object -> Text -> Parser a
@@ -210,3 +212,6 @@ instance Display JSONWarning where
 
 instance IsString JSONWarning where
   fromString = JSONGeneralWarning . T.pack
+
+instance FromJSON (WithJSONWarnings StylesUpdate) where
+  parseJSON v = noJSONWarnings <$> parseJSON v

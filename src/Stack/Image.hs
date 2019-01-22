@@ -20,9 +20,9 @@ import qualified Data.Text as T
 import           Path
 import           Path.Extra
 import           Path.IO
+import           RIO.PrettyPrint
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.PrettyPrint
 import           Stack.Types.Config
 import           Stack.Types.Image
 import           RIO.Process

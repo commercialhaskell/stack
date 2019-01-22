@@ -31,6 +31,7 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
+import           RIO.PrettyPrint
 import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
 import           Stack.Build
 import           Stack.Build.Installed
@@ -40,7 +41,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
-import           Stack.PrettyPrint
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Build
@@ -453,7 +453,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
             scriptOptions <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
             execGhci (macrosOptions ++ scriptOptions)
 
-writeMacrosFile :: HasRunner env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
+writeMacrosFile :: HasTerm env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
 writeMacrosFile outputDirectory pkgs = do
     fps <- fmap (nubOrd . catMaybes . concat) $
         forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
@@ -816,7 +816,7 @@ borderedWarning f = do
 
 -- TODO: Should this also tell the user the filepaths, not just the
 -- module name?
-checkForDuplicateModules :: HasRunner env => [GhciPkgInfo] -> RIO env ()
+checkForDuplicateModules :: HasTerm env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
@@ -839,7 +839,6 @@ checkForDuplicateModules pkgs = do
 
 targetWarnings
   :: HasEnvConfig env
-  => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
   -> RIO env ()
