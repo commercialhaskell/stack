@@ -223,7 +223,7 @@ initStorage fp inner = do
     (createSqlitePoolFromInfo (sqinfo True) 1)
     (liftIO . destroyAllResources) $ \pool -> inner (P.Storage pool)
   where
-    wrapMigrationFailure = handle (throwIO . MigrationFailure)
+    wrapMigrationFailure = handle (throwIO . MigrationFailure fp)
     sqinfo fk = set extraPragmas ["PRAGMA busy_timeout=2000;"]
            $ set fkEnabled fk
            $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
