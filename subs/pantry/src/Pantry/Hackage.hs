@@ -10,6 +10,7 @@ module Pantry.Hackage
   , getHackageTarballKey
   , getHackageCabalFile
   , getHackagePackageVersions
+  , getHackagePackageVersionRevisions
   , getHackageTypoCorrections
   , UsePreferredVersions (..)
   ) where
@@ -404,16 +405,31 @@ getHackagePackageVersions usePreferred name = do
           Just $ \v _ -> withinRange v vr
     Map.filterWithKey predicate <$> loadHackagePackageVersions name
 
+-- | Returns the versions of the package available on Hackage.
+--
+-- @since 0.1.0.0
+getHackagePackageVersionRevisions
+  :: (HasPantryConfig env, HasLogFunc env)
+  => PackageName -- ^ package name
+  -> Version -- ^ package version
+  -> RIO env (Map Revision BlobKey)
+getHackagePackageVersionRevisions name version = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+  withStorage $
+    Map.map snd <$> loadHackagePackageVersion name version
+
 withCachedTree
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
+  => RawPackageLocationImmutable
   -> PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
   -> RIO env Package
   -> RIO env Package
-withCachedTree pli name ver bid inner = do
-  mres <- withStorage $ loadHackageTree pli name ver bid
+withCachedTree rpli name ver bid inner = do
+  mres <- withStorage $ loadHackageTree rpli name ver bid
   case mres of
     Just package -> pure package
     Nothing -> do
@@ -440,8 +456,8 @@ getHackageTarball
 getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
   cabalFile <- resolveCabalFileInfo pir
   cabalFileKey <- withStorage $ getBlobKey cabalFile
-  let pli = PLIHackage pir mtreeKey
-  withCachedTree pli name ver cabalFile $ do
+  let rpli = RPLIHackage pir mtreeKey
+  withCachedTree rpli name ver cabalFile $ do
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
       case mpair of
@@ -467,18 +483,18 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           , ".tar.gz"
           ]
     package <- getArchive
-      (PLIHackage pir mtreeKey)
-      Archive
-        { archiveLocation = ALUrl url
-        , archiveHash = Just sha
-        , archiveSize = Just size
-        , archiveSubdir = T.empty -- no subdirs on Hackage
+      rpli
+      RawArchive
+        { raLocation = ALUrl url
+        , raHash = Just sha
+        , raSize = Just size
+        , raSubdir = T.empty -- no subdirs on Hackage
         }
-      PackageMetadata
-        { pmName = Just name
-        , pmVersion = Just ver
-        , pmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
-        , pmCabal = Nothing -- cabal file in the tarball may be different!
+      RawPackageMetadata
+        { rpmName = Just name
+        , rpmVersion = Just ver
+        , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
+        , rpmCabal = Nothing -- cabal file in the tarball may be different!
         }
 
     case packageTree package of
@@ -495,7 +511,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             Nothing -> error $ "Invariant violated, cabal file key: " ++ show cabalFileKey
             Just bid -> loadBlobById bid
 
-        (_warnings, gpd) <- rawParseGPD (Left (PLIHackage pir mtreeKey)) cabalBS
+        (_warnings, gpd) <- rawParseGPD (Left rpli) cabalBS
         let gpdIdent = Cabal.package $ Cabal.packageDescription gpd
         when (ident /= gpdIdent) $ throwIO $
           MismatchedCabalFileForHackage pir Mismatch
@@ -503,7 +519,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             , mismatchActual = gpdIdent
             }
 
-        (_tid, treeKey') <- withStorage $ storeTree pli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        (_tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
         pure Package
           { packageTreeKey = treeKey'
           , packageTree = tree'

@@ -77,6 +77,7 @@ import qualified Data.Text as T
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
+import           RIO.Process (HasProcessContext)
 import           Stack.SourceMap
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -209,11 +210,12 @@ data ResolveResult = ResolveResult
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
 resolveRawTarget ::
-       (HasLogFunc env, HasPantryConfig env)
+       (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
     => SMActual
+    -> Map PackageName PackageLocation
     -> (RawInput, RawTarget)
     -> RIO env (Either Text ResolveResult)
-resolveRawTarget sma (ri, rt) =
+resolveRawTarget sma allLocs (ri, rt) =
   go rt
   where
     locals = smaProject sma
@@ -311,28 +313,17 @@ resolveRawTarget sma (ri, rt) =
           , rrPackageType = PTDependency
           }
       | otherwise = do
-          mversion <- getLatestHackageVersion name UsePreferredVersions
-          return $ case mversion of
-            -- This is actually an error case. We _could_ return a
-            -- Left value here, but it turns out to be better to defer
-            -- this until the ConstructPlan phase, and let it complain
-            -- about the missing package so that we get more errors
-            -- together, plus the fancy colored output from that
-            -- module.
-            Nothing -> Right ResolveResult
-              { rrName = name
-              , rrRaw = ri
-              , rrComponent = Nothing
-              , rrAddedDep = Nothing
-              , rrPackageType = PTDependency
-              }
-            Just pir -> Right ResolveResult
-              { rrName = name
-              , rrRaw = ri
-              , rrComponent = Nothing
-              , rrAddedDep = Just $ PLIHackage pir Nothing
-              , rrPackageType = PTDependency
-              }
+          mloc <- getLatestHackageLocation name UsePreferredVersions
+          pure $ case mloc of
+            Nothing -> deferToConstructPlan name
+            Just loc -> do
+              Right ResolveResult
+                    { rrName = name
+                    , rrRaw = ri
+                    , rrComponent = Nothing
+                    , rrAddedDep = Just loc
+                    , rrPackageType = PTDependency
+                    }
 
     -- Note that we use CFILatest below, even though it's
     -- non-reproducible, to avoid user confusion. In any event,
@@ -346,11 +337,12 @@ resolveRawTarget sma (ri, rt) =
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
             , "\nTo build the local package, specify the target without an explicit version."
             ]
-      | otherwise = return $
+      | otherwise =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLImmutable (PLIHackage (PackageIdentifierRevision _name versionLoc _mcfi) _mtree)) -> Right ResolveResult
+            Just (PLImmutable (PLIHackage (PackageIdentifier _name versionLoc) cfKey treeKey)) ->
+              pure $ Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Nothing
@@ -360,38 +352,44 @@ resolveRawTarget sma (ri, rt) =
                         -- version we have
                         then Nothing
                         -- OK, we'll override it
-                        else Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+                        else Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
                   , rrPackageType = PTDependency
                   }
             -- The package was coming from something besides the
             -- index, so refuse to do the override
-            Just loc' -> Left $ T.concat
+            Just loc' -> pure $ Left $ T.concat
               [ "Package with identifier was targeted on the command line: "
               , T.pack $ packageIdentifierString ident
               , ", but it was specified from a non-index location: "
               , T.pack $ show loc'
               , ".\nRecommendation: add the correctly desired version to extra-deps."
               ]
-            -- Not present at all, so add it
-            Nothing -> Right ResolveResult
+            -- Not present at all, add it from Hackage
+            Nothing -> do
+              mrev <- getLatestHackageRevision name version
+              pure $ case mrev of
+                Nothing -> deferToConstructPlan name
+                Just (_rev, cfKey, treeKey) -> Right ResolveResult
+                  { rrName = name
+                  , rrRaw = ri
+                  , rrComponent = Nothing
+                  , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+                  , rrPackageType = PTDependency
+                  }
+
+    -- This is actually an error case. We _could_ return a
+    -- Left value here, but it turns out to be better to defer
+    -- this until the ConstructPlan phase, and let it complain
+    -- about the missing package so that we get more errors
+    -- together, plus the fancy colored output from that
+    -- module.
+    deferToConstructPlan name = Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just $ PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
+              , rrAddedDep = Nothing
               , rrPackageType = PTDependency
               }
-
-      where
-        allLocs :: Map PackageName PackageLocation
-        allLocs = Map.unions
-          [ Map.mapWithKey
-              (\name' gp -> PLImmutable $ PLIHackage
-                  (PackageIdentifierRevision name' (gpVersion gp) CFILatest)
-                  Nothing)
-              globals
-          , Map.map dpLocation deps
-          ]
-
 ---------------------------------------------------------------------------------
 -- Combine the ResolveResults
 ---------------------------------------------------------------------------------
@@ -446,8 +444,19 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
+  let deps = smaDeps smActual
+      globals = smaGlobal smActual
+      latestGlobal name gp = do
+        let version = gpVersion gp
+        mrev <- getLatestHackageRevision name version
+        forM mrev $ \(_rev, cfKey, treeKey) -> do
+          let ident = PackageIdentifier name version
+          pure $ PLImmutable (PLIHackage ident cfKey treeKey)
+  globalLocs <- Map.traverseMaybeWithKey latestGlobal globals
+  let allLocs = Map.union globalLocs (Map.map dpLocation deps)
+
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget smActual
+    resolveRawTarget smActual allLocs
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 

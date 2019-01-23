@@ -14,7 +14,7 @@ spec :: Spec
 spec = do
   prop "parseLtsName" $ \(abs -> x) (abs -> y) -> do
     case ltsSnapshotLocation x y of
-      SLUrl url _ ->
+      RSLUrl url _ ->
         case parseLtsName url of
           Just (x', y') -> do
             x `shouldBe` x'

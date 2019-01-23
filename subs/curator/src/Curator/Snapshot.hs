@@ -35,22 +35,20 @@ makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
   -> Text -- ^ name
-  -> RIO env SnapshotLayer
+  -> RIO env RawSnapshotLayer
 makeSnapshot cons name = do
-    locs <-
-        traverseValidate (uncurry toLoc) $
-        Map.toList $ consPackages cons
-    pure
-        SnapshotLayer
-        { slParent = SLCompiler $ WCGhc $ consGhcVersion cons
-        , slCompiler = Nothing
-        , slName = name
-        , slLocations = catMaybes locs
-        , slDropPackages = mempty
-        , slFlags = Map.mapMaybe getFlags (consPackages cons)
-        , slHidden = Map.filter id (pcHide <$> consPackages cons)
-        , slGhcOptions = mempty
-        }
+  locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
+  pure RawSnapshotLayer
+    { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
+    , rslCompiler = Nothing
+    , rslName = name
+    , rslLocations = catMaybes locs
+    , rslDropPackages = mempty
+    , rslFlags = Map.mapMaybe getFlags (consPackages cons)
+    , rslHidden = Map.filter id (pcHide <$> consPackages cons)
+    , rslGhcOptions = mempty
+    }
+
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
 getFlags pc
@@ -61,7 +59,7 @@ toLoc
   :: (HasPantryConfig env, HasLogFunc env)
   => PackageName
   -> PackageConstraints
-  -> RIO env (Maybe PackageLocationImmutable)
+  -> RIO env (Maybe RawPackageLocationImmutable)
 toLoc name pc =
   case pcSource pc of
     PSHackage (HackageSource mrange mrequiredLatest revisions) -> do
@@ -95,7 +93,7 @@ toLoc name pc =
             case viewer revs of
               Nothing -> error $ "Impossible! No revisions found for " ++ show (name, version)
               Just (BlobKey sha size, _) -> pure $ CFIHash sha $ Just size
-          pure $ Just $ PLIHackage (PackageIdentifierRevision name version cfi) Nothing
+          pure $ Just $ RPLIHackage (PackageIdentifierRevision name version cfi) Nothing
 
 traverseValidate
   :: (MonadUnliftIO m, Traversable t)
@@ -113,7 +111,7 @@ traverseValidate f t = do
     [] -> pure res
     [x] -> throwIO x
     _ -> throwIO $ TraverseValidateExceptions errs
-  
+
 newtype TraverseValidateExceptions = TraverseValidateExceptions [SomeException]
   deriving (Show, Typeable)
 instance Exception TraverseValidateExceptions
@@ -121,11 +119,11 @@ instance Exception TraverseValidateExceptions
 checkDependencyGraph ::
        (HasTerm env, HasProcessContext env, HasPantryConfig env)
     => Constraints
-    -> Snapshot
+    -> RawSnapshot
     -> RIO env ()
 checkDependencyGraph constraints snapshot = do
     globalHintsYaml <- resolveFile' "global-hints.yaml"
-    let compiler = snapshotCompiler snapshot
+    let compiler = rsCompiler snapshot
         compilerVer = case compiler of
           WCGhc v -> v
           WCGhcjs _ _ -> error "GHCJS is not supported"
@@ -137,8 +135,8 @@ checkDependencyGraph constraints snapshot = do
         return $ Map.map Just hints
     let declared =
             Map.fromList
-                [ (pn, snapshotVersion (spLocation sp))
-                | (pn, sp) <- Map.toList (snapshotPackages snapshot)
+                [ (pn, snapshotVersion (rspLocation sp))
+                | (pn, sp) <- Map.toList (rsPackages snapshot)
                 ] <>
             ghcBootPackages
         cabalName = "Cabal"
@@ -150,7 +148,7 @@ checkDependencyGraph constraints snapshot = do
         cabalError "Cabal version in snapshot is not defined"
       Just (Just cabalVersion) -> do
         pkgInfos <- Map.traverseWithKey (getPkgInfo constraints compilerVer)
-                    (snapshotPackages snapshot)
+                    (rsPackages snapshot)
         let depTree =
               Map.map (piVersion &&& piTreeDeps) pkgInfos
               <> Map.map (, []) ghcBootPackages
@@ -226,8 +224,8 @@ pkgBoundsError dep maintainers mdepVer users =
     display :: DT.Text a => a -> Text
     display = T.pack . DT.display
 
-snapshotVersion :: PackageLocationImmutable -> Maybe Version
-snapshotVersion (PLIHackage (PackageIdentifierRevision _ v _) _) = Just v
+snapshotVersion :: RawPackageLocationImmutable -> Maybe Version
+snapshotVersion (RPLIHackage (PackageIdentifierRevision _ v _) _) = Just v
 snapshotVersion _ = Nothing
 
 data DependencyError =
@@ -308,10 +306,10 @@ getPkgInfo ::
     => Constraints
     -> Version
     -> PackageName
-    -> SnapshotPackage
+    -> RawSnapshotPackage
     -> RIO env PkgInfo
-getPkgInfo constraints compilerVer pname sp = do
-    gpd <- loadCabalFileImmutable (spLocation sp)
+getPkgInfo constraints compilerVer pname rsp = do
+    gpd <- loadCabalFileRawImmutable (rspLocation rsp)
     logDebug $ "Extracting deps for " <> displayShow pname
     let mpc = Map.lookup pname (consPackages constraints)
         skipBuild = maybe False pcSkipBuild mpc
@@ -356,7 +354,7 @@ getPkgInfo constraints compilerVer pname sp = do
                    , comp == CompLibrary || comp == CompExecutable
                    , dep <- deps ]
     return PkgInfo
-      { piVersion = snapshotVersion (spLocation sp)
+      { piVersion = snapshotVersion (rspLocation rsp)
       , piAllDeps = allDeps
       , piTreeDeps = treeDeps
       , piCabalVersion = C.specVersion $ C.packageDescription gpd

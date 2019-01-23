@@ -241,24 +241,25 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       bopts <- view $ configL.to configBuild
       env <- ask
       let buildHaddocks = shouldHaddockDeps bopts
-          globalDeps = Map.mapMaybeWithKey globalToSource $ smGlobal sourceMap
-          globalToSource name gp | name `Set.member` wiredInPackages = Nothing
-                                 | otherwise =
+          globalToSource name gp | name `Set.member` wiredInPackages = pure Nothing
+                                 | otherwise = do
             let version = gpVersion gp
-                loc = PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
-                common = CommonPackage
-                  { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
-                  , cpName = name
-                  , cpFlags = mempty
-                  , cpGhcOptions = mempty
-                  , cpHaddocks = buildHaddocks
-                  }
-            in Just $ PSRemote loc version NotFromSnapshot common
+            mrev <- getLatestHackageRevision name version
+            forM mrev $ \(_rev, cfKey, treeKey) ->
+                let loc = PLIHackage (PackageIdentifier name version) cfKey treeKey
+                    common = CommonPackage
+                      { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
+                      , cpName = name
+                      , cpFlags = mempty
+                      , cpGhcOptions = mempty
+                      , cpHaddocks = buildHaddocks
+                      }
+                in pure $ PSRemote loc version NotFromSnapshot common
+      globalDeps <- Map.traverseMaybeWithKey globalToSource $ smGlobal sourceMap
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-          PLImmutable loc -> do
-            version <- getPLIVersion loc (loadVersion $ dpCommon dp)
-            return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
+          PLImmutable loc ->
+            return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage sourceMap pp
@@ -427,11 +428,16 @@ addDep treatAsDep' name = do
                             -- FIXME Slightly hacky, no flags since
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
-                            tellExecutablesUpstream
-                              name
-                              (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
-                              loc
-                              Map.empty
+                            let version = installedVersion installed
+                            mrev <- liftRIO $ getLatestHackageRevision name version
+                            case mrev of
+                              Nothing -> error $ "No package revision found for: " <> show name
+                              Just (_rev, cfKey, treeKey) ->
+                                tellExecutablesUpstream
+                                  name
+                                  (PLIHackage (PackageIdentifier name version) cfKey treeKey)
+                                  loc
+                                  Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps

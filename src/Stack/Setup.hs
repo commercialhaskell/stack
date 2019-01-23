@@ -781,7 +781,7 @@ doCabalInstall wc installed wantedVersion = do
         let name = mkPackageName "Cabal"
         suffix <- parseRelDir $ "Cabal-" ++ versionString wantedVersion
         let dir = tmpdir </> suffix
-        unpackPackageLocation dir $ PLIHackage
+        unpackPackageLocationRaw dir $ RPLIHackage
           (PackageIdentifierRevision name wantedVersion CFILatest)
           Nothing
         compilerPath <- findExecutable (compilerExeName wc)

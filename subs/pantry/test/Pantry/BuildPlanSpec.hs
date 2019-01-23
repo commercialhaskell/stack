@@ -17,10 +17,10 @@ spec =
   describe "PackageLocation" $ do
     describe "Archive" $ do
       describe "github" $ do
-        let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
+        let decode' :: (HasCallStack, MonadThrow m) => ByteString -> m (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
             decode' = decodeThrow
 
-            decode'' :: HasCallStack => ByteString -> IO (NonEmpty PackageLocationImmutable)
+            decode'' :: HasCallStack => ByteString -> IO (NonEmpty RawPackageLocationImmutable)
             decode'' bs = do
               WithJSONWarnings unresolved warnings <- decode' bs
               unless (null warnings) $ error $ show warnings
@@ -34,20 +34,20 @@ spec =
                     [ "github: oink/town"
                     , "commit: abc123"
                     ])
-          let expected :: PackageLocationImmutable
+          let expected :: RawPackageLocationImmutable
               expected =
-                PLIArchive
-                  Archive
-                    { archiveLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
-                    , archiveHash = Nothing
-                    , archiveSize = Nothing
-                    , archiveSubdir = ""
+                RPLIArchive
+                  RawArchive
+                    { raLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
+                    , raHash = Nothing
+                    , raSize = Nothing
+                    , raSubdir = ""
                     }
-                  PackageMetadata
-                    { pmName = Nothing
-                    , pmVersion = Nothing
-                    , pmTreeKey = Nothing
-                    , pmCabal = Nothing
+                  RawPackageMetadata
+                    { rpmName = Nothing
+                    , rpmVersion = Nothing
+                    , rpmTreeKey = Nothing
+                    , rpmCabal = Nothing
                     }
           actual <- decode'' contents
           actual `shouldBe` pure expected
@@ -62,20 +62,20 @@ spec =
                     , "subdirs:"
                     , "  - foo"
                     ])
-          let expected :: PackageLocationImmutable
+          let expected :: RawPackageLocationImmutable
               expected =
-                PLIArchive
-                  Archive
-                    { archiveLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
-                    , archiveHash = Nothing
-                    , archiveSize = Nothing
-                    , archiveSubdir = "foo"
+                RPLIArchive
+                  RawArchive
+                    { raLocation = ALUrl "https://github.com/oink/town/archive/abc123.tar.gz"
+                    , raHash = Nothing
+                    , raSize = Nothing
+                    , raSubdir = "foo"
                     }
-                  PackageMetadata
-                    { pmName = Nothing
-                    , pmVersion = Nothing
-                    , pmTreeKey = Nothing
-                    , pmCabal = Nothing
+                  RawPackageMetadata
+                    { rpmName = Nothing
+                    , rpmVersion = Nothing
+                    , rpmTreeKey = Nothing
+                    , rpmCabal = Nothing
                     }
           actual <- decode'' contents
           actual `shouldBe` pure expected

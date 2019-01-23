@@ -60,7 +60,6 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~), lens)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import           Pantry
 import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -157,7 +156,7 @@ getSnapshots = do
 makeConcreteResolver
     :: HasConfig env
     => AbstractResolver
-    -> RIO env SnapshotLocation
+    -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
 makeConcreteResolver ar = do
     snapshots <- getSnapshots
@@ -185,7 +184,7 @@ makeConcreteResolver ar = do
     return r
 
 -- | Get the latest snapshot resolver available.
-getLatestResolver :: HasConfig env => RIO env SnapshotLocation
+getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
     let mlts = uncurry ltsSnapshotLocation <$>
@@ -588,7 +587,8 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
-    snapshot <- loadSnapshot (projectResolver project)
+    resolver <- completeSnapshotLocation $ projectResolver project
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -600,8 +600,12 @@ loadBuildConfig mproject maresolver mcompiler = do
       pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
       pure (cpName $ ppCommon pp, pp)
 
-    deps0 <- forM (projectDependencies project) $ \plp -> do
-      dp <- additionalDepPackage (shouldHaddockDeps bopts) plp
+    let completeLocation (RPLMutable m) = pure $ PLMutable m
+        completeLocation (RPLImmutable im) = PLImmutable <$> completePackageLocation im
+
+    deps0 <- forM (projectDependencies project) $ \rpl -> do
+      pl <- completeLocation rpl
+      dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
       pure (cpName $ dpCommon dp, dp)
 
     checkDuplicateNames $
@@ -658,7 +662,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         , bcDownloadCompiler = WithDownloadCompiler
         }
   where
-    getEmptyProject :: Maybe SnapshotLocation -> RIO Config Project
+    getEmptyProject :: Maybe RawSnapshotLocation -> RIO Config Project
     getEmptyProject mresolver = do
       r <- case mresolver of
             Just resolver -> do

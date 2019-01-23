@@ -103,19 +103,10 @@ loadVersion common = do
     gpd <- liftIO $ cpGPD common
     return (pkgVersion $ PD.package $ PD.packageDescription gpd)
 
-getPLIVersion ::
-       MonadIO m
-    => PackageLocationImmutable
-    -> IO Version
-    -> m Version
-getPLIVersion (PLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
-getPLIVersion (PLIArchive _ pm) loadVer = versionMaybeFromPM pm loadVer
-getPLIVersion (PLIRepo _ pm) loadVer = versionMaybeFromPM pm loadVer
-
-versionMaybeFromPM ::
-       MonadIO m => PackageMetadata -> IO Version -> m Version
-versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
-versionMaybeFromPM _ loadVer = liftIO loadVer
+getPLIVersion :: PackageLocationImmutable -> Version
+getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
+getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
+getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env)

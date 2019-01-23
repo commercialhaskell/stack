@@ -727,7 +727,7 @@ solveExtraDeps modStackYaml = do
 
         writeStackYaml
           :: Path Abs File
-          -> SnapshotLocation
+          -> RawSnapshotLocation
           -> Map PackageName Version
           -> Map PackageName (Map FlagName Bool)
           -> RIO env ()

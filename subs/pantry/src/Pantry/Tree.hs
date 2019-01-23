@@ -22,11 +22,11 @@ import Path (File)
 
 unpackTree
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageLocationImmutable -- for exceptions
+  => RawPackageLocationImmutable -- for exceptions
   -> Path Abs Dir -- ^ dest dir, will be created if necessary
   -> Tree
   -> RIO env ()
-unpackTree loc (toFilePath -> dir) (TreeMap m) = do
+unpackTree rpli (toFilePath -> dir) (TreeMap m) = do
   withStorage $ for_ (Map.toList m) $ \(sfp, TreeEntry blobKey ft) -> do
     let dest = dir </> T.unpack (unSafeFilePath sfp)
     createDirectoryIfMissing True $ takeDirectory dest
@@ -34,7 +34,7 @@ unpackTree loc (toFilePath -> dir) (TreeMap m) = do
     case mbs of
       Nothing -> do
         -- TODO when we have pantry wire stuff, try downloading
-        throwIO $ TreeReferencesMissingBlob loc sfp blobKey
+        throwIO $ TreeReferencesMissingBlob rpli sfp blobKey
       Just bs -> do
         B.writeFile dest bs
         case ft of
@@ -47,7 +47,7 @@ unpackTree loc (toFilePath -> dir) (TreeMap m) = do
 -- necessary.
 rawParseGPD
   :: MonadThrow m
-  => Either PackageLocationImmutable (Path Abs File)
+  => Either RawPackageLocationImmutable (Path Abs File)
   -> ByteString
   -> m ([PWarning], GenericPackageDescription)
 rawParseGPD loc bs =
