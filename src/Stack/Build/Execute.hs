@@ -53,7 +53,7 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Version (mkVersion)
+import           Distribution.Version (mkVersion, nullVersion)
 import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
@@ -1752,7 +1752,22 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
-                menv <- liftIO $ configProcessContextSettings config EnvSettings
+                packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
+                    let pkgId = PackageIdentifier name nullVersion
+                    case Map.lookupGT pkgId allDepsMap of
+                        Just (PackageIdentifier name' version, ghcPkgId)
+                            | name' == name && dvType dv == AsLibrary &&
+                              version `withinRange` dvVersionRange dv ->
+                            return $ Just (unGhcPkgId ghcPkgId)
+                        _ -> do
+                            logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
+                            return Nothing
+                -- env var HASKELL_PACKAGE_IDS is used by doctest so module names for
+                -- packages with proper dependencies should no longer get ambiguous
+                -- see e.g. https://github.com/doctest/issues/119
+                let usePackageIds pc = modifyEnvVars pc $ \envVars ->
+                      Map.insert "HASKELL_PACKAGE_IDS" (T.unwords packageIds) envVars
+                menv <- liftIO $ usePackageIds =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
