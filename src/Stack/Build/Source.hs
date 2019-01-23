@@ -116,6 +116,7 @@ loadSourceMap smt boptsCli sma = do
         , smDeps = deps
         , smGlobal = globals
         , smHash = smh
+        , smName = smaName sma
         }
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'

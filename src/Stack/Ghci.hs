@@ -41,9 +41,7 @@ import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Setup (withNewLocalBuildTargets)
-import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan (sdResolverName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -151,6 +149,7 @@ ghci opts@GhciOpts{..} = do
              , smaProject = smProject sourceMap
              , smaDeps = smDeps sourceMap
              , smaGlobal = smGlobal sourceMap
+             , smaName = smName sourceMap
              }
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets buildOptsCLI sma ghciMainIs
@@ -854,23 +853,14 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
   when (null localTargets && isNothing mfileTargets) $ do
+      sourceMap <- view $ envConfigL.to envConfigSourceMap
       stackYaml <- view stackYamlL
-      mproject <- view $ configL.to configMaybeProject
-      resolverMsg <-
-        case mproject of
-            Just (p, _) -> do
-              resolver <- loadResolver (projectResolver p) (projectCompiler p)
-              return [ flow $ "You are using resolver: " ++ T.unpack (sdResolverName resolver)
-                     , ""
-                     ]
-            Nothing ->
-              return []
-      prettyNote $ vsep $
+      prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          ] ++
-          resolverMsg ++
-          [ flow "If you want to use package hiding and options, then you can try one of the following:"
+          , flow $ "You are using resolver: " ++ T.unpack (smName sourceMap)
+          , ""
+          , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""
           , bulletedList
               [ fillSep
