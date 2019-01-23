@@ -37,18 +37,24 @@ makeSnapshot
   -> Text -- ^ name
   -> RIO env RawSnapshotLayer
 makeSnapshot cons name = do
-  locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
-  pure RawSnapshotLayer
-    { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
-    , rslCompiler = Nothing
-    , rslName = name
-    , rslLocations = catMaybes locs
-    , rslDropPackages = mempty
-    , rslFlags = Map.mapMaybe getFlags (consPackages cons)
-    , rslHidden = Map.filter id (pcHide <$> consPackages cons)
-    , rslGhcOptions = mempty
-    }
-
+    locs <-
+        traverseValidate (\(pn, pc) -> (pn,) <$> toLoc pn pc) $
+        Map.toList $ consPackages cons
+    let snapshotPackages = Set.fromList [ pn | (pn, Just _) <- locs ]
+        inSnapshot pn = pn `Set.member` snapshotPackages
+    pure
+        RawSnapshotLayer
+        { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
+        , rslCompiler = Nothing
+        , rslName = name
+        , rslLocations = mapMaybe snd locs
+        , rslDropPackages = mempty
+        , rslFlags = Map.mapMaybeWithKey (\pn pc -> if (inSnapshot pn) then getFlags pc else Nothing)
+                     (consPackages cons)
+        , rslHidden = Map.filterWithKey (\pn hide -> hide && inSnapshot pn)
+                      (pcHide <$> consPackages cons)
+        , rslGhcOptions = mempty
+        }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
 getFlags pc
