@@ -84,7 +84,7 @@ import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackVersion, hpack)
 import Conduit
 import Data.Acquire (with)
-import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..))
+import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..), PantryException (MigrationFailure))
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 -- Raw blobs
@@ -215,15 +215,17 @@ initStorage
 initStorage fp inner = do
   ensureDir $ parent fp
   bracket
-    (createSqlitePoolFromInfo sqinfo 1)
+    (createSqlitePoolFromInfo (sqinfo False) 1)
     (liftIO . destroyAllResources) $ \pool -> do
-
-    migrates <- runSqlPool (runMigrationSilent migrateAll) pool
-    forM_ migrates $ \mig -> logDebug $ "Migration output: " <> display mig
-    inner (P.Storage pool)
+    migrates <- wrapMigrationFailure $ runSqlPool (runMigrationSilent migrateAll) pool
+    forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
+  bracket
+    (createSqlitePoolFromInfo (sqinfo True) 1)
+    (liftIO . destroyAllResources) $ \pool -> inner (P.Storage pool)
   where
-    sqinfo = set extraPragmas ["PRAGMA busy_timeout=2000;"]
-           $ set fkEnabled True
+    wrapMigrationFailure = handle (throwIO . MigrationFailure fp)
+    sqinfo fk = set extraPragmas ["PRAGMA busy_timeout=2000;"]
+           $ set fkEnabled fk
            $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
 
 withStorage
