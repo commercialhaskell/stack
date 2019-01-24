@@ -163,7 +163,6 @@ toActual smw downloadCompiler ac = do
         , smaProject = smwProject smw
         , smaDeps = smwDeps smw
         , smaGlobal = globals
-        , smaName = smwName smw
         }
 
 checkFlagsUsedThrowing ::

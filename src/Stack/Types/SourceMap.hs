@@ -78,7 +78,7 @@ data SMWanted = SMWanted
   { smwCompiler :: !WantedCompiler
   , smwProject :: !(Map PackageName ProjectPackage)
   , smwDeps :: !(Map PackageName DepPackage)
-  , smwName :: !Text
+  , smwSnapshotName :: !Text
   }
 
 -- | Adds in actual compiler information to 'SMWanted', in particular
@@ -90,7 +90,6 @@ data SMActual = SMActual
   , smaProject :: !(Map PackageName ProjectPackage)
   , smaDeps :: !(Map PackageName DepPackage)
   , smaGlobal :: !(Map PackageName GlobalPackage)
-  , smaName :: !Text
   }
 
 -- | How a package is intended to be built
@@ -136,7 +135,6 @@ data SourceMap = SourceMap
   , smHash :: !SourceMapHash
     -- ^ hash of the source map calculated once as an expensive
     -- operation
-  , smName :: !Text
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.

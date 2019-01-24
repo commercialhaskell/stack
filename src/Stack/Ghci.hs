@@ -149,7 +149,6 @@ ghci opts@GhciOpts{..} = do
              , smaProject = smProject sourceMap
              , smaDeps = smDeps sourceMap
              , smaGlobal = smGlobal sourceMap
-             , smaName = smName sourceMap
              }
     -- Parse --main-is argument.
     mainIsTargets <- parseMainIsTargets buildOptsCLI sma ghciMainIs
@@ -853,12 +852,12 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
   when (null localTargets && isNothing mfileTargets) $ do
-      sourceMap <- view $ envConfigL.to envConfigSourceMap
+      smWanted <- view $ buildConfigL.to bcSMWanted
       stackYaml <- view stackYamlL
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          , flow $ "You are using resolver: " ++ T.unpack (smName sourceMap)
+          , flow $ "You are using snapshot: " ++ T.unpack (smwSnapshotName smWanted)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""
