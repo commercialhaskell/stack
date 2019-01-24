@@ -295,8 +295,8 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
                  Stack.Prelude.pkgName
                  (Map.lookup depId globalIdMap)
 
-    noDepsErr = error ("Invariant violated: Expected to find "
-                ++ packageNameString pkgName ++ " in global DB")
+    noDepsErr = error ("Invariant violated: The '" ++ packageNameString pkgName
+                ++ "' package was not found in any of the dependency sources")
 
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
