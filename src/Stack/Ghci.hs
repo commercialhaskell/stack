@@ -835,7 +835,7 @@ checkForDuplicateModules pkgs = do
       pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
 targetWarnings
-  :: HasEnvConfig env
+  :: HasBuildConfig env
   => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
