@@ -33,7 +33,7 @@ your projects:
   first time around. See the multiple GHC section below for more information.
 
 Each of these configurations is ready to be used immediately. Steps to make them works:
-* For siple Azure configuration, copy-paste the
+* For simple Azure configuration, copy-paste the
   [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-simple.yml)
   file into `azure-pipelines.yml` in the root of your repository.
 * For complex Azure configuration, you need to take the above four
@@ -52,7 +52,7 @@ configuration files or write your own.
 ## Infrastructure
 
 Note that you need atleast one agent to build your code. You can
-specify which virtual image you want to choose using the config:
+specify which virtual image you want to choose using this configuration:
 
 ``` yaml
 pool:
@@ -108,7 +108,7 @@ For the above commands to work, you need to set the `CABALVER` and
 
 For different GHC versions, you probably want to use different
 `stack.yaml` files. If you don't want to put a specific `stack.yaml`
-for a particula resolver and still want to test it, you have specify
+for a particular resolver and still want to test it, you have specify
 your resolver argument in `ARGS` environment variable (you will see an
 example below). For cabal based builds, you have to specify both
 `GHCVER` and `CABALVER` environment variables.
