@@ -146,12 +146,8 @@ After the environment setup, actual test running is simple:
 
 ```yaml
 script:
-  - stack --no-terminal test
+  - stack test
 ```
-
-In case you're wondering: we need `--no-terminal` because stack does some fancy
-sticky display on smart terminals to give nicer status and progress messages,
-and the terminal detection is broken on Travis.
 
 ## Other details
 
@@ -159,6 +155,6 @@ Some Stack commands will run for long time. To avoid timeouts, use the [timeoutI
 
 ## Examples
 
-- [commercialhaskell/stack](https://github.com/futurice/fum2github/blob/master/.travis.yml)
+- [commercialhaskell/stack](https://github.com/commercialhaskell/stack/blob/master/azure-pipelines.yml)
 - [psibi/tldr-hs](http://github.com/psibi/tldr-hs)
 - [psibi/wai-slack-middleware](https://github.com/psibi/wai-slack-middleware)
