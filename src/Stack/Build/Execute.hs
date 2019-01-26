@@ -1974,7 +1974,7 @@ extraBuildOptions :: (HasEnvConfig env, HasRunner env)
                   => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
     colorOpt <- appropriateGhcColorFlag
-    let ddumpOpts = " -ddump-hi -ddump-to-file"
+    let ddumpOpts = " -keep-hi-files"
         optsFlag = compilerOptionsCabalFlag wc
         baseOpts = ddumpOpts ++ maybe "" (" " ++) colorOpt
     if toCoverage (boptsTestOpts bopts)
