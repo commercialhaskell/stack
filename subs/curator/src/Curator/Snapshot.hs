@@ -20,7 +20,6 @@ import Distribution.Types.VersionRange (withinRange, VersionRange)
 import Pantry
 import Path.IO (resolveFile')
 import RIO hiding (display)
-import qualified RIO
 import RIO.List (find, partition)
 import qualified RIO.Map as Map
 import RIO.PrettyPrint
@@ -160,13 +159,27 @@ checkDependencyGraph constraints snapshot = do
               <> Map.map (, []) ghcBootPackages
         return $ Map.mapWithKey (validateDeps constraints depTree cabalVersion) pkgInfos
     let (rangeErrors, otherErrors) = splitErrors pkgErrors
-    unless (Map.null rangeErrors && Map.null otherErrors) $ do
-      logWarn "Errors in snapshot:"
-      void $ flip Map.traverseWithKey rangeErrors $ \(dep, maintainers, mver) users -> do
-        logWarn $ RIO.display (pkgBoundsError dep maintainers mver users)
-      void $ flip Map.traverseWithKey otherErrors $ \pname errors -> do
-        logWarn $ fromString (packageNameString pname)
-        forM_ errors $ \err -> logWarn $ "    " <> fromString err
+    unless (Map.null rangeErrors && Map.null otherErrors) $
+      throwM (BrokenDependencyGraph rangeErrors otherErrors)
+
+data BrokenDependencyGraph = BrokenDependencyGraph
+  (Map (PackageName, Set Text, Maybe Version) (Map DependingPackage DepBounds))
+  (Map PackageName (Seq String))
+
+instance Exception BrokenDependencyGraph
+
+instance Show BrokenDependencyGraph where
+  show (BrokenDependencyGraph rangeErrors otherErrors) = T.unpack . T.unlines $
+    "Snapshot dependency graph contains errors:" :
+    shownBoundsErrors <>
+    shownOtherErrors
+    where
+      shownBoundsErrors =
+        flip map (Map.toList rangeErrors) $ \((dep, maintainers, mver), users) ->
+          pkgBoundsError dep maintainers mver users
+      shownOtherErrors = flip map (Map.toList otherErrors) $ \(pname, errors) -> T.unlines $
+        T.pack (packageNameString pname) :
+        flip map (toList errors) (\err -> "    " <> fromString err)
 
 pkgBoundsError ::
        PackageName
