@@ -46,6 +46,12 @@ Major changes:
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
+* `stack script` now passes `-i -idir` in to the `ghc`
+  invocation. This makes it so that the script can import local
+  modules, and fixes an issue where `.hs` files in the current
+  directory could affect interpretation of the script. See
+  [#4538](https://github.com/commercialhaskell/stack/pull/4538)
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
