@@ -32,7 +32,7 @@ your projects:
   `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
   first time around. See the multiple GHC section below for more information.
 
-Each of these configurations is ready to be used immediately. Steps to make them works:
+Each of these configurations is ready to be used immediately. Steps to make them work:
 * For simple Azure configuration, copy-paste the
   [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-simple.yml)
   file into `azure-pipelines.yml` in the root of your repository.
