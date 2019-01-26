@@ -1,5 +1,8 @@
 resolver: nightly-2018-12-01
 
+packages:
+- .
+
 extra-deps:
 - resolv-0.1.1.2@rev:0
 
