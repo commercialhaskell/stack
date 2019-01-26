@@ -9,6 +9,8 @@ module Stack.ModuleInterface
     , getInterface
     ) where
 
+{- HLINT ignore "Reduce duplication" -}
+
 import           Control.Monad   (replicateM, replicateM_, when)
 import           Data.Binary
 import           Data.Binary.Get (bytesRead, getInt64be, getWord32be,
@@ -388,25 +390,25 @@ getInterface :: Get Interface
 getInterface = do
     magic <- getWord32be
     when (magic /= 0x1face64) (fail $ "Invalid magic: " <> showHex magic "")
-  {-
-    dummy value depending on the wORD_SIZE
-    wORD_SIZE :: Int
-    wORD_SIZE = (#const SIZEOF_HSINT)
+    {-
+      dummy value depending on the wORD_SIZE
+      wORD_SIZE :: Int
+      wORD_SIZE = (#const SIZEOF_HSINT)
 
-    This was used to serialize pointers
-  -}
+      This was used to serialize pointers
+    -}
     if sizeOf (undefined :: Int) == 4
         then void getWord32be
         else void getWord64be
-  -- ghc version
+    -- ghc version
     version <- getString
-  -- way
+    -- way
     void getString
-  -- dict_ptr
+    -- dict_ptr
     dictPtr <- getWord32be
-  -- dict
+    -- dict
     dict <- lookAhead $ getDictionary $ fromIntegral dictPtr
-  -- symtable_ptr
+    -- symtable_ptr
     void getWord32be
     let versions =
             [ ("8061", getInterface861)

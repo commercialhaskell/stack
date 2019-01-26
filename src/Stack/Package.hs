@@ -26,14 +26,13 @@ module Stack.Package
   ,packageDependencies
   ) where
 
+import           Data.Binary.Get (runGetOrFail)
 import qualified Data.ByteString.Lazy.Char8 as CL8
-import           Data.List (isPrefixOf, unzip)
-import           Data.Maybe (maybe)
+import           Data.List (isPrefixOf, unzip, find)
+import           Data.Maybe (maybe, fromMaybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -59,6 +58,7 @@ import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.ModuleInterface
 import           Stack.Prelude hiding (Display (..))
 import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
@@ -1018,7 +1018,7 @@ resolveFilesAndDeps component dirs names0 = do
         let foundFiles = mapMaybe snd resolved
             foundModules = mapMaybe toResolvedModule resolved
             missingModules = mapMaybe toMissingModule resolved
-        pairs <- mapM (getDependencies component) foundFiles
+        pairs <- mapM (getDependencies component dirs) foundFiles
         let doneModules =
                 S.union
                     doneModules0
@@ -1079,8 +1079,8 @@ resolveFilesAndDeps component dirs names0 = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
-    :: NamedComponent -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
-getDependencies component dotCabalPath =
+    :: NamedComponent -> [Path Abs Dir] -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
+getDependencies component dirs dotCabalPath =
     case dotCabalPath of
         DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
         DotCabalMainPath resolvedFile -> readResolvedHi resolvedFile
@@ -1090,13 +1090,15 @@ getDependencies component dotCabalPath =
     readResolvedHi resolvedFile = do
         dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
         dir <- asks (parent . ctxFile)
-        case stripProperPrefix dir resolvedFile of
+        let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
+            stripSourceDir d = stripProperPrefix d resolvedFile
+        case stripSourceDir sourceDir of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
                 let dumpHIPath =
                         FilePath.replaceExtension
                             (toFilePath (dumpHIDir </> fileRel))
-                            ".dump-hi"
+                            ".hi"
                 dumpHIExists <- liftIO $ D.doesFileExist dumpHIPath
                 if dumpHIExists
                     then parseDumpHI dumpHIPath
@@ -1106,54 +1108,33 @@ getDependencies component dotCabalPath =
 parseDumpHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
 parseDumpHI dumpHIPath = do
-    dir <- asks (parent . ctxFile)
-    dumpHI <- liftIO $ filterDumpHi <$> fmap CL8.lines (CL8.readFile dumpHIPath)
-    let startModuleDeps =
-            dropWhile (not . ("module dependencies:" `CL8.isPrefixOf`)) dumpHI
-        moduleDeps =
-            S.fromList $
-            mapMaybe (D.simpleParse . TL.unpack . TLE.decodeUtf8) $
-            CL8.words $
-            CL8.concat $
-            CL8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
-            takeWhile (" " `CL8.isPrefixOf`) (drop 1 startModuleDeps)
-        thDeps =
-            -- The dependent file path is surrounded by quotes but is not escaped.
-            -- It can be an absolute or relative path.
-                  TL.unpack .
-                  -- Starting with GHC 8.4.3, there's a hash following
-                  -- the path. See
-                  -- https://github.com/yesodweb/yesod/issues/1551
-                  TLE.decodeUtf8 .
-                  CL8.takeWhile (/= '\"') <$>
-            mapMaybe (CL8.stripPrefix "addDependentFile \"") dumpHI
-    thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
-        mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
-        when (isNothing mresolved) $
+  dir <- asks (parent . ctxFile)
+  content <- liftIO $ CL8.readFile dumpHIPath
+  case runGetOrFail getInterface content of
+    Left (_, _, msg) -> do
+      prettyWarnL
+        [ flow "Failed to decode module interface:"
+        , style File $ fromString dumpHIPath
+        , flow "Decoding failure:"
+        , style Error $ fromString msg
+        ]
+      pure (S.empty, [])
+    Right (_, _, iface) -> do
+      let
+        moduleNames = fmap (fromString . unFastString . fst) . unList . dmods . deps
+        resolveFileDependency file = do
+          resolved <- liftIO (forgivingAbsence (resolveFile dir file)) >>= rejectMissingFile
+          when (isNothing resolved) $
             prettyWarnL
-                [ flow "addDependentFile path (Template Haskell) listed in"
-                , style File $ fromString dumpHIPath
-                , flow "does not exist:"
-                , style File $ fromString x
-                ]
-        return mresolved
-    return (moduleDeps, thDepsResolved)
-  where
-    -- | Filtering step fixing RAM usage upon a big dump-hi file. See
-    --   https://github.com/commercialhaskell/stack/issues/4027 It is
-    --   an optional step from a functionality stand-point.
-    filterDumpHi dumpHI =
-        let dl x xs = x ++ xs
-            isLineInteresting (acc, moduleDepsStarted) l
-                | moduleDepsStarted && " " `CL8.isPrefixOf` l =
-                    (acc . dl [l], True)
-                | "module dependencies:" `CL8.isPrefixOf` l =
-                    (acc . dl [l], True)
-                | "addDependentFile \"" `CL8.isPrefixOf` l =
-                    (acc . dl [l], False)
-                | otherwise = (acc, False)
-         in fst (foldl' isLineInteresting (dl [], False) dumpHI) []
-
+            [ flow "Dependent file listed in:"
+            , style File $ fromString dumpHIPath
+            , flow "does not exist:"
+            , style File $ fromString file
+            ]
+          pure resolved
+        resolveUsages = traverse (resolveFileDependency . unUsage) . unList . usage
+      resolvedUsages <- catMaybes <$> resolveUsages iface
+      pure (S.fromList $ moduleNames iface, resolvedUsages)
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
