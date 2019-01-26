@@ -314,6 +314,10 @@ packages and the tools. See [Docker integration](docker_integration.md) for deta
 
 See the [Travis CI instructions](travis_ci.md)
 
+## How do I use this with Azure CI?
+
+See the [Azure CI instructions](azure_ci.md)
+
 ## What is licensing restrictions on Windows?
 
 Currently on Windows GHC produces binaries linked statically with [GNU Multiple
@@ -432,7 +436,7 @@ If you are experiencing this with GHC >= 8.0.2, try running `stack setup
 before late December 2017.
 
 If GHC doesn't recognize your C compiler as being able to use `-no-pie`,
-this can happen even with GCC and Clang, it might be necessary to enable 
+this can happen even with GCC and Clang, it might be necessary to enable
 this feature manually. To do this, just change
 `("C compiler supports -no-pie", "NO"),` to `("C compiler supports -no-pie", "YES"),`
 in the file `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-VER/settings`.
