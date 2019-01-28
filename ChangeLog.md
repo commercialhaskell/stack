@@ -37,6 +37,10 @@ Major changes:
       their exact versions.
     * The `ignore-revision-mismatch` setting is no longer needed, and
       has been removed.
+    * Overriding GHC boot packages results in any other GHC boot
+      packages depending on it being no longer available as a dependency,
+      such packages need to be added explicitly when needed. See
+      [#4510] (https://github.com/commercialhaskell/stack/issues/4510).
 * Upgrade to Cabal 2.4
     * Note that, in this process, the behavior of file globbing has
       been modified to match that of Cabal. In particular, this means
