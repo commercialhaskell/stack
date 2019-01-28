@@ -61,10 +61,13 @@ data ProjectPackage = ProjectPackage
   , ppResolvedDir :: !(ResolvedPath Dir)
   }
 
--- | A view of a package installed in the global package database.
-newtype GlobalPackage = GlobalPackage
-  { gpVersion :: Version
-  }
+-- | A view of a package installed in the global package database also
+-- could include marker for a replaced global package (could be replaced
+-- because of a replaced dependency)
+data GlobalPackage
+  = GlobalPackage !Version
+  | ReplacedGlobalPackage
+  deriving Eq
 
 -- | A source map with information on the wanted (but not actual)
 -- compiler. This is derived by parsing the @stack.yaml@ file for

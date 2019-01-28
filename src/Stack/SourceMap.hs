@@ -111,7 +111,7 @@ getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env)
     => ActualCompiler
-    -> RIO env (Map PackageName GlobalPackage)
+    -> RIO env (Map PackageName Version)
 globalsFromDump compiler = do
     let pkgConduit =
             conduitDumpPackage .|
@@ -119,18 +119,18 @@ globalsFromDump compiler = do
         toGlobals ds = Map.fromList $ map toGlobal $ Map.elems ds
         toGlobal d =
             ( pkgName $ dpPackageIdent d
-            , GlobalPackage (pkgVersion $ dpPackageIdent d))
+            , pkgVersion $ dpPackageIdent d)
     toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
     => WantedCompiler
-    -> RIO env (Map PackageName GlobalPackage)
+    -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
     ghfp <- globalHintsFile
     mglobalHints <- loadGlobalHints ghfp compiler
     case mglobalHints of
-        Just hints -> pure $ Map.map GlobalPackage hints
+        Just hints -> pure hints
         Nothing -> do
             logWarn $ "Unable to load global hints for " <> RIO.display compiler
             pure mempty
@@ -146,8 +146,10 @@ toActual smw downloadCompiler ac = do
         case downloadCompiler of
             WithDownloadCompiler -> globalsFromDump ac
             SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
-    let globals =
-            allGlobals `Map.difference` smwProject smw `Map.difference` smwDeps smw
+    (prunedGlobals, keptGlobals) <-
+        partitionReplacedDependencies allGlobals (Map.keysSet $ smwDeps smw)
+    let globals = Map.map GlobalPackage keptGlobals <>
+                  Map.fromSet (const ReplacedGlobalPackage) prunedGlobals
     return
         SMActual
         { smaCompiler = ac

@@ -100,12 +100,20 @@ loadSourceMap smt boptsCli sma = do
                          then boptsHaddock bopts
                          else shouldHaddockDeps bopts
                }
-        globals = smaGlobal sma `M.difference` smtDeps smt
         packageCliFlags = Map.fromList $
           mapMaybe maybeProjectFlags $
           Map.toList (boptsCLIFlags boptsCli)
         maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
         maybeProjectFlags _ = Nothing
+        actualGlobals = flip Map.mapMaybe (smaGlobal sma) $ \gp ->
+            case gp of
+                ReplacedGlobalPackage -> Nothing
+                GlobalPackage v -> Just v
+    (prunedGlobals, keptGlobals) <-
+        partitionReplacedDependencies actualGlobals (Map.keysSet deps)
+    let globals = Map.map GlobalPackage keptGlobals <>
+                  Map.fromSet (const ReplacedGlobalPackage) prunedGlobals <>
+                  Map.filter (==ReplacedGlobalPackage) (smaGlobal sma)
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     smh <- hashSourceMapData (whichCompiler compiler) deps
     return
