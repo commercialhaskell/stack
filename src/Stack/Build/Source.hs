@@ -107,13 +107,14 @@ loadSourceMap smt boptsCli sma = do
         maybeProjectFlags _ = Nothing
         actualGlobals = flip Map.mapMaybe (smaGlobal sma) $ \gp ->
             case gp of
-                ReplacedGlobalPackage -> Nothing
+                ReplacedGlobalPackage _ -> Nothing
                 GlobalPackage v -> Just v
+    check <- globalCondCheck
     (prunedGlobals, keptGlobals) <-
-        partitionReplacedDependencies actualGlobals (Map.keysSet deps)
+        partitionReplacedDependencies actualGlobals (Map.keysSet deps) check
     let globals = Map.map GlobalPackage keptGlobals <>
-                  Map.fromSet (const ReplacedGlobalPackage) prunedGlobals <>
-                  Map.filter (==ReplacedGlobalPackage) (smaGlobal sma)
+                  Map.map ReplacedGlobalPackage prunedGlobals <>
+                  Map.filter isReplacedGlobal (smaGlobal sma)
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     smh <- hashSourceMapData (whichCompiler compiler) deps
     return

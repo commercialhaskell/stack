@@ -309,7 +309,7 @@ resolveRawTarget sma allLocs (ri, rt) =
       | Just gp <- Map.lookup name globals =
           case gp of
               GlobalPackage _ -> pure $ deferToConstructPlan name
-              ReplacedGlobalPackage -> hackageLatest name
+              ReplacedGlobalPackage _ -> hackageLatest name
       | otherwise = hackageLatest name
 
     -- Note that we use CFILatest below, even though it's
@@ -448,7 +448,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
 
   let deps = smaDeps smActual
       globals = smaGlobal smActual
-      latestGlobal _ ReplacedGlobalPackage = pure Nothing
+      latestGlobal _ (ReplacedGlobalPackage _) = pure Nothing
       latestGlobal name (GlobalPackage version) = do
         mrev <- getLatestHackageRevision name version
         forM mrev $ \(_rev, cfKey, treeKey) -> do

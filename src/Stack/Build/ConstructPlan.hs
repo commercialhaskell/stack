@@ -220,7 +220,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             stackYaml <- view stackYamlL
             stackRoot <- view stackRootL
             prettyErrorNoIndent $
-                pprintExceptions errs stackYaml stackRoot parents (wanted ctx) replacedGlobals
+                pprintExceptions errs stackYaml stackRoot parents (wanted ctx) prunedGlobalDeps
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
@@ -235,7 +235,15 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , localNames = Map.keysSet (smProject sourceMap)
         }
 
-    replacedGlobals = Map.keysSet $ Map.filter (== ReplacedGlobalPackage) (smGlobal sourceMap)
+    prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
+      case gp of
+         ReplacedGlobalPackage deps ->
+           let pruned = filter (not . inSourceMap) deps
+           in if null pruned then Nothing else Just pruned
+         GlobalPackage _ -> Nothing
+
+    inSourceMap pname = pname `Map.member` smDeps sourceMap ||
+                        pname `Map.member` smProject sourceMap
 
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
@@ -958,9 +966,9 @@ pprintExceptions
     -> Path Abs Dir
     -> ParentMap
     -> Set PackageName
-    -> Set PackageName
+    -> Map PackageName [PackageName]
     -> StyleDoc
-pprintExceptions exceptions stackYaml stackRoot parentMap wanted' replacedGlobals =
+pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDeps =
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
       , line <> line
@@ -1057,11 +1065,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' replacedGlobal
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `Set.member` wiredInPackages =
             Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . fromString . packageNameString $ name)
-        | name `Set.member` replacedGlobals =
-            Just $ flow "Can't use GHC boot package" <+>
-                   (style Current . fromString . packageNameString $ name) <+>
-                   flow "when it has an overriden dependency, " <+>
-                   flow "you need to add it as an explicit dependency to the project."
+        | Just pruned <- Map.lookup name prunedGlobalDeps =
+            let prunedDeps = map (style Current . fromString . packageNameString) pruned
+            in Just $ flow "Can't use GHC boot package" <+>
+                      (style Current . fromString . packageNameString $ name) <+>
+                      flow "when it has an overriden dependency, " <+>
+                      flow "you need to add the following as explicit dependencies to the project:" <+>
+                      line <+> encloseSep "" "" ", " prunedDeps
         | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
 
     pprintFlags flags

@@ -10,10 +10,12 @@ module Stack.SourceMap
     , loadGlobalHints
     , toActual
     , checkFlagsUsedThrowing
+    , globalCondCheck
     ) where
 
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
+import Distribution.System (Platform(..))
 import Pantry
 import qualified RIO
 import qualified RIO.Map as Map
@@ -146,10 +148,11 @@ toActual smw downloadCompiler ac = do
         case downloadCompiler of
             WithDownloadCompiler -> globalsFromDump ac
             SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
+    check <- globalCondCheck
     (prunedGlobals, keptGlobals) <-
-        partitionReplacedDependencies allGlobals (Map.keysSet $ smwDeps smw)
+        partitionReplacedDependencies allGlobals (Map.keysSet $ smwDeps smw) check
     let globals = Map.map GlobalPackage keptGlobals <>
-                  Map.fromSet (const ReplacedGlobalPackage) prunedGlobals
+                  Map.map ReplacedGlobalPackage prunedGlobals
     return
         SMActual
         { smaCompiler = ac
@@ -157,6 +160,15 @@ toActual smw downloadCompiler ac = do
         , smaDeps = smwDeps smw
         , smaGlobal = globals
         }
+
+-- | Simple cond check for boot packages - checks only OS and Arch
+globalCondCheck :: (HasConfig env) => RIO env (PD.ConfVar -> Either PD.ConfVar Bool)
+globalCondCheck = do
+  Platform arch os <- view platformL
+  let condCheck (PD.OS os') = pure $ os' == os
+      condCheck (PD.Arch arch') = pure $ arch' == arch
+      condCheck c = Left c
+  return condCheck
 
 checkFlagsUsedThrowing ::
        (MonadIO m, MonadThrow m)

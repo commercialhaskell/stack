@@ -182,6 +182,7 @@ import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, par
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
+import Distribution.Types.CondTree (simplifyCondTree)
 import Distribution.Types.Dependency (depPkgName)
 import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
@@ -1471,27 +1472,29 @@ loadGlobalHints dest wc =
            $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
          <$> Yaml.decodeFileThrow (toFilePath dest)
 
--- | Partition map of global packages with its versions into a Set of
--- replaced packages and its dependencies and other (untouched) packages.
+-- | Partition a map of global packages with its versions into a Set of
+-- replaced packages and its dependencies and a map of remaining (untouched) packages.
 --
 -- @since 0.1.0.0
 partitionReplacedDependencies ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Map PackageName Version
     -> Set PackageName
-    -> RIO env (Set PackageName, Map PackageName Version)
-partitionReplacedDependencies globals overrides =
-  fmap (first Map.keysSet) . flip execStateT (replaced, mempty) $
-    for (Map.keys globals) $ prunePackageWithDeps globals
+    -> (D.ConfVar -> Either D.ConfVar Bool)
+    -> RIO env (Map PackageName [PackageName], Map PackageName Version)
+partitionReplacedDependencies globals overrides condCheck =
+  flip execStateT (replaced, mempty) $
+    for (Map.keys globals) $ prunePackageWithDeps globals condCheck
   where
-    replaced = Map.restrictKeys globals overrides
+    replaced = Map.map (const []) $ Map.restrictKeys globals overrides
 
 prunePackageWithDeps ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Map PackageName Version
+    -> (D.ConfVar -> Either D.ConfVar Bool)
     -> PackageName
-    -> StateT (Map PackageName Version, Map PackageName Version) (RIO env) Bool
-prunePackageWithDeps pkgs pname = do
+    -> StateT (Map PackageName [PackageName], Map PackageName Version) (RIO env) Bool
+prunePackageWithDeps pkgs condCheck pname = do
   (pruned, kept) <- get
   if Map.member pname pruned
   then return True
@@ -1502,18 +1505,21 @@ prunePackageWithDeps pkgs pname = do
         Just v -> return v
         Nothing -> error $ "Missing package version" ++ show (pname, pruned, kept, pkgs)
       mrev <- lift $ getLatestHackageRevision pname version
-      prune <- case mrev of
+      prunedDeps <- case mrev of
         Nothing -> do
           -- wired-in package
-          return False
+          return mempty
         Just (_, blobKey, treeKey) -> do
           gpd <- lift $ loadCabalFileImmutable $
                  PLIHackage (PackageIdentifier pname version) blobKey treeKey
-          let deps = maybe mempty D.condTreeConstraints $ D.condLibrary gpd
-          fmap or . for deps $ prunePackageWithDeps pkgs . depPkgName
-      if prune
+          let deps = maybe mempty (fst . simplifyCondTree condCheck) $ D.condLibrary gpd
+          forMaybeM deps $ \dep -> do
+            let depName = depPkgName dep
+            isPruned <- prunePackageWithDeps pkgs condCheck depName
+            pure $ if isPruned then Just depName else Nothing
+      if null prunedDeps
       then do
-        modify' $ first (Map.insert pname version)
-      else do
         modify' $ second (Map.insert pname version)
-      return prune
+      else do
+        modify' $ first (Map.insert pname prunedDeps)
+      return $ not (null prunedDeps)

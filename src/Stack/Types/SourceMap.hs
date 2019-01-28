@@ -17,6 +17,7 @@ module Stack.Types.SourceMap
   , ProjectPackage (..)
   , CommonPackage (..)
   , GlobalPackage (..)
+  , isReplacedGlobal
   , SourceMapHash (..)
   ) where
 
@@ -66,8 +67,12 @@ data ProjectPackage = ProjectPackage
 -- because of a replaced dependency)
 data GlobalPackage
   = GlobalPackage !Version
-  | ReplacedGlobalPackage
+  | ReplacedGlobalPackage ![PackageName]
   deriving Eq
+
+isReplacedGlobal :: GlobalPackage -> Bool
+isReplacedGlobal (ReplacedGlobalPackage _) = True
+isReplacedGlobal (GlobalPackage _) = False
 
 -- | A source map with information on the wanted (but not actual)
 -- compiler. This is derived by parsing the @stack.yaml@ file for
