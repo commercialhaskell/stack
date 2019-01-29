@@ -118,6 +118,8 @@ Bug fixes:
   inside docker on Mac. See
   [#4506](https://github.com/commercialhaskell/stack/issues/4506)
 * Using `--ghc-options` with `stack script --compile` now works.
+* Ensure the detailed-0.9 type tests work.
+  See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
 
 ## v1.9.3
 
