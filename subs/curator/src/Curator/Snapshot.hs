@@ -133,17 +133,19 @@ checkDependencyGraph constraints snapshot = do
           WCGhc v -> v
           WCGhcjs _ _ -> error "GHCJS is not supported"
     mhints <- loadGlobalHints globalHintsYaml compiler
-    ghcBootPackages <- case mhints of
+    ghcBootPackages0 <- case mhints of
       Nothing ->
         error $ "Cannot load global hints for GHC " <> DT.display compilerVer
       Just hints ->
-        return $ Map.map Just hints
-    let declared =
+        pure hints
+    let snapshotPackages =
             Map.fromList
                 [ (pn, snapshotVersion (rspLocation sp))
                 | (pn, sp) <- Map.toList (rsPackages snapshot)
-                ] <>
-            ghcBootPackages
+                ]
+    (_pruned, ghcBootPackages) <-
+      partitionReplacedDependencies ghcBootPackages0 (Map.keysSet snapshotPackages) basicCheck
+    let declared = snapshotPackages <> Map.map Just ghcBootPackages
         cabalName = "Cabal"
         cabalError err = pure . Map.singleton cabalName $ [OtherError err]
     pkgErrors <- case Map.lookup cabalName declared of
@@ -156,14 +158,16 @@ checkDependencyGraph constraints snapshot = do
                     (rsPackages snapshot)
         let depTree =
               Map.map (piVersion &&& piTreeDeps) pkgInfos
-              <> Map.map (, []) ghcBootPackages
+              <> Map.map ((, []) . Just) ghcBootPackages
         return $ Map.mapWithKey (validateDeps constraints depTree cabalVersion) pkgInfos
     let (rangeErrors, otherErrors) = splitErrors pkgErrors
+        rangeErrors' =
+          Map.mapWithKey (\(pname, _, _) bs -> (Map.member pname ghcBootPackages0, bs)) rangeErrors
     unless (Map.null rangeErrors && Map.null otherErrors) $
-      throwM (BrokenDependencyGraph rangeErrors otherErrors)
+      throwM (BrokenDependencyGraph rangeErrors' otherErrors)
 
 data BrokenDependencyGraph = BrokenDependencyGraph
-  (Map (PackageName, Set Text, Maybe Version) (Map DependingPackage DepBounds))
+  (Map (PackageName, Set Text, Maybe Version) (Bool, Map DependingPackage DepBounds))
   (Map PackageName (Seq String))
 
 instance Exception BrokenDependencyGraph
@@ -175,8 +179,8 @@ instance Show BrokenDependencyGraph where
     shownOtherErrors
     where
       shownBoundsErrors =
-        flip map (Map.toList rangeErrors) $ \((dep, maintainers, mver), users) ->
-          pkgBoundsError dep maintainers mver users
+        flip map (Map.toList rangeErrors) $ \((dep, maintainers, mver), (isBoot, users)) ->
+          pkgBoundsError dep maintainers mver isBoot users
       shownOtherErrors = flip map (Map.toList otherErrors) $ \(pname, errors) -> T.unlines $
         T.pack (packageNameString pname) :
         flip map (toList errors) (\err -> "    " <> fromString err)
@@ -185,9 +189,10 @@ pkgBoundsError ::
        PackageName
     -> Set Text
     -> Maybe Version
+    -> Bool
     -> Map DependingPackage DepBounds
     -> Text
-pkgBoundsError dep maintainers mdepVer users =
+pkgBoundsError dep maintainers mdepVer isBoot users =
     T.unlines $ ""
               : showDepVer
               : map showUser (Map.toList users)
@@ -199,7 +204,9 @@ pkgBoundsError dep maintainers mdepVer users =
                             ]
                | otherwise =
                    T.concat [ display dep, displayMaintainers maintainers
-                            , " (not present) depended on by:"
+                            , " (not present"
+                            , if isBoot then ", GHC boot library" else ""
+                            , ") depended on by:"
                             ]
 
     displayMaintainers ms | Set.null ms = ""
@@ -296,6 +303,20 @@ splitErrors = Map.foldrWithKey go (mempty, mempty)
         res
       , oes)
 
+targetOS :: OS
+targetOS = Linux
+
+targetArch :: Arch
+targetArch = X86_64
+
+targetFlavor :: CompilerFlavor
+targetFlavor = GHC
+
+basicCheck :: C.ConfVar -> Either C.ConfVar Bool
+basicCheck (C.OS os) = return $ os == targetOS
+basicCheck (C.Arch arch) = return $ arch == targetArch
+basicCheck c = Left c
+
 checkConditions ::
        (Monad m)
     => Version
@@ -304,21 +325,18 @@ checkConditions ::
     -> C.ConfVar
     -> m Bool
 checkConditions compilerVer pname flags confVar =
-    let targetOS = Linux
-        targetArch = X86_64
-        targetFlavor = GHC
-    in case confVar of
-           C.OS os -> return $ os == targetOS
-           C.Arch arch -> return $ arch == targetArch
-           C.Flag flag ->
-               case Map.lookup flag flags of
-                   Nothing ->
-                       error $
-                       "Flag " <> show flag <> " for " <> show pname <>
-                       " is not defined"
-                   Just b -> return b
-           C.Impl flavor range ->
-             return $ (flavor == targetFlavor) && (compilerVer `withinRange` range)
+    case confVar of
+        C.OS os -> return $ os == targetOS
+        C.Arch arch -> return $ arch == targetArch
+        C.Flag flag ->
+            case Map.lookup flag flags of
+                Nothing ->
+                    error $
+                    "Flag " <> show flag <> " for " <> show pname <>
+                    " is not defined"
+                Just b -> return b
+        C.Impl flavor range ->
+          return $ (flavor == targetFlavor) && (compilerVer `withinRange` range)
 
 getPkgInfo ::
        (HasProcessContext env, HasLogFunc env, HasPantryConfig env)
