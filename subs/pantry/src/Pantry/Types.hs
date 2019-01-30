@@ -1542,13 +1542,13 @@ parseLockFile value = do
         pliResolve :: Vector (WithJSONWarnings (IO (NonEmpty (PackageLocationImmutable)))) =
             Vector.map
                 (\(WithJSONWarnings item warn) ->
-                     (WithJSONWarnings (resolvePaths Nothing item) warn))
+                     (WithJSONWarnings (resolvePaths Nothing item) warn)) -- todo: Fix Root path
                 pli
     pure $ Vector.foldr1 appendPLI pliResolve
 
 
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) where
-    parseJSON v = repo v
+    parseJSON v = repo v <|> archiveArray v
                   <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
         where
           hackageText :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
@@ -1591,14 +1591,14 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
                 archiveLocation <- mkArchiveLocation mdir
                 pure $ PLIArchive Archive {..} pm
               ) value
-            pure pli
+            pure $ pli
 
-          archiveArray :: Value -> Parser (Unresolved (NonEmpty PackageLocationImmutable))
+          archiveArray :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
           archiveArray value@(Array arr) = do
             let xs :: [Parser (Unresolved PackageLocationImmutable)] = Vector.toList $ Vector.map archiveObject arr
                 xs' = sequence xs
             pli :: [Unresolved PackageLocationImmutable] <- xs'
-            pure (sequence $ NonEmpty.fromList pli)
+            pure $ noJSONWarnings (sequence $ NonEmpty.fromList pli)
       -- github :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
       -- github value = do
       --   (WithJSONWarnings pm _) <- parseJSON value
