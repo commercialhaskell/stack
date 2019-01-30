@@ -1503,15 +1503,15 @@ rpmToPairs (RawPackageMetadata mname mversion mtree mcabal) = concat
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
   ]
 
-appendPLI :: WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)) -> WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)) -> WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))
-appendPLI (WithJSONWarnings item1 warn1) (WithJSONWarnings item2 warn2) = WithJSONWarnings (item1 <> item2) (warn1 <> warn2)
+appendPLI :: NonEmpty (IO PackageLocationImmutable) -> NonEmpty (IO PackageLocationImmutable) -> NonEmpty (IO PackageLocationImmutable)
+appendPLI xs ys = xs <> ys
 
 isCompleteObject :: Value -> Bool
 isCompleteObject obj@(Object xs) = HM.member "complete" xs
 isCompleteObject _ = False
 
 parseLockFile ::
-       Value -> Parser (WithJSONWarnings (IO (NonEmpty PackageLocationImmutable)))
+       Value -> Parser (NonEmpty (IO PackageLocationImmutable))
 parseLockFile value = do
     (WithJSONWarnings val _) <-
         withObjectWarnings
@@ -1524,11 +1524,11 @@ parseLockFile value = do
                          (\vector -> do
                               let vector' :: Array =
                                       Vector.filter isCompleteObject vector
-                              let pli :: Vector (Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))) =
+                              let pli :: Vector (Parser (NonEmpty (Unresolved PackageLocationImmutable))) =
                                       Vector.map
                                           (\(Object o) -> do
                                                complete <- o .: "complete"
-                                               pl :: (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) <-
+                                               pl :: (NonEmpty (Unresolved PackageLocationImmutable)) <-
                                                    parseJSON complete
                                                pure pl)
                                           vector'
@@ -1537,47 +1537,41 @@ parseLockFile value = do
                               pure pli')
                          deps)
             value
-    let pli :: Vector (WithJSONWarnings (Unresolved (NonEmpty (PackageLocationImmutable)))) =
+    let pli :: Vector (NonEmpty (Unresolved (PackageLocationImmutable))) =
             val
-        pliResolve :: Vector (WithJSONWarnings (IO (NonEmpty (PackageLocationImmutable)))) =
-            Vector.map
-                (\(WithJSONWarnings item warn) ->
-                     (WithJSONWarnings (resolvePaths Nothing item) warn)) -- todo: Fix Root path
-                pli
+        pliResolve :: Vector (NonEmpty (IO PackageLocationImmutable)) =
+            Vector.map (\item -> NE.map (resolvePaths Nothing) item) pli -- todo: Fix Root path
     pure $ Vector.foldr1 appendPLI pliResolve
 
-
-instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable))) where
-    parseJSON v = repo v <|> archiveArray v
+instance FromJSON (Unresolved PackageLocationImmutable) where
+    parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v
                   <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
         where
-          hackageText :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
-          hackageText value = do
-             tkey <- withObject "UnresolvedPackagelocationimmutable.PLIHackage (Object)" (\o -> do
-                        treeKey <- o .: "pantry-tree"
-                        pure treeKey) value
-             withText "UnresolvedPackageLocationImmutable.PLIHackage (Text)" (\t -> do
-               case parseHackageText t of
-                 Left e -> fail $ show e
-                 Right (pkgIdentifier, blobKey) -> pure $ noJSONWarnings $ pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey tkey)) value
+          -- repo :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
+          -- repo value@(Array objs) = do
+          --   pli :: NonEmpty PackageLocationImmutable <- repos value
+          --   pure $ noJSONWarnings $ pure $ pli
 
-          repo :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
-          repo value@(Array objs) = do
-            pli :: NonEmpty PackageLocationImmutable <- repos value
-            pure $ noJSONWarnings $ pure $ pli
+          -- repos :: Value -> Parser (NonEmpty PackageLocationImmutable)
+          -- repos value@(Array arr) = do
+          --   let xs :: [Parser PackageLocationImmutable] = Vector.toList $ Vector.map repoObject arr
+          --       xs' :: Parser [PackageLocationImmutable] = sequence xs
+          --   pli <- xs'
+          --   pure $ NonEmpty.fromList pli
 
-          repos :: Value -> Parser (NonEmpty PackageLocationImmutable)
-          repos value@(Array arr) = do
-            let xs :: [Parser PackageLocationImmutable] = Vector.toList $ Vector.map repoObject arr
-                xs' :: Parser [PackageLocationImmutable] = sequence xs
-            pli <- xs'
-            pure $ NonEmpty.fromList pli
-
-          repoObject :: Value -> Parser PackageLocationImmutable
+          repoObject :: Value -> Parser (Unresolved PackageLocationImmutable)
           repoObject value@(Object _) = do
             repo <- parseJSON value
             pm <- parseJSON value
-            pure $ PLIRepo repo pm
+            pure $ pure $ PLIRepo repo pm
+
+          -- hackageObject :: Value -> Parser (Unresolved PackageLocationImmutable)
+          -- hackageObject value@(Object _) = do
+          --   (WithJSONWarnings pli _) <- withObjectWarnings "UnresolvedPackageLocationImmutable.PLIHackage" (\o -> do
+          --      hackageText <- o ..: "hackage"
+          --      case parseHackageText t of
+          --        Left e -> fail $ show e
+          --        Right (pkgIdentifier, blobKey) -> pure $ noJSONWarnings $ pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey tkey)) value
 
           archiveObject :: Value -> Parser (Unresolved PackageLocationImmutable)
           archiveObject value@(Object _) = do
@@ -1599,6 +1593,23 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutab
                 xs' = sequence xs
             pli :: [Unresolved PackageLocationImmutable] <- xs'
             pure $ noJSONWarnings (sequence $ NonEmpty.fromList pli)
+
+          hackageArray :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
+          hackageArray value@(Array arr) = do
+            let xs :: [Parser (Unresolved PackageLocationImmutable)] = Vector.toList $ Vector.map hackageObject arr
+                xs' = sequence xs
+            pli :: [Unresolved PackageLocationImmutable] <- xs'
+            pure $ noJSONWarnings (sequence $ NonEmpty.fromList pli)
+
+          hackageObject :: Value -> Parser (Unresolved PackageLocationImmutable)
+          hackageObject value =
+             withObject "UnresolvedPackagelocationimmutable.PLIHackage (Object)" (\o -> do
+                      treeKey <- o .: "pantry-tree"
+                      htxt :: Text <- o .: "hackage"
+                      case parseHackageText htxt of
+                        Left e -> fail $ show e
+                        Right (pkgIdentifier, blobKey) -> pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)) value
+
       -- github :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
       -- github value = do
       --   (WithJSONWarnings pm _) <- parseJSON value
