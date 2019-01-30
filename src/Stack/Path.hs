@@ -25,6 +25,7 @@ import           Stack.Types.Config
 import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
+import           RIO.PrettyPrint
 import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 
 -- | Print out useful path information in a human-readable format (and
@@ -118,6 +119,11 @@ instance HasLogFunc PathInfo where
     logFuncL = configL.logFuncL
 instance HasRunner PathInfo where
     runnerL = configL.runnerL
+instance HasStylesUpdate PathInfo where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasTerm PathInfo where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
 instance HasConfig PathInfo
 instance HasPantryConfig PathInfo where
     pantryConfigL = configL.pantryConfigL

@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.6.2
+GHCVER=8.6.3
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -77,12 +77,13 @@ mirror () {
 mirror i386-deb8-linux xz xz linux32 linux32-nopie
 mirror x86_64-deb8-linux xz xz linux64 linux64-nopie
 #mirror x86_64-centos67-linux xz xz linux64-gmp4 linux64-gmp4-nopie
-mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie linux64-ncurses6 linux64-ncurses6-nopie
+mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie
 mirror x86_64-apple-darwin xz bz2 macosx
 mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
 #mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
-mirror aarch64-deb8-linux xz xz linux-aarch64
+mirror x86_64-portbld-freebsd xz xz freebsd64 freebsd64-11
+#mirror aarch64-deb8-linux xz xz linux-aarch64
 
 set +x
 echo

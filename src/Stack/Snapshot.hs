@@ -176,7 +176,7 @@ loadSnapshot mcompiler =
           case mcompiler of
             Nothing -> do
               ghfp <- globalHintsFile
-              mglobalHints <- loadGlobalHints ghfp (wantedToActual $ sdWantedCompilerVersion sd)
+              mglobalHints <- loadGlobalHints ghfp (sdWantedCompilerVersion sd)
               globalHints <-
                 case mglobalHints of
                   Just x -> pure x

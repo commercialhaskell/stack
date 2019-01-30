@@ -35,15 +35,14 @@ import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Package
-import           Stack.PrettyPrint
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           System.FilePath (isPathSeparator)
 import qualified RIO
+import           RIO.PrettyPrint
 import           RIO.Process
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
@@ -475,7 +474,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
             else return $ Left $ "Multiple files matching " <> T.pack (pkgIdStr ++ "-*.conf") <> " found in " <>
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
-displayReportPath :: (HasRunner env)
+displayReportPath :: (HasTerm env)
                   => Text -> StyleDoc -> RIO env ()
 displayReportPath report reportPath =
      prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> reportPath

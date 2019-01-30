@@ -3,7 +3,7 @@ version: 0.1.0.0
 synopsis: A package with no dependencies, other than base
 license: BSD3
 author: David Baynard
-copyright: 2018 David Baynard
+copyright: 2018-2019 David Baynard
 category: Development
 extra-source-files: []
 

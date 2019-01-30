@@ -5,7 +5,7 @@ description: Please see the README and documentation at <https://www.stackage.or
 category:    Development
 author:      Michael Snoyman
 maintainer:  michael@snoyman.com
-copyright:   2018 FP Complete
+copyright:   2018-2019 FP Complete
 license:     MIT
 github:      commercialhaskell/pantry # TODO move to this repo!
 
@@ -32,6 +32,7 @@ dependencies:
 - unliftio
 - http-conduit
 - http-client-tls
+- http-download
 - http-types
 - http-client
 - conduit
@@ -59,6 +60,7 @@ dependencies:
 - zip-archive
 - text-metrics
 - resourcet
+- rio-prettyprint
 
 # FIXME remove when we drop store
 - integer-gmp
@@ -96,6 +98,7 @@ library:
   exposed-modules:
   - Pantry
   - Pantry.SHA256
+  - Pantry.HPack
 
   # For testing
   - Pantry.Internal

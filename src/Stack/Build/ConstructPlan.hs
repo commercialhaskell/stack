@@ -41,7 +41,6 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.SourceMap
-import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -53,6 +52,7 @@ import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.IO (putStrLn)
+import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
 
 data PackageInfo
@@ -137,6 +137,11 @@ instance HasLogFunc Ctx where
     logFuncL = configL.logFuncL
 instance HasRunner Ctx where
     runnerL = configL.runnerL
+instance HasStylesUpdate Ctx where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasTerm Ctx where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
 instance HasConfig Ctx
 instance HasPantryConfig Ctx where
     pantryConfigL = configL.pantryConfigL
@@ -427,7 +432,7 @@ addDep treatAsDep' name = do
                             let version = installedVersion installed
                             mrev <- liftRIO $ getLatestHackageRevision name version
                             case mrev of
-                              Nothing -> return () -- FIXME:qrilka report an error?
+                              Nothing -> error $ "No package revision found for: " <> show name
                               Just (_rev, cfKey, treeKey) ->
                                 tellExecutablesUpstream
                                   name

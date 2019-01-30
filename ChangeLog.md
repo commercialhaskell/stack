@@ -46,6 +46,12 @@ Major changes:
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
+* `stack script` now passes `-i -idir` in to the `ghc`
+  invocation. This makes it so that the script can import local
+  modules, and fixes an issue where `.hs` files in the current
+  directory could affect interpretation of the script. See
+  [#4538](https://github.com/commercialhaskell/stack/pull/4538)
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
@@ -79,6 +85,8 @@ Other enhancements:
   [#4101](https://github.com/commercialhaskell/stack/issues/4101)
 * Add `--pedantic` to `ghci` to run with `-Wall` and `-Werror`
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
+* Add `--cabal-files` flag to `stack ide targets` command.
+* Add `--stdout` flag to all `stack ide` subcommands.
 
 Bug fixes:
 
@@ -104,6 +112,12 @@ Bug fixes:
   by symlinks, while GCC will produce the object files in the original
   directory. See
   [#4402](https://github.com/commercialhaskell/stack/pull/4402)
+* Fix handling of GitHub and URL templates on Windows. See
+  [commercialhaskell/stack#4394](https://github.com/commercialhaskell/stack/issues/4394)
+* Fix `--file-watch` not responding to file modifications when running
+  inside docker on Mac. See
+  [#4506](https://github.com/commercialhaskell/stack/issues/4506)
+* Using `--ghc-options` with `stack script --compile` now works.
 
 ## v1.9.3
 

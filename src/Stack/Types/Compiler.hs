@@ -17,6 +17,7 @@ module Stack.Types.Compiler
   , haddockExeName
   , isWantedCompiler
   , wantedToActual
+  , actualToWanted
   ) where
 
 import           Data.Aeson
@@ -60,6 +61,10 @@ instance FromJSONKey ActualCompiler where
 wantedToActual :: WantedCompiler -> ActualCompiler
 wantedToActual (WCGhc x) = ACGhc x
 wantedToActual (WCGhcjs x y) = ACGhcjs x y
+
+actualToWanted :: ActualCompiler -> WantedCompiler
+actualToWanted (ACGhc x) = WCGhc x
+actualToWanted (ACGhcjs x y) = WCGhcjs x y
 
 parseActualCompiler :: T.Text -> Either PantryException ActualCompiler
 parseActualCompiler = fmap wantedToActual . parseWantedCompiler

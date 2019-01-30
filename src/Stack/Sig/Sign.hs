@@ -6,7 +6,7 @@
 {-|
 Module      : Stack.Sig.Sign
 Description : Signing Packages
-Copyright   : (c) 2015-2018, Stack contributors
+Copyright   : (c) 2015-2019, Stack contributors
 License     : BSD3
 Maintainer  : Tim Dysinger <tim@fpcomplete.com>
 Stability   : experimental
@@ -23,8 +23,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Distribution.PackageDescription as D
 import qualified Distribution.PackageDescription.Parsec as D
 import qualified Distribution.Verbosity as D
-import           Network.HTTP.Download
-import           Network.HTTP.StackClient (RequestBody (RequestBodyBS), setRequestMethod, setRequestBody, getResponseStatusCode, methodPut)
+import           Network.HTTP.StackClient (RequestBody (RequestBodyBS), httpLbs, parseUrlThrow, setRequestMethod, setRequestBody, getResponseStatusCode, methodPut)
 import           Path
 import           Stack.Sig.GPG
 import           Stack.Types.Sig

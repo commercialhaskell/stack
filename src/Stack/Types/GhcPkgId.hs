@@ -6,6 +6,7 @@
 
 module Stack.Types.GhcPkgId
   (GhcPkgId
+  ,unGhcPkgId
   ,ghcPkgIdParser
   ,parseGhcPkgId
   ,ghcPkgIdString)
@@ -61,3 +62,7 @@ ghcPkgIdParser =
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
 ghcPkgIdString (GhcPkgId x) = T.unpack x
+
+-- | Get a text value of GHC package id
+unGhcPkgId :: GhcPkgId -> Text
+unGhcPkgId (GhcPkgId v) = v

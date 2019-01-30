@@ -129,10 +129,17 @@ copyTree toCopy src dst =
   where
     go srcfp = when (toCopy srcfp) $ liftIO $ do
         Just suffix <- return $ stripPrefix src srcfp
-        let dstfp = dst ++ "/" ++ suffix
+        let dstfp = dst </> stripHeadSeparator suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
         createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
             copyFile srcfp dstfp -- for Windows
+
+    stripHeadSeparator :: FilePath -> FilePath
+    stripHeadSeparator [] = []
+    stripHeadSeparator fp@(x:xs) = if isPathSeparator x
+                                   then xs
+                                   else fp
+
 
 toCopyRoot :: FilePath -> Bool
 toCopyRoot srcfp = any (`isSuffixOf` srcfp)

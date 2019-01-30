@@ -30,9 +30,11 @@ data TemplateName = TemplateName !Text !TemplatePath
 
 data TemplatePath = AbsPath (Path Abs File)
                   -- ^ an absolute path on the filesystem
-                  | RelPath (Path Rel File)
+                  | RelPath String (Path Rel File)
                   -- ^ a relative path on the filesystem, or relative to
-                  -- the template repository
+                  -- the template repository. To avoid path separator conversion
+                  -- on Windows, the raw command-line parameter passed is also
+                  -- given as the first field (possibly with @.hsfiles@ appended).
                   | UrlPath String
                   -- ^ a full URL
                   | RepoPath RepoTemplatePath
@@ -91,7 +93,7 @@ parseTemplateNameFromString fname =
         [ TemplateName prefix        . RepoPath <$> parseRepoPath hsf
         , TemplateName (T.pack orig) . UrlPath <$> (parseRequest orig *> Just orig)
         , TemplateName prefix        . AbsPath <$> parseAbsFile hsf
-        , TemplateName prefix        . RelPath <$> parseRelFile hsf
+        , TemplateName prefix        . RelPath hsf <$> parseRelFile hsf
         ]
     expected = "Expected a template like: foo or foo.hsfiles or\
                \ https://example.com/foo.hsfiles or github:user/foo"
@@ -133,4 +135,3 @@ parseRepoPathWithService service path =
         repoUser <- defaultRepoUserForService service
         Just $ RepoTemplatePath service repoUser name
     _            -> Nothing
-

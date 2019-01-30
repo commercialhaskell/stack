@@ -24,9 +24,10 @@ import           Data.Aeson (FromJSON (parseJSON))
 import           Lens.Micro
 import           Stack.Prelude              hiding (lift)
 import           Stack.Constants
-import           Stack.Types.StylesUpdate (StylesUpdate)
-import           System.Console.ANSI
+import           RIO.PrettyPrint
+import           RIO.PrettyPrint.StylesUpdate (HasStylesUpdate (..), StylesUpdate)
 import           RIO.Process (HasProcessContext (..), ProcessContext, mkDefaultProcessContext)
+import           System.Console.ANSI
 import           System.Terminal
 
 -- | Monadic environment.
@@ -46,15 +47,14 @@ instance HasProcessContext Runner where
   processContextL = lens runnerProcessContext (\x y -> x { runnerProcessContext = y })
 instance HasRunner Runner where
   runnerL = id
+instance HasStylesUpdate Runner where
+  stylesUpdateL = lens runnerStylesUpdate (\x y -> x { runnerStylesUpdate = y })
+instance HasTerm Runner where
+  useColorL = lens runnerUseColor (\x y -> x { runnerUseColor = y })
+  termWidthL = lens runnerTermWidth (\x y -> x { runnerTermWidth = y })
 
 terminalL :: HasRunner env => Lens' env Bool
 terminalL = runnerL.lens runnerTerminal (\x y -> x { runnerTerminal = y })
-
-useColorL :: HasRunner env => Lens' env Bool
-useColorL = runnerL.lens runnerUseColor (\x y -> x { runnerUseColor = y })
-
-stylesUpdateL :: HasRunner env => Lens' env StylesUpdate
-stylesUpdateL = runnerL.lens runnerStylesUpdate (\x y -> x { runnerStylesUpdate = y })
 
 reExecL :: HasRunner env => Lens' env Bool
 reExecL = runnerL.lens runnerReExec (\x y -> x { runnerReExec = y })

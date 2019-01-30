@@ -209,6 +209,9 @@ import qualified Options.Applicative.Types as OA
 import qualified Pantry.SHA256 as SHA256
 import           Path
 import qualified Paths_stack as Meta
+import           RIO.PrettyPrint (HasTerm (..))
+import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
+                     parseStylesUpdateFromString, HasStylesUpdate (..))
 import           Stack.Constants
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -220,8 +223,6 @@ import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.Runner
 import           Stack.Types.SourceMap
-import           Stack.Types.StylesUpdate (StylesUpdate,
-                     parseStylesUpdateFromString)
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
@@ -1805,7 +1806,7 @@ class HasGHCVariant env where
     {-# INLINE ghcVariantL #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasProcessContext env, HasPantryConfig env, HasLogFunc env, HasRunner env) => HasConfig env where
+class (HasPlatform env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
@@ -1895,6 +1896,28 @@ instance HasLogFunc BuildConfig where
   logFuncL = runnerL.logFuncL
 instance HasLogFunc EnvConfig where
   logFuncL = runnerL.logFuncL
+
+instance HasStylesUpdate Config where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasStylesUpdate LoadConfig where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasStylesUpdate BuildConfig where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasStylesUpdate EnvConfig where
+  stylesUpdateL = runnerL.stylesUpdateL
+
+instance HasTerm Config where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
+instance HasTerm LoadConfig where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
+instance HasTerm BuildConfig where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
+instance HasTerm EnvConfig where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
 
 -----------------------------------
 -- Helper lenses

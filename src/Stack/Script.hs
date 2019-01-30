@@ -11,6 +11,7 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
+import qualified Distribution.PackageDescription as PD
 import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
@@ -34,11 +35,12 @@ import qualified RIO.Text as T
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
 scriptCmd opts go' = do
     file <- resolveFile' $ soFile opts
-    let go = go'
+    let scriptDir = parent file
+        go = go'
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
                 }
-            , globalStackYaml = SYLNoConfig $ parent file
+            , globalStackYaml = SYLNoConfig scriptDir
             }
     withDefaultBuildConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
@@ -91,7 +93,8 @@ scriptCmd opts go' = do
                     withNewLocalBuildTargets targets $ Stack.Build.build Nothing lk
 
         let ghcArgs = concat
-                [ ["-hide-all-packages"]
+                [ ["-i", "-i" ++ toFilePath scriptDir]
+                , ["-hide-all-packages"]
                 , maybeToList colorFlag
                 , map (\x -> "-package" ++ x)
                     $ Set.toList
@@ -101,20 +104,19 @@ scriptCmd opts go' = do
                     SEInterpret -> []
                     SECompile -> []
                     SEOptimize -> ["-O2"]
-                , map (\x -> "--ghc-arg=" ++ x) (soGhcOptions opts)
+                , soGhcOptions opts
                 ]
         munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
           SEInterpret -> exec ("run" ++ compilerExeName wc)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
-            let dir = parent file
             -- Use readProcessStdout_ so that (1) if GHC does send any output
             -- to stdout, we capture it and stop it from being sent to our
             -- stdout, which could break scripts, and (2) if there's an
             -- exception, the standard output we did capture will be reported
             -- to the user.
-            withWorkingDir (toFilePath dir) $ proc
+            withWorkingDir (toFilePath scriptDir) $ proc
               (compilerExeName wc)
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
@@ -220,9 +222,20 @@ getModuleInfo = do
             , getInstalledSymbols = False
             }
             installMap
-    return $
-        toModuleInfo (notHidden $ smDeps sourceMap) snapshotDumpPkgs <>
-        toModuleInfo (smGlobal sourceMap) globalDumpPkgs
+    let globals = toModuleInfo (smGlobal sourceMap) globalDumpPkgs
+        notHiddenDeps = notHidden $ smDeps sourceMap
+        installedDeps = toModuleInfo notHiddenDeps snapshotDumpPkgs
+        dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
+        notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
+    otherDeps <- liftIO $
+                 fmap (Map.fromListWith mappend . concat) $
+                 forM (Map.toList notInstalledDeps) $ \(pname, dep) -> do
+        gpd <- cpGPD (dpCommon dep)
+        let modules = maybe [] PD.exposedModules $
+              maybe (PD.library $ PD.packageDescription gpd) (Just . PD.condTreeData) $
+              PD.condLibrary gpd
+        return [ (m, Set.singleton pname) | m <- modules ]
+    return $ globals <> installedDeps <> ModuleInfo otherDeps
   where
     notHidden = Map.filter (not . dpHidden)
     toModuleInfo pkgs dumpPkgs =

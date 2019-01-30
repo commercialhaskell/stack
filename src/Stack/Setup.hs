@@ -66,14 +66,19 @@ import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
 import              Lens.Micro (set)
-import              Network.HTTP.StackClient (getResponseBody, getResponseStatusCode)
-import              Network.HTTP.Download
+import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
+                                              drRetryPolicyDefault, getResponseBody, getResponseStatusCode,
+                                              httpLbs, httpJSON, parseRequest, parseUrlThrow, setGithubHeaders,
+                                              verifiedDownload, withResponse)
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
 import qualified    RIO
+import              RIO.List
+import              RIO.PrettyPrint
+import              RIO.Process
 import              Stack.Build (build)
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap)
@@ -83,7 +88,6 @@ import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
-import              Stack.PrettyPrint
 import              Stack.SourceMap
 import              Stack.Setup.Installed
 import              Stack.Types.Build
@@ -101,8 +105,6 @@ import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Permissions (setFileExecutable)
-import              RIO.Process
-import              RIO.List
 import              Text.Printf (printf)
 
 #if !WINDOWS
@@ -886,7 +888,7 @@ getInstalledGhcjs installed goodVersion =
     goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: HasRunner env
+downloadAndInstallTool :: HasTerm env
                        => Path Abs Dir
                        -> SetupInfo
                        -> DownloadInfo
@@ -1054,7 +1056,7 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: HasRunner env
+    :: HasTerm env
     => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
@@ -1578,7 +1580,7 @@ setup7z si = do
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
 
-chattyDownload :: HasRunner env
+chattyDownload :: HasTerm env
                => Text          -- ^ label
                -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
                -> Path Abs File -- ^ destination

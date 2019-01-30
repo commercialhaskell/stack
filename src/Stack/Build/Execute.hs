@@ -53,7 +53,7 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Version (mkVersion)
+import           Distribution.Version (mkVersion, nullVersion)
 import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
@@ -72,7 +72,6 @@ import           Stack.Coverage
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.PrettyPrint
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -88,6 +87,7 @@ import qualified System.FilePath as FP
 import           System.IO (hPutStr, stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
+import           RIO.PrettyPrint
 import           RIO.Process
 
 -- | Has an executable been built or not?
@@ -986,10 +986,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -> RIO env a
     withCabal package pkgDir outputType inner = do
         config <- view configL
-
         unless (configAllowDifferentUser config) $
             checkOwnership (pkgDir </> configWorkDir config)
-
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False
@@ -1225,7 +1223,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
 --
 -- * Generates haddocks
 --
--- * Registers the library and copiesthe built executables into the
+-- * Registers the library and copies the built executables into the
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
@@ -1754,7 +1752,22 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
-                menv <- liftIO $ configProcessContextSettings config EnvSettings
+                packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
+                    let pkgId = PackageIdentifier name nullVersion
+                    case Map.lookupGT pkgId allDepsMap of
+                        Just (PackageIdentifier name' version, ghcPkgId)
+                            | name' == name && dvType dv == AsLibrary &&
+                              version `withinRange` dvVersionRange dv ->
+                            return $ Just (unGhcPkgId ghcPkgId)
+                        _ -> do
+                            logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
+                            return Nothing
+                -- env var HASKELL_PACKAGE_IDS is used by doctest so module names for
+                -- packages with proper dependencies should no longer get ambiguous
+                -- see e.g. https://github.com/doctest/issues/119
+                let usePackageIds pc = modifyEnvVars pc $ \envVars ->
+                      Map.insert "HASKELL_PACKAGE_IDS" (T.unwords packageIds) envVars
+                menv <- liftIO $ usePackageIds =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
