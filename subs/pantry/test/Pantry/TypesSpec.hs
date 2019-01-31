@@ -227,307 +227,302 @@ sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
                       })
            ]
 
---     it "parses PackageLocationImmutable (Multiple Repos)" $ do
---        let lockFile :: ByteString
---            lockFile = [s|#some
--- dependencies:
--- - complete:
---   - subdir: wai
---     cabal-file:
---       size: 1765
---       sha256: eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410
---     name: wai
---     version: 3.2.1.2
---     git: https://github.com/yesodweb/wai.git
---     pantry-tree:
---       size: 714
---       sha256: ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2
---     commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
---   - subdir: warp
---     cabal-file:
---       size: 10725
---       sha256: cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758
---     name: warp
---     version: 3.2.25
---     git: https://github.com/yesodweb/wai.git
---     pantry-tree:
---       size: 5103
---       sha256: f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a
---     commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
--- resolver:
--- - original:
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- - complete:
---     size: 527801
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
--- |]
-
---        pkgImm <- case Yaml.decodeThrow lockFile of
---          Just (pkgIm :: Value) -> do
---            case Yaml.parseEither parseLockFile pkgIm of
---              Left str -> fail $ "Can't parse PackageLocationImmutable - 1" <> str
---              Right xs -> do
---                let (WithJSONWarnings iopli _) = xs
---                pli <- iopli
---                pure $ NonEmpty.toList pli
---          Nothing -> fail "Can't parse PackageLocationImmutable - 2"
---        pkgImm `shouldBe`
---            [ PLIRepo
---                  (Repo
---                       { repoUrl = "https://github.com/yesodweb/wai.git"
---                       , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
---                       , repoSubdir = "wai"
---                       , repoType = RepoGit
---                       })
---                  (PackageMetadata
---                       { pmIdent =
---                             PackageIdentifier
---                                 { pkgName = mkPackageName "wai"
---                                 , pkgVersion = mkVersion [3, 2, 1, 2]
---                                 }
---                       , pmTreeKey =
---                             TreeKey
---                                 (BlobKey
---                                      (decodeSHA
---                                           "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2")
---                                      (FileSize 714))
---                       , pmCabal =
---                             toBlobKey
---                                 "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
---                                 1765
---                       }),
---              PLIRepo
---                  (Repo
---                       { repoUrl = "https://github.com/yesodweb/wai.git"
---                       , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
---                       , repoSubdir = "warp"
---                       , repoType = RepoGit
---                       })
---                  (PackageMetadata
---                       { pmIdent =
---                             PackageIdentifier
---                                 { pkgName = mkPackageName "warp"
---                                 , pkgVersion = mkVersion [3, 2, 25]
---                                 }
---                       , pmTreeKey =
---                             TreeKey
---                                 (BlobKey
---                                      (decodeSHA
---                                       "f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a")
---                                      (FileSize 5103))
---                       , pmCabal =
---                             toBlobKey
---                                 "cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758"
---                                 10725
---                       })
---            ]
---     it "parses PackageLocationImmutable (RPLIArchive)" $ do
---         let lockFile :: ByteString
---             lockFile = [s|#some
--- dependencies:
--- - complete:
---   - size: 285152
---     subdir: wai
---     url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
---     cabal-file:
---       size: 1717
---       sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
---     name: wai
---     version: 3.0.2.3
---     sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
---     pantry-tree:
---       size: 710
---       sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
--- resolver:
--- - original:
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- - complete:
---     size: 527801
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
--- |]
---         pkgImm <-
---             case Yaml.decodeThrow lockFile of
---                 Just (pkgIm :: Value) -> do
---                     case Yaml.parseEither parseLockFile pkgIm of
---                         Left str ->
---                             fail $ "Can't parse PackageLocationImmutable - 1" <> str
---                         Right xs -> do
---                             let (WithJSONWarnings iopli _) = xs
---                             pli <- iopli
---                             pure $ NonEmpty.toList pli
---                 Nothing -> fail "Can't parse PackageLocationImmutable"
---         pkgImm `shouldBe`
---             [ PLIArchive
---                   (Archive
---                        { archiveLocation =
---                              ALUrl
---                                  "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
---                        , archiveHash =
---                              decodeSHA
---                                  "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
---                        , archiveSize = FileSize 285152
---                        , archiveSubdir = "wai"
---                        })
---                   (PackageMetadata
---                        { pmIdent =
---                              PackageIdentifier
---                                  { pkgName = mkPackageName "wai"
---                                  , pkgVersion = mkVersion [3, 0, 2, 3]
---                                  }
---                        , pmTreeKey =
---                              TreeKey
---                                  (BlobKey
---                                       (decodeSHA
---                                            "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
---                                       (FileSize 710))
---                        , pmCabal =
---                              toBlobKey
---                                  "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
---                                  1717
---                        })
---             ]
---     it "parses PackageLocationImmutable (multiple RPLIArchive)" $ do
---         let lockFile :: ByteString
---             lockFile = [s|#some
--- dependencies:
--- - complete:
---   - size: 285152
---     subdir: wai
---     url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
---     cabal-file:
---       size: 1717
---       sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
---     name: wai
---     version: 3.0.2.3
---     sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
---     pantry-tree:
---       size: 710
---       sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
---   - size: 285152
---     subdir: wai
---     url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
---     cabal-file:
---       size: 1717
---       sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
---     name: wai
---     version: 3.0.2.3
---     sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
---     pantry-tree:
---       size: 710
---       sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
--- resolver:
--- - original:
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- - complete:
---     size: 527801
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
--- |]
---         pkgImm <-
---             case Yaml.decodeThrow lockFile of
---                 Just (pkgIm :: Value) -> do
---                     case Yaml.parseEither parseLockFile pkgIm of
---                         Left str ->
---                             fail $ "Can't parse PackageLocationImmutable - 1" <> str
---                         Right xs -> do
---                             let (WithJSONWarnings iopli _) = xs
---                             pli <- iopli
---                             pure $ NonEmpty.toList pli
---                 Nothing -> fail "Can't parse PackageLocationImmutable"
---         pkgImm `shouldBe`
---             [ PLIArchive
---                   (Archive
---                        { archiveLocation =
---                              ALUrl
---                                  "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
---                        , archiveHash =
---                              decodeSHA
---                                  "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
---                        , archiveSize = FileSize 285152
---                        , archiveSubdir = "wai"
---                        })
---                   (PackageMetadata
---                        { pmIdent =
---                              PackageIdentifier
---                                  { pkgName = mkPackageName "wai"
---                                  , pkgVersion = mkVersion [3, 0, 2, 3]
---                                  }
---                        , pmTreeKey =
---                              TreeKey
---                                  (BlobKey
---                                       (decodeSHA
---                                            "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
---                                       (FileSize 710))
---                        , pmCabal =
---                              toBlobKey
---                                  "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
---                                  1717
---                        }),
---               PLIArchive
---                   (Archive
---                        { archiveLocation =
---                              ALUrl
---                                  "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
---                        , archiveHash =
---                              decodeSHA
---                                  "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
---                        , archiveSize = FileSize 285152
---                        , archiveSubdir = "wai"
---                        })
---                   (PackageMetadata
---                        { pmIdent =
---                              PackageIdentifier
---                                  { pkgName = mkPackageName "wai"
---                                  , pkgVersion = mkVersion [3, 0, 2, 3]
---                                  }
---                        , pmTreeKey =
---                              TreeKey
---                                  (BlobKey
---                                       (decodeSHA
---                                            "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
---                                       (FileSize 710))
---                        , pmCabal =
---                              toBlobKey
---                                  "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
---                                  1717
---                        })
---             ]
---     it "parses PackageLocationImmutable (PLIHackage)" $ do
---         let lockFile :: ByteString
---             lockFile = [s|#some
--- dependencies:
--- - complete:
---   - hackage: persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058
---     pantry-tree:
---       size: 2165
---       sha256: 3cb3a9ca3e373a152d9acf622706471578cc93b2ed20c893fc20a4814264f1ce
--- resolver:
--- - original:
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- - complete:
---     size: 527801
---     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
--- sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
--- |]
---         pkgImm <-
---             case Yaml.decodeThrow lockFile of
---                 Just (pkgIm :: Value) -> do
---                     case Yaml.parseEither parseLockFile pkgIm of
---                         Left str ->
---                             fail $ "Can't parse PackageLocationImmutable - 1" <> str
---                         Right xs -> do
---                             let (WithJSONWarnings iopli _) = xs
---                             pli <- iopli
---                             pure $ NonEmpty.toList pli
---                 Nothing -> fail "Can't parse PackageLocationImmutable"
---         pkgImm `shouldBe` [PLIHackage (PackageIdentifier {pkgName = mkPackageName "persistent", pkgVersion = mkVersion [2,8,2]}) (toBlobKey
---                                  "df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1" 5058) (TreeKey
---                                  (BlobKey
---                                       (decodeSHA
---                                            "3cb3a9ca3e373a152d9acf622706471578cc93b2ed20c893fc20a4814264f1ce")
---                                       (FileSize 2165)))]
+    it "parses PackageLocationImmutable (Multiple Repos)" $ do
+       let lockFile :: ByteString
+           lockFile = [s|#some
+dependencies:
+- complete:
+  - subdir: wai
+    cabal-file:
+      size: 1765
+      sha256: eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410
+    name: wai
+    version: 3.2.1.2
+    git: https://github.com/yesodweb/wai.git
+    pantry-tree:
+      size: 714
+      sha256: ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2
+    commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
+  - subdir: warp
+    cabal-file:
+      size: 10725
+      sha256: cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758
+    name: warp
+    version: 3.2.25
+    git: https://github.com/yesodweb/wai.git
+    pantry-tree:
+      size: 5103
+      sha256: f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a
+    commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+       pkgImm <- case Yaml.decodeThrow lockFile of
+         Just (pkgIm :: Value) -> do
+           case Yaml.parseEither parseLockFile pkgIm of
+             Left str -> fail $ "Can't parse PackageLocationImmutable - 1" <> str
+             Right xs -> do
+               xs' <- sequence xs
+               pure $ NonEmpty.toList xs'
+         Nothing -> fail "Can't parse PackageLocationImmutable - 2"
+       pkgImm `shouldBe`
+           [ PLIRepo
+                 (Repo
+                      { repoUrl = "https://github.com/yesodweb/wai.git"
+                      , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                      , repoSubdir = "wai"
+                      , repoType = RepoGit
+                      })
+                 (PackageMetadata
+                      { pmIdent =
+                            PackageIdentifier
+                                { pkgName = mkPackageName "wai"
+                                , pkgVersion = mkVersion [3, 2, 1, 2]
+                                }
+                      , pmTreeKey =
+                            TreeKey
+                                (BlobKey
+                                     (decodeSHA
+                                          "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2")
+                                     (FileSize 714))
+                      , pmCabal =
+                            toBlobKey
+                                "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+                                1765
+                      }),
+             PLIRepo
+                 (Repo
+                      { repoUrl = "https://github.com/yesodweb/wai.git"
+                      , repoCommit = "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                      , repoSubdir = "warp"
+                      , repoType = RepoGit
+                      })
+                 (PackageMetadata
+                      { pmIdent =
+                            PackageIdentifier
+                                { pkgName = mkPackageName "warp"
+                                , pkgVersion = mkVersion [3, 2, 25]
+                                }
+                      , pmTreeKey =
+                            TreeKey
+                                (BlobKey
+                                     (decodeSHA
+                                      "f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a")
+                                     (FileSize 5103))
+                      , pmCabal =
+                            toBlobKey
+                                "cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758"
+                                10725
+                      })
+           ]
+    it "parses PackageLocationImmutable (RPLIArchive)" $ do
+        let lockFile :: ByteString
+            lockFile = [s|#some
+dependencies:
+- complete:
+  - size: 285152
+    subdir: wai
+    url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+    cabal-file:
+      size: 1717
+      sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
+    name: wai
+    version: 3.0.2.3
+    sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
+    pantry-tree:
+      size: 710
+      sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+        pkgImm <-
+            case Yaml.decodeThrow lockFile of
+                Just (pkgIm :: Value) -> do
+                    case Yaml.parseEither parseLockFile pkgIm of
+                        Left str ->
+                            fail $ "Can't parse PackageLocationImmutable - 1" <> str
+                        Right xs -> do
+                            xs' <- sequence xs
+                            pure $ NonEmpty.toList xs'
+                Nothing -> fail "Can't parse PackageLocationImmutable"
+        pkgImm `shouldBe`
+            [ PLIArchive
+                  (Archive
+                       { archiveLocation =
+                             ALUrl
+                                 "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
+                       , archiveHash =
+                             decodeSHA
+                                 "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
+                       , archiveSize = FileSize 285152
+                       , archiveSubdir = "wai"
+                       })
+                  (PackageMetadata
+                       { pmIdent =
+                             PackageIdentifier
+                                 { pkgName = mkPackageName "wai"
+                                 , pkgVersion = mkVersion [3, 0, 2, 3]
+                                 }
+                       , pmTreeKey =
+                             TreeKey
+                                 (BlobKey
+                                      (decodeSHA
+                                           "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
+                                      (FileSize 710))
+                       , pmCabal =
+                             toBlobKey
+                                 "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
+                                 1717
+                       })
+            ]
+    it "parses PackageLocationImmutable (multiple RPLIArchive)" $ do
+        let lockFile :: ByteString
+            lockFile = [s|#some
+dependencies:
+- complete:
+  - size: 285152
+    subdir: wai
+    url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+    cabal-file:
+      size: 1717
+      sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
+    name: wai
+    version: 3.0.2.3
+    sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
+    pantry-tree:
+      size: 710
+      sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
+  - size: 285152
+    subdir: wai
+    url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
+    cabal-file:
+      size: 1717
+      sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
+    name: wai
+    version: 3.0.2.3
+    sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
+    pantry-tree:
+      size: 710
+      sha256: 754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+        pkgImm <-
+            case Yaml.decodeThrow lockFile of
+                Just (pkgIm :: Value) -> do
+                    case Yaml.parseEither parseLockFile pkgIm of
+                        Left str ->
+                            fail $ "Can't parse PackageLocationImmutable - 1" <> str
+                        Right xs -> do
+                            xs' <- sequence xs
+                            pure $ NonEmpty.toList xs'
+                Nothing -> fail "Can't parse PackageLocationImmutable"
+        pkgImm `shouldBe`
+            [ PLIArchive
+                  (Archive
+                       { archiveLocation =
+                             ALUrl
+                                 "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
+                       , archiveHash =
+                             decodeSHA
+                                 "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
+                       , archiveSize = FileSize 285152
+                       , archiveSubdir = "wai"
+                       })
+                  (PackageMetadata
+                       { pmIdent =
+                             PackageIdentifier
+                                 { pkgName = mkPackageName "wai"
+                                 , pkgVersion = mkVersion [3, 0, 2, 3]
+                                 }
+                       , pmTreeKey =
+                             TreeKey
+                                 (BlobKey
+                                      (decodeSHA
+                                           "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
+                                      (FileSize 710))
+                       , pmCabal =
+                             toBlobKey
+                                 "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
+                                 1717
+                       }),
+              PLIArchive
+                  (Archive
+                       { archiveLocation =
+                             ALUrl
+                                 "http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip"
+                       , archiveHash =
+                             decodeSHA
+                                 "3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba"
+                       , archiveSize = FileSize 285152
+                       , archiveSubdir = "wai"
+                       })
+                  (PackageMetadata
+                       { pmIdent =
+                             PackageIdentifier
+                                 { pkgName = mkPackageName "wai"
+                                 , pkgVersion = mkVersion [3, 0, 2, 3]
+                                 }
+                       , pmTreeKey =
+                             TreeKey
+                                 (BlobKey
+                                      (decodeSHA
+                                           "754e9b9d6949e23fa5ca730f50453d7e91fd2bc2d9170537fa2d33db8d6138fc")
+                                      (FileSize 710))
+                       , pmCabal =
+                             toBlobKey
+                                 "7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056"
+                                 1717
+                       })
+            ]
+    it "parses PackageLocationImmutable (PLIHackage)" $ do
+        let lockFile :: ByteString
+            lockFile = [s|#some
+dependencies:
+- complete:
+  - hackage: persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058
+    pantry-tree:
+      size: 2165
+      sha256: 3cb3a9ca3e373a152d9acf622706471578cc93b2ed20c893fc20a4814264f1ce
+resolver:
+- original:
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+- complete:
+    size: 527801
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
+sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
+|]
+        pkgImm <-
+            case Yaml.decodeThrow lockFile of
+                Just (pkgIm :: Value) -> do
+                    case Yaml.parseEither parseLockFile pkgIm of
+                        Left str ->
+                            fail $ "Can't parse PackageLocationImmutable - 1" <> str
+                        Right xs -> do
+                            xs' <- sequence xs
+                            pure $ NonEmpty.toList xs'
+                Nothing -> fail "Can't parse PackageLocationImmutable"
+        pkgImm `shouldBe` [PLIHackage (PackageIdentifier {pkgName = mkPackageName "persistent", pkgVersion = mkVersion [2,8,2]}) (toBlobKey
+                                 "df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1" 5058) (TreeKey
+                                 (BlobKey
+                                      (decodeSHA
+                                           "3cb3a9ca3e373a152d9acf622706471578cc93b2ed20c893fc20a4814264f1ce")
+                                      (FileSize 2165)))]
     it "parses PackageLocationImmutable (PLIHackage & PLIArchive)" $ do
         let lockFile :: ByteString
             lockFile = [s|#some
