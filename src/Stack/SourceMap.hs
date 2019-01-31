@@ -149,8 +149,9 @@ toActual smw downloadCompiler ac = do
             WithDownloadCompiler -> globalsFromDump ac
             SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
     check <- globalCondCheck
+    let wantedPackages = Map.keysSet (smwDeps smw) <> Map.keysSet (smwProject smw)
     (prunedGlobals, keptGlobals) <-
-        partitionReplacedDependencies allGlobals (Map.keysSet $ smwDeps smw) check
+        partitionReplacedDependencies allGlobals wantedPackages check
     let globals = Map.map GlobalPackage keptGlobals <>
                   Map.map ReplacedGlobalPackage prunedGlobals
     return
