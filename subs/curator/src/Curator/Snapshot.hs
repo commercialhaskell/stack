@@ -159,7 +159,7 @@ checkDependencyGraph constraints snapshot = do
         let depTree =
               Map.map (piVersion &&& piTreeDeps) pkgInfos
               <> Map.map ((, []) . Just) ghcBootPackages
-        return $ Map.mapWithKey (validateDeps constraints depTree cabalVersion) pkgInfos
+        return $ Map.mapWithKey (validatePackage constraints depTree cabalVersion) pkgInfos
     let (rangeErrors, otherErrors) = splitErrors pkgErrors
         rangeErrors' =
           Map.mapWithKey (\(pname, _, _) bs -> (Map.member pname ghcBootPackages0, bs)) rangeErrors
@@ -399,14 +399,14 @@ getPkgInfo constraints compilerVer pname rsp = do
       , piGithubPings = applyGithubMapping constraints $ getGithubPings gpd
       }
 
-validateDeps ::
+validatePackage ::
        Constraints
     -> Map PackageName (Maybe Version, [PackageName])
     -> Version
     -> PackageName
     -> PkgInfo
     -> [DependencyError]
-validateDeps constraints depTree cabalVersion pname pkg =
+validatePackage constraints depTree cabalVersion pname pkg =
     checkCabalVersion <> checkCycles <>
     catMaybes [ checkDependency component dep
               | (component, deps) <- piAllDeps pkg
