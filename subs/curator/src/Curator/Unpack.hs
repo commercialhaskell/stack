@@ -40,7 +40,7 @@ unpackSnapshot cons snap root = do
               fromString (packageNameString name) <>
               "-" <>
               fromString (versionString version) <>
-              "@" <>
+              "-" <>
               display sha
         suffixTmp <- parseRelDir $ T.unpack $ utf8BuilderToText $ suffixBuilder <> ".tmp"
         let destTmp = root </> unpacked </> suffixTmp
