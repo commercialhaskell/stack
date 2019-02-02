@@ -10,7 +10,8 @@ module Stack.GhcPkg
   (getGlobalDB
   ,findGhcPkgField
   ,createDatabase
-  ,unregisterGhcPkgId
+  ,unregisterSinglePackageId
+  ,unregisterGhcPkgIds
   ,getCabalPkgVer
   ,ghcPkgExeName
   ,ghcPkgPathEnvVar
@@ -23,7 +24,6 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.List
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Distribution.Version (mkVersion)
 import           Path (parent, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -147,25 +147,35 @@ findGhcPkgVersion wc pkgDbs name = do
         Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
-unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
-                    => WhichCompiler
-                    -> ActualCompiler
-                    -> Path Abs Dir -- ^ package database
-                    -> GhcPkgId
-                    -> PackageIdentifier
-                    -> RIO env ()
-unregisterGhcPkgId wc cv pkgDb gid ident = do
+unregisterSinglePackageId :: (HasProcessContext env, HasLogFunc env)
+                          => WhichCompiler
+                          -> Path Abs Dir -- ^ package database
+                          -> PackageIdentifier
+                          -> RIO env ()
+unregisterSinglePackageId wc pkgDb ident = do
     eres <- ghcPkg wc [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
-    -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = "unregister" : "--user" : "--force" :
-        (case cv of
-            ACGhc v | v < mkVersion [7, 9] ->
-                [packageIdentifierString ident]
-            _ -> ["--ipid", ghcPkgIdString gid])
+           [packageIdentifierString ident]
+
+-- | unregister list of package ghcids, batching available from GHC 8.0.1,
+-- using GHC package id available from GHC 7.9(?)
+unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env)
+                    => WhichCompiler
+                    -> Path Abs Dir -- ^ package database
+                    -> [GhcPkgId]
+                    -> RIO env ()
+unregisterGhcPkgIds wc pkgDb gids = do
+    eres <- ghcPkg wc [pkgDb] args
+    case eres of
+        Left e -> logWarn $ displayShow e
+        Right _ -> return ()
+  where
+    args = "unregister" : "--user" : "--force" :
+        concatMap (\gid -> ["--ipid", ghcPkgIdString gid]) gids
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (HasProcessContext env, HasLogFunc env)

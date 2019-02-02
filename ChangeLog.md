@@ -87,6 +87,8 @@ Other enhancements:
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
 * Add `--cabal-files` flag to `stack ide targets` command.
 * Add `--stdout` flag to all `stack ide` subcommands.
+* Use batches when unregistering packages with `ghc-pkg`.
+  (See [#2662](https://github.com/commercialhaskell/stack/issues/2662))
 
 Bug fixes:
 

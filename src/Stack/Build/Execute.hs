@@ -41,6 +41,7 @@ import           Data.Conduit.Process.Typed
                      runProcess_, getStdout, getStderr, createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
+import           Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -584,14 +585,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', (ident, reason)) -> do
-                logInfo $
-                    fromString (packageIdentifierString ident) <>
-                    ": unregistering" <>
-                    if T.null reason
-                        then ""
-                        else " (" <> RIO.display reason <> ")"
-                unregisterGhcPkgId wc cv localDB id' ident
+            unregisterPackages wc cv localDB ids
 
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
@@ -660,6 +654,35 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ map (\(ident, _) -> (pkgName ident, ()))
                   $ Map.elems
                   $ planUnregisterLocal plan
+
+unregisterPackages ::
+       (HasProcessContext env, HasLogFunc env)
+    => WhichCompiler
+    -> ActualCompiler
+    -> Path Abs Dir
+    -> [(GhcPkgId, (PackageIdentifier, Text))]
+    -> RIO env ()
+unregisterPackages wc ac localDB ids = do
+    let logReason ident reason =
+            logInfo $
+            fromString (packageIdentifierString ident) <> ": unregistering" <>
+            if T.null reason
+                then ""
+                else " (" <> RIO.display reason <> ")"
+    case ac of
+        ACGhc v | v >= mkVersion [8, 0, 1] -> do
+                let batchSize = 500
+                for_ (chunksOf batchSize ids) $ \batch -> do
+                    for_ batch $ \(_, (ident, reason)) -> logReason ident reason
+                    unregisterGhcPkgIds wc localDB $ map fst batch
+        ACGhc v | v >= mkVersion [7, 9] ->
+                for_ ids $ \(gid, (ident, reason)) -> do
+                    logReason ident reason
+                    unregisterGhcPkgIds wc localDB [gid]
+        _ -> do
+            for_ ids $ \(_gid, (ident, reason)) -> do
+                logReason ident reason
+                unregisterSinglePackageId wc localDB ident
 
 toActions :: HasEnvConfig env
           => InstalledMap
