@@ -22,6 +22,8 @@
 STACK_VERSION="1.9.3"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
+# Windows doesn't have a good place for DEST, but all CI systems (Appveyor, Travis, Azure) support /bin
+DEFAULT_DEST_WINDOWS="/bin/stack"
 DEST=""
 QUIET=""
 FORCE=""
@@ -252,6 +254,24 @@ do_centos_install() {
   fi
 }
 
+# Attempts to install on Windows, designed for CI scripts (tested on Appveyor, Travis, Azure)
+do_windows_install() {
+  info "Using Windows install.."
+  info ""
+  make_temp_dir
+  dl_to_file "http://www.stackage.org/stack/windows-x86_64" "$STACK_TEMP_DIR/stack.zip"
+  if [ "$(basename $DEST)" != "stack" ]; then
+    die "Currently the destination must always end with 'stack' on Windows, got: $DEST"
+  fi
+  if ! 7z x $STACK_TEMP_DIR/stack.zip stack.exe "-o$(dirname $DEST)"; then
+    die "Extract zip file installed, you probably don't have 7z installed"
+  fi
+  post_install_separator
+  info "Stack has been installed to: $DEST"
+  info ""
+  check_dest_on_path
+}
+
 # Attempts to install on macOS.
 # If 'brew' exists, installs using Homebrew.  Otherwise, installs
 # the generic bindist.
@@ -432,17 +452,29 @@ GETDISTRO
   esac
 }
 
+set_default_dest() {
+  [ "$DEST" != "" ] || DEST="$DEFAULT_DEST"
+}
+
 # Determine operating system and attempt to install.
 do_os() {
   case "$(uname)" in
     "Linux")
+      set_default_dest
       do_distro
       ;;
     "Darwin")
+      set_default_dest
       do_osx_install
       ;;
     "FreeBSD")
+      set_default_dest
       do_freebsd_install
+      ;;
+    MINGW64_NT-*|MSYS_NT-*)
+      DEFAULT_DEST="$DEFAULT_DEST_WINDOWS"
+      set_default_dest
+      do_windows_install
       ;;
     *)
       die "Sorry, this installer does not support your operating system: $(uname).
@@ -720,8 +752,6 @@ Use 'stack upgrade' or your OS's package manager to upgrade,
 or pass '-f' to this script to over-write the existing binary, e.g.:
   $get https://get.haskellstack.org/ | sh -s - -f"
     fi
-  else
-    [ "$DEST" != "" ] || DEST="$DEFAULT_DEST"
   fi
 }
 
