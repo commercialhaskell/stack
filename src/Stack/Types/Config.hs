@@ -1445,26 +1445,6 @@ data StackLockConfig = StackLockConfig {
       slcResolver :: SnapshotLocation
 }
 
--- tr :: Aeson.Parser a -> WarningParser a
-
-
--- myParser :: Value -> Yaml.Parser (WithJSONWarnings [PackageLocationImmutable])
-parseLockFile ::
-       Value -> Yaml.Parser [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]
-parseLockFile value = do
-    (WithJSONWarnings val _) <- withObjectWarnings
-            "PackageLocationimmutable"
-            (\obj -> do
-                 (deps :: Value) <- obj ..: "dependencies"
-                 lift $ withArray "PackageLocationimmutable.complete (Array)" (\array -> do
-                                                                                  let array' :: [Value] = Vector.toList array
-                                                                                      array'' :: [ Yaml.Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))] = map (parseJSON) array'
-                                                                                  sequence array'') deps
-            ) value
-    let val' :: [WithJSONWarnings (IO (NonEmpty PackageLocationImmutable))]  = map (\(WithJSONWarnings item warn) -> WithJSONWarnings (resolvePaths Nothing item) warn) val
-    pure val'
-
-
 parseStackYamlConfig :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO StackYamlConfig))
 parseStackYamlConfig rootDir = withObjectWarnings "StackYamlConfig" $ \o -> do
                          deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []

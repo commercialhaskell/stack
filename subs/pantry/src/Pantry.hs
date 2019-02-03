@@ -106,6 +106,7 @@ module Pantry
   , parsePackageIdentifierRevision
   , parseHackageText
   , parseLockFile
+  , parseAndResolvePackageLocation
 
     -- ** Cabal values
   , parsePackageIdentifier
