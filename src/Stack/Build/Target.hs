@@ -444,19 +444,10 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let deps = smaDeps smActual
-      globals = smaGlobal smActual
-      latestGlobal name gp = do
-        let version = gpVersion gp
-        mrev <- getLatestHackageRevision name version
-        forM mrev $ \(_rev, cfKey, treeKey) -> do
-          let ident = PackageIdentifier name version
-          pure $ PLImmutable (PLIHackage ident cfKey treeKey)
-  globalLocs <- Map.traverseMaybeWithKey latestGlobal globals
-  let allLocs = Map.union globalLocs (Map.map dpLocation deps)
+  let depLocs = Map.map dpLocation $ smaDeps smActual
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget smActual allLocs
+    resolveRawTarget smActual depLocs
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
