@@ -169,6 +169,7 @@ printTree opts depth remainingDepsCounts packages dependencyMap = do
                           if Just depth == dotDependencyDepth (listDepsDotOpts opts)
                              then return ()
                              else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+                        -- TODO: Define this behaviour, maybe return an error?
                         Nothing -> return ()
 
 printTreeNode :: ListDepsOpts
