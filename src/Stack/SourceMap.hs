@@ -8,9 +8,12 @@ module Stack.SourceMap
     , loadVersion
     , getPLIVersion
     , loadGlobalHints
-    , toActual
+    , DumpedGlobalPackage
+    , actualFromGhc
+    , actualFromHints
     , checkFlagsUsedThrowing
     , globalCondCheck
+    , pruneGlobals
     ) where
 
 import qualified Data.Conduit.List as CL
@@ -113,15 +116,13 @@ getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env)
     => ActualCompiler
-    -> RIO env (Map PackageName Version)
+    -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump compiler = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
-        toGlobals ds = Map.fromList $ map toGlobal $ Map.elems ds
-        toGlobal d =
-            ( pkgName $ dpPackageIdent d
-            , pkgVersion $ dpPackageIdent d)
+        toGlobals ds =
+          Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
     toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
 
 globalsFromHints ::
@@ -137,29 +138,36 @@ globalsFromHints compiler = do
             logWarn $ "Unable to load global hints for " <> RIO.display compiler
             pure mempty
 
-toActual ::
+type DumpedGlobalPackage = DumpPackage () () ()
+
+actualFromGhc ::
        (HasConfig env)
     => SMWanted
-    -> WithDownloadCompiler
     -> ActualCompiler
-    -> RIO env SMActual
-toActual smw downloadCompiler ac = do
-    allGlobals <-
-        case downloadCompiler of
-            WithDownloadCompiler -> globalsFromDump ac
-            SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
-    check <- globalCondCheck
-    let wantedPackages = Map.keysSet (smwDeps smw) <> Map.keysSet (smwProject smw)
-    (prunedGlobals, keptGlobals) <-
-        partitionReplacedDependencies allGlobals wantedPackages check
-    let globals = Map.map GlobalPackage keptGlobals <>
-                  Map.map ReplacedGlobalPackage prunedGlobals
+    -> RIO env (SMActual DumpedGlobalPackage)
+actualFromGhc smw ac = do
+    globals <- globalsFromDump ac
     return
         SMActual
         { smaCompiler = ac
         , smaProject = smwProject smw
         , smaDeps = smwDeps smw
         , smaGlobal = globals
+        }
+
+actualFromHints ::
+       (HasConfig env)
+    => SMWanted
+    -> ActualCompiler
+    -> RIO env (SMActual GlobalPackageVersion)
+actualFromHints smw ac = do
+    globals <- globalsFromHints (actualToWanted ac)
+    return
+        SMActual
+        { smaCompiler = ac
+        , smaProject = smwProject smw
+        , smaDeps = smwDeps smw
+        , smaGlobal = Map.map GlobalPackageVersion globals
         }
 
 -- | Simple cond check for boot packages - checks only OS and Arch
@@ -211,3 +219,14 @@ getUnusedPackageFlags (name, userFlags) source prj deps =
                     then pure Nothing
                     -- Error about the undefined flags
                     else pure $ Just $ UFFlagsNotDefined source pname pkgFlags unused
+
+pruneGlobals ::
+       Map PackageName DumpedGlobalPackage
+    -> Set PackageName
+    -> Map PackageName GlobalPackage
+pruneGlobals globals deps =
+  let (prunedGlobals, keptGlobals) =
+        partitionReplacedDependencies globals (pkgName . dpPackageIdent)
+            dpGhcPkgId dpDepends deps
+  in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
+     Map.map ReplacedGlobalPackage prunedGlobals

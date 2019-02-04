@@ -211,7 +211,7 @@ data ResolveResult = ResolveResult
 -- the module).
 resolveRawTarget ::
        (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
-    => SMActual
+    => SMActual GlobalPackage
     -> Map PackageName PackageLocation
     -> (RawInput, RawTarget)
     -> RIO env (Either Text ResolveResult)
@@ -434,7 +434,7 @@ parseTargets :: HasBuildConfig env
     => NeedTargets
     -> Bool
     -> BuildOptsCLI
-    -> SMActual
+    -> SMActual GlobalPackage
     -> RIO env SMTargets
 parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"

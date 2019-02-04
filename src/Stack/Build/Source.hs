@@ -70,7 +70,7 @@ localDependencies = do
 loadSourceMap :: HasBuildConfig env
               => SMTargets
               -> BuildOptsCLI
-              -> SMActual
+              -> SMActual DumpedGlobalPackage
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
     bconfig <- view buildConfigL
@@ -105,16 +105,7 @@ loadSourceMap smt boptsCli sma = do
           Map.toList (boptsCLIFlags boptsCli)
         maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
         maybeProjectFlags _ = Nothing
-        actualGlobals = flip Map.mapMaybe (smaGlobal sma) $ \gp ->
-            case gp of
-                ReplacedGlobalPackage _ -> Nothing
-                GlobalPackage v -> Just v
-    check <- globalCondCheck
-    (prunedGlobals, keptGlobals) <-
-        partitionReplacedDependencies actualGlobals (Map.keysSet deps) check
-    let globals = Map.map GlobalPackage keptGlobals <>
-                  Map.map ReplacedGlobalPackage prunedGlobals <>
-                  Map.filter isReplacedGlobal (smaGlobal sma)
+        globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     smh <- hashSourceMapData (whichCompiler compiler) deps
     return

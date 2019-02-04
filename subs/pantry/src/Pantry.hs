@@ -164,7 +164,7 @@ module Pantry
 
 import RIO
 import Conduit
-import Control.Monad.State.Strict (get, execStateT, modify', StateT)
+import Control.Monad.State.Strict (State, execState, get, modify')
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import qualified RIO.ByteString as B
@@ -182,8 +182,6 @@ import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, par
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
-import Distribution.Types.CondTree (simplifyCondTree)
-import Distribution.Types.Dependency (depPkgName)
 import Distribution.Parsec.Common (PWarning (..), showPos)
 import qualified Hpack
 import qualified Hpack.Config as Hpack
@@ -1477,49 +1475,42 @@ loadGlobalHints dest wc =
 --
 -- @since 0.1.0.0
 partitionReplacedDependencies ::
-       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => Map PackageName Version
+       Ord id
+    => Map PackageName a
+    -> (a -> PackageName)
+    -> (a -> id)
+    -> (a -> [id])
     -> Set PackageName
-    -> (D.ConfVar -> Either D.ConfVar Bool)
-    -> RIO env (Map PackageName [PackageName], Map PackageName Version)
-partitionReplacedDependencies globals overrides condCheck =
-  flip execStateT (replaced, mempty) $
-    for (Map.keys globals) $ prunePackageWithDeps globals condCheck
+    -> (Map PackageName [PackageName], Map PackageName a)
+partitionReplacedDependencies globals getName getId getDeps overrides =
+  flip execState (replaced, mempty) $
+    for (Map.toList globals) $ prunePackageWithDeps globals' getName getDeps
   where
+    globals' = Map.fromList $ map (getId &&& id) (Map.elems globals)
     replaced = Map.map (const []) $ Map.restrictKeys globals overrides
 
 prunePackageWithDeps ::
-       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => Map PackageName Version
-    -> (D.ConfVar -> Either D.ConfVar Bool)
-    -> PackageName
-    -> StateT (Map PackageName [PackageName], Map PackageName Version) (RIO env) Bool
-prunePackageWithDeps pkgs condCheck pname = do
+       Ord id
+    => Map id a
+    -> (a -> PackageName)
+    -> (a -> [id])
+    -> (PackageName, a)
+    -> State (Map PackageName [PackageName], Map PackageName a) Bool
+prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
   (pruned, kept) <- get
   if Map.member pname pruned
   then return True
   else if Map.member pname kept
     then return False
     else do
-      version <- case Map.lookup pname pkgs of
-        Just v -> return v
-        Nothing -> error $ "Missing package version" ++ show (pname, pruned, kept, pkgs)
-      mrev <- lift $ getLatestHackageRevision pname version
-      prunedDeps <- case mrev of
-        Nothing -> do
-          -- wired-in package
-          return mempty
-        Just (_, blobKey, treeKey) -> do
-          gpd <- lift $ loadCabalFileImmutable $
-                 PLIHackage (PackageIdentifier pname version) blobKey treeKey
-          let deps = maybe mempty (fst . simplifyCondTree condCheck) $ D.condLibrary gpd
-          forMaybeM deps $ \dep -> do
-            let depName = depPkgName dep
-            isPruned <- prunePackageWithDeps pkgs condCheck depName
-            pure $ if isPruned then Just depName else Nothing
+      let deps = Map.elems $ Map.restrictKeys pkgs (Set.fromList $ getDeps a)
+      prunedDeps <- forMaybeM deps $ \dep -> do
+        let depName = getName dep
+        isPruned <- prunePackageWithDeps pkgs getName getDeps (depName, dep)
+        pure $ if isPruned then Just depName else Nothing
       if null prunedDeps
       then do
-        modify' $ second (Map.insert pname version)
+        modify' $ second (Map.insert pname a)
       else do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)

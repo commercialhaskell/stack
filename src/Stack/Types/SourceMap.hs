@@ -16,6 +16,7 @@ module Stack.Types.SourceMap
   , DepPackage (..)
   , ProjectPackage (..)
   , CommonPackage (..)
+  , GlobalPackageVersion (..)
   , GlobalPackage (..)
   , isReplacedGlobal
   , SourceMapHash (..)
@@ -92,12 +93,14 @@ data SMWanted = SMWanted
 -- the contents of the global package database.
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
-data SMActual = SMActual
+data SMActual a = SMActual
   { smaCompiler :: !ActualCompiler
   , smaProject :: !(Map PackageName ProjectPackage)
   , smaDeps :: !(Map PackageName DepPackage)
-  , smaGlobal :: !(Map PackageName GlobalPackage)
+  , smaGlobal :: !(Map PackageName a)
   }
+
+newtype GlobalPackageVersion = GlobalPackageVersion Version
 
 -- | How a package is intended to be built
 data Target

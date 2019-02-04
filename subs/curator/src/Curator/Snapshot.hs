@@ -9,16 +9,24 @@ module Curator.Snapshot
 import Curator.GithubPings
 import Curator.Types
 import Distribution.Compiler (CompilerFlavor(..))
+import Distribution.InstalledPackageInfo (InstalledPackageInfo(..))
 import qualified Distribution.PackageDescription as C
+import Distribution.Simple.Compiler (PackageDB(GlobalPackageDB))
+import Distribution.Simple.GHC (hcPkgInfo)
+import Distribution.Simple.Program.Builtin (ghcProgram)
+import Distribution.Simple.Program.Db
+       (configureAllKnownPrograms, defaultProgramDb, lookupProgramVersion)
+import Distribution.Simple.Program.HcPkg (dump)
 import Distribution.System (Arch(..), OS(..))
 import qualified Distribution.Text as DT
 import qualified Distribution.Types.CondTree as C
 import Distribution.Types.Dependency (depPkgName, depVerRange, Dependency(..))
 import Distribution.Types.ExeDependency (ExeDependency(..))
+import Distribution.Types.UnitId
 import Distribution.Types.UnqualComponentName (unqualComponentNameToPackageName)
-import Distribution.Types.VersionRange (withinRange, VersionRange)
+import Distribution.Types.VersionRange (thisVersion, withinRange, VersionRange)
+import Distribution.Verbosity (silent)
 import Pantry
-import Path.IO (resolveFile')
 import RIO hiding (display)
 import RIO.List (find, partition)
 import qualified RIO.Map as Map
@@ -127,25 +135,18 @@ checkDependencyGraph ::
     -> RawSnapshot
     -> RIO env ()
 checkDependencyGraph constraints snapshot = do
-    globalHintsYaml <- resolveFile' "global-hints.yaml"
     let compiler = rsCompiler snapshot
         compilerVer = case compiler of
           WCGhc v -> v
           WCGhcjs _ _ -> error "GHCJS is not supported"
-    mhints <- loadGlobalHints globalHintsYaml compiler
-    ghcBootPackages0 <- case mhints of
-      Nothing ->
-        error $ "Cannot load global hints for GHC " <> DT.display compilerVer
-      Just hints ->
-        pure hints
     let snapshotPackages =
             Map.fromList
                 [ (pn, snapshotVersion (rspLocation sp))
                 | (pn, sp) <- Map.toList (rsPackages snapshot)
                 ]
-    (_pruned, ghcBootPackages) <-
-      partitionReplacedDependencies ghcBootPackages0 (Map.keysSet snapshotPackages) basicCheck
-    let declared = snapshotPackages <> Map.map Just ghcBootPackages
+    ghcBootPackages0 <- liftIO $ getBootPackages compilerVer
+    let ghcBootPackages = prunedBootPackages ghcBootPackages0 (Map.keysSet snapshotPackages)
+        declared = snapshotPackages <> Map.map (Just . bpVersion) ghcBootPackages
         cabalName = "Cabal"
         cabalError err = pure . Map.singleton cabalName $ [OtherError err]
     pkgErrors <- case Map.lookup cabalName declared of
@@ -154,12 +155,20 @@ checkDependencyGraph constraints snapshot = do
       Just Nothing ->
         cabalError "Cabal version in snapshot is not defined"
       Just (Just cabalVersion) -> do
-        pkgInfos <- Map.traverseWithKey (getPkgInfo constraints compilerVer)
-                    (rsPackages snapshot)
-        let depTree =
-              Map.map (piVersion &&& piTreeDeps) pkgInfos
-              <> Map.map ((, []) . Just) ghcBootPackages
-        return $ Map.mapWithKey (validatePackage constraints depTree cabalVersion) pkgInfos
+        let isWiredIn pn _ = pn `Set.member` wiredInGhcPackages
+            (wiredIn, packages) =
+              Map.partitionWithKey isWiredIn (rsPackages snapshot)
+        if not (Map.null wiredIn)
+        then do
+          let errMsg = "GHC wired-in package can not be overriden"
+          pure $ Map.map (const [OtherError errMsg]) wiredIn
+        else do
+          pkgInfos <- Map.traverseWithKey (getPkgInfo constraints compilerVer)
+                      packages
+          let depTree =
+                Map.map (piVersion &&& piTreeDeps) pkgInfos
+                <> Map.map ((, []) . Just . bpVersion) ghcBootPackages
+          return $ Map.mapWithKey (validatePackage constraints depTree cabalVersion) pkgInfos
     let (rangeErrors, otherErrors) = splitErrors pkgErrors
         rangeErrors' =
           Map.mapWithKey (\(pname, _, _) bs -> (Map.member pname ghcBootPackages0, bs)) rangeErrors
@@ -311,11 +320,6 @@ targetArch = X86_64
 
 targetFlavor :: CompilerFlavor
 targetFlavor = GHC
-
-basicCheck :: C.ConfVar -> Either C.ConfVar Bool
-basicCheck (C.OS os) = return $ os == targetOS
-basicCheck (C.Arch arch) = return $ arch == targetArch
-basicCheck c = Left c
 
 checkConditions ::
        (Monad m)
@@ -483,3 +487,52 @@ occursCheck allPackages = go
                                  | pname' /= pname -> go pname' deps' seen'
                              _ -> []
             where seen' = Set.insert pname seen
+
+data BootPackage = BootPackage
+    { bpName :: !PackageName
+    , bpVersion :: !Version
+    , bpId :: !UnitId
+    , bpDepends :: ![UnitId]
+    }
+
+getBootPackages :: Version -> IO (Map PackageName BootPackage)
+getBootPackages ghcVersion = do
+    db <- configureAllKnownPrograms silent defaultProgramDb
+    rslt <- lookupProgramVersion silent ghcProgram (thisVersion ghcVersion) db
+    case rslt of
+      Left err -> error $ "Can't get proper GHC version: " ++ err
+      Right _ -> return ()
+    let toBootPackage ipi =
+          let PackageIdentifier name version = sourcePackageId ipi
+          in (name, BootPackage name version (installedUnitId ipi) (depends ipi))
+    Map.fromList . map toBootPackage <$> dump (hcPkgInfo db) silent GlobalPackageDB
+
+prunedBootPackages ::
+       Map PackageName BootPackage
+    -> Set PackageName
+    -> Map PackageName BootPackage
+prunedBootPackages ghcBootPackages0 overrides =
+    snd $
+    partitionReplacedDependencies
+        ghcBootPackages0
+        bpName
+        bpId
+        bpDepends
+        overrides
+
+-- | GHC wired-in packages, list taken from Stack.Constants
+-- see also ghc\/compiler\/basicTypes\/Module.hs
+wiredInGhcPackages :: Set PackageName
+wiredInGhcPackages =
+    Set.fromList
+        [ "ghc-prim"
+        , "integer-gmp"
+        , "integer-simple"
+        , "base"
+        , "rts"
+        , "template-haskell"
+        , "dph-seq"
+        , "dph-par"
+        , "ghc"
+        , "interactive"
+        ]
