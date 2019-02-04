@@ -162,12 +162,14 @@ printTree opts depth remainingDepsCounts packages dependencyMap = do
   where
     toSeq = Seq.fromList . Set.toList
     go index name = let newDepsCounts = remainingDepsCounts ++ [Set.size packages - index - 1]
-                        (deps, payload) = (Map.!) dependencyMap name
-                     in do
+                     in
+                      case Map.lookup name dependencyMap of
+                        Just (deps, payload) -> do
                           printTreeNode opts depth newDepsCounts deps payload name
                           if Just depth == dotDependencyDepth (listDepsDotOpts opts)
                              then return ()
                              else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+                        Nothing -> return ()
 
 printTreeNode :: ListDepsOpts
               -> Int
