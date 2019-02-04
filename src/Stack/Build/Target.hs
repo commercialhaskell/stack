@@ -325,7 +325,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                     , rrPackageType = PTDependency
                     }
 
-    -- Note that we use CFILatest below, even though it's
+    -- Note that we use getLatestHackageRevision below, even though it's
     -- non-reproducible, to avoid user confusion. In any event,
     -- reproducible builds should be done by updating your config
     -- files!
