@@ -261,10 +261,11 @@ do_windows_install() {
   make_temp_dir
   dl_to_file "http://www.stackage.org/stack/windows-x86_64" "$STACK_TEMP_DIR/stack.zip"
   if [ "$(basename $DEST)" != "stack" ]; then
+    # should never happen, the -d flag appends stack itself
     die "Currently the destination must always end with 'stack' on Windows, got: $DEST"
   fi
   if ! 7z x $STACK_TEMP_DIR/stack.zip stack.exe "-o$(dirname $DEST)"; then
-    die "Extract zip file installed, you probably don't have 7z installed"
+    die "Extract zip file failed, you probably don't have 7z installed"
   fi
   post_install_separator
   info "Stack has been installed to: $DEST"
