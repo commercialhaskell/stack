@@ -10,7 +10,7 @@ module Stack.GhcPkg
   (getGlobalDB
   ,findGhcPkgField
   ,createDatabase
-  ,unregisterGhcPkgId
+  ,unregisterGhcPkgIds
   ,getCabalPkgVer
   ,ghcPkgExeName
   ,ghcPkgPathEnvVar
@@ -21,9 +21,9 @@ import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List
+import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Distribution.Version (mkVersion)
 import           Path (parent, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -147,25 +147,24 @@ findGhcPkgVersion wc pkgDbs name = do
         Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
-unregisterGhcPkgId :: (HasProcessContext env, HasLogFunc env)
+-- | unregister list of package ghcids, batching available from GHC 8.0.1,
+-- using GHC package id where available (from GHC 7.9)
+unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
-                    -> ActualCompiler
                     -> Path Abs Dir -- ^ package database
-                    -> GhcPkgId
-                    -> PackageIdentifier
+                    -> NonEmpty (Either PackageIdentifier GhcPkgId)
                     -> RIO env ()
-unregisterGhcPkgId wc cv pkgDb gid ident = do
+unregisterGhcPkgIds wc pkgDb epgids = do
     eres <- ghcPkg wc [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
-    -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = "unregister" : "--user" : "--force" :
-        (case cv of
-            ACGhc v | v < mkVersion [7, 9] ->
-                [packageIdentifierString ident]
-            _ -> ["--ipid", ghcPkgIdString gid])
+        concatMap (either
+            (\ident -> [packageIdentifierString ident])
+            (\gid -> ["--ipid", ghcPkgIdString gid]))
+            epgids
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (HasProcessContext env, HasLogFunc env)
