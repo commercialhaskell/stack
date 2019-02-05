@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 097f1c956c3050b63f58c0a2ce38f9eebb02d7e1bfabc081d945a42936608f8b
+-- hash: e07cbc430962c6f97d47cabc25ad162a437b0286c8c77ff49ce54337ebedac86
 
 name:           pantry
 version:        0.1.0.0
@@ -82,6 +82,7 @@ library
     , integer-gmp
     , memory
     , mono-traversable
+    , mtl
     , network
     , network-uri
     , path
@@ -181,6 +182,7 @@ test-suite spec
     , integer-gmp
     , memory
     , mono-traversable
+    , mtl
     , network
     , network-uri
     , pantry
