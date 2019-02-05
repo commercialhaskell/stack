@@ -93,11 +93,11 @@ data SMWanted = SMWanted
 -- the contents of the global package database.
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
-data SMActual a = SMActual
+data SMActual global = SMActual
   { smaCompiler :: !ActualCompiler
   , smaProject :: !(Map PackageName ProjectPackage)
   , smaDeps :: !(Map PackageName DepPackage)
-  , smaGlobal :: !(Map PackageName a)
+  , smaGlobal :: !(Map PackageName global)
   }
 
 newtype GlobalPackageVersion = GlobalPackageVersion Version
