@@ -10,7 +10,6 @@ module Stack.GhcPkg
   (getGlobalDB
   ,findGhcPkgField
   ,createDatabase
-  ,unregisterSinglePackageId
   ,unregisterGhcPkgIds
   ,getCabalPkgVer
   ,ghcPkgExeName
@@ -147,35 +146,24 @@ findGhcPkgVersion wc pkgDbs name = do
         Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
 
-unregisterSinglePackageId :: (HasProcessContext env, HasLogFunc env)
-                          => WhichCompiler
-                          -> Path Abs Dir -- ^ package database
-                          -> PackageIdentifier
-                          -> RIO env ()
-unregisterSinglePackageId wc pkgDb ident = do
-    eres <- ghcPkg wc [pkgDb] args
-    case eres of
-        Left e -> logWarn $ displayShow e
-        Right _ -> return ()
-  where
-    args = "unregister" : "--user" : "--force" :
-           [packageIdentifierString ident]
-
 -- | unregister list of package ghcids, batching available from GHC 8.0.1,
--- using GHC package id available from GHC 7.9(?)
+-- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
                     -> Path Abs Dir -- ^ package database
-                    -> [GhcPkgId]
+                    -> [Either PackageIdentifier GhcPkgId]
                     -> RIO env ()
-unregisterGhcPkgIds wc pkgDb gids = do
+unregisterGhcPkgIds wc pkgDb epgids = do
     eres <- ghcPkg wc [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
     args = "unregister" : "--user" : "--force" :
-        concatMap (\gid -> ["--ipid", ghcPkgIdString gid]) gids
+        concatMap (either
+            (\ident -> [packageIdentifierString ident])
+            (\gid -> ["--ipid", ghcPkgIdString gid]))
+            epgids
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (HasProcessContext env, HasLogFunc env)

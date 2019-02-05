@@ -585,7 +585,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            unregisterPackages wc cv localDB ids
+            unregisterPackages cv localDB ids
 
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
@@ -657,19 +657,25 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
 unregisterPackages ::
        (HasProcessContext env, HasLogFunc env, HasPlatform env)
-    => WhichCompiler
-    -> ActualCompiler
+    => ActualCompiler
     -> Path Abs Dir
     -> [(GhcPkgId, (PackageIdentifier, Text))]
     -> RIO env ()
-unregisterPackages wc ac localDB ids = do
+unregisterPackages cv localDB ids = do
+    let wc = view whichCompilerL cv
     let logReason ident reason =
             logInfo $
             fromString (packageIdentifierString ident) <> ": unregistering" <>
             if T.null reason
                 then ""
                 else " (" <> RIO.display reason <> ")"
-    case ac of
+    let unregisterSinglePkg select (gid, (ident, reason)) = do
+            logReason ident reason
+            unregisterGhcPkgIds wc localDB [select ident gid]
+
+    case cv of
+        -- GHC versions >= 8.0.1 support batch unregistering of packages. See
+        -- https://github.com/commercialhaskell/stack/pull/4554
         ACGhc v | v >= mkVersion [8, 0, 1] -> do
                 platform <- view platformL
                 -- According to https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
@@ -683,15 +689,13 @@ unregisterPackages wc ac localDB ids = do
                       _ -> 500
                 for_ (chunksOf batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    unregisterGhcPkgIds wc localDB $ map fst batch
-        ACGhc v | v >= mkVersion [7, 9] ->
-                for_ ids $ \(gid, (ident, reason)) -> do
-                    logReason ident reason
-                    unregisterGhcPkgIds wc localDB [gid]
-        _ -> do
-            for_ ids $ \(_gid, (ident, reason)) -> do
-                logReason ident reason
-                unregisterSinglePackageId wc localDB ident
+                    unregisterGhcPkgIds wc localDB $ map (Right . fst) batch
+
+        -- GHC versions >= 7.9 support unregistering of packages via their
+        -- GhcPkgId.
+        ACGhc v | v >= mkVersion [7, 9] -> for_ ids . unregisterSinglePkg $ \_ident gid -> Right gid
+
+        _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
 
 toActions :: HasEnvConfig env
           => InstalledMap
