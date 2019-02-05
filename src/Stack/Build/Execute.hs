@@ -656,7 +656,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ planUnregisterLocal plan
 
 unregisterPackages ::
-       (HasProcessContext env, HasLogFunc env)
+       (HasProcessContext env, HasLogFunc env, HasPlatform env)
     => WhichCompiler
     -> ActualCompiler
     -> Path Abs Dir
@@ -671,7 +671,16 @@ unregisterPackages wc ac localDB ids = do
                 else " (" <> RIO.display reason <> ")"
     case ac of
         ACGhc v | v >= mkVersion [8, 0, 1] -> do
-                let batchSize = 500
+                platform <- view platformL
+                -- According to https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
+                -- the maximum command line length on Windows since XP is 8191 characters.
+                -- We use conservative batch size of 100 ids on this OS thus argument name '-ipid', package name,
+                -- its version and a hash should fit well into this limit.
+                -- On Unix-like systems we're limited by ARG_MAX which is normally hundreds
+                -- of kilobytes so batch size of 500 should work fine.
+                let batchSize = case platform of
+                      Platform _ Windows -> 100
+                      _ -> 500
                 for_ (chunksOf batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
                     unregisterGhcPkgIds wc localDB $ map fst batch
