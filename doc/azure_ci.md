@@ -4,10 +4,10 @@
 
 This page documents how to use Stack on [Azure
 CI](http://dev.azure.com/). We assume you have basic familiarity with
-Azure. We provide two fully baked example files ready to be used on
-your projects:
+Azure Pipelines. We provide two fully baked example files ready to be
+used on your projects:
 
-* [The simple Azure configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-simple.yml)
+* [The simple Azure configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
   is intended for applications that do not require multiple GHC
   support or cross-platform support. It builds and tests your project
   with just the settings present in your `stack.yaml` file.
@@ -21,10 +21,10 @@ your projects:
   cabal-install and stack. The macOS and Windows configuration is used
   only for testing Stack build configuration. These are the files for
   the complex configuration:
-  - [azure-pipelines.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-pipelines.yml) : This is the starter file used by the Azure CI.
-  - [azure-linux-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-linux-template.yml) : Template for Azure Linux build
-  - [azure-osx-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-osx-template.yml) : Template for Azure macOS build
-  - [azure-windows-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-windows-template.yml) : Template for Azure Windows build
+  - [azure-pipelines.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-pipelines.yml) : This is the starter file used by the Azure CI.
+  - [azure-linux-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-linux-template.yml) : Template for Azure Linux build
+  - [azure-osx-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-osx-template.yml) : Template for Azure macOS build
+  - [azure-windows-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-windows-template.yml) : Template for Azure Windows build
 
   __NOTE__: It is likely going to be necessary to modify this configuration to
   match the needs of your project, such as tweaking the build matrix to alter
@@ -34,7 +34,7 @@ your projects:
 
 Each of these configurations is ready to be used immediately. Steps to make them work:
 * For simple Azure configuration, copy-paste the
-  [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-simple.yml)
+  [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
   file into `azure-pipelines.yml` in the root of your repository.
 * For complex Azure configuration, you need to take the above four
 files and put them in the root of your repository.
@@ -51,7 +51,7 @@ configuration files or write your own.
 
 ## Infrastructure
 
-Note that you need atleast one agent to build your code. You can
+Note that you need at least one agent to build your code. You can
 specify which virtual image you want to choose using this configuration:
 
 ``` yaml
@@ -91,7 +91,7 @@ There are two ways to install GHC:
   for Debian based images.
 
 See the [simple azure
-script](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/.azure/azure-simple.yml)
+script](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
 for an example of the first option (letting Stack download GHC). Here,
 we will show the second option:
 
