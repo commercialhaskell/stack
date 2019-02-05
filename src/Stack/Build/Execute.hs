@@ -689,7 +689,7 @@ unregisterPackages cv localDB ids = do
                 let batchSize = case platform of
                       Platform _ Windows -> 100
                       _ -> 500
-                let chunksOfNE size = catMaybes . map nonEmpty . chunksOf size . NonEmpty.toList
+                let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
                 for_ (chunksOfNE batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
                     unregisterGhcPkgIds wc localDB $ fmap (Right . fst) batch
