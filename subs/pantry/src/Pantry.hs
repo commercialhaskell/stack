@@ -1476,11 +1476,11 @@ loadGlobalHints dest wc =
 -- @since 0.1.0.0
 partitionReplacedDependencies ::
        Ord id
-    => Map PackageName a
-    -> (a -> PackageName)
-    -> (a -> id)
-    -> (a -> [id])
-    -> Set PackageName
+    => Map PackageName a -- ^ global packages
+    -> (a -> PackageName) -- ^ package name getter
+    -> (a -> id) -- ^ returns unique package id used for dependency pruning
+    -> (a -> [id]) -- ^ returns unique package ids of direct package dependencies
+    -> Set PackageName -- ^ overrides which global dependencies should get pruned
     -> (Map PackageName [PackageName], Map PackageName a)
 partitionReplacedDependencies globals getName getId getDeps overrides =
   flip execState (replaced, mempty) $
