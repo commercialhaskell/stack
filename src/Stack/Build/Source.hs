@@ -70,7 +70,7 @@ localDependencies = do
 loadSourceMap :: HasBuildConfig env
               => SMTargets
               -> BuildOptsCLI
-              -> SMActual
+              -> SMActual DumpedGlobalPackage
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
     bconfig <- view buildConfigL
@@ -100,12 +100,12 @@ loadSourceMap smt boptsCli sma = do
                          then boptsHaddock bopts
                          else shouldHaddockDeps bopts
                }
-        globals = smaGlobal sma `M.difference` smtDeps smt
         packageCliFlags = Map.fromList $
           mapMaybe maybeProjectFlags $
           Map.toList (boptsCLIFlags boptsCli)
         maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
         maybeProjectFlags _ = Nothing
+        globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     smh <- hashSourceMapData (whichCompiler compiler) deps
     return

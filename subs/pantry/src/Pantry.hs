@@ -159,10 +159,12 @@ module Pantry
   , getLatestHackageRevision
   , getHackageTypoCorrections
   , loadGlobalHints
+  , partitionReplacedDependencies
   ) where
 
 import RIO
 import Conduit
+import Control.Monad.State.Strict (State, execState, get, modify')
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import qualified RIO.ByteString as B
@@ -1467,3 +1469,48 @@ loadGlobalHints dest wc =
     inner2 = liftIO
            $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
          <$> Yaml.decodeFileThrow (toFilePath dest)
+
+-- | Partition a map of global packages with its versions into a Set of
+-- replaced packages and its dependencies and a map of remaining (untouched) packages.
+--
+-- @since 0.1.0.0
+partitionReplacedDependencies ::
+       Ord id
+    => Map PackageName a -- ^ global packages
+    -> (a -> PackageName) -- ^ package name getter
+    -> (a -> id) -- ^ returns unique package id used for dependency pruning
+    -> (a -> [id]) -- ^ returns unique package ids of direct package dependencies
+    -> Set PackageName -- ^ overrides which global dependencies should get pruned
+    -> (Map PackageName [PackageName], Map PackageName a)
+partitionReplacedDependencies globals getName getId getDeps overrides =
+  flip execState (replaced, mempty) $
+    for (Map.toList globals) $ prunePackageWithDeps globals' getName getDeps
+  where
+    globals' = Map.fromList $ map (getId &&& id) (Map.elems globals)
+    replaced = Map.map (const []) $ Map.restrictKeys globals overrides
+
+prunePackageWithDeps ::
+       Ord id
+    => Map id a
+    -> (a -> PackageName)
+    -> (a -> [id])
+    -> (PackageName, a)
+    -> State (Map PackageName [PackageName], Map PackageName a) Bool
+prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
+  (pruned, kept) <- get
+  if Map.member pname pruned
+  then return True
+  else if Map.member pname kept
+    then return False
+    else do
+      let deps = Map.elems $ Map.restrictKeys pkgs (Set.fromList $ getDeps a)
+      prunedDeps <- forMaybeM deps $ \dep -> do
+        let depName = getName dep
+        isPruned <- prunePackageWithDeps pkgs getName getDeps (depName, dep)
+        pure $ if isPruned then Just depName else Nothing
+      if null prunedDeps
+      then do
+        modify' $ second (Map.insert pname a)
+      else do
+        modify' $ first (Map.insert pname prunedDeps)
+      return $ not (null prunedDeps)
