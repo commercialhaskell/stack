@@ -16,6 +16,7 @@ Major changes:
     * Support for archives and repos in the `packages` section has
       been removed. Instead, you must use `extra-deps` for such
       dependencies. `packages` now only supports local filepaths.
+    * Add support for Git repositories containing (recursive) submodules.
     * Addition of new configuration options for specifying a "pantry
       tree" key, which provides more reproducibility around builds,
       and (in the future) will be used for more efficient package
