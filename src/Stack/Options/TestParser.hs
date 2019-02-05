@@ -37,7 +37,7 @@ testOptsParser hide0 =
                      help "Disable running of tests. (Tests will still be built.)" <>
                      hide))
         <*> optionalFirst
-                (option (fmap Just $ auto)
+                (option (fmap Just auto)
                     (long "test-suite-timeout" <>
                      help "Maximum test suite run time in seconds." <>
                      hide))

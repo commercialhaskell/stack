@@ -1414,7 +1414,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
                 _ -> fulfillCuratorExpectations pname mcurator enableTests enableBenchmarks Nothing $
-                     fmap Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
+                     Just <$> realBuild cache package pkgDir cabal announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
