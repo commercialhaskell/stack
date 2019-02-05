@@ -21,6 +21,7 @@ import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List
+import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (parent, (</>))
@@ -151,7 +152,7 @@ findGhcPkgVersion wc pkgDbs name = do
 unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env)
                     => WhichCompiler
                     -> Path Abs Dir -- ^ package database
-                    -> [Either PackageIdentifier GhcPkgId]
+                    -> NonEmpty (Either PackageIdentifier GhcPkgId)
                     -> RIO env ()
 unregisterGhcPkgIds wc pkgDb epgids = do
     eres <- ghcPkg wc [pkgDb] args

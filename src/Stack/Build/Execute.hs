@@ -41,6 +41,8 @@ import           Data.Conduit.Process.Typed
                      runProcess_, getStdout, getStderr, createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
+import           Data.List.NonEmpty (NonEmpty(..), nonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty (toList)
 import           Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -581,9 +583,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
     cv <- view actualCompilerVersionL
     let wc = view whichCompilerL cv
-    case Map.toList $ planUnregisterLocal plan of
-        [] -> return ()
-        ids -> do
+    case nonEmpty . Map.toList $ planUnregisterLocal plan of
+        Nothing -> return ()
+        Just ids -> do
             localDB <- packageDatabaseLocal
             unregisterPackages cv localDB ids
 
@@ -659,7 +661,7 @@ unregisterPackages ::
        (HasProcessContext env, HasLogFunc env, HasPlatform env)
     => ActualCompiler
     -> Path Abs Dir
-    -> [(GhcPkgId, (PackageIdentifier, Text))]
+    -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
     -> RIO env ()
 unregisterPackages cv localDB ids = do
     let wc = view whichCompilerL cv
@@ -671,7 +673,7 @@ unregisterPackages cv localDB ids = do
                 else " (" <> RIO.display reason <> ")"
     let unregisterSinglePkg select (gid, (ident, reason)) = do
             logReason ident reason
-            unregisterGhcPkgIds wc localDB [select ident gid]
+            unregisterGhcPkgIds wc localDB $ select ident gid :| []
 
     case cv of
         -- GHC versions >= 8.0.1 support batch unregistering of packages. See
@@ -687,9 +689,10 @@ unregisterPackages cv localDB ids = do
                 let batchSize = case platform of
                       Platform _ Windows -> 100
                       _ -> 500
-                for_ (chunksOf batchSize ids) $ \batch -> do
+                let chunksOfNE size = catMaybes . map nonEmpty . chunksOf size . NonEmpty.toList
+                for_ (chunksOfNE batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    unregisterGhcPkgIds wc localDB $ map (Right . fst) batch
+                    unregisterGhcPkgIds wc localDB $ fmap (Right . fst) batch
 
         -- GHC versions >= 7.9 support unregistering of packages via their
         -- GhcPkgId.
