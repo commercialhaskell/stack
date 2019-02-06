@@ -146,10 +146,10 @@ listDependencies opts = do
       where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
-treeRoots opts defaults = let targets = dotTargets $ listDepsDotOpts opts
-                     in if null targets
-                           then defaults
-                           else Set.fromList $ map (mkPackageName . Text.unpack) targets
+treeRoots opts projectPackages = let targets = dotTargets $ listDepsDotOpts opts
+                                  in if null targets
+                                        then projectPackages
+                                        else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
 printTree :: ListDepsOpts
           -> Int
@@ -157,7 +157,7 @@ printTree :: ListDepsOpts
           -> Set PackageName
           -> Map PackageName (Set PackageName, DotPayload)
           -> IO ()
-printTree opts depth remainingDepsCounts packages dependencyMap = do
+printTree opts depth remainingDepsCounts packages dependencyMap =
   F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
   where
     toSeq = Seq.fromList . Set.toList
