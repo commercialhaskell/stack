@@ -211,7 +211,7 @@ data ResolveResult = ResolveResult
 -- the module).
 resolveRawTarget ::
        (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
-    => SMActual
+    => SMActual GlobalPackage
     -> Map PackageName PackageLocation
     -> (RawInput, RawTarget)
     -> RIO env (Either Text ResolveResult)
@@ -304,28 +304,15 @@ resolveRawTarget sma allLocs (ri, rt) =
           , rrAddedDep = Nothing
           , rrPackageType = PTProject
           }
-      | Map.member name deps ||
-        Map.member name globals = return $ Right ResolveResult
-          { rrName = name
-          , rrRaw = ri
-          , rrComponent = Nothing
-          , rrAddedDep = Nothing
-          , rrPackageType = PTDependency
-          }
-      | otherwise = do
-          mloc <- getLatestHackageLocation name UsePreferredVersions
-          pure $ case mloc of
-            Nothing -> deferToConstructPlan name
-            Just loc -> do
-              Right ResolveResult
-                    { rrName = name
-                    , rrRaw = ri
-                    , rrComponent = Nothing
-                    , rrAddedDep = Just loc
-                    , rrPackageType = PTDependency
-                    }
+      | Map.member name deps =
+          pure $ deferToConstructPlan name
+      | Just gp <- Map.lookup name globals =
+          case gp of
+              GlobalPackage _ -> pure $ deferToConstructPlan name
+              ReplacedGlobalPackage _ -> hackageLatest name
+      | otherwise = hackageLatest name
 
-    -- Note that we use CFILatest below, even though it's
+    -- Note that we use getLatestHackageRevision below, even though it's
     -- non-reproducible, to avoid user confusion. In any event,
     -- reproducible builds should be done by updating your config
     -- files!
@@ -341,20 +328,10 @@ resolveRawTarget sma allLocs (ri, rt) =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLImmutable (PLIHackage (PackageIdentifier _name versionLoc) cfKey treeKey)) ->
-              pure $ Right ResolveResult
-                  { rrName = name
-                  , rrRaw = ri
-                  , rrComponent = Nothing
-                  , rrAddedDep =
-                      if version == versionLoc
-                        -- But no need to override anyway, this is already the
-                        -- version we have
-                        then Nothing
-                        -- OK, we'll override it
-                        else Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
-                  , rrPackageType = PTDependency
-                  }
+            Just (PLImmutable (PLIHackage (PackageIdentifier _name versionLoc) _cfKey _treeKey)) ->
+              if version == versionLoc
+              then pure $ deferToConstructPlan name
+              else hackageLatestRevision name version
             -- The package was coming from something besides the
             -- index, so refuse to do the override
             Just loc' -> pure $ Left $ T.concat
@@ -376,6 +353,31 @@ resolveRawTarget sma allLocs (ri, rt) =
                   , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
                   , rrPackageType = PTDependency
                   }
+
+    hackageLatest name = do
+        mloc <- getLatestHackageLocation name UsePreferredVersions
+        pure $ case mloc of
+          Nothing -> deferToConstructPlan name
+          Just loc -> do
+            Right ResolveResult
+                  { rrName = name
+                  , rrRaw = ri
+                  , rrComponent = Nothing
+                  , rrAddedDep = Just loc
+                  , rrPackageType = PTDependency
+                  }
+
+    hackageLatestRevision name version = do
+        mrev <- getLatestHackageRevision name version
+        pure $ case mrev of
+          Nothing -> deferToConstructPlan name
+          Just (_rev, cfKey, treeKey) -> Right ResolveResult
+            { rrName = name
+            , rrRaw = ri
+            , rrComponent = Nothing
+            , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+            , rrPackageType = PTDependency
+            }
 
     -- This is actually an error case. We _could_ return a
     -- Left value here, but it turns out to be better to defer
@@ -432,7 +434,7 @@ parseTargets :: HasBuildConfig env
     => NeedTargets
     -> Bool
     -> BuildOptsCLI
-    -> SMActual
+    -> SMActual GlobalPackage
     -> RIO env SMTargets
 parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
@@ -444,19 +446,10 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let deps = smaDeps smActual
-      globals = smaGlobal smActual
-      latestGlobal name gp = do
-        let version = gpVersion gp
-        mrev <- getLatestHackageRevision name version
-        forM mrev $ \(_rev, cfKey, treeKey) -> do
-          let ident = PackageIdentifier name version
-          pure $ PLImmutable (PLIHackage ident cfKey treeKey)
-  globalLocs <- Map.traverseMaybeWithKey latestGlobal globals
-  let allLocs = Map.union globalLocs (Map.map dpLocation deps)
+  let depLocs = Map.map dpLocation $ smaDeps smActual
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget smActual allLocs
+    resolveRawTarget smActual depLocs
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
