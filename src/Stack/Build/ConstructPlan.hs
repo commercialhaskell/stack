@@ -423,15 +423,13 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             let version = installedVersion installed
-                            mrev <- liftRIO $ getLatestHackageRevision name version
-                            case mrev of
-                              Nothing -> error $ "No package revision found for: " <> show name
-                              Just (_rev, cfKey, treeKey) ->
-                                tellExecutablesUpstream
-                                  name
-                                  (PLIHackage (PackageIdentifier name version) cfKey treeKey)
-                                  loc
-                                  Map.empty
+                                askPkgLoc = liftRIO $ do
+                                  mrev <- getLatestHackageRevision name version
+                                  case mrev of
+                                    Nothing -> error $ "No package revision found for: " <> show name
+                                    Just (_rev, cfKey, treeKey) ->
+                                      return $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+                            tellExecutablesUpstream name askPkgLoc loc Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
@@ -450,12 +448,13 @@ tellExecutables _name (PSFilePath lp)
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
-    tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
+    tellExecutablesUpstream name (pure pkgloc) Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name pkgloc loc flags = do
+tellExecutablesUpstream :: PackageName -> M PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
+tellExecutablesUpstream name retrievePkgloc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
+        pkgloc <- retrievePkgloc
         p <- loadPackage ctx pkgloc flags []
         tellExecutablesPackage loc p
 
