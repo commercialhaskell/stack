@@ -425,7 +425,11 @@ addDep treatAsDep' name = do
                             let version = installedVersion installed
                             mrev <- liftRIO $ getLatestHackageRevision name version
                             case mrev of
-                              Nothing -> error $ "No package revision found for: " <> show name
+                              Nothing ->
+                                -- this could happen for GHC boot libraries missing from Hackage
+                                logWarn $ "No latest package revision found for: " <>
+                                    fromString (packageNameString name) <> ", dependency callstack: " <>
+                                    displayShow (map packageNameString $ callStack ctx)
                               Just (_rev, cfKey, treeKey) ->
                                 tellExecutablesUpstream
                                   name
