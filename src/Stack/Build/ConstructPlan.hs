@@ -426,9 +426,15 @@ addDep treatAsDep' name = do
                                 askPkgLoc = liftRIO $ do
                                   mrev <- getLatestHackageRevision name version
                                   case mrev of
-                                    Nothing -> error $ "No package revision found for: " <> show name
+                                    Nothing -> do
+                                      -- this could happen for GHC boot libraries missing from Hackage
+                                      logWarn $ "No latest package revision found for: " <>
+                                          fromString (packageNameString name) <> ", dependency callstack: " <>
+                                          displayShow (map packageNameString $ callStack ctx)
+                                      return Nothing
                                     Just (_rev, cfKey, treeKey) ->
-                                      return $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+                                      return . Just $
+                                          PLIHackage (PackageIdentifier name version) cfKey treeKey
                             tellExecutablesUpstream name askPkgLoc loc Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
@@ -448,15 +454,21 @@ tellExecutables _name (PSFilePath lp)
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
-    tellExecutablesUpstream name (pure pkgloc) Snap (cpFlags cp)
+    tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> M PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name retrievePkgloc loc flags = do
+tellExecutablesUpstream ::
+       PackageName
+    -> M (Maybe PackageLocationImmutable)
+    -> InstallLocation
+    -> Map FlagName Bool
+    -> M ()
+tellExecutablesUpstream name retrievePkgLoc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
-        pkgloc <- retrievePkgloc
-        p <- loadPackage ctx pkgloc flags []
-        tellExecutablesPackage loc p
+        mPkgLoc <- retrievePkgLoc
+        forM_ mPkgLoc $ \pkgLoc -> do
+            p <- loadPackage ctx pkgLoc flags []
+            tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
