@@ -3,8 +3,27 @@
 # Azure CI
 
 This page documents how to use Stack on [Azure
-CI](http://dev.azure.com/). We assume you have basic familiarity with
-Azure Pipelines. We provide two fully baked configuration ready to be
+CI](http://dev.azure.com/).
+
+## Quick Start
+
+Note that you have to create [azure
+pipelines](#creating-azure-pipelines) for your project and then you
+need to put the relevant configuration files:
+
+* For simple Azure configuration, copy-paste the
+  [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
+  file into `azure-pipelines.yml`.
+* For complex Azure configuration, you need to take the below linked
+  four files and put all of them into the `.azure` directory except
+  the `azure-pipelines.yml` file which should be put in the root of
+  the repository.
+
+For a more detailed explanation, you can read further.
+
+## Simple and Complex configuration
+
+We provide two fully baked configuration ready to be
 used on your projects:
 
 * [The simple Azure configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
@@ -31,6 +50,8 @@ used on your projects:
   which GHC versions you test against, or to specify GHC-version-specific
   `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
   first time around. See the multiple GHC section below for more information.
+
+## Creating Azure Pipelines
 
 Each of these configurations is ready to be used immediately. But
 before we go into where to put them, we have to create pipeline for
@@ -67,23 +88,12 @@ your project in Azure CI platform:
   step would have created `azure-pipeliens.yml` in your repository,
   you have replace that with the appropriate configuration file.)
 
-Once you have followed the above steps, you need to put the relevant
-configuration files:
-
-* For simple Azure configuration, copy-paste the
-  [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
-  file into `azure-pipelines.yml`.
-* For complex Azure configuration, you need to take the above linked
-  four files and put all of them into the `.azure` directory except
-  the `azure-pipelines.yml` file which should be put in the root of
-  the repository.
-
 The rest of this document explains the details of common Azure
 configurations for those of you who want to tweak the above
 configuration files or write your own.
 
-*Note:* both Azure and Stack infrastructures are actively developed. We try to
- document best practices at the moment.
+*Note:* both Azure and Stack infrastructures are actively
+ developed. We try to document best practices at the moment.
 
 ## Infrastructure
 
