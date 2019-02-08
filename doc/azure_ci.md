@@ -4,7 +4,7 @@
 
 This page documents how to use Stack on [Azure
 CI](http://dev.azure.com/). We assume you have basic familiarity with
-Azure Pipelines. We provide two fully baked example files ready to be
+Azure Pipelines. We provide two fully baked configuration ready to be
 used on your projects:
 
 * [The simple Azure configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
@@ -32,15 +32,51 @@ used on your projects:
   `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
   first time around. See the multiple GHC section below for more information.
 
-Each of these configurations is ready to be used immediately. Steps to make them work:
+Each of these configurations is ready to be used immediately. But
+before we go into where to put them, we have to create pipeline for
+your project in Azure CI platform:
+
+* Go to [dev.azure.com](https://dev.azure.com). You have to initially
+  sign-in to your microsoft account there.
+* Once you have logined into your microsoft account, you have to sign
+  in to [Azure
+  devops](https://user-images.githubusercontent.com/737477/52465678-70963080-2ba5-11e9-83d8-84112b140236.png)
+  from there.
+* You will be [greeted with a
+  dashboard](https://user-images.githubusercontent.com/737477/52465677-70963080-2ba5-11e9-904a-c15c7c0524ef.png)
+  where you can create your projects.
+* Click the "Create Project" button and fill the [relevant information
+  in the dialog](https://user-images.githubusercontent.com/737477/52465676-70963080-2ba5-11e9-82a4-093ee58f11c9.png) and then click the "Create" button.
+* This will lead you to the [project
+  dashboard](https://user-images.githubusercontent.com/737477/52465675-6ffd9a00-2ba5-11e9-917e-3dec251fcc87.png)
+  page where you can create pipelines.
+* Click on "Pipelines" in the left menu. This will load the [pipelines
+  page](https://user-images.githubusercontent.com/737477/52465673-6ffd9a00-2ba5-11e9-97a4-04e703ae1fbc.png)
+  on the right.
+* Click on the button "New Pipeline" and you have to follow through
+  the wizard there. You need to choose your github repository (or
+  Azure repos) and follow the wizard. Note that in the [Configure
+  step](https://user-images.githubusercontent.com/737477/52465670-6ffd9a00-2ba5-11e9-83a3-9fffdacbf249.png)
+  you have to select the "Starter Pipeline". This will open up an
+  [editor
+  window](https://user-images.githubusercontent.com/737477/52465669-6f650380-2ba5-11e9-9662-e9c6fc2682b5.png). You
+  can leave the existing yaml configuration there as it is and click
+  the "Save and run" button.  That will popup a
+  [dialog](https://user-images.githubusercontent.com/737477/52465668-6f650380-2ba5-11e9-9203-6347a609e3c4.png). Select
+  the relevant option and click "Save and run" button. (Note that this
+  step would have created `azure-pipeliens.yml` in your repository,
+  you have replace that with the appropriate configuration file.)
+
+Once you have followed the above steps, you need to put the relevant
+configuration files:
+
 * For simple Azure configuration, copy-paste the
   [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
-  file into `azure-pipelines.yml` in the root of your repository.
-* For complex Azure configuration, you need to take the above four
-files and put them in the root of your repository.
-
-Once you have done that, you need to create a pipeline from the Azure
-Web interface to get things started.
+  file into `azure-pipelines.yml`.
+* For complex Azure configuration, you need to take the above linked
+  four files and put all of them into the `.azure` directory except
+  the `azure-pipelines.yml` file which should be put in the root of
+  the repository.
 
 The rest of this document explains the details of common Azure
 configurations for those of you who want to tweak the above
