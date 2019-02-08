@@ -11,19 +11,19 @@
 # For better organization, you split various jobs into seprate parts
 # and each of them are controlled via individual file.
 jobs:
-- template: azure-linux-template.yml
+- template: ./.azure/azure-linux-template.yml
   parameters:
     name: Linux
     vmImage: ubuntu-16.04
     os: linux
 
-- template: azure-osx-template.yml
+- template: ./.azure/azure-osx-template.yml
   parameters:
     name: macOS
     vmImage: macOS-10.13
     os: osx
 
-- template: azure-windows-template.yml
+- template: ./.azure/azure-windows-template.yml
   parameters:
    name: Windows
    vmImage: vs2017-win2016
