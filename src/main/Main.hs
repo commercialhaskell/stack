@@ -343,7 +343,8 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     (execOptsParser $ Just ExecGhc)
         addCommand' "hoogle"
                     ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
-                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20")
+                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20 or " ++
+                     "stack hoogle -- server --local")
                     hoogleCmd
                     ((,,,) <$> many (strArgument (metavar "ARG"))
                           <*> boolFlags
