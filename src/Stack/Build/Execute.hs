@@ -763,7 +763,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                       Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
-                _ -> error "singleBuild: invariant violated, missing package ID missing"
+                _ -> error $ "singleBuild: invariant violated, missing package ID missing: " ++ show ident
         installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
         installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing

@@ -129,6 +129,7 @@ data Ctx = Ctx
     , callStack      :: ![PackageName]
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
+    , mcurator       :: !(Maybe Curator)
     }
 
 instance HasPlatform Ctx
@@ -183,10 +184,11 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     econfig <- view envConfigL
     sources <- getSources
+    mcur <- view $ buildConfigL.to bcCurator
 
     let onTarget = void . addDep False
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
-    let ctx = mkCtx econfig sources
+    let ctx = mkCtx econfig sources mcur
     ((), m, W efinals installExes dirtyReason deps warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -225,7 +227,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
-    mkCtx econfig sources = Ctx
+    mkCtx econfig sources mcur = Ctx
         { baseConfigOpts = baseConfigOpts0
         , loadPackage = \x y z -> runRIO econfig $ loadPackage0 x y z
         , combinedMap = combineMap sources installedMap
@@ -233,6 +235,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , callStack = []
         , wanted = Map.keysSet (smtTargets $ smTargets sourceMap)
         , localNames = Map.keysSet (smProject sourceMap)
+        , mcurator = mcur
         }
 
     prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
@@ -499,12 +502,17 @@ installPackage treatAsDep name ps minstalled = do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
-        PSFilePath lp ->
+        PSFilePath lp -> do
+            -- in curator builds we can't do all-in-one build as test/benchmark failure
+            -- could prevent library from being available to its dependencies
+            splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
                     resolveDepsAndInstall True treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
-                Just tb -> do
+                Just tb | splitRequired ->
+                    splitInstallSteps lp tb
+                Just tb | otherwise -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
@@ -531,13 +539,21 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
-                            when (isRight res') $ do
-                                -- Insert it into the map so that it's
-                                -- available for addFinal.
-                                updateLibMap name res'
-                                addFinal lp tb False False
-                            return res'
+                            splitInstallSteps lp tb
+ where
+   expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
+     curator <- maybeCurator
+     pure $ Set.member name (curatorExpectTestFailure curator) ||
+            Set.member name (curatorExpectBenchmarkFailure curator)
+
+   splitInstallSteps lp tb = do
+       res' <- resolveDepsAndInstall False treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+       when (isRight res') $ do
+           -- Insert it into the map so that it's
+           -- available for addFinal.
+           updateLibMap name res'
+           addFinal lp tb False False
+       return res'
 
 resolveDepsAndInstall :: Bool
                       -> Bool
