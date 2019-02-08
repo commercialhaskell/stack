@@ -173,7 +173,8 @@ spec = beforeAll setup $ do
       boptsTestOpts `shouldBe` TestOpts {toRerunTests = True
                                          ,toAdditionalArgs = ["-fprof"]
                                          ,toCoverage = True
-                                         ,toDisableRun = True}
+                                         ,toDisableRun = True
+                                         ,toMaximumTimeSeconds = Nothing}
       boptsBenchmarks `shouldBe` True
       boptsBenchmarkOpts `shouldBe` BenchmarkOpts {beoAdditionalArgs = Just "-O2"
                                                    ,beoDisableRun = True}

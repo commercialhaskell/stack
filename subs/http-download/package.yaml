@@ -40,3 +40,4 @@ tests:
     dependencies:
     - http-download
     - hspec
+    - hspec-discover
