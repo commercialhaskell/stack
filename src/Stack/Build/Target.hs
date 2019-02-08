@@ -312,7 +312,7 @@ resolveRawTarget sma allLocs (ri, rt) =
               ReplacedGlobalPackage _ -> hackageLatest name
       | otherwise = hackageLatest name
 
-    -- Note that we use CFILatest below, even though it's
+    -- Note that we use getLatestHackageRevision below, even though it's
     -- non-reproducible, to avoid user confusion. In any event,
     -- reproducible builds should be done by updating your config
     -- files!
@@ -446,19 +446,10 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let deps = smaDeps smActual
-      globals = smaGlobal smActual
-      latestGlobal _ (ReplacedGlobalPackage _) = pure Nothing
-      latestGlobal name (GlobalPackage version) = do
-        mrev <- getLatestHackageRevision name version
-        forM mrev $ \(_rev, cfKey, treeKey) -> do
-          let ident = PackageIdentifier name version
-          pure $ PLImmutable (PLIHackage ident cfKey treeKey)
-  globalLocs <- Map.traverseMaybeWithKey latestGlobal globals
-  let allLocs = Map.union globalLocs (Map.map dpLocation deps)
+  let depLocs = Map.map dpLocation $ smaDeps smActual
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget smActual allLocs
+    resolveRawTarget smActual depLocs
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 

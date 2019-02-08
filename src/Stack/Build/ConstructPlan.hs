@@ -426,19 +426,19 @@ addDep treatAsDep' name = do
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
                             let version = installedVersion installed
-                            mrev <- liftRIO $ getLatestHackageRevision name version
-                            case mrev of
-                              Nothing ->
-                                -- this could happen for GHC boot libraries missing from Hackage
-                                logWarn $ "No latest package revision found for: " <>
-                                    fromString (packageNameString name) <> ", dependency callstack: " <>
-                                    displayShow (map packageNameString $ callStack ctx)
-                              Just (_rev, cfKey, treeKey) ->
-                                tellExecutablesUpstream
-                                  name
-                                  (PLIHackage (PackageIdentifier name version) cfKey treeKey)
-                                  loc
-                                  Map.empty
+                                askPkgLoc = liftRIO $ do
+                                  mrev <- getLatestHackageRevision name version
+                                  case mrev of
+                                    Nothing -> do
+                                      -- this could happen for GHC boot libraries missing from Hackage
+                                      logWarn $ "No latest package revision found for: " <>
+                                          fromString (packageNameString name) <> ", dependency callstack: " <>
+                                          displayShow (map packageNameString $ callStack ctx)
+                                      return Nothing
+                                    Just (_rev, cfKey, treeKey) ->
+                                      return . Just $
+                                          PLIHackage (PackageIdentifier name version) cfKey treeKey
+                            tellExecutablesUpstream name askPkgLoc loc Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
@@ -457,14 +457,21 @@ tellExecutables _name (PSFilePath lp)
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
-    tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
+    tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name pkgloc loc flags = do
+tellExecutablesUpstream ::
+       PackageName
+    -> M (Maybe PackageLocationImmutable)
+    -> InstallLocation
+    -> Map FlagName Bool
+    -> M ()
+tellExecutablesUpstream name retrievePkgLoc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
-        p <- loadPackage ctx pkgloc flags []
-        tellExecutablesPackage loc p
+        mPkgLoc <- retrievePkgLoc
+        forM_ mPkgLoc $ \pkgLoc -> do
+            p <- loadPackage ctx pkgLoc flags []
+            tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
