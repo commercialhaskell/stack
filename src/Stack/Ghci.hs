@@ -185,9 +185,8 @@ ghci opts@GhciOpts{..} = do
               pkgs0 <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     -- Build required dependencies and setup local packages.
-    stackYaml <- view stackYamlL
     buildDepsAndInitialSteps opts (map (T.pack . packageNameString . fst) localTargets)
-    targetWarnings stackYaml localTargets nonLocalTargets mfileTargets
+    targetWarnings localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
     pkgs <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
@@ -836,13 +835,12 @@ checkForDuplicateModules pkgs = do
       pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
 targetWarnings
-  :: HasTerm env
-  => Path Abs File
-  -> [(PackageName, (Path Abs File, Target))]
+  :: HasBuildConfig env
+  => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
   -> RIO env ()
-targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
+targetWarnings localTargets nonLocalTargets mfileTargets = do
   unless (null nonLocalTargets) $
     prettyWarnL
       [ flow "Some targets"
@@ -853,9 +851,13 @@ targetWarnings stackYaml localTargets nonLocalTargets mfileTargets = do
       , "."
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."
       ]
-  when (null localTargets && isNothing mfileTargets) $
+  when (null localTargets && isNothing mfileTargets) $ do
+      smWanted <- view $ buildConfigL.to bcSMWanted
+      stackYaml <- view stackYamlL
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
+          , ""
+          , flow $ "You are using snapshot: " ++ T.unpack (smwSnapshotName smWanted)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""

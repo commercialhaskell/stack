@@ -96,6 +96,8 @@ Other enhancements:
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
+* Show snapshot being used when `stack ghci` is invoked outside of a project directory. See
+  [#3651](https://github.com/commercialhaskell/stack/issues/3651)
 
 Bug fixes:
 
