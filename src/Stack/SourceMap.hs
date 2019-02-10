@@ -8,12 +8,17 @@ module Stack.SourceMap
     , loadVersion
     , getPLIVersion
     , loadGlobalHints
-    , toActual
+    , DumpedGlobalPackage
+    , actualFromGhc
+    , actualFromHints
     , checkFlagsUsedThrowing
+    , globalCondCheck
+    , pruneGlobals
     ) where
 
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
+import Distribution.System (Platform(..))
 import Pantry
 import qualified RIO
 import qualified RIO.Map as Map
@@ -103,60 +108,45 @@ loadVersion common = do
     gpd <- liftIO $ cpGPD common
     return (pkgVersion $ PD.package $ PD.packageDescription gpd)
 
-getPLIVersion ::
-       MonadIO m
-    => PackageLocationImmutable
-    -> IO Version
-    -> m Version
-getPLIVersion (PLIHackage (PackageIdentifierRevision _ v _) _) _ = pure v
-getPLIVersion (PLIArchive _ pm) loadVer = versionMaybeFromPM pm loadVer
-getPLIVersion (PLIRepo _ pm) loadVer = versionMaybeFromPM pm loadVer
-
-versionMaybeFromPM ::
-       MonadIO m => PackageMetadata -> IO Version -> m Version
-versionMaybeFromPM pm _ | Just v <- pmVersion pm = pure v
-versionMaybeFromPM _ loadVer = liftIO loadVer
+getPLIVersion :: PackageLocationImmutable -> Version
+getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
+getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
+getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env)
     => ActualCompiler
-    -> RIO env (Map PackageName GlobalPackage)
+    -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump compiler = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
-        toGlobals ds = Map.fromList $ map toGlobal $ Map.elems ds
-        toGlobal d =
-            ( pkgName $ dpPackageIdent d
-            , GlobalPackage (pkgVersion $ dpPackageIdent d))
+        toGlobals ds =
+          Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
     toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
     => WantedCompiler
-    -> RIO env (Map PackageName GlobalPackage)
+    -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
     ghfp <- globalHintsFile
     mglobalHints <- loadGlobalHints ghfp compiler
     case mglobalHints of
-        Just hints -> pure $ Map.map GlobalPackage hints
+        Just hints -> pure hints
         Nothing -> do
             logWarn $ "Unable to load global hints for " <> RIO.display compiler
             pure mempty
 
-toActual ::
+type DumpedGlobalPackage = DumpPackage () () ()
+
+actualFromGhc ::
        (HasConfig env)
     => SMWanted
-    -> WithDownloadCompiler
     -> ActualCompiler
-    -> RIO env SMActual
-toActual smw downloadCompiler ac = do
-    allGlobals <-
-        case downloadCompiler of
-            WithDownloadCompiler -> globalsFromDump ac
-            SkipDownloadCompiler -> globalsFromHints (actualToWanted ac)
-    let globals =
-            allGlobals `Map.difference` smwProject smw `Map.difference` smwDeps smw
+    -> RIO env (SMActual DumpedGlobalPackage)
+actualFromGhc smw ac = do
+    globals <- globalsFromDump ac
     return
         SMActual
         { smaCompiler = ac
@@ -164,6 +154,30 @@ toActual smw downloadCompiler ac = do
         , smaDeps = smwDeps smw
         , smaGlobal = globals
         }
+
+actualFromHints ::
+       (HasConfig env)
+    => SMWanted
+    -> ActualCompiler
+    -> RIO env (SMActual GlobalPackageVersion)
+actualFromHints smw ac = do
+    globals <- globalsFromHints (actualToWanted ac)
+    return
+        SMActual
+        { smaCompiler = ac
+        , smaProject = smwProject smw
+        , smaDeps = smwDeps smw
+        , smaGlobal = Map.map GlobalPackageVersion globals
+        }
+
+-- | Simple cond check for boot packages - checks only OS and Arch
+globalCondCheck :: (HasConfig env) => RIO env (PD.ConfVar -> Either PD.ConfVar Bool)
+globalCondCheck = do
+  Platform arch os <- view platformL
+  let condCheck (PD.OS os') = pure $ os' == os
+      condCheck (PD.Arch arch') = pure $ arch' == arch
+      condCheck c = Left c
+  return condCheck
 
 checkFlagsUsedThrowing ::
        (MonadIO m, MonadThrow m)
@@ -205,3 +219,14 @@ getUnusedPackageFlags (name, userFlags) source prj deps =
                     then pure Nothing
                     -- Error about the undefined flags
                     else pure $ Just $ UFFlagsNotDefined source pname pkgFlags unused
+
+pruneGlobals ::
+       Map PackageName DumpedGlobalPackage
+    -> Set PackageName
+    -> Map PackageName GlobalPackage
+pruneGlobals globals deps =
+  let (prunedGlobals, keptGlobals) =
+        partitionReplacedDependencies globals (pkgName . dpPackageIdent)
+            dpGhcPkgId dpDepends deps
+  in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
+     Map.map ReplacedGlobalPackage prunedGlobals

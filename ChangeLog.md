@@ -37,6 +37,10 @@ Major changes:
       their exact versions.
     * The `ignore-revision-mismatch` setting is no longer needed, and
       has been removed.
+    * Overriding GHC boot packages results in any other GHC boot
+      packages depending on it being no longer available as a dependency,
+      such packages need to be added explicitly when needed. See
+      [#4510] (https://github.com/commercialhaskell/stack/issues/4510).
 * Upgrade to Cabal 2.4
     * Note that, in this process, the behavior of file globbing has
       been modified to match that of Cabal. In particular, this means
@@ -45,6 +49,12 @@ Major changes:
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
+
+* `stack script` now passes `-i -idir` in to the `ghc`
+  invocation. This makes it so that the script can import local
+  modules, and fixes an issue where `.hs` files in the current
+  directory could affect interpretation of the script. See
+  [#4538](https://github.com/commercialhaskell/stack/pull/4538)
 
 Other enhancements:
 
@@ -81,6 +91,11 @@ Other enhancements:
   [#4463](https://github.com/commercialhaskell/stack/issues/4463)
 * Add `--cabal-files` flag to `stack ide targets` command.
 * Add `--stdout` flag to all `stack ide` subcommands.
+* Use batches when unregistering packages with `ghc-pkg`.
+  (See [#2662](https://github.com/commercialhaskell/stack/issues/2662))
+* `get-stack` script now works on Windows CI machines of Appveyor,
+  Travis and Azure Pipelines. See
+  [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
 * Show snapshot being used when `stack ghci` is invoked outside of a project directory. See
   [#3651](https://github.com/commercialhaskell/stack/issues/3651)
 
@@ -113,6 +128,9 @@ Bug fixes:
 * Fix `--file-watch` not responding to file modifications when running
   inside docker on Mac. See
   [#4506](https://github.com/commercialhaskell/stack/issues/4506)
+* Using `--ghc-options` with `stack script --compile` now works.
+* Ensure the detailed-0.9 type tests work.
+  See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
 
 ## v1.9.3
 

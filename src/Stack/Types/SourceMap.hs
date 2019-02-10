@@ -16,7 +16,9 @@ module Stack.Types.SourceMap
   , DepPackage (..)
   , ProjectPackage (..)
   , CommonPackage (..)
+  , GlobalPackageVersion (..)
   , GlobalPackage (..)
+  , isReplacedGlobal
   , SourceMapHash (..)
   ) where
 
@@ -61,10 +63,17 @@ data ProjectPackage = ProjectPackage
   , ppResolvedDir :: !(ResolvedPath Dir)
   }
 
--- | A view of a package installed in the global package database.
-newtype GlobalPackage = GlobalPackage
-  { gpVersion :: Version
-  }
+-- | A view of a package installed in the global package database also
+-- could include marker for a replaced global package (could be replaced
+-- because of a replaced dependency)
+data GlobalPackage
+  = GlobalPackage !Version
+  | ReplacedGlobalPackage ![PackageName]
+  deriving Eq
+
+isReplacedGlobal :: GlobalPackage -> Bool
+isReplacedGlobal (ReplacedGlobalPackage _) = True
+isReplacedGlobal (GlobalPackage _) = False
 
 -- | A source map with information on the wanted (but not actual)
 -- compiler. This is derived by parsing the @stack.yaml@ file for
@@ -85,12 +94,14 @@ data SMWanted = SMWanted
 -- the contents of the global package database.
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
-data SMActual = SMActual
+data SMActual global = SMActual
   { smaCompiler :: !ActualCompiler
   , smaProject :: !(Map PackageName ProjectPackage)
   , smaDeps :: !(Map PackageName DepPackage)
-  , smaGlobal :: !(Map PackageName GlobalPackage)
+  , smaGlobal :: !(Map PackageName global)
   }
+
+newtype GlobalPackageVersion = GlobalPackageVersion Version
 
 -- | How a package is intended to be built
 data Target

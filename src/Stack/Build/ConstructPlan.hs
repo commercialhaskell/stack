@@ -219,7 +219,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             planDebug $ show errs
             stackYaml <- view stackYamlL
             stackRoot <- view stackRootL
-            prettyErrorNoIndent $ pprintExceptions errs stackYaml stackRoot parents (wanted ctx)
+            prettyErrorNoIndent $
+                pprintExceptions errs stackYaml stackRoot parents (wanted ctx) prunedGlobalDeps
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
@@ -234,36 +235,30 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , localNames = Map.keysSet (smProject sourceMap)
         }
 
+    prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
+      case gp of
+         ReplacedGlobalPackage deps ->
+           let pruned = filter (not . inSourceMap) deps
+           in if null pruned then Nothing else Just pruned
+         GlobalPackage _ -> Nothing
+
+    inSourceMap pname = pname `Map.member` smDeps sourceMap ||
+                        pname `Map.member` smProject sourceMap
+
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage sourceMap pp
         return $ PSFilePath lp
       bopts <- view $ configL.to configBuild
-      env <- ask
-      let buildHaddocks = shouldHaddockDeps bopts
-          globalDeps = Map.mapMaybeWithKey globalToSource $ smGlobal sourceMap
-          globalToSource name gp | name `Set.member` wiredInPackages = Nothing
-                                 | otherwise =
-            let version = gpVersion gp
-                loc = PLIHackage (PackageIdentifierRevision name version CFILatest) Nothing
-                common = CommonPackage
-                  { cpGPD = runRIO env $ loadCabalFile (PLImmutable loc)
-                  , cpName = name
-                  , cpFlags = mempty
-                  , cpGhcOptions = mempty
-                  , cpHaddocks = buildHaddocks
-                  }
-            in Just $ PSRemote loc version NotFromSnapshot common
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
-          PLImmutable loc -> do
-            version <- getPLIVersion loc (loadVersion $ dpCommon dp)
-            return $ PSRemote loc version (dpFromSnapshot dp) (dpCommon dp)
+          PLImmutable loc ->
+            return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage sourceMap pp
             return $ PSFilePath lp
-      return $ pPackages <> deps <> globalDeps
+      return $ pPackages <> deps
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -427,11 +422,20 @@ addDep treatAsDep' name = do
                             -- FIXME Slightly hacky, no flags since
                             -- they likely won't affect executable
                             -- names. This code does not feel right.
-                            tellExecutablesUpstream
-                              name
-                              (PLIHackage (PackageIdentifierRevision name (installedVersion installed) CFILatest) Nothing)
-                              loc
-                              Map.empty
+                            let version = installedVersion installed
+                                askPkgLoc = liftRIO $ do
+                                  mrev <- getLatestHackageRevision name version
+                                  case mrev of
+                                    Nothing -> do
+                                      -- this could happen for GHC boot libraries missing from Hackage
+                                      logWarn $ "No latest package revision found for: " <>
+                                          fromString (packageNameString name) <> ", dependency callstack: " <>
+                                          displayShow (map packageNameString $ callStack ctx)
+                                      return Nothing
+                                    Just (_rev, cfKey, treeKey) ->
+                                      return . Just $
+                                          PLIHackage (PackageIdentifier name version) cfKey treeKey
+                            tellExecutablesUpstream name askPkgLoc loc Map.empty
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
@@ -450,14 +454,21 @@ tellExecutables _name (PSFilePath lp)
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
-    tellExecutablesUpstream name pkgloc Snap (cpFlags cp)
+    tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
 
-tellExecutablesUpstream :: PackageName -> PackageLocationImmutable -> InstallLocation -> Map FlagName Bool -> M ()
-tellExecutablesUpstream name pkgloc loc flags = do
+tellExecutablesUpstream ::
+       PackageName
+    -> M (Maybe PackageLocationImmutable)
+    -> InstallLocation
+    -> Map FlagName Bool
+    -> M ()
+tellExecutablesUpstream name retrievePkgLoc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
-        p <- loadPackage ctx pkgloc flags []
-        tellExecutablesPackage loc p
+        mPkgLoc <- retrievePkgLoc
+        forM_ mPkgLoc $ \pkgLoc -> do
+            p <- loadPackage ctx pkgLoc flags []
+            tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
@@ -966,8 +977,9 @@ pprintExceptions
     -> Path Abs Dir
     -> ParentMap
     -> Set PackageName
+    -> Map PackageName [PackageName]
     -> StyleDoc
-pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
+pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDeps =
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
       , line <> line
@@ -1064,6 +1076,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' =
         | name `Set.member` allNotInBuildPlan = Nothing
         | name `Set.member` wiredInPackages =
             Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . fromString . packageNameString $ name)
+        | Just pruned <- Map.lookup name prunedGlobalDeps =
+            let prunedDeps = map (style Current . fromString . packageNameString) pruned
+            in Just $ flow "Can't use GHC boot package" <+>
+                      (style Current . fromString . packageNameString $ name) <+>
+                      flow "when it has an overriden dependency, " <+>
+                      flow "you need to add the following as explicit dependencies to the project:" <+>
+                      line <+> encloseSep "" "" ", " prunedDeps
         | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
 
     pprintFlags flags

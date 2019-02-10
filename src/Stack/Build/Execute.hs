@@ -28,6 +28,7 @@ import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
 import           Conduit
@@ -36,11 +37,13 @@ import qualified Data.Conduit.Filesystem as CF
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
                     (ExitCodeException (..), waitExitCode,
-                     useHandleOpen, setStdin, setStdout, setStderr, getStdin,
-                     createPipe, runProcess_, getStdout,
-                     getStderr, createSource)
+                     useHandleOpen, setStdin, setStdout, setStderr,
+                     runProcess_, getStdout, getStderr, createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
+import           Data.List.NonEmpty (NonEmpty(..), nonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty (toList)
+import           Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -53,7 +56,7 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Version (mkVersion)
+import           Distribution.Version (mkVersion, nullVersion)
 import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
@@ -84,7 +87,7 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (..))
 import qualified System.FilePath as FP
-import           System.IO (hPutStr, stderr, stdout)
+import           System.IO (stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
@@ -580,18 +583,11 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
     cv <- view actualCompilerVersionL
     let wc = view whichCompilerL cv
-    case Map.toList $ planUnregisterLocal plan of
-        [] -> return ()
-        ids -> do
+    case nonEmpty . Map.toList $ planUnregisterLocal plan of
+        Nothing -> return ()
+        Just ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', (ident, reason)) -> do
-                logInfo $
-                    fromString (packageIdentifierString ident) <>
-                    ": unregistering" <>
-                    if T.null reason
-                        then ""
-                        else " (" <> RIO.display reason <> ")"
-                unregisterGhcPkgId wc cv localDB id' ident
+            unregisterPackages cv localDB ids
 
     liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
         foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
@@ -660,6 +656,49 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ map (\(ident, _) -> (pkgName ident, ()))
                   $ Map.elems
                   $ planUnregisterLocal plan
+
+unregisterPackages ::
+       (HasProcessContext env, HasLogFunc env, HasPlatform env)
+    => ActualCompiler
+    -> Path Abs Dir
+    -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
+    -> RIO env ()
+unregisterPackages cv localDB ids = do
+    let wc = view whichCompilerL cv
+    let logReason ident reason =
+            logInfo $
+            fromString (packageIdentifierString ident) <> ": unregistering" <>
+            if T.null reason
+                then ""
+                else " (" <> RIO.display reason <> ")"
+    let unregisterSinglePkg select (gid, (ident, reason)) = do
+            logReason ident reason
+            unregisterGhcPkgIds wc localDB $ select ident gid :| []
+
+    case cv of
+        -- GHC versions >= 8.0.1 support batch unregistering of packages. See
+        -- https://github.com/commercialhaskell/stack/pull/4554
+        ACGhc v | v >= mkVersion [8, 0, 1] -> do
+                platform <- view platformL
+                -- According to https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
+                -- the maximum command line length on Windows since XP is 8191 characters.
+                -- We use conservative batch size of 100 ids on this OS thus argument name '-ipid', package name,
+                -- its version and a hash should fit well into this limit.
+                -- On Unix-like systems we're limited by ARG_MAX which is normally hundreds
+                -- of kilobytes so batch size of 500 should work fine.
+                let batchSize = case platform of
+                      Platform _ Windows -> 100
+                      _ -> 500
+                let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
+                for_ (chunksOfNE batchSize ids) $ \batch -> do
+                    for_ batch $ \(_, (ident, reason)) -> logReason ident reason
+                    unregisterGhcPkgIds wc localDB $ fmap (Right . fst) batch
+
+        -- GHC versions >= 7.9 support unregistering of packages via their
+        -- GhcPkgId.
+        ACGhc v | v >= mkVersion [7, 9] -> for_ ids . unregisterSinglePkg $ \_ident gid -> Right gid
+
+        _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
 
 toActions :: HasEnvConfig env
           => InstalledMap
@@ -1752,7 +1791,22 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
-                menv <- liftIO $ configProcessContextSettings config EnvSettings
+                packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
+                    let pkgId = PackageIdentifier name nullVersion
+                    case Map.lookupGT pkgId allDepsMap of
+                        Just (PackageIdentifier name' version, ghcPkgId)
+                            | name' == name && dvType dv == AsLibrary &&
+                              version `withinRange` dvVersionRange dv ->
+                            return $ Just (unGhcPkgId ghcPkgId)
+                        _ -> do
+                            logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
+                            return Nothing
+                -- env var HASKELL_PACKAGE_IDS is used by doctest so module names for
+                -- packages with proper dependencies should no longer get ambiguous
+                -- see e.g. https://github.com/doctest/issues/119
+                let usePackageIds pc = modifyEnvVars pc $ \envVars ->
+                      Map.insert "HASKELL_PACKAGE_IDS" (T.unwords packageIds) envVars
+                menv <- liftIO $ usePackageIds =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
@@ -1790,16 +1844,19 @@ singleTest topts testsToRun ac ee task installedMap = do
 
                         ec <- withWorkingDir (toFilePath pkgDir) $
                           proc (toFilePath exePath) args $ \pc0 -> do
-                            let pc = setStdin createPipe
+                            stdinBS <-
+                              if isTestTypeLib
+                                then do
+                                  logPath <- buildLogPath package (Just stestName)
+                                  ensureDir (parent logPath)
+                                  pure $ BL.fromStrict
+                                       $ encodeUtf8 $ fromString $ show (logPath, testName)
+                                else pure mempty
+                            let pc = setStdin (byteStringInput stdinBS)
                                    $ output setStdout
                                    $ output setStderr
                                      pc0
-                            withProcess pc $ \p -> do
-                              when isTestTypeLib $ do
-                                logPath <- buildLogPath package (Just stestName)
-                                ensureDir (parent logPath)
-                                liftIO $ hPutStr (getStdin p) $ show (logPath, testName)
-                              waitExitCode p
+                            runProcess pc
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
                         case outputType of

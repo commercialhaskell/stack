@@ -39,7 +39,7 @@ data AbstractResolver
     = ARLatestNightly
     | ARLatestLTS
     | ARLatestLTSMajor !Int
-    | ARResolver !SnapshotLocation
+    | ARResolver !RawSnapshotLocation
     | ARGlobal
 
 instance Show AbstractResolver where
@@ -61,7 +61,7 @@ readAbstractResolver = do
         "lts" -> pure $ pure ARLatestLTS
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
             pure $ pure $ ARLatestLTSMajor x'
-        _ -> pure $ ARResolver <$> parseSnapshotLocation (T.pack s)
+        _ -> pure $ ARResolver <$> parseRawSnapshotLocation (T.pack s)
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName

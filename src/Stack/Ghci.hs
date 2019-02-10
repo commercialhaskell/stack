@@ -197,7 +197,7 @@ ghci opts@GhciOpts{..} = do
 preprocessTargets
     :: HasEnvConfig env
     => BuildOptsCLI
-    -> SMActual
+    -> SMActual GlobalPackage
     -> [Text]
     -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI sma rawTargets = do
@@ -228,7 +228,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
 parseMainIsTargets
      :: HasEnvConfig env
      => BuildOptsCLI
-     -> SMActual
+     -> SMActual GlobalPackage
      -> Maybe Text
      -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do

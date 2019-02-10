@@ -6,6 +6,7 @@
 module Pantry.Archive
   ( getArchive
   , getArchiveKey
+  , fetchArchivesRaw
   , fetchArchives
   , withArchiveLoc
   ) where
@@ -36,31 +37,44 @@ import Data.Conduit.Zlib (ungzip)
 import qualified Data.Conduit.Tar as Tar
 import Pantry.HTTP
 
+fetchArchivesRaw
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => [(RawArchive, RawPackageMetadata)]
+  -> RIO env ()
+fetchArchivesRaw pairs =
+  for_ pairs $ \(ra, rpm) ->
+    getArchive (RPLIArchive ra rpm) ra rpm
+
 fetchArchives
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => [(Archive, PackageMetadata)]
   -> RIO env ()
-fetchArchives pairs = do
+fetchArchives pairs =
   -- TODO be more efficient, group together shared archives
-  for_ pairs $ \(a, pm) -> getArchive (PLIArchive a pm) a pm
+  fetchArchivesRaw [
+    let PackageIdentifier nm ver = pmIdent pm
+        rpm = RawPackageMetadata (Just nm) (Just ver) (Just $ pmTreeKey pm) (Just $ pmCabal pm)
+        ra = RawArchive (archiveLocation a) (Just $ archiveHash a) (Just $ archiveSize a) (archiveSubdir a)
+    in (ra, rpm)
+   | (a, pm) <- pairs]
 
 getArchiveKey
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable -- ^ for exceptions
-  -> Archive
-  -> PackageMetadata
+  => RawPackageLocationImmutable -- ^ for exceptions
+  -> RawArchive
+  -> RawPackageMetadata
   -> RIO env TreeKey
-getArchiveKey pli archive pm = packageTreeKey <$> getArchive pli archive pm -- potential optimization
+getArchiveKey rpli archive rpm = packageTreeKey <$> getArchive rpli archive rpm -- potential optimization
 
 getArchive
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable -- ^ for exceptions
-  -> Archive
-  -> PackageMetadata
+  => RawPackageLocationImmutable -- ^ for exceptions
+  -> RawArchive
+  -> RawPackageMetadata
   -> RIO env Package
-getArchive pli archive pm = do
+getArchive rpli archive rpm = do
   -- Check if the value is in the archive, and use it if possible
-  mpa <- loadCache pli archive
+  mpa <- loadCache rpli archive
   pa <-
     case mpa of
       Just pa -> pure pa
@@ -68,42 +82,42 @@ getArchive pli archive pm = do
       -- PackageMetadata for now, we'll check that the Package
       -- info matches next.
       Nothing -> withArchiveLoc archive $ \fp sha size -> do
-        pa <- parseArchive pli archive fp
+        pa <- parseArchive rpli archive fp
         -- Storing in the cache exclusively uses information we have
         -- about the archive itself, not metadata from the user.
         storeCache archive sha size pa
         pure pa
 
-  either throwIO pure $ checkPackageMetadata pli pm pa
+  either throwIO pure $ checkPackageMetadata rpli rpm pa
 
 storeCache
   :: forall env. (HasPantryConfig env, HasLogFunc env)
-  => Archive
+  => RawArchive
   -> SHA256
   -> FileSize
   -> Package
   -> RIO env ()
 storeCache archive sha size pa =
-  case archiveLocation archive of
-    ALUrl url -> withStorage $ storeArchiveCache url (archiveSubdir archive) sha size (packageTreeKey pa)
+  case raLocation archive of
+    ALUrl url -> withStorage $ storeArchiveCache url (raSubdir archive) sha size (packageTreeKey pa)
     ALFilePath _ -> pure () -- TODO cache local as well
 
 loadCache
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
-  -> Archive
+  => RawPackageLocationImmutable
+  -> RawArchive
   -> RIO env (Maybe Package)
-loadCache pli archive =
+loadCache rpli archive =
   case loc of
     ALFilePath _ -> pure Nothing -- TODO can we do something intelligent here?
-    ALUrl url -> withStorage (loadArchiveCache url (archiveSubdir archive)) >>= loop
+    ALUrl url -> withStorage (loadArchiveCache url (raSubdir archive)) >>= loop
   where
-    loc = archiveLocation archive
-    msha = archiveHash archive
-    msize = archiveSize archive
+    loc = raLocation archive
+    msha = raHash archive
+    msize = raSize archive
 
     loadFromCache :: TreeId -> RIO env (Maybe Package)
-    loadFromCache tid = fmap Just $ withStorage $ loadPackageById pli tid
+    loadFromCache tid = fmap Just $ withStorage $ loadPackageById rpli tid
 
     loop [] = pure Nothing
     loop ((sha, size, tid):rest) =
@@ -140,8 +154,8 @@ loadCache pli archive =
 
 -- ensure name, version, etc are correct
 checkPackageMetadata
-  :: PackageLocationImmutable
-  -> PackageMetadata
+  :: RawPackageLocationImmutable
+  -> RawPackageMetadata
   -> Package
   -> Either PantryException Package
 checkPackageMetadata pl pm pa = do
@@ -159,10 +173,10 @@ checkPackageMetadata pl pm pa = do
       test Nothing _ = True
 
       tests =
-        [ test (pmTreeKey pm) (packageTreeKey pa)
-        , test (pmName pm) (pkgName $ packageIdent pa)
-        , test (pmVersion pm) (pkgVersion $ packageIdent pa)
-        , test (pmCabal pm) (teBlob pkgCabal)
+        [ test (rpmTreeKey pm) (packageTreeKey pa)
+        , test (rpmName pm) (pkgName $ packageIdent pa)
+        , test (rpmVersion pm) (pkgVersion $ packageIdent pa)
+        , test (rpmCabal pm) (teBlob pkgCabal)
         ]
 
    in if and tests then Right pa else Left err
@@ -172,10 +186,10 @@ checkPackageMetadata pl pm pa = do
 -- downloading.
 withArchiveLoc
   :: HasLogFunc env
-  => Archive
+  => RawArchive
   -> (FilePath -> SHA256 -> FileSize -> RIO env a)
   -> RIO env a
-withArchiveLoc (Archive (ALFilePath resolved) msha msize _subdir) f = do
+withArchiveLoc (RawArchive (ALFilePath resolved) msha msize _subdir) f = do
   let abs' = resolvedAbsolute resolved
       fp = toFilePath abs'
   (sha, size) <- withBinaryFile fp ReadMode $ \h -> do
@@ -193,7 +207,7 @@ withArchiveLoc (Archive (ALFilePath resolved) msha msize _subdir) f = do
 
     pure (sha, size)
   f fp sha size
-withArchiveLoc (Archive (ALUrl url) msha msize _subdir) f =
+withArchiveLoc (RawArchive (ALUrl url) msha msize _subdir) f =
   withSystemTempFile "archive" $ \fp hout -> do
     logDebug $ "Downloading archive from " <> display url
     (sha, size, ()) <- httpSinkChecked url msha msize (sinkHandle hout)
@@ -314,12 +328,12 @@ data SimpleEntry = SimpleEntry
 -- * The name inside the cabal file matches the name of the cabal file itself
 parseArchive
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
-  -> Archive
+  => RawPackageLocationImmutable
+  -> RawArchive
   -> FilePath -- ^ file holding the archive
   -> RIO env Package
-parseArchive pli archive fp = do
-  let loc = archiveLocation archive
+parseArchive rpli archive fp = do
+  let loc = raLocation archive
       getFiles [] = throwIO $ UnknownArchiveType loc
       getFiles (at:ats) = do
         eres <- tryAny $ foldArchive loc fp at id $ \m me -> pure $ m . (me:)
@@ -379,7 +393,7 @@ parseArchive pli archive fp = do
     Left e -> throwIO $ UnsupportedTarball loc $ T.pack e
     Right files1 -> do
       let files2 = stripCommonPrefix $ Map.toList files1
-          files3 = takeSubdir (archiveSubdir archive) files2
+          files3 = takeSubdir (raSubdir archive) files2
           toSafe (fp', a) =
             case mkSafeFilePath fp' of
               Nothing -> Left $ "Not a safe file path: " ++ show fp'
@@ -401,30 +415,30 @@ parseArchive pli archive fp = do
               Nothing -> error $ "Impossible: blob not found for: " ++ seSource se
               Just blobKey -> pure (sfp, TreeEntry blobKey (seType se))
           -- parse the cabal file and ensure it has the right name
-          buildFile <- findCabalOrHpackFile pli tree
+          buildFile <- findCabalOrHpackFile rpli tree
           (buildFilePath, buildFileBlobKey, buildFileEntry) <- case buildFile of
                                                                  BFCabal fpath te@(TreeEntry key _) -> pure (fpath, key, te)
                                                                  BFHpack te@(TreeEntry key _) -> pure (hpackSafeFilePath, key, te)
           mbs <- withStorage $ loadBlob buildFileBlobKey
           bs <-
             case mbs of
-              Nothing -> throwIO $ TreeReferencesMissingBlob pli buildFilePath buildFileBlobKey
+              Nothing -> throwIO $ TreeReferencesMissingBlob rpli buildFilePath buildFileBlobKey
               Just bs -> pure bs
           cabalBs <- case buildFile of
             BFCabal _ _ -> pure bs
-            BFHpack _ -> snd <$> hpackToCabal pli tree
-          (_warnings, gpd) <- rawParseGPD (Left pli) cabalBs
+            BFHpack _ -> snd <$> hpackToCabal rpli tree
+          (_warnings, gpd) <- rawParseGPD (Left rpli) cabalBs
           let ident@(PackageIdentifier name _) = package $ packageDescription gpd
           case buildFile of
-            BFCabal _ _ -> when (buildFilePath /= cabalFileName name) $ throwIO $ WrongCabalFileName pli buildFilePath name
+            BFCabal _ _ -> when (buildFilePath /= cabalFileName name) $ throwIO $ WrongCabalFileName rpli buildFilePath name
             _ -> return ()
           -- It's good! Store the tree, let's bounce
-          (tid, treeKey) <- withStorage $ storeTree pli ident tree buildFile
+          (tid, treeKey) <- withStorage $ storeTree rpli ident tree buildFile
           packageCabal <- case buildFile of
                             BFCabal _ _ -> pure $ PCCabalFile buildFileEntry
                             BFHpack _ -> do
                               cabalKey <- withStorage $ do
-                                            hpackId <- storeHPack pli tid
+                                            hpackId <- storeHPack rpli tid
                                             loadCabalBlobKey hpackId
                               hpackSoftwareVersion <- hpackVersion
                               let cabalTreeEntry = TreeEntry cabalKey (teType buildFileEntry)
@@ -438,7 +452,7 @@ parseArchive pli archive fp = do
 
 findCabalOrHpackFile
   :: MonadThrow m
-  => PackageLocationImmutable -- ^ for exceptions
+  => RawPackageLocationImmutable -- ^ for exceptions
   -> Tree
   -> m BuildFile
 findCabalOrHpackFile loc (TreeMap m) = do
