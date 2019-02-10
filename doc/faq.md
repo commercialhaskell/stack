@@ -75,7 +75,7 @@ Cabal-the-library, in order to support the most recent versions of the Cabal fil
 
 Stack builds a `Setup.hs` file against a version of the Cabal library, in order to build packages.
 
-The [boot version used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory),
+The [boot version of Cabal used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory),
 which is globally available to stack, is used to compile the `build-type: Simple` setup executable.
 All packages using the same compiler and Cabal version are built with the same executable.
 These executables are cached in the `setup-exe-cache` configuration directory.
@@ -85,7 +85,17 @@ Build artefacts are placed in the corresponding `.stack-work/dist/Cabal-xxxxx` d
 For packages with `build-type: Custom`, Stack compiles `Setup.hs` against the version of the Cabal
 library present in the snapshot (which may be overridden using `extra-deps`), and uses that
 setup executable to perform builds. This treats Cabal as any other dependency package.
-The executable is stored TODO
+The process is as follows:
+
+1.  Stack uses the boot version of Cabal to build the required version of Cabal, which is treated as though built with `build-type: Simple`.
+    This will take a short while — typically a few minutes.
+
+2.  Stack uses this version of Cabal to build the setup executable from the `Setup.hs` file.
+    The resulting executable is placed in the `.stack-work/dist/Cabal-xxxxx` directory corresponding to the boot version of Cabal — even though it was built with the snapshot version.
+
+3.  This setup executable builds the package.
+    Again, build artefacts are placed in the `.stack-work/dist/Cabal-xxxxx` directory — even though it was built with the snapshot version.
+    A resulting executable is copied to the `.stack-work/install/$compiler-variant/$snapshot/$compiler-version/bin` directory.
 
 #### Importing Cabal as a library
 
@@ -93,7 +103,7 @@ Packages may themselves depend on the Cabal library.
 
 As any other dependency, they will use the snapshot version (which may be overridden using `extra-deps`).
 
-#### ⁂
+#### What this means
 
 There are a number of consequences of this design.
 
@@ -116,7 +126,7 @@ There are a number of consequences of this design.
    This is a resource intensive build, so avoiding it improves performance.
 
 5. Stack uses `ghc-pkg` to identify the Cabal version it should use for the setup executable for a build.
-   The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the Cabal version used to compile the setup executable.
+   The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the boot version of Cabal corresponding to the GHC version..
    Together, this means it is only possible to know for sure which Cabal version ought to be used if the corresponding compiler is installed.
 
    This behaviour will change with stack 2.0.
