@@ -38,7 +38,6 @@ import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
 -- | Options record for @stack dot@
@@ -259,14 +258,14 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
   where
     projectPackageDeps =
-      fmap loadDeps $ Map.lookup pkgName (smProject sourceMap)
+      loadDeps <$> Map.lookup pkgName (smProject sourceMap)
       where
         loadDeps pp = do
           pkg <- loadCommonPackage (ppCommon pp)
           pure (packageAllDeps pkg, payloadFromLocal pkg)
 
     dependencyDeps =
-      fmap loadDeps $ Map.lookup pkgName (smDeps sourceMap)
+      loadDeps <$> Map.lookup pkgName (smDeps sourceMap)
       where
         loadDeps DepPackage{dpLocation=PLMutable dir} = do
               pp <- mkProjectPackage YesPrintWarnings dir False
@@ -283,7 +282,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
 
     -- If package is a global package, use info from ghc-pkg (#4324, #3084)
     globalDeps =
-      fmap (pure . getDepsFromDump) $ Map.lookup pkgName globalDumpMap
+      pure . getDepsFromDump <$> Map.lookup pkgName globalDumpMap
       where
         getDepsFromDump dump =
           (Set.fromList deps, payloadFromDump dump)
