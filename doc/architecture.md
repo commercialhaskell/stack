@@ -110,7 +110,79 @@ authoritative on this and should be consulted. The basic idea though is:
 
 Once we have the plan, execution is a relatively simple process of calling
 `runghc Setup.hs` in the correct order with the correct parameters. See
-Stack.Build.Execute for more information.
+`Stack.Build.Execute` for the implementation.
+
+The `Setup.hs` file uses the Cabal library to build packages.
+
+#### Parsing Cabal files
+
+Stack itself builds against a version of the Cabal library, which it uses for parsing Cabal files.
+
+This version is not necessarily present on stack users’ machines.
+
+This version determines which version of the Cabal file format stack is able to parse.
+Where possible, releases of stack will be compiled using the most recent version of
+Cabal-the-library, in order to support the most recent versions of the Cabal file format.
+
+#### Building packages
+
+The version of the Cabal library used to build packages Stack builds a `Setup.hs` file against a version of the Cabal library, in order to build packages.
+
+The [boot version of Cabal used by GHC](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/VersionHistory),
+which is globally available to stack, is used to compile the `build-type: Simple` setup executable.
+All packages using the same compiler and Cabal version are built with the same executable.
+These executables are cached in the `setup-exe-cache` configuration directory.
+
+Build artefacts are placed in the corresponding `.stack-work/dist/Cabal-xxxxx` directory.
+
+For packages with `build-type: Custom`, Stack compiles `Setup.hs` against the version of the Cabal
+library present in the snapshot (which may be overridden using `extra-deps`), and uses that
+setup executable to perform builds. This treats Cabal as any other dependency package.
+The process is as follows:
+
+1.  Stack uses the boot version of Cabal to build the required version of Cabal, which is treated as though built with `build-type: Simple`.
+    This will take a short while — typically a few minutes.
+
+2.  Stack uses this version of Cabal to build the setup executable from the `Setup.hs` file.
+    The resulting executable is placed in the `.stack-work/dist/Cabal-xxxxx` directory corresponding to the boot version of Cabal — even though it was built with the snapshot version.
+
+3.  This setup executable builds the package.
+    Again, build artefacts are placed in the `.stack-work/dist/Cabal-xxxxx` directory — even though it was built with the snapshot version.
+    A resulting executable is copied to the `.stack-work/install/$compiler-variant/$snapshot/$compiler-version/bin` directory.
+
+#### Importing Cabal as a library
+
+Packages may themselves depend on the Cabal library.
+
+As any other dependency, they will use the snapshot version (which may be overridden using `extra-deps`).
+
+#### What this means
+
+There are a number of consequences of this design.
+
+1. Snapshot packages only depend on the GHC compiler version, not the Cabal library version (with the exception of `build-type: Custom` packages).
+
+2. The most recent stack can usually read the most recent Cabal files.
+
+3. However, stack may not be able to build packages defined using those files.
+
+   This occurs when
+
+   i. The package uses `build-type: Simple` and the Cabal file format requires a more recent version of Cabal than the global (boot) version for the compiler.
+
+      e.g. Stack lts-11.22 uses GHC 8.2.2, corresponding to Cabal 2.0.1.0.
+      A library using `build-type: Simple` and SPDX license identifiers (introduced in Cabal 2.2) will not build, though stack will process the Cabal file correctly.
+
+          Cabal-simple_mPHDZzAJ_2.0.1.0_ghc-8.2.2: ./file.cabal:7: Parse of field 'license' failed.
+
+4. Stack only occasionally needs to build Cabal-the-library.
+   This is a resource intensive build, so avoiding it improves performance.
+
+5. Stack uses `ghc-pkg` to identify the Cabal version it should use for the setup executable for a build.
+   The build output is stored in a directory `.stack-work/dist/Cabal-xxxxx` named for the boot version of Cabal corresponding to the GHC version..
+   Together, this means it is only possible to know for sure which Cabal version ought to be used if the corresponding compiler is installed.
+
+   This behaviour will change with stack 2.0.
 
 ## Configuration
 

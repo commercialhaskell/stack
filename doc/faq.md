@@ -44,7 +44,9 @@ directory. None of this should affect any existing Haskell tools at all.
 
 ## What is the relationship between stack and cabal?
 
-* Cabal-the-library is used by stack to build your Haskell code.
+* Cabal-the-library is used by stack to build your Haskell code. See the
+  [Architecture: Plan Execution](architecture.md#plan-execution) section for
+  more detail, including how the Cabal version is chosen.
 * cabal-install (the executable) is used by stack for its dependency solver
   functionality.
 * A .cabal file is provided for each package, and defines all package-level
@@ -56,6 +58,9 @@ directory. None of this should affect any existing Haskell tools at all.
   file. Project initialization is something that is still being discussed and
   there may be more options here for new projects in the future (see issue
   [253](https://github.com/commercialhaskell/stack/issues/253))
+
+For detail on the differences between a `stack.yaml` and Cabal package file, see
+[stack.yaml vs cabal package file](stack_yaml_vs_cabal_package_file.md).
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
