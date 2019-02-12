@@ -19,7 +19,7 @@ import           Stack.Prelude
 import           Stack.Types.Config
 import Stack.Config (loadConfigYaml)
 import Path (addFileExtension, parent, fromAbsFile, toFilePath)
-import Path.IO (doesFileExist)
+import Path.IO (doesFileExist, getModificationTime)
 import qualified Data.List.NonEmpty as NE
 
 data FreezeMode = FreezeProject | FreezeSnapshot
@@ -50,7 +50,7 @@ doFreeze p FreezeProject = do
   envConfig <- view envConfigL
   let bconfig = envConfigBuildConfig envConfig
   generateLockFile bconfig
-  isLockFileOutdated bconfig -- todo: remove this in future (just for testing)
+  -- isLockFileOutdated bconfig -- todo: remove this in future (just for testing)
   let deps :: [RawPackageLocation] = projectDependencies p
       resolver :: RawSnapshotLocation = projectResolver p
   resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
@@ -89,33 +89,34 @@ doFreeze p FreezeSnapshot = do
         logInfo "No freezing is required for the snapshot of this project"
         else
         liftIO $ B.putStr $ Yaml.encode snap'
-
 -- BuildConfig is in Types/Config.hs
 generateLockFile :: HasEnvConfig env => BuildConfig -> RIO env ()
 generateLockFile bconfig = do
-  let stackFile = bcStackYaml bconfig
-  lockFile <- liftIO $ addFileExtension "lock" stackFile
-  iosc <- loadConfigYaml (parseStackYamlConfig (parent stackFile)) stackFile
-  StackYamlConfig deps resolver <- liftIO iosc
-  resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
-  deps' :: [PackageLocation] <- mapM completePackageLocation' deps
-  let deps'' = map toRawPL deps'
-  let depsObject = Yaml.object [
-                            ("resolver",
-                                       Yaml.array
-                                           [
-                                            object [("original", Yaml.toJSON resolver)],
-                                            object [("complete", Yaml.toJSON resolver')]
-                                           ]
-                            ),
-                            ("dependencies",
-                                           Yaml.array
-                                                   [
-                                                    object [("original", Yaml.toJSON deps)],
-                                                    object [("complete", Yaml.toJSON deps'')]
-                                                   ]
-                            )]
-  B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
+    let stackFile = bcStackYaml bconfig
+    lockFile <- liftIO $ addFileExtension "lock" stackFile
+    iosc <- loadConfigYaml (parseStackYamlConfig (parent stackFile)) stackFile
+    StackYamlConfig deps resolver <- liftIO iosc
+    resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
+    deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+    let deps'' = map (\x -> (x, toRawPL x)) deps'
+    let depsObject =
+            Yaml.object
+                [ ( "resolver"
+                  , object
+                        [ ("original", Yaml.toJSON resolver)
+                        , ("complete", Yaml.toJSON resolver')
+                        ])
+                , ( "dependencies"
+                  , Yaml.array
+                        (map (\(comp, raw) ->
+                                  object
+                                      [ ("original", Yaml.toJSON raw)
+                                      , ("complete", Yaml.toJSON comp)
+                                      ])
+                             deps''))
+                ]
+    B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
+
 
 
 hasLockFile :: HasEnvConfig env => BuildConfig -> RIO env Bool
@@ -134,24 +135,21 @@ parsePLI bconfig = do
   plis' <- liftIO $ plis
   pure $ NE.toList plis'
 
--- Parse the orignial stack file and then parse the lock file and then compare it with  the original file content
+
 isLockFileOutdated :: HasEnvConfig env => BuildConfig -> RIO env Bool
 isLockFileOutdated bconfig = do
   let stackFile = bcStackYaml bconfig
-  plis <- parsePLI bconfig
   lockFile <- liftIO $ addFileExtension "lock" stackFile
-  iosc <- loadConfigYaml (parseStackYamlConfig (parent stackFile)) stackFile
-  StackYamlConfig deps resolver <- liftIO iosc
-  resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
-  deps' :: [PackageLocation] <- mapM completePackageLocation' deps
-  let deps'' = map toRawPL deps'
-      rawResolver = toRawSL resolver'
-      isUpdated = (deps'' == deps) && (resolver == rawResolver)
-  liftIO $ Prelude.print "raw PLI"
-  liftIO $ Prelude.print deps
-  liftIO $ Prelude.print "raw PLI from complete"
-  liftIO $ Prelude.print plis
-  pure $ not isUpdated
-
+  smt <- liftIO $ getModificationTime stackFile
+  lmt <- liftIO $ do
+           exists <- doesFileExist lockFile
+           if exists
+           then do
+             mt <- getModificationTime lockFile
+             pure $ Just mt
+           else pure Nothing
+  case lmt of
+    Nothing -> return True
+    Just mt -> return $ smt /= mt
 
 -- Use loadProjectConfig and parseLockfile to see if lock file has been outdated
