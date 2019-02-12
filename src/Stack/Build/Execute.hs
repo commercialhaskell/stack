@@ -1858,7 +1858,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
                                     mres <- timeout (maxSecs * 1000000) action
                                     case mres of
-                                      Nothing -> throwString "test suite timed out"
+                                      Nothing -> throwString $ "test suite timed out, package " <>
+                                                               packageNameString pname <> ", suite: " <>
+                                                               T.unpack testName <> T.unpack argsDisplay
                                       Just res -> return res
                                 | otherwise = action
 
