@@ -314,6 +314,10 @@ instance Display PackageLocation where
   display (PLImmutable loc) = display loc
   display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
 
+instance ToJSON PackageLocation where
+  toJSON (PLImmutable pli) = toJSON pli
+  toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
+
 -- | Convert `PackageLocation` to its "raw" equivalent
 --
 -- @since 0.1.0.0
