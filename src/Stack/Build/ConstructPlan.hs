@@ -102,8 +102,6 @@ data W = W
     -- ^ executable to be installed, and location where the binary is placed
     , wDirty :: !(Map PackageName Text)
     -- ^ why a local package is considered dirty
-    , wDeps :: !(Set PackageName)
-    -- ^ Packages which count as dependencies
     , wWarnings :: !([Text] -> [Text])
     -- ^ Warnings
     , wParents :: !ParentMap
@@ -184,10 +182,10 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     econfig <- view envConfigL
     sources <- getSources
 
-    let onTarget = void . addDep False
+    let onTarget = void . addDep
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
     let ctx = mkCtx econfig sources
-    ((), m, W efinals installExes dirtyReason deps warnings parents) <-
+    ((), m, W efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
     let toEither (_, Left e)  = Left e
@@ -204,7 +202,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
                     case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
                         BSAll -> id
                         BSOnlySnapshot -> stripLocals
-                        BSOnlyDependencies -> stripNonDeps deps
+                        BSOnlyDependencies -> stripNonDeps (M.keysSet $ smDeps sourceMap)
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
@@ -356,7 +354,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
 -- step.
 addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
-    depsRes <- addPackageDeps False package
+    depsRes <- addPackageDeps {-False-} package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -394,13 +392,10 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- forcing this package to be marked as a dependency, even if it is
 -- directly wanted. This makes sense - if we left out packages that are
 -- deps, it would break the --only-dependencies build plan.
-addDep :: Bool -- ^ is this being used by a dependency?
-       -> PackageName
+addDep :: PackageName
        -> M (Either ConstructPlanException AddDepRes)
-addDep treatAsDep' name = do
+addDep name = do
     ctx <- ask
-    let treatAsDep = treatAsDep' || name `Set.notMember` wanted ctx
-    when treatAsDep $ markAsDep name
     m <- get
     case Map.lookup name m of
         Just res -> do
@@ -439,10 +434,10 @@ addDep treatAsDep' name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps Nothing
+                            installPackage name ps Nothing
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps (Just installed)
+                            installPackage name ps (Just installed)
             updateLibMap name res
             return res
 
@@ -494,30 +489,29 @@ tellExecutablesPackage loc p = do
 
 -- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
 -- build 'Task's for the package and its dependencies.
-installPackage :: Bool -- ^ is this being used by a dependency?
-               -> PackageName
+installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
                -> M (Either ConstructPlanException AddDepRes)
-installPackage treatAsDep name ps minstalled = do
+installPackage name ps minstalled = do
     ctx <- ask
     case ps of
         PSRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
-            resolveDepsAndInstall True treatAsDep (cpHaddocks cp) ps package minstalled
+            resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
         PSFilePath lp ->
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps treatAsDep tb
+                        res <- addPackageDeps tb
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -538,7 +532,7 @@ installPackage treatAsDep name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False treatAsDep (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for addFinal.
@@ -548,13 +542,12 @@ installPackage treatAsDep name ps minstalled = do
 
 resolveDepsAndInstall :: Bool
                       -> Bool
-                      -> Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
                       -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne treatAsDep buildHaddocks ps package minstalled = do
-    res <- addPackageDeps treatAsDep package
+resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
+    res <- addPackageDeps package
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
@@ -641,13 +634,12 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
-addPackageDeps treatAsDep package = do
+addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
+addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
-        eres <- addDep treatAsDep depname
+        eres <- addDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev = do
               vsAndRevs <- runRIO ctx $ getHackagePackageVersions UsePreferredVersions depname
@@ -929,10 +921,19 @@ stripNonDeps deps plan = plan
     , planInstallExes = Map.empty -- TODO maybe don't disable this?
     }
   where
-    checkTask task = pkgName (taskProvides task) `Set.member` deps
+    checkTask task = taskProvides task `Set.member` missingForDeps
+    providesDep task = pkgName (taskProvides task) `Set.member` deps
+    missing = Map.fromList $ map (taskProvides &&& tcoMissing . taskConfigOpts) $
+              Map.elems (planTasks plan)
+    missingForDeps = flip execState mempty $ do
+      for_ (Map.elems $ planTasks plan) $ \task ->
+        when (providesDep task) $ collectMissing mempty (taskProvides task)
 
-markAsDep :: PackageName -> M ()
-markAsDep name = tell mempty { wDeps = Set.singleton name }
+    collectMissing dependents pid = do
+      when (pid `elem` dependents) $ error $
+        "Unexpected: task cycle for " <> packageNameString (pkgName pid)
+      modify' $ (<> Set.singleton pid)
+      mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
 -- | Is the given package/version combo defined in the snapshot?
 inSnapshot :: PackageName -> Version -> M Bool
