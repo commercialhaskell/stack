@@ -932,7 +932,7 @@ stripNonDeps deps plan = plan
     collectMissing dependents pid = do
       when (pid `elem` dependents) $ error $
         "Unexpected: task cycle for " <> packageNameString (pkgName pid)
-      modify' $ (<> Set.singleton pid)
+      modify'(<> Set.singleton pid)
       mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
 -- | Is the given package/version combo defined in the snapshot?
