@@ -105,11 +105,15 @@ getInstalled opts installMap = do
                 Nothing -> m
                 Just (iLoc, iVersion)
                     -- Not the version we want, ignore it
-                    | version /= iVersion || loc /= iLoc -> Map.empty
+                    | version /= iVersion || mismatchingLoc loc iLoc -> Map.empty
 
                     | otherwise -> m
           where
             m = Map.singleton name (loc, Executable $ PackageIdentifier name version)
+            mismatchingLoc installed target | target == installed = False
+                                            | installed == Local = False -- snapshot dependency could end up
+                                                                         -- in a local install as being mutable
+                                            | otherwise = True
     exesSnap <- getInstalledExes Snap
     exesLocal <- getInstalledExes Local
     let installedMap = Map.unions
