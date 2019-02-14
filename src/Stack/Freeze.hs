@@ -98,7 +98,7 @@ generateLockFile bconfig = do
     StackYamlConfig deps resolver <- liftIO iosc
     resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
     deps' :: [PackageLocation] <- mapM completePackageLocation' deps
-    let deps'' = map (\x -> (x, toRawPL x)) deps'
+    let deps'' = map (\x -> (fst x, snd x)) (zip deps deps')
     let depsObject =
             Yaml.object
                 [ ( "resolver"
@@ -108,7 +108,7 @@ generateLockFile bconfig = do
                         ])
                 , ( "dependencies"
                   , Yaml.array
-                        (map (\(comp, raw) ->
+                        (map (\(raw, comp) ->
                                   object
                                       [ ("original", Yaml.toJSON raw)
                                       , ("complete", Yaml.toJSON comp)
