@@ -115,7 +115,7 @@ getRepo' repo@(Repo url commit repoType' subdir) rpm =
       when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
       runCommand archiveArgs
     abs' <- resolveFile' tarball
-    getArchive
+    getArchivePackage
       (RPLIRepo repo rpm)
       RawArchive
         { raLocation = ALFilePath $ ResolvedPath

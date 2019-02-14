@@ -4,11 +4,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Logic for loading up trees from HTTPS archives.
 module Pantry.Archive
-  ( getArchive
+  ( getArchivePackage
+  , getArchive
   , getArchiveKey
   , fetchArchivesRaw
   , fetchArchives
-  , withArchiveLoc
   ) where
 
 import RIO
@@ -64,20 +64,32 @@ getArchiveKey
   -> RawArchive
   -> RawPackageMetadata
   -> RIO env TreeKey
-getArchiveKey rpli archive rpm = packageTreeKey <$> getArchive rpli archive rpm -- potential optimization
+getArchiveKey rpli archive rpm =
+  packageTreeKey <$> getArchivePackage rpli archive rpm -- potential optimization
 
-getArchive
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+thd3 :: (a, b, c) -> c
+thd3 (_, _, z) = z
+
+getArchivePackage
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env, HasCallStack)
   => RawPackageLocationImmutable -- ^ for exceptions
   -> RawArchive
   -> RawPackageMetadata
   -> RIO env Package
+getArchivePackage rpli archive rpm = thd3 <$> getArchive rpli archive rpm
+
+getArchive
+  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env, HasCallStack)
+  => RawPackageLocationImmutable -- ^ for exceptions
+  -> RawArchive
+  -> RawPackageMetadata
+  -> RIO env (SHA256, FileSize, Package)
 getArchive rpli archive rpm = do
   -- Check if the value is in the archive, and use it if possible
-  mpa <- loadCache rpli archive
-  pa <-
-    case mpa of
-      Just pa -> pure pa
+  mcached <- loadCache rpli archive
+  cached@(_, _, pa) <-
+    case mcached of
+      Just stored -> pure stored
       -- Not in the archive. Load the archive. Completely ignore the
       -- PackageMetadata for now, we'll check that the Package
       -- info matches next.
@@ -86,9 +98,9 @@ getArchive rpli archive rpm = do
         -- Storing in the cache exclusively uses information we have
         -- about the archive itself, not metadata from the user.
         storeCache archive sha size pa
-        pure pa
+        pure (sha, size, pa)
 
-  either throwIO pure $ checkPackageMetadata rpli rpm pa
+  either throwIO (\_ -> pure cached) $ checkPackageMetadata rpli rpm pa
 
 storeCache
   :: forall env. (HasPantryConfig env, HasLogFunc env)
@@ -106,7 +118,7 @@ loadCache
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RawArchive
-  -> RIO env (Maybe Package)
+  -> RIO env (Maybe (SHA256, FileSize, Package))
 loadCache rpli archive =
   case loc of
     ALFilePath _ -> pure Nothing -- TODO can we do something intelligent here?
@@ -132,7 +144,7 @@ loadCache rpli archive =
                   logWarn $ "Cached hash is " <> display sha <> ", file size " <> display size
                   logWarn "For security and reproducibility, please add a hash and file size to your configuration"
                 ALFilePath _ -> pure ()
-              loadFromCache tid
+              fmap (sha, size,) <$> loadFromCache tid
         Just sha'
           | sha == sha' ->
               case msize of
@@ -142,9 +154,9 @@ loadCache rpli archive =
                       logWarn $ "Archive from " <> display url <> " does not specify a size"
                       logWarn $ "To avoid an overflow attack, please add the file size to your configuration: " <> display size
                     ALFilePath _ -> pure ()
-                  loadFromCache tid
+                  fmap (sha, size,) <$> loadFromCache tid
                 Just size'
-                  | size == size' -> loadFromCache tid
+                  | size == size' -> fmap (sha, size,) <$> loadFromCache tid
                   | otherwise -> do
 
                       logWarn $ "Archive from " <> display loc <> " has a matching hash but mismatched size"

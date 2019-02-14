@@ -482,7 +482,7 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
           , T.pack $ Distribution.Text.display ver
           , ".tar.gz"
           ]
-    package <- getArchive
+    package <- getArchivePackage
       rpli
       RawArchive
         { raLocation = ALUrl url
