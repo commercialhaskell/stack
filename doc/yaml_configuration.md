@@ -617,7 +617,7 @@ Possible arguments include `standard`, `gmp4`, `tinfo6`, and `nopie`.
 
 (Since 0.1.5)
 
-Allows overriding from where tools like GHC and msys2 (on Windows) are
+Allows augmenting from where tools like GHC and msys2 (on Windows) are
 downloaded. Most useful for specifying locations of custom GHC binary
 distributions (for use with the [ghc-variant](#ghc-variant) option):
 
@@ -636,6 +636,9 @@ setup-info: "https://raw.githubusercontent.com/fpco/stackage-content/master/stac
 ```
 
 `url` may be either URL or (since 1.2.0) absolute file path.
+
+Note that this **adds** the specified setup info metadata to the default (unlike the
+`stack --setup-info-yaml` command-line argument, which **replaces** it).
 
 ### pvp-bounds
 
