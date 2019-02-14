@@ -261,7 +261,7 @@ isAllowed opts mcache installMap mloc dp
     PackageIdentifier name version = dpPackageIdent dp
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
-    checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
+    checkLocation Snap = True -- snapshot deps could become mutable after getting any mutable dependency
     checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
     -- Check if a package is allowed if it is found in the sourceMap
     checkFound (installLoc, installVer)

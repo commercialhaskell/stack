@@ -75,7 +75,6 @@ combineSourceInstalled :: PackageSource
                        -> PackageInfo
 combineSourceInstalled ps (location, installed) =
     assert (psVersion ps == installedVersion installed) $
-    assert (psLocation ps == location) $
     case location of
         -- Always trust something in the snapshot
         Snap -> PIOnlyInstalled location installed
@@ -330,10 +329,6 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
           = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
-      -- Check if we're no longer using the local version
-      | Just (dpLocation -> PLImmutable _) <- Map.lookup name (smDeps sourceMap)
-          -- FIXME:qrilka do git/archive count as snapshot installed?
-          = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
           = Just $ "Dependency being unregistered: " <> T.pack (packageIdentifierString dep)
