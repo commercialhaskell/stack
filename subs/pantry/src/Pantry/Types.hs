@@ -1624,6 +1624,111 @@ instance FromJSON (Unresolved PackageLocationImmutable) where
       --     archiveSubdir <- o ..: "subdir"
       --     pure $ pure $ pure $ PLIArchive Archive {..} pm) value
 
+parseResolvedPath :: Value -> Parser (Unresolved RawPackageLocation)
+parseResolvedPath value = mkMutable <$> parseJSON value
+    where
+      mkMutable :: Text -> Unresolved RawPackageLocation
+      mkMutable t = Unresolved $ \mdir -> do
+        case mdir of
+          Nothing -> throwIO $ MutablePackageLocationFromUrl t
+          Just dir -> do
+            abs' <- resolveDir dir $ T.unpack t
+            pure $ RPLMutable $ ResolvedPath (RelFilePath t) abs'
+
+
+parseRPLImmutable :: Value -> Parser (Unresolved RawPackageLocation)
+parseRPLImmutable v = do
+  xs :: Unresolved RawPackageLocationImmutable <- parseRPLI v
+  pure $ RPLImmutable <$> xs
+
+parseRPL :: Value -> Parser (Unresolved RawPackageLocation)
+parseRPL v = parseRPLImmutable v <|> parseResolvedPath v
+
+
+
+
+parseRPLI :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLI v =
+    parseRPLHttpText v <|> parseRPLHackageText v <|> parseRPLHackageObject v <|>
+    parseRPLRepo v <|>
+    parseArchiveRPLObject v <|>
+    parseGithubRPLObject v
+
+parseRPLHttpText :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLHttpText = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
+        case parseArchiveLocationText t of
+          Nothing -> fail $ "Invalid archive location: " ++ T.unpack t
+          Just (Unresolved mkArchiveLocation) ->
+            pure $ Unresolved $ \mdir -> do
+              raLocation <- mkArchiveLocation mdir
+              let raHash = Nothing
+                  raSize = Nothing
+                  raSubdir = T.empty
+              pure $ RPLIArchive RawArchive {..} rpmEmpty
+
+parseRPLHackageText :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLHackageText = withText "UnresolvedPackageLocationImmutable.UPLIHackage (Text)" $ \t ->
+        case parsePackageIdentifierRevision t of
+          Left e -> fail $ show e
+          Right pir -> pure $ pure $ RPLIHackage pir Nothing
+
+parseRPLHackageObject :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLHackageObject = withObject "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure) <$> (RPLIHackage
+        <$> o .: "hackage"
+        <*> o .:? "pantry-tree")
+
+optionalSubdirs :: Object -> Parser OptionalSubdirs
+optionalSubdirs o =
+    case HM.lookup "subdirs" o of         -- if subdirs exists, it needs to be valid
+      Just v' -> do
+        subdirs <- parseJSON v'
+        case NE.nonEmpty subdirs of
+          Nothing -> fail "Invalid empty subdirs"
+          Just x -> pure $ OSSubdirs x
+      Nothing -> OSPackageMetadata
+                 <$> o .:? "subdir" .!= T.empty
+                 <*> (RawPackageMetadata
+                      <$> (fmap unCabalString <$> (o .:? "name"))
+                      <*> (fmap unCabalString <$> (o .:? "version"))
+                      <*> o .:? "pantry-tree"
+                      <*> o .:? "cabal-file")
+
+parseRPLRepo :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLRepo = withObject "UnresolvedPackageLocationImmutable.UPLIRepo" $ \o -> do
+                 (repoType, repoUrl) <-
+                     ((RepoGit, ) <$> o .: "git") <|>
+                     ((RepoHg, ) <$> o .: "hg")
+                 repoCommit <- o .: "commit"
+                 os <- optionalSubdirs o
+                 pure $ pure $ NE.head $ NE.map (\(repoSubdir, pm) -> RPLIRepo Repo {..} pm) (osToRpms os)
+
+parseArchiveRPLObject :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseArchiveRPLObject = withObject "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
+  Unresolved mkArchiveLocation <- unWarningParser $ parseArchiveLocationObject o
+  raHash <- o .:? "sha256"
+  raSize <- o .:? "size"
+  os <- optionalSubdirs o
+  pure $ Unresolved $ \mdir -> do
+    raLocation <- mkArchiveLocation mdir
+    pure $ NE.head $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
+
+parseGithubRPLObject :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseGithubRPLObject = withObject "PLArchive:github" $ \o -> do
+  GitHubRepo ghRepo <- o .: "github"
+  commit <- o .: "commit"
+  let raLocation = ALUrl $ T.concat
+        [ "https://github.com/"
+        , ghRepo
+        , "/archive/"
+        , commit
+        , ".tar.gz"
+        ]
+  raHash <- o .:? "sha256"
+  raSize <- o .:? "size"
+  os <- optionalSubdirs o
+  pure $ pure $ NE.head $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
+
+
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where
   parseJSON v
       = http v
@@ -1652,6 +1757,8 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
           Left e -> fail $ show e
           Right pir -> pure $ noJSONWarnings $ pure $ pure $ RPLIHackage pir Nothing
 
+
+      hackageObject :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
       hackageObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o -> (pure.pure) <$> (RPLIHackage
         <$> o ..: "hackage"
         <*> o ..:? "pantry-tree")
