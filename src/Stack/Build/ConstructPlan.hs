@@ -207,7 +207,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
                 , planInstallExes =
                     if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
                        boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
@@ -275,12 +275,11 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Reasons why packages are dirty and must be rebuilt
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
-                  -> SourceMap
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps
                   -- build - don't unregister target packages.
                   -> Map GhcPkgId (PackageIdentifier, Text)
-mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
+mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
     -- We'll take multiple passes through the local packages. This
     -- will allow us to detect that a package should be unregistered,
     -- as well as all packages directly or transitively depending on
