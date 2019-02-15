@@ -29,7 +29,7 @@ generateLockFile stackFile = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
     resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
     deps' :: [PackageLocation] <- mapM completePackageLocation' deps
-    let deps'' = map (\x -> (fst x, snd x)) (zip deps deps')
+    let deps'' = zip deps deps'
     let depsObject =
             Yaml.object
                 [ ( "resolver"
