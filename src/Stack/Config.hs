@@ -523,12 +523,11 @@ stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcess
   -> RIO env PackageLocation
 stackCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
   let xs = filter (\(_,x) -> x == rp) cachePackages
-  item <- case xs of
-            [] -> do
-              pl <- completePackageLocation rpli
-              pure $ PLImmutable pl
-            (x,_):_ -> pure x
-  pure item
+  case xs of
+    [] -> do
+      pl <- completePackageLocation rpli
+      pure $ PLImmutable pl
+    (x,_):_ -> pure x
 stackCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
@@ -606,7 +605,7 @@ loadBuildConfig mproject maresolver mcompiler = do
             }
 
     lockFileOutdated <- isLockFileOutdated stackYamlFP
-    when (not lockFileOutdated) (logDebug "Lock file is upto date")
+    unless lockFileOutdated (logDebug "Lock file is upto date")
     when lockFileOutdated (logDebug "Lock file is outdated" >> generateLockFile stackYamlFP)
 
     -- liftIO $ resolveLockFile (parent stackYamlFP)

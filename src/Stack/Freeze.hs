@@ -13,7 +13,6 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Yaml as Yaml
 import Path (addFileExtension, fromAbsFile, parent, toFilePath)
 import Path.IO (doesFileExist, getModificationTime)
-import qualified Prelude as Prelude
 import qualified RIO.ByteString as B
 import RIO.Process
 import Stack.Config (loadConfigYaml)

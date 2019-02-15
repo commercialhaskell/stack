@@ -205,7 +205,6 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
                         BSAll -> id
                         BSOnlySnapshot -> stripLocals
                         BSOnlyDependencies -> stripNonDeps deps
-            logDebug "constructPlan: 1"
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
