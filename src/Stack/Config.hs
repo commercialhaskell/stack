@@ -86,7 +86,9 @@ import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.PrettyPrint
+import Stack.Lock (generateLockFile, isLockFileOutdated)
 import           RIO.Process
+import Pantry (loadLockFile)
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -513,6 +515,22 @@ loadConfig :: HasRunner env
 loadConfig configArgs mresolver mstackYaml inner =
     loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
 
+
+
+stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => [(PackageLocation, RawPackageLocation)]
+  -> RawPackageLocation
+  -> RIO env PackageLocation
+stackCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
+  let xs = filter (\(_,x) -> x == rp) cachePackages
+  item <- case xs of
+            [] -> do
+              pl <- completePackageLocation rpli
+              pure $ PLImmutable pl
+            (x,_):_ -> pure x
+  pure item
+stackCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
+
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
@@ -587,6 +605,13 @@ loadBuildConfig mproject maresolver mcompiler = do
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
+    lockFileOutdated <- isLockFileOutdated stackYamlFP
+    when lockFileOutdated (generateLockFile stackYamlFP)
+
+    -- liftIO $ resolveLockFile (parent stackYamlFP)
+    lockFile <- liftIO $ addFileExtension "lock" stackYamlFP
+    cachePL <- liftIO $ loadLockFile lockFile
+
     resolver <- completeSnapshotLocation $ projectResolver project
     (snapshot, _completed) <- loadAndCompleteSnapshot resolver
 
@@ -604,7 +629,7 @@ loadBuildConfig mproject maresolver mcompiler = do
         completeLocation (RPLImmutable im) = PLImmutable <$> completePackageLocation im
 
     deps0 <- forM (projectDependencies project) $ \rpl -> do
-      pl <- completeLocation rpl
+      pl <- stackCompletePackageLocation cachePL rpl
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
       pure (cpName $ dpCommon dp, dp)
 
