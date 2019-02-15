@@ -45,10 +45,6 @@ doFreeze ::
     -> FreezeMode
     -> RIO env ()
 doFreeze p FreezeProject = do
-    envConfig <- view envConfigL
-    let bconfig = envConfigBuildConfig envConfig
-    generateLockFile (bcStackYaml bconfig)
-    isLockFileOutdated bconfig -- todo: remove this in future (just for testing)
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
     resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
