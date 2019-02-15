@@ -19,6 +19,7 @@ import Stack.Types.Config
 -- BuildConfig is in Types/Config.hs
 generateLockFile :: Path Abs File -> RIO Config ()
 generateLockFile stackFile = do
+    logDebug "Gennerating lock file"
     mproject <- view $ configL . to configMaybeProject
     p <-
         case mproject of

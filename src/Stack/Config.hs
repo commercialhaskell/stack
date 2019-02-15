@@ -606,7 +606,8 @@ loadBuildConfig mproject maresolver mcompiler = do
             }
 
     lockFileOutdated <- isLockFileOutdated stackYamlFP
-    when lockFileOutdated (generateLockFile stackYamlFP)
+    when (not lockFileOutdated) (logDebug "Lock file is upto date")
+    when lockFileOutdated (logDebug "Lock file is outdated" >> generateLockFile stackYamlFP)
 
     -- liftIO $ resolveLockFile (parent stackYamlFP)
     lockFile <- liftIO $ addFileExtension "lock" stackYamlFP
