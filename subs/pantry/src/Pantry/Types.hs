@@ -67,6 +67,7 @@ module Pantry.Types
   , packageIdentifierString
   , packageNameString
   , resolveLockFile
+  , loadLockFile
   , parseAndResolvePackageLocation
   , flagNameString
   , versionString
@@ -110,6 +111,7 @@ import RIO
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Conduit.Tar as Tar
 import qualified Data.Vector as Vector
+import qualified Data.Yaml as Yaml
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
@@ -144,7 +146,7 @@ import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile)
+import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile, parent)
 import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
@@ -1574,20 +1576,19 @@ resolveLockFile rootDir v = do
       val'' = resolvePaths (Just rootDir) val'
   pure val''
 
+loadLockFile :: Path Abs File -> IO [(PackageLocation, RawPackageLocation)]
+loadLockFile lockFile = do
+  val <- Yaml.decodeFileThrow (toFilePath lockFile)
+  case Yaml.parseEither (resolveLockFile (parent lockFile)) val of
+    Left str -> fail "Cannot parse lock file" -- todo: fix this
+    Right iopl -> do
+      pl <- iopl
+      pure pl
 
 parsePImmutable :: Value -> Parser (Unresolved PackageLocation)
 parsePImmutable v = do
   xs :: Unresolved PackageLocationImmutable <- parseJSON v
   pure $ PLImmutable <$> xs
-
--- parsePL :: Value -> Parser (Unresolved RawPackageLocation)
--- parsePL v = parseRPLImmutable v <|> parseResolvedPath v
-
-
-
-
-
-
 
 instance FromJSON (Unresolved PackageLocationImmutable) where
     parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v <|> github v
