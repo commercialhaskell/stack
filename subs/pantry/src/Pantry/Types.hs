@@ -66,7 +66,7 @@ module Pantry.Types
   , parseVersionThrowing
   , packageIdentifierString
   , packageNameString
-  , parseLockFile
+  , resolveLockFile
   , parseAndResolvePackageLocation
   , flagNameString
   , versionString
@@ -1543,38 +1543,54 @@ parseAndResolvePackageLocation rootDir v = do
   (Unresolved unresolvedPL) <- parsePackageLocation v
   pure $ unresolvedPL (Just rootDir)
 
+combineUnresolved :: Unresolved a -> Unresolved b -> Unresolved (a,b)
+combineUnresolved a b = do
+  ua <- a
+  ub <- b
+  pure (ua, ub)
+
+parseSingleObject :: Value -> Parser (Unresolved (PackageLocation, RawPackageLocation))
+parseSingleObject value = withObject "LockFile" (\obj -> do
+                                                   original <- obj .: "original"
+                                                   complete <- obj .: "complete"
+                                                   orig <- parseRPLImmutable original
+                                                   comp <- parsePImmutable complete
+                                                   pure $ combineUnresolved comp orig
+                                                   ) value
+
+
 parseLockFile ::
-       Path Abs Dir -> Value -> Parser (IO (NonEmpty PackageLocation))
-parseLockFile rootDir value = do
-    (WithJSONWarnings val _) <-
-        withObjectWarnings
-            "PackageLocationimmutable"
-            (\obj -> do
-                 deps <- obj ..: "dependencies"
-                 lift $
-                     withArray
-                         "Dependencies (Array)"
-                         (\vector -> do
-                              let vector' :: Array =
-                                      Vector.filter isCompleteObject vector
-                              let pli :: Vector (Parser (IO (NonEmpty PackageLocation))) =
-                                      Vector.map
-                                          (\(Object o) -> do
-                                               complete <- o .: "complete"
-                                               pl :: (IO (NonEmpty PackageLocation)) <-
-                                                   parseAndResolvePackageLocation rootDir complete
-                                               pure pl)
-                                          vector'
-                                  pliSeq = sequence pli
-                              pli' :: Vector (IO (NonEmpty PackageLocation)) <- pliSeq
-                              pure pli')
-                         deps)
-            value
-    let pli :: Vector (IO (NonEmpty (PackageLocation))) = val
-    pure $ Vector.foldr1 appendPLI' pli
+       Value -> Parser [Unresolved (PackageLocation, RawPackageLocation)]
+parseLockFile value = withObject "LockFile" (\obj -> do
+                                               vals :: Value <- obj .: "dependencies"
+                                               xs <- withArray "LockFileArray" (\vec -> sequence $ Vector.map parseSingleObject vec) vals
+                                               pure $ Vector.toList xs
+                                            ) value
+
+resolveLockFile :: Path Abs Dir -> Value -> Parser (IO [(PackageLocation, RawPackageLocation)])
+resolveLockFile rootDir v = do
+  val <- parseLockFile v
+  let val' = sequence val
+      val'' = resolvePaths (Just rootDir) val'
+  pure val''
+
+
+parsePImmutable :: Value -> Parser (Unresolved PackageLocation)
+parsePImmutable v = do
+  xs :: Unresolved PackageLocationImmutable <- parseJSON v
+  pure $ PLImmutable <$> xs
+
+-- parsePL :: Value -> Parser (Unresolved RawPackageLocation)
+-- parsePL v = parseRPLImmutable v <|> parseResolvedPath v
+
+
+
+
+
+
 
 instance FromJSON (Unresolved PackageLocationImmutable) where
-    parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v
+    parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v <|> github v
                   <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
         where
           repoObject :: Value -> Parser (Unresolved PackageLocationImmutable)
@@ -1586,11 +1602,11 @@ instance FromJSON (Unresolved PackageLocationImmutable) where
           archiveObject :: Value -> Parser (Unresolved PackageLocationImmutable)
           archiveObject value@(Object _) = do
             pm <- parseJSON value
-            (WithJSONWarnings pli _) <- withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
-              Unresolved mkArchiveLocation <- parseArchiveLocationObject o
-              archiveHash <- o ..: "sha256"
-              archiveSize <- o ..: "size"
-              archiveSubdir <- o ..: "subdir"
+            pli <- withObject "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
+              Unresolved mkArchiveLocation <- unWarningParser $ parseArchiveLocationObject o
+              archiveHash <- o .: "sha256"
+              archiveSize <- o .: "size"
+              archiveSubdir <- o .: "subdir"
               pure $ Unresolved $ \mdir -> do
                 archiveLocation <- mkArchiveLocation mdir
                 pure $ PLIArchive Archive {..} pm
@@ -1606,23 +1622,23 @@ instance FromJSON (Unresolved PackageLocationImmutable) where
                         Left e -> fail $ show e
                         Right (pkgIdentifier, blobKey) -> pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)) value
 
-      -- github :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty PackageLocationImmutable)))
-      -- github value = do
-      --   (WithJSONWarnings pm _) <- parseJSON value
-      --   withObjectWarnings "PLArchive:github" (\o -> do
-      --     GitHubRepo ghRepo <- o ..: "github"
-      --     commit <- o ..: "commit"
-      --     let archiveLocation = ALUrl $ T.concat
-      --           [ "https://github.com/"
-      --           , ghRepo
-      --           , "/archive/"
-      --           , commit
-      --           , ".tar.gz"
-      --           ]
-      --     archiveHash <- o ..: "sha256"
-      --     archiveSize <- o ..: "size"
-      --     archiveSubdir <- o ..: "subdir"
-      --     pure $ pure $ pure $ PLIArchive Archive {..} pm) value
+          github :: Value -> Parser (Unresolved PackageLocationImmutable)
+          github value = do
+            pm <- parseJSON value
+            withObject "PLArchive:github" (\o -> do
+              GitHubRepo ghRepo <- o .: "github"
+              commit <- o .: "commit"
+              let archiveLocation = ALUrl $ T.concat
+                    [ "https://github.com/"
+                    , ghRepo
+                    , "/archive/"
+                    , commit
+                    , ".tar.gz"
+                    ]
+              archiveHash <- o .: "sha256"
+              archiveSize <- o .: "size"
+              archiveSubdir <- o .: "subdir"
+              pure $ pure $ PLIArchive Archive {..} pm) value
 
 parseResolvedPath :: Value -> Parser (Unresolved RawPackageLocation)
 parseResolvedPath value = mkMutable <$> parseJSON value
@@ -1727,7 +1743,6 @@ parseGithubRPLObject = withObject "PLArchive:github" $ \o -> do
   raSize <- o .:? "size"
   os <- optionalSubdirs o
   pure $ pure $ NE.head $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
-
 
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where
   parseJSON v
