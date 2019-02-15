@@ -91,8 +91,6 @@ module Stack.Types.Config
   ,Curator(..)
   ,ProjectAndConfigMonoid(..)
   ,parseProjectAndConfigMonoid
-  ,StackYamlConfig(..)
-  ,parseStackYamlConfig
   -- ** PvpBounds
   ,PvpBounds(..)
   ,PvpBoundsType(..)
@@ -1434,25 +1432,6 @@ getCompilerPath wc = do
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
-
-data StackYamlConfig = StackYamlConfig {
-      sycDeps :: [RawPackageLocation],
-      sycResolver :: RawSnapshotLocation
-}
-
-data StackLockConfig = StackLockConfig {
-      slcDeps :: [PackageLocation],
-      slcResolver :: SnapshotLocation
-}
-
-parseStackYamlConfig :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO StackYamlConfig))
-parseStackYamlConfig rootDir = withObjectWarnings "StackYamlConfig" $ \o -> do
-                         deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
-                         resolver <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
-                         return $ do
-                           (deps' :: [NonEmpty RawPackageLocation]) <- mapM (resolvePaths (Just rootDir)) deps
-                           resolver' <- resolvePaths (Just rootDir) resolver
-                           pure $ StackYamlConfig { sycResolver = resolver', sycDeps = concatMap toList deps' }
 
 parseProjectAndConfigMonoid :: Path Abs Dir -> Value -> Yaml.Parser (WithJSONWarnings (IO ProjectAndConfigMonoid))
 parseProjectAndConfigMonoid rootDir =
