@@ -169,12 +169,10 @@ module Stack.Types.Config
 import           Control.Monad.Writer (tell)
 import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.Vector as Vector
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
-                  withObjectWarnings, WarningParser, Object, jsonSubWarnings, unWarningParser,
+                  withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -226,7 +224,6 @@ import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
-import           Data.Aeson (withArray, (.:))
 -- Re-exports
 import           Stack.Types.Config.Build as X
 

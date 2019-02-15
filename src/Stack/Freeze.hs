@@ -9,13 +9,9 @@ module Stack.Freeze
     ) where
 
 import Data.Aeson ((.=), object)
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Yaml as Yaml
-import Path (addFileExtension, fromAbsFile, parent, toFilePath)
-import Path.IO (doesFileExist, getModificationTime)
 import qualified RIO.ByteString as B
 import RIO.Process
-import Stack.Config (loadConfigYaml)
 import Stack.Prelude
 import Stack.Types.Config
 
@@ -47,7 +43,7 @@ doFreeze p FreezeProject = do
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
     resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
-    deps' :: [PackageLocation] <- mapM undefined deps
+    deps' :: [PackageLocation] <- mapM completePackageLocation' deps
     let rawCompleted = map toRawPL deps'
         rawResolver = toRawSL resolver'
     if rawCompleted == deps && rawResolver == resolver

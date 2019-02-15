@@ -108,7 +108,6 @@ module Pantry.Types
   ) where
 
 import RIO
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Conduit.Tar as Tar
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
@@ -1530,16 +1529,6 @@ rpmToPairs (RawPackageMetadata mname mversion mtree mcabal) = concat
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
   ]
 
-appendPLI :: NonEmpty (IO PackageLocation) -> NonEmpty (IO PackageLocation) -> NonEmpty (IO PackageLocation)
-appendPLI xs ys = xs <> ys
-
-appendPLI' :: IO (NonEmpty PackageLocation) -> IO (NonEmpty PackageLocation) -> IO (NonEmpty PackageLocation)
-appendPLI' xs ys = xs <> ys
-
-isCompleteObject :: Value -> Bool
-isCompleteObject obj@(Object xs) = HM.member "complete" xs
-isCompleteObject _ = False
-
 parseAndResolvePackageLocation :: Path Abs Dir -> Value -> Parser (IO (NonEmpty PackageLocation))
 parseAndResolvePackageLocation rootDir v = do
   (Unresolved unresolvedPL) <- parsePackageLocation v
@@ -1555,7 +1544,7 @@ parseSingleObject :: Value -> Parser (Unresolved (PackageLocation, RawPackageLoc
 parseSingleObject value = withObject "LockFile" (\obj -> do
                                                    original <- obj .: "original"
                                                    complete <- obj .: "complete"
-                                                   orig <- parseRPLImmutable original
+                                                   orig <- parseRPL original
                                                    comp <- parsePImmutable complete
                                                    pure $ combineUnresolved comp orig
                                                    ) value
@@ -1580,7 +1569,7 @@ loadLockFile :: Path Abs File -> IO [(PackageLocation, RawPackageLocation)]
 loadLockFile lockFile = do
   val <- Yaml.decodeFileThrow (toFilePath lockFile)
   case Yaml.parseEither (resolveLockFile (parent lockFile)) val of
-    Left str -> fail "Cannot parse lock file" -- todo: fix this
+    Left str -> fail $ "Cannot parse lock file: Got error " <> str
     Right iopl -> do
       pl <- iopl
       pure pl
@@ -1595,13 +1584,13 @@ instance FromJSON (Unresolved PackageLocationImmutable) where
                   <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
         where
           repoObject :: Value -> Parser (Unresolved PackageLocationImmutable)
-          repoObject value@(Object _) = do
+          repoObject value = do
             repo <- parseJSON value
             pm <- parseJSON value
             pure $ pure $ PLIRepo repo pm
 
           archiveObject :: Value -> Parser (Unresolved PackageLocationImmutable)
-          archiveObject value@(Object _) = do
+          archiveObject value = do
             pm <- parseJSON value
             pli <- withObject "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
               Unresolved mkArchiveLocation <- unWarningParser $ parseArchiveLocationObject o
@@ -1641,6 +1630,21 @@ instance FromJSON (Unresolved PackageLocationImmutable) where
               archiveSubdir <- o .: "subdir"
               pure $ pure $ PLIArchive Archive {..} pm) value
 
+parseRPLImmutable :: Value -> Parser (Unresolved RawPackageLocation)
+parseRPLImmutable v = do
+  xs :: Unresolved RawPackageLocationImmutable <- parseRPLI v
+  pure $ RPLImmutable <$> xs
+
+parseRPL :: Value -> Parser (Unresolved RawPackageLocation)
+parseRPL v = parseRPLImmutable v <|> parseResolvedPath v
+
+parseRPLI :: Value -> Parser (Unresolved RawPackageLocationImmutable)
+parseRPLI v =
+    parseRPLHttpText v <|> parseRPLHackageText v <|> parseRPLHackageObject v <|>
+    parseRPLRepo v <|>
+    parseArchiveRPLObject v <|>
+    parseGithubRPLObject v
+
 parseResolvedPath :: Value -> Parser (Unresolved RawPackageLocation)
 parseResolvedPath value = mkMutable <$> parseJSON value
     where
@@ -1651,25 +1655,6 @@ parseResolvedPath value = mkMutable <$> parseJSON value
           Just dir -> do
             abs' <- resolveDir dir $ T.unpack t
             pure $ RPLMutable $ ResolvedPath (RelFilePath t) abs'
-
-
-parseRPLImmutable :: Value -> Parser (Unresolved RawPackageLocation)
-parseRPLImmutable v = do
-  xs :: Unresolved RawPackageLocationImmutable <- parseRPLI v
-  pure $ RPLImmutable <$> xs
-
-parseRPL :: Value -> Parser (Unresolved RawPackageLocation)
-parseRPL v = parseRPLImmutable v <|> parseResolvedPath v
-
-
-
-
-parseRPLI :: Value -> Parser (Unresolved RawPackageLocationImmutable)
-parseRPLI v =
-    parseRPLHttpText v <|> parseRPLHackageText v <|> parseRPLHackageObject v <|>
-    parseRPLRepo v <|>
-    parseArchiveRPLObject v <|>
-    parseGithubRPLObject v
 
 parseRPLHttpText :: Value -> Parser (Unresolved RawPackageLocationImmutable)
 parseRPLHttpText = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
@@ -1694,8 +1679,8 @@ parseRPLHackageObject = withObject "UnresolvedPackageLocationImmutable.UPLIHacka
         <$> o .: "hackage"
         <*> o .:? "pantry-tree")
 
-optionalSubdirs :: Object -> Parser OptionalSubdirs
-optionalSubdirs o =
+optionalSubdirs' :: Object -> Parser OptionalSubdirs
+optionalSubdirs' o =
     case HM.lookup "subdirs" o of         -- if subdirs exists, it needs to be valid
       Just v' -> do
         subdirs <- parseJSON v'
@@ -1716,7 +1701,7 @@ parseRPLRepo = withObject "UnresolvedPackageLocationImmutable.UPLIRepo" $ \o -> 
                      ((RepoGit, ) <$> o .: "git") <|>
                      ((RepoHg, ) <$> o .: "hg")
                  repoCommit <- o .: "commit"
-                 os <- optionalSubdirs o
+                 os <- optionalSubdirs' o
                  pure $ pure $ NE.head $ NE.map (\(repoSubdir, pm) -> RPLIRepo Repo {..} pm) (osToRpms os)
 
 parseArchiveRPLObject :: Value -> Parser (Unresolved RawPackageLocationImmutable)
@@ -1724,7 +1709,7 @@ parseArchiveRPLObject = withObject "UnresolvedPackageLocationImmutable.UPLIArchi
   Unresolved mkArchiveLocation <- unWarningParser $ parseArchiveLocationObject o
   raHash <- o .:? "sha256"
   raSize <- o .:? "size"
-  os <- optionalSubdirs o
+  os <- optionalSubdirs' o
   pure $ Unresolved $ \mdir -> do
     raLocation <- mkArchiveLocation mdir
     pure $ NE.head $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
@@ -1742,7 +1727,7 @@ parseGithubRPLObject = withObject "PLArchive:github" $ \o -> do
         ]
   raHash <- o .:? "sha256"
   raSize <- o .:? "size"
-  os <- optionalSubdirs o
+  os <- optionalSubdirs' o
   pure $ pure $ NE.head $ NE.map (\(raSubdir, pm) -> RPLIArchive RawArchive {..} pm) (osToRpms os)
 
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where

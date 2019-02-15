@@ -8,3 +8,4 @@ packages:
 - infer-license-0.2.0@rev:0 #for hpack-0.31
 - tar-conduit-0.3.1@rev:0
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
+- string-quote-0.0.1@sha256:7d91a0ba1be44b2443497c92f2f027cd4580453b893f8b5ebf061e1d85befaf3

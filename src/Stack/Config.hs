@@ -625,9 +625,6 @@ loadBuildConfig mproject maresolver mcompiler = do
       pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
       pure (cpName $ ppCommon pp, pp)
 
-    let completeLocation (RPLMutable m) = pure $ PLMutable m
-        completeLocation (RPLImmutable im) = PLImmutable <$> completePackageLocation im
-
     deps0 <- forM (projectDependencies project) $ \rpl -> do
       pl <- stackCompletePackageLocation cachePL rpl
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl

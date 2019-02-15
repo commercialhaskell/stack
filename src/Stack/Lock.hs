@@ -4,18 +4,23 @@
 
 module Stack.Lock where
 
-import Data.Aeson ((.=), object)
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Yaml as Yaml
-import Pantry (completePackageLocation)
-import Path (addFileExtension, fromAbsFile, parent, toFilePath)
+import Data.Yaml (object)
+import Path (addFileExtension, fromAbsFile)
 import Path.IO (doesFileExist, getModificationTime)
 import qualified RIO.ByteString as B
-import RIO.Process
 import Stack.Prelude
 import Stack.Types.Config
 
--- BuildConfig is in Types/Config.hs
+data LockException =
+    LockNoProject
+    deriving (Typeable)
+
+instance Exception LockException
+
+instance Show LockException where
+    show (LockNoProject) = "No project found for locking."
+
 generateLockFile :: Path Abs File -> RIO Config ()
 generateLockFile stackFile = do
     logDebug "Gennerating lock file"
@@ -23,7 +28,7 @@ generateLockFile stackFile = do
     p <-
         case mproject of
             Just (p, _) -> return p
-            Nothing -> error "No project was found: nothing to freeze" -- todo
+            Nothing -> throwM LockNoProject
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
     lockFile <- liftIO $ addFileExtension "lock" stackFile
