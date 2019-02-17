@@ -19,7 +19,7 @@ data LockException =
 instance Exception LockException
 
 instance Show LockException where
-    show (LockNoProject) = "No project found for locking."
+    show LockNoProject = "No project found for locking."
 
 generateLockFile :: Path Abs File -> RIO Config ()
 generateLockFile stackFile = do
