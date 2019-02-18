@@ -67,6 +67,7 @@ module Pantry.Types
   , packageIdentifierString
   , packageNameString
   , resolveLockFile
+  , resolveSnapshotFile
   , LockFile (..)
   , loadLockFile
   , parseAndResolvePackageLocation
@@ -1556,6 +1557,18 @@ data LockFile a = LockFile {
       lfcResolver :: a SnapshotLocation
 }
 
+parseSnapshotFile :: Value -> Parser (Unresolved [RawPackageLocation])
+parseSnapshotFile (Object obj) = do
+  packages <- obj .: "packages"
+  xs <- withArray "SnapshotFileArray" (\vec -> sequence $ Vector.map parseRPL vec) packages
+  pure $ sequence $ Vector.toList xs
+parseSnapshotFile val = fail $ "Expected Object, but got: " <> (show val)
+
+resolveSnapshotFile :: Path Abs Dir -> Value -> Parser (IO [RawPackageLocation])
+resolveSnapshotFile rootDir val = do
+  unrpl <- parseSnapshotFile val
+  let pkgLoc = resolvePaths (Just rootDir) unrpl
+  pure pkgLoc
 
 parseLockFile ::
        Value -> Parser (LockFile Unresolved)
