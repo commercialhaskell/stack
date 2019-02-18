@@ -24,17 +24,17 @@ unpackSnapshot
   -> RIO env ()
 unpackSnapshot cons snap root = do
   unpacked <- parseRelDir "unpacked"
-  (suffixes, (flags, hidden), (skipTest, expectTestFailure), (skipBench, expectBenchmarkFailure),
+  (suffixes, flags, (skipTest, expectTestFailure), (skipBench, expectBenchmarkFailure),
    (skipHaddock, expectHaddockFailure)) <- fmap fold $ for (rsPackages snap) $ \sp -> do
     let pl = rspLocation sp
     TreeKey (BlobKey sha _size) <- getRawPackageLocationTreeKey pl
     PackageIdentifier name version <- getRawPackageLocationIdent pl
-    let (flags, hide, skipBuild, test, bench, haddock) =
+    let (flags, skipBuild, test, bench, haddock) =
           case Map.lookup name $ consPackages cons of
             Nothing ->
-              (mempty, False, False, CAExpectSuccess, CAExpectSuccess, CAExpectSuccess)
+              (mempty, False, CAExpectSuccess, CAExpectSuccess, CAExpectSuccess)
             Just pc ->
-              (pcFlags pc, pcHide pc, pcSkipBuild pc, pcTests pc, pcBenchmarks pc, pcHaddock pc)
+              (pcFlags pc, pcSkipBuild pc, pcTests pc, pcBenchmarks pc, pcHaddock pc)
     unless (flags == rspFlags sp) $ error $ unlines
       [ "mismatched flags for " ++ show pl
       , " snapshot: " ++ show (rspFlags sp)
@@ -62,9 +62,7 @@ unpackSnapshot cons snap root = do
           renameDir destTmp dest
         pure
           ( Set.singleton suffix
-          , ( if Map.null flags then Map.empty else Map.singleton name flags
-            , if hide then Map.singleton name True else Map.empty
-            )
+          , if Map.null flags then Map.empty else Map.singleton name flags
           , case test of
               CAExpectSuccess -> mempty
               CAExpectFailure -> (mempty, Set.singleton name)
@@ -84,7 +82,6 @@ unpackSnapshot cons snap root = do
     [ "resolver" .= ("ghc-" ++ versionString (consGhcVersion cons))
     , "packages" .= Set.map (\suffix -> toFilePath (unpacked </> suffix)) suffixes
     , "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
-    , "hidden" .= toCabalStringMap hidden
     , "curator" .= object
         [ "skip-test" .= Set.map CabalString skipTest
         , "expect-test-failure" .= Set.map CabalString expectTestFailure
