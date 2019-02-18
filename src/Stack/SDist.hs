@@ -330,7 +330,7 @@ getSDistFileList lp =
             $ \ee ->
             withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
-                cabal KeepTHLoading ["sdist", "--list-sources", outFile]
+                cabal CloseOnException KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)
                 return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where

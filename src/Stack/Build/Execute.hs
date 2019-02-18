@@ -19,6 +19,7 @@ module Stack.Build.Execute
     , withExecuteEnv
     , withSingleContext
     , ExcludeTHLoading(..)
+    , KeepOutputOpen(..)
     ) where
 
 import           Control.Concurrent.Execute
@@ -930,7 +931,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> Path Abs Dir                           -- Package root directory file path
                      -- Note that the `Path Abs Dir` argument is redundant with the `Path Abs File`
                      -- argument, but we provide both to avoid recalculating `parent` of the `File`.
-                     -> (ExcludeTHLoading -> [String] -> RIO env ())
+                     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
                      -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
                      -> OutputType
@@ -1018,7 +1019,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         :: Package
         -> Path Abs Dir
         -> OutputType
-        -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
+        -> ((KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
     withCabal package pkgDir outputType inner = do
         config <- view configL
@@ -1040,7 +1041,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             case (packageBuildType package, eeSetupExe) of
                 (C.Simple, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ Right <$> getSetupHs pkgDir
-        inner $ \stripTHLoading args -> do
+        inner $ \keepOutputOpen stripTHLoading args -> do
             let cabalPackageArg
                     -- Omit cabal package dependency when building
                     -- Cabal. See
@@ -1164,14 +1165,17 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (mlogFile, bss) <-
                             case outputType of
                                 OTConsole _ -> return (Nothing, [])
-                                OTLogFile logFile h -> do
-                                    liftIO $ hClose h
-                                    fmap (Just logFile,) $ withSourceFile (toFilePath logFile) $ \src ->
-                                           runConduit
-                                         $ src
-                                        .| CT.decodeUtf8Lenient
-                                        .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
-                                        .| CL.consume
+                                OTLogFile logFile h ->
+                                    if keepOutputOpen == KeepOpen
+                                    then return (Nothing, []) -- expected failure build continues further
+                                    else do
+                                        liftIO $ hClose h
+                                        fmap (Just logFile,) $ withSourceFile (toFilePath logFile) $ \src ->
+                                               runConduit
+                                             $ src
+                                            .| CT.decodeUtf8Lenient
+                                            .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
+                                            .| CL.consume
                         throwM $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
                             taskProvides
@@ -1297,12 +1301,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     expectHaddockFailure mcurator =
         maybe False (Set.member pname . curatorExpectHaddockFailure) mcurator
     fulfillHaddockExpectations mcurator action | expectHaddockFailure mcurator = do
-        eres <- tryAny action
+        eres <- tryAny $ action KeepOpen
         case eres of
           Right () -> logWarn $ fromString (packageNameString pname) <> ": unexpected Haddock success"
           Left _ -> return ()
     fulfillHaddockExpectations _ action = do
-        action
+        action CloseOnException
 
     buildingFinals = isFinalBuild || taskAllInOne
     enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -1426,7 +1430,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
     realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
-        $ \package cabalfp pkgDir cabal announce _outputType -> do
+        $ \package cabalfp pkgDir cabal0 announce _outputType -> do
+            let cabal = cabal0 CloseOnException
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
                  (logInfo
@@ -1453,7 +1458,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
                 _ -> fulfillCuratorExpectations pname mcurator enableTests enableBenchmarks Nothing $
-                     Just <$> realBuild cache package pkgDir cabal announce executableBuildStatuses
+                     Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
@@ -1463,11 +1468,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         :: ConfigCache
         -> Package
         -> Path Abs Dir
-        -> (ExcludeTHLoading -> [String] -> RIO env ())
+        -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
         -> (Text -> RIO env ())
         -> Map Text ExecutableBuildStatus
         -> RIO env Installed
-    realBuild cache package pkgDir cabal announce executableBuildStatuses = do
+    realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
+        let cabal = cabal0 CloseOnException
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
         markExeNotInstalled (taskLocation task) taskProvides
@@ -1557,7 +1563,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
                     _ -> []
 
-            fulfillHaddockExpectations mcurator $ cabal KeepTHLoading $ concat
+            fulfillHaddockExpectations mcurator $ \keep -> cabal0 keep KeepTHLoading $ concat
                 [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
@@ -1956,10 +1962,13 @@ singleBench beopts benchesToRun ac ee task installedMap = do
 
         when toRun $ do
             announce "benchmarks"
-            cabal KeepTHLoading ("bench" : args)
+            cabal CloseOnException KeepTHLoading ("bench" : args)
 
 data ExcludeTHLoading = ExcludeTHLoading | KeepTHLoading
 data ConvertPathsToAbsolute = ConvertPathsToAbsolute | KeepPathsAsIs
+-- | special marker for expected failures in curator builds, using those
+-- we need to keep log handle open as build continues further even after a failure
+data KeepOutputOpen = KeepOpen | CloseOnException deriving Eq
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
 mungeBuildOutput :: forall m. MonadIO m
