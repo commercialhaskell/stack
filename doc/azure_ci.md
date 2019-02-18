@@ -59,7 +59,7 @@ your project in Azure CI platform:
 
 * Go to [dev.azure.com](https://dev.azure.com). You have to initially
   sign-in to your microsoft account there.
-* Once you have logined into your microsoft account, you have to sign
+* Once you have logged in to your Microsoft account, you have to sign
   in to [Azure
   devops](https://user-images.githubusercontent.com/737477/52465678-70963080-2ba5-11e9-83d8-84112b140236.png)
   from there.
@@ -85,7 +85,7 @@ your project in Azure CI platform:
   the "Save and run" button.  That will popup a
   [dialog](https://user-images.githubusercontent.com/737477/52465668-6f650380-2ba5-11e9-9203-6347a609e3c4.png). Select
   the relevant option and click "Save and run" button. (Note that this
-  step would have created `azure-pipeliens.yml` in your repository,
+  step would have created `azure-pipelines.yml` in your repository,
   you have replace that with the appropriate configuration file.)
 
 The rest of this document explains the details of common Azure
