@@ -6,7 +6,6 @@ tests :: IO [Test]
 tests = do
   return [   
       test "foo" Pass
-    , test "bar" (Fail "It did not work out!")
     ]
 
 test :: String -> Result -> Test

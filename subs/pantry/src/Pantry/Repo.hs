@@ -19,7 +19,7 @@ import RIO.Process
 import Database.Persist (Entity (..))
 import qualified RIO.Text as T
 import System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import System.Permissions (osIsWindows)
+import System.IsWindows (osIsWindows)
 
 fetchReposRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -115,7 +115,7 @@ getRepo' repo@(Repo url commit repoType' subdir) rpm =
       when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
       runCommand archiveArgs
     abs' <- resolveFile' tarball
-    getArchive
+    getArchivePackage
       (RPLIRepo repo rpm)
       RawArchive
         { raLocation = ALFilePath $ ResolvedPath

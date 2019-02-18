@@ -54,6 +54,7 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
 import           Distribution.Version (mkVersion, nullVersion)
 import           Foreign.C.Types (CTime)
 import           Path
@@ -1878,7 +1879,8 @@ singleTest topts testsToRun ac ee task installedMap = do
                                   logPath <- buildLogPath package (Just stestName)
                                   ensureDir (parent logPath)
                                   pure $ BL.fromStrict
-                                       $ encodeUtf8 $ fromString $ show (logPath, testName)
+                                       $ encodeUtf8 $ fromString $
+                                       show (logPath, mkUnqualComponentName (T.unpack testName))
                                 else pure mempty
                             let pc = setStdin (byteStringInput stdinBS)
                                    $ output setStdout

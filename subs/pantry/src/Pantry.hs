@@ -694,7 +694,7 @@ loadPackage
   => PackageLocationImmutable
   -> RIO env Package
 loadPackage (PLIHackage ident cfHash tree) = getHackageTarball (pirForHash ident cfHash) (Just tree)
-loadPackage pli@(PLIArchive archive pm) = getArchive (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
+loadPackage pli@(PLIArchive archive pm) = getArchivePackage (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
 loadPackage (PLIRepo repo pm) = getRepo repo (toRawPM pm)
 
 -- | Load a 'Package' from a 'RawPackageLocationImmutable'.
@@ -705,7 +705,7 @@ loadPackageRaw
   => RawPackageLocationImmutable
   -> RIO env Package
 loadPackageRaw (RPLIHackage pir mtree) = getHackageTarball pir mtree
-loadPackageRaw rpli@(RPLIArchive archive pm) = getArchive rpli archive pm
+loadPackageRaw rpli@(RPLIArchive archive pm) = getArchivePackage rpli archive pm
 loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
@@ -732,23 +732,16 @@ completePackageLocation (RPLIHackage pir0@(PackageIdentifierRevision name versio
         pure (pir, BlobKey sha size)
   treeKey <- getHackageTarballKey pir
   pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
-completePackageLocation pl@(RPLIArchive archive pm) =
-  PLIArchive <$> completeArchive archive <*> completePM pl pm
+completePackageLocation pl@(RPLIArchive archive rpm) = do
+  -- getArchive checks archive and package metadata
+  (sha, size, package) <- getArchive pl archive rpm
+  let RawArchive loc _ _ subdir = archive
+  pure $ PLIArchive (Archive loc sha size subdir) (packagePM package)
 completePackageLocation pl@(RPLIRepo repo rpm) = do
   unless (isSHA1 (repoCommit repo)) $ throwIO $ CannotCompleteRepoNonSHA1 repo
   PLIRepo repo <$> completePM pl rpm
   where
     isSHA1 t = T.length t == 40 && T.all isHexDigit t
-
-completeArchive
-  :: (HasPantryConfig env, HasLogFunc env)
-  => RawArchive
-  -> RIO env Archive
-completeArchive (RawArchive loc (Just sha) (Just size) subdir) =
-  pure $ Archive loc sha size subdir
-completeArchive a@(RawArchive loc _ _ subdir) =
-  withArchiveLoc a $ \_fp sha size ->
-  pure $ Archive loc sha size subdir
 
 completePM
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -759,16 +752,8 @@ completePM plOrig rpm@(RawPackageMetadata mn mv mtk mc)
   | Just n <- mn, Just v <- mv, Just tk <- mtk, Just c <- mc =
       pure $ PackageMetadata (PackageIdentifier n v) tk c
   | otherwise = do
-      package <- loadPackageRaw plOrig
-      let pm = PackageMetadata
-            { pmIdent = packageIdent package
-            , pmTreeKey = packageTreeKey package
-            , pmCabal = teBlob $ case packageCabalEntry package of
-                                   PCCabalFile cfile -> cfile
-                                   PCHpack hfile -> phGenerated hfile
-            }
-
-          isSame x (Just y) = x == y
+      pm <- packagePM <$> loadPackageRaw plOrig
+      let isSame x (Just y) = x == y
           isSame _ _ = True
 
           allSame =
@@ -779,6 +764,15 @@ completePM plOrig rpm@(RawPackageMetadata mn mv mtk mc)
       if allSame
         then pure pm
         else throwIO $ CompletePackageMetadataMismatch plOrig pm
+
+packagePM :: Package -> PackageMetadata
+packagePM package = PackageMetadata
+  { pmIdent = packageIdent package
+  , pmTreeKey = packageTreeKey package
+  , pmCabal = teBlob $ case packageCabalEntry package of
+                         PCCabalFile cfile -> cfile
+                         PCHpack hfile -> phGenerated hfile
+  }
 
 -- | Add in hashes to make a 'SnapshotLocation' reproducible.
 --
