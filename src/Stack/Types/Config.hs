@@ -430,9 +430,7 @@ data GlobalOpts = GlobalOpts
 data StackYamlLoc filepath
     = SYLDefault
     | SYLOverride !filepath
-    | SYLNoConfig !(Path Abs Dir)
-    -- ^ FilePath is the directory containing the script file, used
-    -- for resolving custom snapshot files.
+    | SYLNoConfig
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Parsed global command-line options monoid.

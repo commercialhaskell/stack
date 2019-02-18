@@ -60,7 +60,7 @@ cfgCmdSet go cmd = do
                      case mstackYaml of
                          LCSProject stackYaml -> return stackYaml
                          LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig _ -> throwString "config command used when no local configuration available"
+                         LCSNoConfig -> throwString "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-

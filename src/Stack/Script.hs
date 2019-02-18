@@ -40,7 +40,7 @@ scriptCmd opts go' = do
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
                 }
-            , globalStackYaml = SYLNoConfig scriptDir
+            , globalStackYaml = SYLNoConfig
             }
     withDefaultBuildConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
@@ -53,7 +53,7 @@ scriptCmd opts go' = do
           "Ignoring override stack.yaml file for script command: " <>
           fromString fp
         SYLDefault -> return ()
-        SYLNoConfig _ -> assert False (return ())
+        SYLNoConfig -> assert False (return ())
 
       config <- view configL
       menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
