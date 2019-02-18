@@ -147,6 +147,7 @@ module Pantry
     -- * Cabal files
   , loadCabalFileRaw
   , loadCabalFile
+  , LockFile (..)
   , loadLockFile
   , loadCabalFileRawImmutable
   , loadCabalFileImmutable

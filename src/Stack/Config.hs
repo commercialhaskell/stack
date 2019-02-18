@@ -88,7 +88,7 @@ import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.PrettyPrint
 import Stack.Lock (generateLockFile, isLockFileOutdated)
 import           RIO.Process
-import Pantry (loadLockFile)
+import Pantry (loadLockFile, LockFile (..))
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -608,11 +608,25 @@ loadBuildConfig mproject maresolver mcompiler = do
     unless lockFileOutdated (logDebug "Lock file is upto date")
     when lockFileOutdated (logDebug "Lock file is outdated" >> generateLockFile stackYamlFP)
 
-    -- liftIO $ resolveLockFile (parent stackYamlFP)
     lockFile <- liftIO $ addFileExtension "lock" stackYamlFP
-    cachePL <- liftIO $ loadLockFile lockFile
+    (cachePL, origResolver, compResolver) <- liftIO $ do
+                                                  lfio <- loadLockFile lockFile
+                                                  let pkgLoc = lfPackageLocation lfio
+                                                      origResolver = lfoResolver lfio
+                                                      compResolver = lfcResolver lfio
+                                                  cpl <- pkgLoc
+                                                  or <- origResolver
+                                                  cr <- compResolver
+                                                  return (cpl, or, cr)
 
-    resolver <- completeSnapshotLocation $ projectResolver project
+
+    resolver <- if (projectResolver project == origResolver)
+                then do
+                  logInfo "Resolver matches with the lock file"
+                  pure compResolver
+                else do
+                  logInfo "Resolving snapshot location"
+                  completeSnapshotLocation $ projectResolver project
     (snapshot, _completed) <- loadAndCompleteSnapshot resolver
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)

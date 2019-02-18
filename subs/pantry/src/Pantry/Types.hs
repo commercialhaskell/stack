@@ -67,6 +67,7 @@ module Pantry.Types
   , packageIdentifierString
   , packageNameString
   , resolveLockFile
+  , LockFile (..)
   , loadLockFile
   , parseAndResolvePackageLocation
   , flagNameString
