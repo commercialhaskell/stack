@@ -22,6 +22,7 @@ module Stack.Runners
     , loadCompilerVersion
     , withUserFileLock
     , munlockFile
+    , withRunnerGlobal
     ) where
 
 import           Stack.Prelude
