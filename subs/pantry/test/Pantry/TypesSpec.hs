@@ -224,7 +224,7 @@ resolver:
                                 str <>
                                 (show pkgIm)
                             Right iopl -> do
-                                pl <- iopl
+                                pl <- lfPackageLocation iopl
                                 pure pl
                     Nothing -> fail "Can't parse PackageLocationImmutable"
             pkgImm `shouldBe` []
@@ -284,7 +284,7 @@ resolver:
                                 str <>
                                 (show pkgIm)
                             Right iopl -> do
-                                pl <- iopl
+                                pl <- lfPackageLocation iopl
                                 pure pl
                     Nothing -> fail "Can't parse PackageLocationImmutable"
             pkgImm `shouldBe`
