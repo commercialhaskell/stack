@@ -5,7 +5,7 @@ module Stack.Options.GlobalParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Path.IO (getCurrentDir)
+import           Path.IO (getCurrentDir, resolveDir')
 import qualified Stack.Docker                      as Docker
 import           Stack.Init
 import           Stack.Prelude
@@ -29,6 +29,7 @@ globalOptsParser currentDir kind defLogLevel =
         hide <*>
     configOptsParser currentDir kind <*>
     optionalFirst (abstractResolverOptsParser hide0) <*>
+    pure (First Nothing) <*> -- resolver root is only set via the script command
     optionalFirst (compilerOptsParser hide0) <*>
     firstBoolFlags
         "terminal"
@@ -68,8 +69,11 @@ globalOptsParser currentDir kind defLogLevel =
 globalOptsFromMonoid :: MonadIO m => Bool -> GlobalOptsMonoid -> m GlobalOpts
 globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
   resolver <- for (getFirst globalMonoidResolver) $ \ur -> do
-    cwd <- getCurrentDir
-    resolvePaths (Just cwd) ur
+    root <-
+      case globalMonoidResolverRoot of
+        First Nothing -> getCurrentDir
+        First (Just dir) -> resolveDir' dir
+    resolvePaths (Just root) ur
   pure GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint

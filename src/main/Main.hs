@@ -109,7 +109,7 @@ import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.Exit
-import           System.FilePath (isValid, pathSeparator)
+import           System.FilePath (isValid, pathSeparator, takeDirectory)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
@@ -388,10 +388,16 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                   "Run runghc (alias for 'runghc')"
                   execCmd
                   (execOptsParser $ Just ExecRunGhc)
-      addCommand' "script"
-                  "Run a Stack Script"
-                  scriptCmd
-                  scriptOptsParser
+      addCommand "script"
+                 "Run a Stack Script"
+                 globalFooter
+                 scriptCmd
+                 (\so gom ->
+                    gom
+                      { globalMonoidResolverRoot = First $ Just $ takeDirectory $ soFile so
+                      })
+                 (globalOpts OtherCmdGlobalOpts)
+                 scriptOptsParser
       addCommand' "freeze"
                   "Show project or snapshot with pinned dependencies if there are any such"
                   freezeCmd
@@ -491,7 +497,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
                     -> AddCommand
         addCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (globalOpts OtherCmdGlobalOpts)
+            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
 
         addSubCommands' :: String -> String -> AddCommand
                         -> AddCommand
@@ -502,13 +508,13 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addBuildCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
                          -> AddCommand
         addBuildCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (globalOpts BuildCmdGlobalOpts)
+            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts BuildCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows some ghci options
         addGhciCommand' :: String -> String -> (a -> GlobalOpts -> IO ()) -> Parser a
                          -> AddCommand
         addGhciCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (globalOpts GhciCmdGlobalOpts)
+            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts GhciCmdGlobalOpts)
 
     globalOpts :: GlobalOptsContext -> Parser GlobalOptsMonoid
     globalOpts kind =

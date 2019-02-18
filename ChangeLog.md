@@ -56,6 +56,9 @@ Behavior changes:
   directory could affect interpretation of the script. See
   [#4538](https://github.com/commercialhaskell/stack/pull/4538)
 
+* When using `stack script`, custom snapshot files will be resolved
+  relative to the directory containing the script.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
