@@ -629,16 +629,18 @@ setup-info:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
 
-Or without using `ghc-variant`:
+Or you can point to external setup-info:
 
 ```yaml
-setup-info: "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
+setup-info: "https://example.com/my-stack-setup-info.yaml"
 ```
 
-`url` may be either URL or (since 1.2.0) absolute file path.
+This may be either URL or (since 1.2.0) absolute file path.
 
-Note that this **adds** the specified setup info metadata to the default (unlike the
-`stack --setup-info-yaml` command-line argument, which **replaces** it).
+Note that this **adds** the specified setup info metadata to the default.
+If you need to **replace** it, use the `stack --setup-info-yaml` command-line
+argument instead.  The default setup metadata is in
+[stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
 
 ### pvp-bounds
 
