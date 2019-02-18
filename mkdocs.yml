@@ -29,6 +29,7 @@ pages:
   - Non-standard project initialization: nonstandard_project_init.md
   - Shell auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
+  - Azure CI: azure_ci.md
   - Custom snapshots: custom_snapshot.md
   - Code coverage: coverage.md
   - GHCi: ghci.md
