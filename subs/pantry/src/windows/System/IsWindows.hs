@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module System.Permissions
+module System.IsWindows
   ( osIsWindows
   ) where
 
