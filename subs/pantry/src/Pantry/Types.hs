@@ -1970,6 +1970,29 @@ instance Display SnapshotLocation where
   display (SLUrl url blob) = display url <> " (" <> display blob <> ")"
   display (SLFilePath resolved) = display (resolvedRelative resolved)
 
+-- use this
+parseRSL :: Value -> Parser (Unresolved RawSnapshotLocation)
+parseRSL v = txtParser v <|> parseRSLObject v
+    where
+      txtParser = withText "UnresolvedSnapshotLocation (Text)" (pure . parseRawSnapshotLocation)
+
+parseRSLObject :: Value -> Parser (Unresolved RawSnapshotLocation)
+parseRSLObject = withObject "UnresolvedRawSnapshotLocation (Object)" $ \o ->
+                   ((pure . RSLCompiler) <$> o .: "compiler") <|>
+                   ((\x y -> pure $ RSLUrl x y) <$> o .: "url" <*> parseBlobKey o) <|>
+                   (parseRawSnapshotLocationPath <$> o .: "filepath")
+
+
+parseBlobKey :: Object -> Parser (Maybe BlobKey)
+parseBlobKey o = do
+  msha <- o .:? "sha256"
+  msize <- o .:? "size"
+  case (msha, msize) of
+    (Nothing, Nothing) -> pure Nothing
+    (Just sha, Just size') -> pure $ Just $ BlobKey sha size'
+    (Just _sha, Nothing) -> fail "You must also specify the file size"
+    (Nothing, Just _) -> fail "You must also specify the file's SHA256"
+
 -- | Parse a 'Text' into an 'Unresolved' 'RawSnapshotLocation'.
 --
 -- @since 0.1.0.0
