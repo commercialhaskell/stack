@@ -75,7 +75,6 @@ combineSourceInstalled :: PackageSource
                        -> PackageInfo
 combineSourceInstalled ps (location, installed) =
     assert (psVersion ps == installedVersion installed) $
-    assert (psLocation ps == location) $
     case location of
         -- Always trust something in the snapshot
         Snap -> PIOnlyInstalled location installed
@@ -206,7 +205,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
                 , planInstallExes =
                     if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
                        boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
@@ -274,12 +273,11 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Reasons why packages are dirty and must be rebuilt
                   -> [DumpPackage () () ()]
                   -- ^ Local package database dump
-                  -> SourceMap
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps
                   -- build - don't unregister target packages.
                   -> Map GhcPkgId (PackageIdentifier, Text)
-mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
+mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
     -- We'll take multiple passes through the local packages. This
     -- will allow us to detect that a package should be unregistered,
     -- as well as all packages directly or transitively depending on
@@ -328,10 +326,6 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs sourceMap initialBuildSteps =
           = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
-      -- Check if we're no longer using the local version
-      | Just (dpLocation -> PLImmutable _) <- Map.lookup name (smDeps sourceMap)
-          -- FIXME:qrilka do git/archive count as snapshot installed?
-          = Just "Switching to snapshot installed package"
       -- Check if a dependency is going to be unregistered
       | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
           = Just $ "Dependency being unregistered: " <> T.pack (packageIdentifierString dep)
