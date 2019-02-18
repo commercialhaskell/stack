@@ -19,7 +19,7 @@ import RIO.Process
 import Database.Persist (Entity (..))
 import qualified RIO.Text as T
 import System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import System.Permissions (osIsWindows)
+import System.IsWindows (osIsWindows)
 
 fetchReposRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
