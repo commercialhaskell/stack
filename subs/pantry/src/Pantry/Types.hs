@@ -1549,30 +1549,51 @@ parseSingleObject value = withObject "LockFile" (\obj -> do
                                                    pure $ combineUnresolved comp orig
                                                    ) value
 
+data LockFile a = LockFile {
+      lfPackageLocation :: a [(PackageLocation, RawPackageLocation)],
+      lfoResolver :: a RawSnapshotLocation,
+      lfcResolver :: a SnapshotLocation
+}
+
 
 parseLockFile ::
-       Value -> Parser [Unresolved (PackageLocation, RawPackageLocation)]
+       Value -> Parser (LockFile Unresolved)
 parseLockFile value = withObject "LockFile" (\obj -> do
                                                vals :: Value <- obj .: "dependencies"
                                                xs <- withArray "LockFileArray" (\vec -> sequence $ Vector.map parseSingleObject vec) vals
-                                               pure $ Vector.toList xs
+                                               resolver <- obj .: "resolver"
+                                               roriginal <- resolver .: "original"
+                                               rcomplete <- resolver .: "complete"
+                                               ro <- parseRSL roriginal
+                                               rc <- parseSL rcomplete
+                                               pure $ LockFile {
+                                                          lfPackageLocation = sequence (Vector.toList xs),
+                                                          lfoResolver = ro,
+                                                          lfcResolver = rc
+                                                        }
                                             ) value
 
-resolveLockFile :: Path Abs Dir -> Value -> Parser (IO [(PackageLocation, RawPackageLocation)])
+resolveLockFile :: Path Abs Dir -> Value -> Parser (LockFile IO)
 resolveLockFile rootDir v = do
-  val <- parseLockFile v
-  let val' = sequence val
-      val'' = resolvePaths (Just rootDir) val'
-  pure val''
+    lockFile <- parseLockFile v
+    let pkgLoc = (lfPackageLocation lockFile)
+        origRes = lfoResolver lockFile
+        compRes = lfcResolver lockFile
+        pkgLoc' = resolvePaths (Just rootDir) pkgLoc
+    pure $
+        LockFile
+            { lfPackageLocation = pkgLoc'
+            , lfoResolver = resolvePaths (Just rootDir) origRes
+            , lfcResolver = resolvePaths (Just rootDir) compRes
+            }
 
-loadLockFile :: Path Abs File -> IO [(PackageLocation, RawPackageLocation)]
+loadLockFile :: Path Abs File -> IO (LockFile IO)
 loadLockFile lockFile = do
   val <- Yaml.decodeFileThrow (toFilePath lockFile)
   case Yaml.parseEither (resolveLockFile (parent lockFile)) val of
     Left str -> fail $ "Cannot parse lock file: Got error " <> str
-    Right iopl -> do
-      pl <- iopl
-      pure pl
+    Right lockFileIO -> pure lockFileIO
+
 
 parsePImmutable :: Value -> Parser (Unresolved PackageLocation)
 parsePImmutable v = do
@@ -1971,6 +1992,26 @@ instance Display SnapshotLocation where
   display (SLFilePath resolved) = display (resolvedRelative resolved)
 
 -- use this
+parseSL :: Value -> Parser (Unresolved SnapshotLocation)
+parseSL v = txtParser v <|> parseSLObject v
+  where
+    txt :: Text -> Maybe (Unresolved SnapshotLocation)
+    txt t = either (const Nothing) (Just . pure . SLCompiler) (parseWantedCompiler t)
+    txtParser =
+        withText
+            ("UnresolvedSnapshotLocation (Text)")
+            (\t ->
+                 pure $ fromMaybe (parseSnapshotLocationPath t) (txt t))
+
+
+
+parseSLObject :: Value -> Parser (Unresolved SnapshotLocation)
+parseSLObject = withObject "UnresolvedSnapshotLocation (Object)" $ \o ->
+                 ((pure . SLCompiler) <$> o .: "compiler") <|>
+                 ((\x y -> pure $ SLUrl x y) <$> o .: "url" <*> parseJSON (Object o)) <|>
+                 (parseSnapshotLocationPath <$> o .: "filepath")
+
+-- use this
 parseRSL :: Value -> Parser (Unresolved RawSnapshotLocation)
 parseRSL v = txtParser v <|> parseRSLObject v
     where
@@ -1992,6 +2033,16 @@ parseBlobKey o = do
     (Just sha, Just size') -> pure $ Just $ BlobKey sha size'
     (Just _sha, Nothing) -> fail "You must also specify the file size"
     (Nothing, Just _) -> fail "You must also specify the file's SHA256"
+
+parseSnapshotLocation :: Value -> Parser (Unresolved SnapshotLocation)
+parseSnapshotLocation =
+    withObject
+        "UnresolvedSnapshotLocation"
+        (\o -> do
+             url <- o .: "url"
+             bkey <- parseJSON (Object o)
+             pure $ pure $ SLUrl url bkey)
+
 
 -- | Parse a 'Text' into an 'Unresolved' 'RawSnapshotLocation'.
 --
@@ -2034,6 +2085,15 @@ parseRawSnapshotLocationPath t =
       abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
       pure $ RSLFilePath $ ResolvedPath (RelFilePath t) abs'
 
+parseSnapshotLocationPath :: Text -> Unresolved SnapshotLocation
+parseSnapshotLocationPath t =
+  Unresolved $ \mdir ->
+  case mdir of
+    Nothing -> throwIO $ InvalidFilePathSnapshot t
+    Just dir -> do
+      abs' <- resolveFile dir (T.unpack t) `catchAny` \_ -> throwIO (InvalidSnapshotLocation dir t)
+      pure $ SLFilePath $ ResolvedPath (RelFilePath t) abs'
+
 githubSnapshotLocation :: Text -> Text -> Text -> RawSnapshotLocation
 githubSnapshotLocation user repo path =
   let url = T.concat
@@ -2051,6 +2111,8 @@ defUser = "commercialhaskell"
 
 defRepo :: Text
 defRepo = "stackage-snapshots"
+
+
 
 -- | Location of an LTS snapshot
 --
