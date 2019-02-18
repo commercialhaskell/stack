@@ -12,6 +12,7 @@ data ScriptOpts = ScriptOpts
   , soArgs :: ![String]
   , soCompile :: !ScriptExecute
   , soGhcOptions :: ![String]
+  , soScriptExtraDeps :: ![PackageIdentifierRevision]
   }
   deriving Show
 
@@ -40,3 +41,9 @@ scriptOptsParser = ScriptOpts
             metavar "OPTIONS" <>
             completer ghcOptsCompleter <>
             help "Additional options passed to GHC"))
+    <*> many (option extraDepRead
+          (long "extra-dep" <>
+            metavar "PACKAGE-VERSION" <>
+            help "Extra dependencies to be added to the snapshot"))
+  where
+    extraDepRead = eitherReader $ mapLeft show . parsePackageIdentifierRevision . fromString

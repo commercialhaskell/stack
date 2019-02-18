@@ -430,7 +430,8 @@ data GlobalOpts = GlobalOpts
 data StackYamlLoc filepath
     = SYLDefault
     | SYLOverride !filepath
-    | SYLNoConfig
+    | SYLNoConfig ![PackageIdentifierRevision]
+    -- ^ Extra dependencies included in the script command line.
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Parsed global command-line options monoid.
