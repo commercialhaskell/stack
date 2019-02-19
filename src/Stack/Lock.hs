@@ -82,7 +82,21 @@ generateLockFile stackFile = do
             Just (pl, or, cr) -> do
                 let change = findChange pl deps
                     unchangedRes = map fst (chUnchanged change)
-                logInfo "Going to do these changes"
+                    addedStr =
+                        concat $
+                        map
+                            (\x ->
+                                 "Adding " <> (show x) <>
+                                 " package to the lock file.\n")
+                            (chAdded change)
+                    deletedstr =
+                        concat $
+                        map
+                            (\x ->
+                                 "Removing " <> (show x) <>
+                                 " package from the lock file.\n")
+                            (chRemoved change)
+                logInfo (displayShow $ addedStr <> deletedstr)
                 deps <- mapM completePackageLocation' (chAdded change)
                 let allDeps = unchangedRes <> deps
                 res <-
