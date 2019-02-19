@@ -86,7 +86,7 @@ import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.PrettyPrint
-import Stack.Lock (generateLockFile, isLockFileOutdated)
+import Stack.Lock (generateLockFile, isLockFileOutdated, generateLockFileForCustomSnapshot)
 import           RIO.Process
 import Pantry (loadLockFile, LockFile (..))
 
@@ -627,6 +627,13 @@ loadBuildConfig mproject maresolver mcompiler = do
                 else do
                   logInfo "Resolving snapshot location"
                   completeSnapshotLocation $ projectResolver project
+
+    case resolver of
+      SLFilePath _ -> generateLockFileForCustomSnapshot resolver stackYamlFP
+      _ -> return ()
+
+    -- todo: loadAndCompleteSnapshot likely has to be cached in a new lock file
+    logDebug $ (displayShow resolver)
     (snapshot, _completed) <- loadAndCompleteSnapshot resolver
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
