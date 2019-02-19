@@ -306,8 +306,6 @@ directories is available in snapshots to ensure reproducibility.
 resolver: lts-8.21 # Inherits GHC version and package set
 compiler: ghc-8.0.1 # Overwrites GHC version in the resolver, optional
 
-name: my-snapshot # User-friendly name
-
 # Additional packages, follows extra-deps syntax
 packages:
 - unordered-containers-0.2.7.1
@@ -371,7 +369,6 @@ packages:
   pantry-tree:
     size: 7376
     sha256: ac2601c49cf7bc0f5d66b2793eddc8352f51a6ee989980827a0d0d8169700a03
-name: my-snapshot
 hidden:
   warp: false
   wai: true

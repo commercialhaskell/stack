@@ -645,7 +645,7 @@ loadBuildConfig mproject maresolver mcompiler = do
           { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
           , smwProject = packages
           , smwDeps = deps
-          , smwSnapshotName = snapshotName snapshot
+          , smwSnapshotLocation = projectResolver project
           }
 
     return BuildConfig
