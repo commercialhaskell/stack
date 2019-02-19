@@ -1150,16 +1150,13 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
   pure (allPackages, unused)
 
 stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => [(PackageLocation, RawPackageLocation)]
+  => [(PackageLocationImmutable, RawPackageLocationImmutable)]
   -> RawPackageLocationImmutable
-  -> RIO env PackageLocation
+  -> RIO env PackageLocationImmutable
 stackCompletePackageLocation cachePackages rpli = do
-  let rp = RPLImmutable rpli
-      xs = filter (\(_,x) -> x == rp) cachePackages
+  let xs = filter (\(_,x) -> x == rpli) cachePackages
   case xs of
-    [] -> do
-      pl <- completePackageLocation rpli
-      pure $ PLImmutable pl
+    [] -> completePackageLocation rpli
     (x,_):_ -> pure x
 
 
@@ -1196,10 +1193,7 @@ addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drop
                  -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
       addPackage (ps, completed) loc = do
         name <- getPackageLocationName loc
-        loc'' <- stackCompletePackageLocation cachedPL loc
-        let loc' = case loc'' of
-                     PLImmutable pli -> pli
-                     PLMutable _ -> error "should be immutable"
+        loc' <- stackCompletePackageLocation cachedPL loc
         let p = (name, SnapshotPackage
               { spLocation = loc'
               , spFlags = Map.findWithDefault mempty name flags

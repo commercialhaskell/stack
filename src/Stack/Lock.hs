@@ -57,7 +57,8 @@ generateLockFile stackFile = do
                 ]
     B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
 
-loadSnapshotFile :: Path Abs File -> Path Abs Dir -> IO [RawPackageLocation]
+loadSnapshotFile ::
+       Path Abs File -> Path Abs Dir -> IO [RawPackageLocationImmutable]
 loadSnapshotFile path rootDir = do
     val <- Yaml.decodeFileThrow (toFilePath path)
     case Yaml.parseEither (resolveSnapshotFile rootDir) val of
@@ -71,13 +72,14 @@ loadSnapshotLockFile = undefined
 
 generateSnapshotLockFile ::
        Path Abs File -- ^ Snapshot file
-    -> [RawPackageLocation]
+    -> [RawPackageLocationImmutable]
     -> RIO Config ()
 generateSnapshotLockFile path rpl = do
     logInfo "Generating Lock file for snapshot"
-    deps :: [PackageLocation] <- mapM completePackageLocation' rpl
+    let rpl' :: [RawPackageLocation] = map RPLImmutable rpl
+    deps :: [PackageLocation] <- mapM completePackageLocation' rpl'
     lockFile <- liftIO $ addFileExtension "lock" path
-    let depPairs :: [(PackageLocation, RawPackageLocation)] = zip deps rpl
+    let depPairs :: [(PackageLocation, RawPackageLocation)] = zip deps rpl'
         depsObject =
             Yaml.object
                 [ ( "dependencies"
