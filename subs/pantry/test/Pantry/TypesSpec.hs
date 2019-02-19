@@ -376,3 +376,55 @@ resolver:
                                   , rpmCabal = Nothing
                                   })))
                 ]
+        it "parses snapshot lock file (non empty)" $ do
+            let lockFile :: ByteString
+                lockFile =
+                    [s|#some
+dependencies:
+- original:
+    hackage: string-quote-0.0.1
+  complete:
+    hackage: string-quote-0.0.1@sha256:7d91a0ba1be44b2443497c92f2f027cd4580453b893f8b5ebf061e1d85befaf3,758
+    pantry-tree:
+      size: 273
+      sha256: d291028785ad39f8d05cde91594f6b313e35ff76af66c0452ab599b1f1f59e5f
+|]
+            rootDir <- Path.parseAbsDir "/home/sibi"
+            pkgImm <-
+                case Yaml.decodeThrow lockFile of
+                    Just (pkgIm :: Value) -> do
+                        case Yaml.parseEither
+                                 (resolveSnapshotLockFile rootDir)
+                                 pkgIm of
+                            Left str ->
+                                fail $
+                                "Can't parse PackageLocationImmutable - 1" <>
+                                str <>
+                                (show pkgIm)
+                            Right iopl -> do
+                                pl <- iopl
+                                pure pl
+                    Nothing -> fail "Can't parse PackageLocationImmutable"
+            pkgImm `shouldBe`
+                [ ( PLImmutable
+                        (PLIHackage
+                             (PackageIdentifier
+                                  { pkgName = mkPackageName "string-quote"
+                                  , pkgVersion = mkVersion [0, 0, 1]
+                                  })
+                             (toBlobKey
+                                  "7d91a0ba1be44b2443497c92f2f027cd4580453b893f8b5ebf061e1d85befaf3"
+                                  758)
+                             (TreeKey
+                                  (BlobKey
+                                       (decodeSHA
+                                            "d291028785ad39f8d05cde91594f6b313e35ff76af66c0452ab599b1f1f59e5f")
+                                       (FileSize 273))))
+                  , RPLImmutable
+                        (RPLIHackage
+                             (PackageIdentifierRevision
+                                  (mkPackageName "string-quote")
+                                  (mkVersion [0, 0, 1])
+                                  CFILatest)
+                             Nothing))
+                ]
