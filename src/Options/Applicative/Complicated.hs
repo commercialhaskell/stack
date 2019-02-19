@@ -79,11 +79,12 @@ addCommand :: String   -- ^ command string
            -> String   -- ^ title of command
            -> String   -- ^ footer of command help
            -> (a -> b) -- ^ constructor to wrap up command in common data type
+           -> (a -> c -> c) -- ^ extend common settings from local settings
            -> Parser c -- ^ common parser
            -> Parser a -- ^ command parser
            -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
-addCommand cmd title footerStr constr =
-  addCommand' cmd title footerStr (\a c -> (constr a,c))
+addCommand cmd title footerStr constr extendCommon =
+  addCommand' cmd title footerStr (\a c -> (constr a,extendCommon a c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands

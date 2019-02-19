@@ -430,9 +430,8 @@ data GlobalOpts = GlobalOpts
 data StackYamlLoc filepath
     = SYLDefault
     | SYLOverride !filepath
-    | SYLNoConfig !(Path Abs Dir)
-    -- ^ FilePath is the directory containing the script file, used
-    -- for resolving custom snapshot files.
+    | SYLNoConfig ![PackageIdentifierRevision]
+    -- ^ Extra dependencies included in the script command line.
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Parsed global command-line options monoid.
@@ -444,6 +443,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
+    , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
     , globalMonoidCompiler     :: !(First WantedCompiler) -- ^ Compiler override
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles

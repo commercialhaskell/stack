@@ -56,6 +56,9 @@ Behavior changes:
   directory could affect interpretation of the script. See
   [#4538](https://github.com/commercialhaskell/stack/pull/4538)
 
+* When using `stack script`, custom snapshot files will be resolved
+  relative to the directory containing the script.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
@@ -98,6 +101,9 @@ Other enhancements:
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
 * Show snapshot being used when `stack ghci` is invoked outside of a project directory. See
   [#3651](https://github.com/commercialhaskell/stack/issues/3651)
+* The script interpreter now accepts a `--extra-dep` flag for adding
+  packages not present in the snapshot. Currently, this only works
+  with packages from Hackage, not Git repos or archives.
 
 Bug fixes:
 

@@ -40,7 +40,7 @@ scriptCmd opts go' = do
             { globalConfigMonoid = (globalConfigMonoid go')
                 { configMonoidInstallGHC = First $ Just True
                 }
-            , globalStackYaml = SYLNoConfig scriptDir
+            , globalStackYaml = SYLNoConfig $ soScriptExtraDeps opts
             }
     withDefaultBuildConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a

@@ -473,7 +473,7 @@ loadConfigMaybeProject configArgs mresolver mproject inner = do
             inner2
 
     let withConfig = case mproject of
-          LCSNoConfig _ -> configNoLocalConfig stackRoot mresolver configArgs
+          LCSNoConfig _extraDeps -> configNoLocalConfig stackRoot mresolver configArgs
           LCSProject project -> loadHelper $ Just project
           LCSNoProject -> loadHelper Nothing
 
@@ -495,7 +495,7 @@ loadConfigMaybeProject configArgs mresolver mproject inner = do
               case mprojectRoot of
                 LCSProject fp -> Just fp
                 LCSNoProject  -> Nothing
-                LCSNoConfig _ -> Nothing
+                LCSNoConfig _extraDeps -> Nothing
           }
 
 -- | Load the configuration, using current directory, environment variables,
@@ -538,8 +538,8 @@ loadBuildConfig mproject maresolver mcompiler = do
       LCSProject (project, fp, _) -> do
           forM_ (projectUserMsg project) (logWarn . fromString)
           return (project, fp)
-      LCSNoConfig _ -> do
-          p <- assert (isJust mresolver) (getEmptyProject mresolver)
+      LCSNoConfig extraDeps -> do
+          p <- assert (isJust mresolver) (getEmptyProject mresolver extraDeps)
           return (p, configUserConfigPath config)
       LCSNoProject -> do
             logDebug "Run from outside a project, using implicit global project config"
@@ -567,7 +567,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                else do
                    logInfo ("Writing implicit global project config file to: " <> fromString dest')
                    logInfo "Note: You can change the snapshot via the resolver field there."
-                   p <- getEmptyProject mresolver
+                   p <- getEmptyProject mresolver []
                    liftIO $ do
                        S.writeFile dest' $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
@@ -658,13 +658,13 @@ loadBuildConfig mproject maresolver mcompiler = do
             case mproject of
                 LCSNoProject -> True
                 LCSProject _ -> False
-                LCSNoConfig _ -> False
+                LCSNoConfig _extraDeps -> False
         , bcCurator = projectCurator project
         , bcDownloadCompiler = WithDownloadCompiler
         }
   where
-    getEmptyProject :: Maybe RawSnapshotLocation -> RIO Config Project
-    getEmptyProject mresolver = do
+    getEmptyProject :: Maybe RawSnapshotLocation -> [PackageIdentifierRevision] -> RIO Config Project
+    getEmptyProject mresolver extraDeps = do
       r <- case mresolver of
             Just resolver -> do
                 logInfo ("Using resolver: " <> display resolver <> " specified on command line")
@@ -676,7 +676,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       return Project
         { projectUserMsg = Nothing
         , projectPackages = []
-        , projectDependencies = []
+        , projectDependencies = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
         , projectFlags = mempty
         , projectResolver = r
         , projectCompiler = Nothing
@@ -849,13 +849,13 @@ getProjectConfig SYLDefault = do
         if exists
             then return $ Just fp
             else return Nothing
-getProjectConfig (SYLNoConfig parentDir) = return (LCSNoConfig parentDir)
+getProjectConfig (SYLNoConfig extraDeps) = return $ LCSNoConfig extraDeps
 
 data LocalConfigStatus a
     = LCSNoProject
     | LCSProject a
-    | LCSNoConfig !(Path Abs Dir)
-    -- ^ parent directory for making a concrete resolving
+    | LCSNoConfig ![PackageIdentifierRevision]
+    -- ^ Extra dependencies
     deriving (Show,Functor,Foldable,Traversable)
 
 -- | Find the project config file location, respecting environment variables
@@ -876,9 +876,9 @@ loadProjectConfig mstackYaml = do
         LCSNoProject -> do
             logDebug "No project config file found, using defaults."
             return LCSNoProject
-        LCSNoConfig mparentDir -> do
+        LCSNoConfig extraDeps -> do
             logDebug "Ignoring config files"
-            return (LCSNoConfig mparentDir)
+            return $ LCSNoConfig extraDeps
   where
     load fp = do
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
