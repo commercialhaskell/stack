@@ -1016,7 +1016,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
          , line
          ]
 
-    extras = Map.unions $ map getExtras exceptions'
+    extras :: Map PackageName (Version, BlobKey) = Map.unions $ map getExtras exceptions'
     getExtras DependencyCycleDetected{} = Map.empty
     getExtras UnknownPackage{} = Map.empty
     getExtras (DependencyPlanFailures _ m) =
@@ -1029,8 +1029,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
            Map.singleton name (version, cabalHash)
        go _ = Map.empty
     pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
-      let cfInfo = CFIHash cabalHash (Just cabalSize)
-          packageIdRev = PackageIdentifierRevision name version cfInfo
+      let packageIdRev = PackageIdentifierRevision name version CFILatest
        in fromString $ T.unpack $ utf8BuilderToText $ RIO.display packageIdRev
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'

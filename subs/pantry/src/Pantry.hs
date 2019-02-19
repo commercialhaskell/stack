@@ -1209,9 +1209,6 @@ addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drop
         if toRawPLI loc' == loc
           then pure (p:ps, completed)
           else pure (p:ps, (loc, loc'):completed)
-  logInfo "Important"
-  logInfo (displayShow loc)
-  logInfo (displayShow newPackages)
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
         = partitionEithers
