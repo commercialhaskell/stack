@@ -1557,6 +1557,33 @@ data LockFile a = LockFile {
       lfcResolver :: a SnapshotLocation
 }
 
+parseSnapshotLockFile ::
+       Value -> Parser (Unresolved [(PackageLocation, RawPackageLocation)])
+parseSnapshotLockFile =
+    withObject
+        "SnapshotLockFile"
+        (\obj -> do
+             vals <- obj .: "dependencies"
+             xs <-
+                 withArray
+                     "SnapshotLockArray"
+                     (\vec -> sequence $ Vector.map parseSingleObject vec)
+                     vals
+             pure $ sequence $ Vector.toList xs)
+
+resolveSnapshotLockFile :: Path Abs Dir -> Value -> Parser (IO [(PackageLocation, RawPackageLocation)])
+resolveSnapshotLockFile rootDir val = do
+  pkgs <- parseSnapshotLockFile val
+  let pkgsLoc = resolvePaths (Just rootDir) pkgs
+  pure pkgsLoc
+
+loadSnapshotLockFile :: Path Abs File -> Path Abs Dir -> IO [(PackageLocation, RawPackageLocation)]
+loadSnapshotLockFile lockFile rootDir = do
+  val <- Yaml.decodeFileThrow (toFilePath lockFile)
+  case Yaml.parseEither (resolveSnapshotLockFile rootDir) val of
+    Left str -> fail $ "Cannot parse snapshot lock file: Got error " <> str
+    Right lockFileIO -> lockFileIO
+
 parseSnapshotFile :: Value -> Parser (Unresolved [RawPackageLocation])
 parseSnapshotFile (Object obj) = do
   packages <- obj .: "packages"
