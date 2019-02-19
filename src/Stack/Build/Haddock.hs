@@ -25,6 +25,7 @@ import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
+import           RIO.List (intercalate)
 import           RIO.PrettyPrint
 import           Stack.Constants
 import           Stack.PackageDump
@@ -235,6 +236,9 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                         docRelFP FP.</>
                         packageIdentifierString dpPackageIdent FP.</>
                         (packageNameString name FP.<.> "haddock")
+                    interfaces = intercalate "," $
+                      maybeToList dpHaddockHtml ++ [srcInterfaceFP]
+
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
                 return $
@@ -242,11 +246,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                         Left _ -> Nothing
                         Right srcInterfaceModTime ->
                             Just
-                                ( [ "-i"
-                                  , concat
-                                        [ docRelFP FP.</> packageIdentifierString dpPackageIdent
-                                        , ","
-                                        , destInterfaceRelFP ]]
+                                ( [ "-i", interfaces ]
                                 , srcInterfaceModTime
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
