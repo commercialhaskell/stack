@@ -4,9 +4,10 @@
 
 module Stack.Lock where
 
+import Data.List ((\\), intersect)
 import qualified Data.Yaml as Yaml
 import Data.Yaml (object)
-import Pantry (resolveSnapshotFile)
+import Pantry (loadLockFile, resolveSnapshotFile)
 import Path (addFileExtension, fromAbsFile, parent)
 import Path.IO (doesFileExist, getModificationTime)
 import qualified RIO.ByteString as B
@@ -25,6 +26,32 @@ instance Show LockException where
     show (LockCannotGenerate e) =
         "Lock file cannot be generated for snapshot: " <> (show e)
 
+-- You need to keep track of the following things
+-- Has resolver changed.
+--  * If yes, then to what value it has changed. Both from and to has to be printed.
+-- Has extra-deps changed
+--  * Can be (added/changed/removed). You need to indicate them.
+--  * Keep track of lockfile package and current stack.yaml [RawPackageLocation]
+data Change = Change
+    { chAdded :: [RawPackageLocation]
+    , chRemoved :: [RawPackageLocation]
+    , chUnchanged :: [(PackageLocation, RawPackageLocation)]
+    }
+
+findChange ::
+       [(PackageLocation, RawPackageLocation)] -- ^ Lock file
+    -> [RawPackageLocation] -- ^ stack.yaml file
+    -> Change
+findChange lrpl srpl =
+    let lr = map snd lrpl
+        unchangedOnes = intersect lr srpl
+        unchangedFull = filter (\(pl, rpl) -> rpl `elem` srpl) lrpl
+     in Change
+            { chAdded = srpl \\ unchangedOnes
+            , chRemoved = lr \\ unchangedOnes
+            , chUnchanged = unchangedFull
+            }
+
 generateLockFile :: Path Abs File -> RIO Config ()
 generateLockFile stackFile = do
     logDebug "Gennerating lock file"
@@ -36,8 +63,38 @@ generateLockFile stackFile = do
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
     lockFile <- liftIO $ addFileExtension "lock" stackFile
-    resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
-    deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+    lockFileExists <- liftIO $ doesFileExist lockFile
+    lockInfo <-
+        case lockFileExists of
+            True ->
+                liftIO $ do
+                    lfio <- loadLockFile lockFile
+                    let lfpl = lfPackageLocation lfio
+                        lfor = lfoResolver lfio
+                        lfcr = lfcResolver lfio
+                    pl <- lfpl
+                    or <- lfor
+                    cr <- lfcr
+                    pure $ Just (pl, or, cr)
+            False -> pure Nothing
+    (deps', resolver') <-
+        case lockInfo of
+            Just (pl, or, cr) -> do
+                let change = findChange pl deps
+                    unchangedRes = map fst (chUnchanged change)
+                logInfo "Going to do these changes"
+                deps <- mapM completePackageLocation' (chAdded change)
+                let allDeps = unchangedRes <> deps
+                res <-
+                    if or == resolver
+                        then pure cr
+                        else completeSnapshotLocation resolver
+                pure (allDeps, res)
+            Nothing -> do
+                resolver' :: SnapshotLocation <-
+                    completeSnapshotLocation resolver
+                deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+                pure (deps', resolver')
     let deps'' = zip deps deps'
     let depsObject =
             Yaml.object
