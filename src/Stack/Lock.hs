@@ -82,7 +82,7 @@ generateSnapshotLockFile path rpl = do
             Yaml.object
                 [ ( "dependencies"
                   , Yaml.array
-                        (map (\(raw, comp) ->
+                        (map (\(comp, raw) ->
                                   object
                                       [ ("original", Yaml.toJSON raw)
                                       , ("complete", Yaml.toJSON comp)
@@ -92,9 +92,8 @@ generateSnapshotLockFile path rpl = do
     B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
 
 -- Things to do
--- 1. Creae function to write custom snapshot lock file. something like fn :: [RawPackageLocation] -> Path Abs File (snapshot file) -> IO ()
--- 2. Create function to load data from custom snapshot file. Something like fn :: Path Abs File -> IO [(PackageLocation, RawPackageLocation)]
--- 3. Try to use the loaded data in the loadBuildconfig function
+-- 2. Try to use the loaded data in the loadBuildconfig function
+-- 3. Finish todos
 generateLockFileForCustomSnapshot ::
        SnapshotLocation -> Path Abs File -> RIO Config ()
 generateLockFileForCustomSnapshot (SLFilePath path) stackFile
