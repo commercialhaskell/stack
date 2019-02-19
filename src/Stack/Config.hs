@@ -629,12 +629,13 @@ loadBuildConfig mproject maresolver mcompiler = do
                   completeSnapshotLocation $ projectResolver project
 
     case resolver of
-      SLFilePath _ -> generateLockFileForCustomSnapshot resolver stackYamlFP
+      SLFilePath path -> do
+                    outdated <- isLockFileOutdated (resolvedAbsolute path)
+                    when outdated (generateLockFileForCustomSnapshot resolver stackYamlFP)
       _ -> return ()
 
     -- todo: loadAndCompleteSnapshot likely has to be cached in a new lock file
-    logDebug $ (displayShow resolver)
-    (snapshot, _completed) <- loadAndCompleteSnapshot resolver
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver (parent stackYamlFP)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 

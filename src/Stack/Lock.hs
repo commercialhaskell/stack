@@ -91,34 +91,15 @@ generateSnapshotLockFile path rpl = do
                 ]
     B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
 
--- Things to do
--- 2. Try to use the loaded data in the loadBuildconfig function
--- 3. Finish todos
 generateLockFileForCustomSnapshot ::
        SnapshotLocation -> Path Abs File -> RIO Config ()
-generateLockFileForCustomSnapshot (SLFilePath path) stackFile
-    -- todo: see if there is existing and outdated file
- = do
+generateLockFileForCustomSnapshot (SLFilePath path) stackFile = do
+    logInfo "Generating lock file for custom snapshot"
     let snapshotPath = resolvedAbsolute path
     rpl <- liftIO $ loadSnapshotFile snapshotPath (parent stackFile)
     generateSnapshotLockFile snapshotPath rpl
 generateLockFileForCustomSnapshot xs _ = throwM (LockCannotGenerate xs)
 
--- hasLockFile :: HasEnvConfig env => RIO env Bool
--- hasLockFile = do
---     bconfig <- view $ envConfigL . to envConfigBuildConfig
---     let stackFile = bcStackYaml bconfig
---     lockFile <- liftIO $ addFileExtension "lock" stackFile
---     liftIO $ doesFileExist lockFile
--- parsePLI :: HasEnvConfig env => BuildConfig -> RIO env [PackageLocation]
--- parsePLI bconfig = do
---     let stackFile = bcStackYaml bconfig
---         rootDir = parent stackFile
---     lockFile <- liftIO $ addFileExtension "lock" stackFile
---     (pli :: Yaml.Value) <- Yaml.decodeFileThrow (toFilePath lockFile)
---     plis <- Yaml.parseMonad (parseLockFile rootDir) pli
---     plis' <- liftIO $ plis
---     pure $ NE.toList plis'
 isLockFileOutdated :: Path Abs File -> RIO Config Bool
 isLockFileOutdated stackFile = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
@@ -134,5 +115,3 @@ isLockFileOutdated stackFile = do
     case lmt of
         Nothing -> return True
         Just mt -> return $ smt > mt
--- lockfile modificaton time < stackfile modification time
--- Use loadProjectConfig and parseLockfile to see if lock file has been outdated

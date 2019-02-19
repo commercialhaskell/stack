@@ -71,6 +71,7 @@ module Pantry.Types
   , resolveSnapshotLockFile
   , LockFile (..)
   , loadLockFile
+  , loadSnapshotLockFile
   , parseAndResolvePackageLocation
   , flagNameString
   , versionString

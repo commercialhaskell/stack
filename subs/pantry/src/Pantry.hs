@@ -151,6 +151,7 @@ module Pantry
   , loadCabalFile
   , LockFile (..)
   , loadLockFile
+  , loadSnapshotLockFile
   , loadCabalFileRawImmutable
   , loadCabalFileImmutable
   , loadCabalFilePath
@@ -988,9 +989,10 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
+  -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshot loc =
-  loadAndCompleteSnapshotRaw (toRawSL loc)
+loadAndCompleteSnapshot loc rootDir =
+  loadAndCompleteSnapshotRaw (toRawSL loc) rootDir
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations
@@ -999,8 +1001,9 @@ loadAndCompleteSnapshot loc =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
+  -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshotRaw loc = do
+loadAndCompleteSnapshotRaw loc rootDir = do
   eres <- loadRawSnapshotLayer loc
   case eres of
     Left wc ->
@@ -1012,10 +1015,11 @@ loadAndCompleteSnapshotRaw loc = do
             }
       in pure (snapshot, [])
     Right (rsl, _sha) -> do
-      (snap0, completed0) <- loadAndCompleteSnapshotRaw $ rslParent rsl
+      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) rootDir
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
-          (display loc)
+          loc
+          rootDir
           (rslLocations rsl)
           AddPackagesConfig
             { apcDrop = rslDropPackages rsl
@@ -1145,6 +1149,20 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
 
   pure (allPackages, unused)
 
+stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => [(PackageLocation, RawPackageLocation)]
+  -> RawPackageLocationImmutable
+  -> RIO env PackageLocation
+stackCompletePackageLocation cachePackages rpli = do
+  let rp = RPLImmutable rpli
+      xs = filter (\(_,x) -> x == rp) cachePackages
+  case xs of
+    [] -> do
+      pl <- completePackageLocation rpli
+      pure $ PLImmutable pl
+    (x,_):_ -> pure x
+
+
 -- | Add more packages to a snapshot completing their locations if needed
 --
 -- Note that any settings on a parent flag which is being replaced will be
@@ -1157,17 +1175,31 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
 -- @since 0.1.0.0
 addAndCompletePackagesToSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Utf8Builder
+  => RawSnapshotLocation
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
+  -> Path Abs Dir
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig
   -> Map PackageName SnapshotPackage -- ^ packages from parent
   -> RIO env (Map PackageName SnapshotPackage, [CompletedPLI], AddPackagesConfig)
-addAndCompletePackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens options) old = do
-  let addPackage (ps, completed) loc = do
+addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
+  cachedPL <- case loc of
+                RSLFilePath path -> do
+                         xs <- liftIO $ loadSnapshotLockFile (resolvedAbsolute path) rootDir
+                         pure xs
+                _ -> pure []
+  let source = display loc
+      addPackage :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+                 => ([(PackageName, SnapshotPackage)],[CompletedPLI])
+                 -> RawPackageLocationImmutable
+                 -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
+      addPackage (ps, completed) loc = do
         name <- getPackageLocationName loc
-        loc' <- completePackageLocation loc
+        loc'' <- stackCompletePackageLocation cachedPL loc
+        let loc' = case loc'' of
+                     PLImmutable pli -> pli
+                     PLMutable _ -> error "should be immutable"
         let p = (name, SnapshotPackage
               { spLocation = loc'
               , spFlags = Map.findWithDefault mempty name flags
@@ -1177,6 +1209,9 @@ addAndCompletePackagesToSnapshot source newPackages (AddPackagesConfig drops fla
         if toRawPLI loc' == loc
           then pure (p:ps, completed)
           else pure (p:ps, (loc, loc'):completed)
+  logInfo "Important"
+  logInfo (displayShow loc)
+  logInfo (displayShow newPackages)
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
         = partitionEithers
