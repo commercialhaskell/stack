@@ -41,9 +41,8 @@ import qualified RIO.Text.Partial as TP
 makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
-  -> Text -- ^ name
   -> RIO env RawSnapshotLayer
-makeSnapshot cons name = do
+makeSnapshot cons = do
     locs <-
         traverseValidate (\(pn, pc) -> (pn,) <$> toLoc pn pc) $
         Map.toList $ consPackages cons
@@ -53,7 +52,6 @@ makeSnapshot cons name = do
         RawSnapshotLayer
         { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
         , rslCompiler = Nothing
-        , rslName = name
         , rslLocations = mapMaybe snd locs
         , rslDropPackages = mempty
         , rslFlags = Map.mapMaybeWithKey (\pn pc -> if (inSnapshot pn) then getFlags pc else Nothing)
