@@ -104,6 +104,12 @@ Other enhancements:
 * The script interpreter now accepts a `--extra-dep` flag for adding
   packages not present in the snapshot. Currently, this only works
   with packages from Hackage, not Git repos or archives.
+* When using the script interpreter with `--optimize` or `--compile`,
+  Stack will perform an optimization of checking whether a newer
+  executable exists, making reruns significantly faster. There's a
+  downside to this, however: if you have a multifile script, and
+  change one of the dependency modules, Stack will not automatically
+  detect and recompile.
 
 Bug fixes:
 
