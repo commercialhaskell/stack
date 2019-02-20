@@ -507,7 +507,7 @@ installPackage name ps minstalled = do
                     resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                 Just tb | splitRequired ->
                     splitInstallSteps lp tb
-                Just tb | otherwise -> do
+                Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
