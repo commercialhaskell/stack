@@ -521,7 +521,7 @@ installPackage name ps minstalled = do
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
-                          adr <- installPackageGivenDeps True False ps tb minstalled deps
+                          adr <- installPackageGivenDeps True (lpBuildHaddocks lp) ps tb minstalled deps
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
                           addFinal lp tb True False
