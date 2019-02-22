@@ -83,6 +83,8 @@ Other enhancements:
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,
   e.g. `stack unpack packagename`.
+* The components output in the `The main module to load is ambiguous` message
+  now include package names so they can be more easily copy-pasted.
 * Git repos are shared across multiple projects. See
   [#3551](https://github.com/commercialhaskell/stack/issues/3551)
 * Use en_US.UTF-8 locale by default in pure Nix mode so programs won't
