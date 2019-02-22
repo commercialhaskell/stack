@@ -103,7 +103,6 @@ module Stack.Types.Config
   ,SCM(..)
   -- * Paths
   ,bindirSuffix
-  ,configInstalledCache
   ,configLoadedSnapshotCache
   ,GlobalInfoSource(..)
   ,getProjectWorkDir
@@ -1173,10 +1172,6 @@ getProjectWorkDir = do
     root    <- view projectRootL
     workDir <- view workDirL
     return (root </> workDir)
-
--- | File containing the installed cache, see "Stack.PackageDump"
-configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
-configInstalledCache = liftM (</> relFileInstalledCacheBin) getProjectWorkDir
 
 -- | Relative directory for the platform identifier
 platformOnlyRelDir

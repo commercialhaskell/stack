@@ -675,13 +675,7 @@ getGhciPkgInfos
     -> [GhciPkgDesc]
     -> RIO env [GhciPkgInfo]
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
-    (installedMap, _, _, _) <- getInstalled
-        GetInstalledOpts
-            { getInstalledProfiling = False
-            , getInstalledHaddock   = False
-            , getInstalledSymbols   = False
-            }
-        installMap
+    (installedMap, _, _, _) <- getInstalled installMap
     let localLibs =
             [ packageName (ghciDescPkg desc)
             | desc <- localTargets

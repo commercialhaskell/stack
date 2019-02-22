@@ -7,7 +7,6 @@
 module Stack.Build.Installed
     ( InstalledMap
     , Installed (..)
-    , GetInstalledOpts (..)
     , getInstalled
     , InstallMap
     , toInstallMap
@@ -15,7 +14,6 @@ module Stack.Build.Installed
 
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
-import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import           Data.List
 import qualified Data.Map.Strict as Map
@@ -30,18 +28,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageDump
 import           Stack.Types.SourceMap
-
--- | Options for 'getInstalled'.
-data GetInstalledOpts = GetInstalledOpts
-    { getInstalledProfiling :: !Bool
-      -- ^ Require profiling libraries?
-    , getInstalledHaddock   :: !Bool
-      -- ^ Require haddocks?
-    , getInstalledSymbols   :: !Bool
-      -- ^ Require debugging symbols?
-    }
 
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
@@ -60,26 +47,20 @@ toInstallMap sourceMap = do
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: HasEnvConfig env
-             => GetInstalledOpts
-             -> InstallMap -- ^ does not contain any installed information
+             => InstallMap -- ^ does not contain any installed information
              -> RIO env
                   ( InstalledMap
-                  , [DumpPackage () () ()] -- globally installed
-                  , [DumpPackage () () ()] -- snapshot installed
-                  , [DumpPackage () () ()] -- locally installed
+                  , [DumpPackage] -- globally installed
+                  , [DumpPackage] -- snapshot installed
+                  , [DumpPackage] -- locally installed
                   )
-getInstalled opts installMap = do
+getInstalled {-opts-} installMap = do
     logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra
 
-    mcache <-
-        if getInstalledProfiling opts || getInstalledHaddock opts
-            then configInstalledCache >>= liftM Just . loadInstalledCache
-            else return Nothing
-
-    let loadDatabase' = loadDatabase opts mcache installMap
+    let loadDatabase' = loadDatabase {-opts mcache-} installMap
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
@@ -91,10 +72,6 @@ getInstalled opts installMap = do
     (installedLibs3, localDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = Map.fromList $ map lhPair installedLibs3
-
-    F.forM_ mcache $ \cache -> do
-        icache <- configInstalledCache
-        saveInstalledCache icache cache
 
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
@@ -134,13 +111,11 @@ getInstalled opts installMap = do
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
 loadDatabase :: HasEnvConfig env
-             => GetInstalledOpts
-             -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
-             -> InstallMap -- ^ to determine which installed things we should include
+             => InstallMap -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> RIO env ([LoadHelper], [DumpPackage () () ()])
-loadDatabase opts mcache installMap mdb lhs0 = do
+             -> RIO env ([LoadHelper], [DumpPackage])
+loadDatabase installMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
     (lhs1', dps) <- ghcPkgDump wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage .| sink
@@ -154,29 +129,8 @@ loadDatabase opts mcache installMap mdb lhs0 = do
             (lhs0 ++ lhs1)
     return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
   where
-    conduitProfilingCache =
-        case mcache of
-            Just cache | getInstalledProfiling opts -> addProfiling cache
-            -- Just an optimization to avoid calculating the profiling
-            -- values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpProfiling = False })
-    conduitHaddockCache =
-        case mcache of
-            Just cache | getInstalledHaddock opts -> addHaddock cache
-            -- Just an optimization to avoid calculating the haddock
-            -- values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpHaddock = False })
-    conduitSymbolsCache =
-        case mcache of
-            Just cache | getInstalledSymbols opts -> addSymbols cache
-            -- Just an optimization to avoid calculating the debugging
-            -- symbol values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpSymbols = False })
     mloc = fmap fst mdb
-    sinkDP = conduitProfilingCache
-           .| conduitHaddockCache
-           .| conduitSymbolsCache
-           .| CL.map (isAllowed opts mcache installMap mloc &&& toLoadHelper mloc)
+    sinkDP =  CL.map (isAllowed installMap mloc &&& toLoadHelper mloc)
            .| CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
@@ -208,9 +162,6 @@ processLoadResult mdb _ (reason, lh) = do
         " due to" <>
         case reason of
             Allowed -> " the impossible?!?!"
-            NeedsProfiling -> " it needing profiling."
-            NeedsHaddock -> " it needing haddocks."
-            NeedsSymbols -> " it needing debugging symbols."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
             WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
             WrongVersion actual wanted ->
@@ -222,9 +173,6 @@ processLoadResult mdb _ (reason, lh) = do
 
 data Allowed
     = Allowed
-    | NeedsProfiling
-    | NeedsHaddock
-    | NeedsSymbols
     | UnknownPkg
     | WrongLocation (Maybe InstalledPackageLocation) InstallLocation
     | WrongVersion Version Version
@@ -233,20 +181,11 @@ data Allowed
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any
 -- dirtiness or flag change checks.
-isAllowed :: GetInstalledOpts
-          -> Maybe InstalledCache
-          -> InstallMap
+isAllowed :: InstallMap
           -> Maybe InstalledPackageLocation
-          -> DumpPackage Bool Bool Bool
+          -> DumpPackage
           -> Allowed
-isAllowed opts mcache installMap mloc dp
-    -- Check that it can do profiling if necessary
-    | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = NeedsProfiling
-    -- Check that it has haddocks if necessary
-    | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = NeedsHaddock
-    -- Check that it has haddocks if necessary
-    | getInstalledSymbols opts && isJust mcache && not (dpSymbols dp) = NeedsSymbols
-    | otherwise =
+isAllowed installMap mloc dp =
         case Map.lookup name installMap of
             Nothing ->
                 -- If the sourceMap has nothing to say about this package,
@@ -288,7 +227,7 @@ data LoadHelper = LoadHelper
     }
     deriving Show
 
-toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage Bool Bool Bool -> LoadHelper
+toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage -> LoadHelper
 toLoadHelper mloc dp = LoadHelper
     { lhId = gid
     , lhDeps =

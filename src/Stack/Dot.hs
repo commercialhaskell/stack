@@ -27,7 +27,7 @@ import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Stack.Build (loadPackage)
-import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..), toInstallMap)
+import           Stack.Build.Installed (getInstalled, toInstallMap)
 import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
@@ -115,8 +115,7 @@ createDependencyGraph dotOpts = do
   locals <- projectLocalPackages
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   installMap <- toInstallMap sourceMap
-  (installedMap, globalDump, _, _) <- getInstalled (GetInstalledOpts False False False)
-                                                   installMap
+  (installedMap, globalDump, _, _) <- getInstalled installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
@@ -249,7 +248,7 @@ resolveDependencies limit graph loadPackageDeps = do
 createDepLoader :: HasEnvConfig env
                 => SourceMap
                 -> Map PackageName (InstallLocation, Installed)
-                -> Map PackageName (DumpPackage () () ())
+                -> Map PackageName DumpPackage
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))

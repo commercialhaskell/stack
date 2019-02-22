@@ -8,9 +8,6 @@ module Stack.StoreTH
   , decodePrecompiledCache
   , encodePrecompiledCache
 
-  , decodeOrLoadInstalledCache
-  , encodeInstalledCache
-
   , decodeOrLoadLoadedSnapshot
   ) where
 
@@ -18,7 +15,6 @@ import Data.Store.Version
 import Stack.Prelude
 import Stack.Types.Build
 import Stack.Types.BuildPlan
-import Stack.Types.PackageDump
 
 decodeConfigCache
   :: HasLogFunc env
@@ -45,20 +41,6 @@ encodePrecompiledCache
   -> PrecompiledCache
   -> RIO env ()
 encodePrecompiledCache = $(versionedEncodeFile precompiledCacheVC)
-
-decodeOrLoadInstalledCache
-  :: HasLogFunc env
-  => Path Abs File
-  -> RIO env InstalledCacheInner
-  -> RIO env InstalledCacheInner
-decodeOrLoadInstalledCache = $(versionedDecodeOrLoad installedCacheVC)
-
-encodeInstalledCache
-  :: HasLogFunc env
-  => Path Abs File
-  -> InstalledCacheInner
-  -> RIO env ()
-encodeInstalledCache = $(versionedEncodeFile installedCacheVC)
 
 decodeOrLoadLoadedSnapshot
   :: HasLogFunc env

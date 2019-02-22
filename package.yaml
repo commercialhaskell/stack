@@ -242,7 +242,6 @@ library:
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
-  - Stack.Types.PackageDump
   - Stack.Types.PackageName
   - Stack.Types.Resolver
   - Stack.Types.Runner

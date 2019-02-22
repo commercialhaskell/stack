@@ -215,13 +215,7 @@ getModuleInfo = do
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     installMap <- toInstallMap sourceMap
     (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
-        getInstalled
-            GetInstalledOpts
-            { getInstalledProfiling = False
-            , getInstalledHaddock = False
-            , getInstalledSymbols = False
-            }
-            installMap
+        getInstalled installMap
     let globals = toModuleInfo (smGlobal sourceMap) globalDumpPkgs
         notHiddenDeps = notHidden $ smDeps sourceMap
         installedDeps = toModuleInfo notHiddenDeps snapshotDumpPkgs

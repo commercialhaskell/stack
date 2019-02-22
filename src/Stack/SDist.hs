@@ -172,12 +172,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     installMap <- toInstallMap sourceMap
-    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
-                                { getInstalledProfiling = False
-                                , getInstalledHaddock = False
-                                , getInstalledSymbols = False
-                                }
-                                installMap
+    (installedMap, _, _, _) <- getInstalled installMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
           map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)

@@ -293,9 +293,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                 , dpDepends = []
                 , dpHaddockInterfaces = []
                 , dpHaddockHtml = Nothing
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = True
                 }
               fakeDump = sma {

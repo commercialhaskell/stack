@@ -167,7 +167,7 @@ instance HasEnvConfig Ctx where
 -- some of its dependencies have changed.
 constructPlan :: forall env. HasEnvConfig env
               => BaseConfigOpts
-              -> [DumpPackage () () ()] -- ^ locally registered
+              -> [DumpPackage] -- ^ locally registered
               -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
@@ -264,7 +264,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 -- to unregister.
 data UnregisterState = UnregisterState
     { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
-    , usKeep :: ![DumpPackage () () ()]
+    , usKeep :: ![DumpPackage]
     , usAnyAdded :: !Bool
     }
 
@@ -274,7 +274,7 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Tasks
                   -> Map PackageName Text
                   -- ^ Reasons why packages are dirty and must be rebuilt
-                  -> [DumpPackage () () ()]
+                  -> [DumpPackage]
                   -- ^ Local package database dump
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps

@@ -201,9 +201,9 @@ data ExecuteEnv = ExecuteEnv
     , eeTotalWanted    :: !Int
     , eeLocals         :: ![LocalPackage]
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () () ()))
-    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
-    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
+    , eeGlobalDumpPkgs :: !(Map GhcPkgId DumpPackage)
+    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
+    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
     , eeGetGhcPath     :: !(forall m. MonadIO m => m (Path Abs File))
     , eeGetGhcjsPath   :: !(forall m. MonadIO m => m (Path Abs File))
@@ -306,9 +306,9 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> BuildOptsCLI
                -> BaseConfigOpts
                -> [LocalPackage]
-               -> [DumpPackage () () ()] -- ^ global packages
-               -> [DumpPackage () () ()] -- ^ snapshot packages
-               -> [DumpPackage () () ()] -- ^ local packages
+               -> [DumpPackage] -- ^ global packages
+               -> [DumpPackage] -- ^ snapshot packages
+               -> [DumpPackage] -- ^ local packages
                -> (ExecuteEnv -> RIO env a)
                -> RIO env a
 withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
@@ -471,9 +471,9 @@ executePlan :: HasEnvConfig env
             => BuildOptsCLI
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> [DumpPackage () () ()] -- ^ global packages
-            -> [DumpPackage () () ()] -- ^ snapshot packages
-            -> [DumpPackage () () ()] -- ^ local packages
+            -> [DumpPackage] -- ^ global packages
+            -> [DumpPackage] -- ^ snapshot packages
+            -> [DumpPackage] -- ^ local packages
             -> InstalledMap
             -> Map PackageName Target
             -> Plan
@@ -2147,7 +2147,7 @@ taskComponents task =
 --
 -- * https://github.com/commercialhaskell/stack/issues/949
 addGlobalPackages :: Map PackageIdentifier GhcPkgId -- ^ dependencies of the package
-                  -> [DumpPackage () () ()] -- ^ global packages
+                  -> [DumpPackage] -- ^ global packages
                   -> Set GhcPkgId
 addGlobalPackages deps globals0 =
     res

@@ -406,14 +406,14 @@ loadCompiler cv = do
     , lsPackages = Map.empty
     }
   where
-    toGlobals :: Map GhcPkgId (DumpPackage () () ())
+    toGlobals :: Map GhcPkgId DumpPackage
               -> Map PackageName (LoadedPackageInfo GhcPkgId)
     toGlobals m =
         Map.fromList $ map go $ Map.elems m
       where
         identMap = Map.map dpPackageIdent m
 
-        go :: DumpPackage () () () -> (PackageName, LoadedPackageInfo GhcPkgId)
+        go :: DumpPackage -> (PackageName, LoadedPackageInfo GhcPkgId)
         go dp =
             (name, lpi)
           where

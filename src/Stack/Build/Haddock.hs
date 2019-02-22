@@ -103,7 +103,7 @@ generateLocalHaddockIndex
     :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local package dump
+    -> Map GhcPkgId DumpPackage  -- ^ Local package dump
     -> [LocalPackage]
     -> RIO env ()
 generateLocalHaddockIndex wc bco localDumpPkgs locals = do
@@ -127,9 +127,9 @@ generateDepsHaddockIndex
     :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local dump information
+    -> Map GhcPkgId DumpPackage  -- ^ Global dump information
+    -> Map GhcPkgId DumpPackage  -- ^ Snapshot dump information
+    -> Map GhcPkgId DumpPackage  -- ^ Local dump information
     -> [LocalPackage]
     -> RIO env ()
 generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
@@ -170,8 +170,8 @@ generateSnapHaddockIndex
     :: (HasProcessContext env, HasLogFunc env)
     => WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global package dump
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot package dump
+    -> Map GhcPkgId DumpPackage  -- ^ Global package dump
+    -> Map GhcPkgId DumpPackage  -- ^ Snapshot package dump
     -> RIO env ()
 generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
@@ -188,7 +188,7 @@ generateHaddockIndex
     => Text
     -> WhichCompiler
     -> BaseConfigOpts
-    -> [DumpPackage () () ()]
+    -> [DumpPackage]
     -> FilePath
     -> Path Abs Dir
     -> RIO env ()
@@ -225,7 +225,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                 " already up to date at:\n" <>
                 fromString (toFilePath destIndexFile)
   where
-    toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
+    toInterfaceOpt :: DumpPackage -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =
         case dpHaddockInterfaces of
             [] -> return Nothing
@@ -275,8 +275,8 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
 
 -- | Find first DumpPackage matching the GhcPkgId
 lookupDumpPackage :: GhcPkgId
-                  -> [Map GhcPkgId (DumpPackage () () ())]
-                  -> Maybe (DumpPackage () () ())
+                  -> [Map GhcPkgId DumpPackage]
+                  -> Maybe DumpPackage
 lookupDumpPackage ghcPkgId dumpPkgs =
     listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 
