@@ -561,10 +561,13 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
     renderCandidate c@(pkgName,namedComponent,mainIs) =
         let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . elemIndex c
+            pkgNameText = T.pack (packageNameString pkgName)
         in  candidateIndex candidates <> ". Package `" <>
-            T.pack (packageNameString pkgName) <>
+            pkgNameText <>
             "' component " <>
-            renderComp namedComponent <>
+            -- This is the format that can be directly copy-pasted as
+            -- an argument to `stack ghci`.
+            pkgNameText <> ":" <> renderComp namedComponent <>
             " with main-is file: " <>
             T.pack (toFilePath mainIs)
     candidateIndices = take (length candidates) [1 :: Int ..]
