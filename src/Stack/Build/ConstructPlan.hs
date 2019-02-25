@@ -516,11 +516,12 @@ installPackage name ps minstalled = do
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
-                          adr <- installPackageGivenDeps True (lpBuildHaddocks lp) ps tb minstalled deps
                           -- in curator builds we can't do all-in-one build as test/benchmark failure
                           -- could prevent library from being available to its dependencies
                           -- but when it's already available it's OK to do that
                           splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
+                          let isAllInOne = not splitRequired
+                          adr <- installPackageGivenDeps isAllInOne (lpBuildHaddocks lp) ps tb minstalled deps
                           let finalAllInOne = case adr of
                                 ADRToInstall _ | splitRequired -> False
                                 _ -> True
