@@ -351,7 +351,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- step.
 addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
-    depsRes <- addPackageDeps {-False-} package
+    depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
