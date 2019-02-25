@@ -498,15 +498,10 @@ installPackage name ps minstalled = do
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
         PSFilePath lp -> do
-            -- in curator builds we can't do all-in-one build as test/benchmark failure
-            -- could prevent library from being available to its dependencies
-            splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
                     resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
-                Just tb | splitRequired ->
-                    splitInstallSteps lp tb
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
@@ -522,9 +517,16 @@ installPackage name ps minstalled = do
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
                           adr <- installPackageGivenDeps True (lpBuildHaddocks lp) ps tb minstalled deps
+                          -- in curator builds we can't do all-in-one build as test/benchmark failure
+                          -- could prevent library from being available to its dependencies
+                          -- but when it's already available it's OK to do that
+                          splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
+                          let finalAllInOne = case adr of
+                                ADRToInstall _ | splitRequired -> False
+                                _ -> True
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb True False
+                          addFinal lp tb finalAllInOne False
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -534,21 +536,18 @@ installPackage name ps minstalled = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            splitInstallSteps lp tb
+                            res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                            when (isRight res') $ do
+                                -- Insert it into the map so that it's
+                                -- available for addFinal.
+                                updateLibMap name res'
+                                addFinal lp tb False False
+                            return res'
  where
    expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
      curator <- maybeCurator
      pure $ Set.member name (curatorExpectTestFailure curator) ||
             Set.member name (curatorExpectBenchmarkFailure curator)
-
-   splitInstallSteps lp tb = do
-       res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
-       when (isRight res') $ do
-           -- Insert it into the map so that it's
-           -- available for addFinal.
-           updateLibMap name res'
-           addFinal lp tb False False
-       return res'
 
 resolveDepsAndInstall :: Bool
                       -> Bool
