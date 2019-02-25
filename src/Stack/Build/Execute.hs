@@ -1863,15 +1863,10 @@ singleTest topts testsToRun ac ee task installedMap = do
                                     OTLogFile _ h -> setter (useHandleOpen h)
                             optionalTimeout action
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
-                                    mres <- timeout (maxSecs * 1000000) action
-                                    case mres of
-                                      Nothing -> throwString $ "test suite timed out, package " <>
-                                                               packageNameString pname <> ", suite: " <>
-                                                               T.unpack testName <> T.unpack argsDisplay
-                                      Just res -> return res
-                                | otherwise = action
+                                    timeout (maxSecs * 1000000) action
+                                | otherwise = Just <$> action
 
-                        ec <- withWorkingDir (toFilePath pkgDir) $
+                        mec <- withWorkingDir (toFilePath pkgDir) $
                           optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
                             stdinBS <-
                               if isTestTypeLib
@@ -1898,11 +1893,16 @@ singleTest topts testsToRun ac ee task installedMap = do
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
                         let announceResult result = announce $ "Test suite " <> testName <> " " <> result
-                        case ec of
-                            ExitSuccess -> do
+                        case mec of
+                            Just ExitSuccess -> do
                                 announceResult "passed"
                                 return Map.empty
-                            _ -> do
+                            Nothing -> do
+                                announceResult "timed out"
+                                if expectFailure
+                                then return Map.empty
+                                else return $ Map.singleton testName Nothing
+                            Just ec -> do
                                 announceResult "failed"
                                 if expectFailure
                                 then return Map.empty
