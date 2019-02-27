@@ -187,7 +187,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
+import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile, addFileExtension)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
@@ -1183,7 +1183,9 @@ addAndCompletePackagesToSnapshot
 addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
   cachedPL <- case loc of
                 RSLFilePath path -> do
-                         xs <- liftIO $ loadSnapshotLockFile (resolvedAbsolute path) rootDir
+                         let sf = resolvedAbsolute path -- com here
+                         slf <- liftIO $ addFileExtension "lock" sf
+                         xs <- liftIO $ loadSnapshotLockFile slf rootDir
                          pure xs
                 _ -> pure []
   let source = display loc

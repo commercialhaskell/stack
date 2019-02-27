@@ -1593,17 +1593,19 @@ loadSnapshotLockFile :: Path Abs File -> Path Abs Dir -> IO [(PackageLocationImm
 loadSnapshotLockFile lockFile rootDir = do
   val <- Yaml.decodeFileThrow (toFilePath lockFile)
   case Yaml.parseEither (resolveSnapshotLockFile rootDir) val of
-    Left str -> fail $ "Cannot parse snapshot lock file: Got error " <> str
+    Left str -> fail $ "Cannot parse snapshot lock file: Got error " <> str <> (show val)
     Right lockFileIO -> lockFileIO
 
-parseSnapshotFile :: Value -> Parser (Unresolved [RawPackageLocationImmutable])
+parseSnapshotFile :: Value -> Parser (Unresolved ([RawPackageLocationImmutable], RawSnapshotLocation))
 parseSnapshotFile (Object obj) = do
   packages <- obj .: "packages"
+  resolver <- obj .: "resolver"
   xs <- withArray "SnapshotFileArray" (\vec -> sequence $ Vector.map parseRPLI vec) packages
-  pure $ sequence $ Vector.toList xs
+  resolver <- parseRSL resolver
+  pure $ combineUnresolved (sequence $ Vector.toList xs) resolver
 parseSnapshotFile val = fail $ "Expected Object, but got: " <> (show val)
 
-resolveSnapshotFile :: Path Abs Dir -> Value -> Parser (IO [RawPackageLocationImmutable])
+resolveSnapshotFile :: Path Abs Dir -> Value -> Parser (IO ([RawPackageLocationImmutable], RawSnapshotLocation))
 resolveSnapshotFile rootDir val = do
   unrpl <- parseSnapshotFile val
   let pkgLoc = resolvePaths (Just rootDir) unrpl
