@@ -129,7 +129,9 @@ generateLockFile stackFile = do
     B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
 
 loadSnapshotFile ::
-       Path Abs File -> Path Abs Dir -> IO [RawPackageLocationImmutable]
+       Path Abs File
+    -> Path Abs Dir
+    -> IO ([RawPackageLocationImmutable], RawSnapshotLocation)
 loadSnapshotFile path rootDir = do
     val <- Yaml.decodeFileThrow (toFilePath path)
     case Yaml.parseEither (resolveSnapshotFile rootDir) val of
@@ -144,13 +146,15 @@ loadSnapshotLockFile = undefined
 generateSnapshotLockFile ::
        Path Abs File -- ^ Snapshot file
     -> [RawPackageLocationImmutable]
+    -> RawSnapshotLocation
     -> RIO Config ()
-generateSnapshotLockFile path rpl = do
+generateSnapshotLockFile path rpli rpl = do
     logInfo "Generating Lock file for snapshot"
-    let rpl' :: [RawPackageLocation] = map RPLImmutable rpl
-    deps :: [PackageLocation] <- mapM completePackageLocation' rpl'
+    let rpli' :: [RawPackageLocation] = map RPLImmutable rpli
+    deps :: [PackageLocation] <- mapM completePackageLocation' rpli'
+    rpl' :: SnapshotLocation <- completeSnapshotLocation rpl
     lockFile <- liftIO $ addFileExtension "lock" path
-    let depPairs :: [(PackageLocation, RawPackageLocation)] = zip deps rpl'
+    let depPairs :: [(PackageLocation, RawPackageLocation)] = zip deps rpli'
         depsObject =
             Yaml.object
                 [ ( "dependencies"
@@ -161,6 +165,11 @@ generateSnapshotLockFile path rpl = do
                                       , ("complete", Yaml.toJSON comp)
                                       ])
                              depPairs))
+                , ( "resolver"
+                  , object
+                        [ ("original", Yaml.toJSON rpl)
+                        , ("complete", Yaml.toJSON rpl')
+                        ])
                 ]
     B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
 
@@ -169,8 +178,8 @@ generateLockFileForCustomSnapshot ::
 generateLockFileForCustomSnapshot (SLFilePath path) stackFile = do
     logInfo "Generating lock file for custom snapshot"
     let snapshotPath = resolvedAbsolute path
-    rpl <- liftIO $ loadSnapshotFile snapshotPath (parent stackFile)
-    generateSnapshotLockFile snapshotPath rpl
+    (rpli, rpl) <- liftIO $ loadSnapshotFile snapshotPath (parent stackFile)
+    generateSnapshotLockFile snapshotPath rpli rpl
 generateLockFileForCustomSnapshot xs _ = throwM (LockCannotGenerate xs)
 
 isLockFileOutdated :: Path Abs File -> RIO Config Bool

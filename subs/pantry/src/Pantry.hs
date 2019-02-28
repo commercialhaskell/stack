@@ -1183,7 +1183,7 @@ addAndCompletePackagesToSnapshot
 addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
   cachedPL <- case loc of
                 RSLFilePath path -> do
-                         let sf = resolvedAbsolute path -- com here
+                         let sf = resolvedAbsolute path
                          slf <- liftIO $ addFileExtension "lock" sf
                          xs <- liftIO $ loadSnapshotLockFile slf rootDir
                          pure xs
