@@ -37,7 +37,7 @@ module Pantry
   , FileSize (..)
   , RelFilePath (..)
   , ResolvedPath (..)
-  , Unresolved
+  , Unresolved (..)
 
     -- ** Cryptography
   , SHA256
@@ -46,6 +46,7 @@ module Pantry
 
     -- ** Packages
   , RawPackageMetadata (..)
+  , rpmEmpty
   , PackageMetadata (..)
   , Package (..)
 
@@ -59,10 +60,13 @@ module Pantry
   , RawArchive (..)
   , Archive (..)
   , ArchiveLocation (..)
+  , OptionalSubdirs (..)
+  , osToRpms
 
     -- ** Repos
   , Repo (..)
   , RepoType (..)
+  , GitHubRepo (..)
 
     -- ** Package location
   , RawPackageLocation (..)
@@ -106,9 +110,9 @@ module Pantry
   , parseRawSnapshotLocation
   , parsePackageIdentifierRevision
   , parseHackageText
-  , resolveLockFile
-  , resolveSnapshotFile
-  , resolveSnapshotLockFile
+  , parseArchiveLocationText
+  , parseArchiveLocationObject
+  , parseRawSnapshotLocationPath
   , parseAndResolvePackageLocation
 
     -- ** Cabal values
@@ -149,9 +153,6 @@ module Pantry
     -- * Cabal files
   , loadCabalFileRaw
   , loadCabalFile
-  , LockFile (..)
-  , loadLockFile
-  , loadSnapshotLockFile
   , loadCabalFileRawImmutable
   , loadCabalFileImmutable
   , loadCabalFilePath
@@ -992,7 +993,7 @@ loadAndCompleteSnapshot
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshot loc rootDir =
-  loadAndCompleteSnapshotRaw (toRawSL loc) rootDir
+  loadAndCompleteSnapshotRaw (toRawSL loc) [] rootDir -- todo: fix empty list
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations
@@ -1001,9 +1002,10 @@ loadAndCompleteSnapshot loc rootDir =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
+  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshotRaw loc rootDir = do
+loadAndCompleteSnapshotRaw loc cachePL rootDir = do
   eres <- loadRawSnapshotLayer loc
   case eres of
     Left wc ->
@@ -1015,10 +1017,11 @@ loadAndCompleteSnapshotRaw loc rootDir = do
             }
       in pure (snapshot, [])
     Right (rsl, _sha) -> do
-      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) rootDir
+      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL rootDir
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
           loc
+          cachePL
           rootDir
           (rslLocations rsl)
           AddPackagesConfig
@@ -1175,19 +1178,13 @@ addAndCompletePackagesToSnapshot
   => RawSnapshotLocation
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
+  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig
   -> Map PackageName SnapshotPackage -- ^ packages from parent
   -> RIO env (Map PackageName SnapshotPackage, [CompletedPLI], AddPackagesConfig)
-addAndCompletePackagesToSnapshot loc rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
-  cachedPL <- case loc of
-                RSLFilePath path -> do
-                         let sf = resolvedAbsolute path
-                         slf <- liftIO $ addFileExtension "lock" sf
-                         xs <- liftIO $ loadSnapshotLockFile slf rootDir
-                         pure xs
-                _ -> pure []
+addAndCompletePackagesToSnapshot loc cachedPL rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
   let source = display loc
       addPackage :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
                  => ([(PackageName, SnapshotPackage)],[CompletedPLI])

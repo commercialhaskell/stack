@@ -86,9 +86,8 @@ import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.PrettyPrint
-import Stack.Lock (generateLockFile, isLockFileOutdated, generateLockFileForCustomSnapshot)
+import Stack.Lock (generateLockFile, isLockFileOutdated, generateLockFileForCustomSnapshot, loadLockFile, LockFile (..))
 import           RIO.Process
-import Pantry (loadLockFile, LockFile (..))
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
