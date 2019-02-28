@@ -20,8 +20,12 @@ module Stack.Types.SourceMap
   , GlobalPackage (..)
   , isReplacedGlobal
   , SourceMapHash (..)
+  , smRelDir
   ) where
 
+import qualified Data.Text as T
+import qualified Pantry.SHA256 as SHA256
+import Path
 import Stack.Prelude
 import Stack.Types.Compiler
 import Stack.Types.NamedComponent
@@ -150,3 +154,9 @@ data SourceMap = SourceMap
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.
 newtype SourceMapHash = SourceMapHash SHA256
+
+-- | Returns relative directory name with source map's hash
+smRelDir :: (MonadThrow m) => SourceMap -> m (Path Rel Dir)
+smRelDir sm = do
+  let SourceMapHash smh = smHash sm
+  parseRelDir $ T.unpack $ SHA256.toHexText smh

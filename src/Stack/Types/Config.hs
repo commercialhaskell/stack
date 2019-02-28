@@ -1243,9 +1243,9 @@ platformSnapAndCompilerRel
     :: (HasEnvConfig env)
     => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to smHash
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
+    sm <- view $ envConfigL.to envConfigSourceMap
+    name <- smRelDir sm
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
