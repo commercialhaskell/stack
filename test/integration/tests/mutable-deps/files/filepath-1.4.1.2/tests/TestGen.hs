@@ -1,3 +1,4 @@
+{-# ANN module "HLint: ignore" #-}
 -- GENERATED CODE: See ../Generate.hs
 module TestGen(tests) where
 import TestUtil

@@ -7,7 +7,7 @@ main :: IO ()
 main = do
     let expectRecompilation stderr =
           unless ("files-1.0.0: build" `isInfixOf` stderr) $
-          error $ "package recompilation was expected"
+          error "package recompilation was expected"
         expectNoRecompilation stderr =
           when ("files-1.0.0: build" `isInfixOf` stderr) $
           error "package recompilation was not expected"
