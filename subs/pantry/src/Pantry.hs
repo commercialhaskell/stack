@@ -990,10 +990,11 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
+  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshot loc rootDir =
-  loadAndCompleteSnapshotRaw (toRawSL loc) [] rootDir -- todo: fix empty list
+loadAndCompleteSnapshot loc cachedPL rootDir =
+  loadAndCompleteSnapshotRaw (toRawSL loc) cachedPL rootDir
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations

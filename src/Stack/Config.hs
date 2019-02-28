@@ -86,8 +86,15 @@ import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.PrettyPrint
-import Stack.Lock (generateLockFile, isLockFileOutdated, generateLockFileForCustomSnapshot, loadLockFile, LockFile (..))
 import           RIO.Process
+import Stack.Lock
+    ( LockFile(..)
+    , generateLockFile
+    , generateLockFileForCustomSnapshot
+    , isLockFileOutdated
+    , loadLockFile
+    , loadSnapshotLockFile
+    )
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -633,8 +640,15 @@ loadBuildConfig mproject maresolver mcompiler = do
                     when outdated (generateLockFileForCustomSnapshot resolver stackYamlFP)
       _ -> return ()
 
-    -- todo: loadAndCompleteSnapshot likely has to be cached in a new lock file
-    (snapshot, _completed) <- loadAndCompleteSnapshot resolver (parent stackYamlFP)
+    cachedPL <- case resolver of
+                  SLFilePath path -> do
+                           let sf = resolvedAbsolute path
+                           slf <- liftIO $ addFileExtension "lock" sf
+                           xs <- liftIO $ loadSnapshotLockFile slf (parent stackYamlFP)
+                           pure xs
+                  _ -> pure []
+
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedPL (parent stackYamlFP)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
