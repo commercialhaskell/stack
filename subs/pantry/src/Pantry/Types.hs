@@ -720,10 +720,11 @@ parseHackageText t = maybe (Left $ PackageIdentifierRevisionParseFail t) Right $
         pure msize
       _ -> Nothing
   pure $ (PackageIdentifier name version, BlobKey csha csize)
-  where
-    splitColon t' =
-      let (x, y) = T.break (== ':') t'
-       in (x, ) <$> T.stripPrefix ":" y
+
+splitColon :: Text -> Maybe (Text, Text)
+splitColon t' =
+    let (x, y) = T.break (== ':') t'
+     in (x, ) <$> T.stripPrefix ":" y
 
 -- | Parse a 'PackageIdentifierRevision'
 --
@@ -752,10 +753,6 @@ parsePackageIdentifierRevision t = maybe (Left $ PackageIdentifierRevisionParseF
       Nothing -> pure CFILatest
       _ -> Nothing
   pure $ PackageIdentifierRevision name version cfi
-  where
-    splitColon t' =
-      let (x, y) = T.break (== ':') t'
-       in (x, ) <$> T.stripPrefix ":" y
 
 data Mismatch a = Mismatch
   { mismatchExpected :: !a

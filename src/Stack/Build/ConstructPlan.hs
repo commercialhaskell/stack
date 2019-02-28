@@ -1016,7 +1016,8 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
          , line
          ]
 
-    extras :: Map PackageName (Version, BlobKey) = Map.unions $ map getExtras exceptions'
+    extras :: Map PackageName (Version, BlobKey)
+    extras = Map.unions $ map getExtras exceptions'
     getExtras DependencyCycleDetected{} = Map.empty
     getExtras UnknownPackage{} = Map.empty
     getExtras (DependencyPlanFailures _ m) =

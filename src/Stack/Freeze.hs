@@ -30,6 +30,15 @@ freeze (FreezeOpts mode) = do
         Just (p, _) -> doFreeze p mode
         Nothing -> logWarn "No project was found: nothing to freeze"
 
+completeFullPackageLocation ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => RawPackageLocation
+    -> RIO env PackageLocation
+completeFullPackageLocation (RPLImmutable rpli) = do
+    pl <- completePackageLocation rpli
+    pure $ PLImmutable pl
+completeFullPackageLocation (RPLMutable rplm) = pure $ PLMutable rplm
+
 doFreeze ::
        ( HasProcessContext env
        , HasLogFunc env
@@ -43,7 +52,7 @@ doFreeze p FreezeProject = do
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
     resolver' :: SnapshotLocation <- completeSnapshotLocation resolver
-    deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+    deps' :: [PackageLocation] <- mapM completeFullPackageLocation deps
     let rawCompleted = map toRawPL deps'
         rawResolver = toRawSL resolver'
     if rawCompleted == deps && rawResolver == resolver

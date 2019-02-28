@@ -16,6 +16,7 @@ import Pantry
     ( GitHubRepo(..)
     , OptionalSubdirs(..)
     , Unresolved(..)
+    , completePackageLocation
     , osToRpms
     , parseArchiveLocationObject
     , parseArchiveLocationText
@@ -29,6 +30,7 @@ import Path (addFileExtension, fromAbsFile, parent)
 import Path.IO (doesFileExist, getModificationTime, resolveDir, resolveFile)
 import qualified RIO.ByteString as B
 import qualified RIO.HashMap as HM
+import RIO.Process
 import qualified RIO.Text as T
 import Stack.Prelude
 import Stack.Types.Config
@@ -57,6 +59,15 @@ data Change = Change
     , chUnchanged :: [(PackageLocation, RawPackageLocation)]
     }
 
+completeFullPackageLocation ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => RawPackageLocation
+    -> RIO env PackageLocation
+completeFullPackageLocation (RPLImmutable rpli) = do
+    pl <- completePackageLocation rpli
+    pure $ PLImmutable pl
+completeFullPackageLocation (RPLMutable rplm) = pure $ PLMutable rplm
+
 findChange ::
        [(PackageLocation, RawPackageLocation)] -- ^ Lock file
     -> [RawPackageLocation] -- ^ stack.yaml file
@@ -71,8 +82,8 @@ findChange lrpl srpl =
             , chUnchanged = unchangedFull
             }
 
-generateLockFile :: Path Abs File -> RIO Config ()
-generateLockFile stackFile = do
+generatePackageLockFile :: Path Abs File -> RIO Config ()
+generatePackageLockFile stackFile = do
     logDebug "Gennerating lock file"
     mproject <- view $ configL . to configMaybeProject
     p <-
@@ -81,25 +92,19 @@ generateLockFile stackFile = do
             Nothing -> throwM LockNoProject
     let deps :: [RawPackageLocation] = projectDependencies p
         resolver :: RawSnapshotLocation = projectResolver p
-    lockFile <- liftIO $ addFileExtension "lock" stackFile
-    lockFileExists <- liftIO $ doesFileExist lockFile
-    lockInfo <-
-        case lockFileExists of
+    packageLockFile <- liftIO $ addFileExtension "lock" stackFile
+    packageLockFileExists <- liftIO $ doesFileExist packageLockFile
+    lockInfo :: Maybe LockFile <-
+        case packageLockFileExists of
             True ->
                 liftIO $ do
-                    lfio <- loadLockFile lockFile
-                    let lfpl = lfPackageLocation lfio
-                        lfor = lfoResolver lfio
-                        lfcr = lfcResolver lfio
-                    pl <- lfpl
-                    or <- lfor
-                    cr <- lfcr
-                    pure $ Just (pl, or, cr)
+                    lfio <- loadPackageLockFile packageLockFile
+                    pure $ Just lfio
             False -> pure Nothing
     (deps', resolver') <-
         case lockInfo of
-            Just (pl, or, cr) -> do
-                let change = findChange pl deps
+            Just lockData -> do
+                let change = findChange (lfPackageLocations lockData) deps
                     unchangedRes = map fst (chUnchanged change)
                     addedStr =
                         concat $
@@ -116,17 +121,18 @@ generateLockFile stackFile = do
                                  " package from the lock file.\n")
                             (chRemoved change)
                 logInfo (displayShow $ addedStr <> deletedstr)
-                deps <- mapM completePackageLocation' (chAdded change)
+                deps <- mapM completeFullPackageLocation (chAdded change)
                 let allDeps = unchangedRes <> deps
                 res <-
-                    if or == resolver
-                        then pure cr
+                    if (lfoResolver lockData) == resolver
+                        then pure (lfcResolver lockData)
                         else completeSnapshotLocation resolver
                 pure (allDeps, res)
             Nothing -> do
                 resolver' :: SnapshotLocation <-
                     completeSnapshotLocation resolver
-                deps' :: [PackageLocation] <- mapM completePackageLocation' deps
+                deps' :: [PackageLocation] <-
+                    mapM completeFullPackageLocation deps
                 pure (deps', resolver')
     let deps'' = zip deps deps'
     let depsObject =
@@ -145,7 +151,7 @@ generateLockFile stackFile = do
                                       ])
                              deps''))
                 ]
-    B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
+    B.writeFile (fromAbsFile packageLockFile) (Yaml.encode depsObject)
 
 loadSnapshotFile ::
        Path Abs File
@@ -157,17 +163,16 @@ loadSnapshotFile path rootDir = do
         Left str -> fail $ "Cannot parse snapshot file: Got error " <> str
         Right rplio -> rplio
 
-generateSnapshotLockFile ::
+createSnapshotLockFile ::
        Path Abs File -- ^ Snapshot file
     -> [RawPackageLocationImmutable]
     -> RawSnapshotLocation
     -> RIO Config ()
-generateSnapshotLockFile path rpli rpl = do
-    logInfo "Generating Lock file for snapshot"
+createSnapshotLockFile path rpli rpl = do
     let rpli' :: [RawPackageLocation] = map RPLImmutable rpli
-    deps :: [PackageLocation] <- mapM completePackageLocation' rpli'
+    deps :: [PackageLocation] <- mapM completeFullPackageLocation rpli'
     rpl' :: SnapshotLocation <- completeSnapshotLocation rpl
-    lockFile <- liftIO $ addFileExtension "lock" path
+    snapshotLockFile <- liftIO $ addFileExtension "lock" path
     let depPairs :: [(PackageLocation, RawPackageLocation)] = zip deps rpli'
         depsObject =
             Yaml.object
@@ -185,44 +190,68 @@ generateSnapshotLockFile path rpli rpl = do
                         , ("complete", Yaml.toJSON rpl')
                         ])
                 ]
-    B.writeFile (fromAbsFile lockFile) (Yaml.encode depsObject)
+    B.writeFile (fromAbsFile snapshotLockFile) (Yaml.encode depsObject)
 
-generateLockFileForCustomSnapshot ::
-       SnapshotLocation -> Path Abs File -> RIO Config ()
-generateLockFileForCustomSnapshot (SLFilePath path) stackFile = do
-    logInfo "Generating lock file for custom snapshot"
+generateSnapshotLockFile :: SnapshotLocation -> Path Abs File -> RIO Config ()
+generateSnapshotLockFile (SLFilePath path) stackFile = do
+    logInfo "Generating Lock file for custom snapshot"
     let snapshotPath = resolvedAbsolute path
     (rpli, rpl) <- liftIO $ loadSnapshotFile snapshotPath (parent stackFile)
-    generateSnapshotLockFile snapshotPath rpli rpl
-generateLockFileForCustomSnapshot xs _ = throwM (LockCannotGenerate xs)
+    createSnapshotLockFile snapshotPath rpli rpl
+generateSnapshotLockFile xs _ = throwM (LockCannotGenerate xs)
 
 isLockFileOutdated :: Path Abs File -> RIO Config Bool
 isLockFileOutdated stackFile = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
     smt <- liftIO $ getModificationTime stackFile
-    lmt <-
-        liftIO $ do
-            exists <- doesFileExist lockFile
-            if exists
-                then do
-                    mt <- getModificationTime lockFile
-                    pure $ Just mt
-                else pure Nothing
-    case lmt of
-        Nothing -> return True
-        Just mt -> return $ smt > mt
+    liftIO $ do
+        exists <- doesFileExist lockFile
+        if exists
+            then do
+                mt <- getModificationTime lockFile
+                pure $ smt > mt
+            else pure True
 
-loadLockFile :: Path Abs File -> IO (LockFile IO)
-loadLockFile lockFile = do
+parsePackageLockFile :: Path Abs Dir -> Value -> Parser (IO LockFile)
+parsePackageLockFile rootDir value =
+    withObject
+        "LockFile"
+        (\obj -> do
+             vals :: Value <- obj .: "dependencies"
+             xs <-
+                 withArray
+                     "LockFileArray"
+                     (\vec -> sequence $ Vector.map parseSingleObject vec)
+                     vals
+             resolver <- obj .: "resolver"
+             roriginal <- resolver .: "original"
+             rcomplete <- resolver .: "complete"
+             ro <- parseRSL roriginal
+             rc <- parseSL rcomplete
+             let rpaths = resolvePaths (Just rootDir)
+             pure $ do
+                 lfpls <- rpaths $ sequence (Vector.toList xs)
+                 lfor <- rpaths ro
+                 lfcr <- rpaths rc
+                 pure $
+                     LockFile
+                         { lfPackageLocations = lfpls
+                         , lfoResolver = lfor
+                         , lfcResolver = lfcr
+                         })
+        value
+
+loadPackageLockFile :: Path Abs File -> IO LockFile
+loadPackageLockFile lockFile = do
     val <- Yaml.decodeFileThrow (toFilePath lockFile)
-    case Yaml.parseEither (resolveLockFile (parent lockFile)) val of
+    case Yaml.parseEither (parsePackageLockFile (parent lockFile)) val of
         Left str -> fail $ "Cannot parse lock file: Got error " <> str
-        Right lockFileIO -> pure lockFileIO
+        Right lockFileIO -> lockFileIO
 
-data LockFile a = LockFile
-    { lfPackageLocation :: a [(PackageLocation, RawPackageLocation)]
-    , lfoResolver :: a RawSnapshotLocation
-    , lfcResolver :: a SnapshotLocation
+data LockFile = LockFile
+    { lfPackageLocations :: [(PackageLocation, RawPackageLocation)]
+    , lfoResolver :: RawSnapshotLocation
+    , lfcResolver :: SnapshotLocation
     }
 
 combineUnresolved :: Unresolved a -> Unresolved b -> Unresolved (a, b)
@@ -309,44 +338,6 @@ parseSL v = txtParser v <|> parseSLObject v
         withText
             ("UnresolvedSnapshotLocation (Text)")
             (\t -> pure $ fromMaybe (parseSnapshotLocationPath t) (txt t))
-
-parseLockFile :: Value -> Parser (LockFile Unresolved)
-parseLockFile value =
-    withObject
-        "LockFile"
-        (\obj -> do
-             vals :: Value <- obj .: "dependencies"
-             xs <-
-                 withArray
-                     "LockFileArray"
-                     (\vec -> sequence $ Vector.map parseSingleObject vec)
-                     vals
-             resolver <- obj .: "resolver"
-             roriginal <- resolver .: "original"
-             rcomplete <- resolver .: "complete"
-             ro <- parseRSL roriginal
-             rc <- parseSL rcomplete
-             pure $
-                 LockFile
-                     { lfPackageLocation = sequence (Vector.toList xs)
-                     , lfoResolver = ro
-                     , lfcResolver = rc
-                     })
-        value
-
-resolveLockFile :: Path Abs Dir -> Value -> Parser (LockFile IO)
-resolveLockFile rootDir v = do
-    lockFile <- parseLockFile v
-    let pkgLoc = (lfPackageLocation lockFile)
-        origRes = lfoResolver lockFile
-        compRes = lfcResolver lockFile
-        pkgLoc' = resolvePaths (Just rootDir) pkgLoc
-    pure $
-        LockFile
-            { lfPackageLocation = pkgLoc'
-            , lfoResolver = resolvePaths (Just rootDir) origRes
-            , lfcResolver = resolvePaths (Just rootDir) compRes
-            }
 
 parseBlobKey :: Object -> Parser (Maybe BlobKey)
 parseBlobKey o = do

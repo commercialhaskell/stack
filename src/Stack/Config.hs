@@ -89,10 +89,10 @@ import           RIO.PrettyPrint
 import           RIO.Process
 import Stack.Lock
     ( LockFile(..)
-    , generateLockFile
-    , generateLockFileForCustomSnapshot
+    , generatePackageLockFile
+    , generateSnapshotLockFile
     , isLockFileOutdated
-    , loadLockFile
+    , loadPackageLockFile
     , loadSnapshotLockFile
     )
 
@@ -521,8 +521,6 @@ loadConfig :: HasRunner env
 loadConfig configArgs mresolver mstackYaml inner =
     loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
 
-
-
 stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => [(PackageLocation, RawPackageLocation)]
   -> RawPackageLocation
@@ -611,19 +609,16 @@ loadBuildConfig mproject maresolver mcompiler = do
             }
 
     lockFileOutdated <- isLockFileOutdated stackYamlFP
-    unless lockFileOutdated (logDebug "Lock file is upto date")
-    when lockFileOutdated (logDebug "Lock file is outdated" >> generateLockFile stackYamlFP)
+    if lockFileOutdated
+    then do
+      logDebug "Lock file is outdated"
+      generatePackageLockFile stackYamlFP
+    else logDebug "Lock file is upto date"
 
     lockFile <- liftIO $ addFileExtension "lock" stackYamlFP
     (cachePL, origResolver, compResolver) <- liftIO $ do
-                                                  lfio <- loadLockFile lockFile
-                                                  let pkgLoc = lfPackageLocation lfio
-                                                      origResolver = lfoResolver lfio
-                                                      compResolver = lfcResolver lfio
-                                                  cpl <- pkgLoc
-                                                  or <- origResolver
-                                                  cr <- compResolver
-                                                  return (cpl, or, cr)
+                                                  lf <- loadPackageLockFile lockFile
+                                                  return (lfPackageLocations lf, lfoResolver lf, lfcResolver lf)
 
 
     resolver <- if (projectResolver project == origResolver)
@@ -637,7 +632,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     case resolver of
       SLFilePath path -> do
                     outdated <- isLockFileOutdated (resolvedAbsolute path)
-                    when outdated (generateLockFileForCustomSnapshot resolver stackYamlFP)
+                    when outdated (generateSnapshotLockFile resolver stackYamlFP)
       _ -> return ()
 
     cachedPL <- case resolver of

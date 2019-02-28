@@ -101,7 +101,6 @@ module Pantry
 
     -- * Completion functions
   , completePackageLocation
-  , completePackageLocation'
   , completeSnapshotLayer
   , completeSnapshotLocation
 
@@ -721,15 +720,6 @@ loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 -- | Fill in optional fields in a 'PackageLocationImmutable' for more reproducible builds.
 --
 -- @since 0.1.0.0
-completePackageLocation' :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => RawPackageLocation
-  -> RIO env PackageLocation
-completePackageLocation' (RPLImmutable rpli) = do
-  pl <- completePackageLocation rpli
-  pure $ PLImmutable pl
-completePackageLocation' (RPLMutable rplm) = pure $ PLMutable rplm
-
-
 completePackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
