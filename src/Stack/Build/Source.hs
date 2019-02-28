@@ -107,7 +107,7 @@ loadSourceMap smt boptsCli sma = do
         maybeProjectFlags _ = Nothing
         globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
-    smh <- hashSourceMapData (whichCompiler compiler) deps
+    smh <- hashSourceMapData bconfig boptsCli (whichCompiler compiler) deps
     return
         SourceMap
         { smTargets = smt
@@ -140,10 +140,12 @@ loadSourceMap smt boptsCli sma = do
 --
 hashSourceMapData
     :: (HasConfig env)
-    => WhichCompiler
+    => BuildConfig
+    -> BuildOptsCLI
+    -> WhichCompiler
     -> Map PackageName DepPackage
     -> RIO env SourceMapHash
-hashSourceMapData wc smDeps = do
+hashSourceMapData bc boptsCli wc smDeps = do
     compilerPath <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
     let compilerExe =
             case wc of
@@ -151,7 +153,12 @@ hashSourceMapData wc smDeps = do
                 Ghcjs -> "ghcjs"
     compilerInfo <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
     immDeps <- forM (Map.elems smDeps) depPackageHashableContent
-    let hashedContent = compilerPath:compilerInfo:immDeps
+    let -- extra bytestring specifying GHC options supposed to be applied to
+        -- GHC boot packages so we'll have differrent hashes when bare
+        -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
+        -- with profiling or without
+        bootGhcOpts = B.concat $ map encodeUtf8 (generalGhcOptions bc boptsCli False False)
+        hashedContent = compilerPath:compilerInfo:bootGhcOpts:immDeps
     return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
