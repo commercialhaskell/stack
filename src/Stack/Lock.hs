@@ -9,6 +9,8 @@ module Stack.Lock where
 import Data.Aeson.Extended (unWarningParser)
 import Data.List ((\\), intersect)
 import qualified Data.List.NonEmpty as NE
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Data.Yaml
@@ -56,7 +58,7 @@ instance Show LockException where
 data Change = Change
     { chAdded :: [RawPackageLocation]
     , chRemoved :: [RawPackageLocation]
-    , chUnchanged :: [(PackageLocation, RawPackageLocation)]
+    , chUnchanged :: [(RawPackageLocation, PackageLocation)]
     }
 
 completeFullPackageLocation ::
@@ -69,13 +71,13 @@ completeFullPackageLocation (RPLImmutable rpli) = do
 completeFullPackageLocation (RPLMutable rplm) = pure $ PLMutable rplm
 
 findChange ::
-       [(PackageLocation, RawPackageLocation)] -- ^ Lock file
+       [(RawPackageLocation, PackageLocation)] -- ^ Lock file
     -> [RawPackageLocation] -- ^ stack.yaml file
     -> Change
 findChange lrpl srpl =
-    let lr = map snd lrpl
+    let lr = map fst lrpl
         unchangedOnes = intersect lr srpl
-        unchangedFull = filter (\(pl, rpl) -> rpl `elem` srpl) lrpl
+        unchangedFull = filter (\(rpl, pl) -> rpl `elem` srpl) lrpl
      in Change
             { chAdded = srpl \\ unchangedOnes
             , chRemoved = lr \\ unchangedOnes
@@ -105,7 +107,7 @@ generatePackageLockFile stackFile = do
         case lockInfo of
             Just lockData -> do
                 let change = findChange (lfPackageLocations lockData) deps
-                    unchangedRes = map fst (chUnchanged change)
+                    unchangedRes = map snd (chUnchanged change)
                     addedStr =
                         concat $
                         map
@@ -249,7 +251,7 @@ loadPackageLockFile lockFile = do
         Right lockFileIO -> lockFileIO
 
 data LockFile = LockFile
-    { lfPackageLocations :: [(PackageLocation, RawPackageLocation)]
+    { lfPackageLocations :: [(RawPackageLocation, PackageLocation)]
     , lfoResolver :: RawSnapshotLocation
     , lfcResolver :: SnapshotLocation
     }
@@ -286,7 +288,7 @@ parsePImmutable v = do
     pure $ PLImmutable <$> xs
 
 parseSingleObject ::
-       Value -> Parser (Unresolved (PackageLocation, RawPackageLocation))
+       Value -> Parser (Unresolved (RawPackageLocation, PackageLocation))
 parseSingleObject value =
     withObject
         "LockFile"
@@ -295,7 +297,7 @@ parseSingleObject value =
              complete <- obj .: "complete"
              orig <- parseRPL original
              comp <- parsePImmutable complete
-             pure $ combineUnresolved comp orig)
+             pure $ combineUnresolved orig comp)
         value
 
 parseSnapshotLocationPath :: Text -> Unresolved SnapshotLocation

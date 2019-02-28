@@ -521,17 +521,29 @@ loadConfig :: HasRunner env
 loadConfig configArgs mresolver mstackYaml inner =
     loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
 
+cachedCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)   => Map RawPackageLocation PackageLocation
+  -> RawPackageLocation
+  -> RIO env PackageLocation
+cachedCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
+  let item = Map.lookup rp cachePackages
+  case item of
+    Nothing -> do
+              pl <- completePackageLocation rpli
+              pure $ PLImmutable pl
+    Just pl -> pure pl
+cachedCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
+
 stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => [(PackageLocation, RawPackageLocation)]
+  => [(RawPackageLocation, PackageLocation)]
   -> RawPackageLocation
   -> RIO env PackageLocation
 stackCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
-  let xs = filter (\(_,x) -> x == rp) cachePackages
+  let xs = filter (\(x,_) -> x == rp) cachePackages
   case xs of
     [] -> do
       pl <- completePackageLocation rpli
       pure $ PLImmutable pl
-    (x,_):_ -> pure x
+    (_,x):_ -> pure x
 stackCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.

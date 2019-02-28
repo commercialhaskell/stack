@@ -299,7 +299,7 @@ instance Store (ResolvedPath File)
 data RawPackageLocation
   = RPLImmutable !RawPackageLocationImmutable
   | RPLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Ord, Data, Generic)
 instance NFData RawPackageLocation
 instance Store RawPackageLocation
 
@@ -311,7 +311,7 @@ instance Store RawPackageLocation
 data PackageLocation
   = PLImmutable !PackageLocationImmutable
   | PLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Ord, Data, Generic)
 instance NFData PackageLocation
 instance Store PackageLocation
 
