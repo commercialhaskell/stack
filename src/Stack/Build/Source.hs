@@ -144,14 +144,15 @@ hashSourceMapData
     -> Map PackageName DepPackage
     -> RIO env SourceMapHash
 hashSourceMapData wc smDeps = do
-    path <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
+    compilerPath <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
     let compilerExe =
             case wc of
                 Ghc -> "ghc"
                 Ghcjs -> "ghcjs"
-    info <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
+    compilerInfo <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
     immDeps <- forM (Map.elems smDeps) depPackageHashableContent
-    return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks (path:info:immDeps))
+    let hashedContent = compilerPath:compilerInfo:immDeps
+    return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
 depPackageHashableContent DepPackage {..} = do
