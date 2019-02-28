@@ -185,6 +185,7 @@ library:
   - Stack.Image
   - Stack.Init
   - Stack.Ls
+  - Stack.Lock
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
@@ -301,6 +302,7 @@ tests:
     - hspec
     - stack
     - smallcheck
+    - raw-strings-qq
   stack-integration-test:
     main: IntegrationSpec.hs
     source-dirs:
