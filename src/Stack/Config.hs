@@ -638,7 +638,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                            pure xs
                   _ -> pure Map.empty
 
-    (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedSnapshotLock (parent stackYamlFP)
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedSnapshotLock
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 

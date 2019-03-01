@@ -981,10 +981,9 @@ loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
   -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshot loc cachedPL rootDir =
-  loadAndCompleteSnapshotRaw (toRawSL loc) cachedPL rootDir
+loadAndCompleteSnapshot loc cachedPL =
+  loadAndCompleteSnapshotRaw (toRawSL loc) cachedPL
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations
@@ -994,9 +993,8 @@ loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
   -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshotRaw loc cachePL rootDir = do
+loadAndCompleteSnapshotRaw loc cachePL = do
   eres <- loadRawSnapshotLayer loc
   case eres of
     Left wc ->
@@ -1008,12 +1006,11 @@ loadAndCompleteSnapshotRaw loc cachePL rootDir = do
             }
       in pure (snapshot, [])
     Right (rsl, _sha) -> do
-      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL rootDir
+      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
           loc
           cachePL
-          rootDir
           (rslLocations rsl)
           AddPackagesConfig
             { apcDrop = rslDropPackages rsl
@@ -1170,12 +1167,11 @@ addAndCompletePackagesToSnapshot
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
   -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> Path Abs Dir
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig
   -> Map PackageName SnapshotPackage -- ^ packages from parent
   -> RIO env (Map PackageName SnapshotPackage, [CompletedPLI], AddPackagesConfig)
-addAndCompletePackagesToSnapshot loc cachedPL rootDir newPackages (AddPackagesConfig drops flags hiddens options) old = do
+addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig drops flags hiddens options) old = do
   let source = display loc
       addPackage :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
                  => ([(PackageName, SnapshotPackage)],[CompletedPLI])
