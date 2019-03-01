@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Stack.Lock where
 
@@ -56,9 +57,9 @@ instance Show LockException where
 --  * Can be (added/changed/removed). You need to indicate them.
 --  * Keep track of lockfile package and current stack.yaml [RawPackageLocation]
 data Change = Change
-    { chAdded :: [RawPackageLocation]
-    , chRemoved :: [RawPackageLocation]
-    , chUnchanged :: [(RawPackageLocation, PackageLocation)]
+    { chAdded :: ![RawPackageLocation]
+    , chRemoved :: ![RawPackageLocation]
+    , chUnchanged :: ![(RawPackageLocation, PackageLocation)]
     }
 
 completeFullPackageLocation ::
@@ -86,7 +87,7 @@ findChange lrpl srpl =
 
 generatePackageLockFile :: Path Abs File -> RIO Config ()
 generatePackageLockFile stackFile = do
-    logDebug "Gennerating lock file"
+    logDebug "Generating lock file"
     mproject <- view $ configL . to configMaybeProject
     p <-
         case mproject of
@@ -111,21 +112,16 @@ generatePackageLockFile stackFile = do
                             (Map.toList $ lfPackageLocations lockData)
                             deps
                     unchangedRes = map snd (chUnchanged change)
-                    addedStr =
-                        concat $
+                    addedStr :: [Utf8Builder] =
                         map
-                            (\x ->
-                                 "Adding " <> (show x) <>
-                                 " package to the lock file.\n")
+                            (\x -> "Lock file package added: " (display x))
                             (chAdded change)
-                    deletedstr =
-                        concat $
+                    deletedStr :: [Utf8Builder] =
                         map
-                            (\x ->
-                                 "Removing " <> (show x) <>
-                                 " package from the lock file.\n")
+                            (\x -> "Lock file package removed: " (display x))
                             (chRemoved change)
-                logInfo (displayShow $ addedStr <> deletedstr)
+                mapM_ logDebug addedStr
+                mapM_ logDebug deletedStr
                 deps <- mapM completeFullPackageLocation (chAdded change)
                 let allDeps = unchangedRes <> deps
                 res <-
@@ -255,9 +251,9 @@ loadPackageLockFile lockFile = do
         Right lockFileIO -> lockFileIO
 
 data LockFile = LockFile
-    { lfPackageLocations :: Map RawPackageLocation PackageLocation
-    , lfoResolver :: RawSnapshotLocation
-    , lfcResolver :: SnapshotLocation
+    { lfPackageLocations :: !(Map RawPackageLocation PackageLocation)
+    , lfoResolver :: !RawSnapshotLocation
+    , lfcResolver :: !SnapshotLocation
     }
 
 combineUnresolved :: Unresolved a -> Unresolved b -> Unresolved (a, b)

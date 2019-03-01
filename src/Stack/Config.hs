@@ -610,7 +610,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     lockFileOutdated <- isLockFileOutdated stackYamlFP
     if lockFileOutdated
     then do
-      logDebug "Lock file is outdated"
+      logDebug "Lock file is outdated or isn't present"
       generatePackageLockFile stackYamlFP
     else logDebug "Lock file is upto date"
 
@@ -621,12 +621,8 @@ loadBuildConfig mproject maresolver mcompiler = do
 
 
     resolver <- if (projectResolver project == origResolver)
-                then do
-                  logInfo "Resolver matches with the lock file"
-                  pure compResolver
-                else do
-                  logInfo "Resolving snapshot location"
-                  completeSnapshotLocation $ projectResolver project
+                then pure compResolver
+                else completeSnapshotLocation $ projectResolver project
 
     case resolver of
       SLFilePath path -> do
