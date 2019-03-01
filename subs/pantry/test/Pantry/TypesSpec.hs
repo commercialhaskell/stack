@@ -45,15 +45,6 @@ hh name p =
         result <- check p
         unless result $ throwString "Hedgehog property failed" :: IO ()
 
-decodeSHA :: ByteString -> SHA256
-decodeSHA string =
-    case SHA256.fromHexBytes string of
-        Right csha -> csha
-        Left err -> error $ "Failed decoding. Error:  " <> show err
-
-toBlobKey :: ByteString -> Word -> BlobKey
-toBlobKey string size = BlobKey (decodeSHA string) (FileSize size)
-
 genBlobKey :: Gen BlobKey
 genBlobKey =
     BlobKey <$> genSha256 <*> (FileSize <$> (Gen.word (Range.linear 1 10000)))
