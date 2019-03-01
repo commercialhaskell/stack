@@ -227,7 +227,8 @@ dependencies:
                             pl <- iopl
                             pure pl
                 Nothing -> fail "Can't parse PackageLocationImmutable"
-        pkgImm `shouldBe`
+        let pkgImm' = map (\(a, b) -> (b, a)) (Map.toList pkgImm)
+        pkgImm' `shouldBe`
             [ ( (PLIHackage
                      (PackageIdentifier
                           { pkgName = mkPackageName "string-quote"
