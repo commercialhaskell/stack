@@ -48,7 +48,7 @@ instance Exception LockException
 instance Show LockException where
     show LockNoProject = "No project found for locking."
     show (LockCannotGenerate e) =
-        "Lock file cannot be generated for snapshot: " <> (show e)
+        "Lock file cannot be generated for snapshot: " <> show e
 
 -- You need to keep track of the following things
 -- Has resolver changed.
@@ -102,12 +102,11 @@ generatePackageLockFile stackFile = do
     packageLockFile <- liftIO $ addFileExtension "lock" stackFile
     packageLockFileExists <- liftIO $ doesFileExist packageLockFile
     lockInfo :: Maybe LockFile <-
-        case packageLockFileExists of
-            True ->
-                liftIO $ do
-                    lfio <- loadPackageLockFile packageLockFile
-                    pure $ Just lfio
-            False -> pure Nothing
+        if packageLockFileExists
+            then liftIO $ do
+                     lfio <- loadPackageLockFile packageLockFile
+                     pure $ Just lfio
+            else pure Nothing
     (deps', resolver') <-
         case lockInfo of
             Just lockData -> do
@@ -118,18 +117,18 @@ generatePackageLockFile stackFile = do
                     unchangedRes = map snd (chUnchanged change)
                     addedStr :: [Utf8Builder] =
                         map
-                            (\x -> "Lock file package added: " <> (display x))
+                            (\x -> "Lock file package added: " <> display x)
                             (chAdded change)
                     deletedStr :: [Utf8Builder] =
                         map
-                            (\x -> "Lock file package removed: " <> (display x))
+                            (\x -> "Lock file package removed: " <> display x)
                             (chRemoved change)
                 mapM_ logDebug addedStr
                 mapM_ logDebug deletedStr
                 cdeps <- mapM completeFullPackageLocation (chAdded change)
                 let allDeps = unchangedRes <> cdeps
                 res <-
-                    if (lfoResolver lockData) == resolver
+                    if lfoResolver lockData == resolver
                         then pure (lfcResolver lockData)
                         else completeSnapshotLocation resolver
                 pure (allDeps, res)
@@ -318,7 +317,7 @@ parseSnapshotLocationPath t =
 parseSLObject :: Value -> Parser (Unresolved SnapshotLocation)
 parseSLObject =
     withObject "UnresolvedSnapshotLocation (Object)" $ \o ->
-        ((pure . SLCompiler) <$> o .: "compiler") <|>
+        (pure . SLCompiler <$> o .: "compiler") <|>
         ((\x y -> pure $ SLUrl x y) <$> o .: "url" <*> parseJSON (Object o)) <|>
         (parseSnapshotLocationPath <$> o .: "filepath")
 
@@ -342,7 +341,7 @@ parseSL v = txtParser v <|> parseSLObject v
             (parseWantedCompiler t)
     txtParser =
         withText
-            ("UnresolvedSnapshotLocation (Text)")
+            "UnresolvedSnapshotLocation (Text)"
             (\t -> pure $ fromMaybe (parseSnapshotLocationPath t) (txt t))
 
 parseBlobKey :: Object -> Parser (Maybe BlobKey)
@@ -358,7 +357,7 @@ parseBlobKey o = do
 parseRSLObject :: Value -> Parser (Unresolved RawSnapshotLocation)
 parseRSLObject =
     withObject "UnresolvedRawSnapshotLocation (Object)" $ \o ->
-        ((pure . RSLCompiler) <$> o .: "compiler") <|>
+        (pure . RSLCompiler <$> o .: "compiler") <|>
         ((\x y -> pure $ RSLUrl x y) <$> o .: "url" <*> parseBlobKey o) <|>
         (parseRawSnapshotLocationPath <$> o .: "filepath")
 
@@ -383,7 +382,7 @@ parseSnapshotFile (Object obj) = do
             packages
     resolver' <- parseRSL resolver
     pure $ combineUnresolved (sequence $ Vector.toList xs) resolver'
-parseSnapshotFile val = fail $ "Expected Object, but got: " <> (show val)
+parseSnapshotFile val = fail $ "Expected Object, but got: " <> show val
 
 resolveSnapshotFile ::
        Path Abs Dir
@@ -419,7 +418,7 @@ parseRPLHackageObject ::
        Value -> Parser (Unresolved RawPackageLocationImmutable)
 parseRPLHackageObject =
     withObject "UnresolvedPackageLocationImmutable.UPLIHackage" $ \o ->
-        (pure) <$> (RPLIHackage <$> o .: "hackage" <*> o .:? "pantry-tree")
+        pure <$> (RPLIHackage <$> o .: "hackage" <*> o .:? "pantry-tree")
 
 optionalSubdirs' :: Object -> Parser OptionalSubdirs
 optionalSubdirs' o =
@@ -481,8 +480,8 @@ parseGithubRPLObject =
                     , commit
                     , ".tar.gz"
                     ]
-        raHash <- o .:? "sha256"
         raSize <- o .:? "size"
+        raHash <- o .:? "sha256"
         os <- optionalSubdirs' o
         pure $
             pure $
@@ -499,9 +498,7 @@ parseRPLI v =
     parseGithubRPLObject v
 
 parsePLI :: Value -> Parser (Unresolved PackageLocationImmutable)
-parsePLI v = do
-    x <- parseJSON v
-    pure x
+parsePLI v = parseJSON v
 
 parseImmutableObject ::
        Value
@@ -552,5 +549,5 @@ loadSnapshotLayerLockFile lockFile rootDir = do
     case Yaml.parseEither (resolveSnapshotLayerLockFile rootDir) val of
         Left str ->
             fail $
-            "Cannot parse snapshot lock file: Got error " <> str <> (show val)
+            "Cannot parse snapshot lock file: Got error " <> str <> show val
         Right lockFileIO -> lockFileIO

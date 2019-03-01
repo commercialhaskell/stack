@@ -13,7 +13,7 @@ import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Types.Version (mkVersion)
 import Pantry
 import qualified Pantry.SHA256 as SHA256
-import qualified Path as Path
+import qualified Path
 import Stack.Lock
 import Test.Hspec
 import Text.RawString.QQ
@@ -50,12 +50,10 @@ resolver:
                         Left str ->
                             fail $
                             "Can't parse PackageLocationImmutable - 1" <> str <>
-                            (show pkgIm)
-                        Right iopl -> do
-                            pl <- iopl
-                            pure (lfPackageLocations pl)
+                            show pkgIm
+                        Right iopl -> lfPackageLocations <$> iopl
                 Nothing -> fail "Can't parse PackageLocationImmutable"
-        (Map.toList pkgImm) `shouldBe` []
+        Map.toList pkgImm `shouldBe` []
     it "parses lock file (non empty)" $ do
         let lockFile :: ByteString
             lockFile =
@@ -109,10 +107,8 @@ resolver:
                         Left str ->
                             fail $
                             "Can't parse PackageLocationImmutable - 1" <> str <>
-                            (show pkgIm)
-                        Right iopl -> do
-                            pl <- iopl
-                            pure $ lfPackageLocations pl
+                            show pkgIm
+                        Right iopl -> lfPackageLocations <$> iopl
                 Nothing -> fail "Can't parse PackageLocationImmutable"
         let pkgImm' = map (\(a, b) -> (b, a)) (Map.toList pkgImm)
         pkgImm' `shouldBe`
@@ -222,30 +218,28 @@ dependencies:
                         Left str ->
                             fail $
                             "Can't parse PackageLocationImmutable - 1" <> str <>
-                            (show pkgIm)
-                        Right iopl -> do
-                            pl <- iopl
-                            pure pl
+                            show pkgIm
+                        Right iopl -> iopl
                 Nothing -> fail "Can't parse PackageLocationImmutable"
         let pkgImm' = map (\(a, b) -> (b, a)) (Map.toList pkgImm)
         pkgImm' `shouldBe`
-            [ ( (PLIHackage
-                     (PackageIdentifier
-                          { pkgName = mkPackageName "string-quote"
-                          , pkgVersion = mkVersion [0, 0, 1]
-                          })
-                     (toBlobKey
-                          "7d91a0ba1be44b2443497c92f2f027cd4580453b893f8b5ebf061e1d85befaf3"
-                          758)
-                     (TreeKey
-                          (BlobKey
-                               (decodeSHA
-                                    "d291028785ad39f8d05cde91594f6b313e35ff76af66c0452ab599b1f1f59e5f")
-                               (FileSize 273))))
-              , (RPLIHackage
-                     (PackageIdentifierRevision
-                          (mkPackageName "string-quote")
-                          (mkVersion [0, 0, 1])
-                          CFILatest)
-                     Nothing))
+            [ ( PLIHackage
+                    (PackageIdentifier
+                         { pkgName = mkPackageName "string-quote"
+                         , pkgVersion = mkVersion [0, 0, 1]
+                         })
+                    (toBlobKey
+                         "7d91a0ba1be44b2443497c92f2f027cd4580453b893f8b5ebf061e1d85befaf3"
+                         758)
+                    (TreeKey
+                         (BlobKey
+                              (decodeSHA
+                                   "d291028785ad39f8d05cde91594f6b313e35ff76af66c0452ab599b1f1f59e5f")
+                              (FileSize 273)))
+              , RPLIHackage
+                    (PackageIdentifierRevision
+                         (mkPackageName "string-quote")
+                         (mkVersion [0, 0, 1])
+                         CFILatest)
+                    Nothing)
             ]

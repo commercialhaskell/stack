@@ -620,7 +620,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                                                   return (lfPackageLocations lf, lfoResolver lf, lfcResolver lf)
 
 
-    resolver <- if (projectResolver project == origResolver)
+    resolver <- if projectResolver project == origResolver
                 then pure compResolver
                 else completeSnapshotLocation $ projectResolver project
 
@@ -634,8 +634,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                   SLFilePath path -> do
                            let sf = resolvedAbsolute path
                            slf <- liftIO $ addFileExtension "lock" sf
-                           xs <- liftIO $ loadSnapshotLayerLockFile slf (parent stackYamlFP)
-                           pure xs
+                           liftIO $ loadSnapshotLayerLockFile slf (parent stackYamlFP)
                   _ -> pure Map.empty
 
     (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedSnapshotLock
