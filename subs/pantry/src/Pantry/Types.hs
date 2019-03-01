@@ -303,6 +303,10 @@ data RawPackageLocation
 instance NFData RawPackageLocation
 instance Store RawPackageLocation
 
+instance Display RawPackageLocation where
+  display (RPLImmutable loc) = display loc
+  display (RPLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
+
 -- | Location to load a package from. Can either be immutable (see
 -- 'PackageLocationImmutable') or a local directory which is expected
 -- to change over time.
