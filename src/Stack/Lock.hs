@@ -505,8 +505,8 @@ parsePLI v = do
 
 parseImmutableObject ::
        Value
-    -> Parser (Unresolved ( PackageLocationImmutable
-                          , RawPackageLocationImmutable))
+    -> Parser (Unresolved ( RawPackageLocationImmutable
+                          , PackageLocationImmutable))
 parseImmutableObject value =
     withObject
         "LockFile"
@@ -515,13 +515,13 @@ parseImmutableObject value =
              complete <- obj .: "complete"
              orig <- parseRPLI original
              comp <- parsePLI complete
-             pure $ combineUnresolved comp orig)
+             pure $ combineUnresolved orig comp)
         value
 
 parseSnapshotLayerLockFile ::
        Value
-    -> Parser (Unresolved [( PackageLocationImmutable
-                           , RawPackageLocationImmutable)])
+    -> Parser (Unresolved [( RawPackageLocationImmutable
+                           , PackageLocationImmutable)])
 parseSnapshotLayerLockFile =
     withObject
         "SnapshotLayerLockFile"
@@ -537,7 +537,7 @@ parseSnapshotLayerLockFile =
 resolveSnapshotLayerLockFile ::
        Path Abs Dir
     -> Value
-    -> Parser (IO [(PackageLocationImmutable, RawPackageLocationImmutable)])
+    -> Parser (IO [(RawPackageLocationImmutable, PackageLocationImmutable)])
 resolveSnapshotLayerLockFile rootDir val = do
     pkgs <- parseSnapshotLayerLockFile val
     let pkgsLoc = resolvePaths (Just rootDir) pkgs
@@ -546,7 +546,7 @@ resolveSnapshotLayerLockFile rootDir val = do
 loadSnapshotLayerLockFile ::
        Path Abs File
     -> Path Abs Dir
-    -> IO [(PackageLocationImmutable, RawPackageLocationImmutable)]
+    -> IO [(RawPackageLocationImmutable, PackageLocationImmutable)]
 loadSnapshotLayerLockFile lockFile rootDir = do
     val <- Yaml.decodeFileThrow (toFilePath lockFile)
     case Yaml.parseEither (resolveSnapshotLayerLockFile rootDir) val of

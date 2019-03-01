@@ -980,7 +980,7 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
-  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshot loc cachedPL rootDir =
@@ -993,7 +993,7 @@ loadAndCompleteSnapshot loc cachedPL rootDir =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
-  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshotRaw loc cachePL rootDir = do
@@ -1144,14 +1144,14 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
   pure (allPackages, unused)
 
 stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => [(PackageLocationImmutable, RawPackageLocationImmutable)]
+  => [(RawPackageLocationImmutable, PackageLocationImmutable)]
   -> RawPackageLocationImmutable
   -> RIO env PackageLocationImmutable
 stackCompletePackageLocation cachePackages rpli = do
-  let xs = filter (\(_,x) -> x == rpli) cachePackages
+  let xs = filter (\(x,_) -> x == rpli) cachePackages
   case xs of
     [] -> completePackageLocation rpli
-    (x,_):_ -> pure x
+    (_,x):_ -> pure x
 
 
 -- | Add more packages to a snapshot completing their locations if needed
@@ -1169,7 +1169,7 @@ addAndCompletePackagesToSnapshot
   => RawSnapshotLocation
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
-  -> [(PackageLocationImmutable, RawPackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig

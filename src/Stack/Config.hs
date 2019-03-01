@@ -615,7 +615,7 @@ loadBuildConfig mproject maresolver mcompiler = do
     else logDebug "Lock file is upto date"
 
     lockFile <- liftIO $ addFileExtension "lock" stackYamlFP
-    (cachePL, origResolver, compResolver) <- liftIO $ do
+    (cachedPackageLock, origResolver, compResolver) <- liftIO $ do
                                                   lf <- loadPackageLockFile lockFile
                                                   return (lfPackageLocations lf, lfoResolver lf, lfcResolver lf)
 
@@ -634,7 +634,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                     when outdated (generateSnapshotLayerLockFile resolver stackYamlFP)
       _ -> return ()
 
-    cachedPL <- case resolver of
+    cachedSnapshotLock <- case resolver of
                   SLFilePath path -> do
                            let sf = resolvedAbsolute path
                            slf <- liftIO $ addFileExtension "lock" sf
@@ -642,7 +642,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                            pure xs
                   _ -> pure []
 
-    (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedPL (parent stackYamlFP)
+    (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedSnapshotLock (parent stackYamlFP)
 
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
@@ -655,7 +655,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       pure (cpName $ ppCommon pp, pp)
 
     deps0 <- forM (projectDependencies project) $ \rpl -> do
-      pl <- cachedCompletePackageLocation cachePL rpl
+      pl <- cachedCompletePackageLocation cachedPackageLock rpl
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
       pure (cpName $ dpCommon dp, dp)
 
