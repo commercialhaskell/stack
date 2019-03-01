@@ -980,7 +980,7 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
-  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshot loc cachedPL rootDir =
@@ -993,7 +993,7 @@ loadAndCompleteSnapshot loc cachedPL rootDir =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
-  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshotRaw loc cachePL rootDir = do
@@ -1143,15 +1143,15 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
 
   pure (allPackages, unused)
 
-stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => [(RawPackageLocationImmutable, PackageLocationImmutable)]
+cachedSnapshotCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Map RawPackageLocationImmutable PackageLocationImmutable
   -> RawPackageLocationImmutable
   -> RIO env PackageLocationImmutable
-stackCompletePackageLocation cachePackages rpli = do
-  let xs = filter (\(x,_) -> x == rpli) cachePackages
+cachedSnapshotCompletePackageLocation cachePackages rpli = do
+  let xs = Map.lookup rpli cachePackages
   case xs of
-    [] -> completePackageLocation rpli
-    (_,x):_ -> pure x
+    Nothing -> completePackageLocation rpli
+    Just x -> pure x
 
 
 -- | Add more packages to a snapshot completing their locations if needed
@@ -1169,7 +1169,7 @@ addAndCompletePackagesToSnapshot
   => RawSnapshotLocation
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
-  -> [(RawPackageLocationImmutable, PackageLocationImmutable)] -- ^ Cached data from snapshot lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
   -> Path Abs Dir
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig
@@ -1183,7 +1183,7 @@ addAndCompletePackagesToSnapshot loc cachedPL rootDir newPackages (AddPackagesCo
                  -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
       addPackage (ps, completed) loc = do
         name <- getPackageLocationName loc
-        loc' <- stackCompletePackageLocation cachedPL loc
+        loc' <- cachedSnapshotCompletePackageLocation cachedPL loc
         let p = (name, SnapshotPackage
               { spLocation = loc'
               , spFlags = Map.findWithDefault mempty name flags

@@ -640,7 +640,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                            slf <- liftIO $ addFileExtension "lock" sf
                            xs <- liftIO $ loadSnapshotLayerLockFile slf (parent stackYamlFP)
                            pure xs
-                  _ -> pure []
+                  _ -> pure Map.empty
 
     (snapshot, _completed) <- loadAndCompleteSnapshot resolver cachedSnapshotLock (parent stackYamlFP)
 
