@@ -13,7 +13,7 @@ import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Types.Version (mkVersion)
 import Pantry
 import qualified Pantry.SHA256 as SHA256
-import qualified Path
+import qualified Path.IO as Path
 import Stack.Lock
 import Test.Hspec
 import Text.RawString.QQ
@@ -42,7 +42,7 @@ resolver:
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/12/20.yaml
     sha256: 7373bd6e5bb08955cb30bc98afe38a06eadc44706d20aff896fd0376ec0de619
 |]
-        rootDir <- Path.parseAbsDir "/home/sibi"
+        rootDir <- Path.getHomeDir
         pkgImm <-
             case Yaml.decodeThrow lockFile of
                 Just (pkgIm :: Value) -> do
@@ -99,7 +99,7 @@ resolver:
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
     sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
 |]
-        rootDir <- Path.parseAbsDir "/home/sibi"
+        rootDir <- Path.getHomeDir
         pkgImm <-
             case Yaml.decodeThrow lockFile of
                 Just (pkgIm :: Value) -> do
@@ -208,7 +208,7 @@ dependencies:
       size: 273
       sha256: d291028785ad39f8d05cde91594f6b313e35ff76af66c0452ab599b1f1f59e5f
 |]
-        rootDir <- Path.parseAbsDir "/home/sibi"
+        rootDir <- Path.getHomeDir
         pkgImm <-
             case Yaml.decodeThrow lockFile of
                 Just (pkgIm :: Value) -> do
