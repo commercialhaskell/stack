@@ -5,6 +5,7 @@
 module Stack.LockSpec where
 
 import Data.ByteString (ByteString)
+import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import qualified Data.Yaml as Yaml
 import Data.Yaml (Value)
@@ -54,7 +55,7 @@ resolver:
                             pl <- iopl
                             pure (lfPackageLocations pl)
                 Nothing -> fail "Can't parse PackageLocationImmutable"
-        pkgImm `shouldBe` []
+        (Map.toList pkgImm) `shouldBe` []
     it "parses lock file (non empty)" $ do
         let lockFile :: ByteString
             lockFile =
@@ -113,7 +114,7 @@ resolver:
                             pl <- iopl
                             pure $ lfPackageLocations pl
                 Nothing -> fail "Can't parse PackageLocationImmutable"
-        let pkgImm' = map (\(a, b) -> (b, a)) pkgImm
+        let pkgImm' = map (\(a, b) -> (b, a)) (Map.toList pkgImm)
         pkgImm' `shouldBe`
             [ ( PLImmutable
                     (PLIRepo
@@ -216,7 +217,7 @@ dependencies:
             case Yaml.decodeThrow lockFile of
                 Just (pkgIm :: Value) -> do
                     case Yaml.parseEither
-                             (resolveSnapshotLockFile rootDir)
+                             (resolveSnapshotLayerLockFile rootDir)
                              pkgIm of
                         Left str ->
                             fail $
