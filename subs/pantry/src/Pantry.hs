@@ -187,7 +187,7 @@ import Pantry.Storage
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
-import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile, addFileExtension)
+import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
@@ -1177,18 +1177,18 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
                  => ([(PackageName, SnapshotPackage)],[CompletedPLI])
                  -> RawPackageLocationImmutable
                  -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
-      addPackage (ps, completed) loc = do
-        name <- getPackageLocationName loc
-        loc' <- cachedSnapshotCompletePackageLocation cachedPL loc
+      addPackage (ps, completed) locs = do
+        name <- getPackageLocationName locs
+        loc' <- cachedSnapshotCompletePackageLocation cachedPL locs
         let p = (name, SnapshotPackage
               { spLocation = loc'
               , spFlags = Map.findWithDefault mempty name flags
               , spHidden = Map.findWithDefault False name hiddens
               , spGhcOptions = Map.findWithDefault [] name options
               })
-        if toRawPLI loc' == loc
+        if toRawPLI loc' == locs
           then pure (p:ps, completed)
-          else pure (p:ps, (loc, loc'):completed)
+          else pure (p:ps, (locs, loc'):completed)
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
         = partitionEithers

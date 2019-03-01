@@ -1029,7 +1029,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
        go (name, (_range, Just (version,cabalHash), DependencyMismatch{})) =
            Map.singleton name (version, cabalHash)
        go _ = Map.empty
-    pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
+    pprintExtra (name, (version, BlobKey _ _)) =
       let packageIdRev = PackageIdentifierRevision name version CFILatest
        in fromString $ T.unpack $ utf8BuilderToText $ RIO.display packageIdRev
 

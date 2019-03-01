@@ -113,8 +113,6 @@ module Pantry.Types
 
 import RIO
 import qualified Data.Conduit.Tar as Tar
-import qualified Data.Vector as Vector
-import qualified Data.Yaml as Yaml
 import qualified RIO.Text as T
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
@@ -149,7 +147,7 @@ import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
-import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile, parent)
+import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile)
 import Path.IO (resolveFile, resolveDir)
 import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)

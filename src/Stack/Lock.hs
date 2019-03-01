@@ -78,7 +78,11 @@ findChange ::
 findChange lrpl srpl =
     let lr = map fst lrpl
         unchangedOnes = intersect lr srpl
-        unchangedFull = filter (\(rpl, pl) -> rpl `elem` srpl) lrpl
+        -- unchangedOnes contains the ones present in both the lock
+        -- file as well as stack.yaml file
+        unchangedFull :: [(RawPackageLocation, PackageLocation)]
+        unchangedFull = filter (\(rpl, _) -> rpl `elem` srpl) lrpl
+        -- unchangedFull is same as unchangedOnes
      in Change
             { chAdded = srpl \\ unchangedOnes
             , chRemoved = lr \\ unchangedOnes
@@ -122,8 +126,8 @@ generatePackageLockFile stackFile = do
                             (chRemoved change)
                 mapM_ logDebug addedStr
                 mapM_ logDebug deletedStr
-                deps <- mapM completeFullPackageLocation (chAdded change)
-                let allDeps = unchangedRes <> deps
+                cdeps <- mapM completeFullPackageLocation (chAdded change)
+                let allDeps = unchangedRes <> cdeps
                 res <-
                     if (lfoResolver lockData) == resolver
                         then pure (lfcResolver lockData)
@@ -377,8 +381,8 @@ parseSnapshotFile (Object obj) = do
             "SnapshotFileArray"
             (\vec -> sequence $ Vector.map parseRPLI vec)
             packages
-    resolver <- parseRSL resolver
-    pure $ combineUnresolved (sequence $ Vector.toList xs) resolver
+    resolver' <- parseRSL resolver
+    pure $ combineUnresolved (sequence $ Vector.toList xs) resolver'
 parseSnapshotFile val = fail $ "Expected Object, but got: " <> (show val)
 
 resolveSnapshotFile ::
