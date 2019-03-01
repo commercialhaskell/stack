@@ -668,7 +668,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       pure (cpName $ ppCommon pp, pp)
 
     deps0 <- forM (projectDependencies project) $ \rpl -> do
-      pl <- stackCompletePackageLocation cachePL rpl
+      pl <- cachedCompletePackageLocation cachePL rpl
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
       pure (cpName $ dpCommon dp, dp)
 

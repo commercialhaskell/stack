@@ -106,7 +106,10 @@ generatePackageLockFile stackFile = do
     (deps', resolver') <-
         case lockInfo of
             Just lockData -> do
-                let change = findChange (lfPackageLocations lockData) deps
+                let change =
+                        findChange
+                            (Map.toList $ lfPackageLocations lockData)
+                            deps
                     unchangedRes = map snd (chUnchanged change)
                     addedStr =
                         concat $
@@ -220,7 +223,7 @@ parsePackageLockFile rootDir value =
         "LockFile"
         (\obj -> do
              vals :: Value <- obj .: "dependencies"
-             xs <-
+             xs :: Vector (Unresolved (RawPackageLocation, PackageLocation)) <-
                  withArray
                      "LockFileArray"
                      (\vec -> sequence $ Vector.map parseSingleObject vec)
@@ -232,12 +235,12 @@ parsePackageLockFile rootDir value =
              rc <- parseSL rcomplete
              let rpaths = resolvePaths (Just rootDir)
              pure $ do
-                 lfpls <- rpaths $ sequence (Vector.toList xs)
+                 lfpls <- rpaths $ sequence $ Vector.toList xs
                  lfor <- rpaths ro
                  lfcr <- rpaths rc
                  pure $
                      LockFile
-                         { lfPackageLocations = lfpls
+                         { lfPackageLocations = Map.fromList lfpls
                          , lfoResolver = lfor
                          , lfcResolver = lfcr
                          })
@@ -247,11 +250,11 @@ loadPackageLockFile :: Path Abs File -> IO LockFile
 loadPackageLockFile lockFile = do
     val <- Yaml.decodeFileThrow (toFilePath lockFile)
     case Yaml.parseEither (parsePackageLockFile (parent lockFile)) val of
-        Left str -> fail $ "Cannot parse lock file: Got error " <> str
+        Left str -> fail $ "Cannot parse package lock file: Got error " <> str
         Right lockFileIO -> lockFileIO
 
 data LockFile = LockFile
-    { lfPackageLocations :: [(RawPackageLocation, PackageLocation)]
+    { lfPackageLocations :: Map RawPackageLocation PackageLocation
     , lfoResolver :: RawSnapshotLocation
     , lfcResolver :: SnapshotLocation
     }
