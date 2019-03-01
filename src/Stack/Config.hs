@@ -533,19 +533,6 @@ cachedCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
     Just pl -> pure pl
 cachedCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
 
-stackCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => [(RawPackageLocation, PackageLocation)]
-  -> RawPackageLocation
-  -> RIO env PackageLocation
-stackCompletePackageLocation cachePackages rp@(RPLImmutable rpli) = do
-  let xs = filter (\(x,_) -> x == rp) cachePackages
-  case xs of
-    [] -> do
-      pl <- completePackageLocation rpli
-      pure $ PLImmutable pl
-    (_,x):_ -> pure x
-stackCompletePackageLocation _ (RPLMutable rplm) = pure $ PLMutable rplm
-
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
