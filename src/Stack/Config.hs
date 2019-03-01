@@ -90,10 +90,10 @@ import           RIO.Process
 import Stack.Lock
     ( LockFile(..)
     , generatePackageLockFile
-    , generateSnapshotLockFile
+    , generateSnapshotLayerLockFile
     , isLockFileOutdated
     , loadPackageLockFile
-    , loadSnapshotLockFile
+    , loadSnapshotLayerLockFile
     )
 
 -- | If deprecated path exists, use it and print a warning.
@@ -631,14 +631,14 @@ loadBuildConfig mproject maresolver mcompiler = do
     case resolver of
       SLFilePath path -> do
                     outdated <- isLockFileOutdated (resolvedAbsolute path)
-                    when outdated (generateSnapshotLockFile resolver stackYamlFP)
+                    when outdated (generateSnapshotLayerLockFile resolver stackYamlFP)
       _ -> return ()
 
     cachedPL <- case resolver of
                   SLFilePath path -> do
                            let sf = resolvedAbsolute path
                            slf <- liftIO $ addFileExtension "lock" sf
-                           xs <- liftIO $ loadSnapshotLockFile slf (parent stackYamlFP)
+                           xs <- liftIO $ loadSnapshotLayerLockFile slf (parent stackYamlFP)
                            pure xs
                   _ -> pure []
 

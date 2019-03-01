@@ -168,12 +168,12 @@ loadSnapshotFile path rootDir = do
         Left str -> fail $ "Cannot parse snapshot file: Got error " <> str
         Right rplio -> rplio
 
-createSnapshotLockFile ::
+createSnapshotLayerLockFile ::
        Path Abs File -- ^ Snapshot file
     -> [RawPackageLocationImmutable]
     -> RawSnapshotLocation
     -> RIO Config ()
-createSnapshotLockFile path rpli rpl = do
+createSnapshotLayerLockFile path rpli rpl = do
     let rpli' :: [RawPackageLocation] = map RPLImmutable rpli
     deps :: [PackageLocation] <- mapM completeFullPackageLocation rpli'
     rpl' :: SnapshotLocation <- completeSnapshotLocation rpl
@@ -197,13 +197,14 @@ createSnapshotLockFile path rpli rpl = do
                 ]
     B.writeFile (fromAbsFile snapshotLockFile) (Yaml.encode depsObject)
 
-generateSnapshotLockFile :: SnapshotLocation -> Path Abs File -> RIO Config ()
-generateSnapshotLockFile (SLFilePath path) stackFile = do
+generateSnapshotLayerLockFile ::
+       SnapshotLocation -> Path Abs File -> RIO Config ()
+generateSnapshotLayerLockFile (SLFilePath path) stackFile = do
     logInfo "Generating Lock file for custom snapshot"
     let snapshotPath = resolvedAbsolute path
     (rpli, rpl) <- liftIO $ loadSnapshotFile snapshotPath (parent stackFile)
-    createSnapshotLockFile snapshotPath rpli rpl
-generateSnapshotLockFile xs _ = throwM (LockCannotGenerate xs)
+    createSnapshotLayerLockFile snapshotPath rpli rpl
+generateSnapshotLayerLockFile xs _ = throwM (LockCannotGenerate xs)
 
 isLockFileOutdated :: Path Abs File -> RIO Config Bool
 isLockFileOutdated stackFile = do
@@ -517,38 +518,38 @@ parseImmutableObject value =
              pure $ combineUnresolved comp orig)
         value
 
-parseSnapshotLockFile ::
+parseSnapshotLayerLockFile ::
        Value
     -> Parser (Unresolved [( PackageLocationImmutable
                            , RawPackageLocationImmutable)])
-parseSnapshotLockFile =
+parseSnapshotLayerLockFile =
     withObject
-        "SnapshotLockFile"
+        "SnapshotLayerLockFile"
         (\obj -> do
              vals <- obj .: "dependencies"
              xs <-
                  withArray
-                     "SnapshotLockArray"
+                     "SnapshotLayerLockArray"
                      (\vec -> sequence $ Vector.map parseImmutableObject vec)
                      vals
              pure $ sequence $ Vector.toList xs)
 
-resolveSnapshotLockFile ::
+resolveSnapshotLayerLockFile ::
        Path Abs Dir
     -> Value
     -> Parser (IO [(PackageLocationImmutable, RawPackageLocationImmutable)])
-resolveSnapshotLockFile rootDir val = do
-    pkgs <- parseSnapshotLockFile val
+resolveSnapshotLayerLockFile rootDir val = do
+    pkgs <- parseSnapshotLayerLockFile val
     let pkgsLoc = resolvePaths (Just rootDir) pkgs
     pure pkgsLoc
 
-loadSnapshotLockFile ::
+loadSnapshotLayerLockFile ::
        Path Abs File
     -> Path Abs Dir
     -> IO [(PackageLocationImmutable, RawPackageLocationImmutable)]
-loadSnapshotLockFile lockFile rootDir = do
+loadSnapshotLayerLockFile lockFile rootDir = do
     val <- Yaml.decodeFileThrow (toFilePath lockFile)
-    case Yaml.parseEither (resolveSnapshotLockFile rootDir) val of
+    case Yaml.parseEither (resolveSnapshotLayerLockFile rootDir) val of
         Left str ->
             fail $
             "Cannot parse snapshot lock file: Got error " <> str <> (show val)
