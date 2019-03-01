@@ -114,11 +114,11 @@ generatePackageLockFile stackFile = do
                     unchangedRes = map snd (chUnchanged change)
                     addedStr :: [Utf8Builder] =
                         map
-                            (\x -> "Lock file package added: " (display x))
+                            (\x -> "Lock file package added: " <> (display x))
                             (chAdded change)
                     deletedStr :: [Utf8Builder] =
                         map
-                            (\x -> "Lock file package removed: " (display x))
+                            (\x -> "Lock file package removed: " <> (display x))
                             (chRemoved change)
                 mapM_ logDebug addedStr
                 mapM_ logDebug deletedStr
