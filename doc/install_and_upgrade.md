@@ -21,7 +21,7 @@ future, we are open to supporting more OSes (to request one, please
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 If you are writing a script that needs to download the latest binary, you can
-use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` (e.g. //get.haskellstack.org/stable/linux-x86_64.tar.gz) that always point to the latest stable release.
+use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` (e.g. https://get.haskellstack.org/stable/linux-x86_64.tar.gz) that always point to the latest stable release.
 
 ## Windows
 
