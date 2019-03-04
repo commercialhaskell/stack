@@ -6,6 +6,9 @@ module Pantry.Repo
   , fetchRepos
   , getRepo
   , getRepoKey
+  , createRepoArchive
+  , withRepoArchive
+  , withRepo
   ) where
 
 import Pantry.Types
@@ -71,26 +74,82 @@ getRepo'
   => Repo
   -> RawPackageMetadata
   -> RIO env Package
-getRepo' repo@(Repo url commit repoType' subdir) rpm =
-  withSystemTempDirectory "get-repo" $
+getRepo' repo rpm = do
+  withRepoArchive repo $ \tarball -> do
+    abs' <- resolveFile' tarball
+    getArchivePackage
+      (RPLIRepo repo rpm)
+      RawArchive
+        { raLocation = ALFilePath $ ResolvedPath
+            { resolvedRelative = RelFilePath $ T.pack tarball
+            , resolvedAbsolute = abs'
+            }
+        , raHash = Nothing
+        , raSize = Nothing
+        , raSubdir = repoSubdir repo
+        }
+      rpm
+
+-- | Fetch a repository and create a (temporary) tar archive from it. Pass the
+-- path of the generated tarball to the given action.
+withRepoArchive
+  :: forall env a. (HasLogFunc env, HasProcessContext env)
+  => Repo
+  -> (FilePath -> RIO env a)
+  -> RIO env a
+withRepoArchive repo action =
+  withSystemTempDirectory "with-repo-archive" $ \tmpdir -> do
+    let tarball = tmpdir </> "foo.tar"
+    createRepoArchive repo tarball
+    action tarball
+
+-- | Create a tarball containing files from a repository
+createRepoArchive
+  :: forall env. (HasLogFunc env, HasProcessContext env)
+  => Repo
+  -> FilePath -- ^ Output tar archive filename
+  -> RIO env ()
+createRepoArchive repo tarball = do
+  let runCommand cmd args = void $ proc cmd args readProcess_
+  
+  withRepo repo $ case repoType repo of
+    RepoGit -> do
+       runCommand "git" ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
+       -- also include submodules files: use `git submodule foreach` to
+       -- execute `git archive` in each submodule and to append the
+       -- generated archive to the main one with `tar -A`
+       runCommand "git"
+         [ "submodule", "foreach", "--recursive"
+         , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD"
+           <> " && if [ -f bar.tar ]; then tar -Af " <> tarball <> " bar.tar ; fi"
+         ]
+    RepoHg  -> runCommand "hg"  ["archive", tarball, "-X", ".hg_archival.txt"]
+
+
+-- | Clone the repository and execute the action with the working
+-- directory set to the repository root.
+withRepo
+  :: forall env a. (HasLogFunc env, HasProcessContext env)
+  => Repo
+  -> RIO env a
+  -> RIO env a
+withRepo repo@(Repo url commit repoType' _subdir) action =
+  withSystemTempDirectory "with-repo" $
   \tmpdir -> withWorkingDir tmpdir $ do
     let suffix = "cloned"
         dir = tmpdir </> suffix
-        tarball = tmpdir </> "foo.tar"
 
-    let (commandName, resetArgs, submoduleArgs, archiveArgs) =
+    let (commandName, resetArgs, submoduleArgs) =
           case repoType' of
             RepoGit ->
               ( "git"
               , ["reset", "--hard", T.unpack commit]
               , Just ["submodule", "update", "--init", "--recursive"]
-              , ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
               )
             RepoHg ->
               ( "hg"
               , ["update", "-C", T.unpack commit]
               , Nothing
-              , ["archive", tarball, "-X", ".hg_archival.txt"]
               )
 
     let runCommand args = void $ proc commandName args readProcess_
@@ -113,17 +172,4 @@ getRepo' repo@(Repo url commit repoType' subdir) rpm =
       -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
       -- folowing hack re-enables the lost ANSI-capability.
       when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
-      runCommand archiveArgs
-    abs' <- resolveFile' tarball
-    getArchivePackage
-      (RPLIRepo repo rpm)
-      RawArchive
-        { raLocation = ALFilePath $ ResolvedPath
-            { resolvedRelative = RelFilePath $ T.pack tarball
-            , resolvedAbsolute = abs'
-            }
-        , raHash = Nothing
-        , raSize = Nothing
-        , raSubdir = subdir
-        }
-      rpm
+      action
