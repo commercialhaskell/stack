@@ -235,7 +235,7 @@ complicated update procedure?
 3. For each incomplete package location:
     * Lookup the value in the map created in (1)
     * If present: use that completed information
-    * Otherwise: complete the information using the procedure in
-      "creation"
+    * Otherwise: complete the information using the same completion
+      procedure from Pantry as in "creation"
 
 This should minimize the number of changes to packages incurred.
