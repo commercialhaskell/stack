@@ -54,7 +54,7 @@ snapshotIncomplete :: RIO PantryApp ()
 snapshotIncomplete = do
   logInfo "Writing snapshot-incomplete.yaml"
   decodeFileThrow "constraints.yaml" >>= \constraints' ->
-    makeSnapshot constraints' "my-test-snapshot-2" >>=
+    makeSnapshot constraints' >>=
     liftIO . encodeFile "snapshot-incomplete.yaml"
 
 snapshot :: RIO PantryApp ()

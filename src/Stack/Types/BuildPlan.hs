@@ -57,10 +57,7 @@ instance Store SnapshotDef
 instance NFData SnapshotDef
 
 sdResolverName :: SnapshotDef -> Text
-sdResolverName sd =
-  case sdSnapshot sd of
-    Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
-    Just (snapshot, _) -> rslName snapshot
+sdResolverName = utf8BuilderToText . display . sdResolver
 
 sdSnapshots :: SnapshotDef -> [RawSnapshotLayer]
 sdSnapshots sd =

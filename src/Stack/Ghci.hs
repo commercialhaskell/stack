@@ -860,7 +860,9 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          , flow $ "You are using snapshot: " ++ T.unpack (smwSnapshotName smWanted)
+          , flow $ T.unpack $ utf8BuilderToText $
+                   "You are using snapshot: " <>
+                   RIO.display (smwSnapshotLocation smWanted)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""

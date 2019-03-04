@@ -803,7 +803,6 @@ completeSnapshotLayer rsnapshot = do
     { slParent = parent'
     , slLocations = pls
     , slCompiler= rslCompiler rsnapshot
-    , slName = rslName rsnapshot
     , slDropPackages = rslDropPackages rsnapshot
     , slFlags = rslFlags rsnapshot
     , slHidden = rslHidden rsnapshot
@@ -893,7 +892,6 @@ loadSnapshotRaw loc = do
     Left wc ->
       pure RawSnapshot
         { rsCompiler = wc
-        , rsName = utf8BuilderToText $ display wc
         , rsPackages = mempty
         , rsDrop = mempty
         }
@@ -913,7 +911,6 @@ loadSnapshotRaw loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       pure RawSnapshot
         { rsCompiler = fromMaybe (rsCompiler snap0) (rslCompiler rsl)
-        , rsName = rslName rsl
         , rsPackages = packages
         , rsDrop = apcDrop unused
         }
@@ -931,7 +928,6 @@ loadSnapshot loc = do
     Left wc ->
       pure RawSnapshot
         { rsCompiler = wc
-        , rsName = utf8BuilderToText $ display wc
         , rsPackages = mempty
         , rsDrop = mempty
         }
@@ -951,7 +947,6 @@ loadSnapshot loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       pure RawSnapshot
         { rsCompiler = fromMaybe (rsCompiler snap0) (rslCompiler rsl)
-        , rsName = rslName rsl
         , rsPackages = packages
         , rsDrop = apcDrop unused
         }
@@ -983,7 +978,6 @@ loadAndCompleteSnapshotRaw loc = do
     Left wc ->
       let snapshot = Snapshot
             { snapshotCompiler = wc
-            , snapshotName = utf8BuilderToText $ display wc
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
@@ -1004,7 +998,6 @@ loadAndCompleteSnapshotRaw loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       let snapshot = Snapshot
             { snapshotCompiler = fromMaybe (snapshotCompiler snap0) (rslCompiler rsl)
-            , snapshotName = rslName rsl
             , snapshotPackages = packages
             , snapshotDrop = apcDrop unused
             }

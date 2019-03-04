@@ -87,7 +87,8 @@ data SMWanted = SMWanted
   { smwCompiler :: !WantedCompiler
   , smwProject :: !(Map PackageName ProjectPackage)
   , smwDeps :: !(Map PackageName DepPackage)
-  , smwSnapshotName :: !Text
+  , smwSnapshotLocation :: !RawSnapshotLocation
+  -- ^ Where this snapshot is loaded from.
   }
 
 -- | Adds in actual compiler information to 'SMWanted', in particular

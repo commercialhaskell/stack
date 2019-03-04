@@ -1838,8 +1838,6 @@ toRawSL (SLFilePath fp) = RSLFilePath fp
 data RawSnapshot = RawSnapshot
   { rsCompiler :: !WantedCompiler
   -- ^ The compiler wanted for this snapshot.
-  , rsName :: !Text
-  -- ^ The 'slName' from the top 'SnapshotLayer'.
   , rsPackages :: !(Map PackageName RawSnapshotPackage)
   -- ^ Packages available in this snapshot for installation. This will be
   -- applied on top of any globally available packages.
@@ -1853,8 +1851,6 @@ data RawSnapshot = RawSnapshot
 data Snapshot = Snapshot
   { snapshotCompiler :: !WantedCompiler
   -- ^ The compiler wanted for this snapshot.
-  , snapshotName :: !Text
-  -- ^ The 'slName' from the top 'SnapshotLayer'.
   , snapshotPackages :: !(Map PackageName SnapshotPackage)
   -- ^ Packages available in this snapshot for installation. This will be
   -- applied on top of any globally available packages.
@@ -1907,10 +1903,6 @@ data RawSnapshotLayer = RawSnapshotLayer
   -- 'Nothing' if using 'SLCompiler'.
   --
   -- @since 0.1.0.0
-  , rslName :: !Text
-  -- ^ A user-friendly way of referring to this resolver.
-  --
-  -- @since 0.1.0.0
   , rslLocations :: ![RawPackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   --
@@ -1945,7 +1937,6 @@ instance ToJSON RawSnapshotLayer where
   toJSON rsnap = object $ concat
     [ ["resolver" .= rslParent rsnap]
     , maybe [] (\compiler -> ["compiler" .= compiler]) (rslCompiler rsnap)
-    , ["name" .= rslName rsnap]
     , ["packages" .= rslLocations rsnap]
     , if Set.null (rslDropPackages rsnap)
         then []
@@ -1975,7 +1966,6 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
             (RSLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
             _ -> pure (sl, mcompiler)
 
-    rslName <- o ..: "name"
     unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
     rslDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
     rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
@@ -2016,10 +2006,6 @@ data SnapshotLayer = SnapshotLayer
   -- 'Nothing' if using 'SLCompiler'.
   --
   -- @since 0.1.0.0
-  , slName :: !Text
-  -- ^ A user-friendly way of referring to this resolver.
-  --
-  -- @since 0.1.0.0
   , slLocations :: ![PackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   --
@@ -2051,7 +2037,6 @@ instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
     , ["compiler" .= slCompiler snap]
-    , ["name" .= slName snap]
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
@@ -2066,7 +2051,6 @@ toRawSnapshotLayer :: SnapshotLayer -> RawSnapshotLayer
 toRawSnapshotLayer sl = RawSnapshotLayer
   { rslParent = toRawSL (slParent sl)
   , rslCompiler = slCompiler sl
-  , rslName = slName sl
   , rslLocations = map toRawPLI (slLocations sl)
   , rslDropPackages = slDropPackages sl
   , rslFlags = slFlags sl
