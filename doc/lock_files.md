@@ -129,7 +129,8 @@ parsing of the additional files in the common case of no changes.
 The lock file contains the following information:
 
 * The full snapshot definition information, including completed
-  package locations
+  package locations for both `extra-deps` and packages in
+  snapshot files
     * **NOTE** This only applies to _immutable_ packages. Mutable
       packages are not included in the lock file.
 * Completed information for the snapshot locations
@@ -153,7 +154,7 @@ snapshots:
       foo.yaml # raw content specified in a snapshot file
     completed:
       file: foo.yaml
-      sha256: XXXX # QUESTION: do we really need hashes of local files?
+      sha256: XXXX
       size: XXXX
   - original:
       lts-13.9
@@ -210,7 +211,8 @@ If the lock file does not exist, it will be created by:
 If the `stack.yaml.lock` file exists, its last modification time is
 compared against the last modification time of the `stack.yaml` file
 and any local snapshot files. If any of those files is more recent
-than the `stack.yaml` file, then the update procedure is
+than the `stack.yaml` file, and the file hashes in the lock file
+do not match the files on the filesystem, then the update procedure is
 triggered. Otherwise, the `stack.yaml.lock` file can be used as the
 definition of the snapshot.
 
