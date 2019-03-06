@@ -639,7 +639,8 @@ inspects :: (HasProcessContext env, HasLogFunc env)
          => [String] -> RIO env (Map String Inspect)
 inspects [] = return Map.empty
 inspects images =
-  do maybeInspectOut <- try (readDockerProcess ("inspect" : images))
+  do maybeInspectOut <-
+       try (BL.toStrict . fst <$> proc "docker" ("inspect" : images) readProcess_)
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8

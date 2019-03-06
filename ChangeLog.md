@@ -17,7 +17,7 @@ Other enhancements:
 - Document the way stack interacts with the Cabal library.
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
-  [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
+  [#4535](https://github.com/commercialhaskell/stack/issues/4535)
 
 Bug fixes:
 
@@ -25,6 +25,8 @@ Bug fixes:
 - Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
   downloads and shows a help file, rather than listing available templates.
 - Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
+- Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
+  [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 
 ## v1.9.3
 
