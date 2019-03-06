@@ -15,7 +15,7 @@ import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
+import           Stack.Constants.Config (rootDistDirFromDir, workDirFromDir)
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
 import           System.Exit (exitFailure)
@@ -23,29 +23,32 @@ import           System.Exit (exitFailure)
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
-clean :: HasEnvConfig env => CleanOpts -> RIO env ()
+clean :: HasBuildConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
-    failures <- mapM cleanDir =<< dirsToDelete cleanOpts
+    toDelete <- dirsToDelete cleanOpts
+    logDebug $ "Need to delete: " <> fromString (show (map toFilePath toDelete))
+    failures <- mapM cleanDir toDelete
     when (or failures) $ liftIO exitFailure
   where
-    cleanDir dir =
+    cleanDir dir = do
+      logDebug $ "Deleting directory: " <> fromString (toFilePath dir)
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
         logError $ "Exception while recursively deleting " <> fromString (toFilePath dir) <> "\n" <> displayShow ex
         logError "Perhaps you do not have permission to delete these files or they are in use?"
         return True
 
-dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
+dirsToDelete :: HasBuildConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
     packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM (distDirFromDir . ppRoot) $ Map.elems packages
+            mapM (rootDistDirFromDir . ppRoot) $ Map.elems packages
         CleanShallow targets -> do
             let localPkgNames = Map.keys packages
                 getPkgDir pkgName' = fmap ppRoot (Map.lookup pkgName' packages)
             case targets \\ localPkgNames of
-                [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
+                [] -> mapM rootDistDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
             pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages

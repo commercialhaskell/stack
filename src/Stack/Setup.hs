@@ -63,7 +63,7 @@ import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
-import              Distribution.Types.PackageName (mkPackageName, unPackageName)
+import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
 import              Lens.Micro (set)
 import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
@@ -87,7 +87,6 @@ import              Stack.Config (loadConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
-import              Stack.PackageDump (DumpPackage (..))
 import              Stack.Prelude hiding (Display (..))
 import              Stack.SourceMap
 import              Stack.Setup.Installed
@@ -96,7 +95,6 @@ import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.GhcPkgId (parseGhcPkgId)
 import              Stack.Types.Runner
 import              Stack.Types.SourceMap
 import              Stack.Types.Version
@@ -246,10 +244,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, mCompilerBuild, _) <-
-      case bcDownloadCompiler bc of
-        SkipDownloadCompiler -> return (Nothing, Nothing, False)
-        WithDownloadCompiler -> ensureCompiler sopts
+    (mghcBin, mCompilerBuild, _) <- ensureCompiler sopts
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -275,45 +270,11 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         bcPath = set envOverrideSettingsL (\_ -> return menv) $
                  set processContextL menv bc
     sourceMap <- runRIO bcPath $ do
-      (smActual, prunedActual) <- case bcDownloadCompiler bc of
-        SkipDownloadCompiler -> do
-          -- FIXME temprorary version, should be resolved the same way as getCompilerVersion above
-          sma <- actualFromHints (bcSMWanted bc) compilerVer
-          let noDepsDump :: PackageName -> a -> DumpedGlobalPackage
-              noDepsDump pname _ = DumpPackage
-                { dpGhcPkgId = fromMaybe (error "bad package name") $
-                               parseGhcPkgId (T.pack $ unPackageName pname)
-                , dpPackageIdent = PackageIdentifier pname (mkVersion [])
-                , dpParentLibIdent = Nothing
-                , dpLicense = Nothing
-                , dpLibDirs = []
-                , dpLibraries = []
-                , dpHasExposedModules = True
-                , dpExposedModules = mempty
-                , dpDepends = []
-                , dpHaddockInterfaces = []
-                , dpHaddockHtml = Nothing
-                , dpIsExposed = True
-                }
-              fakeDump = sma {
-                smaGlobal = Map.mapWithKey noDepsDump (smaGlobal sma)
-                }
-              fakePruned = sma {
-                smaGlobal = Map.map (\(GlobalPackageVersion v) -> GlobalPackage v)
-                  (smaGlobal sma)
-                }
-          return (fakeDump, fakePruned)
-        WithDownloadCompiler -> do
-          sma <- actualFromGhc (bcSMWanted bc) compilerVer
-          let actualPkgs = Map.keysSet (smaDeps sma) <>
-                           Map.keysSet (smaProject sma)
-          return ( sma
-                 , sma {
-                     smaGlobal = pruneGlobals (smaGlobal sma) actualPkgs
-                     }
-                 )
-
-      let haddockDeps = shouldHaddockDeps (configBuild config)
+      smActual <- actualFromGhc (bcSMWanted bc) compilerVer
+      let actualPkgs = Map.keysSet (smaDeps smActual) <>
+                       Map.keysSet (smaProject smActual)
+          prunedActual = smActual { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
+          haddockDeps = shouldHaddockDeps (configBuild config)
       targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
       loadSourceMap targets boptsCLI smActual
 

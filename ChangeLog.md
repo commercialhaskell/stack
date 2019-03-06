@@ -113,6 +113,9 @@ Other enhancements:
   downside to this, however: if you have a multifile script, and
   change one of the dependency modules, Stack will not automatically
   detect and recompile.
+* `stack clean` will delete the entire `.stack-work/dist` directory,
+  not just the relevant subdirectory for the current GHC version. See
+  [#4480](https://github.com/commercialhaskell/stack/issues/4480).
 
 Bug fixes:
 

@@ -11,9 +11,7 @@ module Stack.Runners
     , withMiniConfigAndLock
     , withBuildConfigAndLock
     , withDefaultBuildConfigAndLock
-    , withDefaultBuildConfigAndLockNoDocker
-    , withBuildConfigAndLockInClean
-    , withBuildConfigAndLockNoDockerInClean
+    , withCleanConfig
     , withBuildConfig
     , withDefaultBuildConfig
     , withBuildConfigExt
@@ -143,7 +141,7 @@ withDefaultBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withDefaultBuildConfigAndLock go inner =
-    withBuildConfigExt WithDocker WithDownloadCompiler go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+    withBuildConfigExt WithDocker go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
 
 withBuildConfigAndLock
     :: GlobalOpts
@@ -152,36 +150,28 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go needTargets boptsCLI inner =
-    withBuildConfigExt WithDocker WithDownloadCompiler go needTargets boptsCLI Nothing inner Nothing
+    withBuildConfigExt WithDocker go needTargets boptsCLI Nothing inner Nothing
 
--- | See issue #2010 for why this exists. Currently just used for the
--- specific case of "stack clean --full".
-withDefaultBuildConfigAndLockNoDocker
-    :: GlobalOpts
-    -> (Maybe FileLock -> RIO EnvConfig ())
-    -> IO ()
-withDefaultBuildConfigAndLockNoDocker go inner =
-    withBuildConfigExt SkipDocker WithDownloadCompiler go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
-
-withBuildConfigAndLockInClean
-    :: GlobalOpts
-    -> (Maybe FileLock -> RIO EnvConfig ())
-    -> IO ()
-withBuildConfigAndLockInClean go inner =
-    withBuildConfigExt WithDocker SkipDownloadCompiler go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
-
--- | See issue #2010 for why this exists. Currently just used for the
--- specific case of "stack clean --full".
-withBuildConfigAndLockNoDockerInClean
-    :: GlobalOpts
-    -> (Maybe FileLock -> RIO EnvConfig ())
-    -> IO ()
-withBuildConfigAndLockNoDockerInClean go inner =
-    withBuildConfigExt SkipDocker SkipDownloadCompiler go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+-- | A runner specially built for the "stack clean" use case. For some
+-- reason (hysterical raisins?), all of the functions in this module
+-- which say BuildConfig actually work on an EnvConfig, while the
+-- clean command legitimately only needs a BuildConfig. At some point
+-- in the future, we could consider renaming everything for more
+-- consistency.
+--
+-- /NOTE/ This command always runs outside of the Docker environment,
+-- since it does not need to run any commands to get information on
+-- the project. This is a change as of #4480. For previous behavior,
+-- see issue #2010.
+withCleanConfig :: GlobalOpts -> RIO BuildConfig () -> IO ()
+withCleanConfig go inner =
+  loadConfigWithOpts go $ \lc ->
+  withUserFileLock go (view stackRootL lc) $ \_lk0 -> do
+    bconfig <- lcLoadBuildConfig lc $ globalCompiler go
+    runRIO bconfig inner
 
 withBuildConfigExt
     :: WithDocker
-    -> WithDownloadCompiler -- ^ bypassed download compiler if SkipDownloadCompiler.
     -> GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
@@ -199,7 +189,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker downloadCompiler go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
+withBuildConfigExt skipDocker go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -217,8 +207,7 @@ withBuildConfigExt skipDocker downloadCompiler go@GlobalOpts{..} needTargets bop
 
       let inner'' lk = do
               bconfig <- lcLoadBuildConfig lc globalCompiler
-              let bconfig' = bconfig { bcDownloadCompiler = downloadCompiler }
-              envConfig <- runRIO bconfig' (setupEnv needTargets boptsCLI Nothing)
+              envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
               runRIO envConfig (inner' lk)
 
       let getCompilerVersion = loadCompilerVersion go lc

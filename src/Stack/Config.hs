@@ -660,7 +660,6 @@ loadBuildConfig mproject maresolver mcompiler = do
                 LCSProject _ -> False
                 LCSNoConfig _extraDeps -> False
         , bcCurator = projectCurator project
-        , bcDownloadCompiler = WithDownloadCompiler
         }
   where
     getEmptyProject :: Maybe RawSnapshotLocation -> [PackageIdentifierRevision] -> RIO Config Project
