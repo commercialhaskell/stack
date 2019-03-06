@@ -584,7 +584,8 @@ loadBuildConfig mproject maresolver mcompiler = do
                            , "outside of a real project.\n" ]
                    return (p, dest)
     let project = project'
-            { projectResolver = fromMaybe (projectResolver project') mresolver
+            { projectCompiler = mcompiler <|> projectCompiler project'
+            , projectResolver = fromMaybe (projectResolver project') mresolver
             }
 
     resolver <- completeSnapshotLocation $ projectResolver project
@@ -642,7 +643,7 @@ loadBuildConfig mproject maresolver mcompiler = do
       throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
     let wanted = SMWanted
-          { smwCompiler = fromMaybe (snapshotCompiler snapshot)  mcompiler
+          { smwCompiler = fromMaybe (snapshotCompiler snapshot) (projectCompiler project)
           , smwProject = packages
           , smwDeps = deps
           , smwSnapshotLocation = projectResolver project
