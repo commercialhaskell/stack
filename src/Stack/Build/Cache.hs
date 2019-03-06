@@ -51,6 +51,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
+import           Stack.Types.SourceMap (smRelDir)
 import qualified System.FilePath as FP
 import           System.PosixCompat.Files (modificationTime, getFileStatus, setFileTimes)
 
@@ -108,6 +109,8 @@ buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
                -> m (Path Abs File)
 buildCacheFile dir component = do
     cachesDir <- buildCachesDir dir
+    sm <- view $ envConfigL.to envConfigSourceMap
+    smDirName <- smRelDir sm
     let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
     cacheFileName <- parseRelFile $ case component of
         CLib -> "lib"
@@ -115,7 +118,7 @@ buildCacheFile dir component = do
         CExe name -> nonLibComponent "exe" name
         CTest name -> nonLibComponent "test" name
         CBench name -> nonLibComponent "bench" name
-    return $ cachesDir </> cacheFileName
+    return $ cachesDir </> smDirName </> cacheFileName
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: HasEnvConfig env

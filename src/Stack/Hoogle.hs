@@ -13,6 +13,7 @@ import           Data.Char (isSpace)
 import qualified Data.Text as T
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
+import           Lens.Micro ((?~))
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
@@ -24,11 +25,12 @@ import           RIO.Process
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
+hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig haddocksGo $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
   where
+    haddocksGo = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
     args' :: [String]
     args' = if startServer
                  then ["server", "--local", "--port", "8080"]
@@ -60,16 +62,9 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
            runHoogle hooglePath ["generate", "--local"]
     buildHaddocks :: RIO EnvConfig ()
     buildHaddocks =
-        liftIO
-            (catch
-                 (withDefaultBuildConfigAndLock
-                      (set
-                           (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
-                           (Just True)
-                           go)
-                      (Stack.Build.build Nothing))
-                 (\(_ :: ExitCode) ->
-                       return ()))
+        liftIO $
+        catch (withDefaultBuildConfigAndLock haddocksGo $ Stack.Build.build Nothing)
+              (\(_ :: ExitCode) -> return ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
@@ -104,15 +99,16 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig go $ do
         let boptsCLI = defaultBuildOptsCLI
                 { boptsCLITargets =
                     pure $
+                    T.pack . packageIdentifierString $
                     either
-                    (T.pack . packageIdentifierString)
-                    (utf8BuilderToText . display)
+                    id
+                    (\(PackageIdentifierRevision n v _) -> PackageIdentifier n v)
                     hooglePackageIdentifier
                 }
         liftIO
             (catch
                  (withBuildConfigAndLock
-                      go
+                      haddocksGo
                       NeedTargets
                       boptsCLI $
                       Stack.Build.build Nothing

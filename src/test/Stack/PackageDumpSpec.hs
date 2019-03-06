@@ -88,9 +88,6 @@ spec = do
                 , dpHasExposedModules = True
                 , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpHaddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
                 , dpExposedModules = mempty
                 }
@@ -133,9 +130,6 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHasExposedModules = True
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
                 , dpExposedModules = mempty
                 }
@@ -175,9 +169,6 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HShmatrix-0.16.1.5"]
                 , dpHasExposedModules = True
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = True
                 , dpExposedModules = Set.fromList ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
                 }
@@ -211,31 +202,15 @@ spec = do
             , dpDepends = depends
             , dpLibraries = ["HSghc-boot-0.0.0.0"]
             , dpHasExposedModules = True
-            , dpProfiling = ()
-            , dpHaddock = ()
-            , dpSymbols = ()
             , dpIsExposed = True
             , dpExposedModules = Set.fromList ["GHC.Lexeme", "GHC.PackageDb"]
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ runEnvNoLogging $ do
-        icache <- newInstalledCache
-        ghcPkgDump Ghc []
-            $  conduitDumpPackage
-            .| addProfiling icache
-            .| addHaddock icache
-            .| fakeAddSymbols
-            .| CL.sinkNull
-
     it "sinkMatching" $ runEnvNoLogging $ do
-        icache <- newInstalledCache
         m <- ghcPkgDump Ghc []
             $  conduitDumpPackage
-            .| addProfiling icache
-            .| addHaddock icache
-            .| fakeAddSymbols
-            .| sinkMatching False False False (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
+            .| sinkMatching (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
         case Map.lookup (mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
@@ -283,10 +258,6 @@ checkDepsPresent prunes selected =
         case Map.lookup ident depMap of
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
-
--- addSymbols can't be reasonably tested like this
-fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
-fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
 
 runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
 runEnvNoLogging inner = do

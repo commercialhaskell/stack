@@ -138,7 +138,7 @@ globalsFromHints compiler = do
             logWarn $ "Unable to load global hints for " <> RIO.display compiler
             pure mempty
 
-type DumpedGlobalPackage = DumpPackage () () ()
+type DumpedGlobalPackage = DumpPackage
 
 actualFromGhc ::
        (HasConfig env)

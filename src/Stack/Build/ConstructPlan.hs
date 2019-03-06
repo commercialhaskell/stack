@@ -126,6 +126,7 @@ data Ctx = Ctx
     , callStack      :: ![PackageName]
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
+    , mcurator       :: !(Maybe Curator)
     }
 
 instance HasPlatform Ctx
@@ -166,7 +167,7 @@ instance HasEnvConfig Ctx where
 -- some of its dependencies have changed.
 constructPlan :: forall env. HasEnvConfig env
               => BaseConfigOpts
-              -> [DumpPackage () () ()] -- ^ locally registered
+              -> [DumpPackage] -- ^ locally registered
               -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
@@ -180,10 +181,11 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     econfig <- view envConfigL
     sources <- getSources
+    mcur <- view $ buildConfigL.to bcCurator
 
     let onTarget = void . addDep
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
-    let ctx = mkCtx econfig sources
+    let ctx = mkCtx econfig sources mcur
     ((), m, W efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -222,7 +224,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
-    mkCtx econfig sources = Ctx
+    mkCtx econfig sources mcur = Ctx
         { baseConfigOpts = baseConfigOpts0
         , loadPackage = \x y z -> runRIO econfig $ loadPackage0 x y z
         , combinedMap = combineMap sources installedMap
@@ -230,6 +232,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , callStack = []
         , wanted = Map.keysSet (smtTargets $ smTargets sourceMap)
         , localNames = Map.keysSet (smProject sourceMap)
+        , mcurator = mcur
         }
 
     prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
@@ -261,7 +264,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 -- to unregister.
 data UnregisterState = UnregisterState
     { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
-    , usKeep :: ![DumpPackage () () ()]
+    , usKeep :: ![DumpPackage]
     , usAnyAdded :: !Bool
     }
 
@@ -271,7 +274,7 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Tasks
                   -> Map PackageName Text
                   -- ^ Reasons why packages are dirty and must be rebuilt
-                  -> [DumpPackage () () ()]
+                  -> [DumpPackage]
                   -- ^ Local package database dump
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps
@@ -348,7 +351,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- step.
 addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
-    depsRes <- addPackageDeps {-False-} package
+    depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -494,7 +497,7 @@ installPackage name ps minstalled = do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
             resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
-        PSFilePath lp ->
+        PSFilePath lp -> do
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
@@ -513,10 +516,18 @@ installPackage name ps minstalled = do
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
-                          adr <- installPackageGivenDeps True False ps tb minstalled deps
+                          -- in curator builds we can't do all-in-one build as test/benchmark failure
+                          -- could prevent library from being available to its dependencies
+                          -- but when it's already available it's OK to do that
+                          splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
+                          let isAllInOne = not splitRequired
+                          adr <- installPackageGivenDeps isAllInOne (lpBuildHaddocks lp) ps tb minstalled deps
+                          let finalAllInOne = case adr of
+                                ADRToInstall _ | splitRequired -> False
+                                _ -> True
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb True False
+                          addFinal lp tb finalAllInOne False
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -533,6 +544,11 @@ installPackage name ps minstalled = do
                                 updateLibMap name res'
                                 addFinal lp tb False False
                             return res'
+ where
+   expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
+     curator <- maybeCurator
+     pure $ Set.member name (curatorExpectTestFailure curator) ||
+            Set.member name (curatorExpectBenchmarkFailure curator)
 
 resolveDepsAndInstall :: Bool
                       -> Bool

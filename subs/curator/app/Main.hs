@@ -124,7 +124,7 @@ build = do
   logInfo "Building"
   withWorkingDir "unpack-dir" $ proc
     "stack"
-    (words "build --test --bench --no-rerun-tests --no-run-benchmarks --haddock")
+    (words "build --test --bench --test-suite-timeout=600 --no-rerun-tests --no-run-benchmarks --haddock --color never")
     runProcess_
 
 loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp RawSnapshotLayer

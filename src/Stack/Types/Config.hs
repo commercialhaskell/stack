@@ -103,7 +103,6 @@ module Stack.Types.Config
   ,SCM(..)
   -- * Paths
   ,bindirSuffix
-  ,configInstalledCache
   ,configLoadedSnapshotCache
   ,GlobalInfoSource(..)
   ,getProjectWorkDir
@@ -610,21 +609,30 @@ instance ToJSON Project where
 -- documented and exposed Stack API. SUBJECT TO CHANGE.
 data Curator = Curator
   { curatorSkipTest :: !(Set PackageName)
+  , curatorExpectTestFailure :: !(Set PackageName)
   , curatorSkipBenchmark :: !(Set PackageName)
+  , curatorExpectBenchmarkFailure :: !(Set PackageName)
   , curatorSkipHaddock :: !(Set PackageName)
+  , curatorExpectHaddockFailure :: !(Set PackageName)
   }
   deriving Show
 instance ToJSON Curator where
   toJSON c = object
     [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
+    , "expect-test-failure" .= Set.map CabalString (curatorExpectTestFailure c)
     , "skip-bench" .= Set.map CabalString (curatorSkipBenchmark c)
+    , "expect-benchmark-failure" .= Set.map CabalString (curatorExpectTestFailure c)
     , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
+    , "expect-test-failure" .= Set.map CabalString (curatorExpectHaddockFailure c)
     ]
 instance FromJSON (WithJSONWarnings Curator) where
   parseJSON = withObjectWarnings "Curator" $ \o -> Curator
     <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
+    <*> fmap (Set.map unCabalString) (o ..:? "expect-test-failure" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "skip-bench" ..!= mempty)
+    <*> fmap (Set.map unCabalString) (o ..:? "expect-benchmark-failure" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
+    <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -1165,10 +1173,6 @@ getProjectWorkDir = do
     workDir <- view workDirL
     return (root </> workDir)
 
--- | File containing the installed cache, see "Stack.PackageDump"
-configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
-configInstalledCache = liftM (</> relFileInstalledCacheBin) getProjectWorkDir
-
 -- | Relative directory for the platform identifier
 platformOnlyRelDir
     :: (MonadReader env m, HasPlatform env, MonadThrow m)
@@ -1239,9 +1243,9 @@ platformSnapAndCompilerRel
     :: (HasEnvConfig env)
     => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
-    SourceMapHash smh <- view $ envConfigL.to envConfigSourceMap.to smHash
     platform <- platformGhcRelDir
-    name <- parseRelDir $ T.unpack $ SHA256.toHexText smh
+    sm <- view $ envConfigL.to envConfigSourceMap
+    name <- smRelDir sm
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 

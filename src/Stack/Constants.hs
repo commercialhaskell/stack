@@ -50,7 +50,6 @@ module Stack.Constants
     ,relFileReadmeTxt
     ,relDirScript
     ,relFileConfigYaml
-    ,relFileInstalledCacheBin
     ,relDirSnapshots
     ,relDirGlobalHints
     ,relFileGlobalHintsYaml
@@ -376,9 +375,6 @@ relDirScript = $(mkRelDir "script")
 
 relFileConfigYaml :: Path Rel File
 relFileConfigYaml = $(mkRelFile "config.yaml")
-
-relFileInstalledCacheBin :: Path Rel File
-relFileInstalledCacheBin = $(mkRelFile "installed-cache.bin")
 
 relDirSnapshots :: Path Rel Dir
 relDirSnapshots = $(mkRelDir "snapshots")

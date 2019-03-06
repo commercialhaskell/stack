@@ -172,12 +172,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     unless (cabalfp == cabalfp')
       $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
     installMap <- toInstallMap sourceMap
-    (installedMap, _, _, _) <- getInstalled GetInstalledOpts
-                                { getInstalledProfiling = False
-                                , getInstalledHaddock = False
-                                , getInstalledSymbols = False
-                                }
-                                installMap
+    (installedMap, _, _, _) <- getInstalled installMap
     let internalPackages = Set.fromList $
           gpdPackageName gpd :
           map (Cabal.unqualComponentNameToPackageName . fst) (Cabal.condSubLibraries gpd)
@@ -330,7 +325,7 @@ getSDistFileList lp =
             $ \ee ->
             withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
-                cabal KeepTHLoading ["sdist", "--list-sources", outFile]
+                cabal CloseOnException KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)
                 return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where

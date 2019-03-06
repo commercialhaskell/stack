@@ -35,7 +35,6 @@ import           Distribution.Version (mkVersion)
 import           Path (parent)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
-import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Package
@@ -63,9 +62,6 @@ build msetLocalFiles mbuildLk = do
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
-    let profiling = boptsLibProfile bopts || boptsExeProfile bopts
-    let symbols = not (boptsLibStrip bopts || boptsExeStrip bopts)
-
     sourceMap <- view $ envConfigL.to envConfigSourceMap
     locals <- projectLocalPackages
     depsLocals <- localDependencies
@@ -82,12 +78,7 @@ build msetLocalFiles mbuildLk = do
 
     installMap <- toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled
-                     GetInstalledOpts
-                         { getInstalledProfiling = profiling
-                         , getInstalledHaddock   = shouldHaddockDeps bopts
-                         , getInstalledSymbols   = symbols }
-                     installMap
+        getInstalled installMap
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli

@@ -19,6 +19,7 @@ module Stack.Build.Execute
     , withExecuteEnv
     , withSingleContext
     , ExcludeTHLoading(..)
+    , KeepOutputOpen(..)
     ) where
 
 import           Control.Concurrent.Execute
@@ -35,10 +36,7 @@ import           Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Filesystem as CF
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed
-                    (ExitCodeException (..), waitExitCode,
-                     useHandleOpen, setStdin, setStdout, setStderr,
-                     runProcess_, getStdout, getStderr, createSource)
+import           Data.Conduit.Process.Typed (createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
 import           Data.List.NonEmpty (NonEmpty(..), nonEmpty)
@@ -203,9 +201,9 @@ data ExecuteEnv = ExecuteEnv
     , eeTotalWanted    :: !Int
     , eeLocals         :: ![LocalPackage]
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () () ()))
-    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
-    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () () ())))
+    , eeGlobalDumpPkgs :: !(Map GhcPkgId DumpPackage)
+    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
+    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
     , eeGetGhcPath     :: !(forall m. MonadIO m => m (Path Abs File))
     , eeGetGhcjsPath   :: !(forall m. MonadIO m => m (Path Abs File))
@@ -308,9 +306,9 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> BuildOptsCLI
                -> BaseConfigOpts
                -> [LocalPackage]
-               -> [DumpPackage () () ()] -- ^ global packages
-               -> [DumpPackage () () ()] -- ^ snapshot packages
-               -> [DumpPackage () () ()] -- ^ local packages
+               -> [DumpPackage] -- ^ global packages
+               -> [DumpPackage] -- ^ snapshot packages
+               -> [DumpPackage] -- ^ local packages
                -> (ExecuteEnv -> RIO env a)
                -> RIO env a
 withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
@@ -473,9 +471,9 @@ executePlan :: HasEnvConfig env
             => BuildOptsCLI
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> [DumpPackage () () ()] -- ^ global packages
-            -> [DumpPackage () () ()] -- ^ snapshot packages
-            -> [DumpPackage () () ()] -- ^ local packages
+            -> [DumpPackage] -- ^ global packages
+            -> [DumpPackage] -- ^ snapshot packages
+            -> [DumpPackage] -- ^ local packages
             -> InstalledMap
             -> Map PackageName Target
             -> Plan
@@ -806,7 +804,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                       Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
-                _ -> error "singleBuild: invariant violated, missing package ID missing"
+                _ -> error $ "singleBuild: invariant violated, missing package ID missing: " ++ show ident
         installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
         installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
@@ -934,7 +932,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> Path Abs Dir                           -- Package root directory file path
                      -- Note that the `Path Abs Dir` argument is redundant with the `Path Abs File`
                      -- argument, but we provide both to avoid recalculating `parent` of the `File`.
-                     -> (ExcludeTHLoading -> [String] -> RIO env ())
+                     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
                      -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
                      -> OutputType
@@ -1022,7 +1020,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         :: Package
         -> Path Abs Dir
         -> OutputType
-        -> ((ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
+        -> ((KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
     withCabal package pkgDir outputType inner = do
         config <- view configL
@@ -1044,7 +1042,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
             case (packageBuildType package, eeSetupExe) of
                 (C.Simple, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ Right <$> getSetupHs pkgDir
-        inner $ \stripTHLoading args -> do
+        inner $ \keepOutputOpen stripTHLoading args -> do
             let cabalPackageArg
                     -- Omit cabal package dependency when building
                     -- Cabal. See
@@ -1168,14 +1166,17 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         (mlogFile, bss) <-
                             case outputType of
                                 OTConsole _ -> return (Nothing, [])
-                                OTLogFile logFile h -> do
-                                    liftIO $ hClose h
-                                    fmap (Just logFile,) $ withSourceFile (toFilePath logFile) $ \src ->
-                                           runConduit
-                                         $ src
-                                        .| CT.decodeUtf8Lenient
-                                        .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
-                                        .| CL.consume
+                                OTLogFile logFile h ->
+                                    if keepOutputOpen == KeepOpen
+                                    then return (Nothing, []) -- expected failure build continues further
+                                    else do
+                                        liftIO $ hClose h
+                                        fmap (Just logFile,) $ withSourceFile (toFilePath logFile) $ \src ->
+                                               runConduit
+                                             $ src
+                                            .| CT.decodeUtf8Lenient
+                                            .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
+                                            .| CL.consume
                         throwM $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
                             taskProvides
@@ -1280,7 +1281,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     minstalled <-
         case mprecompiled of
             Just precompiled -> copyPreCompiled precompiled
-            Nothing -> realConfigAndBuild cache allDepsMap
+            Nothing -> do
+                mcurator <- view $ buildConfigL.to bcCurator
+                realConfigAndBuild cache mcurator allDepsMap
     case minstalled of
         Nothing -> return ()
         Just installed -> do
@@ -1296,6 +1299,15 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         packageHasExposedModules package &&
                         -- Special help for the curator tool to avoid haddocks that are known to fail
                         maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
+    expectHaddockFailure mcurator =
+        maybe False (Set.member pname . curatorExpectHaddockFailure) mcurator
+    fulfillHaddockExpectations mcurator action | expectHaddockFailure mcurator = do
+        eres <- tryAny $ action KeepOpen
+        case eres of
+          Right () -> logWarn $ fromString (packageNameString pname) <> ": unexpected Haddock success"
+          Left _ -> return ()
+    fulfillHaddockExpectations _ action = do
+        action CloseOnException
 
     buildingFinals = isFinalBuild || taskAllInOne
     enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -1418,8 +1430,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
-    realConfigAndBuild cache allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
-        $ \package cabalfp pkgDir cabal announce _outputType -> do
+    realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
+        $ \package cabalfp pkgDir cabal0 announce _outputType -> do
+            let cabal = cabal0 CloseOnException
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
             when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
                  (logInfo
@@ -1445,7 +1458,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
                     initialBuildSteps executableBuildStatuses cabal announce
                     return Nothing
-                _ -> liftM Just $ realBuild cache package pkgDir cabal announce executableBuildStatuses
+                _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $
+                     Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
         () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
@@ -1455,11 +1469,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         :: ConfigCache
         -> Package
         -> Path Abs Dir
-        -> (ExcludeTHLoading -> [String] -> RIO env ())
+        -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
         -> (Text -> RIO env ())
         -> Map Text ExecutableBuildStatus
         -> RIO env Installed
-    realBuild cache package pkgDir cabal announce executableBuildStatuses = do
+    realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
+        let cabal = cabal0 CloseOnException
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
         markExeNotInstalled (taskLocation task) taskProvides
@@ -1549,7 +1564,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
                     _ -> []
 
-            cabal KeepTHLoading $ concat
+            fulfillHaddockExpectations mcurator $ \keep -> cabal0 keep KeepTHLoading $ concat
                 [ ["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                 , sourceFlag
                 , ["--internal" | boptsHaddockInternal eeBuildOpts]
@@ -1746,6 +1761,9 @@ singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+    mcurator <- view $ buildConfigL.to bcCurator
+    let pname = pkgName $ taskProvides task
+        expectFailure = expectTestFailure pname mcurator
     withSingleContext ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce outputType -> do
         config <- view configL
         let needHpc = toCoverage topts
@@ -1814,6 +1832,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                     , esLocaleUtf8 = False
                     , esKeepGhcRts = False
                     }
+                let emptyResult = Map.singleton testName Nothing
                 withProcessContext menv $ if exists
                     then do
                         -- We clear out the .tix files before doing a run.
@@ -1842,9 +1861,13 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 case outputType of
                                     OTConsole _ -> id
                                     OTLogFile _ h -> setter (useHandleOpen h)
+                            optionalTimeout action
+                                | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
+                                    timeout (maxSecs * 1000000) action
+                                | otherwise = Just <$> action
 
-                        ec <- withWorkingDir (toFilePath pkgDir) $
-                          proc (toFilePath exePath) args $ \pc0 -> do
+                        mec <- withWorkingDir (toFilePath pkgDir) $
+                          optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
                             stdinBS <-
                               if isTestTypeLib
                                 then do
@@ -1870,20 +1893,27 @@ singleTest topts testsToRun ac ee task installedMap = do
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
                         let announceResult result = announce $ "Test suite " <> testName <> " " <> result
-                        case ec of
-                            ExitSuccess -> do
+                        case mec of
+                            Just ExitSuccess -> do
                                 announceResult "passed"
                                 return Map.empty
-                            _ -> do
+                            Nothing -> do
+                                announceResult "timed out"
+                                if expectFailure
+                                then return Map.empty
+                                else return $ Map.singleton testName Nothing
+                            Just ec -> do
                                 announceResult "failed"
-                                return $ Map.singleton testName (Just ec)
+                                if expectFailure
+                                then return Map.empty
+                                else return $ Map.singleton testName (Just ec)
                     else do
-                        logError $ displayShow $ TestSuiteExeMissing
+                        unless expectFailure $ logError $ displayShow $ TestSuiteExeMissing
                             (packageBuildType package == C.Simple)
                             exeName
                             (packageNameString (packageName package))
                             (T.unpack testName)
-                        return $ Map.singleton testName Nothing
+                        return emptyResult
 
             when needHpc $ do
                 let testsToRun' = map f testsToRun
@@ -1900,7 +1930,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         hClose h
                         S.readFile $ toFilePath logFile
 
-            unless (Map.null errs) $ throwM $ TestSuiteFailure
+            unless (Map.null errs || expectFailure) $ throwM $ TestSuiteFailure
                 (taskProvides task)
                 errs
                 (case outputType of
@@ -1936,10 +1966,13 @@ singleBench beopts benchesToRun ac ee task installedMap = do
 
         when toRun $ do
             announce "benchmarks"
-            cabal KeepTHLoading ("bench" : args)
+            cabal CloseOnException KeepTHLoading ("bench" : args)
 
 data ExcludeTHLoading = ExcludeTHLoading | KeepTHLoading
 data ConvertPathsToAbsolute = ConvertPathsToAbsolute | KeepPathsAsIs
+-- | special marker for expected failures in curator builds, using those
+-- we need to keep log handle open as build continues further even after a failure
+data KeepOutputOpen = KeepOpen | CloseOnException deriving Eq
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
 mungeBuildOutput :: forall m. MonadIO m
@@ -2114,7 +2147,7 @@ taskComponents task =
 --
 -- * https://github.com/commercialhaskell/stack/issues/949
 addGlobalPackages :: Map PackageIdentifier GhcPkgId -- ^ dependencies of the package
-                  -> [DumpPackage () () ()] -- ^ global packages
+                  -> [DumpPackage] -- ^ global packages
                   -> Set GhcPkgId
 addGlobalPackages deps globals0 =
     res
@@ -2169,3 +2202,40 @@ addGlobalPackages deps globals0 =
     -- None of the packages we checked can be added, therefore drop them all
     -- and return our results
     loop _ [] gids = gids
+
+
+expectTestFailure :: PackageName -> Maybe Curator -> Bool
+expectTestFailure pname mcurator =
+    maybe False (Set.member pname . curatorExpectTestFailure) mcurator
+
+expectBenchmarkFailure :: PackageName -> Maybe Curator -> Bool
+expectBenchmarkFailure pname mcurator =
+    maybe False (Set.member pname . curatorExpectBenchmarkFailure) mcurator
+
+fulfillCuratorBuildExpectations ::
+       (HasLogFunc env, HasCallStack)
+    => PackageName
+    -> Maybe Curator
+    -> Bool
+    -> Bool
+    -> b
+    -> RIO env b
+    -> RIO env b
+fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action | enableTests &&
+                                                                          expectTestFailure pname mcurator = do
+    eres <- tryAny action
+    case eres of
+      Right res -> do
+          logWarn $ fromString (packageNameString pname) <> ": unexpected test build success"
+          return res
+      Left _ -> return defValue
+fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action | enableBench &&
+                                                                          expectBenchmarkFailure pname mcurator = do
+    eres <- tryAny action
+    case eres of
+      Right res -> do
+          logWarn $ fromString (packageNameString pname) <> ": unexpected benchmark build success"
+          return res
+      Left _ -> return defValue
+fulfillCuratorBuildExpectations _ _ _ _ _ action = do
+    action

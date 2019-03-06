@@ -347,6 +347,7 @@ data TestOpts =
            ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
            ,toCoverage :: !Bool -- ^ Generate a code coverage report
            ,toDisableRun :: !Bool -- ^ Disable running of tests
+           ,toMaximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
            } deriving (Eq,Show)
 
 defaultTestOpts :: TestOpts
@@ -355,6 +356,7 @@ defaultTestOpts = TestOpts
     , toAdditionalArgs = []
     , toCoverage = False
     , toDisableRun = False
+    , toMaximumTimeSeconds = Nothing
     }
 
 data TestOptsMonoid =
@@ -363,6 +365,7 @@ data TestOptsMonoid =
     , toMonoidAdditionalArgs :: ![String]
     , toMonoidCoverage :: !(First Bool)
     , toMonoidDisableRun :: !(First Bool)
+    , toMonoidMaximumTimeSeconds :: !(First (Maybe Int))
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings TestOptsMonoid) where
@@ -371,6 +374,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
               toMonoidAdditionalArgs <- o ..:? toMonoidAdditionalArgsName ..!= []
               toMonoidCoverage <- First <$> o ..:? toMonoidCoverageArgName
               toMonoidDisableRun <- First <$> o ..:? toMonoidDisableRunArgName
+              toMonoidMaximumTimeSeconds <- First <$> o ..:? toMonoidMaximumTimeSecondsArgName
               return TestOptsMonoid{..})
 
 toMonoidRerunTestsArgName :: Text
@@ -384,6 +388,9 @@ toMonoidCoverageArgName = "coverage"
 
 toMonoidDisableRunArgName :: Text
 toMonoidDisableRunArgName = "no-run-tests"
+
+toMonoidMaximumTimeSecondsArgName :: Text
+toMonoidMaximumTimeSecondsArgName = "test-suite-timeout"
 
 instance Semigroup TestOptsMonoid where
   (<>) = mappenddefault

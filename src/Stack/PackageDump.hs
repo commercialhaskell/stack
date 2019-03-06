@@ -12,12 +12,6 @@ module Stack.PackageDump
     , conduitDumpPackage
     , ghcPkgDump
     , ghcPkgDescribe
-    , newInstalledCache
-    , loadInstalledCache
-    , saveInstalledCache
-    , addProfiling
-    , addHaddock
-    , addSymbols
     , sinkMatching
     , pruneDeps
     ) where
@@ -28,22 +22,16 @@ import           Data.Attoparsec.Text as P
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
-import           Data.List (isPrefixOf)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified RIO.Text as T
 import qualified Distribution.License as C
 import           Distribution.ModuleName (ModuleName)
-import qualified Distribution.System as OS
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
-import           Stack.StoreTH
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageDump
-import           System.Directory (getDirectoryContents, doesFileExist)
-import           System.Process (readProcess) -- FIXME confirm that this is correct
 import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
@@ -89,22 +77,6 @@ ghcPkgCmdArgs cmd wc mpkgDbs sink = do
         ]
     sink' = CT.decodeUtf8 .| sink
 
--- | Create a new, empty @InstalledCache@
-newInstalledCache :: MonadIO m => m InstalledCache
-newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Map.empty)
-
--- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
--- empty cache.
-loadInstalledCache :: HasLogFunc env => Path Abs File -> RIO env InstalledCache
-loadInstalledCache path = do
-    m <- decodeOrLoadInstalledCache path (return $ InstalledCacheInner Map.empty)
-    liftIO $ InstalledCache <$> newIORef m
-
--- | Save a @InstalledCache@ to disk
-saveInstalledCache :: HasLogFunc env => Path Abs File -> InstalledCache -> RIO env ()
-saveInstalledCache path (InstalledCache ref) =
-    readIORef ref >>= encodeInstalledCache path
-
 -- | Prune a list of possible packages down to those whose dependencies are met.
 --
 -- * id uniquely identifies an item
@@ -148,14 +120,9 @@ pruneDeps getName getId getDepends chooseBest =
 -- | Find the package IDs matching the given constraints with all dependencies installed.
 -- Packages not mentioned in the provided @Map@ are allowed to be present too.
 sinkMatching :: Monad m
-             => Bool -- ^ require profiling?
-             -> Bool -- ^ require haddock?
-             -> Bool -- ^ require debugging symbols?
-             -> Map PackageName Version -- ^ allowed versions
-             -> ConduitM (DumpPackage Bool Bool Bool) o
-                         m
-                         (Map PackageName (DumpPackage Bool Bool Bool))
-sinkMatching reqProfiling reqHaddock reqSymbols allowed =
+             => Map PackageName Version -- ^ allowed versions
+             -> ConduitM DumpPackage o m (Map PackageName DumpPackage)
+sinkMatching allowed =
       Map.fromList
     . map (pkgName . dpPackageIdent &&& id)
     . Map.elems
@@ -164,117 +131,15 @@ sinkMatching reqProfiling reqHaddock reqSymbols allowed =
         dpGhcPkgId
         dpDepends
         const -- Could consider a better comparison in the future
-    <$> (CL.filter predicate .| CL.consume)
+    <$> (CL.filter (isAllowed . dpPackageIdent) .| CL.consume)
   where
-    predicate dp =
-      isAllowed (dpPackageIdent dp) &&
-      (not reqProfiling || dpProfiling dp) &&
-      (not reqHaddock || dpHaddock dp) &&
-      (not reqSymbols || dpSymbols dp)
-
     isAllowed (PackageIdentifier name version) =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False
             _ -> True
 
--- | Add profiling information to the stream of @DumpPackage@s
-addProfiling :: MonadIO m
-             => InstalledCache
-             -> ConduitM (DumpPackage a b c) (DumpPackage Bool b c) m ()
-addProfiling (InstalledCache ref) =
-    CL.mapM go
-  where
-    go dp = liftIO $ do
-        InstalledCacheInner m <- readIORef ref
-        let gid = dpGhcPkgId dp
-        p <- case Map.lookup gid m of
-            Just installed -> return (installedCacheProfiling installed)
-            Nothing | null (dpLibraries dp) -> return True
-            Nothing -> do
-                let loop [] = return False
-                    loop (dir:dirs) = do
-                        econtents <- tryIO $ getDirectoryContents dir
-                        let contents = either (const []) id econtents
-                        if or [isProfiling content lib
-                              | content <- contents
-                              , lib <- dpLibraries dp
-                              ] && not (null contents)
-                            then return True
-                            else loop dirs
-                loop $ dpLibDirs dp
-        return dp { dpProfiling = p }
-
-isProfiling :: FilePath -- ^ entry in directory
-            -> Text -- ^ name of library
-            -> Bool
-isProfiling content lib =
-    prefix `T.isPrefixOf` T.pack content
-  where
-    prefix = T.concat ["lib", lib, "_p"]
-
--- | Add haddock information to the stream of @DumpPackage@s
-addHaddock :: MonadIO m
-           => InstalledCache
-           -> ConduitM (DumpPackage a b c) (DumpPackage a Bool c) m ()
-addHaddock (InstalledCache ref) =
-    CL.mapM go
-  where
-    go dp = liftIO $ do
-        InstalledCacheInner m <- readIORef ref
-        let gid = dpGhcPkgId dp
-        h <- case Map.lookup gid m of
-            Just installed -> return (installedCacheHaddock installed)
-            Nothing | not (dpHasExposedModules dp) -> return True
-            Nothing -> do
-                let loop [] = return False
-                    loop (ifc:ifcs) = do
-                        exists <- doesFileExist ifc
-                        if exists
-                            then return True
-                            else loop ifcs
-                loop $ dpHaddockInterfaces dp
-        return dp { dpHaddock = h }
-
--- | Add debugging symbol information to the stream of @DumpPackage@s
-addSymbols :: MonadIO m
-           => InstalledCache
-           -> ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
-addSymbols (InstalledCache ref) =
-    CL.mapM go
-  where
-    go dp = do
-        InstalledCacheInner m <- liftIO $ readIORef ref
-        let gid = dpGhcPkgId dp
-        s <- case Map.lookup gid m of
-            Just installed -> return (installedCacheSymbols installed)
-            Nothing | null (dpLibraries dp) -> return True
-            Nothing ->
-              case dpLibraries dp of
-                [] -> return True
-                lib:_ ->
-                  liftM or . mapM (\dir -> liftIO $ hasDebuggingSymbols dir (T.unpack lib)) $ dpLibDirs dp
-        return dp { dpSymbols = s }
-
-hasDebuggingSymbols :: FilePath -- ^ library directory
-                    -> String   -- ^ name of library
-                    -> IO Bool
-hasDebuggingSymbols dir lib = do
-    let path = concat [dir, "/lib", lib, ".a"]
-    exists <- doesFileExist path
-    if not exists then return False
-    else case OS.buildOS of
-        OS.OSX     -> liftM (any (isPrefixOf "0x") . lines) $
-            readProcess "dwarfdump" [path] ""
-        OS.Linux   -> liftM (any (isPrefixOf "Contents") . lines) $
-            readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", path] ""
-        OS.FreeBSD -> liftM (any (isPrefixOf "Contents") . lines) $
-            readProcess "readelf" ["--debug-dump=info", "--dwarf-depth=1", path] ""
-        OS.Windows -> return False -- No support, so it can't be there.
-        _          -> return False
-
-
 -- | Dump information for a single package
-data DumpPackage profiling haddock symbols = DumpPackage
+data DumpPackage = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
     , dpParentLibIdent :: !(Maybe PackageIdentifier)
@@ -286,9 +151,6 @@ data DumpPackage profiling haddock symbols = DumpPackage
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
     , dpHaddockHtml :: !(Maybe FilePath)
-    , dpProfiling :: !profiling
-    , dpHaddock :: !haddock
-    , dpSymbols :: !symbols
     , dpIsExposed :: !Bool
     }
     deriving (Show, Eq)
@@ -310,7 +172,7 @@ instance Show PackageDumpException where
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => ConduitM Text (DumpPackage () () ()) m ()
+                   => ConduitM Text DumpPackage m ()
 conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) .| CL.consume
     let m = Map.fromList pairs
@@ -388,9 +250,6 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = exposed == ["True"]
                 }
 
