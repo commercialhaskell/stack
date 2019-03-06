@@ -1954,6 +1954,7 @@ instance ToJSON RawSnapshotLayer where
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
   parseJSON = withObjectWarnings "Snapshot" $ \o -> do
+    _ :: Maybe Text <- o ..:? "name" -- avoid warnings for old snapshot format
     mcompiler <- o ..:? "compiler"
     mresolver <- jsonSubWarningsT $ o ...:? ["snapshot", "resolver"]
     unresolvedSnapshotParent <-
