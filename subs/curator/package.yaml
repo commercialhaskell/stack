@@ -26,4 +26,4 @@ executables:
     main: Main.hs
     dependencies:
     - curator
-    - optparse-generic
+    - optparse-applicative

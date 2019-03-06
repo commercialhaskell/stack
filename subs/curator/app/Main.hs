@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 import Curator hiding (Snapshot)
 import Data.Yaml (encodeFile, decodeFileThrow)
-import Options.Generic (ParseRecord, getRecord)
+import Options.Applicative hiding (action)
 import qualified Pantry
 import Path.IO (resolveFile', resolveDir')
 import RIO.PrettyPrint
@@ -19,13 +19,29 @@ data CuratorOptions
   | CheckSnapshot
   | Unpack
   | Build
-  deriving (Eq, Show, Generic)
 
-instance ParseRecord CuratorOptions
+opts :: Parser CuratorOptions
+opts = subparser
+        ( simpleCmd "update" Update "Update Pantry databse from Hackage"
+       <> simpleCmd "constraints" Constraints "Generate constraints file from build-constraints.yaml"
+       <> simpleCmd "snapshotincomplete" SnapshotIncomplete "Generate incomplete snapshot"
+       <> simpleCmd "snapshot" Snapshot "Complete locations in incomplete snapshot"
+       <> simpleCmd "checksnapshot" CheckSnapshot "Check snapshot consistency"
+       <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
+       <> simpleCmd "build" Build "Build Stack project for a Stackage snapshot"
+        )
+  where
+    simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
+
+allOpts :: ParserInfo CuratorOptions
+allOpts = info (opts <**> helper)
+  ( fullDesc
+ <> progDesc "Special utilities for Stackage curators"
+ <> header "curator - Stackage curator tool" )
 
 main :: IO ()
 main = runPantryApp $
-  getRecord "curator" >>= \case
+  liftIO (execParser allOpts) >>= \case
     Update ->
       update
     Constraints ->
