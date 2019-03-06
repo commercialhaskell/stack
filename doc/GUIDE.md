@@ -286,19 +286,17 @@ You can clean up build artifacts for your project using the `stack clean` and `s
 
 ### `stack clean`
 
-`stack clean` deletes the local working directories containing compiler output. 
+`stack clean` deletes the local working directories containing compiler output.
 By default, that means the contents of directories in `.stack-work/dist`, for all the `.stack-work` directories within a project.
 
 Use `stack clean <specific-package>` to delete the output for the package _specific-package_ only.
 
 ### `stack purge`
 
-`stack purge` deletes the local stack working directories, including extra-deps, git dependencies and the compiler output (including logs). 
+`stack purge` deletes the local stack working directories, including extra-deps, git dependencies and the compiler output (including logs).
 It does not delete any snapshot packages, compilers or programs installed using `stack install`. This essentially
-reverts the project to a completely fresh state, as if it had never been built. 
+reverts the project to a completely fresh state, as if it had never been built.
 `stack purge` is just a shortcut for `stack clean --full`
-
-- Note: `stack purge` is not available when used in docker
 
 ### The build command
 
