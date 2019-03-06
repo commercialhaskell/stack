@@ -662,12 +662,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
           (Just $ munlockFile lk)
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
-cleanCmd opts go =
-  -- See issues #2010 and #3468 for why "stack clean --full" is not used
-  -- within docker.
-  case opts of
-    CleanFull{} -> withBuildConfigAndLockNoDockerInClean go (const (clean opts))
-    CleanShallow{} -> withBuildConfigAndLockInClean go (const (clean opts))
+cleanCmd opts go = withCleanConfig go (clean opts)
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
@@ -1002,7 +997,6 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
     let mProjectRoot = lcProjectRoot lc
     withBuildConfigExt
         WithDocker
-        WithDownloadCompiler
         go
         NeedTargets
         defaultBuildOptsCLI
