@@ -7,12 +7,15 @@ import Data.Yaml (encodeFile, decodeFileThrow)
 import Options.Applicative hiding (action)
 import qualified Pantry
 import Path.IO (resolveFile', resolveDir')
+import RIO.List (stripPrefix)
 import RIO.PrettyPrint
 import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
+import RIO.Time
 
 data CuratorOptions
   = Update
+  | CheckTargetAvailable Target
   | Constraints
   | SnapshotIncomplete
   | Snapshot
@@ -23,6 +26,8 @@ data CuratorOptions
 opts :: Parser CuratorOptions
 opts = subparser
         ( simpleCmd "update" Update "Update Pantry databse from Hackage"
+       <> command "checktargetavailable" (info (CheckTargetAvailable <$> target)
+                                          (progDesc "Check if target snapshot isn't yet on Github"))
        <> simpleCmd "constraints" Constraints "Generate constraints file from build-constraints.yaml"
        <> simpleCmd "snapshotincomplete" SnapshotIncomplete "Generate incomplete snapshot"
        <> simpleCmd "snapshot" Snapshot "Complete locations in incomplete snapshot"
@@ -32,6 +37,15 @@ opts = subparser
         )
   where
     simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
+    target = argument (nightly <|> lts) (metavar "TARGET")
+    nightly = maybeReader $ \s -> do
+      s' <- stripPrefix "nightly-" s
+      TargetNightly <$> parseTimeM False defaultTimeLocale "%Y-%m-%d" s'
+    lts = maybeReader $ \s -> do
+      s' <- stripPrefix "lts-" s
+      case break (== '.') s' of
+        (major, '.':minor) -> TargetLts <$> readMaybe major <*> readMaybe minor
+        _ -> Nothing
 
 allOpts :: ParserInfo CuratorOptions
 allOpts = info (opts <**> helper)
@@ -44,6 +58,8 @@ main = runPantryApp $
   liftIO (execParser allOpts) >>= \case
     Update ->
       update
+    CheckTargetAvailable t ->
+      checkTargetAvailable t
     Constraints ->
       constraints
     SnapshotIncomplete ->

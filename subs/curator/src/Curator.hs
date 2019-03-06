@@ -1,9 +1,12 @@
 module Curator
   ( module Export
+  , Target(..)
   ) where
 
+import Curator.Repo as Export
 import Curator.StackageConstraints as Export
 import Curator.Snapshot as Export
+import Curator.Types (Target(..))
 import Curator.Unpack as Export
 import Pantry as Export
 import RIO as Export
