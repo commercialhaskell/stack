@@ -21,7 +21,7 @@ data CuratorOptions
   | Snapshot
   | CheckSnapshot
   | Unpack
-  | Build
+  | Build Int
 
 opts :: Parser CuratorOptions
 opts = subparser
@@ -33,7 +33,9 @@ opts = subparser
        <> simpleCmd "snapshot" Snapshot "Complete locations in incomplete snapshot"
        <> simpleCmd "checksnapshot" CheckSnapshot "Check snapshot consistency"
        <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
-       <> simpleCmd "build" Build "Build Stack project for a Stackage snapshot"
+       <> command "build" (info (buildCmd <**> helper)
+                           (progDesc "Build Stack project for a Stackage snapshot")
+                          )
         )
   where
     simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
@@ -48,6 +50,11 @@ opts = subparser
       case break (== '.') s' of
         (major, '.':minor) -> TargetLts <$> readMaybe major <*> readMaybe minor
         _ -> Nothing
+    buildCmd = Build <$> argument auto ( help "Number of jobs to run Stackage build with"
+                                      <> showDefault
+                                      <> value 1
+                                      <> metavar "JOBS"
+                                       )
 
 allOpts :: ParserInfo CuratorOptions
 allOpts = info (opts <**> helper)
@@ -72,8 +79,8 @@ main = runPantryApp $
       checkSnapshot
     Unpack ->
       unpackFiles
-    Build ->
-      build
+    Build jobs ->
+      build jobs
 
 update :: RIO PantryApp ()
 update = do
@@ -153,12 +160,12 @@ unpackFiles = do
   dest <- resolveDir' "unpack-dir"
   unpackSnapshot constraints' snapshot' dest
 
-build :: RIO PantryApp ()
-build = do
+build :: Int -> RIO PantryApp ()
+build jobs = do
   logInfo "Building"
   withWorkingDir "unpack-dir" $ proc
     "stack"
-    (words "build --test --bench --test-suite-timeout=600 --no-rerun-tests --no-run-benchmarks --haddock --color never")
+    (words $ "build --test --bench --test-suite-timeout=600 --no-rerun-tests --no-run-benchmarks --haddock --color never --jobs=" ++ show jobs)
     runProcess_
 
 loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp RawSnapshotLayer
