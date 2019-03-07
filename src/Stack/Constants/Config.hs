@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.Constants.Config
   ( distDirFromDir
+  , rootDistDirFromDir
   , workDirFromDir
   , distRelativeDir
   , imageStagingDir
@@ -105,8 +106,26 @@ distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 distDirFromDir fp =
     liftM (fp </>) distRelativeDir
 
+-- | The directory containing all dist directories, including all
+-- different GHC/Cabal combos.
+rootDistDirFromDir
+  :: (MonadReader env m, HasConfig env)
+  => Path Abs Dir
+  -> m (Path Abs Dir)
+rootDistDirFromDir fp =
+    liftM (fp </>) rootDistRelativeDir
+
+-- | Relative directory to the top dist directory, containing
+-- individual GHC/Cabal combo as subdirs.
+rootDistRelativeDir
+  :: (MonadReader env m, HasConfig env)
+  => m (Path Rel Dir)
+rootDistRelativeDir = do
+    workDir <- view workDirL
+    return $ workDir </> $(mkRelDir "dist")
+
 -- | Package's working directory.
-workDirFromDir :: (MonadReader env m, HasEnvConfig env)
+workDirFromDir :: (MonadReader env m, HasConfig env)
                => Path Abs Dir
                -> m (Path Abs Dir)
 workDirFromDir fp = view $ workDirL.to (fp </>)
@@ -129,11 +148,8 @@ distRelativeDir = do
         packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
-    workDir <- view workDirL
-    return $
-        workDir </>
-        $(mkRelDir "dist") </>
-        platformAndCabal
+    allDist <- rootDistRelativeDir
+    return $ allDist </> platformAndCabal
 
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
