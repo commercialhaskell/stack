@@ -26,7 +26,7 @@ data CuratorOptions
 opts :: Parser CuratorOptions
 opts = subparser
         ( simpleCmd "update" Update "Update Pantry databse from Hackage"
-       <> command "checktargetavailable" (info (CheckTargetAvailable <$> target)
+       <> command "checktargetavailable" (info (CheckTargetAvailable <$> target <**> helper)
                                           (progDesc "Check if target snapshot isn't yet on Github"))
        <> simpleCmd "constraints" Constraints "Generate constraints file from build-constraints.yaml"
        <> simpleCmd "snapshotincomplete" SnapshotIncomplete "Generate incomplete snapshot"
@@ -37,7 +37,9 @@ opts = subparser
         )
   where
     simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
-    target = argument (nightly <|> lts) (metavar "TARGET")
+    target = argument (nightly <|> lts) ( metavar "TARGET"
+                                       <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
+                                        )
     nightly = maybeReader $ \s -> do
       s' <- stripPrefix "nightly-" s
       TargetNightly <$> parseTimeM False defaultTimeLocale "%Y-%m-%d" s'
