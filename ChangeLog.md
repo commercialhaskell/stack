@@ -116,6 +116,8 @@ Other enhancements:
 * `stack clean` will delete the entire `.stack-work/dist` directory,
   not just the relevant subdirectory for the current GHC version. See
   [#4480](https://github.com/commercialhaskell/stack/issues/4480).
+* Add `stack purge` as a shortcut for `stack clean --full`. See
+  [#3863](https://github.com/commercialhaskell/stack/issues/3863).
 
 Bug fixes:
 

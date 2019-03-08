@@ -8,6 +8,7 @@
 module Stack.Clean
     (clean
     ,CleanOpts(..)
+    ,CleanCommand(..)
     ,StackCleanException(..)
     ) where
 
@@ -58,11 +59,16 @@ dirsToDelete cleanOpts = do
 -- | Options for @stack clean@.
 data CleanOpts
     = CleanShallow [PackageName]
-    -- ^ Delete the "dist directories" as defined in 'Stack.Constants.distRelativeDir'
+    -- ^ Delete the "dist directories" as defined in 'Stack.Constants.Config.distRelativeDir'
     -- for the given local packages. If no packages are given, all project packages
     -- should be cleaned.
     | CleanFull
     -- ^ Delete all work directories in the project.
+
+-- | Clean commands
+data CleanCommand
+    = Clean
+    | Purge
 
 -- | Exceptions during cleanup.
 newtype StackCleanException
