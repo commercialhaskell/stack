@@ -17,7 +17,6 @@ import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Stack.Prelude hiding (Snapshot (..))
-import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
 import Data.Text hiding (pack, intercalate)
@@ -30,9 +29,10 @@ import qualified Options.Applicative as OA
 import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
+import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
-import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
 import Stack.Runners (loadConfigWithOpts, withDefaultBuildConfig, withBuildConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)

@@ -25,6 +25,7 @@ module Stack.Runners
 import           Stack.Prelude
 import           Path
 import           Path.IO
+import           RIO.Process (mkDefaultProcessContext)
 import           Stack.Build.Target(NeedTargets(..))
 import           Stack.Config
 import           Stack.Constants
@@ -33,18 +34,18 @@ import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
 import           Stack.Types.Config
-import           Stack.Types.Runner
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment (getEnvironment)
 import           System.IO
 import           System.FileLock
+import           System.Terminal (getTerminalWidth)
 import           Stack.Dot
 
 -- FIXME it seems wrong that we call loadBuildConfig multiple times
-loadCompilerVersion :: GlobalOpts
-                    -> Config
+loadCompilerVersion :: Config
                     -> IO WantedCompiler
-loadCompilerVersion go config =
-    view wantedCompilerVersionL <$> runRIO config (loadBuildConfig (globalCompiler go))
+loadCompilerVersion config =
+    view wantedCompilerVersionL <$> runRIO config loadBuildConfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -166,7 +167,7 @@ withCleanConfig :: GlobalOpts -> RIO BuildConfig () -> IO ()
 withCleanConfig go inner =
   loadConfigWithOpts go $ \config ->
   withUserFileLock go (view stackRootL config) $ \_lk0 -> do
-    bconfig <- runRIO config $ loadBuildConfig $ globalCompiler go
+    bconfig <- runRIO config loadBuildConfig
     runRIO bconfig inner
 
 withBuildConfigExt
@@ -204,11 +205,11 @@ withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter =
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- runRIO config $ loadBuildConfig globalCompiler
+              bconfig <- runRIO config loadBuildConfig
               envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
               runRIO envConfig (inner' lk)
 
-      let getCompilerVersion = loadCompilerVersion go config
+      let getCompilerVersion = loadCompilerVersion config
       runRIO config $
         Docker.reexecWithOptionalContainer
           (configProjectRoot config)
@@ -237,19 +238,39 @@ loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
         liftIO $ inner config
 
 withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
-withRunnerGlobal GlobalOpts{..} inner = do
-    defColorWhen <- defaultColorWhen
-    let globalColorWhen =
-            fromFirst defColorWhen (configMonoidColorWhen globalConfigMonoid)
-    withRunner
-        globalLogLevel
-        globalTimeInLog
-        globalTerminal
-        globalColorWhen
-        globalStylesUpdate
-        globalTermWidth
-        (isJust globalReExecVersion)
-        inner
+withRunnerGlobal go inner = liftIO $ do
+  colorWhen <-
+    case getFirst $ configMonoidColorWhen $ globalConfigMonoid go of
+      Nothing -> defaultColorWhen
+      Just colorWhen -> pure colorWhen
+  useColor <- case colorWhen of
+    ColorNever -> return False
+    ColorAlways -> return True
+    ColorAuto -> fromMaybe True <$>
+                          hSupportsANSIWithoutEmulation stderr
+  termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
+                                    <$> getTerminalWidth)
+                                   pure (globalTermWidth go)
+  menv <- mkDefaultProcessContext
+  logOptions0 <- logOptionsHandle stderr False
+  let logOptions
+        = setLogUseColor useColor
+        $ setLogUseTime (globalTimeInLog go)
+        $ setLogMinLevel (globalLogLevel go)
+        $ setLogVerboseFormat (globalLogLevel go <= LevelDebug)
+        $ setLogTerminal (globalTerminal go)
+          logOptions0
+  withLogFunc logOptions $ \logFunc -> inner Runner
+    { runnerGlobalOpts = go
+    , runnerUseColor = useColor
+    , runnerLogFunc = logFunc
+    , runnerTermWidth = termWidth
+    , runnerProcessContext = menv
+    }
+  where clipWidth w
+          | w < minTerminalWidth = minTerminalWidth
+          | w > maxTerminalWidth = maxTerminalWidth
+          | otherwise = w
 
 -- | Unlock a lock file, if the value is Just
 munlockFile :: MonadIO m => Maybe FileLock -> m ()

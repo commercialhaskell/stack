@@ -95,7 +95,6 @@ import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.Runner
 import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
@@ -1325,7 +1324,7 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
         })
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
-        bconfig <- runRIO lc $ loadBuildConfig Nothing
+        bconfig <- runRIO lc loadBuildConfig
         envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
 

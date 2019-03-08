@@ -637,7 +637,7 @@ pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \config -> do
   withUserFileLock go (view stackRootL config) $ \lk -> do
-    let getCompilerVersion = loadCompilerVersion go config
+    let getCompilerVersion = loadCompilerVersion config
     runRIO config $
       Docker.reexecWithOptionalContainer
           (configProjectRoot config)
@@ -648,7 +648,7 @@ setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \confi
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
                    Nothing -> do
-                       bc <- liftIO $ runRIO config $ loadBuildConfig globalCompiler
+                       bc <- liftIO $ runRIO config loadBuildConfig
                        return ( view wantedCompilerVersionL bc
                               , configCompilerCheck config
                               , Just $ view stackYamlL bc
@@ -831,7 +831,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
         ExecOptsPlain -> do
           loadConfigWithOpts go $ \config ->
             withUserFileLock go (view stackRootL config) $ \lk -> do
-              let getCompilerVersion = loadCompilerVersion go config
+              let getCompilerVersion = loadCompilerVersion config
               runRIO config $
                 Docker.reexecWithOptionalContainer
                     (configProjectRoot config)

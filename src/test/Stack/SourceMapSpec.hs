@@ -4,9 +4,11 @@ module Stack.SourceMapSpec (spec) where
 
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Version (mkVersion)
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import Stack.Prelude
+import Stack.Runners
 import Stack.SourceMap (loadGlobalHints)
-import Stack.Types.Runner (withRunner, ColorWhen (ColorNever))
+import Stack.Types.Config (globalLogLevel)
 import Test.Hspec
 import qualified RIO.Map as Map
 import RIO.ByteString (hPut)
@@ -19,7 +21,8 @@ spec = do
           hPut h "this should be ignored"
           hClose h :: IO ()
           abs' <- resolveFile' fp
-          withRunner LevelError False False ColorNever mempty Nothing False $ \runner ->
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = LevelError } $ \runner ->
             runRIO runner $ inner abs'
     it' "unknown compiler" $ \fp -> do
       mmap <- loadGlobalHints fp $ WCGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])

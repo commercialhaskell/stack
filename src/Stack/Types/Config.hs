@@ -26,6 +26,12 @@ module Stack.Types.Config
   -- ** HasPlatform & HasStackRoot
    HasPlatform(..)
   ,PlatformVariant(..)
+  -- ** Runner
+  ,HasRunner(..)
+  ,Runner(..)
+  ,ColorWhen(..)
+  ,terminalL
+  ,reExecL
   -- ** Config & HasConfig
   ,Config(..)
   ,HasConfig(..)
@@ -211,7 +217,6 @@ import           Stack.Types.Image
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
@@ -221,6 +226,30 @@ import           RIO.Process (ProcessContext, HasProcessContext (..), findExecut
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
+
+-- | The base environment that almost everything in Stack runs in,
+-- based off of parsing command line options in 'GlobalOpts'. Provides
+-- logging and process execution.
+data Runner = Runner
+  { runnerGlobalOpts :: !GlobalOpts
+  , runnerUseColor   :: !Bool
+  , runnerLogFunc    :: !LogFunc
+  , runnerTermWidth  :: !Int
+  , runnerProcessContext :: !ProcessContext
+  }
+
+data ColorWhen = ColorNever | ColorAlways | ColorAuto
+    deriving (Eq, Show, Generic)
+
+instance FromJSON ColorWhen where
+    parseJSON v = do
+        s <- parseJSON v
+        case s of
+            "never"  -> return ColorNever
+            "always" -> return ColorAlways
+            "auto"   -> return ColorAuto
+            _ -> fail ("Unknown color use: " <> s <> ". Expected values of " <>
+                       "option are 'never', 'always', or 'auto'.")
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -1760,6 +1789,25 @@ class HasGHCVariant env where
     ghcVariantL = configL.ghcVariantL
     {-# INLINE ghcVariantL #-}
 
+-- | Class for environment values which have a 'Runner'.
+class (HasProcessContext env, HasLogFunc env) => HasRunner env where
+  runnerL :: Lens' env Runner
+instance HasLogFunc Runner where
+  logFuncL = lens runnerLogFunc (\x y -> x { runnerLogFunc = y })
+instance HasProcessContext Runner where
+  processContextL = lens runnerProcessContext (\x y -> x { runnerProcessContext = y })
+instance HasRunner Runner where
+  runnerL = id
+instance HasStylesUpdate Runner where
+  stylesUpdateL = globalOptsL.
+                  lens globalStylesUpdate (\x y -> x { globalStylesUpdate = y })
+instance HasTerm Runner where
+  useColorL = lens runnerUseColor (\x y -> x { runnerUseColor = y })
+  termWidthL = lens runnerTermWidth (\x y -> x { runnerTermWidth = y })
+
+globalOptsL :: HasRunner env => Lens' env GlobalOpts
+globalOptsL = runnerL.lens runnerGlobalOpts (\x y -> x { runnerGlobalOpts = y })
+
 -- | Class for environment values that can provide a 'Config'.
 class (HasPlatform env, HasGHCVariant env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
@@ -1909,11 +1957,13 @@ buildOptsHaddockL =
   lens boptsHaddock
        (\bopts t -> bopts {boptsHaddock = t})
 
-globalOptsL :: Lens' GlobalOpts ConfigMonoid
-globalOptsL = lens globalConfigMonoid (\x y -> x { globalConfigMonoid = y })
-
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
-globalOptsBuildOptsMonoidL = globalOptsL.lens
+globalOptsBuildOptsMonoidL =
+  lens
+    globalConfigMonoid
+    (\x y -> x { globalConfigMonoid = y })
+  .
+  lens
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
 
@@ -1943,3 +1993,11 @@ appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
 appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
   where f True = Just ghcColorForceFlag
         f False = Nothing
+
+-- | See 'globalTerminal'
+terminalL :: HasRunner env => Lens' env Bool
+terminalL = globalOptsL.lens globalTerminal (\x y -> x { globalTerminal = y })
+
+-- | See 'globalReExecVersion'
+reExecL :: HasRunner env => SimpleGetter env Bool
+reExecL = globalOptsL.to (isJust . globalReExecVersion)

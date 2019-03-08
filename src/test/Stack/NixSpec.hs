@@ -10,11 +10,12 @@ import Prelude (writeFile)
 import Stack.Config
 import Stack.Config.Nix
 import Stack.Constants
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import Stack.Options.NixParser
 import Stack.Prelude
+import Stack.Runners
 import Stack.Types.Config
 import Stack.Types.Nix
-import Stack.Types.Runner
 import System.Directory
 import System.Environment
 import Test.Hspec
@@ -41,9 +42,10 @@ setup = unsetEnv "STACK_YAML"
 spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' :: ConfigMonoid -> (Config -> IO ()) -> IO ()
-      loadConfig' cmdLineArgs inner =
-        withRunner LevelDebug True False ColorAuto mempty Nothing False $ \runner ->
-        runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
+      loadConfig' cmdLineArgs inner = do
+        globalOpts <- globalOptsFromMonoid False mempty
+        withRunnerGlobal globalOpts { globalLogLevel = LevelDebug } $ \runner ->
+          runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do

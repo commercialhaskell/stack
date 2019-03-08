@@ -22,7 +22,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
 import           Stack.Types.Config
-import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           System.IO (stderr)
 import           RIO.PrettyPrint

@@ -24,7 +24,6 @@ import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inConta
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
-import           Stack.Types.Runner
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)

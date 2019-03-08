@@ -72,13 +72,13 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
+import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 
 -- | If deprecated path exists, use it and print a warning.
@@ -339,7 +339,7 @@ configFromConfigMonoid
      useAnsi <- liftIO $ fromMaybe True <$>
                          hSupportsANSIWithoutEmulation stderr
 
-     let stylesUpdate' = runnerStylesUpdate configRunner' <>
+     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
            configMonoidStyles
          useColor' = runnerUseColor configRunner'
          mUseColor = do
@@ -462,9 +462,8 @@ loadConfig configArgs mresolver mstackYaml inner =
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: Maybe WantedCompiler -- override compiler
-                -> RIO Config BuildConfig
-loadBuildConfig mcompiler = do
+loadBuildConfig :: RIO Config BuildConfig
+loadBuildConfig = do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
@@ -528,6 +527,7 @@ loadBuildConfig mcompiler = do
                            [ "This is the implicit global project, which is used only when 'stack' is run\n"
                            , "outside of a real project.\n" ]
                    return (p, dest)
+    mcompiler <- view $ globalOptsL.to globalCompiler
     let project = project'
             { projectCompiler = mcompiler <|> projectCompiler project'
             , projectResolver = fromMaybe (projectResolver project') mresolver

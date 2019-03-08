@@ -58,7 +58,6 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
