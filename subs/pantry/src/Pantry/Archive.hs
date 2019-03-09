@@ -394,7 +394,9 @@ parseArchive rpli archive fp = do
                   ]
                 Right x -> Right x
             case Map.lookup dest files of
-              Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest ++ ", looking for " ++ dest
+              Nothing -> Left $ "Symbolic link dest not found from " ++ mePath me ++ " to " ++ relDest ++ ", looking for " ++ dest ++ ".\n"
+                  ++ "This may indicate that the source is a git archive which uses git-annex.\n"
+                  ++ "See https://github.com/commercialhaskell/stack/issues/4579 for further information."
               Just me' ->
                 case meType me' of
                   METNormal -> Right $ SimpleEntry dest FTNormal
