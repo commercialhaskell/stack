@@ -118,6 +118,11 @@ Other enhancements:
   [#4480](https://github.com/commercialhaskell/stack/issues/4480).
 * Add `stack purge` as a shortcut for `stack clean --full`. See
   [#3863](https://github.com/commercialhaskell/stack/issues/3863).
+* Add an optional `ignore-expiry` flag to the `hackage-security`
+  section of the `~/.stack/config.yaml`. It allows to disable timestamp
+  expiration verification just like `cabal --ignore-expiry` does.
+  The flag is not enabled by default so that the default functionality
+  is not changed.
 
 Bug fixes:
 
