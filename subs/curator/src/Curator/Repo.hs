@@ -2,12 +2,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Curator.Repo
     ( checkTargetAvailable
+    , uploadGithub
     ) where
 
+import Conduit
+import Curator.Constants
 import Curator.Types
 import Path
 import Path.IO
 import RIO
+import RIO.FilePath (dropExtension)
 import RIO.Process
 import RIO.Time
 
@@ -22,6 +26,21 @@ checkTargetAvailable ::
     => Target
     -> m ()
 checkTargetAvailable = void . checkoutRepo
+
+-- | Upload snapshot definition to Github repository
+uploadGithub ::
+       (HasLogFunc env, HasProcessContext env)
+    => Target
+    -> RIO env ()
+uploadGithub target = do
+    (git, snapshotFile) <- checkoutRepo target
+
+    createDirIfMissing True $ parent snapshotFile
+    runConduitRes $ sourceFile snapshotFilename .| sinkFile (toFilePath snapshotFile)
+
+    git ["add", toFilePath snapshotFile]
+    git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
+    git ["push", "origin", "HEAD:master"]
 
 checkoutRepo ::
        ( HasLogFunc env

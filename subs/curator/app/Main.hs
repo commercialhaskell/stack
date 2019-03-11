@@ -23,13 +23,13 @@ data CuratorOptions
   | CheckSnapshot
   | Unpack
   | Build Int
+  | UploadGithub Target
   | HackageDistro Target
 
 opts :: Parser CuratorOptions
 opts = subparser
         ( simpleCmd "update" Update "Update Pantry databse from Hackage"
-       <> command "checktargetavailable" (info (CheckTargetAvailable <$> target <**> helper)
-                                          (progDesc "Check if target snapshot isn't yet on Github"))
+       <> targetCmd "checktargetavailable" CheckTargetAvailable "Check if target snapshot isn't yet on Github"
        <> simpleCmd "constraints" Constraints "Generate constraints file from build-constraints.yaml"
        <> simpleCmd "snapshotincomplete" SnapshotIncomplete "Generate incomplete snapshot"
        <> simpleCmd "snapshot" Snapshot "Complete locations in incomplete snapshot"
@@ -37,11 +37,13 @@ opts = subparser
        <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
        <> command "build" (info (buildCmd <**> helper)
                            (progDesc "Build Stack project for a Stackage snapshot"))
-       <> command "hackagedistro" (info (HackageDistro <$> target <**> helper)
-                                   (progDesc "Upload list of snapshot packages on Hackage as a distro"))
+       <> targetCmd "uploadgithub" UploadGithub "Commit and push snapshot definition to Github repository"
+       <> targetCmd "hackagedistro" HackageDistro "Upload list of snapshot packages on Hackage as a distro"
         )
   where
     simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
+    targetCmd nm constr desc =
+      command nm (info (constr <$> target <**> helper) (progDesc desc))
     target = argument (nightly <|> lts) ( metavar "TARGET"
                                        <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
                                         )
@@ -84,6 +86,8 @@ main = runPantryApp $
       unpackFiles
     Build jobs ->
       build jobs
+    UploadGithub target ->
+      uploadGithub' target
     HackageDistro target ->
       hackageDistro target
 
@@ -108,13 +112,13 @@ snapshot = do
   logInfo "Writing snapshot.yaml"
   incomplete <- loadPantrySnapshotLayerFile "snapshot-incomplete.yaml"
   complete <- completeSnapshotLayer incomplete
-  liftIO $ encodeFile "snapshot.yaml" complete
+  liftIO $ encodeFile snapshotFilename complete
 
 loadSnapshotYaml :: RIO PantryApp Pantry.RawSnapshot
 loadSnapshotYaml = do
-  let fp = "snapshot.yaml"
-  abs' <- resolveFile' fp
-  loadSnapshot $ SLFilePath $ ResolvedPath (RelFilePath (fromString fp)) abs'
+  abs' <- resolveFile' snapshotFilename
+  loadSnapshot $ SLFilePath $
+    ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
 
 checkSnapshot :: RIO PantryApp ()
 checkSnapshot = do
@@ -158,9 +162,9 @@ defaultTerminalWidth = 100
 unpackFiles :: RIO PantryApp ()
 unpackFiles = do
   logInfo "Unpacking files"
-  let fp = "snapshot.yaml"
-  abs' <- resolveFile' fp
-  snapshot' <- loadSnapshot $ SLFilePath $ ResolvedPath (RelFilePath (fromString fp)) abs'
+  abs' <- resolveFile' snapshotFilename
+  snapshot' <- loadSnapshot $ SLFilePath $
+               ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
   constraints' <- decodeFileThrow "constraints.yaml"
   dest <- resolveDir' "unpack-dir"
   unpackSnapshot constraints' snapshot' dest
@@ -180,6 +184,11 @@ hackageDistro target = do
   let packageVersions =
         Map.mapMaybe (snapshotVersion . rspLocation) (rsPackages snapshot')
   uploadHackageDistro target packageVersions
+
+uploadGithub' :: Target -> RIO PantryApp ()
+uploadGithub' target = do
+  logInfo "Uploading snapshot definition to Github"
+  uploadGithub target
 
 loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp RawSnapshotLayer
 loadPantrySnapshotLayerFile fp = do
