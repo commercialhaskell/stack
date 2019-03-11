@@ -8,6 +8,7 @@ import Options.Applicative hiding (action)
 import qualified Pantry
 import Path.IO (resolveFile', resolveDir')
 import RIO.List (stripPrefix)
+import qualified RIO.Map as Map
 import RIO.PrettyPrint
 import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
@@ -22,6 +23,7 @@ data CuratorOptions
   | CheckSnapshot
   | Unpack
   | Build Int
+  | HackageDistro Target
 
 opts :: Parser CuratorOptions
 opts = subparser
@@ -34,8 +36,9 @@ opts = subparser
        <> simpleCmd "checksnapshot" CheckSnapshot "Check snapshot consistency"
        <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
        <> command "build" (info (buildCmd <**> helper)
-                           (progDesc "Build Stack project for a Stackage snapshot")
-                          )
+                           (progDesc "Build Stack project for a Stackage snapshot"))
+       <> command "hackagedistro" (info (HackageDistro <$> target <**> helper)
+                                   (progDesc "Upload list of snapshot packages on Hackage as a distro"))
         )
   where
     simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
@@ -81,6 +84,8 @@ main = runPantryApp $
       unpackFiles
     Build jobs ->
       build jobs
+    HackageDistro target ->
+      hackageDistro target
 
 update :: RIO PantryApp ()
 update = do
@@ -167,6 +172,14 @@ build jobs = do
     "stack"
     (words $ "build --test --bench --test-suite-timeout=600 --no-rerun-tests --no-run-benchmarks --haddock --color never --jobs=" ++ show jobs)
     runProcess_
+
+hackageDistro :: Target -> RIO PantryApp ()
+hackageDistro target = do
+  logInfo "Uploading Hackage distro for snapshot.yaml"
+  snapshot' <- loadSnapshotYaml
+  let packageVersions =
+        Map.mapMaybe (snapshotVersion . rspLocation) (rsPackages snapshot')
+  uploadHackageDistro target packageVersions
 
 loadPantrySnapshotLayerFile :: FilePath -> RIO PantryApp RawSnapshotLayer
 loadPantrySnapshotLayerFile fp = do

@@ -4,6 +4,7 @@
 module Curator.Snapshot
   ( makeSnapshot
   , checkDependencyGraph
+  , snapshotVersion
   ) where
 
 import Curator.GithubPings

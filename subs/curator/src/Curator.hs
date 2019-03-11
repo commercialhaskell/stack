@@ -3,6 +3,7 @@ module Curator
   , Target(..)
   ) where
 
+import Curator.HackageDistro as Export
 import Curator.Repo as Export
 import Curator.StackageConstraints as Export
 import Curator.Snapshot as Export

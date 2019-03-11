@@ -18,6 +18,9 @@ library:
   - Curator
   dependencies:
   - Cabal
+  - bytestring
+  - http-client
+  - http-client-tls
   - path
 
 executables:
