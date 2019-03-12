@@ -229,48 +229,6 @@ flags:
 If a specified flag is different than the one specified for a snapshot package,
 then the snapshot package will automatically be promoted to be an extra-dep.
 
-### image
-
-The image settings are used for the creation of container images using
-`stack image container`, e.g.
-
-```yaml
-image:
-  containers:
-    - base: "fpco/stack-build"
-      add:
-        static: /data/static
-```
-
-`base` is the docker image that will be used to built upon. The `add` lines
-allow you to add additional directories to your image. You can specify the name
-of the image using `name` (otherwise it defaults to the same as your project).
-You can also specify `entrypoints`. By default all your executables are placed
-in `/usr/local/bin`, but you can specify a list using `executables` to only add
-some.
-
-When you specify `entrypoints`, multiple containers will be built:  a project
-container, and one container for each entrypoint.
-
-For example the following configuration:
-
-```yaml
-image:
-  containers:
-  - name: myproject
-    base: fpco/stack-run
-    add:
-      production/app-backend/conf/: /etc/app-backend
-    entrypoints:
-    - app-backend
-```
-
-will build one container tagged `myproject:latest` which contains the project
-including the `/etc/app-backend` configuration data.
-
-Another container tagged `myproject-app-backend:latest` based on the `myproject:latest`
-will additionally contain the logic for starting the `app-backend` entrypoint.
-
 
 ### user-message
 

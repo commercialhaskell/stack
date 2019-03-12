@@ -71,7 +71,6 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
-import qualified Stack.Image as Image
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
@@ -256,8 +255,6 @@ configFromConfigMonoid
          configPlatform = Platform arch os
 
          configRequireStackVersion = simplifyVersionRange (getIntersectingVersionRange configMonoidRequireStackVersion)
-
-         configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
          configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
 

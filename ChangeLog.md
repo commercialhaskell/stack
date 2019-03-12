@@ -47,6 +47,10 @@ Major changes:
       been modified to match that of Cabal. In particular, this means
       that for Cabal spec versions less than 2.4, `*.txt` will
       match `foo.txt`, but not `foo.2.txt`.
+* Remove the `stack image` command. With the advent of Docker multistage
+  builds, this functionality is no longer useful. For an example, please see
+  [Building Haskell Apps with
+  Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
