@@ -69,7 +69,6 @@ import           Stack.Ghci
 import           Stack.Hoogle
 import           Stack.Ls
 import qualified Stack.IDE as IDE
-import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options.BuildParser
@@ -470,23 +469,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                         "Sets a field in the project's stack.yaml to value"
                         cfgSetCmd
                         configCmdSetParser)
-        addSubCommands'
-            Image.imgCmdName
-            "Subcommands specific to imaging"
-            (addCommand'
-                 Image.imgDockerCmdName
-                 "Build a Docker image for the project"
-                 imgDockerCmd
-                 ((,) <$>
-                  boolFlags
-                      True
-                      "build"
-                      "building the project before creating the container"
-                      idm <*>
-                  many
-                      (textOption
-                           (long "image" <>
-                            help "A specific container image name to build"))))
         addSubCommands'
           "hpc"
           "Subcommands specific to Haskell Program Coverage"
@@ -986,18 +968,6 @@ dockerCleanupCmd cleanupOpts =
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> RIO Runner ()
 cfgSetCmd = withGlobalConfigAndLock . cfgCmdSet
-
-imgDockerCmd :: (Bool, [Text]) -> RIO Runner ()
-imgDockerCmd (rebuild,images) = withConfig $ do
-    mProjectRoot <- view $ to configProjectRoot
-    withEnvConfigExt
-        NeedTargets
-        defaultBuildOptsCLI
-        Nothing
-        (\lk ->
-              do when rebuild $ Stack.Build.build Nothing lk
-                 Image.stageContainerImageArtifacts mProjectRoot images)
-        (Just $ Image.createContainerImageFromStage mProjectRoot images)
 
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()

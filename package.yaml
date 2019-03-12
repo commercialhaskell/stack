@@ -182,7 +182,6 @@ library:
   - Stack.Ghci.Script
   - Stack.Hoogle
   - Stack.IDE
-  - Stack.Image
   - Stack.Init
   - Stack.Ls
   - Stack.New
@@ -238,7 +237,6 @@ library:
   - Stack.Types.Config.Build
   - Stack.Types.Docker
   - Stack.Types.GhcPkgId
-  - Stack.Types.Image
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package

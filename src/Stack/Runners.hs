@@ -165,7 +165,7 @@ withEnvConfigExt
     -> BuildOptsCLI
     -> Maybe (RIO Config ())
     -- ^ Action to perform before the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
+    -- OS even if Docker is enabled for builds.  The env config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> (Maybe FileLock -> RIO EnvConfig a)
@@ -173,7 +173,7 @@ withEnvConfigExt
     -- this will be run in a Docker container.
     -> Maybe (RIO Config ())
     -- ^ Action to perform after the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The build config is not
+    -- OS even if Docker is enabled for builds.  The env config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> RIO Config a
