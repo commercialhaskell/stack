@@ -141,7 +141,7 @@ withDefaultBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withDefaultBuildConfigAndLock go inner =
-    withBuildConfigExt WithDocker go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+    withBuildConfigExt go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
 
 withBuildConfigAndLock
     :: GlobalOpts
@@ -150,7 +150,7 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go needTargets boptsCLI inner =
-    withBuildConfigExt WithDocker go needTargets boptsCLI Nothing inner Nothing
+    withBuildConfigExt go needTargets boptsCLI Nothing inner Nothing
 
 -- | A runner specially built for the "stack clean" use case. For some
 -- reason (hysterical raisins?), all of the functions in this module
@@ -171,8 +171,7 @@ withCleanConfig go inner =
     runRIO bconfig inner
 
 withBuildConfigExt
-    :: WithDocker
-    -> GlobalOpts
+    :: GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
     -> Maybe (RIO Config ())
@@ -189,7 +188,7 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
+withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
     withUserFileLock go (view stackRootL lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
@@ -212,20 +211,15 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} needTargets boptsCLI mbefore inn
 
       let getCompilerVersion = loadCompilerVersion go lc
       runRIO (lcConfig lc) $
-        case skipDocker of
-          SkipDocker -> do
-            forM_ mbefore id
-            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0)
-            forM_ mafter id
-          WithDocker -> Docker.reexecWithOptionalContainer
-                          (lcProjectRoot lc)
-                          mbefore
-                          (runRIO (lcConfig lc) $
-                              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
-                          mafter
-                          (Just $ liftIO $
-                                do lk' <- readIORef curLk
-                                   munlockFile lk')
+        Docker.reexecWithOptionalContainer
+          (lcProjectRoot lc)
+          mbefore
+          (runRIO (lcConfig lc) $
+              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
+          mafter
+          (Just $ liftIO $
+                do lk' <- readIORef curLk
+                   munlockFile lk')
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
