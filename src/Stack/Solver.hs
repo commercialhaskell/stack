@@ -268,7 +268,6 @@ setupCompiler compiler = do
         , soptsSanityCheck       = False
         , soptsSkipGhcCheck      = False
         , soptsSkipMsys          = configSkipMsys config
-        , soptsUpgradeCabal      = Nothing
         , soptsResolveMissingGHC = msg
         , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing

@@ -60,6 +60,8 @@ Behavior changes:
 * When using `stack script`, custom snapshot files will be resolved
   relative to the directory containing the script.
 
+* Remove the `--upgrade-cabal` flag to `stack setup`.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
