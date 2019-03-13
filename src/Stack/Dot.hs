@@ -38,7 +38,6 @@ import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
-import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
 -- | Options record for @stack dot@
@@ -115,12 +114,12 @@ createDependencyGraph dotOpts = do
   locals <- projectLocalPackages
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   installMap <- toInstallMap sourceMap
-  (installedMap, globalDump, _, _) <- getInstalled installMap
+  (_, globalDump, _, _) <- getInstalled installMap
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
-  let depLoader = createDepLoader sourceMap installedMap globalDumpMap globalIdMap loadPackageDeps
+  let depLoader = createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
@@ -247,49 +246,57 @@ resolveDependencies limit graph loadPackageDeps = do
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
 createDepLoader :: HasEnvConfig env
                 => SourceMap
-                -> Map PackageName (InstallLocation, Installed)
                 -> Map PackageName DumpPackage
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
                     Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
                 -> PackageName
                 -> RIO env (Set PackageName, DotPayload)
-createDepLoader sourceMap installed globalDumpMap globalIdMap loadPackageDeps pkgName =
-  if not (pkgName `Set.member` wiredInPackages)
-      then case Map.lookup pkgName (smProject sourceMap) of
-          Just pp -> do
-            pkg <- loadCommonPackage (ppCommon pp)
-            pure (packageAllDeps pkg, payloadFromLocal pkg)
-          Nothing ->
-            case Map.lookup pkgName (smDeps sourceMap) of
-              Just DepPackage{dpLocation=PLMutable dir} -> do
-                pp <- mkProjectPackage YesPrintWarnings dir False
-                pkg <- loadCommonPackage (ppCommon pp)
-                pure (packageAllDeps pkg, payloadFromLocal pkg)
-              Just dp@DepPackage{dpLocation=PLImmutable loc} -> do
-                let common = dpCommon dp
-                gpd <- liftIO $ cpGPD common
-                let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
-                    flags = cpFlags common
-                    ghcOptions = cpGhcOptions common
-                assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
-              Nothing ->
-                pure (Set.empty, payloadFromInstalled (Map.lookup pkgName installed))
-      -- For wired-in-packages, use information from ghc-pkg (see #3084)
-      else case Map.lookup pkgName globalDumpMap of
-          Nothing -> error ("Invariant violated: Expected to find wired-in-package " ++ packageNameString pkgName ++ " in global DB")
-          Just dp -> pure (Set.fromList deps, payloadFromDump dp)
-            where
-              deps = map (\depId -> maybe (error ("Invariant violated: Expected to find " ++ ghcPkgIdString depId ++ " in global DB"))
-                                          Stack.Prelude.pkgName
-                                          (Map.lookup depId globalIdMap))
-                         (dpDepends dp)
+createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
+  fromMaybe noDepsErr
+    (projectPackageDeps <|> dependencyDeps <|> globalDeps)
   where
+    projectPackageDeps =
+      loadDeps <$> Map.lookup pkgName (smProject sourceMap)
+      where
+        loadDeps pp = do
+          pkg <- loadCommonPackage (ppCommon pp)
+          pure (packageAllDeps pkg, payloadFromLocal pkg)
+
+    dependencyDeps =
+      loadDeps <$> Map.lookup pkgName (smDeps sourceMap)
+      where
+        loadDeps DepPackage{dpLocation=PLMutable dir} = do
+              pp <- mkProjectPackage YesPrintWarnings dir False
+              pkg <- loadCommonPackage (ppCommon pp)
+              pure (packageAllDeps pkg, payloadFromLocal pkg)
+
+        loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
+          let common = dpCommon dp
+          gpd <- liftIO $ cpGPD common
+          let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
+              flags = cpFlags common
+              ghcOptions = cpGhcOptions common
+          assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
+
+    -- If package is a global package, use info from ghc-pkg (#4324, #3084)
+    globalDeps =
+      pure . getDepsFromDump <$> Map.lookup pkgName globalDumpMap
+      where
+        getDepsFromDump dump =
+          (Set.fromList deps, payloadFromDump dump)
+          where
+            deps = map ghcIdToPackageName (dpDepends dump)
+            ghcIdToPackageName depId =
+              let errText = "Invariant violated: Expected to find "
+              in maybe (error (errText ++ ghcPkgIdString depId ++ " in global DB"))
+                 Stack.Prelude.pkgName
+                 (Map.lookup depId globalIdMap)
+
+    noDepsErr = error ("Invariant violated: The '" ++ packageNameString pkgName
+                ++ "' package was not found in any of the dependency sources")
+
     payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromInstalled maybePkg = DotPayload (fmap (installedVersion . snd) maybePkg) $
-        case maybePkg of
-            Just (_, Library _ _ mlicense) -> mlicense
-            _ -> Nothing
     payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
