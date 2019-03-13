@@ -83,7 +83,7 @@ import              Stack.Build (build)
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap)
 import              Stack.Build.Target (NeedTargets(..), parseTargets)
-import              Stack.Config (loadConfig)
+import              Stack.Config (loadConfig, loadBuildConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
@@ -1415,7 +1415,7 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
         })
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
-        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        bconfig <- runRIO lc $ loadBuildConfig Nothing
         envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
 

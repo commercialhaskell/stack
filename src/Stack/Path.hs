@@ -133,6 +133,7 @@ instance HasStylesUpdate PathInfo where
 instance HasTerm PathInfo where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+instance HasGHCVariant PathInfo
 instance HasConfig PathInfo
 instance HasPantryConfig PathInfo where
     pantryConfigL = configL.pantryConfigL

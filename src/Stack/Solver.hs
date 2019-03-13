@@ -658,9 +658,13 @@ solveExtraDeps modStackYaml = do
         Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
-    mOldResolver <- view $ configL.to (fmap (projectResolver . fst) . configMaybeProject)
+    config <- view configL
+    let mOldResolver =
+          case configProject config of
+            PCProject (p, _) -> Just $ projectResolver p
+            PCNoProject -> Nothing
+            PCNoConfig _deps -> Nothing
 
-    let
         flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))
         versions = fmap fst edeps
 
