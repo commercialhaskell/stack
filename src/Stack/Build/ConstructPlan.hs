@@ -230,8 +230,8 @@ constructPlan ls0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage
             throwM $ ConstructPlanFailed "Plan construction failed."
   where
     hasBaseInDeps bconfig =
-        elem $(mkPackageName "base")
-      $ map (packageIdentifierName . pirIdent) [i | (PLIndex i) <- bcDependencies bconfig]
+      $(mkPackageName "base") `elem`
+      [packageIdentifierName (pirIdent i) | (PLIndex i) <- bcDependencies bconfig]
 
     mkCtx econfig = Ctx
         { ls = ls0

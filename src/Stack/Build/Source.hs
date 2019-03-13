@@ -328,7 +328,7 @@ checkFlagsUsed boptsCli lps extraDeps snapshot = do
 
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
-    let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
+    let flags = [((k, v), FSCommandLine) | (Just k, v) <- Map.toList $ boptsCLIFlags boptsCli]
              ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
