@@ -628,14 +628,14 @@ pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
     continueOnSuccess f = catch f ignoreSuccess
     ignoreSuccess ExitSuccess = return ()
     ignoreSuccess ex = throwIO ex
-    withoutHaddocks = continueOnSuccess . withDefaultBuildConfig goWithout
+    withoutHaddocks = continueOnSuccess . withDefaultEnvConfig goWithout
     goWithout = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ False
-    withHaddocks = continueOnSuccess . withDefaultBuildConfig goWith
+    withHaddocks = continueOnSuccess . withDefaultEnvConfig goWith
     goWith = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
 
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \config -> do
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = withConfig go $ \config -> do
   withUserFileLock go (view stackRootL config) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion config
     runRIO config $
@@ -674,7 +674,7 @@ buildCmd opts go = do
     FileWatch -> fileWatch stderr (inner . Just)
     NoFileWatch -> inner Nothing
   where
-    inner setLocalFiles = withBuildConfigAndLock go' NeedTargets opts $ \lk ->
+    inner setLocalFiles = withEnvConfigAndLock go' NeedTargets opts $ \lk ->
         Stack.Build.build setLocalFiles lk
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
@@ -738,7 +738,7 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    withDefaultBuildConfigAndLock go $ \_ -> do
+    withDefaultEnvConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
@@ -791,7 +791,7 @@ uploadCmd sdistOpts go = do
 
 sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
 sdistCmd sdistOpts go =
-    withDefaultBuildConfig go $ do -- No locking needed.
+    withDefaultEnvConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
@@ -829,7 +829,7 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          loadConfigWithOpts go $ \config ->
+          withConfig go $ \config ->
             withUserFileLock go (view stackRootL config) $ \lk -> do
               let getCompilerVersion = loadCompilerVersion config
               runRIO config $
@@ -837,7 +837,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (configProjectRoot config)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (withDefaultBuildConfigAndLock go $ \buildLock -> do
+                    (withDefaultEnvConfigAndLock go $ \buildLock -> do
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
                         withProcessContext menv $ do
                             (cmd, args) <- case (eoCmd, eoArgs) of
@@ -854,7 +854,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 boptsCLI = defaultBuildOptsCLI
                            { boptsCLITargets = map T.pack targets
                            }
-            withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
+            withEnvConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
               unless (null targets) $ Stack.Build.build Nothing lk
 
               config <- view configL
@@ -939,7 +939,7 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           , boptsCLIFlags = ghciFlags ghciOpts
           , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
           }
-  in withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
+  in withEnvConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
@@ -953,17 +953,17 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
 -- | List packages in the project.
 idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> GlobalOpts -> IO ()
 idePackagesCmd (stream, cmd) go =
-    withDefaultBuildConfig go (IDE.listPackages stream cmd) -- TODO don't need EnvConfig any more
+    withDefaultEnvConfig go (IDE.listPackages stream cmd) -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: IDE.OutputStream -> GlobalOpts -> IO ()
 ideTargetsCmd stream go =
-    withDefaultBuildConfig go (IDE.listTargets stream) -- TODO don't need EnvConfig any more
+    withDefaultEnvConfig go (IDE.listTargets stream) -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \lc ->
+    withConfig go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO lc $
@@ -972,7 +972,7 @@ dockerPullCmd _ go@GlobalOpts{..} =
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \config ->
+    withConfig go $ \config ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (view stackRootL config) $ \_ ->
       runRIO config $
@@ -981,7 +981,7 @@ dockerResetCmd keepHome go@GlobalOpts{..} =
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \lc ->
+    withConfig go $ \lc ->
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (view stackRootL lc) $ \_ ->
      runRIO lc $
@@ -995,9 +995,9 @@ cfgSetCmd co go@GlobalOpts{..} =
         (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \config -> do
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = withConfig go $ \config -> do
     let mProjectRoot = configProjectRoot config
-    withBuildConfigExt
+    withEnvConfigExt
         go
         NeedTargets
         defaultBuildOptsCLI
@@ -1031,15 +1031,15 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withDefaultBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
+    withDefaultEnvConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
+dotCmd dotOpts go = withEnvConfigDot dotOpts go $ dot dotOpts
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
-queryCmd selectors go = withDefaultBuildConfig go $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors go = withDefaultEnvConfig go $ queryBuildInfo $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
@@ -1047,12 +1047,12 @@ hpcReportCmd hropts go = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
         boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
-    withBuildConfig go AllowNoTargets boptsCLI $
+    withEnvConfig go AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
 
 freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
 freezeCmd freezeOpts go =
-  withDefaultBuildConfig go $ freeze freezeOpts
+  withDefaultEnvConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | InvalidPathForExec FilePath

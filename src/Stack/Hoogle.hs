@@ -25,7 +25,7 @@ import           RIO.Process
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig haddocksGo $ do
+hoogleCmd (args,setup,rebuild,startServer) go = withDefaultEnvConfig haddocksGo $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
@@ -63,7 +63,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig haddocksG
     buildHaddocks :: RIO EnvConfig ()
     buildHaddocks =
         liftIO $
-        catch (withDefaultBuildConfigAndLock haddocksGo $ Stack.Build.build Nothing)
+        catch (withDefaultEnvConfigAndLock haddocksGo $ Stack.Build.build Nothing)
               (\(_ :: ExitCode) -> return ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
@@ -107,7 +107,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultBuildConfig haddocksG
                 }
         liftIO
             (catch
-                 (withBuildConfigAndLock
+                 (withEnvConfigAndLock
                       haddocksGo
                       NeedTargets
                       boptsCLI $

@@ -62,7 +62,7 @@ scriptCmd opts go' = do
       else longWay file scriptDir go
 
   longWay file scriptDir go = do
-    withDefaultBuildConfigAndLock go $ \lk -> do
+    withDefaultEnvConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use
       -- logError instead of logWarn because, when using the

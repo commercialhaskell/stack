@@ -23,7 +23,7 @@ import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Config (loadBuildConfig)
 import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
-import           Stack.Runners (loadConfigWithOpts)
+import           Stack.Runners (withConfig)
 import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Config
@@ -54,7 +54,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         _ -> do
             go' <- globalOptsFromMonoid False mempty
             let go = go' { globalLogLevel = LevelOther "silent" }
-            loadConfigWithOpts go $ \config -> do
+            withConfig go $ \config -> do
               bconfig <- runRIO config loadBuildConfig
               envConfig <- runRIO bconfig (setupEnv AllowNoTargets defaultBuildOptsCLI Nothing)
               runRIO envConfig (inner input)
