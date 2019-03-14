@@ -311,6 +311,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hspec
+    - filepath
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false

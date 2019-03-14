@@ -32,6 +32,14 @@ runShell cmd = do
     ec <- waitForProcess ph
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+runWithCwd :: HasCallStack => FilePath -> String -> [String] -> IO String
+runWithCwd cwdPath cmd args = do
+    logInfo $ "Running: " ++ cmd
+    let cp = proc cmd args
+    (ec, stdoutStr, _) <- readCreateProcessWithExitCode (cp { cwd = Just cwdPath }) ""
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    return stdoutStr
+
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
