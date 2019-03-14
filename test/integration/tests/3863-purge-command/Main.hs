@@ -6,9 +6,6 @@ import System.Directory
 import System.FilePath
 import Data.List.Extra (trimEnd)
 
-newline :: Char
-newline = '\n'
-
 main :: IO ()
 main =
   -- For these commands, we'll need to know the `dist` directory.
