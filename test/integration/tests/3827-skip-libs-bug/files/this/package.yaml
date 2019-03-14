@@ -4,8 +4,25 @@ version:             0.1.0.0
 dependencies:
 - base >= 4.7 && < 5
 
+flags:
+  library:
+    description: The library compiles
+    default: false
+    manual: true
+  executable:
+    description: The executable compiles
+    default: false
+    manual: true
+  tests:
+    description: The tests compile
+    default: false
+    manual: true
+
 library:
   source-dirs: src
+  when:
+  - condition: '!flag(library)'
+    buildable: false
 
 executables:
   this-exe:
@@ -17,6 +34,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - this
+    when:
+    - condition: '!flag(executable)'
+      buildable: false
 
 tests:
   this-test:
@@ -28,3 +48,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - this
+    when:
+    - condition: '!flag(tests)'
+      buildable: false
