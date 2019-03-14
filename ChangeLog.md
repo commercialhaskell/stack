@@ -60,7 +60,7 @@ Behavior changes:
 * When using `stack script`, custom snapshot files will be resolved
   relative to the directory containing the script.
 
-* Remove the `--upgrade-cabal` flag to `stack setup`.
+* Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
 
 Other enhancements:
 
