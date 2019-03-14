@@ -21,10 +21,12 @@ module Pantry.Types
   , Version
   , PackageIdentifier (..)
   , Revision (..)
+  , ModuleName
   , CabalFileInfo (..)
   , PrintWarnings (..)
   , PackageNameP (..)
   , VersionP (..)
+  , ModuleNameP (..)
   , PackageIdentifierRevision (..)
   , pirForHash
   , FileType (..)
@@ -606,6 +608,18 @@ instance PersistField VersionP where
       Nothing -> Left $ "Invalid version number: " <> T.pack str
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
+  sqlType _ = SqlString
+
+newtype ModuleNameP = ModuleNameP ModuleName
+  deriving (Show)
+instance PersistField ModuleNameP where
+  toPersistValue (ModuleNameP mn) = PersistText $ T.pack $ moduleNameString mn
+  fromPersistValue v = do
+    str <- fromPersistValue v
+    case parseModuleName str of
+      Nothing -> Left $ "Invalid module name: " <> T.pack str
+      Just pn -> Right $ ModuleNameP pn
+instance PersistFieldSql ModuleNameP where
   sqlType _ = SqlString
 
 -- | How to choose a cabal file for a package from Hackage. This is to
@@ -1224,6 +1238,12 @@ parseVersionThrowing str =
 -- @since 0.1.0.0
 parseVersionRange :: String -> Maybe VersionRange
 parseVersionRange = Distribution.Text.simpleParse
+
+-- | Parse a module name from a 'String'.
+--
+-- @since 0.1.0.0
+parseModuleName :: String -> Maybe ModuleName
+parseModuleName = Distribution.Text.simpleParse
 
 -- | Parse a flag name from a 'String'.
 --

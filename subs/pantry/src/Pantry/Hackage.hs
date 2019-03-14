@@ -9,6 +9,7 @@ module Pantry.Hackage
   , getHackageTarball
   , getHackageTarballKey
   , getHackageCabalFile
+  , getHackagePackagesExposedModules
   , getHackagePackageVersions
   , getHackagePackageVersionRevisions
   , getHackageTypoCorrections
@@ -20,9 +21,12 @@ import RIO.Process
 import Data.Aeson
 import Conduit
 import Data.Conduit.Tar
+import Data.List.Extra (groupSort)
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
+import qualified RIO.Set as Set
 import Data.Text.Unsafe (unsafeTail)
+import Data.Tuple (swap)
 import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import Pantry.Archive
@@ -38,6 +42,7 @@ import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text.Metrics (damerauLevenshtein)
+import Distribution.ModuleName (ModuleName)
 import Distribution.Types.Version (versionNumbers)
 import Distribution.Types.VersionRange (withinRange)
 
@@ -291,6 +296,42 @@ getHackageCabalFile pir@(PackageIdentifierRevision _ _ cfi) = do
         $ error $ "getHackageCabalFile: size or SHA mismatch for " ++ show (pir, bs)
     _ -> pure ()
   pure bs
+
+type HackageLocation = (PackageIdentifier, BlobKey, TreeKey)
+
+getHackagePackagesExposedModules
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [HackageLocation]
+  -> (ByteString -> HackageLocation -> RIO env [ModuleName])
+  -> RIO env [(HackageLocation, [ModuleName])]
+getHackagePackagesExposedModules hkgLocs extractModules = do
+  locsWithBids <- forM hkgLocs $ \hkgLoc  -> do
+    let (pident, BlobKey sha size, _) = hkgLoc
+        PackageIdentifier name ver = pident
+    bid <- resolveCabalFileInfo $
+           PackageIdentifierRevision name ver (CFIHash sha (Just size))
+    return (hkgLoc, bid)
+  cachedBids <- withStorage $ loadHasCachedExposedModules (map snd locsWithBids)
+  let cachedSet = Set.fromList cachedBids
+      notCached = flip mapMaybe locsWithBids $ \(hkgLoc, bid) -> do
+        if bid `Set.member` cachedSet
+        then Nothing
+        else Just (hkgLoc, bid)
+  cachedWithBids <- withStorage $ loadHackageExposedModules cachedBids
+  let locByBid = Map.fromList $ map swap locsWithBids
+      modulesByBid = groupSort cachedWithBids
+      cachedModules = flip mapMaybe modulesByBid  $ \(bid, ms) -> do
+        loc <- Map.lookup bid locByBid
+        pure (loc, ms)
+  extracted <- for notCached $ \(hkgLoc, bid) -> do
+      bs <- withStorage $ loadBlobById bid
+      modules <- extractModules bs hkgLoc
+      return (map (\m -> (bid, m)) modules, (hkgLoc, modules))
+  withStorage $ do
+    storeExposedModules (concatMap fst extracted)
+    storeHasCachedExposedModules (map snd notCached)
+  let extracedModules = map snd extracted
+  return $ cachedModules ++ extracedModules
 
 resolveCabalFileInfo
   :: (HasPantryConfig env, HasLogFunc env)

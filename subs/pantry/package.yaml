@@ -62,6 +62,7 @@ dependencies:
 - resourcet
 - rio-prettyprint
 - mtl
+- extra
 
 # FIXME remove when we drop store
 - integer-gmp

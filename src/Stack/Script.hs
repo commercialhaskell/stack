@@ -11,7 +11,7 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
-import qualified Distribution.PackageDescription as PD
+import           Data.Tuple                 (swap)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Path
 import           Path.IO
@@ -241,14 +241,20 @@ getModuleInfo = do
         installedDeps = toModuleInfo notHiddenDeps snapshotDumpPkgs
         dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
         notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
-    otherDeps <- liftIO $
-                 fmap (Map.fromListWith mappend . concat) $
-                 forM (Map.toList notInstalledDeps) $ \(pname, dep) -> do
-        gpd <- cpGPD (dpCommon dep)
-        let modules = maybe [] PD.exposedModules $
-              maybe (PD.library $ PD.packageDescription gpd) (Just . PD.condTreeData) $
-              PD.condLibrary gpd
+        eitherMutable (pname, dep) = case dpLocation dep of
+          PLMutable _ -> Right (pname, dep)
+          PLImmutable pli -> Left (pname, pli)
+        (notInstImmutable, notInstMutable) = partitionEithers $
+          map eitherMutable (Map.toList notInstalledDeps)
+    otherMutable <- forM notInstMutable $ \(pname, dep) -> liftIO $ do
+        modules <- allExposedModules <$> cpGPD (dpCommon dep)
         return [ (m, Set.singleton pname) | m <- modules ]
+    immutableModules <- exposedPackageModules (map snd notInstImmutable)
+    let immutablePnames = Map.fromList $ map swap notInstImmutable
+        otherImmutable = flip mapMaybe immutableModules $ \(loc, modules) -> do
+          pname <- Map.lookup loc immutablePnames
+          return [ (m, Set.singleton pname) | m <- modules ]
+        otherDeps = Map.fromListWith mappend $ concat (otherMutable ++ otherImmutable)
     return $ globals <> installedDeps <> ModuleInfo otherDeps
   where
     notHidden = Map.filter (not . dpHidden)

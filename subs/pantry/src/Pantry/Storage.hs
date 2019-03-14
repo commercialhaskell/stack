@@ -47,10 +47,15 @@ module Pantry.Storage
   , loadCabalBlobKey
   , hpackToCabal
   , countHackageCabals
+  , storeExposedModules
+  , loadHasCachedExposedModules
+  , storeHasCachedExposedModules
+  , loadHackageExposedModules
 
     -- avoid warnings
   , BlobId
   , HackageCabalId
+  , HackageExposedModulesId
   , HackageTarballId
   , CacheUpdateId
   , FilePathId
@@ -62,6 +67,7 @@ module Pantry.Storage
   , UrlBlobId
   ) where
 
+import Data.List.Extra (chunksOf)
 import RIO hiding (FilePath)
 import RIO.Process
 import qualified RIO.ByteString as B
@@ -134,7 +140,16 @@ HackageCabal
     -- If available: the full tree containing the HackageTarball
     -- contents with the cabal file modified.
     tree TreeId Maybe
+    -- If available should be equal to True meaning that
+    -- exposed modules were saved in HackageExposedModules
+    hasExposedModules Bool Maybe
     UniqueHackage name version revision
+
+-- Cache of modules exposed by a Hackage package
+HackageExposedModules
+    cabal BlobId
+    moduleName P.ModuleNameP
+    UniqueHackageExposedModules cabal moduleName
 
 -- Any preferred-version information from Hackage
 PreferredVersions
@@ -379,6 +394,7 @@ storeHackageRevision name version key = do
     , hackageCabalRevision = Revision (fromIntegral rev)
     , hackageCabalCabal = key
     , hackageCabalTree = Nothing
+    , hackageCabalHasExposedModules = Nothing
     }
 
 loadHackagePackageVersions
@@ -1023,3 +1039,55 @@ countHackageCabals = do
     [] -> pure 0
     (Single n):_ ->
       pure n
+
+loadHasCachedExposedModules
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [BlobId]
+  -> ReaderT SqlBackend (RIO env) [BlobId]
+loadHasCachedExposedModules bids =
+  fmap concat $ forM (chunksOf sqliteListLimit bids) $ \bids' ->
+    mapMaybe go <$> selectList [HackageCabalCabal <-. bids'] []
+  where
+    go e | v <- entityVal e,
+           Just True <- hackageCabalHasExposedModules v =
+             Just $ hackageCabalCabal v
+         | otherwise =
+             Nothing
+
+-- SQLITE_MAX_VARIABLE_NUMBER is 999 by default,
+-- see https://www.sqlite.org/limits.html
+sqliteListLimit :: Int
+sqliteListLimit = 500
+
+storeHasCachedExposedModules
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [BlobId]
+  -> ReaderT SqlBackend (RIO env) ()
+storeHasCachedExposedModules bids =
+  forM_ (chunksOf sqliteListLimit bids) $ \bids' ->
+    updateWhere [HackageCabalCabal <-. bids']
+                [HackageCabalHasExposedModules =. Just True]
+
+storeExposedModules
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [(BlobId, P.ModuleName)]
+  -> ReaderT SqlBackend (RIO env) ()
+storeExposedModules ms =
+  forM_ ms $ \(bid, m) ->
+    rawExecute
+      "INSERT OR IGNORE INTO hackage_exposed_modules(cabal, module_name)\n\
+      \VALUES (?, ?)"
+      [toPersistValue bid, toPersistValue (P.ModuleNameP m)]
+
+loadHackageExposedModules
+  :: (HasPantryConfig env, HasLogFunc env)
+  => [BlobId]
+  -> ReaderT SqlBackend (RIO env) [(BlobId, P.ModuleName)]
+loadHackageExposedModules bids =
+  fmap concat $ forM (chunksOf sqliteListLimit bids) $ \bids' ->
+    map go <$> selectList [HackageExposedModulesCabal <-. bids'] []
+  where
+    go e =
+      let v = entityVal e
+          P.ModuleNameP m = hackageExposedModulesModuleName v
+      in  (hackageExposedModulesCabal v, m)

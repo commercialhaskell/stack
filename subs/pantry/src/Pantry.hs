@@ -160,6 +160,8 @@ module Pantry
   , getHackageTypoCorrections
   , loadGlobalHints
   , partitionReplacedDependencies
+  , exposedPackageModules
+  , allExposedModules
   ) where
 
 import RIO
@@ -180,6 +182,7 @@ import Pantry.Types
 import Pantry.Hackage
 import Path (Path, Abs, File, toFilePath, Dir, (</>), filename, parseAbsDir, parent, parseRelFile)
 import Path.IO (doesFileExist, resolveDir', listDir)
+import Distribution.ModuleName (ModuleName)
 import Distribution.PackageDescription (GenericPackageDescription, FlagName)
 import qualified Distribution.PackageDescription as D
 import Distribution.Parsec.Common (PWarning (..), showPos)
@@ -384,38 +387,36 @@ loadCabalFileImmutable
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env GenericPackageDescription
-loadCabalFileImmutable loc = withCache $ do
+loadCabalFileImmutable loc = cachedCabalFile rawLoc $ do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFileBytes loc
-  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
-  (_warnings, gpd) <- rawParseGPD (Left $ toRawPLI loc) bs
-  let pm =
+  let rpm =
         case loc of
-          PLIHackage (PackageIdentifier name version) cfHash mtree -> PackageMetadata
-            { pmIdent = PackageIdentifier name version
-            , pmTreeKey = mtree
-            , pmCabal = cfHash
+          PLIHackage (PackageIdentifier name version) cfKey treeKey -> RawPackageMetadata
+            { rpmName = Just name
+            , rpmVersion = Just version
+            , rpmTreeKey = Just treeKey
+            , rpmCabal = Just cfKey
             }
-          PLIArchive _ pm' -> pm'
-          PLIRepo _ pm' -> pm'
-  let exc = MismatchedPackageMetadata (toRawPLI loc) (toRawPM pm) Nothing
-        foundCabalKey (gpdPackageIdentifier gpd)
-      PackageIdentifier name ver = pmIdent pm
-  maybe (throwIO exc) pure $ do
-    guard $ name == gpdPackageName gpd
-    guard $ ver == gpdVersion gpd
-    guard $ pmCabal pm == foundCabalKey
-    pure gpd
+          PLIArchive _ pm -> toRawPM pm
+          PLIRepo _ pm -> toRawPM pm
+  parseAndCheckGPD rawLoc rpm bs
   where
-    withCache inner = do
-      let rawLoc = toRawPLI loc
-      ref <- view $ pantryConfigL.to pcParsedCabalFilesRawImmutable
-      m0 <- readIORef ref
-      case Map.lookup rawLoc m0 of
-        Just x -> pure x
-        Nothing -> do
-          x <- inner
-          atomicModifyIORef' ref $ \m -> (Map.insert rawLoc x m, x)
+    rawLoc = toRawPLI loc
+
+cachedCabalFile ::
+       (HasPantryConfig env)
+    => RawPackageLocationImmutable
+    -> RIO env GenericPackageDescription
+    -> RIO env GenericPackageDescription
+cachedCabalFile rawLoc inner = do
+  ref <- view $ pantryConfigL.to pcParsedCabalFilesRawImmutable
+  m0 <- readIORef ref
+  case Map.lookup rawLoc m0 of
+    Just x -> pure x
+    Nothing -> do
+      x <- inner
+      atomicModifyIORef' ref $ \m -> (Map.insert rawLoc x m, x)
 
 -- | Load the cabal file for the given 'RawPackageLocationImmutable'.
 --
@@ -430,11 +431,9 @@ loadCabalFileRawImmutable
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RIO env GenericPackageDescription
-loadCabalFileRawImmutable loc = withCache $ do
+loadCabalFileRawImmutable loc = cachedCabalFile loc $ do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadRawCabalFileBytes loc
-  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
-  (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let rpm =
         case loc of
           RPLIHackage (PackageIdentifierRevision name version cfi) mtree -> RawPackageMetadata
@@ -448,21 +447,23 @@ loadCabalFileRawImmutable loc = withCache $ do
             }
           RPLIArchive _ rpm' -> rpm'
           RPLIRepo _ rpm' -> rpm'
-  let exc = MismatchedPackageMetadata loc rpm Nothing foundCabalKey (gpdPackageIdentifier gpd)
+  parseAndCheckGPD loc rpm bs
+
+parseAndCheckGPD ::
+       RawPackageLocationImmutable
+    -> RawPackageMetadata
+    -> ByteString
+    -> RIO env GenericPackageDescription
+parseAndCheckGPD rawLoc rpm bs = do
+  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
+  (_warnings, gpd) <- rawParseGPD (Left rawLoc) bs
+  let exc = MismatchedPackageMetadata rawLoc rpm Nothing
+        foundCabalKey (gpdPackageIdentifier gpd)
   maybe (throwIO exc) pure $ do
     guard $ maybe True (== gpdPackageName gpd) (rpmName rpm)
     guard $ maybe True (== gpdVersion gpd) (rpmVersion rpm)
     guard $ maybe True (== foundCabalKey) (rpmCabal rpm)
     pure gpd
-  where
-    withCache inner = do
-      ref <- view $ pantryConfigL.to pcParsedCabalFilesRawImmutable
-      m0 <- readIORef ref
-      case Map.lookup loc m0 of
-        Just x -> pure x
-        Nothing -> do
-          x <- inner
-          atomicModifyIORef' ref $ \m -> (Map.insert loc x m, x)
 
 -- | Same as 'loadCabalFileRawImmutable', but takes a
 -- 'RawPackageLocation'. Never prints warnings, see 'loadCabalFilePath'
@@ -1501,3 +1502,35 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
       else do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
+
+exposedPackageModules ::
+       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+    => [PackageLocationImmutable]
+    -> RIO env [(PackageLocationImmutable, [ModuleName])]
+exposedPackageModules locs = do
+  let eitherHackage (PLIHackage pident cfKey treeKey) = Right (pident, cfKey, treeKey)
+      eitherHackage otherLoc = Left otherLoc
+      (otherLocs, hkgLocs) = partitionEithers $ map eitherHackage locs
+  hkgModules <- getHackagePackagesExposedModules hkgLocs $ \bs (pident, cfKey, treeKey) -> do
+    let loc = PLIHackage pident cfKey treeKey
+        rawLoc = toRawPLI loc
+        PackageIdentifier name version = pident
+        rpm = RawPackageMetadata
+              { rpmName = Just name
+              , rpmVersion = Just version
+              , rpmTreeKey = Just treeKey
+              , rpmCabal = Just cfKey
+              }
+    gpd <- cachedCabalFile rawLoc $ parseAndCheckGPD rawLoc rpm bs
+    return $ allExposedModules gpd
+  otherModules <- forM otherLocs $ \loc -> do
+    gpd <- loadCabalFileImmutable loc
+    return (loc, allExposedModules gpd)
+  let hkgPLI (pident, cfKey, treeKey) = PLIHackage pident cfKey treeKey
+  return $ map (first hkgPLI) hkgModules ++ otherModules
+
+allExposedModules :: GenericPackageDescription -> [ModuleName]
+allExposedModules gpd | Just lib <- D.condTreeData <$> D.condLibrary gpd =
+                         D.exposedModules lib ++
+                         map D.moduleReexportName (D.reexportedModules lib)
+                     | otherwise = mempty
