@@ -102,7 +102,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
-import           Stack.Types.Nix
 import           Stack.Types.SourceMap
 import           Stack.Unpack
 import           Stack.Upgrade
@@ -637,8 +636,6 @@ pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \config -> do
-  when (isJust scoUpgradeCabal && nixEnable (configNix config)) $ do
-    throwIO UpgradeCabalUnusable
   withUserFileLock go (view stackRootL config) $ \lk -> do
     let getCompilerVersion = loadCompilerVersion go config
     runRIO config $
@@ -1058,7 +1055,6 @@ freezeCmd freezeOpts go =
   withDefaultBuildConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
-                   | UpgradeCabalUnusable
                    | InvalidPathForExec FilePath
      deriving (Typeable)
 instance Exception MainException
@@ -1070,7 +1066,6 @@ instance Show MainException where
         , expected
         , "; found: "
         , actual]
-    show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"
     show (InvalidPathForExec path) = concat
         [ "Got an invalid --cwd argument for stack exec ("
         , path
