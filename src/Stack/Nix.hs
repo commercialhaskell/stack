@@ -33,9 +33,9 @@ import           RIO.Process (processContextL, exec)
 reexecWithOptionalShell
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO WantedCompiler
-    -> IO ()
-    -> RIO env ()
+    -> RIO env WantedCompiler
+    -> RIO env a
+    -> RIO env a
 reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
   do config <- view configL
      inShell <- getInNixShell
@@ -51,15 +51,15 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
            return (exePath, args)
      if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
         then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
-        else liftIO inner
+        else inner
 
 
 runShellAndExit
     :: HasConfig env
     => Maybe (Path Abs Dir)
-    -> IO WantedCompiler
+    -> RIO env WantedCompiler
     -> RIO env (String, [String])
-    -> RIO env ()
+    -> RIO env void
 runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
    config <- view configL
    envOverride <- view processContextL
@@ -68,7 +68,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
-     compilerVersion <- liftIO getCompilerVersion
+     compilerVersion <- getCompilerVersion
      inContainer <- getInContainer
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)

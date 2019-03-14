@@ -44,8 +44,8 @@ spec = beforeAll setup $ do
   let loadConfig' :: ConfigMonoid -> (Config -> IO ()) -> IO ()
       loadConfig' cmdLineArgs inner = do
         globalOpts <- globalOptsFromMonoid False mempty
-        withRunnerGlobal globalOpts { globalLogLevel = LevelDebug } $ \runner ->
-          runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
+        withRunnerGlobal globalOpts { globalLogLevel = LevelDebug } $
+          loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
         withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do

@@ -56,8 +56,7 @@ scriptCmd opts go' = do
     srcMod <- getModificationTime file
     exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
     if srcMod < exeMod
-      then withRunnerGlobal go' $ \runner ->
-           runRIO runner $
+      then withRunnerGlobal go' $
            exec (toExeName $ toFilePath file) (soArgs opts)
       else longWay file scriptDir go
 

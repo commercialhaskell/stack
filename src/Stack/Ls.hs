@@ -310,8 +310,9 @@ lsViewRemoteCmd =
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
 
 -- | List stack's output styles
-listStylesCmd :: ListStylesOpts -> Config -> IO ()
-listStylesCmd opts lc = do
+listStylesCmd :: ListStylesOpts -> RIO Config ()
+listStylesCmd opts = do
+    lc <- ask
     -- This is the same test as is used in Stack.Types.Runner.withRunner
     let useColor = view useColorL lc
         styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
@@ -319,7 +320,7 @@ listStylesCmd opts lc = do
         showSGR = isComplex && coptSGR opts
         showExample = isComplex && coptExample opts && useColor
         styleReports = L.map (styleReport showSGR showExample) styles
-    T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
+    liftIO $ T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
   where
     styleReport :: Bool -> Bool -> StyleSpec -> Text
     styleReport showSGR showExample (k, sgrs) = k <> "=" <> codes

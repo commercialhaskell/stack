@@ -635,15 +635,15 @@ pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
 
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = withConfig go $ \config -> do
-  withUserFileLock go (view stackRootL config) $ \lk -> do
-    let getCompilerVersion = loadCompilerVersion config
-    runRIO config $
-      Docker.reexecWithOptionalContainer
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = withConfig go $ do
+  stackRoot <- view stackRootL
+  withUserFileLock stackRoot $ \lk -> do
+    config <- ask
+    Docker.reexecWithOptionalContainer
           (configProjectRoot config)
           Nothing
           (runRIO config $
-           Nix.reexecWithOptionalShell (configProjectRoot config) getCompilerVersion $ do
+           Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion $ do
            (wantedCompiler, compilerCheck, mstack) <-
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
@@ -708,7 +708,7 @@ updateCmd () go = withConfigAndLock go (void (updateHackageIndex Nothing))
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
 upgradeCmd upgradeOpts' go =
   case globalResolver go of
-    Just _ -> withRunnerGlobal go $ \runner -> runRIO runner $ do
+    Just _ -> withRunnerGlobal go $ do
       logError "You cannot use the --resolver option with the upgrade command"
       liftIO exitFailure
     Nothing ->
@@ -829,15 +829,16 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          withConfig go $ \config ->
-            withUserFileLock go (view stackRootL config) $ \lk -> do
-              let getCompilerVersion = loadCompilerVersion config
-              runRIO config $
-                Docker.reexecWithOptionalContainer
-                    (configProjectRoot config)
+          withConfig go $ do
+            stackRoot <- view stackRootL
+            projectRoot <- view $ to configProjectRoot
+            withUserFileLock stackRoot $ \lk -> do
+              Docker.reexecWithOptionalContainer
+                    projectRoot
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (withDefaultEnvConfigAndLock go $ \buildLock -> do
+                    (liftIO $ withDefaultEnvConfigAndLock go $ \buildLock -> do -- FIXME don't use runRIO
+                        config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
                         withProcessContext menv $ do
                             (cmd, args) <- case (eoCmd, eoArgs) of
@@ -846,7 +847,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                                 (ExecGhc, args) -> return ("ghc", args)
                                 (ExecRunGhc, args) -> return ("runghc", args)
                             munlockFile buildLock
-                            Nix.reexecWithOptionalShell (configProjectRoot config) getCompilerVersion (runRIO config $ exec cmd args))
+                            Nix.reexecWithOptionalShell (configProjectRoot config) (runRIO config loadCompilerVersion) (exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} -> do
@@ -963,30 +964,31 @@ ideTargetsCmd stream go =
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
-    withConfig go $ \lc ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL lc) $ \_ ->
-     runRIO lc $
-       Docker.preventInContainer Docker.pull
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
-    withConfig go $ \config ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL config) $ \_ ->
-      runRIO config $
-        Docker.preventInContainer $ Docker.reset (configProjectRoot config) keepHome
+    withUserFileLock stackRoot $ \_ -> do
+      projectRoot <- view $ to configProjectRoot
+      Docker.preventInContainer $ Docker.reset projectRoot keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
-    withConfig go $ \lc ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL lc) $ \_ ->
-     runRIO lc $
-        Docker.preventInContainer $
-            Docker.cleanup cleanupOpts
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer $
+      Docker.cleanup cleanupOpts
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
 cfgSetCmd co go@GlobalOpts{..} =
@@ -995,9 +997,9 @@ cfgSetCmd co go@GlobalOpts{..} =
         (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} = withConfig go $ \config -> do
-    let mProjectRoot = configProjectRoot config
-    withEnvConfigExt
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = withConfig go $ do
+    mProjectRoot <- view $ to configProjectRoot
+    liftIO $ withEnvConfigExt -- FIXME this is causing the config to be loaded twice!
         go
         NeedTargets
         defaultBuildOptsCLI
