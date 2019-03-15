@@ -40,7 +40,7 @@ setup = unsetEnv "STACK_YAML"
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let loadConfig' :: ConfigMonoid -> (LoadConfig -> IO ()) -> IO ()
+  let loadConfig' :: ConfigMonoid -> (Config -> IO ()) -> IO ()
       loadConfig' cmdLineArgs inner =
         withRunner LevelDebug True False ColorAuto mempty Nothing False $ \runner ->
         runRIO runner $ loadConfig cmdLineArgs Nothing SYLDefault (liftIO . inner)
@@ -61,43 +61,43 @@ spec = beforeAll setup $ do
   let trueOnNonWindows = not osIsWindows
   describe "nix disabled in config file" $
     around_ (withStackDotYaml sampleConfigNixDisabled) $ do
-      it "sees that the nix shell is not enabled" $ loadConfig' mempty $ \lc ->
-        nixEnable (configNix $ lcConfig lc) `shouldBe` False
+      it "sees that the nix shell is not enabled" $ loadConfig' mempty $ \config ->
+        nixEnable (configNix config) `shouldBe` False
       describe "--nix given on command line" $
         it "sees that the nix shell is enabled" $
-          loadConfig' (parseOpts ["--nix"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
+          loadConfig' (parseOpts ["--nix"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` trueOnNonWindows
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
-          loadConfig' (parseOpts ["--nix-pure"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
+          loadConfig' (parseOpts ["--nix-pure"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $
-          loadConfig' (parseOpts ["--no-nix"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` False
+          loadConfig' (parseOpts ["--no-nix"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` False
       describe "--no-nix-pure given on command line" $
         it "sees that the nix shell is not enabled" $
-          loadConfig' (parseOpts ["--no-nix-pure"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` False
+          loadConfig' (parseOpts ["--no-nix-pure"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` False
   describe "nix enabled in config file" $
     around_ (withStackDotYaml sampleConfigNixEnabled) $ do
       it "sees that the nix shell is enabled" $
-        loadConfig' mempty $ \lc ->
-        nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
+        loadConfig' mempty $ \config ->
+        nixEnable (configNix config) `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $
-          loadConfig' (parseOpts ["--no-nix"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` False
+          loadConfig' (parseOpts ["--no-nix"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` False
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
-          loadConfig' (parseOpts ["--nix-pure"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
+          loadConfig' (parseOpts ["--nix-pure"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` trueOnNonWindows
       describe "--no-nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
-          loadConfig' (parseOpts ["--no-nix-pure"]) $ \lc ->
-          nixEnable (configNix $ lcConfig lc) `shouldBe` trueOnNonWindows
-      it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \lc -> do
-        nixPackages (configNix $ lcConfig lc) `shouldBe` ["glpk"]
+          loadConfig' (parseOpts ["--no-nix-pure"]) $ \config ->
+          nixEnable (configNix config) `shouldBe` trueOnNonWindows
+      it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \config -> do
+        nixPackages (configNix config) `shouldBe` ["glpk"]
         v <- parseVersionThrowing "7.10.3"
         ghc <- either throwIO return $ nixCompiler (WCGhc v)
         ghc `shouldBe` "haskell.compiler.ghc7103"

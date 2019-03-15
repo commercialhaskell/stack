@@ -22,7 +22,7 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
 import           Path.IO
-import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
+import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
 import           Stack.Constants
 import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
@@ -58,9 +58,9 @@ cfgCmdSet go cmd = do
                      mstackYamlOption <- forM (globalStackYaml go) resolveFile'
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
-                         LCSProject stackYaml -> return stackYaml
-                         LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig _extraDeps -> throwString "config command used when no local configuration available"
+                         PCProject stackYaml -> return stackYaml
+                         PCNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         PCNoConfig _extraDeps -> throwString "config command used when no local configuration available"
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-

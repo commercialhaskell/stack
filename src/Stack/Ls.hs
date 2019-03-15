@@ -310,7 +310,7 @@ lsViewRemoteCmd =
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
 
 -- | List stack's output styles
-listStylesCmd :: ListStylesOpts -> LoadConfig -> IO ()
+listStylesCmd :: ListStylesOpts -> Config -> IO ()
 listStylesCmd opts lc = do
     -- This is the same test as is used in Stack.Types.Runner.withRunner
     let useColor = view useColorL lc

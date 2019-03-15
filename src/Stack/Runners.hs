@@ -8,7 +8,6 @@
 module Stack.Runners
     ( withGlobalConfigAndLock
     , withConfigAndLock
-    , withMiniConfigAndLock
     , withBuildConfigAndLock
     , withDefaultBuildConfigAndLock
     , withCleanConfig
@@ -40,12 +39,12 @@ import           System.IO
 import           System.FileLock
 import           Stack.Dot
 
--- FIXME it seems wrong that we call lcLoadBuildConfig multiple times
+-- FIXME it seems wrong that we call loadBuildConfig multiple times
 loadCompilerVersion :: GlobalOpts
-                    -> LoadConfig
+                    -> Config
                     -> IO WantedCompiler
-loadCompilerVersion go lc =
-    view wantedCompilerVersionL <$> lcLoadBuildConfig lc (globalCompiler go)
+loadCompilerVersion go config =
+    view wantedCompilerVersionL <$> runRIO config (loadBuildConfig (globalCompiler go))
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -91,13 +90,13 @@ withConfigAndLock
     :: GlobalOpts
     -> RIO Config ()
     -> IO ()
-withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (view stackRootL lc) $ \lk ->
-        runRIO (lcConfig lc) $
+withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \config -> do
+    withUserFileLock go (view stackRootL config) $ \lk ->
+        runRIO config $
             Docker.reexecWithOptionalContainer
-                (lcProjectRoot lc)
+                (configProjectRoot config)
                 Nothing
-                (runRIO (lcConfig lc) inner)
+                (runRIO config inner)
                 Nothing
                 (Just $ munlockFile lk)
 
@@ -111,10 +110,10 @@ withGlobalConfigAndLock go@GlobalOpts{..} inner =
     withRunnerGlobal go $ \runner ->
     runRIO runner $ loadConfigMaybeProject
       globalConfigMonoid
-      Nothing
-      LCSNoProject $ \lc ->
+      globalResolver
+      PCNoProject $ \lc ->
         withUserFileLock go (view stackRootL lc) $ \_lk ->
-          runRIO (lcConfig lc) inner
+          runRIO lc inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
@@ -141,7 +140,7 @@ withDefaultBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withDefaultBuildConfigAndLock go inner =
-    withBuildConfigExt WithDocker go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+    withBuildConfigExt go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
 
 withBuildConfigAndLock
     :: GlobalOpts
@@ -150,7 +149,7 @@ withBuildConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
 withBuildConfigAndLock go needTargets boptsCLI inner =
-    withBuildConfigExt WithDocker go needTargets boptsCLI Nothing inner Nothing
+    withBuildConfigExt go needTargets boptsCLI Nothing inner Nothing
 
 -- | A runner specially built for the "stack clean" use case. For some
 -- reason (hysterical raisins?), all of the functions in this module
@@ -165,14 +164,13 @@ withBuildConfigAndLock go needTargets boptsCLI inner =
 -- see issue #2010.
 withCleanConfig :: GlobalOpts -> RIO BuildConfig () -> IO ()
 withCleanConfig go inner =
-  loadConfigWithOpts go $ \lc ->
-  withUserFileLock go (view stackRootL lc) $ \_lk0 -> do
-    bconfig <- lcLoadBuildConfig lc $ globalCompiler go
+  loadConfigWithOpts go $ \config ->
+  withUserFileLock go (view stackRootL config) $ \_lk0 -> do
+    bconfig <- runRIO config $ loadBuildConfig $ globalCompiler go
     runRIO bconfig inner
 
 withBuildConfigExt
-    :: WithDocker
-    -> GlobalOpts
+    :: GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
     -> Maybe (RIO Config ())
@@ -189,8 +187,8 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt skipDocker go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \lc -> do
-    withUserFileLock go (view stackRootL lc) $ \lk0 -> do
+withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \config -> do
+    withUserFileLock go (view stackRootL config) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
       let inner' lk =
@@ -206,42 +204,37 @@ withBuildConfigExt skipDocker go@GlobalOpts{..} needTargets boptsCLI mbefore inn
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- lcLoadBuildConfig lc globalCompiler
+              bconfig <- runRIO config $ loadBuildConfig globalCompiler
               envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
               runRIO envConfig (inner' lk)
 
-      let getCompilerVersion = loadCompilerVersion go lc
-      runRIO (lcConfig lc) $
-        case skipDocker of
-          SkipDocker -> do
-            forM_ mbefore id
-            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0)
-            forM_ mafter id
-          WithDocker -> Docker.reexecWithOptionalContainer
-                          (lcProjectRoot lc)
-                          mbefore
-                          (runRIO (lcConfig lc) $
-                              Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (inner'' lk0))
-                          mafter
-                          (Just $ liftIO $
-                                do lk' <- readIORef curLk
-                                   munlockFile lk')
+      let getCompilerVersion = loadCompilerVersion go config
+      runRIO config $
+        Docker.reexecWithOptionalContainer
+          (configProjectRoot config)
+          mbefore
+          (runRIO config $
+              Nix.reexecWithOptionalShell (configProjectRoot config) getCompilerVersion (inner'' lk0))
+          mafter
+          (Just $ liftIO $
+                do lk' <- readIORef curLk
+                   munlockFile lk')
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
 loadConfigWithOpts
   :: GlobalOpts
-  -> (LoadConfig -> IO a)
+  -> (Config -> IO a)
   -> IO a
 loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
     mstackYaml <- forM globalStackYaml resolveFile'
     runRIO runner $
-      loadConfig globalConfigMonoid globalResolver mstackYaml $ \lc -> do
+      loadConfig globalConfigMonoid globalResolver mstackYaml $ \config -> do
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.
-        forM_ globalDockerEntrypoint $ Docker.entrypoint (lcConfig lc)
-        liftIO $ inner lc
+        forM_ globalDockerEntrypoint $ Docker.entrypoint config
+        liftIO $ inner config
 
 withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
 withRunnerGlobal GlobalOpts{..} inner = do
@@ -257,17 +250,6 @@ withRunnerGlobal GlobalOpts{..} inner = do
         globalTermWidth
         (isJust globalReExecVersion)
         inner
-
-withMiniConfigAndLock
-    :: GlobalOpts
-    -> RIO MiniConfig ()
-    -> IO ()
-withMiniConfigAndLock go@GlobalOpts{..} inner =
-  withRunnerGlobal go $ \runner ->
-  runRIO runner $
-  loadConfigMaybeProject globalConfigMonoid globalResolver LCSNoProject $ \lc -> do
-    let miniConfig = loadMiniConfig $ lcConfig lc
-    runRIO miniConfig inner
 
 -- | Unlock a lock file, if the value is Just
 munlockFile :: MonadIO m => Maybe FileLock -> m ()
