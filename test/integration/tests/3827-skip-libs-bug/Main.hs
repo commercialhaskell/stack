@@ -6,34 +6,54 @@ main = do
   stack [defaultResolverArg, "clean", "--full"]
 
   -- Nothing should be built here, so stack should succeed
-  stack [defaultResolverArg, "build", "--skip", "this:lib", "this:lib"]
-  stack [defaultResolverArg, "build", "--skip", "this:lib", "--skip", "this:exe", "this:exe:this-exe"]
-  stack [defaultResolverArg, "build", "--skip", "this:lib", "--skip", "this:test", "this:test:this-test"]
+  builds targetLib [skipLib]
+  builds targetExe [skipLib, skipExe]
+  builds targetTest [skipLib, skipTest]
 
   -- stack should try to build the library but fail due to missing library flag
-  stackErr [defaultResolverArg, "build", "this:lib"]
+  failsToBuild targetLib []
 
   -- stack should try to build the library and succeed
-  stack [defaultResolverArg, "build", "--flag", "this:library", "this:lib"]
+  builds targetLib [buildLib]
 
   -- stack should try to build the executable and fail due to skipped library
   -- TODO Or should it? The library has already been build. Perhaps it should succeed?
-  stackErr [defaultResolverArg, "build", "--flag", "this:library", "--skip", "this:lib", "this:exe:this-exe"]
+  failsToBuild targetExe [buildLib, skipLib]
 
   -- stack should try to build the executable and fail due to missing executable flag
-  stackErr [defaultResolverArg, "build", "--flag", "this:library", "this:exe:this-exe"]
+  failsToBuild targetExe [buildLib]
 
   -- stack should try to build the executable and succeed
-  stack [defaultResolverArg, "build", "--flag", "this:library", "--flag", "this:executable", "this:exe:this-exe"]
+  builds targetExe [buildLib, buildExe]
 
   -- stack should try to build the tests and fail due to skipped library
   -- TODO Or should it? The library has already been build. Perhaps it should succeed?
-  stackErr [defaultResolverArg, "build", "--flag", "this:library", "--skip", "this:lib", "this:test:this-test"]
+  failsToBuild targetTest [buildLib, skipLib]
 
   -- stack should try to build the tests and fail due to missing tests flag
-  stackErr [defaultResolverArg, "build", "--flag", "this:library", "this:test:this-test"]
+  failsToBuild targetTest [buildLib]
 
   -- stack should try to build the testcutable and succeed
-  stack [defaultResolverArg, "build", "--flag", "this:library", "--flag", "this:tests", "this:test:this-test"]
+  builds targetTest [buildLib, buildTest]
 
   stack [defaultResolverArg, "clean", "--full"]
+
+withArgs :: ([String] -> IO()) -> String -> [[String]] -> IO()
+withArgs stackFunction target argsList = stackFunction . mconcat $ [defaultResolverArg, "build"] : argsList <> [[target]]
+
+builds, failsToBuild :: String -> [[String]] -> IO()
+builds = withArgs stack
+failsToBuild = withArgs stackErr
+
+skipLib, skipExe, skipTest, buildLib, buildExe, buildTest :: [String]
+skipLib   = ["--skip", "this:lib"]
+skipExe   = ["--skip", "this:test"]
+skipTest  = ["--skip", "this:exe"]
+buildLib  = ["--flag", "this:library"]
+buildExe  = ["--flag", "this:executable"]
+buildTest = ["--flag", "this:tests"]
+
+targetLib, targetExe, targetTest :: String
+targetLib  = "this:lib"
+targetExe  = "this:exe:this-exe"
+targetTest = "this:test:this-test"
