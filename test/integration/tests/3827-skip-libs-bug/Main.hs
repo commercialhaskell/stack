@@ -39,7 +39,11 @@ main = do
   stack [defaultResolverArg, "clean", "--full"]
 
 withArgs :: ([String] -> IO()) -> String -> [[String]] -> IO()
-withArgs stackFunction target argsList = stackFunction . mconcat $ [defaultResolverArg, "build"] : argsList <> [[target]]
+withArgs stackFunction target argsList = stackFunction . mconcat $
+  [ [defaultResolverArg, "build"]
+  , mconcat argsList
+  , [target]
+  ]
 
 builds, failsToBuild :: String -> [[String]] -> IO()
 builds = withArgs stack
@@ -47,8 +51,8 @@ failsToBuild = withArgs stackErr
 
 skipLib, skipExe, skipTest, buildLib, buildExe, buildTest :: [String]
 skipLib   = ["--skip", "this:lib"]
-skipExe   = ["--skip", "this:test"]
-skipTest  = ["--skip", "this:exe"]
+skipExe   = ["--skip", "this:exe"]
+skipTest  = ["--skip", "this:test"]
 buildLib  = ["--flag", "this:library"]
 buildExe  = ["--flag", "this:executable"]
 buildTest = ["--flag", "this:tests"]
