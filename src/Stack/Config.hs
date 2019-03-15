@@ -1,9 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,14 +18,11 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  (MiniConfig
-  ,loadConfig
+  (loadConfig
   ,loadConfigMaybeProject
-  ,loadMiniConfig
   ,loadConfigYaml
   ,packagesParser
   ,getImplicitGlobalProjectDir
-  ,getStackYaml
   ,getSnapshots
   ,makeConcreteResolver
   ,checkOwnership
@@ -36,7 +30,7 @@ module Stack.Config
   ,getInNixShell
   ,defaultConfigYaml
   ,getProjectConfig
-  ,LocalConfigStatus(..)
+  ,loadBuildConfig
   ) where
 
 import           Control.Monad.Extra (firstJustM)
@@ -57,7 +51,7 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform, Arc
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
-import           Lens.Micro ((.~), lens)
+import           Lens.Micro ((.~))
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
 import qualified Pantry.SHA256 as SHA256
@@ -78,14 +72,13 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
-import           RIO.PrettyPrint
+import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 
 -- | If deprecated path exists, use it and print a warning.
@@ -132,15 +125,6 @@ getImplicitGlobalProjectDir config =
         (implicitGlobalProjectDirDeprecated stackRoot)
   where
     stackRoot = view stackRootL config
-
--- | This is slightly more expensive than @'asks' ('bcStackYaml' '.' 'getBuildConfig')@
--- and should only be used when no 'BuildConfig' is at hand.
-getStackYaml :: HasConfig env => RIO env (Path Abs File)
-getStackYaml = do
-    config <- view configL
-    case configMaybeProject config of
-        Just (_project, stackYaml) -> return stackYaml
-        Nothing -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir config)
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: HasConfig env => RIO env Snapshots
@@ -198,17 +182,18 @@ configNoLocalConfig
     => Path Abs Dir -- ^ stack root
     -> Maybe AbstractResolver
     -> ConfigMonoid
+    -> [PackageIdentifierRevision]
     -> (Config -> RIO env a)
     -> RIO env a
-configNoLocalConfig _ Nothing _ _ = throwIO NoResolverWhenUsingNoLocalConfig
-configNoLocalConfig stackRoot (Just resolver) configMonoid inner = do
+configNoLocalConfig _ Nothing _ _ _ = throwIO NoResolverWhenUsingNoLocalConfig
+configNoLocalConfig stackRoot (Just resolver) configMonoid extraDeps inner = do
     userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
     configFromConfigMonoid
       stackRoot
       userConfigPath
       False
       (Just resolver)
-      Nothing -- project
+      (PCNoConfig extraDeps)
       configMonoid
       inner
 
@@ -219,16 +204,21 @@ configFromConfigMonoid
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Bool -- ^ allow locals?
     -> Maybe AbstractResolver
-    -> Maybe (Project, Path Abs File)
+    -> ProjectConfig (Project, Path Abs File)
     -> ConfigMonoid
     -> (Config -> RIO env a)
     -> RIO env a
 configFromConfigMonoid
-    configStackRoot configUserConfigPath configAllowLocals mresolver
-    mproject ConfigMonoid{..} inner = do
+    configStackRoot configUserConfigPath configAllowLocals configResolver
+    configProject ConfigMonoid{..} inner = do
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
      mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
+     let mproject =
+           case configProject of
+             PCProject pair -> Just pair
+             PCNoProject -> Nothing
+             PCNoConfig _deps -> Nothing
      configWorkDir0 <- maybe (return relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
          configLatestSnapshot = fromFirst
@@ -237,7 +227,7 @@ configFromConfigMonoid
          clConnectionCount = fromFirst 8 configMonoidConnectionCount
          configHideTHLoading = fromFirst True configMonoidHideTHLoading
 
-         configGHCVariant0 = getFirst configMonoidGHCVariant
+         configGHCVariant = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
          configInstallGHC = fromFirst True configMonoidInstallGHC
          configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
@@ -271,7 +261,7 @@ configFromConfigMonoid
 
      let configBuild = buildOptsFromMonoid configMonoidBuildOpts
      configDocker <-
-         dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
+         dockerOptsFromMonoid (fmap fst mproject) configStackRoot configResolver configMonoidDockerOpts
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      configSystemGHC <-
@@ -284,7 +274,7 @@ configFromConfigMonoid
                          (dockerEnable configDocker || nixEnable configNix)
                          configMonoidSystemGHC)
 
-     when (isJust configGHCVariant0 && configSystemGHC) $
+     when (isJust configGHCVariant && configSystemGHC) $
          throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
 
      rawEnv <- liftIO getEnvironment
@@ -344,14 +334,12 @@ configFromConfigMonoid
             Just True -> return True
             _ -> getInContainer
 
-     let configMaybeProject = mproject
-
      configRunner' <- view runnerL
 
      useAnsi <- liftIO $ fromMaybe True <$>
                          hSupportsANSIWithoutEmulation stderr
 
-     let stylesUpdate' = runnerStylesUpdate configRunner' <>
+     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
            configMonoidStyles
          useColor' = runnerUseColor configRunner'
          mUseColor = do
@@ -402,40 +390,6 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
           Nothing -> return defaultBase
       _ -> return defaultBase
 
--- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig -- TODO do we really need a whole extra data type?
-    { mcGHCVariant :: !GHCVariant
-    , mcConfig :: !Config
-    }
-instance HasConfig MiniConfig where
-    configL = lens mcConfig (\x y -> x { mcConfig = y })
-instance HasProcessContext MiniConfig where
-    processContextL = configL.processContextL
-instance HasPantryConfig MiniConfig where
-    pantryConfigL = configL.pantryConfigL
-instance HasPlatform MiniConfig
-instance HasGHCVariant MiniConfig where
-    ghcVariantL = lens mcGHCVariant (\x y -> x { mcGHCVariant = y })
-instance HasRunner MiniConfig where
-    runnerL = configL.runnerL
-instance HasLogFunc MiniConfig where
-    logFuncL = configL.logFuncL
-instance HasStylesUpdate MiniConfig where
-  stylesUpdateL = runnerL.stylesUpdateL
-instance HasTerm MiniConfig where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
-
--- | Load the 'MiniConfig'.
-loadMiniConfig :: Config -> MiniConfig
-loadMiniConfig config = MiniConfig
-  { mcGHCVariant = configGHCVariantDefault config
-  , mcConfig = config
-  }
-
-configGHCVariantDefault :: Config -> GHCVariant -- FIXME why not just use this as the HasGHCVariant instance for Config?
-configGHCVariantDefault = fromMaybe GHCStandard . configGHCVariant0
-
 -- Load the configuration, using environment variables, and defaults as
 -- necessary.
 loadConfigMaybeProject
@@ -444,14 +398,19 @@ loadConfigMaybeProject
     -- ^ Config monoid from parsed command-line arguments
     -> Maybe AbstractResolver
     -- ^ Override resolver
-    -> LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
+    -> ProjectConfig (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
-    -> (LoadConfig -> RIO env a)
+    -> (Config -> RIO env a)
     -> RIO env a
 loadConfigMaybeProject configArgs mresolver mproject inner = do
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
-    let loadHelper mproject' inner2 = do
+    let (mproject', addConfigMonoid) =
+          case mproject of
+            PCProject (proj, fp, cm) -> (PCProject (proj, fp), (cm:))
+            PCNoProject -> (PCNoProject, id)
+            PCNoConfig deps -> (PCNoConfig deps, id)
+    let loadHelper inner2 = do
           userConfigPath <- getDefaultUserConfigPath stackRoot
           extraConfigs0 <- getExtraConfigs userConfigPath >>=
               mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
@@ -467,36 +426,24 @@ loadConfigMaybeProject configArgs mresolver mproject inner = do
             userConfigPath
             True -- allow locals
             mresolver
-            (fmap (\(x, y, _) -> (x, y)) mproject')
-            (mconcat $ configArgs
-            : maybe id (\(_, _, projectConfig) -> (projectConfig:)) mproject' extraConfigs)
+            mproject'
+            (mconcat $ configArgs : addConfigMonoid extraConfigs)
             inner2
 
     let withConfig = case mproject of
-          LCSNoConfig _extraDeps -> configNoLocalConfig stackRoot mresolver configArgs
-          LCSProject project -> loadHelper $ Just project
-          LCSNoProject -> loadHelper Nothing
+          PCNoConfig extraDeps -> configNoLocalConfig stackRoot mresolver configArgs extraDeps
+          PCProject _project -> loadHelper
+          PCNoProject -> loadHelper
 
     withConfig $ \config -> do
       unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
           (throwM (BadStackVersionException (configRequireStackVersion config)))
-
-      let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
       unless (configAllowDifferentUser config) $ do
           unless userOwnsStackRoot $
               throwM (UserDoesn'tOwnDirectory stackRoot)
-          forM_ mprojectRoot $ \dir ->
+          forM_ (configProjectRoot config) $ \dir ->
               checkOwnership (dir </> configWorkDir config)
-
-      inner LoadConfig
-          { lcConfig          = config
-          , lcLoadBuildConfig = runRIO config . loadBuildConfig mproject mresolver
-          , lcProjectRoot     =
-              case mprojectRoot of
-                LCSProject fp -> Just fp
-                LCSNoProject  -> Nothing
-                LCSNoConfig _extraDeps -> Nothing
-          }
+      inner config
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
@@ -508,40 +455,37 @@ loadConfig :: HasRunner env
            -- ^ Override resolver
            -> StackYamlLoc (Path Abs File)
            -- ^ Override stack.yaml
-           -> (LoadConfig -> RIO env a)
+           -> (Config -> RIO env a)
            -> RIO env a
 loadConfig configArgs mresolver mstackYaml inner =
     loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: LocalConfigStatus (Project, Path Abs File, ConfigMonoid)
-                -> Maybe AbstractResolver -- override resolver
-                -> Maybe WantedCompiler -- override compiler
-                -> RIO Config BuildConfig
-loadBuildConfig mproject maresolver mcompiler = do
+loadBuildConfig :: RIO Config BuildConfig
+loadBuildConfig = do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
     -- into a Resolver that can be used below.
 
-    -- The maresolver and mcompiler are provided on the command
+    -- The configResolver and mcompiler are provided on the command
     -- line. In order to properly deal with an AbstractResolver, we
     -- need a base directory (to deal with custom snapshot relative
     -- paths). We consider the current working directory to be the
     -- correct base. Let's calculate the mresolver first.
-    mresolver <- forM maresolver $ \aresolver -> do
+    mresolver <- forM (configResolver config) $ \aresolver -> do
       logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
       makeConcreteResolver aresolver
 
-    (project', stackYamlFP) <- case mproject of
-      LCSProject (project, fp, _) -> do
+    (project', stackYamlFP) <- case configProject config of
+      PCProject (project, fp) -> do
           forM_ (projectUserMsg project) (logWarn . fromString)
           return (project, fp)
-      LCSNoConfig extraDeps -> do
+      PCNoConfig extraDeps -> do
           p <- assert (isJust mresolver) (getEmptyProject mresolver extraDeps)
           return (p, configUserConfigPath config)
-      LCSNoProject -> do
+      PCNoProject -> do
             logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
@@ -555,7 +499,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                    iopc <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
                    ProjectAndConfigMonoid project _ <- liftIO iopc
                    when (view terminalL config) $
-                       case maresolver of
+                       case configResolver config of
                            Nothing ->
                                logDebug $
                                  "Using resolver: " <>
@@ -583,6 +527,7 @@ loadBuildConfig mproject maresolver mcompiler = do
                            [ "This is the implicit global project, which is used only when 'stack' is run\n"
                            , "outside of a real project.\n" ]
                    return (p, dest)
+    mcompiler <- view $ globalOptsL.to globalCompiler
     let project = project'
             { projectCompiler = mcompiler <|> projectCompiler project'
             , projectResolver = fromMaybe (projectResolver project') mresolver
@@ -652,14 +597,8 @@ loadBuildConfig mproject maresolver mcompiler = do
     return BuildConfig
         { bcConfig = config
         , bcSMWanted = wanted
-        , bcGHCVariant = configGHCVariantDefault config
         , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
-        , bcImplicitGlobal =
-            case mproject of
-                LCSNoProject -> True
-                LCSProject _ -> False
-                LCSNoConfig _extraDeps -> False
         , bcCurator = projectCurator project
         }
   where
@@ -829,17 +768,17 @@ loadYaml parser path = do
 getProjectConfig :: HasLogFunc env
                  => StackYamlLoc (Path Abs File)
                  -- ^ Override stack.yaml
-                 -> RIO env (LocalConfigStatus (Path Abs File))
-getProjectConfig (SYLOverride stackYaml) = return $ LCSProject stackYaml
+                 -> RIO env (ProjectConfig (Path Abs File))
+getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
 getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
             logInfo "Getting project config file from STACK_YAML environment"
-            liftM LCSProject $ resolveFile' fp
+            liftM PCProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            maybe LCSNoProject LCSProject <$> findInParents getStackDotYaml currDir
+            maybe PCNoProject PCProject <$> findInParents getStackDotYaml currDir
   where
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
@@ -849,14 +788,7 @@ getProjectConfig SYLDefault = do
         if exists
             then return $ Just fp
             else return Nothing
-getProjectConfig (SYLNoConfig extraDeps) = return $ LCSNoConfig extraDeps
-
-data LocalConfigStatus a
-    = LCSNoProject
-    | LCSProject a
-    | LCSNoConfig ![PackageIdentifierRevision]
-    -- ^ Extra dependencies
-    deriving (Show,Functor,Foldable,Traversable)
+getProjectConfig (SYLNoConfig extraDeps) = return $ PCNoConfig extraDeps
 
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
@@ -864,21 +796,21 @@ data LocalConfigStatus a
 loadProjectConfig :: HasLogFunc env
                   => StackYamlLoc (Path Abs File)
                   -- ^ Override stack.yaml
-                  -> RIO env (LocalConfigStatus (Project, Path Abs File, ConfigMonoid))
+                  -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
 loadProjectConfig mstackYaml = do
     mfp <- getProjectConfig mstackYaml
     case mfp of
-        LCSProject fp -> do
+        PCProject fp -> do
             currDir <- getCurrentDir
             logDebug $ "Loading project config file " <>
                         fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
-            LCSProject <$> load fp
-        LCSNoProject -> do
+            PCProject <$> load fp
+        PCNoProject -> do
             logDebug "No project config file found, using defaults."
-            return LCSNoProject
-        LCSNoConfig extraDeps -> do
+            return PCNoProject
+        PCNoConfig extraDeps -> do
             logDebug "Ignoring config files"
-            return $ LCSNoConfig extraDeps
+            return $ PCNoConfig extraDeps
   where
     load fp = do
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp

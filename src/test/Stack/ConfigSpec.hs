@@ -11,8 +11,9 @@ import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
 import Stack.Prelude
+import Stack.Runners
 import Stack.Types.Config
-import Stack.Types.Runner
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import System.Directory
 import System.Environment
 import System.IO (writeFile)
@@ -99,10 +100,9 @@ spec = beforeAll setup $ do
         bracket_ setVar resetVar action
 
   describe "parseProjectAndConfigMonoid" $ do
-    let loadProject' fp inner =
-          withRunner logLevel True False ColorAuto mempty Nothing False $
-          \runner ->
-            runRIO runner $ do
+    let loadProject' fp inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $ do
               iopc <- loadConfigYaml (
                 parseProjectAndConfigMonoid (parent fp)
                 ) fp
@@ -131,9 +131,10 @@ spec = beforeAll setup $ do
         `shouldThrow` anyException
 
   describe "loadConfig" $ do
-    let loadConfig' inner =
-          withRunner logLevel True False ColorAuto mempty Nothing False $ \runner ->
-            runRIO runner $ loadConfig mempty Nothing SYLDefault inner
+    let loadConfig' inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $
+            loadConfig mempty Nothing SYLDefault inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
       loadConfig' $ const $ return ()
@@ -147,19 +148,19 @@ spec = beforeAll setup $ do
 
     it "parses config option with-hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) hpackConfig
-      loadConfig' $ \lc ->
-        liftIO $ configOverrideHpack (lcConfig lc) `shouldBe`
+      loadConfig' $ \config ->
+        liftIO $ configOverrideHpack config `shouldBe`
         HpackCommand "/usr/local/bin/hpack"
 
     it "parses config bundled hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
-      loadConfig' $ \lc ->
-        liftIO $ configOverrideHpack (lcConfig lc) `shouldBe` HpackBundled
+      loadConfig' $ \config ->
+        liftIO $ configOverrideHpack config `shouldBe` HpackBundled
 
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
-     loadConfig' $ \lc -> liftIO $ do
-      let BuildOpts{..} = configBuild  $ lcConfig lc
+     loadConfig' $ \config -> liftIO $ do
+      let BuildOpts{..} = configBuild  config
       boptsLibProfile `shouldBe` True
       boptsExeProfile `shouldBe` True
       boptsHaddock `shouldBe` True
@@ -188,8 +189,8 @@ spec = beforeAll setup $ do
       let childDir = "child"
       createDirectory childDir
       setCurrentDirectory childDir
-      loadConfig' $ \LoadConfig{..} -> liftIO $ do
-        bc <- lcLoadBuildConfig Nothing
+      loadConfig' $ \config -> liftIO $ do
+        bc <- runRIO config loadBuildConfig
         view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
@@ -197,8 +198,8 @@ spec = beforeAll setup $ do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
-        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
-          BuildConfig{..} <- lcLoadBuildConfig Nothing
+        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \config -> liftIO $ do
+          BuildConfig{..} <- runRIO config loadBuildConfig
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
@@ -211,8 +212,8 @@ spec = beforeAll setup $ do
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
         writeFile (toFilePath packageYaml) "name: foo"
-        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \LoadConfig{..} -> liftIO $ do
-            BuildConfig{..} <- lcLoadBuildConfig Nothing
+        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
+            BuildConfig{..} <- runRIO config loadBuildConfig
             bcStackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $

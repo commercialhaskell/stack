@@ -48,7 +48,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.IO (putStrLn)

@@ -102,7 +102,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
-import           Stack.Types.Nix
 import           Stack.Types.SourceMap
 import           Stack.Unpack
 import           Stack.Upgrade
@@ -629,34 +628,32 @@ pathCmd keys go = Stack.Path.path withoutHaddocks withHaddocks keys
     continueOnSuccess f = catch f ignoreSuccess
     ignoreSuccess ExitSuccess = return ()
     ignoreSuccess ex = throwIO ex
-    withoutHaddocks = continueOnSuccess . withDefaultBuildConfig goWithout
+    withoutHaddocks = continueOnSuccess . withDefaultEnvConfig goWithout
     goWithout = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ False
-    withHaddocks = continueOnSuccess . withDefaultBuildConfig goWith
+    withHaddocks = continueOnSuccess . withDefaultEnvConfig goWith
     goWith = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
 
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
-setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
-  when (isJust scoUpgradeCabal && nixEnable (configNix (lcConfig lc))) $ do
-    throwIO UpgradeCabalUnusable
-  withUserFileLock go (view stackRootL lc) $ \lk -> do
-    let getCompilerVersion = loadCompilerVersion go lc
-    runRIO (lcConfig lc) $
-      Docker.reexecWithOptionalContainer
-          (lcProjectRoot lc)
+setupCmd sco@SetupCmdOpts{..} go@GlobalOpts{..} = withConfig go $ do
+  stackRoot <- view stackRootL
+  withUserFileLock stackRoot $ \lk -> do
+    config <- ask
+    Docker.reexecWithOptionalContainer
+          (configProjectRoot config)
           Nothing
-          (runRIO (lcConfig lc) $
-           Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion $ do
+          (runRIO config $
+           Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion $ do
            (wantedCompiler, compilerCheck, mstack) <-
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
                    Nothing -> do
-                       bc <- liftIO $ lcLoadBuildConfig lc globalCompiler
+                       bc <- liftIO $ runRIO config loadBuildConfig
                        return ( view wantedCompilerVersionL bc
-                              , configCompilerCheck (lcConfig lc)
+                              , configCompilerCheck config
                               , Just $ view stackYamlL bc
                               )
-           runRIO (loadMiniConfig (lcConfig lc)) $ setup sco wantedCompiler compilerCheck mstack
+           runRIO config $ setup sco wantedCompiler compilerCheck mstack
            )
           Nothing
           (Just $ munlockFile lk)
@@ -677,7 +674,7 @@ buildCmd opts go = do
     FileWatch -> fileWatch stderr (inner . Just)
     NoFileWatch -> inner Nothing
   where
-    inner setLocalFiles = withBuildConfigAndLock go' NeedTargets opts $ \lk ->
+    inner setLocalFiles = withEnvConfigAndLock go' NeedTargets opts $ \lk ->
         Stack.Build.build setLocalFiles lk
     -- Read the build command from the CLI and enable it to run
     go' = case boptsCLICommand opts of
@@ -709,15 +706,21 @@ updateCmd :: () -> GlobalOpts -> IO ()
 updateCmd () go = withConfigAndLock go (void (updateHackageIndex Nothing))
 
 upgradeCmd :: UpgradeOpts -> GlobalOpts -> IO ()
-upgradeCmd upgradeOpts' go = withGlobalConfigAndLock go $
-    upgrade (globalConfigMonoid go)
-            (globalResolver go)
+upgradeCmd upgradeOpts' go =
+  case globalResolver go of
+    Just _ -> withRunnerGlobal go $ do
+      logError "You cannot use the --resolver option with the upgrade command"
+      liftIO exitFailure
+    Nothing ->
+      withGlobalConfigAndLock go $
+      upgrade
+        (globalConfigMonoid go)
 #ifdef USE_GIT_INFO
-            (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
+        (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
 #else
-            Nothing
+        Nothing
 #endif
-            upgradeOpts'
+        upgradeOpts'
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> GlobalOpts -> IO ()
@@ -735,7 +738,7 @@ uploadCmd sdistOpts go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
-    withDefaultBuildConfigAndLock go $ \_ -> do
+    withDefaultEnvConfigAndLock go $ \_ -> do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
@@ -788,7 +791,7 @@ uploadCmd sdistOpts go = do
 
 sdistCmd :: SDistOpts -> GlobalOpts -> IO ()
 sdistCmd sdistOpts go =
-    withDefaultBuildConfig go $ do -- No locking needed.
+    withDefaultEnvConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
@@ -826,15 +829,15 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
-          loadConfigWithOpts go $ \lc ->
-            withUserFileLock go (view stackRootL lc) $ \lk -> do
-              let getCompilerVersion = loadCompilerVersion go lc
-              runRIO (lcConfig lc) $
-                Docker.reexecWithOptionalContainer
-                    (lcProjectRoot lc)
+          withConfig go $ do
+            stackRoot <- view stackRootL
+            projectRoot <- view $ to configProjectRoot
+            withUserFileLock stackRoot $ \lk -> do
+              Docker.reexecWithOptionalContainer
+                    projectRoot
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (withDefaultBuildConfigAndLock go $ \buildLock -> do
+                    (liftIO $ withDefaultEnvConfigAndLock go $ \buildLock -> do -- FIXME don't use runRIO
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
                         withProcessContext menv $ do
@@ -844,7 +847,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                                 (ExecGhc, args) -> return ("ghc", args)
                                 (ExecRunGhc, args) -> return ("runghc", args)
                             munlockFile buildLock
-                            Nix.reexecWithOptionalShell (lcProjectRoot lc) getCompilerVersion (runRIO (lcConfig lc) $ exec cmd args))
+                            Nix.reexecWithOptionalShell (configProjectRoot config) (runRIO config loadCompilerVersion) (exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} -> do
@@ -852,7 +855,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 boptsCLI = defaultBuildOptsCLI
                            { boptsCLITargets = map T.pack targets
                            }
-            withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
+            withEnvConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
               unless (null targets) $ Stack.Build.build Nothing lk
 
               config <- view configL
@@ -937,7 +940,7 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
           , boptsCLIFlags = ghciFlags ghciOpts
           , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
           }
-  in withBuildConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
+  in withEnvConfigAndLock go AllowNoTargets boptsCLI $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
@@ -951,51 +954,52 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
 -- | List packages in the project.
 idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> GlobalOpts -> IO ()
 idePackagesCmd (stream, cmd) go =
-    withDefaultBuildConfig go (IDE.listPackages stream cmd) -- TODO don't need EnvConfig any more
+    withDefaultEnvConfig go (IDE.listPackages stream cmd) -- TODO don't need EnvConfig any more
 
 -- | List targets in the project.
 ideTargetsCmd :: IDE.OutputStream -> GlobalOpts -> IO ()
 ideTargetsCmd stream go =
-    withDefaultBuildConfig go (IDE.listTargets stream) -- TODO don't need EnvConfig any more
+    withDefaultEnvConfig go (IDE.listTargets stream) -- TODO don't need EnvConfig any more
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \lc ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL lc) $ \_ ->
-     runRIO (lcConfig lc) $
-       Docker.preventInContainer Docker.pull
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \lc ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL lc) $ \_ ->
-      runRIO (lcConfig lc) $
-        Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
+    withUserFileLock stackRoot $ \_ -> do
+      projectRoot <- view $ to configProjectRoot
+      Docker.preventInContainer $ Docker.reset projectRoot keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
-    loadConfigWithOpts go $ \lc ->
+  withConfig go $ do
+    stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock go (view stackRootL lc) $ \_ ->
-     runRIO (lcConfig lc) $
-        Docker.preventInContainer $
-            Docker.cleanup cleanupOpts
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer $
+      Docker.cleanup cleanupOpts
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
 cfgSetCmd co go@GlobalOpts{..} =
-    withMiniConfigAndLock
+    withGlobalConfigAndLock
         go
         (cfgCmdSet go co)
 
 imgDockerCmd :: (Bool, [Text]) -> GlobalOpts -> IO ()
-imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc -> do
-    let mProjectRoot = lcProjectRoot lc
-    withBuildConfigExt
+imgDockerCmd (rebuild,images) go@GlobalOpts{..} = withConfig go $ do
+    mProjectRoot <- view $ to configProjectRoot
+    liftIO $ withEnvConfigExt -- FIXME this is causing the config to be loaded twice!
         go
         NeedTargets
         defaultBuildOptsCLI
@@ -1009,12 +1013,12 @@ imgDockerCmd (rebuild,images) go@GlobalOpts{..} = loadConfigWithOpts go $ \lc ->
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
     pwd <- getCurrentDir
-    withMiniConfigAndLock go (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withGlobalConfigAndLock go (initProject IsInitCmd pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
-    withMiniConfigAndLock go $ do
+    withGlobalConfigAndLock go $ do
         dir <- new newOpts (forceOverwrite initOpts)
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $
@@ -1029,15 +1033,15 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withDefaultBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
+    withDefaultEnvConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfigDot dotOpts go $ dot dotOpts
+dotCmd dotOpts go = withEnvConfigDot dotOpts go $ dot dotOpts
 
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
-queryCmd selectors go = withDefaultBuildConfig go $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors go = withDefaultEnvConfig go $ queryBuildInfo $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
@@ -1045,15 +1049,14 @@ hpcReportCmd hropts go = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
         boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
-    withBuildConfig go AllowNoTargets boptsCLI $
+    withEnvConfig go AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
 
 freezeCmd :: FreezeOpts -> GlobalOpts -> IO ()
 freezeCmd freezeOpts go =
-  withDefaultBuildConfig go $ freeze freezeOpts
+  withDefaultEnvConfig go $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
-                   | UpgradeCabalUnusable
                    | InvalidPathForExec FilePath
      deriving (Typeable)
 instance Exception MainException
@@ -1065,7 +1068,6 @@ instance Show MainException where
         , expected
         , "; found: "
         , actual]
-    show UpgradeCabalUnusable = "--upgrade-cabal cannot be used when nix is activated"
     show (InvalidPathForExec path) = concat
         [ "Got an invalid --cwd argument for stack exec ("
         , path

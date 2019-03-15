@@ -22,7 +22,6 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Setup
 import           Stack.Types.Config
-import           Stack.Types.Resolver
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
@@ -93,11 +92,10 @@ data UpgradeOpts = UpgradeOpts
 
 upgrade :: HasConfig env
         => ConfigMonoid
-        -> Maybe AbstractResolver
         -> Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
         -> RIO env ()
-upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
+upgrade gConfigMonoid builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
         -- options parser itself so we get better error messages, but
@@ -117,7 +115,7 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
             source so
   where
     binary bo = binaryUpgrade bo
-    source so = sourceUpgrade gConfigMonoid mresolver builtHash so
+    source so = sourceUpgrade gConfigMonoid builtHash so
 
 binaryUpgrade :: HasConfig env => BinaryOpts -> RIO env ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
@@ -172,11 +170,10 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
 sourceUpgrade
   :: HasConfig env
   => ConfigMonoid
-  -> Maybe AbstractResolver
   -> Maybe String
   -> SourceOpts
   -> RIO env ()
-sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
+sourceUpgrade gConfigMonoid builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     mdir <- case gitRepo of
       Just (repo, branch) -> do
@@ -237,9 +234,9 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
     forM_ mdir $ \dir ->
       loadConfig
       gConfigMonoid
-      mresolver
+      Nothing -- always use the resolver settings in the stack.yaml file
       (SYLOverride $ dir </> stackDotYaml) $ \lc -> do
-        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        bconfig <- runRIO lc loadBuildConfig
         let boptsCLI = defaultBuildOptsCLI
                 { boptsCLITargets = ["stack"]
                 }

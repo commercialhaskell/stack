@@ -83,7 +83,7 @@ import              Stack.Build (build)
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap)
 import              Stack.Build.Target (NeedTargets(..), parseTargets)
-import              Stack.Config (loadConfig)
+import              Stack.Config (loadConfig, loadBuildConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
@@ -95,7 +95,6 @@ import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
 import              Stack.Types.Config
 import              Stack.Types.Docker
-import              Stack.Types.Runner
 import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
@@ -134,9 +133,6 @@ data SetupOpts = SetupOpts
     -- ^ Don't check for a compatible GHC version/architecture
     , soptsSkipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
-    , soptsUpgradeCabal :: !(Maybe UpgradeTo)
-    -- ^ Upgrade the global Cabal library in the database to the newest
-    -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
     , soptsSetupInfoYaml :: !FilePath
@@ -237,7 +233,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck config
             , soptsSkipMsys = configSkipMsys config
-            , soptsUpgradeCabal = Nothing
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
@@ -565,12 +560,6 @@ ensureCompiler sopts = do
                    $ augmentPathMap (toFilePath <$> edBins ed) (view envVarsL menv0)
                 mkProcessContext (removeHaskellEnvVars m)
 
-    forM_ (soptsUpgradeCabal sopts) $ \version -> do
-        unless needLocal $ do
-            logWarn "Trying to change a Cabal library on a GHC not installed by stack."
-            logWarn "This may fail, caveat emptor!"
-        withProcessContext menv $ upgradeCabal wc version
-
     case mtools of
         Just (Just (ToolGhcjs cv), _) ->
             withProcessContext menv
@@ -732,86 +721,6 @@ ensureDockerStackExe containerPlatform = do
         platforms <- runReaderT preferredPlatforms (containerPlatform, PlatformVariantNone)
         downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
-
--- | Install the newest version or a specific version of Cabal globally
-upgradeCabal :: (HasConfig env, HasGHCVariant env)
-             => WhichCompiler
-             -> UpgradeTo
-             -> RIO env ()
-upgradeCabal wc upgradeTo = do
-    logWarn "Using deprecated --upgrade-cabal feature, this is not recommended"
-    logWarn "Manipulating the global Cabal is only for debugging purposes"
-    let name = mkPackageName "Cabal"
-    installed <- getCabalPkgVer wc
-    case upgradeTo of
-        Specific wantedVersion -> do
-            if installed /= wantedVersion then
-                doCabalInstall wc installed wantedVersion
-            else
-                logInfo $
-                  "No install necessary. Cabal " <>
-                  fromString (versionString installed) <>
-                  " is already installed"
-        Latest -> do
-          mversion <- getLatestHackageVersion name UsePreferredVersions
-          case mversion of
-            Nothing -> throwString "No Cabal library found in index, cannot upgrade"
-            Just (PackageIdentifierRevision _name latestVersion _cabalHash) -> do
-                if installed < latestVersion then
-                    doCabalInstall wc installed latestVersion
-                else
-                    logInfo $
-                        "No upgrade necessary: Cabal-" <>
-                        fromString (versionString latestVersion) <>
-                        " is the same or newer than latest hackage version " <>
-                        fromString (versionString installed)
-
--- Configure and run the necessary commands for a cabal install
-doCabalInstall :: (HasConfig env, HasGHCVariant env)
-               => WhichCompiler
-               -> Version
-               -> Version
-               -> RIO env ()
-doCabalInstall wc installed wantedVersion = do
-    when (wantedVersion >= mkVersion [2, 2]) $ do
-        logWarn "--upgrade-cabal will almost certainly fail for Cabal 2.2 or later"
-        logWarn "See: https://github.com/commercialhaskell/stack/issues/4070"
-        logWarn "Valiantly attempting to build it anyway, but I know this is doomed"
-    withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
-        logInfo $
-            "Installing Cabal-" <>
-            fromString (versionString wantedVersion) <>
-            " to replace " <>
-            fromString (versionString installed)
-        let name = mkPackageName "Cabal"
-        suffix <- parseRelDir $ "Cabal-" ++ versionString wantedVersion
-        let dir = tmpdir </> suffix
-        unpackPackageLocationRaw dir $ RPLIHackage
-          (PackageIdentifierRevision name wantedVersion CFILatest)
-          Nothing
-        compilerPath <- findExecutable (compilerExeName wc)
-                    >>= either throwM parseAbsFile
-        versionDir <- parseRelDir $ versionString wantedVersion
-        let installRoot = toFilePath $ parent (parent compilerPath)
-                                    </> relDirNewCabal
-                                    </> versionDir
-        withWorkingDir (toFilePath dir) $ proc (compilerExeName wc) ["Setup.hs"] runProcess_
-        platform <- view platformL
-        let setupExe = dir </> case platform of
-                Platform _ Cabal.Windows -> relFileSetupExe
-                _                        -> relFileSetupUpper
-            dirArgument name' = concat [ "--"
-                                       , name'
-                                       , "dir="
-                                       , installRoot FP.</> name'
-                                       ]
-            args = "configure" : map dirArgument (words "lib bin data doc")
-        withWorkingDir (toFilePath dir) $ mapM_ (\args' -> proc (toFilePath setupExe) args' runProcess_)
-          [ args
-          , ["build"]
-          , ["install"]
-          ]
-        logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
 getSystemCompiler
@@ -1415,7 +1324,7 @@ loadGhcjsEnvConfig stackYaml binPath inner = do
         })
       Nothing
       (SYLOverride stackYaml) $ \lc -> do
-        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
+        bconfig <- runRIO lc loadBuildConfig
         envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
 

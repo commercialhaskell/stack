@@ -56,7 +56,6 @@ import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)

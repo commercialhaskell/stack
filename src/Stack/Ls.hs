@@ -17,7 +17,6 @@ import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Stack.Prelude hiding (Snapshot (..))
-import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
 import Data.Text hiding (pack, intercalate)
@@ -30,11 +29,12 @@ import qualified Options.Applicative as OA
 import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
+import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
-import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
-import Stack.Runners (loadConfigWithOpts, withDefaultBuildConfig, withBuildConfigDot)
+import Stack.Runners (withConfig, withDefaultEnvConfig, withEnvConfigDot)
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
@@ -282,10 +282,10 @@ lsCmd lsOpts go =
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
-                Local -> withDefaultBuildConfig go (handleLocal lsOpts)
-                Remote -> withDefaultBuildConfig go (handleRemote lsOpts)
+                Local -> withDefaultEnvConfig go (handleLocal lsOpts)
+                Remote -> withDefaultEnvConfig go (handleRemote lsOpts)
         LsDependencies depOpts -> listDependenciesCmd False depOpts go
-        LsStyles stylesOpts -> loadConfigWithOpts go (listStylesCmd stylesOpts)
+        LsStyles stylesOpts -> withConfig go (listStylesCmd stylesOpts)
 
 -- | List the dependencies
 listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
@@ -295,7 +295,7 @@ listDependenciesCmd deprecated opts go = do
         (hPutStrLn
              stderr
              "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
-    withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
+    withEnvConfigDot (listDepsDotOpts opts) go $ listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
@@ -310,8 +310,9 @@ lsViewRemoteCmd =
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
 
 -- | List stack's output styles
-listStylesCmd :: ListStylesOpts -> LoadConfig -> IO ()
-listStylesCmd opts lc = do
+listStylesCmd :: ListStylesOpts -> RIO Config ()
+listStylesCmd opts = do
+    lc <- ask
     -- This is the same test as is used in Stack.Types.Runner.withRunner
     let useColor = view useColorL lc
         styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
@@ -319,7 +320,7 @@ listStylesCmd opts lc = do
         showSGR = isComplex && coptSGR opts
         showExample = isComplex && coptExample opts && useColor
         styleReports = L.map (styleReport showSGR showExample) styles
-    T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
+    liftIO $ T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
   where
     styleReport :: Bool -> Bool -> StyleSpec -> Text
     styleReport showSGR showExample (k, sgrs) = k <> "=" <> codes
