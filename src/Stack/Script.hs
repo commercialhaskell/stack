@@ -11,8 +11,13 @@ import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
+import           Distribution.Compiler      (CompilerFlavor (..))
 import qualified Distribution.PackageDescription as PD
+import qualified Distribution.Types.CondTree as C
 import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Types.VersionRange (withinRange)
+import           Distribution.System        (Platform (..))
+import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.IO
 import qualified Stack.Build
@@ -23,11 +28,13 @@ import           Stack.PackageDump
 import           Stack.Options.ScriptParser
 import           Stack.Runners
 import           Stack.Setup                (withNewLocalBuildTargets)
+import           Stack.SourceMap            (getCompilerInfo, immutableLocShaBs)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
 import           System.FilePath            (dropExtension, replaceExtension)
+import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Directory as Dir
 import           RIO.Process
 import qualified RIO.Text as T
@@ -85,8 +92,7 @@ scriptCmd opts go' = do
             case soPackages opts of
                 [] -> do
                     -- Using the import parser
-                    moduleInfo <- getModuleInfo
-                    getPackagesFromModuleInfo moduleInfo (soFile opts)
+                    getPackagesFromImports (soFile opts)
                 packages -> do
                     let targets = concatMap wordsComma packages
                     targets' <- mapM parsePackageNameThrowing targets
@@ -152,31 +158,114 @@ scriptCmd opts go' = do
       then replaceExtension fp "exe"
       else dropExtension fp
 
-getPackagesFromModuleInfo
-  :: ModuleInfo
-  -> FilePath -- ^ script filename
+getPackagesFromImports
+  :: FilePath -- ^ script filename
   -> RIO EnvConfig (Set PackageName)
-getPackagesFromModuleInfo mi scriptFP = do
-    (pns1, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
-    pns2 <-
-        if Set.null mns
-            then return Set.empty
-            else do
-                pns <- forM (Set.toList mns) $ \mn ->
-                    case Map.lookup mn $ miModules mi of
-                        Just pns ->
-                            case Set.toList pns of
-                                [] -> assert False $ return Set.empty
-                                [pn] -> return $ Set.singleton pn
-                                pns' -> throwString $ concat
-                                    [ "Module "
-                                    , moduleNameString mn
-                                    , " appears in multiple packages: "
-                                    , unwords $ map packageNameString pns'
-                                    ]
-                        Nothing -> return Set.empty
-                return $ Set.unions pns `Set.difference` blacklist
-    return $ Set.union pns1 pns2
+getPackagesFromImports scriptFP = do
+    (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
+    if Set.null mns
+        then return pns
+        else Set.union pns <$> getPackagesFromModuleNames mns
+
+getPackagesFromModuleNames
+  :: Set ModuleName
+  -> RIO EnvConfig (Set PackageName)
+getPackagesFromModuleNames mns = do
+    hash <- hashSnapshot
+    cached <- areSnapshotModulesCached hash
+    unless cached $ do
+        logWarn "Populating module name cache"
+        mapping <- mapSnapshotPackageModules
+        populateSnapshotModuleCache hash mapping
+    mutableMapping <- mapMutablePackageModules
+    pns <- forM (Set.toList mns) $ \mn -> do
+        immutable <- findPackagesWithModule hash mn
+        let pkgs = immutable <>
+              Map.findWithDefault mempty mn mutableMapping
+        case Set.toList pkgs of
+            [] -> return Set.empty
+            [pn] -> return $ Set.singleton pn
+            pns' -> throwString $ concat
+                [ "Module "
+                , moduleNameString mn
+                , " appears in multiple packages: "
+                , unwords $ map packageNameString pns'
+                ]
+    return $ Set.unions pns `Set.difference` blacklist
+
+hashSnapshot :: RIO EnvConfig SnapshotCacheHash
+hashSnapshot = do
+    sourceMap <- view $ envConfigL . to envConfigSourceMap
+    let wc = whichCompiler $ smCompiler sourceMap
+    compilerInfo <- getCompilerInfo wc
+    let maybePliHash dep | PLImmutable pli <- dpLocation dep =
+                             Just $ immutableLocShaBs pli
+                         | otherwise = Nothing
+        locHashes = mapMaybe maybePliHash $ Map.elems (smDeps sourceMap)
+        hashedContent = compilerInfo:locHashes
+    return $ SnapshotCacheHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
+
+mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
+mapSnapshotPackageModules = do
+    sourceMap <- view $ envConfigL . to envConfigSourceMap
+    installMap <- toInstallMap sourceMap
+    (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
+        getInstalled installMap
+    let globals = dumpedPackageModules (smGlobal sourceMap) globalDumpPkgs
+        notHidden = Map.filter (not . dpHidden)
+        notHiddenDeps = notHidden $ smDeps sourceMap
+        installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
+        dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
+        notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
+    otherDeps <- for notInstalledDeps $ \dep -> do
+        gpd <- liftIO $ cpGPD (dpCommon dep)
+        Set.fromList <$> allExposedModules gpd
+    -- source map construction process should guarantee unique package names
+    -- in these maps
+    return $ globals <> installedDeps <> otherDeps
+
+dumpedPackageModules :: Map PackageName a
+                     -> [DumpPackage]
+                     -> Map PackageName (Set ModuleName)
+dumpedPackageModules pkgs dumpPkgs =
+    let pnames = Map.keysSet pkgs `Set.difference` blacklist
+    in Map.fromList
+           [ (pn, dpExposedModules)
+           | DumpPackage {..} <- dumpPkgs
+           , let PackageIdentifier pn _ = dpPackageIdent
+           , pn `Set.member` pnames
+           ]
+
+mapMutablePackageModules :: RIO EnvConfig (Map ModuleName (Set PackageName))
+mapMutablePackageModules = do
+  deps <- view $ envConfigL . to envConfigSourceMap . to smDeps
+  fmap (Map.fromListWith mappend . concat) $ for (Map.toList deps) $ \(pname, dep) -> do
+      case dpLocation dep of
+          PLImmutable _ -> pure []
+          PLMutable _ -> do
+              gpd <- liftIO $ cpGPD (dpCommon dep)
+              modules <- allExposedModules gpd
+              return [ (m, Set.singleton pname) | m <- modules ]
+
+allExposedModules :: PD.GenericPackageDescription -> RIO EnvConfig [ModuleName]
+allExposedModules gpd = do
+  -- FIXME add os, arch conditionals
+  Platform curArch curOs <- view platformL
+  curCompiler <- view actualCompilerVersionL
+  let checkCond (PD.OS os) = pure $ os == curOs
+      checkCond (PD.Arch arch) = pure $ arch == curArch
+      checkCond (PD.Impl compiler range) = case curCompiler of
+        ACGhc version ->
+          pure $ compiler == GHC && version `withinRange` range
+        ACGhcjs version _ghcVersion ->
+          pure $ compiler == GHCJS && version `withinRange` range
+      -- currently we don't do flag checking here
+      checkCond other = Left other
+      mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
+  pure $ case mlibrary  of
+    Just lib -> PD.exposedModules lib ++
+                map PD.moduleReexportName (PD.reexportedModules lib)
+    Nothing  -> mempty
 
 -- | The Stackage project introduced the concept of hidden packages,
 -- to deal with conflicting module names. However, this is a
@@ -229,40 +318,6 @@ blacklist = Set.fromList
     , mkPackageName "cryptohash-sha1"
     , mkPackageName "cryptohash-sha256"
     ]
-
-getModuleInfo :: HasEnvConfig env => RIO env ModuleInfo
-getModuleInfo = do
-    sourceMap <- view $ envConfigL . to envConfigSourceMap
-    installMap <- toInstallMap sourceMap
-    (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
-        getInstalled installMap
-    let globals = toModuleInfo (smGlobal sourceMap) globalDumpPkgs
-        notHiddenDeps = notHidden $ smDeps sourceMap
-        installedDeps = toModuleInfo notHiddenDeps snapshotDumpPkgs
-        dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
-        notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
-    otherDeps <- liftIO $
-                 fmap (Map.fromListWith mappend . concat) $
-                 forM (Map.toList notInstalledDeps) $ \(pname, dep) -> do
-        gpd <- cpGPD (dpCommon dep)
-        let modules = maybe [] PD.exposedModules $
-              maybe (PD.library $ PD.packageDescription gpd) (Just . PD.condTreeData) $
-              PD.condLibrary gpd
-        return [ (m, Set.singleton pname) | m <- modules ]
-    return $ globals <> installedDeps <> ModuleInfo otherDeps
-  where
-    notHidden = Map.filter (not . dpHidden)
-    toModuleInfo pkgs dumpPkgs =
-        let pnames = Map.keysSet pkgs `Set.difference` blacklist
-            modules =
-                Map.fromListWith mappend
-                    [ (m, Set.singleton pn)
-                    | DumpPackage {..} <- dumpPkgs
-                    , let PackageIdentifier pn _ = dpPackageIdent
-                    , pn `Set.member` pnames
-                    , m <- Set.toList dpExposedModules
-                    ]
-        in ModuleInfo modules
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =

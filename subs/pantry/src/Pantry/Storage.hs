@@ -47,6 +47,9 @@ module Pantry.Storage
   , loadCabalBlobKey
   , hpackToCabal
   , countHackageCabals
+  , getSnapshotCacheByHash
+  , storeSnapshotModuleCache
+  , loadExposedModulePackages
 
     -- avoid warnings
   , BlobId
@@ -60,6 +63,8 @@ module Pantry.Storage
   , RepoCacheId
   , PreferredVersionsId
   , UrlBlobId
+  , SnapshotCacheId
+  , PackageExposedModuleId
   ) where
 
 import RIO hiding (FilePath)
@@ -84,7 +89,7 @@ import Data.Pool (destroyAllResources)
 import Pantry.HPack (hpackVersion, hpack)
 import Conduit
 import Data.Acquire (with)
-import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..), PantryException (MigrationFailure))
+import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..), PantryException (MigrationFailure), SnapshotCacheHash (..))
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 -- Raw blobs
@@ -205,6 +210,21 @@ RepoCache
     commit Text
     subdir Text
     tree TreeId
+
+-- Identified by sha of all immutable packages contained in a snapshot
+-- and GHC version used
+SnapshotCache
+    sha SHA256
+    UniqueSnapshotCache sha
+
+PackageExposedModule
+    snapshotCache SnapshotCacheId
+    module ModuleNameId
+    package PackageNameId
+
+ModuleName
+    name P.ModuleNameP
+    UniqueModule name
 |]
 
 initStorage
@@ -1023,3 +1043,61 @@ countHackageCabals = do
     [] -> pure 0
     (Single n):_ ->
       pure n
+
+getSnapshotCacheByHash
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> ReaderT SqlBackend (RIO env) (Maybe SnapshotCacheId)
+getSnapshotCacheByHash =
+  fmap (fmap entityKey) . getBy . UniqueSnapshotCache . unSnapshotCacheHash
+
+getSnapshotCacheId
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> ReaderT SqlBackend (RIO env) SnapshotCacheId
+getSnapshotCacheId =
+  fmap (either entityKey id) . insertBy . SnapshotCache . unSnapshotCacheHash
+
+getModuleNameId
+  :: (HasPantryConfig env, HasLogFunc env)
+  => P.ModuleName
+  -> ReaderT SqlBackend (RIO env) ModuleNameId
+getModuleNameId =
+  fmap (either entityKey id) . insertBy . ModuleName . P.ModuleNameP
+
+storeSnapshotModuleCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> Map P.PackageName (Set P.ModuleName)
+  -> ReaderT SqlBackend (RIO env) ()
+storeSnapshotModuleCache hash packageModules = do
+  cache <- getSnapshotCacheId hash
+  forM_ (Map.toList packageModules) $ \(pn, modules) -> do
+    package <- getPackageNameId pn
+    forM_ modules $ \m -> do
+      moduleName <- getModuleNameId m
+      insert_ PackageExposedModule
+        { packageExposedModuleSnapshotCache = cache
+        , packageExposedModulePackage = package
+        , packageExposedModuleModule = moduleName
+        }
+
+loadExposedModulePackages
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> P.ModuleName
+  -> ReaderT SqlBackend (RIO env) [P.PackageName]
+loadExposedModulePackages (SnapshotCacheHash sha) mName =
+  map go <$> rawSql
+    "SELECT package_name.name\n\
+    \FROM package_name, snapshot_cache, package_exposed_module, module_name\n\
+    \WHERE module_name.name=?\n\
+    \AND   snapshot_cache.sha=?\n\
+    \AND   module_name.id=package_exposed_module.module\n\
+    \AND   snapshot_cache.id=package_exposed_module.snapshot_cache\n\
+    \AND   package_name.id=package_exposed_module.package"
+    [ toPersistValue (P.ModuleNameP mName)
+    , toPersistValue sha
+    ]
+  where
+    go (Single (P.PackageNameP m)) = m

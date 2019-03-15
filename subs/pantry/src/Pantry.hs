@@ -160,6 +160,10 @@ module Pantry
   , getHackageTypoCorrections
   , loadGlobalHints
   , partitionReplacedDependencies
+  , SnapshotCacheHash (..)
+  , areSnapshotModulesCached
+  , populateSnapshotModuleCache
+  , findPackagesWithModule
   ) where
 
 import RIO
@@ -1501,3 +1505,36 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
       else do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
+
+-- | Tell if snapshot cache of exposed modules exists in the current database.
+--
+-- @since 0.1.0.0
+areSnapshotModulesCached
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> RIO env Bool
+areSnapshotModulesCached hash =
+  maybe False (const True) <$> withStorage (getSnapshotCacheByHash hash)
+
+-- | Store mapping between exposed module names and packages for a particular
+-- snapshot (specified snapshot cache hash is supposed to be unique)
+--
+-- @since 0.1.0.0
+populateSnapshotModuleCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> Map PackageName (Set ModuleName)
+  -> RIO env ()
+populateSnapshotModuleCache hash packageModules =
+  withStorage $ storeSnapshotModuleCache hash packageModules
+
+-- | Find any snapshot packages exposing specified module name as its exposed module
+--
+-- @since 0.1.0.0
+findPackagesWithModule
+   :: (HasPantryConfig env, HasLogFunc env)
+   => SnapshotCacheHash
+   -> ModuleName
+   -> RIO env (Set PackageName)
+findPackagesWithModule hash m = do
+  Set.fromList <$> withStorage (loadExposedModulePackages hash m)

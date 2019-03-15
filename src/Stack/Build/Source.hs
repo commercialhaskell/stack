@@ -44,7 +44,6 @@ import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
 import qualified    RIO.ByteString as B
 import qualified    RIO.ByteString.Lazy as BL
-import              RIO.Process (proc, readProcess_)
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
@@ -147,11 +146,7 @@ hashSourceMapData
     -> RIO env SourceMapHash
 hashSourceMapData bc boptsCli wc smDeps = do
     compilerPath <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
-    let compilerExe =
-            case wc of
-                Ghc -> "ghc"
-                Ghcjs -> "ghcjs"
-    compilerInfo <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
+    compilerInfo <- getCompilerInfo wc
     immDeps <- forM (Map.elems smDeps) depPackageHashableContent
     let -- extra bytestring specifying GHC options supposed to be applied to
         -- GHC boot packages so we'll have differrent hashes when bare
@@ -171,13 +166,9 @@ depPackageHashableContent DepPackage {..} = do
                         then ""
                         else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
                 flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-                locationTreeKey (PLIHackage _ _ tk) = tk
-                locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
-                locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
-                treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
                 ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-                hash = treeKeyToBs $ locationTreeKey pli
+                hash = immutableLocShaBs pli
             return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
 
 -- | All flags for a local package.
