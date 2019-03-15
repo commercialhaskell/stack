@@ -1,10 +1,14 @@
 {-# LANGUAGE ViewPatterns #-}
 
 import StackTest
+import Data.Char (isSpace)
+import Data.List (dropWhileEnd)
 import Data.Maybe (listToMaybe, fromMaybe)
 import System.Directory
 import System.FilePath
-import Data.List.Extra (trimEnd)
+
+trimEnd :: String -> String
+trimEnd = dropWhileEnd isSpace
 
 main :: IO ()
 main =
