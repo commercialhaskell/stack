@@ -14,8 +14,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Distribution.System (OS (..))
 import Stack.Constants
+import Stack.Types.Config
 import Stack.Types.Nix
-import Stack.Types.Runner
 import System.Directory (doesFileExist)
 
 -- | Interprets NixOptsMonoid options.

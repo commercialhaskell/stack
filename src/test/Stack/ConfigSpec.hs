@@ -11,8 +11,9 @@ import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
 import Stack.Prelude
+import Stack.Runners
 import Stack.Types.Config
-import Stack.Types.Runner
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import System.Directory
 import System.Environment
 import System.IO (writeFile)
@@ -99,10 +100,9 @@ spec = beforeAll setup $ do
         bracket_ setVar resetVar action
 
   describe "parseProjectAndConfigMonoid" $ do
-    let loadProject' fp inner =
-          withRunner logLevel True False ColorAuto mempty Nothing False $
-          \runner ->
-            runRIO runner $ do
+    let loadProject' fp inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $ do
               iopc <- loadConfigYaml (
                 parseProjectAndConfigMonoid (parent fp)
                 ) fp
@@ -131,9 +131,10 @@ spec = beforeAll setup $ do
         `shouldThrow` anyException
 
   describe "loadConfig" $ do
-    let loadConfig' inner =
-          withRunner logLevel True False ColorAuto mempty Nothing False $ \runner ->
-            runRIO runner $ loadConfig mempty Nothing SYLDefault inner
+    let loadConfig' inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $
+            loadConfig mempty Nothing SYLDefault inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
       loadConfig' $ const $ return ()
@@ -189,7 +190,7 @@ spec = beforeAll setup $ do
       createDirectory childDir
       setCurrentDirectory childDir
       loadConfig' $ \config -> liftIO $ do
-        bc <- runRIO config $ loadBuildConfig Nothing
+        bc <- runRIO config loadBuildConfig
         view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
@@ -198,7 +199,7 @@ spec = beforeAll setup $ do
         writeFile stackYamlFp sampleConfig
         writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
         withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \config -> liftIO $ do
-          BuildConfig{..} <- runRIO config $ loadBuildConfig Nothing
+          BuildConfig{..} <- runRIO config loadBuildConfig
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
@@ -212,7 +213,7 @@ spec = beforeAll setup $ do
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
-            BuildConfig{..} <- runRIO config $ loadBuildConfig Nothing
+            BuildConfig{..} <- runRIO config loadBuildConfig
             bcStackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $

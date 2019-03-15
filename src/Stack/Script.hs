@@ -56,13 +56,12 @@ scriptCmd opts go' = do
     srcMod <- getModificationTime file
     exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
     if srcMod < exeMod
-      then withRunnerGlobal go' $ \runner ->
-           runRIO runner $
+      then withRunnerGlobal go' $
            exec (toExeName $ toFilePath file) (soArgs opts)
       else longWay file scriptDir go
 
   longWay file scriptDir go = do
-    withDefaultBuildConfigAndLock go $ \lk -> do
+    withDefaultEnvConfigAndLock go $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use
       -- logError instead of logWarn because, when using the

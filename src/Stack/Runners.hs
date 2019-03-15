@@ -8,14 +8,14 @@
 module Stack.Runners
     ( withGlobalConfigAndLock
     , withConfigAndLock
-    , withBuildConfigAndLock
-    , withDefaultBuildConfigAndLock
+    , withEnvConfigAndLock
+    , withDefaultEnvConfigAndLock
     , withCleanConfig
-    , withBuildConfig
-    , withDefaultBuildConfig
-    , withBuildConfigExt
-    , withBuildConfigDot
-    , loadConfigWithOpts
+    , withEnvConfig
+    , withDefaultEnvConfig
+    , withEnvConfigExt
+    , withEnvConfigDot
+    , withConfig
     , loadCompilerVersion
     , withUserFileLock
     , munlockFile
@@ -25,6 +25,7 @@ module Stack.Runners
 import           Stack.Prelude
 import           Path
 import           Path.IO
+import           RIO.Process (mkDefaultProcessContext)
 import           Stack.Build.Target(NeedTargets(..))
 import           Stack.Config
 import           Stack.Constants
@@ -33,18 +34,15 @@ import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
 import           Stack.Types.Config
-import           Stack.Types.Runner
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment (getEnvironment)
-import           System.IO
 import           System.FileLock
+import           System.Terminal (getTerminalWidth)
 import           Stack.Dot
 
 -- FIXME it seems wrong that we call loadBuildConfig multiple times
-loadCompilerVersion :: GlobalOpts
-                    -> Config
-                    -> IO WantedCompiler
-loadCompilerVersion go config =
-    view wantedCompilerVersionL <$> runRIO config (loadBuildConfig (globalCompiler go))
+loadCompilerVersion :: RIO Config WantedCompiler
+loadCompilerVersion = view wantedCompilerVersionL <$> loadBuildConfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -53,13 +51,12 @@ loadCompilerVersion go config =
 -- stack uses locks per-snapshot.  In the future, stack may refine
 -- this to an even more fine-grain locking approach.
 --
-withUserFileLock :: MonadUnliftIO m
-                 => GlobalOpts
-                 -> Path Abs Dir
-                 -> (Maybe FileLock -> m a)
-                 -> m a
-withUserFileLock go@GlobalOpts{} dir act = do
-    env <- liftIO getEnvironment
+withUserFileLock :: HasRunner env
+                 => Path Abs Dir
+                 -> (Maybe FileLock -> RIO env a)
+                 -> RIO env a
+withUserFileLock dir act = withRunInIO $ \run -> do
+    env <- getEnvironment
     let toLock = lookup "STACK_LOCK" env == Just "true"
     if toLock
         then do
@@ -68,37 +65,37 @@ withUserFileLock go@GlobalOpts{} dir act = do
             ensureDir dir
             -- Just in case of asynchronous exceptions, we need to be careful
             -- when using tryLockFile here:
-            bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-                    (maybe (return ()) (liftIO . unlockFile))
+            bracket (tryLockFile (toFilePath pth) Exclusive)
+                    munlockFile
                     (\fstTry ->
                         case fstTry of
-                          Just lk -> finally (act $ Just lk) (liftIO $ unlockFile lk)
+                          Just lk -> run $ act $ Just lk
                           Nothing ->
-                            do let chatter = globalLogLevel go /= LevelOther "silent"
-                               when chatter $
-                                 liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
-                                                     "); other stack instance running.  Waiting..."
-                               bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
-                                       (liftIO . unlockFile)
-                                       (\lk -> do
-                                            when chatter $
-                                              liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
+                            do run $ logError $
+                                 "Failed to grab lock (" <>
+                                 displayShow pth <>
+                                 "); other stack instance running.  Waiting..."
+                               bracket (lockFile (toFilePath pth) Exclusive)
+                                       unlockFile
+                                       (\lk -> run $ do
+                                            logError "Lock acquired, proceeding."
                                             act $ Just lk))
-        else act Nothing
+        else run $ act Nothing
 
 withConfigAndLock
     :: GlobalOpts
     -> RIO Config ()
     -> IO ()
-withConfigAndLock go@GlobalOpts{..} inner = loadConfigWithOpts go $ \config -> do
-    withUserFileLock go (view stackRootL config) $ \lk ->
-        runRIO config $
-            Docker.reexecWithOptionalContainer
-                (configProjectRoot config)
-                Nothing
-                (runRIO config inner)
-                Nothing
-                (Just $ munlockFile lk)
+withConfigAndLock go@GlobalOpts{..} inner = withConfig go $ do
+    stackRoot <- view stackRootL
+    projectRoot <- view $ to configProjectRoot
+    withUserFileLock stackRoot $ \lk ->
+      Docker.reexecWithOptionalContainer
+        projectRoot
+        Nothing
+        inner
+        Nothing
+        (Just $ munlockFile lk)
 
 -- | Loads global config, ignoring any configuration which would be
 -- loaded due to $PWD.
@@ -107,49 +104,49 @@ withGlobalConfigAndLock
     -> RIO Config ()
     -> IO ()
 withGlobalConfigAndLock go@GlobalOpts{..} inner =
-    withRunnerGlobal go $ \runner ->
-    runRIO runner $ loadConfigMaybeProject
+    withRunnerGlobal go $
+    loadConfigMaybeProject
       globalConfigMonoid
       globalResolver
       PCNoProject $ \lc ->
-        withUserFileLock go (view stackRootL lc) $ \_lk ->
+        withUserFileLock (view stackRootL lc) $ \_lk ->
           runRIO lc inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
-withDefaultBuildConfig
+withDefaultEnvConfig
     :: GlobalOpts
     -> RIO EnvConfig ()
     -> IO ()
-withDefaultBuildConfig go inner =
-    withBuildConfigAndLock go AllowNoTargets defaultBuildOptsCLI (\lk -> do munlockFile lk
-                                                                            inner)
+withDefaultEnvConfig go inner =
+    withEnvConfigAndLock go AllowNoTargets defaultBuildOptsCLI (\lk -> do munlockFile lk
+                                                                          inner)
 
-withBuildConfig
+withEnvConfig
     :: GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
     -> RIO EnvConfig ()
     -> IO ()
-withBuildConfig go needTargets boptsCLI inner =
-    withBuildConfigAndLock go needTargets boptsCLI (\lk -> do munlockFile lk
-                                                              inner)
+withEnvConfig go needTargets boptsCLI inner =
+    withEnvConfigAndLock go needTargets boptsCLI (\lk -> do munlockFile lk
+                                                            inner)
 
-withDefaultBuildConfigAndLock
+withDefaultEnvConfigAndLock
     :: GlobalOpts
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
-withDefaultBuildConfigAndLock go inner =
-    withBuildConfigExt go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+withDefaultEnvConfigAndLock go inner =
+    withEnvConfigExt go AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
 
-withBuildConfigAndLock
+withEnvConfigAndLock
     :: GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
     -> (Maybe FileLock -> RIO EnvConfig ())
     -> IO ()
-withBuildConfigAndLock go needTargets boptsCLI inner =
-    withBuildConfigExt go needTargets boptsCLI Nothing inner Nothing
+withEnvConfigAndLock go needTargets boptsCLI inner =
+    withEnvConfigExt go needTargets boptsCLI Nothing inner Nothing
 
 -- | A runner specially built for the "stack clean" use case. For some
 -- reason (hysterical raisins?), all of the functions in this module
@@ -162,14 +159,15 @@ withBuildConfigAndLock go needTargets boptsCLI inner =
 -- since it does not need to run any commands to get information on
 -- the project. This is a change as of #4480. For previous behavior,
 -- see issue #2010.
-withCleanConfig :: GlobalOpts -> RIO BuildConfig () -> IO ()
+withCleanConfig :: GlobalOpts -> RIO BuildConfig a -> IO a
 withCleanConfig go inner =
-  loadConfigWithOpts go $ \config ->
-  withUserFileLock go (view stackRootL config) $ \_lk0 -> do
-    bconfig <- runRIO config $ loadBuildConfig $ globalCompiler go
-    runRIO bconfig inner
+  withConfig go $ do
+    root <- view stackRootL
+    withUserFileLock root $ \_lk0 -> do
+      bconfig <- loadBuildConfig
+      runRIO bconfig inner
 
-withBuildConfigExt
+withEnvConfigExt
     :: GlobalOpts
     -> NeedTargets
     -> BuildOptsCLI
@@ -187,8 +185,9 @@ withBuildConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> IO ()
-withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = loadConfigWithOpts go $ \config -> do
-    withUserFileLock go (view stackRootL config) $ \lk0 -> do
+withEnvConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter = withConfig go $ do
+    config <- ask
+    withUserFileLock (view stackRootL config) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
       let inner' lk =
@@ -197,24 +196,21 @@ withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter =
             -- trade in the lock here.
             do dir <- installationRootDeps
                -- Hand-over-hand locking:
-               withUserFileLock go dir $ \lk2 -> do
+               withUserFileLock dir $ \lk2 -> do
                  liftIO $ writeIORef curLk lk2
                  liftIO $ munlockFile lk
                  logDebug "Starting to execute command inside EnvConfig"
                  inner lk2
 
       let inner'' lk = do
-              bconfig <- runRIO config $ loadBuildConfig globalCompiler
+              bconfig <- runRIO config loadBuildConfig
               envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
               runRIO envConfig (inner' lk)
 
-      let getCompilerVersion = loadCompilerVersion go config
-      runRIO config $
-        Docker.reexecWithOptionalContainer
+      Docker.reexecWithOptionalContainer
           (configProjectRoot config)
           mbefore
-          (runRIO config $
-              Nix.reexecWithOptionalShell (configProjectRoot config) getCompilerVersion (inner'' lk0))
+          (Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion (inner'' lk0))
           mafter
           (Just $ liftIO $
                 do lk' <- readIORef curLk
@@ -222,34 +218,53 @@ withBuildConfigExt go@GlobalOpts{..} needTargets boptsCLI mbefore inner mafter =
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
-loadConfigWithOpts
+withConfig
   :: GlobalOpts
-  -> (Config -> IO a)
+  -> RIO Config a
   -> IO a
-loadConfigWithOpts go@GlobalOpts{..} inner = withRunnerGlobal go $ \runner -> do
+withConfig go@GlobalOpts{..} inner = withRunnerGlobal go $ do
     mstackYaml <- forM globalStackYaml resolveFile'
-    runRIO runner $
-      loadConfig globalConfigMonoid globalResolver mstackYaml $ \config -> do
-        -- If we have been relaunched in a Docker container, perform in-container initialization
-        -- (switch UID, etc.).  We do this after first loading the configuration since it must
-        -- happen ASAP but needs a configuration.
-        forM_ globalDockerEntrypoint $ Docker.entrypoint config
-        liftIO $ inner config
+    loadConfig globalConfigMonoid globalResolver mstackYaml $ \config -> do
+      -- If we have been relaunched in a Docker container, perform in-container initialization
+      -- (switch UID, etc.).  We do this after first loading the configuration since it must
+      -- happen ASAP but needs a configuration.
+      forM_ globalDockerEntrypoint $ Docker.entrypoint config
+      runRIO config inner
 
-withRunnerGlobal :: GlobalOpts -> (Runner -> IO a) -> IO a
-withRunnerGlobal GlobalOpts{..} inner = do
-    defColorWhen <- defaultColorWhen
-    let globalColorWhen =
-            fromFirst defColorWhen (configMonoidColorWhen globalConfigMonoid)
-    withRunner
-        globalLogLevel
-        globalTimeInLog
-        globalTerminal
-        globalColorWhen
-        globalStylesUpdate
-        globalTermWidth
-        (isJust globalReExecVersion)
-        inner
+withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
+withRunnerGlobal go inner = do
+  colorWhen <-
+    case getFirst $ configMonoidColorWhen $ globalConfigMonoid go of
+      Nothing -> defaultColorWhen
+      Just colorWhen -> pure colorWhen
+  useColor <- case colorWhen of
+    ColorNever -> return False
+    ColorAlways -> return True
+    ColorAuto -> fromMaybe True <$>
+                          hSupportsANSIWithoutEmulation stderr
+  termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
+                                    <$> getTerminalWidth)
+                                   pure (globalTermWidth go)
+  menv <- mkDefaultProcessContext
+  logOptions0 <- logOptionsHandle stderr False
+  let logOptions
+        = setLogUseColor useColor
+        $ setLogUseTime (globalTimeInLog go)
+        $ setLogMinLevel (globalLogLevel go)
+        $ setLogVerboseFormat (globalLogLevel go <= LevelDebug)
+        $ setLogTerminal (globalTerminal go)
+          logOptions0
+  withLogFunc logOptions $ \logFunc -> runRIO Runner
+    { runnerGlobalOpts = go
+    , runnerUseColor = useColor
+    , runnerLogFunc = logFunc
+    , runnerTermWidth = termWidth
+    , runnerProcessContext = menv
+    } inner
+  where clipWidth w
+          | w < minTerminalWidth = minTerminalWidth
+          | w > maxTerminalWidth = maxTerminalWidth
+          | otherwise = w
 
 -- | Unlock a lock file, if the value is Just
 munlockFile :: MonadIO m => Maybe FileLock -> m ()
@@ -257,12 +272,12 @@ munlockFile Nothing = return ()
 munlockFile (Just lk) = liftIO $ unlockFile lk
 
 -- Plumbing for --test and --bench flags
-withBuildConfigDot
+withEnvConfigDot
     :: DotOpts
     -> GlobalOpts
     -> RIO EnvConfig ()
     -> IO ()
-withBuildConfigDot opts go f = withBuildConfig go' NeedTargets boptsCLI f
+withEnvConfigDot opts go f = withEnvConfig go' NeedTargets boptsCLI f
   where
     boptsCLI = defaultBuildOptsCLI
         { boptsCLITargets = dotTargets opts
