@@ -14,7 +14,6 @@ module Stack.Runners
     , withEnvConfig
     , withDefaultEnvConfig
     , withEnvConfigExt
-    , withEnvConfigDot
     , withConfig
     , loadCompilerVersion
     , withUserFileLock
@@ -38,7 +37,6 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment (getEnvironment)
 import           System.FileLock
 import           System.Terminal (getTerminalWidth)
-import           Stack.Dot
 
 -- FIXME it seems wrong that we call loadBuildConfig multiple times
 loadCompilerVersion :: RIO Config WantedCompiler
@@ -110,8 +108,8 @@ withGlobalConfigAndLock inner =
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
 withDefaultEnvConfig
-    :: RIO EnvConfig ()
-    -> RIO Config ()
+    :: RIO EnvConfig a
+    -> RIO Config a
 withDefaultEnvConfig inner =
     withEnvConfigAndLock AllowNoTargets defaultBuildOptsCLI (\lk -> do munlockFile lk
                                                                        inner)
@@ -119,23 +117,23 @@ withDefaultEnvConfig inner =
 withEnvConfig
     :: NeedTargets
     -> BuildOptsCLI
-    -> RIO EnvConfig ()
-    -> RIO Config ()
+    -> RIO EnvConfig a
+    -> RIO Config a
 withEnvConfig needTargets boptsCLI inner =
     withEnvConfigAndLock needTargets boptsCLI (\lk -> do munlockFile lk
                                                          inner)
 
 withDefaultEnvConfigAndLock
-    :: (Maybe FileLock -> RIO EnvConfig ())
-    -> RIO Config ()
+    :: (Maybe FileLock -> RIO EnvConfig a)
+    -> RIO Config a
 withDefaultEnvConfigAndLock inner =
     withEnvConfigExt AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
 
 withEnvConfigAndLock
     :: NeedTargets
     -> BuildOptsCLI
-    -> (Maybe FileLock -> RIO EnvConfig ())
-    -> RIO Config ()
+    -> (Maybe FileLock -> RIO EnvConfig a)
+    -> RIO Config a
 withEnvConfigAndLock needTargets boptsCLI inner =
     withEnvConfigExt needTargets boptsCLI Nothing inner Nothing
 
@@ -263,20 +261,3 @@ withRunnerGlobal go inner = do
 munlockFile :: MonadIO m => Maybe FileLock -> m ()
 munlockFile Nothing = return ()
 munlockFile (Just lk) = liftIO $ unlockFile lk
-
--- Plumbing for --test and --bench flags
-withEnvConfigDot
-    :: DotOpts
-    -> RIO EnvConfig ()
-    -> RIO Config ()
-withEnvConfigDot opts f =
-  local (over globalOptsL modifyGO) $
-  withEnvConfig NeedTargets boptsCLI f
-  where
-    boptsCLI = defaultBuildOptsCLI
-        { boptsCLITargets = dotTargets opts
-        , boptsCLIFlags = dotFlags opts
-        }
-    modifyGO =
-        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) .
-        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)

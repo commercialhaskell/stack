@@ -34,11 +34,13 @@ import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
 import qualified Stack.Prelude (pkgName)
+import           Stack.Runners
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.SourceMap
+import           Stack.Build.Target(NeedTargets(..))
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -72,7 +74,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: HasEnvConfig env => DotOpts -> RIO env ()
+dot :: DotOpts -> RIO Runner ()
 dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
@@ -88,12 +90,11 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: HasEnvConfig env
-                            => DotOpts
-                            -> RIO env
+createPrunedDependencyGraph :: DotOpts
+                            -> RIO Runner
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
-createPrunedDependencyGraph dotOpts = do
+createPrunedDependencyGraph dotOpts = withConfig $ withEnvConfigDot dotOpts $ do
   localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
@@ -106,9 +107,9 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: HasEnvConfig env
-                       => DotOpts
-                       -> RIO env (Map PackageName (Set PackageName, DotPayload))
+createDependencyGraph
+  :: DotOpts
+  -> RIO EnvConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view $ envConfigL.to envConfigSourceMap
   locals <- projectLocalPackages
@@ -129,9 +130,9 @@ createDependencyGraph dotOpts = do
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: HasEnvConfig env
-                  => ListDepsOpts
-                  -> RIO env ()
+listDependencies
+  :: ListDepsOpts
+  -> RIO Runner ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
@@ -244,14 +245,13 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: HasEnvConfig env
-                => SourceMap
+createDepLoader :: SourceMap
                 -> Map PackageName DumpPackage
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
-                    Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
+                    Map FlagName Bool -> [Text] -> RIO EnvConfig (Set PackageName, DotPayload))
                 -> PackageName
-                -> RIO env (Set PackageName, DotPayload)
+                -> RIO EnvConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
   fromMaybe noDepsErr
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
@@ -372,3 +372,20 @@ isWiredIn = (`Set.member` wiredInPackages)
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp =
   fromMaybe (lpPackage lp) (lpTestBench lp)
+
+-- Plumbing for --test and --bench flags
+withEnvConfigDot
+    :: DotOpts
+    -> RIO EnvConfig a
+    -> RIO Config a
+withEnvConfigDot opts f =
+  local (over globalOptsL modifyGO) $
+  withEnvConfig NeedTargets boptsCLI f
+  where
+    boptsCLI = defaultBuildOptsCLI
+        { boptsCLITargets = dotTargets opts
+        , boptsCLIFlags = dotFlags opts
+        }
+    modifyGO =
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) .
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)

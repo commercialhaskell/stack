@@ -10,9 +10,6 @@ module Stack.Ls
   ) where
 
 import Control.Exception (Exception, throw)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
@@ -34,7 +31,7 @@ import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
 import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
-import Stack.Runners (withConfig, withDefaultEnvConfig, withEnvConfigDot)
+import Stack.Runners (withConfig, withDefaultEnvConfig)
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
@@ -226,11 +223,9 @@ displayLocalSnapshot term xs = renderData term (localSnaptoText xs)
 localSnaptoText :: [String] -> Text
 localSnaptoText xs = T.intercalate "\n" $ L.map T.pack xs
 
-handleLocal
-    :: (HasEnvConfig env)
-    => LsCmdOpts -> RIO env ()
+handleLocal :: LsCmdOpts -> RIO Runner ()
 handleLocal lsOpts = do
-    (instRoot :: Path Abs Dir) <- installationRootDeps
+    (instRoot :: Path Abs Dir) <- withConfig $ withDefaultEnvConfig installationRootDeps
     isStdoutTerminal <- view terminalL
     let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
@@ -251,8 +246,8 @@ handleLocal lsOpts = do
         LsStyles _ -> return ()
 
 handleRemote
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
-    => LsCmdOpts -> m ()
+    :: HasRunner env
+    => LsCmdOpts -> RIO env ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
     isStdoutTerminal <- view terminalL
@@ -278,23 +273,22 @@ handleRemote lsOpts = do
 
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
-    withConfig $
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
-                Local -> withDefaultEnvConfig (handleLocal lsOpts)
-                Remote -> withDefaultEnvConfig (handleRemote lsOpts)
+                Local -> handleLocal lsOpts
+                Remote -> handleRemote lsOpts
         LsDependencies depOpts -> listDependenciesCmd False depOpts
-        LsStyles stylesOpts -> listStylesCmd stylesOpts
+        LsStyles stylesOpts -> withConfig $ listStylesCmd stylesOpts
 
 -- | List the dependencies
-listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Config ()
+listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Runner ()
 listDependenciesCmd deprecated opts = do
     when
         deprecated
         (logWarn
              "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
-    withEnvConfigDot (listDepsDotOpts opts) $ listDependencies opts
+    listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
