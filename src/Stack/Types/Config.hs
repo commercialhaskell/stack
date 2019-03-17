@@ -454,7 +454,7 @@ data GlobalOpts = GlobalOpts
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
-    , globalStackYaml    :: !(StackYamlLoc FilePath) -- ^ Override project stack.yaml
+    , globalStackYaml    :: !(StackYamlLoc (Path Abs File)) -- ^ Override project stack.yaml
     } deriving (Show)
 
 -- | Location for the project's stack.yaml file.

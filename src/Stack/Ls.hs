@@ -40,7 +40,6 @@ import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
-import System.IO (stderr, hPutStrLn)
 
 data LsView
     = Local
@@ -277,25 +276,25 @@ handleRemote lsOpts = do
   where
     urlInfo = "https://www.stackage.org/snapshots"
 
-lsCmd :: LsCmdOpts -> GlobalOpts -> IO ()
-lsCmd lsOpts go =
+lsCmd :: LsCmdOpts -> RIO Runner ()
+lsCmd lsOpts =
+    withConfig $
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
-                Local -> withDefaultEnvConfig go (handleLocal lsOpts)
-                Remote -> withDefaultEnvConfig go (handleRemote lsOpts)
-        LsDependencies depOpts -> listDependenciesCmd False depOpts go
-        LsStyles stylesOpts -> withConfig go (listStylesCmd stylesOpts)
+                Local -> withDefaultEnvConfig (handleLocal lsOpts)
+                Remote -> withDefaultEnvConfig (handleRemote lsOpts)
+        LsDependencies depOpts -> listDependenciesCmd False depOpts
+        LsStyles stylesOpts -> listStylesCmd stylesOpts
 
 -- | List the dependencies
-listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd deprecated opts go = do
+listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Config ()
+listDependenciesCmd deprecated opts = do
     when
         deprecated
-        (hPutStrLn
-             stderr
+        (logWarn
              "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
-    withEnvConfigDot (listDepsDotOpts opts) go $ listDependencies opts
+    withEnvConfigDot (listDepsDotOpts opts) $ listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =

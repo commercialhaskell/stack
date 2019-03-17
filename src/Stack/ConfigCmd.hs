@@ -21,7 +21,6 @@ import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Path
-import           Path.IO
 import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
 import           Stack.Constants
 import           Stack.Snapshot (loadResolver)
@@ -49,13 +48,13 @@ configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
     :: (HasConfig env, HasGHCVariant env)
-    => GlobalOpts -> ConfigCmdSet -> RIO env ()
-cfgCmdSet go cmd = do
+    => ConfigCmdSet -> RIO env ()
+cfgCmdSet cmd = do
     conf <- view configL
     configFilePath <-
              case configCmdSetScope cmd of
                  CommandScopeProject -> do
-                     mstackYamlOption <- forM (globalStackYaml go) resolveFile'
+                     mstackYamlOption <- view $ globalOptsL.to globalStackYaml
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
                          PCProject stackYaml -> return stackYaml

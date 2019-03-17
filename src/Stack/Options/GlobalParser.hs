@@ -5,7 +5,7 @@ module Stack.Options.GlobalParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Path.IO (getCurrentDir, resolveDir')
+import           Path.IO (getCurrentDir, resolveDir', resolveFile')
 import qualified Stack.Docker                      as Docker
 import           Stack.Init
 import           Stack.Prelude
@@ -74,6 +74,10 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
         First Nothing -> getCurrentDir
         First (Just dir) -> resolveDir' dir
     resolvePaths (Just root) ur
+  stackYaml <-
+    case getFirst globalMonoidStackYaml of
+      Nothing -> pure SYLDefault
+      Just fp -> SYLOverride <$> resolveFile' fp
   pure GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
@@ -85,7 +89,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
     , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
-    , globalStackYaml = maybe SYLDefault SYLOverride $ getFirst globalMonoidStackYaml
+    , globalStackYaml = stackYaml
     }
 
 initOptsParser :: Parser InitOpts

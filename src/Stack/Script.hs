@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -33,12 +34,12 @@ import           RIO.Process
 import qualified RIO.Text as T
 
 -- | Run a Stack Script
-scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
-scriptCmd opts go' = do
+scriptCmd :: ScriptOpts -> RIO Runner ()
+scriptCmd opts = do
     file <- resolveFile' $ soFile opts
     let scriptDir = parent file
-        go = go'
-            { globalConfigMonoid = (globalConfigMonoid go')
+        modifyGO go = go
+            { globalConfigMonoid = (globalConfigMonoid go)
                 { configMonoidInstallGHC = First $ Just True
                 }
             , globalStackYaml = SYLNoConfig $ soScriptExtraDeps opts
@@ -46,31 +47,32 @@ scriptCmd opts go' = do
 
     -- Optimization: if we're compiling, and the executable is newer
     -- than the source file, run it immediately.
-    case soCompile opts of
-      SEInterpret -> longWay file scriptDir go
-      SECompile -> shortCut file scriptDir go
-      SEOptimize -> shortCut file scriptDir go
+    local (over globalOptsL modifyGO) $
+      case soCompile opts of
+        SEInterpret -> longWay file scriptDir
+        SECompile -> shortCut file scriptDir
+        SEOptimize -> shortCut file scriptDir
 
   where
-  shortCut file scriptDir go = handleIO (const $ longWay file scriptDir go) $ do
+  shortCut file scriptDir = handleIO (const $ longWay file scriptDir) $ do
     srcMod <- getModificationTime file
     exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
     if srcMod < exeMod
-      then withRunnerGlobal go' $
-           exec (toExeName $ toFilePath file) (soArgs opts)
-      else longWay file scriptDir go
+      then exec (toExeName $ toFilePath file) (soArgs opts)
+      else longWay file scriptDir
 
-  longWay file scriptDir go = do
-    withDefaultEnvConfigAndLock go $ \lk -> do
+  longWay file scriptDir =
+    withConfig $
+    withDefaultEnvConfigAndLock $ \lk -> do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use
       -- logError instead of logWarn because, when using the
       -- interpreter mode, only error messages are shown. See:
       -- https://github.com/commercialhaskell/stack/issues/3007
-      case globalStackYaml go' of
+      view (globalOptsL.to globalStackYaml) >>= \case
         SYLOverride fp -> logError $
           "Ignoring override stack.yaml file for script command: " <>
-          fromString fp
+          fromString (toFilePath fp)
         SYLDefault -> return ()
         SYLNoConfig _ -> assert False (return ())
 
