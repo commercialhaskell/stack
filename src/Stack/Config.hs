@@ -394,15 +394,13 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
 -- necessary.
 loadConfigMaybeProject
     :: HasRunner env
-    => ConfigMonoid
-    -- ^ Config monoid from parsed command-line arguments
-    -> Maybe AbstractResolver
-    -- ^ Override resolver
-    -> ProjectConfig (Project, Path Abs File, ConfigMonoid)
+    => ProjectConfig (Project, Path Abs File, ConfigMonoid)
     -- ^ Project config to use, if any
     -> (Config -> RIO env a)
     -> RIO env a
-loadConfigMaybeProject configArgs mresolver mproject inner = do
+loadConfigMaybeProject mproject inner = do
+    mresolver <- view $ globalOptsL.to globalResolver
+    configArgs <- view $ globalOptsL.to globalConfigMonoid
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
     let (mproject', addConfigMonoid) =
@@ -448,17 +446,10 @@ loadConfigMaybeProject configArgs mresolver mproject inner = do
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
 -- override for the location of the project's stack.yaml.
-loadConfig :: HasRunner env
-           => ConfigMonoid
-           -- ^ Config monoid from parsed command-line arguments
-           -> Maybe AbstractResolver
-           -- ^ Override resolver
-           -> StackYamlLoc (Path Abs File)
-           -- ^ Override stack.yaml
-           -> (Config -> RIO env a)
-           -> RIO env a
-loadConfig configArgs mresolver mstackYaml inner =
-    loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject configArgs mresolver x inner
+loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
+loadConfig inner = do
+    mstackYaml <- view $ globalOptsL.to globalStackYaml
+    loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject x inner
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.

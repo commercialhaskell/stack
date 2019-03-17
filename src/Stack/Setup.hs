@@ -1316,17 +1316,21 @@ loadGhcjsEnvConfig
   -> Path b t
   -> (EnvConfig -> RIO env a)
   -> RIO env a
-loadGhcjsEnvConfig stackYaml binPath inner = do
-    loadConfig
-      (mempty
-        { configMonoidInstallGHC = First (Just True)
-        , configMonoidLocalBinPath = First (Just (toFilePath binPath))
-        })
-      Nothing
-      (SYLOverride stackYaml) $ \lc -> do
-        bconfig <- runRIO lc loadBuildConfig
+loadGhcjsEnvConfig stackYaml binPath inner =
+    local (over globalOptsL modifyGO) $
+    loadConfig $ \config -> do
+        bconfig <- runRIO config loadBuildConfig
         envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
         inner envConfig
+  where
+    modifyGO go = go
+      { globalConfigMonoid = mempty
+        { configMonoidInstallGHC = First (Just True)
+        , configMonoidLocalBinPath = First (Just (toFilePath binPath))
+        }
+      , globalResolver = Nothing
+      , globalStackYaml = SYLOverride stackYaml
+      }
 
 buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> m ()
 buildInGhcjsEnv envConfig = do

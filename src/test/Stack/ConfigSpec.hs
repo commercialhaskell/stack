@@ -134,7 +134,7 @@ spec = beforeAll setup $ do
     let loadConfig' inner = do
           globalOpts <- globalOptsFromMonoid False mempty
           withRunnerGlobal globalOpts { globalLogLevel = logLevel } $
-            loadConfig mempty Nothing SYLDefault inner
+            loadConfig inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
       loadConfig' $ const $ return ()

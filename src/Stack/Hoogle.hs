@@ -24,13 +24,18 @@ import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withDefaultEnvConfig haddocksGo $ do
+hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
+hoogleCmd (args,setup,rebuild,startServer) =
+  local (over globalOptsL modifyGO) $
+  withConfig $
+  withDefaultEnvConfig $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
   where
-    haddocksGo = go & globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
+    modifyGO :: GlobalOpts -> GlobalOpts
+    modifyGO = globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
+
     args' :: [String]
     args' = if startServer
                  then ["server", "--local", "--port", "8080"]
@@ -61,9 +66,10 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultEnvConfig haddocksGo 
            createDirIfMissing True dir
            runHoogle hooglePath ["generate", "--local"]
     buildHaddocks :: RIO EnvConfig ()
-    buildHaddocks =
-        liftIO $
-        catch (withDefaultEnvConfigAndLock haddocksGo $ Stack.Build.build Nothing)
+    buildHaddocks = do
+      config <- view configL
+      runRIO config $ -- a bit weird that we have to drop down like this
+        catch (withDefaultEnvConfigAndLock $ Stack.Build.build Nothing)
               (\(_ :: ExitCode) -> return ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
@@ -105,10 +111,8 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultEnvConfig haddocksGo 
                     (\(PackageIdentifierRevision n v _) -> PackageIdentifier n v)
                     hooglePackageIdentifier
                 }
-        liftIO
-            (catch
+        runRIO config $ catch -- Also a bit weird
                  (withEnvConfigAndLock
-                      haddocksGo
                       NeedTargets
                       boptsCLI $
                       Stack.Build.build Nothing
@@ -116,7 +120,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withDefaultEnvConfig haddocksGo 
                  (\(e :: ExitCode) ->
                        case e of
                            ExitSuccess -> runRIO menv resetExeCache
-                           _ -> throwIO e))
+                           _ -> throwIO e)
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
