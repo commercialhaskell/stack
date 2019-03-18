@@ -245,7 +245,6 @@ mapMutablePackageModules = do
 
 allExposedModules :: PD.GenericPackageDescription -> RIO EnvConfig [ModuleName]
 allExposedModules gpd = do
-  -- FIXME add os, arch conditionals
   Platform curArch curOs <- view platformL
   curCompiler <- view actualCompilerVersionL
   let checkCond (PD.OS os) = pure $ os == curOs
