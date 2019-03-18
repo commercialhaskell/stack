@@ -175,28 +175,29 @@ withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
     withUserFileLock (view stackRootL config) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
-      let inner' lk =
+      let inner' = do
             -- Locking policy:  This is only used for build commands, which
             -- only need to lock the snapshot, not the global lock.  We
             -- trade in the lock here.
-            do dir <- installationRootDeps
-               -- Hand-over-hand locking:
-               withUserFileLock dir $ \lk2 -> do
-                 liftIO $ writeIORef curLk lk2
-                 liftIO $ munlockFile lk
-                 logDebug "Starting to execute command inside EnvConfig"
-                 inner lk2
+            dir <- installationRootDeps
+            -- Hand-over-hand locking:
+            withUserFileLock dir $ \lk2 -> do
+              lk1 <- readIORef curLk
+              munlockFile lk1
+              writeIORef curLk lk2
+              logDebug "Starting to execute command inside EnvConfig"
+              inner lk2
 
-      let inner'' lk = do
+      let inner'' = do
               bconfig <- runRIO config loadBuildConfig
               envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
-              runRIO envConfig (inner' lk)
+              runRIO envConfig inner'
 
       Docker.reexecWithOptionalContainer
           mbefore
           mafter
           (readIORef curLk)
-          (Nix.reexecWithOptionalShell (inner'' lk0))
+          (Nix.reexecWithOptionalShell inner'')
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
