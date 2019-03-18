@@ -252,7 +252,7 @@ mkBaseConfigOpts boptsCli = do
 
 -- | Provide a function for loading package information from the package index
 loadPackage
-  :: HasEnvConfig env
+  :: (HasBuildConfig env, HasSourceMap env)
   => PackageLocationImmutable
   -> Map FlagName Bool
   -> [Text]

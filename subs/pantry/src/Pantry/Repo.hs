@@ -111,7 +111,7 @@ createRepoArchive
   -> RIO env ()
 createRepoArchive repo tarball = do
   let runCommand cmd args = void $ proc cmd args readProcess_
-  
+
   withRepo repo $ case repoType repo of
     RepoGit -> do
        runCommand "git" ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
@@ -121,7 +121,7 @@ createRepoArchive repo tarball = do
        runCommand "git"
          [ "submodule", "foreach", "--recursive"
          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD"
-           <> " && if [ -f bar.tar ]; then tar -Af " <> tarball <> " bar.tar ; fi"
+           <> " && if [ -f bar.tar ]; then tar --force-local -Af " <> tarball <> " bar.tar ; fi"
          ]
     RepoHg  -> runCommand "hg"  ["archive", tarball, "-X", ".hg_archival.txt"]
 

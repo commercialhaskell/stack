@@ -22,10 +22,12 @@ newtype FreezeOpts = FreezeOpts
 
 freeze :: HasEnvConfig env => FreezeOpts -> RIO env ()
 freeze (FreezeOpts mode) = do
-  mproject <- view $ configL.to configMaybeProject
+  mproject <- view $ configL.to configProject
+  let warn = logWarn "No project was found: nothing to freeze"
   case mproject of
-    Just (p, _) -> doFreeze p mode
-    Nothing -> logWarn "No project was found: nothing to freeze"
+    PCProject (p, _) -> doFreeze p mode
+    PCNoProject -> warn
+    PCNoConfig _ -> warn
 
 doFreeze ::
        (HasProcessContext env, HasLogFunc env, HasPantryConfig env)

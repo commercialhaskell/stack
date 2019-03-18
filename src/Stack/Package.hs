@@ -66,7 +66,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.FilePath (replaceExtension)
@@ -78,7 +77,7 @@ import qualified RIO.PrettyPrint as PP (Style (Module))
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
-               , ctxEnvConfig :: !EnvConfig
+               , ctxBuildConfig :: !BuildConfig
                }
 
 instance HasPlatform Ctx
@@ -97,9 +96,8 @@ instance HasPantryConfig Ctx where
     pantryConfigL = configL.pantryConfigL
 instance HasProcessContext Ctx where
     processContextL = configL.processContextL
-instance HasBuildConfig Ctx
-instance HasEnvConfig Ctx where
-    envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
+instance HasBuildConfig Ctx where
+    buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
@@ -214,10 +212,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
         \cabalfp -> debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
-             env <- view envConfigL
+             bc <- view buildConfigL
              (componentModules,componentFiles,dataFiles',warnings) <-
                  runRIO
-                     (Ctx cabalfp distDir env)
+                     (Ctx cabalfp distDir bc)
                      (packageDescModulesAndFiles pkg)
              setupFiles <-
                  if buildType pkg == Custom

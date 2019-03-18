@@ -14,6 +14,7 @@ module Stack.SourceMap
     , checkFlagsUsedThrowing
     , globalCondCheck
     , pruneGlobals
+    , globalsFromHints
     , getCompilerInfo
     , immutableLocSha
     ) where

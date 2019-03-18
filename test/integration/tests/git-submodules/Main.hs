@@ -1,5 +1,9 @@
 import StackTest
-import System.Directory (createDirectoryIfMissing,withCurrentDirectory)
+import System.Directory (createDirectoryIfMissing,withCurrentDirectory, getCurrentDirectory)
+import System.Exit (exitFailure)
+import System.FilePath ((</>))
+import Data.List (filter)
+import System.IO (hPutStrLn, withFile, IOMode(..))
 
 main :: IO ()
 main = do
@@ -30,13 +34,14 @@ main = do
 
     stack ["new", defaultResolverArg, "tmpPackage"]
 
+    curDir <- getCurrentDirectory
+    let tmpRepoDir = curDir </> "tmpRepo"
+    gitHead <- runWithCwd tmpRepoDir "git" ["rev-parse", "HEAD"]
+    let gitHeadCommit = stripNewline gitHead
+
     withCurrentDirectory "tmpPackage" $ do
       -- add git dependency on repo with recursive submodules
-      runShell "echo 'extra-deps:' >> stack.yaml"
-      runShell "echo \"- git: $(cd ../tmpRepo && pwd)\" >> stack.yaml"
-      runShell "echo \"  commit: $(cd ../tmpRepo && git rev-parse HEAD)\" >> stack.yaml"
-      runShell "echo '  subdir: sub/sub/pkg' >> stack.yaml"
-
+      writeToStackFile (tmpRepoDir, gitHeadCommit)
       -- Setup the package
       stack ["setup"]
 
@@ -45,3 +50,24 @@ main = do
     removeDirIgnore "tmpSubRepo"
     removeDirIgnore "tmpSubSubRepo"
     removeDirIgnore "tmpPackage"
+
+writeToStackFile :: (String, String) -> IO ()
+writeToStackFile (tmpRepoDir, gitCommit) = do
+  curDir <- getCurrentDirectory
+  let stackFile = curDir </> "stack.yaml"
+  let line1 = "extra-deps:"
+      line2 = "- git: " ++ tmpRepoDir
+      line3 = "  commit: " ++ gitCommit
+      line4 = "  subdir: sub/sub/pkg"
+  withFile stackFile AppendMode (\handle -> do
+                                   hPutStrLn handle line1
+                                   hPutStrLn handle line2
+                                   hPutStrLn handle line3
+                                   hPutStrLn handle line4
+                                )
+
+newline :: Char
+newline = '\n'
+
+stripNewline :: String -> String
+stripNewline str = filter (\x -> x /= newline) str

@@ -474,3 +474,9 @@ parseTargets needTargets haddockDeps boptscli smActual = do
     { smtTargets = targets
     , smtDeps = addedDeps'
     }
+  where
+    bcImplicitGlobal bconfig =
+      case configProject $ bcConfig bconfig of
+        PCProject _ -> False
+        PCNoProject -> True
+        PCNoConfig _ -> False

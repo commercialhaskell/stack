@@ -182,7 +182,6 @@ library:
   - Stack.Ghci.Script
   - Stack.Hoogle
   - Stack.IDE
-  - Stack.Image
   - Stack.Init
   - Stack.Ls
   - Stack.New
@@ -238,13 +237,11 @@ library:
   - Stack.Types.Config.Build
   - Stack.Types.Docker
   - Stack.Types.GhcPkgId
-  - Stack.Types.Image
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageName
   - Stack.Types.Resolver
-  - Stack.Types.Runner
   - Stack.Types.Sig
   - Stack.Types.SourceMap
   - Stack.Types.TemplateName
@@ -311,6 +308,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hspec
+    - filepath
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false

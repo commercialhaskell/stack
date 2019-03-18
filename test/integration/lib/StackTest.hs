@@ -32,6 +32,14 @@ runShell cmd = do
     ec <- waitForProcess ph
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+runWithCwd :: HasCallStack => FilePath -> String -> [String] -> IO String
+runWithCwd cwdPath cmd args = do
+    logInfo $ "Running: " ++ cmd
+    let cp = proc cmd args
+    (ec, stdoutStr, _) <- readCreateProcessWithExitCode (cp { cwd = Just cwdPath }) ""
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    return stdoutStr
+
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
@@ -154,6 +162,9 @@ runEx' cmd args = do
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
+--
+-- Take care with newlines; if the output includes a newline character that
+-- should not be there, use 'Data.List.Extra.trimEnd' to remove it.
 stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
     stackExe' <- stackExe

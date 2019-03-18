@@ -21,29 +21,22 @@ import           Path.Extra
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
+import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.Runner
 import qualified System.FilePath as FP
-import           System.IO (stderr)
 import           RIO.PrettyPrint
 import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
-path ::
-       (HasEnvConfig envHaddocks, HasEnvConfig envNoHaddocks)
-    => (RIO envNoHaddocks () -> IO ())
-    -> (RIO envHaddocks () -> IO ())
-    -> [Text]
-    -> IO ()
-path runNoHaddocks runHaddocks keys =
+path :: [Text] -> RIO Runner ()
+path keys =
     do let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
-       liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
-           [ ""
-           , "'--" <> oldOption <> "' will be removed in a future release."
-           , "Please use '--" <> newOption <> "' instead."
-           , ""
-           ]
+       forM_ deprecated $ \(oldOption, newOption) -> logWarn $
+           "\n" <>
+           "'--" <> display oldOption <> "' will be removed in a future release.\n" <>
+           "Please use '--" <> display newOption <> "' instead.\n" <>
+           "\n"
        let -- filter the chosen paths in flags (keys),
            -- or show all of them if no specific paths chosen.
            goodPaths = filter
@@ -54,13 +47,21 @@ path runNoHaddocks runHaddocks keys =
            toEither (_, k, UseHaddocks p) = Left (k, p)
            toEither (_, k, WithoutHaddocks p) = Right (k, p)
            (with, without) = partitionEithers $ map toEither goodPaths
-           printKeys runEnv extractors single = runEnv $ do
+           printKeys extractors single = do
              pathInfo <- fillPathInfo
              liftIO $ forM_ extractors $ \(key, extractPath) -> do
                let prefix = if single then "" else key <> ": "
                T.putStrLn $ prefix <> extractPath pathInfo
-       printKeys runHaddocks with singlePath
-       printKeys runNoHaddocks without singlePath
+           runHaddock x = local
+             (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
+             withConfig .
+             withDefaultEnvConfig
+       -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
+       -- withDefaultEnvConfig each time, need to figure out what
+       -- purpose is served and whether we can achieve it without two
+       -- completely separate Config setups
+       runHaddock True $ printKeys with singlePath
+       runHaddock False $ printKeys without singlePath
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
@@ -133,6 +134,7 @@ instance HasStylesUpdate PathInfo where
 instance HasTerm PathInfo where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+instance HasGHCVariant PathInfo
 instance HasConfig PathInfo
 instance HasPantryConfig PathInfo where
     pantryConfigL = configL.pantryConfigL
