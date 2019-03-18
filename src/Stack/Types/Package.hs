@@ -312,7 +312,7 @@ instance Show (MemoizedWith env a) where
   show _ = "<<MemoizedWith>>"
 
 lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
-lpFiles lp = runMemoizedWith $ fmap (Set.unions . M.elems) $ lpComponentFiles lp
+lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
