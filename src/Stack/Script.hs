@@ -39,6 +39,21 @@ import qualified RIO.Directory as Dir
 import           RIO.Process
 import qualified RIO.Text as T
 
+data StackScriptException
+    = MutableDependenciesForScript [PackageName]
+    | AmbiguousModuleName ModuleName [PackageName]
+  deriving Typeable
+
+instance Exception StackScriptException
+
+instance Show StackScriptException where
+    show (MutableDependenciesForScript names) = unlines
+        $ "No mutable packages are allowed in the `script` command. Mutable packages found:"
+        : map (\name -> "- " ++ packageNameString name) names
+    show (AmbiguousModuleName mname pkgs) = unlines
+        $ ("Module " ++ moduleNameString mname ++ " appears in multiple packages: ")
+        : [unwords $ map packageNameString pkgs ]
+
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> GlobalOpts -> IO ()
 scriptCmd opts go' = do
@@ -173,20 +188,12 @@ getPackagesFromModuleNames
 getPackagesFromModuleNames mns = do
     hash <- hashSnapshot
     withSnapshotCache hash mapSnapshotPackageModules $ \getModulePackages -> do
-        mutableMapping <- mapMutablePackageModules
         pns <- forM (Set.toList mns) $ \mn -> do
-            immutable <- Set.fromList <$> getModulePackages mn
-            let pkgs = immutable <>
-                  Map.findWithDefault mempty mn mutableMapping
-            case Set.toList pkgs of
+            pkgs <- getModulePackages mn
+            case pkgs of
                 [] -> return Set.empty
                 [pn] -> return $ Set.singleton pn
-                pns' -> throwString $ concat
-                    [ "Module "
-                    , moduleNameString mn
-                    , " appears in multiple packages: "
-                    , unwords $ map packageNameString pns'
-                    ]
+                _ -> throwM $ AmbiguousModuleName mn pkgs
         return $ Set.unions pns `Set.difference` blacklist
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
@@ -194,12 +201,17 @@ hashSnapshot = do
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     let wc = whichCompiler $ smCompiler sourceMap
     compilerInfo <- getCompilerInfo wc
-    let maybePliHash dep | PLImmutable pli <- dpLocation dep =
-                             Just $ immutableLocSha pli
-                         | otherwise = Nothing
-        locHashes = mapMaybe maybePliHash $ Map.elems (smDeps sourceMap)
-        hashedContent = mconcat $ compilerInfo : locHashes
-    return $ SnapshotCacheHash (SHA256.hashLazyBytes $ toLazyByteString hashedContent)
+    let eitherPliHash (pn, dep) | PLImmutable pli <- dpLocation dep =
+                                    Right $ immutableLocSha pli
+                                | otherwise =
+                                    Left pn
+        deps = Map.toList (smDeps sourceMap)
+    case partitionEithers (map eitherPliHash deps) of
+        ([], pliHashes) -> do
+            let hashedContent = mconcat $ compilerInfo : pliHashes
+            pure $ SnapshotCacheHash (SHA256.hashLazyBytes $ toLazyByteString hashedContent)
+        (mutables, _) ->
+            throwM $ MutableDependenciesForScript mutables
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
@@ -231,17 +243,6 @@ dumpedPackageModules pkgs dumpPkgs =
            , let PackageIdentifier pn _ = dpPackageIdent
            , pn `Set.member` pnames
            ]
-
-mapMutablePackageModules :: RIO EnvConfig (Map ModuleName (Set PackageName))
-mapMutablePackageModules = do
-  deps <- view $ envConfigL . to envConfigSourceMap . to smDeps
-  fmap (Map.fromListWith mappend . concat) $ for (Map.toList deps) $ \(pname, dep) -> do
-      case dpLocation dep of
-          PLImmutable _ -> pure []
-          PLMutable _ -> do
-              gpd <- liftIO $ cpGPD (dpCommon dep)
-              modules <- allExposedModules gpd
-              return [ (m, Set.singleton pname) | m <- modules ]
 
 allExposedModules :: PD.GenericPackageDescription -> RIO EnvConfig [ModuleName]
 allExposedModules gpd = do
