@@ -85,12 +85,11 @@ withConfigAndLock
     -> RIO Runner ()
 withConfigAndLock inner = withConfig $ do
     stackRoot <- view stackRootL
-    withUserFileLock stackRoot $ \lk ->
+    withUserFileLock stackRoot $
       Docker.reexecWithOptionalContainer
         Nothing
         inner
-        Nothing
-        (Just $ munlockFile lk)
+        Nothing . pure
 
 -- | Loads global config, ignoring any configuration which would be
 -- loaded due to $PWD.
@@ -201,9 +200,7 @@ withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
           mbefore
           (Nix.reexecWithOptionalShell loadCompilerVersion (inner'' lk0))
           mafter
-          (Just $ liftIO $
-                do lk' <- readIORef curLk
-                   munlockFile lk')
+          (readIORef curLk)
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.

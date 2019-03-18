@@ -66,6 +66,7 @@ import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
+import           System.FileLock (FileLock, unlockFile)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout)
 import           System.IO.Error (isDoesNotExistError)
@@ -187,7 +188,7 @@ reexecWithOptionalContainer
     => Maybe (RIO env ())
     -> RIO env a
     -> Maybe (RIO env ())
-    -> Maybe (RIO env ())
+    -> IO (Maybe FileLock)
     -> RIO env a
 reexecWithOptionalContainer mbefore inner mafter mrelease =
   do config <- view configL
@@ -201,7 +202,7 @@ reexecWithOptionalContainer mbefore inner mafter mrelease =
             inner <*
             fromMaybeAction mafter
         | otherwise ->
-            do fromMaybeAction mrelease
+            do liftIO $ mrelease >>= traverse_ unlockFile
                runContainerAndExit
                  (fromMaybeAction mbefore)
                  (fromMaybeAction mafter)

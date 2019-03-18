@@ -624,7 +624,7 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
            runRIO config $ setup sco wantedCompiler compilerCheck mstack
            )
           Nothing
-          (Just $ munlockFile lk)
+          (pure lk)
 
 cleanCmd :: CleanOpts -> RIO Runner ()
 cleanCmd = withConfig . withCleanConfig . clean
@@ -824,7 +824,7 @@ execCmd ExecOpts {..} =
                             munlockFile buildLock
                             Nix.reexecWithOptionalShell (runRIO config loadCompilerVersion) (exec cmd args))
                     Nothing
-                    Nothing -- Unlocked already above.
+                    (pure Nothing) -- Unlocked already above.
         ExecOptsEmbellished {..} -> do
             let targets = concatMap words eoPackages
                 boptsCLI = defaultBuildOptsCLI
