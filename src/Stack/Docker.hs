@@ -186,11 +186,11 @@ getCmdArgs docker imageInfo isRemoteDocker = do
 reexecWithOptionalContainer
     :: HasConfig env
     => Maybe (RIO env ())
-    -> RIO env a
     -> Maybe (RIO env ())
     -> IO (Maybe FileLock)
     -> RIO env a
-reexecWithOptionalContainer mbefore inner mafter mrelease =
+    -> RIO env a
+reexecWithOptionalContainer mbefore mafter mrelease inner =
   do config <- view configL
      inContainer <- getInContainer
      isReExec <- view reExecL

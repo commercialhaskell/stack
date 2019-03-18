@@ -610,6 +610,8 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
     config <- ask
     Docker.reexecWithOptionalContainer
           Nothing
+          Nothing
+          (pure lk)
           (runRIO config $
            Nix.reexecWithOptionalShell $ do
            (wantedCompiler, compilerCheck, mstack) <-
@@ -623,8 +625,6 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
                               )
            runRIO config $ setup sco wantedCompiler compilerCheck mstack
            )
-          Nothing
-          (pure lk)
 
 cleanCmd :: CleanOpts -> RIO Runner ()
 cleanCmd = withConfig . withCleanConfig . clean
@@ -812,6 +812,8 @@ execCmd ExecOpts {..} =
               Docker.reexecWithOptionalContainer
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
+                    Nothing
+                    (pure Nothing) -- Unlocked already above.
                     (withDefaultEnvConfigAndLock $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
@@ -827,8 +829,6 @@ execCmd ExecOpts {..} =
                             -- at the wrong point in the pipeline
                             config' <- view configL -- load up a second time to get the modified env
                             runRIO config' $ Nix.reexecWithOptionalShell (exec cmd args))
-                    Nothing
-                    (pure Nothing) -- Unlocked already above.
         ExecOptsEmbellished {..} -> do
             let targets = concatMap words eoPackages
                 boptsCLI = defaultBuildOptsCLI

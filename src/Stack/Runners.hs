@@ -80,11 +80,12 @@ withConfigAndLock
     -> RIO Runner ()
 withConfigAndLock inner = withConfig $ do
     stackRoot <- view stackRootL
-    withUserFileLock stackRoot $
+    withUserFileLock stackRoot $ \lk ->
       Docker.reexecWithOptionalContainer
         Nothing
+        Nothing
+        (pure lk)
         inner
-        Nothing . pure
 
 -- | Loads global config, ignoring any configuration which would be
 -- loaded due to $PWD.
@@ -193,9 +194,9 @@ withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
 
       Docker.reexecWithOptionalContainer
           mbefore
-          (Nix.reexecWithOptionalShell (inner'' lk0))
           mafter
           (readIORef curLk)
+          (Nix.reexecWithOptionalShell (inner'' lk0))
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
