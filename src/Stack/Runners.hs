@@ -120,7 +120,7 @@ withDefaultEnvConfigAndLock
     :: (Maybe FileLock -> RIO EnvConfig a)
     -> RIO Config a
 withDefaultEnvConfigAndLock inner =
-    withEnvConfigExt AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
+    withEnvConfigExt AllowNoTargets defaultBuildOptsCLI inner Nothing
 
 withEnvConfigAndLock
     :: NeedTargets
@@ -128,7 +128,7 @@ withEnvConfigAndLock
     -> (Maybe FileLock -> RIO EnvConfig a)
     -> RIO Config a
 withEnvConfigAndLock needTargets boptsCLI inner =
-    withEnvConfigExt needTargets boptsCLI Nothing inner Nothing
+    withEnvConfigExt needTargets boptsCLI inner Nothing
 
 -- | A runner specially built for the "stack clean" use case. For some
 -- reason (hysterical raisins?), all of the functions in this module
@@ -156,11 +156,6 @@ withBuildConfig inner = do
 withEnvConfigExt
     :: NeedTargets
     -> BuildOptsCLI
-    -> Maybe (RIO Config ())
-    -- ^ Action to perform before the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The env config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
     -> (Maybe FileLock -> RIO EnvConfig a)
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
@@ -170,13 +165,13 @@ withEnvConfigExt
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
     -> RIO Config a
-withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
+withEnvConfigExt needTargets boptsCLI inner mafter = do
     config <- ask
     withUserFileLock (view stackRootL config) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
 
-      Docker.reexecWithOptionalContainer mbefore mafter (readIORef curLk) $
+      Docker.reexecWithOptionalContainer Nothing mafter (readIORef curLk) $
         Nix.reexecWithOptionalShell $ withBuildConfig $ do
           envConfig <- setupEnv needTargets boptsCLI Nothing
           runRIO envConfig $ do
