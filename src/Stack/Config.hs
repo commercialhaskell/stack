@@ -745,7 +745,7 @@ loadYaml parser path = do
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: HasLogFunc env
-                 => StackYamlLoc (Path Abs File)
+                 => StackYamlLoc
                  -- ^ Override stack.yaml
                  -> RIO env (ProjectConfig (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
@@ -774,7 +774,7 @@ getProjectConfig (SYLNoConfig extraDeps) = return $ PCNoConfig extraDeps
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig :: HasLogFunc env
-                  => StackYamlLoc (Path Abs File)
+                  => StackYamlLoc
                   -- ^ Override stack.yaml
                   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
 loadProjectConfig mstackYaml = do

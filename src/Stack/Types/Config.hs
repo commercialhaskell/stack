@@ -2,10 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -456,22 +453,22 @@ data GlobalOpts = GlobalOpts
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
-    , globalStackYaml    :: !(StackYamlLoc (Path Abs File)) -- ^ Override project stack.yaml
+    , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
     } deriving (Show)
 
 -- | Location for the project's stack.yaml file.
-data StackYamlLoc filepath
+data StackYamlLoc
     = SYLDefault
     -- ^ Use the standard parent-directory-checking logic
-    | SYLOverride !filepath
+    | SYLOverride !(Path Abs File)
     -- ^ Use a specific stack.yaml file provided
     | SYLNoConfig ![PackageIdentifierRevision]
     -- ^ Extra dependencies included in the script command line.
     | SYLNoProject
     -- ^ Do not look for a project configuration, and use the implicit global.
-    deriving (Show,Functor,Foldable,Traversable)
+    deriving Show
 
-stackYamlLocL :: HasRunner env => Lens' env (StackYamlLoc (Path Abs File))
+stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL = globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = y })
 
 -- | Project configuration information. Not every run of Stack has a
