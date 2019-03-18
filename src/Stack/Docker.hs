@@ -82,6 +82,99 @@ import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
 
+-- | Function to get command and arguments to run in Docker container
+getCmdArgs
+  :: HasConfig env
+  => DockerOpts
+  -> Inspect
+  -> Bool
+  -> RIO env (FilePath,[String],[(String,String)],[Mount])
+getCmdArgs docker imageInfo isRemoteDocker = do
+    config <- view configL
+    deUser <-
+        if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+            then liftIO $ do
+              duUid <- User.getEffectiveUserID
+              duGid <- User.getEffectiveGroupID
+              duGroups <- nubOrd <$> User.getGroups
+              duUmask <- Files.setFileCreationMask 0o022
+              -- Only way to get old umask seems to be to change it, so set it back afterward
+              _ <- Files.setFileCreationMask duUmask
+              return (Just DockerUser{..})
+            else return Nothing
+    args <-
+        fmap
+            (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
+             ,"--" ++ dockerEntrypointArgName
+             ,show DockerEntrypoint{..}] ++)
+            (liftIO getArgs)
+    case dockerStackExe (configDocker config) of
+        Just DockerStackExeHost
+          | configPlatform config == dockerContainerPlatform -> do
+              exePath <- liftIO getExecutablePath
+              cmdArgs args exePath
+          | otherwise -> throwIO UnsupportedStackExeHostPlatformException
+        Just DockerStackExeImage -> do
+            progName <- liftIO getProgName
+            return (FP.takeBaseName progName, args, [], [])
+        Just (DockerStackExePath path) -> do
+            exePath <- liftIO $ canonicalizePath (toFilePath path)
+            cmdArgs args exePath
+        Just DockerStackExeDownload -> exeDownload args
+        Nothing
+          | configPlatform config == dockerContainerPlatform -> do
+              (exePath,exeTimestamp,misCompatible) <-
+                  liftIO $
+                  do exePath <- liftIO getExecutablePath
+                     exeTimestamp <- resolveFile' exePath >>= getModificationTime
+                     isKnown <-
+                         liftIO $
+                         getDockerImageExe
+                             config
+                             (iiId imageInfo)
+                             exePath
+                             exeTimestamp
+                     return (exePath, exeTimestamp, isKnown)
+              case misCompatible of
+                  Just True -> cmdArgs args exePath
+                  Just False -> exeDownload args
+                  Nothing -> do
+                      e <-
+                          try $
+                          sinkProcessStderrStdout
+                              "docker"
+                              [ "run"
+                              , "-v"
+                              , exePath ++ ":" ++ "/tmp/stack"
+                              , iiId imageInfo
+                              , "/tmp/stack"
+                              , "--version"]
+                              sinkNull
+                              sinkNull
+                      let compatible =
+                              case e of
+                                  Left (ProcessExitedUnsuccessfully _ _) ->
+                                      False
+                                  Right _ -> True
+                      liftIO $
+                          setDockerImageExe
+                              config
+                              (iiId imageInfo)
+                              exePath
+                              exeTimestamp
+                              compatible
+                      if compatible
+                          then cmdArgs args exePath
+                          else exeDownload args
+        Nothing -> exeDownload args
+  where
+    exeDownload args = do
+        exePath <- ensureDockerStackExe dockerContainerPlatform
+        cmdArgs args (toFilePath exePath)
+    cmdArgs args exePath = do
+        let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
+        return (mountPath, args, [], [Mount exePath mountPath])
+
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
 --
@@ -96,107 +189,7 @@ reexecWithOptionalContainer
     -> Maybe (RIO env ())
     -> Maybe (RIO env ())
     -> RIO env a
-reexecWithOptionalContainer =
-    execWithOptionalContainer getCmdArgs
-  where
-    getCmdArgs docker imageInfo isRemoteDocker = do
-        config <- view configL
-        deUser <-
-            if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
-                then liftIO $ do
-                  duUid <- User.getEffectiveUserID
-                  duGid <- User.getEffectiveGroupID
-                  duGroups <- nubOrd <$> User.getGroups
-                  duUmask <- Files.setFileCreationMask 0o022
-                  -- Only way to get old umask seems to be to change it, so set it back afterward
-                  _ <- Files.setFileCreationMask duUmask
-                  return (Just DockerUser{..})
-                else return Nothing
-        args <-
-            fmap
-                (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
-                 ,"--" ++ dockerEntrypointArgName
-                 ,show DockerEntrypoint{..}] ++)
-                (liftIO getArgs)
-        case dockerStackExe (configDocker config) of
-            Just DockerStackExeHost
-              | configPlatform config == dockerContainerPlatform -> do
-                  exePath <- liftIO getExecutablePath
-                  cmdArgs args exePath
-              | otherwise -> throwIO UnsupportedStackExeHostPlatformException
-            Just DockerStackExeImage -> do
-                progName <- liftIO getProgName
-                return (FP.takeBaseName progName, args, [], [])
-            Just (DockerStackExePath path) -> do
-                exePath <- liftIO $ canonicalizePath (toFilePath path)
-                cmdArgs args exePath
-            Just DockerStackExeDownload -> exeDownload args
-            Nothing
-              | configPlatform config == dockerContainerPlatform -> do
-                  (exePath,exeTimestamp,misCompatible) <-
-                      liftIO $
-                      do exePath <- liftIO getExecutablePath
-                         exeTimestamp <- resolveFile' exePath >>= getModificationTime
-                         isKnown <-
-                             liftIO $
-                             getDockerImageExe
-                                 config
-                                 (iiId imageInfo)
-                                 exePath
-                                 exeTimestamp
-                         return (exePath, exeTimestamp, isKnown)
-                  case misCompatible of
-                      Just True -> cmdArgs args exePath
-                      Just False -> exeDownload args
-                      Nothing -> do
-                          e <-
-                              try $
-                              sinkProcessStderrStdout
-                                  "docker"
-                                  [ "run"
-                                  , "-v"
-                                  , exePath ++ ":" ++ "/tmp/stack"
-                                  , iiId imageInfo
-                                  , "/tmp/stack"
-                                  , "--version"]
-                                  sinkNull
-                                  sinkNull
-                          let compatible =
-                                  case e of
-                                      Left (ProcessExitedUnsuccessfully _ _) ->
-                                          False
-                                      Right _ -> True
-                          liftIO $
-                              setDockerImageExe
-                                  config
-                                  (iiId imageInfo)
-                                  exePath
-                                  exeTimestamp
-                                  compatible
-                          if compatible
-                              then cmdArgs args exePath
-                              else exeDownload args
-            Nothing -> exeDownload args
-    exeDownload args = do
-        exePath <- ensureDockerStackExe dockerContainerPlatform
-        cmdArgs args (toFilePath exePath)
-    cmdArgs args exePath = do
-        let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
-        return (mountPath, args, [], [Mount exePath mountPath])
-
--- | If Docker is enabled, re-runs the OS command returned by the second argument in a
--- Docker container.  Otherwise, runs the inner action.
---
--- This takes an optional release action just like `reexecWithOptionalContainer`.
-execWithOptionalContainer
-    :: HasConfig env
-    => GetCmdArgs env
-    -> Maybe (RIO env ())
-    -> RIO env a
-    -> Maybe (RIO env ())
-    -> Maybe (RIO env ())
-    -> RIO env a
-execWithOptionalContainer getCmdArgs mbefore inner mafter mrelease =
+reexecWithOptionalContainer mbefore inner mafter mrelease =
   do config <- view configL
      inContainer <- getInContainer
      isReExec <- view reExecL
@@ -210,7 +203,6 @@ execWithOptionalContainer getCmdArgs mbefore inner mafter mrelease =
         | otherwise ->
             do fromMaybeAction mrelease
                runContainerAndExit
-                 getCmdArgs
                  (fromMaybeAction mbefore)
                  (fromMaybeAction mafter)
   where
@@ -228,12 +220,10 @@ preventInContainer inner =
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit
   :: HasConfig env
-  => GetCmdArgs env
-  -> RIO env ()  -- ^ Action to run before
+  => RIO env ()  -- ^ Action to run before
   -> RIO env ()  -- ^ Action to run after
   -> RIO env void
-runContainerAndExit getCmdArgs
-                    before
+runContainerAndExit before
                     after = do
      config <- view configL
      let docker = configDocker config
@@ -900,10 +890,3 @@ instance FromJSON ImageConfig where
        ImageConfig
          <$> fmap join (o .:? "Env") .!= []
          <*> fmap join (o .:? "Entrypoint") .!= []
-
--- | Function to get command and arguments to run in Docker container
-type GetCmdArgs env
-   = DockerOpts
-  -> Inspect
-  -> Bool
-  -> RIO env (FilePath,[String],[(String,String)],[Mount])
