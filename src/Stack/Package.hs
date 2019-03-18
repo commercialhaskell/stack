@@ -98,12 +98,6 @@ instance HasProcessContext Ctx where
     processContextL = configL.processContextL
 instance HasBuildConfig Ctx where
     buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
-    {-
-instance HasSourceMap Ctx where
-    sourceMapL = envConfigL.sourceMapL
-instance HasEnvConfig Ctx where
-    envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
-    -}
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
