@@ -467,7 +467,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "Subcommands specific to modifying stack.yaml files"
             (addCommand' ConfigCmd.cfgCmdSetName
                         "Sets a field in the project's stack.yaml to value"
-                        cfgSetCmd
+                        (withConfig . cfgCmdSet)
                         configCmdSetParser)
         addSubCommands'
           "hpc"
@@ -963,9 +963,6 @@ dockerCleanupCmd cleanupOpts =
     withUserFileLock stackRoot $ \_ ->
       Docker.preventInContainer $
       Docker.cleanup cleanupOpts
-
-cfgSetCmd :: ConfigCmd.ConfigCmdSet -> RIO Runner ()
-cfgSetCmd = withGlobalConfigAndLock . cfgCmdSet
 
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()
