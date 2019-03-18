@@ -160,6 +160,8 @@ module Pantry
   , getHackageTypoCorrections
   , loadGlobalHints
   , partitionReplacedDependencies
+  , SnapshotCacheHash (..)
+  , withSnapshotCache
   ) where
 
 import RIO
@@ -1501,3 +1503,21 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
       else do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
+
+withSnapshotCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> RIO env (Map PackageName (Set ModuleName))
+  -> ((ModuleName -> RIO env [PackageName]) -> RIO env a)
+  -> RIO env a
+withSnapshotCache hash getModuleMapping f = do
+  mres <- withStorage $ getSnapshotCacheByHash hash
+  cacheId <- case mres of
+    Nothing -> do
+      scId <- withStorage $ getSnapshotCacheId hash
+      packageModules <- getModuleMapping
+      logWarn "Populating snapshot module name cache"
+      withStorage $ storeSnapshotModuleCache scId packageModules
+      return scId
+    Just scId -> pure scId
+  f $ withStorage . loadExposedModulePackages cacheId

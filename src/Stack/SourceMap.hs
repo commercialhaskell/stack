@@ -15,12 +15,16 @@ module Stack.SourceMap
     , globalCondCheck
     , pruneGlobals
     , globalsFromHints
+    , getCompilerInfo
+    , immutableLocSha
     ) where
 
+import Data.ByteString.Builder (byteString, lazyByteString)
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import Distribution.System (Platform(..))
 import Pantry
+import qualified Pantry.SHA256 as SHA256
 import qualified RIO
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -231,3 +235,19 @@ pruneGlobals globals deps =
             dpGhcPkgId dpDepends deps
   in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
      Map.map ReplacedGlobalPackage prunedGlobals
+
+getCompilerInfo :: (HasConfig env) => WhichCompiler -> RIO env Builder
+getCompilerInfo wc = do
+    let compilerExe =
+            case wc of
+                Ghc -> "ghc"
+                Ghcjs -> "ghcjs"
+    lazyByteString . fst <$> proc compilerExe ["--info"] readProcess_
+
+immutableLocSha :: PackageLocationImmutable -> Builder
+immutableLocSha = byteString . treeKeyToBs . locationTreeKey
+  where
+    locationTreeKey (PLIHackage _ _ tk) = tk
+    locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
+    locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
+    treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
