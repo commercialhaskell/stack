@@ -100,10 +100,10 @@ withGlobalConfigAndLock
     :: RIO Config ()
     -> RIO Runner ()
 withGlobalConfigAndLock inner =
-    loadConfigMaybeProject
-      PCNoProject $ \lc ->
-        withUserFileLock (view stackRootL lc) $ \_lk ->
-          runRIO lc inner
+    local (set stackYamlLocL SYLNoProject) $
+    loadConfig $ \config ->
+    withUserFileLock (view stackRootL config) $ \_lk ->
+    runRIO config inner
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.

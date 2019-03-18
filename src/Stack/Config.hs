@@ -19,7 +19,6 @@
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
   (loadConfig
-  ,loadConfigMaybeProject
   ,loadConfigYaml
   ,packagesParser
   ,getImplicitGlobalProjectDir
@@ -390,15 +389,12 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
           Nothing -> return defaultBase
       _ -> return defaultBase
 
--- Load the configuration, using environment variables, and defaults as
--- necessary.
-loadConfigMaybeProject
-    :: HasRunner env
-    => ProjectConfig (Project, Path Abs File, ConfigMonoid)
-    -- ^ Project config to use, if any
-    -> (Config -> RIO env a)
-    -> RIO env a
-loadConfigMaybeProject mproject inner = do
+-- | Load the configuration, using current directory, environment variables,
+-- and defaults as necessary.
+loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
+loadConfig inner = do
+    mstackYaml <- view $ globalOptsL.to globalStackYaml
+    mproject <- loadProjectConfig mstackYaml
     mresolver <- view $ globalOptsL.to globalResolver
     configArgs <- view $ globalOptsL.to globalConfigMonoid
     (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
@@ -442,14 +438,6 @@ loadConfigMaybeProject mproject inner = do
           forM_ (configProjectRoot config) $ \dir ->
               checkOwnership (dir </> configWorkDir config)
       inner config
-
--- | Load the configuration, using current directory, environment variables,
--- and defaults as necessary. The passed @Maybe (Path Abs File)@ is an
--- override for the location of the project's stack.yaml.
-loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
-loadConfig inner = do
-    mstackYaml <- view $ globalOptsL.to globalStackYaml
-    loadProjectConfig mstackYaml >>= \x -> loadConfigMaybeProject x inner
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
@@ -761,6 +749,7 @@ getProjectConfig :: HasLogFunc env
                  -- ^ Override stack.yaml
                  -> RIO env (ProjectConfig (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
+getProjectConfig SYLNoProject = return PCNoProject
 getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of

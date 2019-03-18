@@ -86,6 +86,7 @@ module Stack.Types.Config
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
   ,StackYamlLoc(..)
+  ,stackYamlLocL
   ,defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -466,7 +467,12 @@ data StackYamlLoc filepath
     -- ^ Use a specific stack.yaml file provided
     | SYLNoConfig ![PackageIdentifierRevision]
     -- ^ Extra dependencies included in the script command line.
+    | SYLNoProject
+    -- ^ Do not look for a project configuration, and use the implicit global.
     deriving (Show,Functor,Foldable,Traversable)
+
+stackYamlLocL :: HasRunner env => Lens' env (StackYamlLoc (Path Abs File))
+stackYamlLocL = globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = y })
 
 -- | Project configuration information. Not every run of Stack has a
 -- true local project; see constructors below.
