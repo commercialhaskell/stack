@@ -85,10 +85,8 @@ withConfigAndLock
     -> RIO Runner ()
 withConfigAndLock inner = withConfig $ do
     stackRoot <- view stackRootL
-    projectRoot <- view $ to configProjectRoot
     withUserFileLock stackRoot $ \lk ->
       Docker.reexecWithOptionalContainer
-        projectRoot
         Nothing
         inner
         Nothing
@@ -200,9 +198,8 @@ withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
               runRIO envConfig (inner' lk)
 
       Docker.reexecWithOptionalContainer
-          (configProjectRoot config)
           mbefore
-          (Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion (inner'' lk0))
+          (Nix.reexecWithOptionalShell loadCompilerVersion (inner'' lk0))
           mafter
           (Just $ liftIO $
                 do lk' <- readIORef curLk

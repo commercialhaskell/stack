@@ -26,6 +26,7 @@ module Stack.Docker
   ,reset
   ,reExecArgName
   ,StackDockerException(..)
+  ,getProjectRoot
   ) where
 
 import           Stack.Prelude
@@ -90,14 +91,13 @@ import qualified System.Posix.User as PosixUser
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
     :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> Maybe (RIO env ())
+    => Maybe (RIO env ())
     -> RIO env a
     -> Maybe (RIO env ())
     -> Maybe (RIO env ())
     -> RIO env a
-reexecWithOptionalContainer mprojectRoot =
-    execWithOptionalContainer mprojectRoot getCmdArgs
+reexecWithOptionalContainer =
+    execWithOptionalContainer getCmdArgs
   where
     getCmdArgs docker imageInfo isRemoteDocker = do
         config <- view configL
@@ -190,14 +190,13 @@ reexecWithOptionalContainer mprojectRoot =
 -- This takes an optional release action just like `reexecWithOptionalContainer`.
 execWithOptionalContainer
     :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> GetCmdArgs env
+    => GetCmdArgs env
     -> Maybe (RIO env ())
     -> RIO env a
     -> Maybe (RIO env ())
     -> Maybe (RIO env ())
     -> RIO env a
-execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
+execWithOptionalContainer getCmdArgs mbefore inner mafter mrelease =
   do config <- view configL
      inContainer <- getInContainer
      isReExec <- view reExecL
@@ -212,7 +211,6 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
             do fromMaybeAction mrelease
                runContainerAndExit
                  getCmdArgs
-                 mprojectRoot
                  (fromMaybeAction mbefore)
                  (fromMaybeAction mafter)
   where
@@ -231,12 +229,10 @@ preventInContainer inner =
 runContainerAndExit
   :: HasConfig env
   => GetCmdArgs env
-  -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
   -> RIO env ()  -- ^ Action to run before
   -> RIO env ()  -- ^ Action to run after
   -> RIO env void
 runContainerAndExit getCmdArgs
-                    mprojectRoot
                     before
                     after = do
      config <- view configL
@@ -271,6 +267,7 @@ runContainerAndExit getCmdArgs
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
+     projectRoot <- getProjectRoot
      sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
@@ -393,7 +390,6 @@ runContainerAndExit getCmdArgs
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    projectRoot = fromMaybeProjectRoot mprojectRoot
     sshRelDir = relDirDotSsh
 
 -- | Clean-up old docker images and containers.
@@ -718,15 +714,14 @@ checkDockerVersion docker =
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
 
 -- | Remove the project's Docker sandbox.
-reset :: (MonadIO m, MonadReader env m, HasConfig env)
-  => Maybe (Path Abs Dir) -> Bool -> m ()
-reset maybeProjectRoot keepHome = do
+reset :: HasConfig env => Bool -> RIO env ()
+reset keepHome = do
+  projectRoot <- getProjectRoot
   dockerSandboxDir <- projectDockerSandboxDir projectRoot
   liftIO (removeDirectoryContents
             dockerSandboxDir
             [homeDirName | keepHome]
             [])
-  where projectRoot = fromMaybeProjectRoot maybeProjectRoot
 
 -- | The Docker container "entrypoint": special actions performed when first entering
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
@@ -849,8 +844,10 @@ decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
 
 -- | Fail with friendly error if project root not set.
-fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRootException)
+getProjectRoot :: HasConfig env => RIO env (Path Abs Dir)
+getProjectRoot = do
+  mroot <- view $ configL.to configProjectRoot
+  maybe (throwIO CannotDetermineProjectRootException) pure mroot
 
 -- | Environment variable that contained the old sandbox ID.
 -- | Use of this variable is deprecated, and only used to detect old images.

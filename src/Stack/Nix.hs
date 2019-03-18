@@ -24,6 +24,7 @@ import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inConta
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
+import           Stack.Docker (getProjectRoot)
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
@@ -32,11 +33,10 @@ import           RIO.Process (processContextL, exec)
 -- Otherwise, runs the inner action.
 reexecWithOptionalShell
     :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> RIO env WantedCompiler
+    => RIO env WantedCompiler
     -> RIO env a
     -> RIO env a
-reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
+reexecWithOptionalShell getCompilerVersion inner =
   do config <- view configL
      inShell <- getInNixShell
      inContainer <- getInContainer
@@ -50,23 +50,23 @@ reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
            exePath <- liftIO getExecutablePath
            return (exePath, args)
      if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
-        then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
+        then runShellAndExit getCompilerVersion getCmdArgs
         else inner
 
 
 runShellAndExit
     :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> RIO env WantedCompiler
+    => RIO env WantedCompiler
     -> RIO env (String, [String])
     -> RIO env void
-runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
+runShellAndExit getCompilerVersion getCmdArgs = do
    config <- view configL
    envOverride <- view processContextL
    local (set processContextL envOverride) $ do
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
+     projectRoot <- getProjectRoot
      mshellFile <-
-         traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
+         traverse (resolveFile projectRoot) $
          nixInitFile (configNix config)
      compilerVersion <- getCompilerVersion
      inContainer <- getInContainer
@@ -127,10 +127,6 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
                                    ("'\"'\"'"++)
                                  else (c:)) "" str
                  ++ "'"
-
--- | Fail with friendly error if project root not set.
-fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRoot)
 
 -- | Command-line argument for "nix"
 nixCmdName :: String

@@ -609,10 +609,9 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
   withUserFileLock stackRoot $ \lk -> do
     config <- ask
     Docker.reexecWithOptionalContainer
-          (configProjectRoot config)
           Nothing
           (runRIO config $
-           Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion $ do
+           Nix.reexecWithOptionalShell loadCompilerVersion $ do
            (wantedCompiler, compilerCheck, mstack) <-
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
@@ -809,10 +808,8 @@ execCmd ExecOpts {..} =
         ExecOptsPlain -> do
           withConfig $ do
             stackRoot <- view stackRootL
-            projectRoot <- view $ to configProjectRoot
             withUserFileLock stackRoot $ \lk -> do
               Docker.reexecWithOptionalContainer
-                    projectRoot
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (withDefaultEnvConfigAndLock $ \buildLock -> do
@@ -825,7 +822,7 @@ execCmd ExecOpts {..} =
                                 (ExecGhc, args) -> return ("ghc", args)
                                 (ExecRunGhc, args) -> return ("runghc", args)
                             munlockFile buildLock
-                            Nix.reexecWithOptionalShell (configProjectRoot config) (runRIO config loadCompilerVersion) (exec cmd args))
+                            Nix.reexecWithOptionalShell (runRIO config loadCompilerVersion) (exec cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} -> do
@@ -952,9 +949,8 @@ dockerResetCmd keepHome =
   withConfig $ do
     stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock stackRoot $ \_ -> do
-      projectRoot <- view $ to configProjectRoot
-      Docker.preventInContainer $ Docker.reset projectRoot keepHome
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer $ Docker.reset keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> RIO Runner ()
