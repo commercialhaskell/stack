@@ -154,6 +154,9 @@ runEx' cmd args = do
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
+--
+-- Take care with newlines; if the output includes a newline character that
+-- should not be there, use 'Data.List.Extra.trimEnd' to remove it.
 stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
     stackExe' <- stackExe
