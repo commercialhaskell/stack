@@ -59,6 +59,7 @@ module Stack.Types.Config
   ,globalHintsFile
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
+  ,HasSourceMap(..)
   ,HasEnvConfig(..)
   ,getCompilerPath
   -- * Details
@@ -1822,7 +1823,7 @@ class HasConfig env => HasBuildConfig env where
         envConfigBuildConfig
         (\x y -> x { envConfigBuildConfig = y })
 
-class HasBuildConfig env => HasEnvConfig env where
+class (HasBuildConfig env, HasSourceMap env) => HasEnvConfig env where
     envConfigL :: Lens' env EnvConfig
 
 -----------------------------------
@@ -1919,11 +1920,16 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
+class HasSourceMap env where
+  sourceMapL :: Lens' env SourceMap
+instance HasSourceMap EnvConfig where
+  sourceMapL = lens envConfigSourceMap (\x y -> x { envConfigSourceMap = y })
+
 -- | The version of the compiler which will actually be used. May be
 -- different than that specified in the 'SnapshotDef' and returned
 -- by 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasEnvConfig s => SimpleGetter s ActualCompiler
-actualCompilerVersionL = envConfigL.to (smCompiler . envConfigSourceMap)
+actualCompilerVersionL :: HasSourceMap env => SimpleGetter env ActualCompiler
+actualCompilerVersionL = sourceMapL.to smCompiler
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens

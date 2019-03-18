@@ -1480,7 +1480,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTLocalMutable lp -> do
                 when enableTests $ unsetTestSuccess pkgDir
-                caches <- runMemoized $ lpNewBuildCaches lp
+                caches <- runMemoizedWith $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList caches)
             TTRemotePackage{} -> return ()
@@ -1722,7 +1722,7 @@ checkExeStatus compiler platform distDir name = do
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> CTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
-    caches <- runMemoized $ lpNewBuildCaches lp
+    caches <- runMemoizedWith $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime

@@ -1,6 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -270,19 +272,47 @@ data LocalPackage = LocalPackage
     -- ^ The .cabal file
     , lpBuildHaddocks :: !Bool
     , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(Memoized (Maybe (Set FilePath)))
+    , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(Memoized (Map NamedComponent (Map FilePath FileCacheInfo)))
+    , lpNewBuildCaches :: !(MemoizedWith EnvConfig (Map NamedComponent (Map FilePath FileCacheInfo)))
     -- ^ current state of the files
-    , lpComponentFiles :: !(Memoized (Map NamedComponent (Set (Path Abs File))))
+    , lpComponentFiles :: !(MemoizedWith EnvConfig (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
     }
     deriving Show
 
-lpFiles :: MonadIO m => LocalPackage -> m (Set.Set (Path Abs File))
-lpFiles = runMemoized . fmap (Set.unions . M.elems) . lpComponentFiles
+newtype MemoizedWith env a = MemoizedWith { unMemoizedWith :: RIO env a }
+  deriving (Functor, Applicative, Monad)
+
+memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
+memoizeRefWith action = do
+  ref <- newIORef Nothing
+  pure $ MemoizedWith $ do
+    mres <- readIORef ref
+    res <-
+      case mres of
+        Just res -> pure res
+        Nothing -> do
+          res <- tryAny action
+          writeIORef ref $ Just res
+          pure res
+    either throwIO pure res
+
+runMemoizedWith
+  :: (HasEnvConfig env, MonadReader env m, MonadIO m)
+  => MemoizedWith EnvConfig a
+  -> m a
+runMemoizedWith (MemoizedWith action) = do
+  envConfig <- view envConfigL
+  runRIO envConfig action
+
+instance Show (MemoizedWith env a) where
+  show _ = "<<MemoizedWith>>"
+
+lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
+lpFiles lp = runMemoizedWith $ fmap (Set.unions . M.elems) $ lpComponentFiles lp
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local

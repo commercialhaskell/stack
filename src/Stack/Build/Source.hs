@@ -51,7 +51,7 @@ projectLocalPackages :: HasEnvConfig env
               => RIO env [LocalPackage]
 projectLocalPackages = do
     sm <- view $ envConfigL.to envConfigSourceMap
-    for (toList $ smProject sm) $ loadLocalPackage sm
+    for (toList $ smProject sm) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
@@ -62,7 +62,7 @@ localDependencies = do
         case dpLocation dp of
             PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
-                Just <$> loadLocalPackage sourceMap pp
+                Just <$> loadLocalPackage pp
             _ -> return Nothing
 
 -- | Given the parsed targets and buld command line options constructs
@@ -236,7 +236,7 @@ splitComponents =
     go a b c (CBench x:xs) = go a b (c . (x:)) xs
 
 loadCommonPackage ::
-       forall env. HasEnvConfig env
+       forall env. (HasBuildConfig env, HasSourceMap env)
     => CommonPackage
     -> RIO env Package
 loadCommonPackage common = do
@@ -247,11 +247,11 @@ loadCommonPackage common = do
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
 -- based on the selected components
 loadLocalPackage ::
-       forall env. HasEnvConfig env
-    => SourceMap
-    -> ProjectPackage
+       forall env. (HasBuildConfig env, HasSourceMap env)
+    => ProjectPackage
     -> RIO env LocalPackage
-loadLocalPackage sm pp = do
+loadLocalPackage pp = do
+    sm <- view sourceMapL
     let common = ppCommon pp
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
@@ -338,10 +338,10 @@ loadLocalPackage sm pp = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    componentFiles <- memoizeRef $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
+    componentFiles <- memoizeRefWith $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
-    checkCacheResults <- memoizeRef $ do
-      componentFiles' <- runMemoized componentFiles
+    checkCacheResults <- memoizeRefWith $ do
+      componentFiles' <- runMemoizedWith componentFiles
       forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (ppRoot pp) component
         checkCacheResult <- checkBuildCache
@@ -503,10 +503,11 @@ calcFci modTime' fp = liftIO $
             }
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadReader env m, HasEnvConfig env)
+getPackageConfig
+  :: (HasBuildConfig env, HasSourceMap env)
   => Map FlagName Bool
   -> [Text]
-  -> m PackageConfig
+  -> RIO env PackageConfig
 getPackageConfig flags ghcOptions = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
