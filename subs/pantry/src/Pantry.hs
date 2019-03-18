@@ -161,9 +161,7 @@ module Pantry
   , loadGlobalHints
   , partitionReplacedDependencies
   , SnapshotCacheHash (..)
-  , areSnapshotModulesCached
-  , populateSnapshotModuleCache
-  , findPackagesWithModule
+  , withSnapshotCache
   ) where
 
 import RIO
@@ -1506,35 +1504,20 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
 
--- | Tell if snapshot cache of exposed modules exists in the current database.
---
--- @since 0.1.0.0
-areSnapshotModulesCached
+withSnapshotCache
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotCacheHash
-  -> RIO env Bool
-areSnapshotModulesCached hash =
-  maybe False (const True) <$> withStorage (getSnapshotCacheByHash hash)
-
--- | Store mapping between exposed module names and packages for a particular
--- snapshot (specified snapshot cache hash is supposed to be unique)
---
--- @since 0.1.0.0
-populateSnapshotModuleCache
-  :: (HasPantryConfig env, HasLogFunc env)
-  => SnapshotCacheHash
-  -> Map PackageName (Set ModuleName)
-  -> RIO env ()
-populateSnapshotModuleCache hash packageModules =
-  withStorage $ storeSnapshotModuleCache hash packageModules
-
--- | Find any snapshot packages exposing specified module name as its exposed module
---
--- @since 0.1.0.0
-findPackagesWithModule
-   :: (HasPantryConfig env, HasLogFunc env)
-   => SnapshotCacheHash
-   -> ModuleName
-   -> RIO env (Set PackageName)
-findPackagesWithModule hash m = do
-  Set.fromList <$> withStorage (loadExposedModulePackages hash m)
+  -> RIO env (Map PackageName (Set ModuleName))
+  -> ((ModuleName -> RIO env [PackageName]) -> RIO env a)
+  -> RIO env a
+withSnapshotCache hash getModuleMapping f = do
+  mres <- withStorage $ getSnapshotCacheByHash hash
+  cacheId <- case mres of
+    Nothing -> do
+      scId <- withStorage $ getSnapshotCacheId hash
+      packageModules <- getModuleMapping
+      logWarn "Populating snapshot module name cache"
+      withStorage $ storeSnapshotModuleCache scId packageModules
+      return scId
+    Just scId -> pure scId
+  f $ withStorage . loadExposedModulePackages cacheId

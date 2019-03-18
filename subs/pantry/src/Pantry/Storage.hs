@@ -48,6 +48,7 @@ module Pantry.Storage
   , hpackToCabal
   , countHackageCabals
   , getSnapshotCacheByHash
+  , getSnapshotCacheId
   , storeSnapshotModuleCache
   , loadExposedModulePackages
 
@@ -1067,11 +1068,10 @@ getModuleNameId =
 
 storeSnapshotModuleCache
   :: (HasPantryConfig env, HasLogFunc env)
-  => SnapshotCacheHash
+  => SnapshotCacheId
   -> Map P.PackageName (Set P.ModuleName)
   -> ReaderT SqlBackend (RIO env) ()
-storeSnapshotModuleCache hash packageModules = do
-  cache <- getSnapshotCacheId hash
+storeSnapshotModuleCache cache packageModules =
   forM_ (Map.toList packageModules) $ \(pn, modules) -> do
     package <- getPackageNameId pn
     forM_ modules $ \m -> do
@@ -1084,20 +1084,19 @@ storeSnapshotModuleCache hash packageModules = do
 
 loadExposedModulePackages
   :: (HasPantryConfig env, HasLogFunc env)
-  => SnapshotCacheHash
+  => SnapshotCacheId
   -> P.ModuleName
   -> ReaderT SqlBackend (RIO env) [P.PackageName]
-loadExposedModulePackages (SnapshotCacheHash sha) mName =
+loadExposedModulePackages cacheId mName =
   map go <$> rawSql
     "SELECT package_name.name\n\
-    \FROM package_name, snapshot_cache, package_exposed_module, module_name\n\
+    \FROM package_name, package_exposed_module, module_name\n\
     \WHERE module_name.name=?\n\
-    \AND   snapshot_cache.sha=?\n\
+    \AND   package_exposed_module.snapshot_cache=?\n\
     \AND   module_name.id=package_exposed_module.module\n\
-    \AND   snapshot_cache.id=package_exposed_module.snapshot_cache\n\
     \AND   package_name.id=package_exposed_module.package"
     [ toPersistValue (P.ModuleNameP mName)
-    , toPersistValue sha
+    , toPersistValue cacheId
     ]
   where
     go (Single (P.PackageNameP m)) = m

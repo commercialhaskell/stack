@@ -172,26 +172,22 @@ getPackagesFromModuleNames
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromModuleNames mns = do
     hash <- hashSnapshot
-    cached <- areSnapshotModulesCached hash
-    unless cached $ do
-        logWarn "Populating module name cache"
-        mapping <- mapSnapshotPackageModules
-        populateSnapshotModuleCache hash mapping
-    mutableMapping <- mapMutablePackageModules
-    pns <- forM (Set.toList mns) $ \mn -> do
-        immutable <- findPackagesWithModule hash mn
-        let pkgs = immutable <>
-              Map.findWithDefault mempty mn mutableMapping
-        case Set.toList pkgs of
-            [] -> return Set.empty
-            [pn] -> return $ Set.singleton pn
-            pns' -> throwString $ concat
-                [ "Module "
-                , moduleNameString mn
-                , " appears in multiple packages: "
-                , unwords $ map packageNameString pns'
-                ]
-    return $ Set.unions pns `Set.difference` blacklist
+    withSnapshotCache hash mapSnapshotPackageModules $ \getModulePackages -> do
+        mutableMapping <- mapMutablePackageModules
+        pns <- forM (Set.toList mns) $ \mn -> do
+            immutable <- Set.fromList <$> getModulePackages mn
+            let pkgs = immutable <>
+                  Map.findWithDefault mempty mn mutableMapping
+            case Set.toList pkgs of
+                [] -> return Set.empty
+                [pn] -> return $ Set.singleton pn
+                pns' -> throwString $ concat
+                    [ "Module "
+                    , moduleNameString mn
+                    , " appears in multiple packages: "
+                    , unwords $ map packageNameString pns'
+                    ]
+        return $ Set.unions pns `Set.difference` blacklist
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
