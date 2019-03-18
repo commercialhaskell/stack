@@ -19,6 +19,7 @@ module Stack.Build.Source
 import              Stack.Prelude
 import qualified    Pantry.SHA256 as SHA256
 import qualified    Data.ByteString as S
+import              Data.ByteString.Builder (toLazyByteString)
 import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
 import qualified    Distribution.PackageDescription as C
@@ -26,7 +27,6 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
-import qualified    Data.Text as T
 import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Haddock (shouldHaddockDeps)
@@ -42,8 +42,6 @@ import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
-import qualified    RIO.ByteString as B
-import qualified    RIO.ByteString.Lazy as BL
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
@@ -145,18 +143,19 @@ hashSourceMapData
     -> Map PackageName DepPackage
     -> RIO env SourceMapHash
 hashSourceMapData bc boptsCli wc smDeps = do
-    compilerPath <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
+    compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath wc
     compilerInfo <- getCompilerInfo wc
     immDeps <- forM (Map.elems smDeps) depPackageHashableContent
     let -- extra bytestring specifying GHC options supposed to be applied to
         -- GHC boot packages so we'll have differrent hashes when bare
         -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
         -- with profiling or without
-        bootGhcOpts = B.concat $ map encodeUtf8 (generalGhcOptions bc boptsCli False False)
-        hashedContent = compilerPath:compilerInfo:bootGhcOpts:immDeps
-    return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
+        bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
+        hashedContent = toLazyByteString $ compilerPath <> compilerInfo <>
+            getUtf8Builder (mconcat bootGhcOpts) <> mconcat immDeps
+    return $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
-depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
+depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
 depPackageHashableContent DepPackage {..} = do
     case dpLocation of
         PLMutable _ -> return ""
@@ -164,12 +163,13 @@ depPackageHashableContent DepPackage {..} = do
             let flagToBs (f, enabled) =
                     if enabled
                         then ""
-                        else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
+                        else "-" <> fromString (C.unFlagName f)
                 flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-                ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
+                ghcOptions = map display (cpGhcOptions dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-                hash = immutableLocShaBs pli
-            return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
+                hash = immutableLocSha pli
+            return $ hash <> haddocks <> getUtf8Builder (mconcat flags) <>
+                getUtf8Builder (mconcat ghcOptions)
 
 -- | All flags for a local package.
 getLocalFlags

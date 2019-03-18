@@ -6,6 +6,7 @@ module Stack.Script
     ) where
 
 import           Stack.Prelude
+import           Data.ByteString.Builder    (toLazyByteString)
 import qualified Data.ByteString.Char8      as S8
 import qualified Data.Conduit.List          as CL
 import           Data.List.Split            (splitWhen)
@@ -28,13 +29,12 @@ import           Stack.PackageDump
 import           Stack.Options.ScriptParser
 import           Stack.Runners
 import           Stack.Setup                (withNewLocalBuildTargets)
-import           Stack.SourceMap            (getCompilerInfo, immutableLocShaBs)
+import           Stack.SourceMap            (getCompilerInfo, immutableLocSha)
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
 import           System.FilePath            (dropExtension, replaceExtension)
-import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Directory as Dir
 import           RIO.Process
 import qualified RIO.Text as T
@@ -195,11 +195,11 @@ hashSnapshot = do
     let wc = whichCompiler $ smCompiler sourceMap
     compilerInfo <- getCompilerInfo wc
     let maybePliHash dep | PLImmutable pli <- dpLocation dep =
-                             Just $ immutableLocShaBs pli
+                             Just $ immutableLocSha pli
                          | otherwise = Nothing
         locHashes = mapMaybe maybePliHash $ Map.elems (smDeps sourceMap)
-        hashedContent = compilerInfo:locHashes
-    return $ SnapshotCacheHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
+        hashedContent = mconcat $ compilerInfo : locHashes
+    return $ SnapshotCacheHash (SHA256.hashLazyBytes $ toLazyByteString hashedContent)
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
