@@ -82,7 +82,6 @@ withConfigAndLock inner = withConfig $ do
     withUserFileLock stackRoot $ \lk ->
       Docker.reexecWithOptionalContainer
         Nothing
-        Nothing
         (pure lk)
         inner
 
@@ -156,7 +155,7 @@ withEnvConfigAndLock needTargets boptsCLI inner = do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
 
-      Docker.reexecWithOptionalContainer Nothing Nothing (readIORef curLk) $
+      Docker.reexecWithOptionalContainer Nothing (readIORef curLk) $
         Nix.reexecWithOptionalShell $ withBuildConfig $ do
           envConfig <- setupEnv needTargets boptsCLI Nothing
           runRIO envConfig $ do

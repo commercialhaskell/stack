@@ -610,7 +610,6 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
     config <- ask
     Docker.reexecWithOptionalContainer
           Nothing
-          Nothing
           (pure lk)
           (runRIO config $
            Nix.reexecWithOptionalShell $ do
@@ -812,7 +811,6 @@ execCmd ExecOpts {..} =
               Docker.reexecWithOptionalContainer
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    Nothing
                     (pure Nothing) -- Unlocked already above.
                     (withDefaultEnvConfigAndLock $ \buildLock -> do
                         config <- view configL

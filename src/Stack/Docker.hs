@@ -186,26 +186,22 @@ getCmdArgs docker imageInfo isRemoteDocker = do
 reexecWithOptionalContainer
     :: HasConfig env
     => Maybe (RIO env ())
-    -> Maybe (RIO env ())
     -> IO (Maybe FileLock)
     -> RIO env a
     -> RIO env a
-reexecWithOptionalContainer mbefore mafter mrelease inner =
+reexecWithOptionalContainer mbefore mrelease inner =
   do config <- view configL
      inContainer <- getInContainer
      isReExec <- view reExecL
-     if | inContainer && not isReExec && (isJust mbefore || isJust mafter) ->
+     if | inContainer && not isReExec && isJust mbefore ->
             throwIO OnlyOnHostException
         | inContainer -> inner
         | not (dockerEnable (configDocker config)) ->
-            fromMaybeAction mbefore *>
-            inner <*
-            fromMaybeAction mafter
+            fromMaybeAction mbefore *> inner
         | otherwise ->
             do liftIO $ mrelease >>= traverse_ unlockFile
                runContainerAndExit
                  (fromMaybeAction mbefore)
-                 (fromMaybeAction mafter)
   where
     fromMaybeAction Nothing = return ()
     fromMaybeAction (Just hook) = hook
@@ -222,10 +218,8 @@ preventInContainer inner =
 runContainerAndExit
   :: HasConfig env
   => RIO env ()  -- ^ Action to run before
-  -> RIO env ()  -- ^ Action to run after
   -> RIO env void
-runContainerAndExit before
-                    after = do
+runContainerAndExit before = do
      config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
@@ -369,8 +363,7 @@ runContainerAndExit before
          )
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-       Right () -> do after
-                      liftIO exitSuccess
+       Right () -> liftIO exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
