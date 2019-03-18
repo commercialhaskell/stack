@@ -26,6 +26,8 @@ import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
+import           RIO.PrettyPrint (HasTerm (..), HasStylesUpdate (..))
+import           RIO.Process (HasProcessContext (..))
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, toInstallMap)
 import           Stack.Build.Source
@@ -34,11 +36,14 @@ import           Stack.Package
 import           Stack.PackageDump (DumpPackage(..))
 import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
 import qualified Stack.Prelude (pkgName)
+import           Stack.Runners
 import           Stack.SourceMap
 import           Stack.Types.Build
+import           Stack.Types.Compiler (wantedToActual)
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.SourceMap
+import           Stack.Build.Target(NeedTargets(..), parseTargets)
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -58,6 +63,8 @@ data DotOpts = DotOpts
     -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.
     , dotBenchTargets :: Bool
     -- ^ Like the "--bench" flag for build, affects the meaning of 'dotTargets'.
+    , dotGlobalHints :: Bool
+    -- ^ Use global hints instead of relying on an actual GHC installation.
     }
 
 data ListDepsOpts = ListDepsOpts
@@ -72,7 +79,7 @@ data ListDepsOpts = ListDepsOpts
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
-dot :: HasEnvConfig env => DotOpts -> RIO env ()
+dot :: DotOpts -> RIO Runner ()
 dot dotOpts = do
   (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
   printGraph dotOpts localNames prunedGraph
@@ -88,12 +95,11 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph :: HasEnvConfig env
-                            => DotOpts
-                            -> RIO env
+createPrunedDependencyGraph :: DotOpts
+                            -> RIO Runner
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
-createPrunedDependencyGraph dotOpts = do
+createPrunedDependencyGraph dotOpts = withConfig $ withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
@@ -106,15 +112,14 @@ createPrunedDependencyGraph dotOpts = do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph :: HasEnvConfig env
-                       => DotOpts
-                       -> RIO env (Map PackageName (Set PackageName, DotPayload))
+createDependencyGraph
+  :: DotOpts
+  -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
-  sourceMap <- view $ envConfigL.to envConfigSourceMap
-  locals <- projectLocalPackages
+  sourceMap <- view sourceMapL
+  locals <- for (toList $ smProject sourceMap) loadLocalPackage
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
-  installMap <- toInstallMap sourceMap
-  (_, globalDump, _, _) <- getInstalled installMap
+  globalDump <- view $ to dcGlobalDump
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
@@ -129,9 +134,9 @@ createDependencyGraph dotOpts = do
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
-listDependencies :: HasEnvConfig env
-                  => ListDepsOpts
-                  -> RIO env ()
+listDependencies
+  :: ListDepsOpts
+  -> RIO Runner ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
@@ -244,14 +249,13 @@ resolveDependencies limit graph loadPackageDeps = do
   where unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
-createDepLoader :: HasEnvConfig env
-                => SourceMap
+createDepLoader :: SourceMap
                 -> Map PackageName DumpPackage
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
-                    Map FlagName Bool -> [Text] -> RIO env (Set PackageName, DotPayload))
+                    Map FlagName Bool -> [Text] -> RIO DotConfig (Set PackageName, DotPayload))
                 -> PackageName
-                -> RIO env (Set PackageName, DotPayload)
+                -> RIO DotConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
   fromMaybe noDepsErr
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
@@ -372,3 +376,97 @@ isWiredIn = (`Set.member` wiredInPackages)
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp =
   fromMaybe (lpPackage lp) (lpTestBench lp)
+
+-- Plumbing for --test and --bench flags
+withDotConfig
+    :: DotOpts
+    -> RIO DotConfig a
+    -> RIO Config a
+withDotConfig opts inner =
+  local (over globalOptsL modifyGO) $
+    if dotGlobalHints opts
+      then withBuildConfig withGlobalHints
+      else withReal
+  where
+    withGlobalHints = do
+      bconfig <- view buildConfigL
+      globals <- globalsFromHints $ smwCompiler $ bcSMWanted bconfig
+      fakeGhcPkgId <- parseGhcPkgId "ignored"
+      let smActual = SMActual
+            { smaCompiler = wantedToActual $ smwCompiler $ bcSMWanted bconfig
+            , smaProject = smwProject $ bcSMWanted bconfig
+            , smaDeps = smwDeps $ bcSMWanted bconfig
+            , smaGlobal = Map.mapWithKey toDump globals
+            }
+          toDump :: PackageName -> Version -> DumpPackage
+          toDump name version = DumpPackage
+            { dpGhcPkgId = fakeGhcPkgId
+            , dpPackageIdent = PackageIdentifier name version
+            , dpParentLibIdent = Nothing
+            , dpLicense = Nothing
+            , dpLibDirs = []
+            , dpLibraries = []
+            , dpHasExposedModules = True
+            , dpExposedModules = mempty
+            , dpDepends = []
+            , dpHaddockInterfaces = []
+            , dpHaddockHtml = Nothing
+            , dpIsExposed = True
+            }
+          actualPkgs = Map.keysSet (smaDeps smActual) <>
+                       Map.keysSet (smaProject smActual)
+          prunedActual = smActual { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
+      targets <- parseTargets NeedTargets False boptsCLI prunedActual
+      sourceMap <- loadSourceMap targets boptsCLI smActual
+      let dc = DotConfig
+                  { dcBuildConfig = bconfig
+                  , dcSourceMap = sourceMap
+                  , dcGlobalDump = toList $ smaGlobal smActual
+                  }
+      runRIO dc inner
+
+    withReal = withEnvConfig NeedTargets boptsCLI $ do
+      envConfig <- ask
+      let sourceMap = envConfigSourceMap envConfig
+      installMap <- toInstallMap sourceMap
+      (_, globalDump, _, _) <- getInstalled installMap
+      let dc = DotConfig
+            { dcBuildConfig = envConfigBuildConfig envConfig
+            , dcSourceMap = sourceMap
+            , dcGlobalDump = globalDump
+            }
+      runRIO dc inner
+
+    boptsCLI = defaultBuildOptsCLI
+        { boptsCLITargets = dotTargets opts
+        , boptsCLIFlags = dotFlags opts
+        }
+    modifyGO =
+        (if dotTestTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True) else id) .
+        (if dotBenchTargets opts then set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True) else id)
+
+data DotConfig = DotConfig
+  { dcBuildConfig :: !BuildConfig
+  , dcSourceMap :: !SourceMap
+  , dcGlobalDump :: ![DumpPackage]
+  }
+instance HasLogFunc DotConfig where
+  logFuncL = runnerL.logFuncL
+instance HasPantryConfig DotConfig where
+  pantryConfigL = configL.pantryConfigL
+instance HasTerm DotConfig where
+  useColorL = runnerL.useColorL
+  termWidthL = runnerL.termWidthL
+instance HasStylesUpdate DotConfig where
+  stylesUpdateL = runnerL.stylesUpdateL
+instance HasGHCVariant DotConfig
+instance HasPlatform DotConfig
+instance HasRunner DotConfig where
+  runnerL = configL.runnerL
+instance HasProcessContext DotConfig where
+  processContextL = runnerL.processContextL
+instance HasConfig DotConfig
+instance HasBuildConfig DotConfig where
+  buildConfigL = lens dcBuildConfig (\x y -> x { dcBuildConfig = y })
+instance HasSourceMap DotConfig where
+  sourceMapL = lens dcSourceMap (\x y -> x { dcSourceMap = y })

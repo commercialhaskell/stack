@@ -145,6 +145,8 @@ instance HasPantryConfig Ctx where
 instance HasProcessContext Ctx where
     processContextL = configL.processContextL
 instance HasBuildConfig Ctx
+instance HasSourceMap Ctx where
+    sourceMapL = envConfigL.sourceMapL
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
@@ -246,7 +248,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     getSources = do
       pPackages <- for (smProject sourceMap) $ \pp -> do
-        lp <- loadLocalPackage sourceMap pp
+        lp <- loadLocalPackage pp
         return $ PSFilePath lp
       bopts <- view $ configL.to configBuild
       deps <- for (smDeps sourceMap) $ \dp ->
@@ -255,7 +257,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
-            lp <- loadLocalPackage sourceMap pp
+            lp <- loadLocalPackage pp
             return $ PSFilePath lp
       return $ pPackages <> deps
 
@@ -871,8 +873,11 @@ psForceDirty :: PackageSource -> Bool
 psForceDirty (PSFilePath lp) = lpForceDirty lp
 psForceDirty PSRemote{} = False
 
-psDirty :: MonadIO m => PackageSource -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp) = runMemoized $ lpDirtyFiles lp
+psDirty
+  :: (MonadIO m, HasEnvConfig env, MonadReader env m)
+  => PackageSource
+  -> m (Maybe (Set FilePath))
+psDirty (PSFilePath lp) = runMemoizedWith $ lpDirtyFiles lp
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool

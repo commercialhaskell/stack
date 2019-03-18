@@ -338,7 +338,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             (sdistOptsParser False)
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
-                    dotCmd
+                    dot
                     (dotOptsParser False) -- Default for --external is False.
         addCommand' "ghc"
                     "Run ghc"
@@ -417,7 +417,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     (cleanOptsParser Purge)
         addCommand' "list-dependencies"
                     "List the dependencies"
-                    (withConfig . listDependenciesCmd True)
+                    (listDependenciesCmd True)
                     listDepsOptsParser
         addCommand' "query"
                     "Query general build information (experimental)"
@@ -1026,10 +1026,6 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
 solverCmd fixStackYaml =
     withConfig $
     withDefaultEnvConfigAndLock (\_ -> solveExtraDeps fixStackYaml)
-
--- | Visualize dependencies
-dotCmd :: DotOpts -> RIO Runner ()
-dotCmd dotOpts = withConfig $ withEnvConfigDot dotOpts $ dot dotOpts
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()

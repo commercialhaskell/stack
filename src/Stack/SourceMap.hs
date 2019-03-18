@@ -14,6 +14,7 @@ module Stack.SourceMap
     , checkFlagsUsedThrowing
     , globalCondCheck
     , pruneGlobals
+    , globalsFromHints
     ) where
 
 import qualified Data.Conduit.List as CL

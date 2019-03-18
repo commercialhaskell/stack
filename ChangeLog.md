@@ -120,6 +120,9 @@ Other enhancements:
   [#4480](https://github.com/commercialhaskell/stack/issues/4480).
 * Add `stack purge` as a shortcut for `stack clean --full`. See
   [#3863](https://github.com/commercialhaskell/stack/issues/3863).
+* Both `stack dot` and `stack ls dependencies` accept a
+  `--global-hints` flag to bypass the need for an installed GHC. See
+  [#4390](https://github.com/commercialhaskell/stack/issues/4390).
 
 Bug fixes:
 
