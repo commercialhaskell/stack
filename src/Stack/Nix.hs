@@ -36,40 +36,42 @@ reexecWithOptionalShell
     => RIO env WantedCompiler
     -> RIO env a
     -> RIO env a
-reexecWithOptionalShell getCompilerVersion inner =
-  do config <- view configL
-     inShell <- getInNixShell
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     let getCmdArgs = do
-           origArgs <- liftIO getArgs
-           let args | inContainer = origArgs  -- internal-re-exec version already passed
-                      -- first stack when restarting in the container
-                    | otherwise =
-                        ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
-           exePath <- liftIO getExecutablePath
-           return (exePath, args)
-     if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
-        then runShellAndExit getCompilerVersion getCmdArgs
-        else inner
+reexecWithOptionalShell getCompilerVersion inner = do
+  inShell <- launchInShell
+  if inShell
+    then runShellAndExit getCompilerVersion
+    else inner
 
+launchInShell :: HasConfig env => RIO env Bool
+launchInShell = do
+  nixEnable' <- view $ configL.to configNix.to nixEnable
+  inShell <- getInNixShell
+  inContainer <- getInContainer
+  isReExec <- view reExecL
+  pure $ nixEnable' && not inShell && (not isReExec || inContainer)
 
 runShellAndExit
     :: HasConfig env
     => RIO env WantedCompiler
-    -> RIO env (String, [String])
     -> RIO env void
-runShellAndExit getCompilerVersion getCmdArgs = do
+runShellAndExit getCompilerVersion = do
+   inContainer <- getInContainer
+   origArgs <- liftIO getArgs
+   let args | inContainer = origArgs  -- internal-re-exec version already passed
+              -- first stack when restarting in the container
+            | otherwise =
+                ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
+   exePath <- liftIO getExecutablePath
    config <- view configL
    envOverride <- view processContextL
    local (set processContextL envOverride) $ do
-     (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
+     let cmnd = escape exePath
+         args' = map escape args
      projectRoot <- getProjectRoot
      mshellFile <-
          traverse (resolveFile projectRoot) $
          nixInitFile (configNix config)
      compilerVersion <- getCompilerVersion
-     inContainer <- getInContainer
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
@@ -109,7 +111,7 @@ runShellAndExit getCompilerVersion getCmdArgs = do
                                                 F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
+                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
