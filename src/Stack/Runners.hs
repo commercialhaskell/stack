@@ -15,7 +15,6 @@ module Stack.Runners
     , withDefaultEnvConfig
     , withEnvConfigExt
     , withConfig
-    , loadCompilerVersion
     , withUserFileLock
     , munlockFile
     , withRunnerGlobal
@@ -37,10 +36,6 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment (getEnvironment)
 import           System.FileLock
 import           System.Terminal (getTerminalWidth)
-
--- FIXME it seems wrong that we call loadBuildConfig multiple times
-loadCompilerVersion :: RIO Config WantedCompiler
-loadCompilerVersion = view wantedCompilerVersionL <$> loadBuildConfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -198,7 +193,7 @@ withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
 
       Docker.reexecWithOptionalContainer
           mbefore
-          (Nix.reexecWithOptionalShell loadCompilerVersion (inner'' lk0))
+          (Nix.reexecWithOptionalShell (inner'' lk0))
           mafter
           (readIORef curLk)
 

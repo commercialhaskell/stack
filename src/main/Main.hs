@@ -611,7 +611,7 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
     Docker.reexecWithOptionalContainer
           Nothing
           (runRIO config $
-           Nix.reexecWithOptionalShell loadCompilerVersion $ do
+           Nix.reexecWithOptionalShell $ do
            (wantedCompiler, compilerCheck, mstack) <-
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
@@ -822,7 +822,11 @@ execCmd ExecOpts {..} =
                                 (ExecGhc, args) -> return ("ghc", args)
                                 (ExecRunGhc, args) -> return ("runghc", args)
                             munlockFile buildLock
-                            Nix.reexecWithOptionalShell (runRIO config loadCompilerVersion) (exec cmd args))
+
+                            -- FIXME this looks like it's running Nix
+                            -- at the wrong point in the pipeline
+                            config' <- view configL -- load up a second time to get the modified env
+                            runRIO config' $ Nix.reexecWithOptionalShell (exec cmd args))
                     Nothing
                     (pure Nothing) -- Unlocked already above.
         ExecOptsEmbellished {..} -> do

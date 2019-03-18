@@ -18,7 +18,7 @@ import           Data.Version (showVersion)
 import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.Config (getInNixShell, getInContainer)
+import           Stack.Config (getInNixShell, getInContainer, loadBuildConfig)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
@@ -31,15 +31,11 @@ import           RIO.Process (processContextL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
-reexecWithOptionalShell
-    :: HasConfig env
-    => RIO env WantedCompiler
-    -> RIO env a
-    -> RIO env a
-reexecWithOptionalShell getCompilerVersion inner = do
+reexecWithOptionalShell :: RIO Config a -> RIO Config a
+reexecWithOptionalShell inner = do
   inShell <- launchInShell
   if inShell
-    then runShellAndExit getCompilerVersion
+    then runShellAndExit
     else inner
 
 launchInShell :: HasConfig env => RIO env Bool
@@ -50,11 +46,8 @@ launchInShell = do
   isReExec <- view reExecL
   pure $ nixEnable' && not inShell && (not isReExec || inContainer)
 
-runShellAndExit
-    :: HasConfig env
-    => RIO env WantedCompiler
-    -> RIO env void
-runShellAndExit getCompilerVersion = do
+runShellAndExit :: RIO Config void
+runShellAndExit = do
    inContainer <- getInContainer
    origArgs <- liftIO getArgs
    let args | inContainer = origArgs  -- internal-re-exec version already passed
@@ -71,7 +64,15 @@ runShellAndExit getCompilerVersion = do
      mshellFile <-
          traverse (resolveFile projectRoot) $
          nixInitFile (configNix config)
-     compilerVersion <- getCompilerVersion
+
+     -- This will never result in double loading the build config, since:
+     --
+     -- 1. This function explicitly takes a Config, not a HasConfig
+     --
+     -- 2. This function ends up exiting before running other code
+     -- (thus the void return type)
+     compilerVersion <- view wantedCompilerVersionL <$> loadBuildConfig
+
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
