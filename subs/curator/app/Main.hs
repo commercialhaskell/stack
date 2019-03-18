@@ -7,11 +7,13 @@ import Data.Yaml (encodeFile, decodeFileThrow)
 import Options.Applicative hiding (action)
 import qualified Pantry
 import Path.IO (resolveFile', resolveDir')
+import qualified RIO.ByteString.Lazy as BL
 import RIO.List (stripPrefix)
 import qualified RIO.Map as Map
 import RIO.PrettyPrint
 import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
+import qualified RIO.Text as T
 import RIO.Time
 
 data CuratorOptions
@@ -23,6 +25,7 @@ data CuratorOptions
   | CheckSnapshot
   | Unpack
   | Build Int
+  | UploadDocs Target
   | UploadGithub Target
   | HackageDistro Target
 
@@ -37,6 +40,7 @@ opts = subparser
        <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
        <> command "build" (info (buildCmd <**> helper)
                            (progDesc "Build Stack project for a Stackage snapshot"))
+       <> targetCmd "uploaddocs" UploadDocs "Upload documentation to an S3 bucket"
        <> targetCmd "uploadgithub" UploadGithub "Commit and push snapshot definition to Github repository"
        <> targetCmd "hackagedistro" HackageDistro "Upload list of snapshot packages on Hackage as a distro"
         )
@@ -86,6 +90,8 @@ main = runPantryApp $
       unpackFiles
     Build jobs ->
       build jobs
+    UploadDocs target ->
+      uploadDocs' target
     UploadGithub target ->
       uploadGithub' target
     HackageDistro target ->
@@ -159,6 +165,9 @@ withFixedColorTerm action = do
 defaultTerminalWidth :: Int
 defaultTerminalWidth = 100
 
+unpackDir :: FilePath
+unpackDir = "unpack-dir"
+
 unpackFiles :: RIO PantryApp ()
 unpackFiles = do
   logInfo "Unpacking files"
@@ -166,13 +175,13 @@ unpackFiles = do
   snapshot' <- loadSnapshot $ SLFilePath $
                ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
   constraints' <- decodeFileThrow "constraints.yaml"
-  dest <- resolveDir' "unpack-dir"
+  dest <- resolveDir' unpackDir
   unpackSnapshot constraints' snapshot' dest
 
 build :: Int -> RIO PantryApp ()
 build jobs = do
   logInfo "Building"
-  withWorkingDir "unpack-dir" $ proc
+  withWorkingDir unpackDir $ proc
     "stack"
     (words $ "build --test --bench --test-suite-timeout=600 --no-rerun-tests --no-run-benchmarks --haddock --color never --jobs=" ++ show jobs)
     runProcess_
@@ -184,6 +193,21 @@ hackageDistro target = do
   let packageVersions =
         Map.mapMaybe (snapshotVersion . rspLocation) (rsPackages snapshot')
   uploadHackageDistro target packageVersions
+
+uploadDocs' :: Target -> RIO PantryApp ()
+uploadDocs' target = do
+  docsDir <- fmap (T.unpack . T.dropSuffix "\n" . decodeUtf8Lenient . BL.toStrict) $
+    withWorkingDir unpackDir $ proc "stack" (words "path --local-doc-root") readProcessStdout_
+  logInfo "Uploading docs to S3"
+  let bucket = "next.haddocks.stackage.org"
+      prefix = utf8BuilderToText $
+        case target of
+          TargetNightly day ->
+            let date = formatTime defaultTimeLocale (iso8601DateFormat Nothing) day
+            in "nightly-" <> fromString date
+          TargetLts x y ->
+            "lts-" <> display x <> "." <> display y
+  uploadDocs docsDir prefix bucket
 
 uploadGithub' :: Target -> RIO PantryApp ()
 uploadGithub' target = do
