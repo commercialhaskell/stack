@@ -44,4 +44,4 @@ executables:
     main: Main.hs
     dependencies:
     - curator
-    - optparse-applicative
+    - optparse-simple

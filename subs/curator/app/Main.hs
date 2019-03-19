@@ -2,11 +2,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 import Curator hiding (Snapshot)
 import Data.Yaml (encodeFile, decodeFileThrow)
-import Options.Applicative hiding (action)
+import Options.Applicative.Simple hiding (action)
 import qualified Pantry
 import Path.IO (resolveFile', resolveDir')
+import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
 import RIO.List (stripPrefix)
 import qualified RIO.Map as Map
@@ -16,41 +18,63 @@ import RIO.Process
 import qualified RIO.Text as T
 import RIO.Time
 
-data CuratorOptions
-  = Update
-  | CheckTargetAvailable Target
-  | Constraints
-  | SnapshotIncomplete
-  | Snapshot
-  | CheckSnapshot
-  | Unpack
-  | Build Int
-  | UploadDocs Target
-  | UploadGithub Target
-  | HackageDistro Target
-
-opts :: Parser CuratorOptions
-opts = subparser
-        ( simpleCmd "update" Update "Update Pantry databse from Hackage"
-       <> targetCmd "checktargetavailable" CheckTargetAvailable "Check if target snapshot isn't yet on Github"
-       <> simpleCmd "constraints" Constraints "Generate constraints file from build-constraints.yaml"
-       <> simpleCmd "snapshotincomplete" SnapshotIncomplete "Generate incomplete snapshot"
-       <> simpleCmd "snapshot" Snapshot "Complete locations in incomplete snapshot"
-       <> simpleCmd "checksnapshot" CheckSnapshot "Check snapshot consistency"
-       <> simpleCmd "unpack" Unpack "Unpack snapshot packages and create a Stack project for it"
-       <> command "build" (info (buildCmd <**> helper)
-                           (progDesc "Build Stack project for a Stackage snapshot"))
-       <> targetCmd "uploaddocs" UploadDocs "Upload documentation to an S3 bucket"
-       <> targetCmd "uploadgithub" UploadGithub "Commit and push snapshot definition to Github repository"
-       <> targetCmd "hackagedistro" HackageDistro "Upload list of snapshot packages on Hackage as a distro"
-        )
+options :: IO ((), RIO PantryApp ())
+options =
+    simpleOptions $(simpleVersion version)
+                  "curator - Stackage curator tool"
+                  "Special utilities for Stackage curators"
+                  (pure ())
+                  commands
   where
-    simpleCmd nm constr desc = command nm (info (pure constr) (progDesc desc))
-    targetCmd nm constr desc =
-      command nm (info (constr <$> target <**> helper) (progDesc desc))
-    target = argument (nightly <|> lts) ( metavar "TARGET"
-                                       <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
-                                        )
+    commands = do
+      addCommand "update"
+                 "Update Pantry databse from Hackage"
+                 (const update)
+                 (pure ())
+      addCommand "checktargetavailable"
+                 "Check if target snapshot isn't yet on Github"
+                 checkTargetAvailable
+                 parseTarget
+      addCommand "constraints"
+                 "Generate constraints file from build-constraints.yaml"
+                 (const constraints)
+                 (pure ())
+      addCommand "snapshotincomplete"
+                 "Generate incomplete snapshot"
+                 (const snapshotIncomplete)
+                 (pure ())
+      addCommand "snapshot"
+                 "Complete locations in incomplete snapshot"
+                 (const snapshot)
+                 (pure ())
+      addCommand "checksnapshot"
+                 "Check snapshot consistency"
+                 (const checkSnapshot)
+                 (pure ())
+      addCommand "unpack"
+                 "Unpack snapshot packages and create a Stack project for it"
+                 (const unpackFiles)
+                 (pure ())
+      addCommand "build"
+                 "Build Stack project for a Stackage snapshot"
+                 build
+                 parseJobs
+      addCommand "uploaddocs"
+                 "Upload documentation to an S3 bucket"
+                 uploadDocs'
+                 parseTarget
+      addCommand "uploadgithub"
+                 "Commit and push snapshot definition to Github repository"
+                 uploadGithub'
+                 parseTarget
+      addCommand "hackagedistro"
+                 "Upload list of snapshot packages on Hackage as a distro"
+                 hackageDistro
+                 parseTarget
+    parseTarget =
+      argument (nightly <|> lts) ( metavar "TARGET"
+                                <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
+                                 )
     nightly = maybeReader $ \s -> do
       s' <- stripPrefix "nightly-" s
       TargetNightly <$> parseTimeM False defaultTimeLocale "%Y-%m-%d" s'
@@ -59,43 +83,16 @@ opts = subparser
       case break (== '.') s' of
         (major, '.':minor) -> TargetLts <$> readMaybe major <*> readMaybe minor
         _ -> Nothing
-    buildCmd = Build <$> argument auto ( help "Number of jobs to run Stackage build with"
-                                      <> showDefault
-                                      <> value 1
-                                      <> metavar "JOBS"
-                                       )
-
-allOpts :: ParserInfo CuratorOptions
-allOpts = info (opts <**> helper)
-  ( fullDesc
- <> progDesc "Special utilities for Stackage curators"
- <> header "curator - Stackage curator tool" )
+    parseJobs = argument auto ( help "Number of jobs to run Stackage build with"
+                             <> showDefault
+                             <> value 1
+                             <> metavar "JOBS"
+                              )
 
 main :: IO ()
-main = runPantryApp $
-  liftIO (execParser allOpts) >>= \case
-    Update ->
-      update
-    CheckTargetAvailable t ->
-      checkTargetAvailable t
-    Constraints ->
-      constraints
-    SnapshotIncomplete ->
-      snapshotIncomplete
-    Snapshot ->
-      snapshot
-    CheckSnapshot ->
-      checkSnapshot
-    Unpack ->
-      unpackFiles
-    Build jobs ->
-      build jobs
-    UploadDocs target ->
-      uploadDocs' target
-    UploadGithub target ->
-      uploadGithub' target
-    HackageDistro target ->
-      hackageDistro target
+main = runPantryApp $ do
+  ((), runCmd) <- liftIO options
+  runCmd
 
 update :: RIO PantryApp ()
 update = do
