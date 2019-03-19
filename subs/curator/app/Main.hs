@@ -5,9 +5,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 import Curator hiding (Snapshot)
 import Data.Yaml (encodeFile, decodeFileThrow)
+import Network.HTTP.Client (parseUrlThrow)
+import Network.HTTP.Download (download)
 import Options.Applicative.Simple hiding (action)
 import qualified Pantry
-import Path.IO (resolveFile', resolveDir')
+import Path
+import Path.IO (doesFileExist, resolveFile', resolveDir')
 import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
 import RIO.List (stripPrefix)
@@ -37,8 +40,8 @@ options =
                  parseTarget
       addCommand "constraints"
                  "Generate constraints file from build-constraints.yaml"
-                 (const constraints)
-                 (pure ())
+                 constraints
+                 parseTarget
       addCommand "snapshotincomplete"
                  "Generate incomplete snapshot"
                  (const snapshotIncomplete)
@@ -98,15 +101,43 @@ update :: RIO PantryApp ()
 update = do
   void $ updateHackageIndex $ Just "Updating hackage index"
 
-constraints :: RIO PantryApp ()
-constraints = do
-  logInfo "Writing constraints.yaml"
-  loadStackageConstraints "build-constraints.yaml" >>= liftIO . encodeFile "constraints.yaml"
+constraints :: Target -> RIO PantryApp ()
+constraints target =
+  withFixedColorTerm $ case target of
+    TargetLts x y | y > 0 -> do
+      let prev = y - 1
+          url = concat [ "https://raw.githubusercontent.com/commercialhaskell/stackage-constraints/master/lts-"
+                        , show x
+                        , "."
+                        , show prev
+                        , ".yaml"
+                        ]
+      logInfo $ "Reusing constraints.yaml from lts-" <> display x <> "." <> display prev
+      req <- parseUrlThrow url
+      constraintsPath <- resolveFile' constraintsFilename
+      downloaded <- download req constraintsPath
+      unless downloaded $
+        error $ "Could not download constraints.yaml from " <> url
+    _ -> do
+      buildConstraintsPath <- resolveFile' "build-constraints.yaml"
+      exists <- doesFileExist buildConstraintsPath
+      if exists
+      then do
+        logInfo "Reusing already existing file build-constraints.yaml"
+      else do
+        logInfo $ "Downloading build-constraints from commercialhaskell/stackage"
+        req <- parseUrlThrow "https://raw.githubusercontent.com/commercialhaskell/stackage/master/build-constraints.yaml"
+        downloaded <- download req buildConstraintsPath
+        unless downloaded $
+          error $ "Could not download build-constraints.yaml from Github"
+        logInfo "Writing constraints.yaml"
+        loadStackageConstraints "build-constraints.yaml" >>=
+          liftIO . encodeFile constraintsFilename
 
 snapshotIncomplete :: RIO PantryApp ()
 snapshotIncomplete = do
   logInfo "Writing snapshot-incomplete.yaml"
-  decodeFileThrow "constraints.yaml" >>= \constraints' ->
+  decodeFileThrow constraintsFilename >>= \constraints' ->
     makeSnapshot constraints' "my-test-snapshot-2" >>=
     liftIO . encodeFile "snapshot-incomplete.yaml"
 
@@ -126,7 +157,7 @@ loadSnapshotYaml = do
 checkSnapshot :: RIO PantryApp ()
 checkSnapshot = do
   logInfo "Checking dependencies in snapshot.yaml"
-  decodeFileThrow "constraints.yaml" >>= \constraints' -> do
+  decodeFileThrow constraintsFilename >>= \constraints' -> do
     snapshot' <- loadSnapshotYaml
     withFixedColorTerm $ checkDependencyGraph constraints' snapshot'
 
@@ -171,7 +202,7 @@ unpackFiles = do
   abs' <- resolveFile' snapshotFilename
   snapshot' <- loadSnapshot $ SLFilePath $
                ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
-  constraints' <- decodeFileThrow "constraints.yaml"
+  constraints' <- decodeFileThrow constraintsFilename
   dest <- resolveDir' unpackDir
   unpackSnapshot constraints' snapshot' dest
 

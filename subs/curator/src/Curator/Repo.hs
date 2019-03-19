@@ -25,7 +25,9 @@ checkTargetAvailable ::
        )
     => Target
     -> m ()
-checkTargetAvailable = void . checkoutRepo
+checkTargetAvailable t = do
+    void $ checkoutConstraintsRepo t
+    void $ checkoutSnapshotsRepo t
 
 -- | Upload snapshot definition to Github repository
 uploadGithub ::
@@ -33,14 +35,28 @@ uploadGithub ::
     => Target
     -> RIO env ()
 uploadGithub target = do
-    (git, snapshotFile) <- checkoutRepo target
+    upload checkoutConstraintsRepo constraintsFilename
+    upload checkoutSnapshotsRepo snapshotFilename
+  where
+    upload checkout srcFilename = do
+        (git, snapshotFile) <- checkout target
 
-    createDirIfMissing True $ parent snapshotFile
-    runConduitRes $ sourceFile snapshotFilename .| sinkFile (toFilePath snapshotFile)
+        createDirIfMissing True $ parent snapshotFile
+        runConduitRes $ sourceFile srcFilename .| sinkFile (toFilePath snapshotFile)
 
-    git ["add", toFilePath snapshotFile]
-    git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
-    git ["push", "origin", "HEAD:master"]
+        git ["add", toFilePath snapshotFile]
+        git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
+        git ["push", "origin", "HEAD:master"]
+
+checkoutSnapshotsRepo t = checkoutRepo t dir url
+  where
+    url = "git@github.com:commercialhaskell/stackage-next"
+    dir = $(mkRelDir "stackage-snapshots")
+
+checkoutConstraintsRepo t = checkoutRepo t dir url
+  where
+    url = "git@github.com:commercialhaskell/stackage-constraints-next"
+    dir = $(mkRelDir "stackage-constraints")
 
 checkoutRepo ::
        ( HasLogFunc env
@@ -50,11 +66,13 @@ checkoutRepo ::
        , MonadThrow m
        )
     => Target
+    -> Path Rel Dir
+    -> String
     -> m ([String] -> m (), Path Abs File)
-checkoutRepo target = do
+checkoutRepo target dirName repoUrl = do
     root <- fmap (</> $(mkRelDir "curator")) $ getAppUserDataDir "stackage"
 
-    let repoDir = root </> $(mkRelDir "stackage-snapshots")
+    let repoDir = root </> dirName
 
         runIn wdir cmd args = do
             let wdir' = toFilePath wdir
@@ -92,5 +110,3 @@ checkoutRepo target = do
         $ error $ "File already exists: " ++ toFilePath destSnapshotFile
 
     return (git, destSnapshotFile)
-  where
-    repoUrl = "git@github.com:commercialhaskell/stackage-next"
