@@ -1046,7 +1046,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
       let cfInfo = CFIHash cabalHash (Just cabalSize)
           packageIdRev = PackageIdentifierRevision name version cfInfo
-       in fromString $ T.unpack $ utf8BuilderToText $ RIO.display packageIdRev
+       in "- " <+> fromString (T.unpack (utf8BuilderToText (RIO.display packageIdRev)))
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
