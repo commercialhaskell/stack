@@ -1661,13 +1661,10 @@ page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 
-stack provides two built-in Docker integrations. The first way is to
-build your code inside a Docker image, which means:
-
-* even more reproducibility to your builds, since you and the rest of your team
-  will always have the same system libraries
-* the Docker images ship with entire precompiled snapshots. That means you have
-  a large initial download, but much faster builds
+Stack provides two built-in Docker integrations. The first way is to
+build your code inside a Docker image, which means even more
+reproducibility to your builds, since you and the rest of your team
+will always have the same system libraries.
 
 The second way is to generate Docker images for you containing your
 built executables (the executable is built in your local machine and
