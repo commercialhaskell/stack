@@ -81,7 +81,7 @@ import              RIO.PrettyPrint
 import              RIO.Process
 import              Stack.Build (build)
 import              Stack.Build.Haddock (shouldHaddockDeps)
-import              Stack.Build.Source (loadSourceMap)
+import              Stack.Build.Source (loadSourceMap, hashSourceMapData)
 import              Stack.Build.Target (NeedTargets(..), parseTargets)
 import              Stack.Config (loadConfig, loadBuildConfig)
 import              Stack.Constants
@@ -264,20 +264,23 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     let bcPath :: BuildConfig
         bcPath = set envOverrideSettingsL (\_ -> return menv) $
                  set processContextL menv bc
-    sourceMap <- runRIO bcPath $ do
+    (sourceMap, sourceMapHash) <- runRIO bcPath $ do
       smActual <- actualFromGhc (bcSMWanted bc) compilerVer
       let actualPkgs = Map.keysSet (smaDeps smActual) <>
                        Map.keysSet (smaProject smActual)
           prunedActual = smActual { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
           haddockDeps = shouldHaddockDeps (configBuild config)
       targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
-      loadSourceMap targets boptsCLI smActual
+      sourceMap <- loadSourceMap targets boptsCLI smActual
+      sourceMapHash <- hashSourceMapData boptsCLI sourceMap
+      pure (sourceMap, sourceMapHash)
 
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigCabalVersion = cabalVer
             , envConfigBuildOptsCLI = boptsCLI
             , envConfigSourceMap = sourceMap
+            , envConfigSourceMapHash = sourceMapHash
             , envConfigCompilerBuild = mCompilerBuild
             }
 
@@ -365,6 +368,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         , envConfigCabalVersion = cabalVer
         , envConfigBuildOptsCLI = boptsCLI
         , envConfigSourceMap = sourceMap
+        , envConfigSourceMapHash = sourceMapHash
         , envConfigCompilerBuild = mCompilerBuild
         }
 

@@ -101,11 +101,13 @@ createPrunedDependencyGraph :: DotOpts
                                   Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withConfig $ withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
+  logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotIncludeBase dotOpts
                        then dotPrune dotOpts
                        else Set.insert "base" (dotPrune dotOpts)
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
+  logDebug "Returning prouned dependency graph"
   return (localNames, prunedGraph)
 
 -- | Create the dependency graph, the result is a map from a package
@@ -417,12 +419,14 @@ withDotConfig opts inner =
                        Map.keysSet (smaProject smActual)
           prunedActual = smActual { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
       targets <- parseTargets NeedTargets False boptsCLI prunedActual
+      logDebug "Loading source map"
       sourceMap <- loadSourceMap targets boptsCLI smActual
       let dc = DotConfig
                   { dcBuildConfig = bconfig
                   , dcSourceMap = sourceMap
                   , dcGlobalDump = toList $ smaGlobal smActual
                   }
+      logDebug "DotConfig fully loaded"
       runRIO dc inner
 
     withReal = withEnvConfig NeedTargets boptsCLI $ do

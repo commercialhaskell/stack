@@ -560,6 +560,7 @@ data EnvConfig = EnvConfig
     -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigBuildOptsCLI :: !BuildOptsCLI
     ,envConfigSourceMap :: !SourceMap
+    ,envConfigSourceMapHash :: !SourceMapHash
     ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
     }
 
@@ -1263,8 +1264,8 @@ platformSnapAndCompilerRel
     => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
     platform <- platformGhcRelDir
-    sm <- view $ envConfigL.to envConfigSourceMap
-    name <- smRelDir sm
+    smh <- view $ envConfigL.to envConfigSourceMapHash
+    name <- smRelDir smh
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
