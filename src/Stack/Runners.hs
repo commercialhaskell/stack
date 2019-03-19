@@ -13,9 +13,7 @@ module Stack.Runners
     , withCleanConfig
     , withEnvConfig
     , withDefaultEnvConfig
-    , withEnvConfigExt
     , withConfig
-    , loadCompilerVersion
     , withUserFileLock
     , munlockFile
     , withRunnerGlobal
@@ -37,10 +35,6 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment (getEnvironment)
 import           System.FileLock
 import           System.Terminal (getTerminalWidth)
-
--- FIXME it seems wrong that we call loadBuildConfig multiple times
-loadCompilerVersion :: RIO Config WantedCompiler
-loadCompilerVersion = view wantedCompilerVersionL <$> loadBuildConfig
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -85,14 +79,11 @@ withConfigAndLock
     -> RIO Runner ()
 withConfigAndLock inner = withConfig $ do
     stackRoot <- view stackRootL
-    projectRoot <- view $ to configProjectRoot
     withUserFileLock stackRoot $ \lk ->
       Docker.reexecWithOptionalContainer
-        projectRoot
         Nothing
+        (pure lk)
         inner
-        Nothing
-        (Just $ munlockFile lk)
 
 -- | Loads global config, ignoring any configuration which would be
 -- loaded due to $PWD.
@@ -126,16 +117,7 @@ withEnvConfig needTargets boptsCLI inner =
 withDefaultEnvConfigAndLock
     :: (Maybe FileLock -> RIO EnvConfig a)
     -> RIO Config a
-withDefaultEnvConfigAndLock inner =
-    withEnvConfigExt AllowNoTargets defaultBuildOptsCLI Nothing inner Nothing
-
-withEnvConfigAndLock
-    :: NeedTargets
-    -> BuildOptsCLI
-    -> (Maybe FileLock -> RIO EnvConfig a)
-    -> RIO Config a
-withEnvConfigAndLock needTargets boptsCLI inner =
-    withEnvConfigExt needTargets boptsCLI Nothing inner Nothing
+withDefaultEnvConfigAndLock = withEnvConfigAndLock AllowNoTargets defaultBuildOptsCLI
 
 -- | A runner specially built for the "stack clean" use case. For some
 -- reason (hysterical raisins?), all of the functions in this module
@@ -160,53 +142,34 @@ withBuildConfig inner = do
   bconfig <- loadBuildConfig
   runRIO bconfig inner
 
-withEnvConfigExt
+withEnvConfigAndLock
     :: NeedTargets
     -> BuildOptsCLI
-    -> Maybe (RIO Config ())
-    -- ^ Action to perform before the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The env config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
     -> (Maybe FileLock -> RIO EnvConfig a)
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
-    -> Maybe (RIO Config ())
-    -- ^ Action to perform after the build.  This will be run on the host
-    -- OS even if Docker is enabled for builds.  The env config is not
-    -- available in this action, since that would require build tools to be
-    -- installed on the host OS.
     -> RIO Config a
-withEnvConfigExt needTargets boptsCLI mbefore inner mafter = do
+withEnvConfigAndLock needTargets boptsCLI inner = do
     config <- ask
     withUserFileLock (view stackRootL config) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
-      let inner' lk =
+
+      Docker.reexecWithOptionalContainer Nothing (readIORef curLk) $
+        Nix.reexecWithOptionalShell $ withBuildConfig $ do
+          envConfig <- setupEnv needTargets boptsCLI Nothing
+          runRIO envConfig $ do
             -- Locking policy:  This is only used for build commands, which
             -- only need to lock the snapshot, not the global lock.  We
             -- trade in the lock here.
-            do dir <- installationRootDeps
-               -- Hand-over-hand locking:
-               withUserFileLock dir $ \lk2 -> do
-                 liftIO $ writeIORef curLk lk2
-                 liftIO $ munlockFile lk
-                 logDebug "Starting to execute command inside EnvConfig"
-                 inner lk2
-
-      let inner'' lk = do
-              bconfig <- runRIO config loadBuildConfig
-              envConfig <- runRIO bconfig (setupEnv needTargets boptsCLI Nothing)
-              runRIO envConfig (inner' lk)
-
-      Docker.reexecWithOptionalContainer
-          (configProjectRoot config)
-          mbefore
-          (Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion (inner'' lk0))
-          mafter
-          (Just $ liftIO $
-                do lk' <- readIORef curLk
-                   munlockFile lk')
+            dir <- installationRootDeps
+            -- Hand-over-hand locking:
+            withUserFileLock dir $ \lk2 -> do
+              lk1 <- readIORef curLk
+              munlockFile lk1
+              writeIORef curLk lk2
+              logDebug "Starting to execute command inside EnvConfig"
+              inner lk2
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.

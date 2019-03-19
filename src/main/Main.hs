@@ -467,7 +467,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "Subcommands specific to modifying stack.yaml files"
             (addCommand' ConfigCmd.cfgCmdSetName
                         "Sets a field in the project's stack.yaml to value"
-                        cfgSetCmd
+                        (withConfig . cfgCmdSet)
                         configCmdSetParser)
         addSubCommands'
           "hpc"
@@ -609,10 +609,10 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
   withUserFileLock stackRoot $ \lk -> do
     config <- ask
     Docker.reexecWithOptionalContainer
-          (configProjectRoot config)
           Nothing
+          (pure lk)
           (runRIO config $
-           Nix.reexecWithOptionalShell (configProjectRoot config) loadCompilerVersion $ do
+           Nix.reexecWithOptionalShell $ do
            (wantedCompiler, compilerCheck, mstack) <-
                case scoCompilerVersion of
                    Just v -> return (v, MatchMinor, Nothing)
@@ -624,8 +624,6 @@ setupCmd sco@SetupCmdOpts{..} = withConfig $ do
                               )
            runRIO config $ setup sco wantedCompiler compilerCheck mstack
            )
-          Nothing
-          (Just $ munlockFile lk)
 
 cleanCmd :: CleanOpts -> RIO Runner ()
 cleanCmd = withConfig . withCleanConfig . clean
@@ -809,12 +807,11 @@ execCmd ExecOpts {..} =
         ExecOptsPlain -> do
           withConfig $ do
             stackRoot <- view stackRootL
-            projectRoot <- view $ to configProjectRoot
             withUserFileLock stackRoot $ \lk -> do
               Docker.reexecWithOptionalContainer
-                    projectRoot
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
+                    (pure Nothing) -- Unlocked already above.
                     (withDefaultEnvConfigAndLock $ \buildLock -> do
                         config <- view configL
                         menv <- liftIO $ configProcessContextSettings config plainEnvSettings
@@ -825,9 +822,11 @@ execCmd ExecOpts {..} =
                                 (ExecGhc, args) -> return ("ghc", args)
                                 (ExecRunGhc, args) -> return ("runghc", args)
                             munlockFile buildLock
-                            Nix.reexecWithOptionalShell (configProjectRoot config) (runRIO config loadCompilerVersion) (exec cmd args))
-                    Nothing
-                    Nothing -- Unlocked already above.
+
+                            -- FIXME this looks like it's running Nix
+                            -- at the wrong point in the pipeline
+                            config' <- view configL -- load up a second time to get the modified env
+                            runRIO config' $ Nix.reexecWithOptionalShell (exec cmd args))
         ExecOptsEmbellished {..} -> do
             let targets = concatMap words eoPackages
                 boptsCLI = defaultBuildOptsCLI
@@ -952,9 +951,8 @@ dockerResetCmd keepHome =
   withConfig $ do
     stackRoot <- view stackRootL
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock stackRoot $ \_ -> do
-      projectRoot <- view $ to configProjectRoot
-      Docker.preventInContainer $ Docker.reset projectRoot keepHome
+    withUserFileLock stackRoot $ \_ ->
+      Docker.preventInContainer $ Docker.reset keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> RIO Runner ()
@@ -965,9 +963,6 @@ dockerCleanupCmd cleanupOpts =
     withUserFileLock stackRoot $ \_ ->
       Docker.preventInContainer $
       Docker.cleanup cleanupOpts
-
-cfgSetCmd :: ConfigCmd.ConfigCmdSet -> RIO Runner ()
-cfgSetCmd = withGlobalConfigAndLock . cfgCmdSet
 
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()

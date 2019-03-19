@@ -18,58 +18,61 @@ import           Data.Version (showVersion)
 import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.Config (getInNixShell, getInContainer)
+import           Stack.Config (getInNixShell, getInContainer, loadBuildConfig)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
+import           Stack.Docker (getProjectRoot)
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
-reexecWithOptionalShell
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> RIO env WantedCompiler
-    -> RIO env a
-    -> RIO env a
-reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
-  do config <- view configL
-     inShell <- getInNixShell
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     let getCmdArgs = do
-           origArgs <- liftIO getArgs
-           let args | inContainer = origArgs  -- internal-re-exec version already passed
-                      -- first stack when restarting in the container
-                    | otherwise =
-                        ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
-           exePath <- liftIO getExecutablePath
-           return (exePath, args)
-     if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
-        then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
-        else inner
+reexecWithOptionalShell :: RIO Config a -> RIO Config a
+reexecWithOptionalShell inner = do
+  inShell <- launchInShell
+  if inShell
+    then runShellAndExit
+    else inner
 
+launchInShell :: HasConfig env => RIO env Bool
+launchInShell = do
+  nixEnable' <- view $ configL.to configNix.to nixEnable
+  inShell <- getInNixShell
+  inContainer <- getInContainer
+  isReExec <- view reExecL
+  pure $ nixEnable' && not inShell && (not isReExec || inContainer)
 
-runShellAndExit
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> RIO env WantedCompiler
-    -> RIO env (String, [String])
-    -> RIO env void
-runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
+runShellAndExit :: RIO Config void
+runShellAndExit = do
+   inContainer <- getInContainer
+   origArgs <- liftIO getArgs
+   let args | inContainer = origArgs  -- internal-re-exec version already passed
+              -- first stack when restarting in the container
+            | otherwise =
+                ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
+   exePath <- liftIO getExecutablePath
    config <- view configL
    envOverride <- view processContextL
    local (set processContextL envOverride) $ do
-     (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
+     let cmnd = escape exePath
+         args' = map escape args
+     projectRoot <- getProjectRoot
      mshellFile <-
-         traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
+         traverse (resolveFile projectRoot) $
          nixInitFile (configNix config)
-     compilerVersion <- getCompilerVersion
-     inContainer <- getInContainer
+
+     -- This will never result in double loading the build config, since:
+     --
+     -- 1. This function explicitly takes a Config, not a HasConfig
+     --
+     -- 2. This function ends up exiting before running other code
+     -- (thus the void return type)
+     compilerVersion <- view wantedCompilerVersionL <$> loadBuildConfig
+
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
@@ -109,7 +112,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                                                 F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
+                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
@@ -127,10 +130,6 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
                                    ("'\"'\"'"++)
                                  else (c:)) "" str
                  ++ "'"
-
--- | Fail with friendly error if project root not set.
-fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRoot)
 
 -- | Command-line argument for "nix"
 nixCmdName :: String
