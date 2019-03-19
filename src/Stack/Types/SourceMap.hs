@@ -148,16 +148,11 @@ data SourceMap = SourceMap
     -- packages. We can document that as not supported, _or_ we could
     -- actually include all of this in the hash and make Stack more
     -- resilient.
-  , smHash :: !SourceMapHash
-    -- ^ hash of the source map calculated once as an expensive
-    -- operation
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.
 newtype SourceMapHash = SourceMapHash SHA256
 
 -- | Returns relative directory name with source map's hash
-smRelDir :: (MonadThrow m) => SourceMap -> m (Path Rel Dir)
-smRelDir sm = do
-  let SourceMapHash smh = smHash sm
-  parseRelDir $ T.unpack $ SHA256.toHexText smh
+smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
+smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh

@@ -14,6 +14,7 @@ module Stack.Build.Source
     , loadSourceMap
     , getLocalFlags
     , addUnlistedToBuildCache
+    , hashSourceMapData
     ) where
 
 import              Stack.Prelude
@@ -34,7 +35,7 @@ import              Stack.Build.Target
 import              Stack.Package
 import              Stack.SourceMap
 import              Stack.Types.Build
-import              Stack.Types.Compiler (whichCompiler, WhichCompiler(..))
+import              Stack.Types.Compiler (whichCompiler)
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
@@ -62,7 +63,7 @@ localDependencies = do
                 Just <$> loadLocalPackage pp
             _ -> return Nothing
 
--- | Given the parsed targets and buld command line options constructs
+-- | Given the parsed targets and build command line options constructs
 --   a source map
 loadSourceMap :: HasBuildConfig env
               => SMTargets
@@ -103,8 +104,9 @@ loadSourceMap smt boptsCli sma = do
         maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
         maybeProjectFlags _ = Nothing
         globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
+    logDebug "Checking flags"
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
-    smh <- hashSourceMapData bconfig boptsCli (whichCompiler compiler) deps
+    logDebug "SourceMap constructed"
     return
         SourceMap
         { smTargets = smt
@@ -112,7 +114,6 @@ loadSourceMap smt boptsCli sma = do
         , smProject = project
         , smDeps = deps
         , smGlobal = globals
-        , smHash = smh
         }
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'
@@ -136,16 +137,16 @@ loadSourceMap smt boptsCli sma = do
 -- * Make sure things like profiling and haddocks are included in the hash
 --
 hashSourceMapData
-    :: (HasConfig env)
-    => BuildConfig
-    -> BuildOptsCLI
-    -> WhichCompiler
-    -> Map PackageName DepPackage
+    :: HasBuildConfig env
+    => BuildOptsCLI
+    -> SourceMap
     -> RIO env SourceMapHash
-hashSourceMapData bc boptsCli wc smDeps = do
+hashSourceMapData boptsCli sm = do
+    let wc = whichCompiler $ smCompiler sm
     compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath wc
     compilerInfo <- getCompilerInfo wc
-    immDeps <- forM (Map.elems smDeps) depPackageHashableContent
+    immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
+    bc <- view buildConfigL
     let -- extra bytestring specifying GHC options supposed to be applied to
         -- GHC boot packages so we'll have differrent hashes when bare
         -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
