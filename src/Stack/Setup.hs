@@ -35,6 +35,7 @@ module Stack.Setup
   ) where
 
 import qualified    Codec.Archive.Tar as Tar
+import              Conduit
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
@@ -43,12 +44,11 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
-import              Data.Conduit (await, yield, awaitForever)
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
-import              Data.Conduit.Process.Typed (eceStderr)
+import              Data.Conduit.Process.Typed (eceStderr, createSource)
 import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
@@ -1497,7 +1497,32 @@ setup7z si = do
                         , "-y"
                         , toFilePath archive
                         ]
-                ec <- proc cmd args runProcess
+                let archiveDisplay = fromString $ FP.takeFileName $ toFilePath archive
+                    isExtract = FP.takeExtension (toFilePath archive) == ".tar"
+                logInfo $
+                  (if isExtract then "Extracting " else "Decompressing ") <>
+                  archiveDisplay <> "..."
+                ec <-
+                  proc cmd args $ \pc ->
+                  if isExtract
+                    then withProcess (setStdout createSource pc) $ \p -> do
+                        total <- runConduit
+                            $ getStdout p
+                           .| filterCE (== 10) -- newline characters
+                           .| foldMC
+                                (\count bs -> do
+                                    let count' = count + S.length bs
+                                    logSticky $ "Extracted " <> RIO.display count' <> " files"
+                                    pure count'
+                                )
+                                0
+                        logStickyDone $
+                          "Extracted total of " <>
+                          RIO.display total <>
+                          " files from " <>
+                          archiveDisplay
+                        waitExitCode p
+                    else runProcess pc
                 when (ec /= ExitSuccess)
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
