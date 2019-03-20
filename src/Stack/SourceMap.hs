@@ -119,7 +119,7 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-       (HasLogFunc env, HasProcessContext env)
+       (HasLogFunc env, HasProcessContext env, HasCompiler env)
     => ActualCompiler
     -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump compiler = do
@@ -146,7 +146,7 @@ globalsFromHints compiler = do
 type DumpedGlobalPackage = DumpPackage
 
 actualFromGhc ::
-       (HasConfig env)
+       (HasConfig env, HasCompiler env)
     => SMWanted
     -> ActualCompiler
     -> RIO env (SMActual DumpedGlobalPackage)

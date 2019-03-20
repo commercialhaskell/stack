@@ -13,6 +13,7 @@ import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version          (mkVersion)
 import           Stack.PackageDump
 import           Stack.Prelude
+import           Stack.Setup
 import           Stack.Types.Compiler
 import           Stack.Types.GhcPkgId
 import           RIO.Process
@@ -259,8 +260,8 @@ checkDepsPresent prunes selected =
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
-runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
+runEnvNoLogging :: RIO (WithGHC LoggedProcessContext) a -> IO a
 runEnvNoLogging inner = do
   envVars <- view envVarsL <$> mkDefaultProcessContext
   menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
-  runRIO (LoggedProcessContext menv mempty) inner
+  runRIO (WithGHC (LoggedProcessContext menv mempty)) inner

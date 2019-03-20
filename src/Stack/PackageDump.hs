@@ -31,12 +31,13 @@ import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
 import           Stack.Types.Compiler
+import           Stack.Types.Config (HasCompiler)
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
@@ -45,7 +46,7 @@ ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => PackageName
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
@@ -55,7 +56,7 @@ ghcPkgDescribe pkgName' = ghcPkgCmdArgs ["describe", "--simple-output", packageN
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => [String]
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
