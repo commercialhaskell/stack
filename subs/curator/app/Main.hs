@@ -75,9 +75,10 @@ options =
                  hackageDistro
                  parseTarget
     parseTarget =
-      argument (nightly <|> lts) ( metavar "TARGET"
-                                <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
-                                 )
+      option (nightly <|> lts) ( long "target"
+                              <> metavar "TARGET"
+                              <> help "Target Stackage snapshot 'lts-MM.NN' or 'nightly-YYYY-MM-DD'"
+                               )
     nightly = maybeReader $ \s -> do
       s' <- stripPrefix "nightly-" s
       TargetNightly <$> parseTimeM False defaultTimeLocale "%Y-%m-%d" s'
@@ -86,10 +87,11 @@ options =
       case break (== '.') s' of
         (major, '.':minor) -> TargetLts <$> readMaybe major <*> readMaybe minor
         _ -> Nothing
-    parseJobs = argument auto ( help "Number of jobs to run Stackage build with"
-                             <> showDefault
-                             <> value 1
-                             <> metavar "JOBS"
+    parseJobs = option auto ( long "jobs"
+                           <> metavar "JOBS"
+                           <> showDefault
+                           <> value 1
+                           <> help "Number of jobs to run Stackage build with"
                               )
 
 main :: IO ()
