@@ -465,10 +465,15 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         addSubCommands'
             ConfigCmd.cfgCmdName
             "Subcommands specific to modifying stack.yaml files"
-            (addCommand' ConfigCmd.cfgCmdSetName
-                        "Sets a field in the project's stack.yaml to value"
-                        (withConfig . cfgCmdSet)
-                        configCmdSetParser)
+            (do
+               addCommand' ConfigCmd.cfgCmdSetName
+                          "Sets a field in the project's stack.yaml to value"
+                          (withConfig . cfgCmdSet)
+                          configCmdSetParser
+               addCommand' ConfigCmd.cfgCmdEnvName
+                          "Print environment variables for use in a shell"
+                          (withConfig . withDefaultEnvConfig . cfgCmdEnv)
+                          configCmdEnvParser)
         addSubCommands'
           "hpc"
           "Subcommands specific to Haskell Program Coverage"

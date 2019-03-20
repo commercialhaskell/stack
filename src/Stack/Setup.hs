@@ -297,7 +297,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
-    distDir <- runReaderT distRelativeDir envConfig0
+    distDir <- runReaderT distRelativeDir envConfig0 >>= canonicalizePath
 
     executablePath <- liftIO getExecutablePath
 
