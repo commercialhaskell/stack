@@ -6,7 +6,6 @@ module Stack.Unpack
   ) where
 
 import Stack.Prelude
-import Stack.Types.BuildPlan
 import qualified RIO.Text as T
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -31,13 +30,16 @@ instance Show UnpackException where
 -- | Intended to work for the command line command.
 unpackPackages
   :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Maybe SnapshotDef -- ^ when looking up by name, take from this build plan
+  => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
   -> Path Abs Dir -- ^ destination
   -> [String] -- ^ names or identifiers
   -> RIO env ()
-unpackPackages mSnapshotDef dest input = do
+unpackPackages mSnapshot dest input = do
     let (errs1, (names, pirs1)) =
           fmap partitionEithers $ partitionEithers $ map parse input
+    locs1 <- forM pirs1 $ \pir -> do
+      loc <- completePackageLocation $ RPLIHackage pir Nothing
+      pure (loc, packageLocationIdent loc)
     (errs2, locs2) <- partitionEithers <$> traverse toLoc names
     case errs1 ++ errs2 of
       [] -> pure ()
@@ -47,9 +49,7 @@ unpackPackages mSnapshotDef dest input = do
               suffix <- parseRelDir $ packageIdentifierString ident
               pure (pir, dest </> suffix)
           )
-          (map (\pir@(PackageIdentifierRevision name ver _) ->
-                  (RPLIHackage pir Nothing, PackageIdentifier name ver)) pirs1 ++
-           locs2)
+          (locs1 ++ locs2)
 
     alreadyUnpacked <- filterM doesDirExist $ Map.elems locs
 
@@ -57,27 +57,28 @@ unpackPackages mSnapshotDef dest input = do
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
     forM_ (Map.toList locs) $ \(loc, dest') -> do
-      unpackPackageLocationRaw dest' loc
+      unpackPackageLocation dest' loc
       logInfo $
         "Unpacked " <>
         display loc <>
         " to " <>
         fromString (toFilePath dest')
   where
-    toLoc = maybe toLocNoSnapshot toLocSnapshot mSnapshotDef
+    toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
+          | otherwise = toLocNoSnapshot
 
-    toLocNoSnapshot :: PackageName -> RIO env (Either String (RawPackageLocationImmutable, PackageIdentifier))
+    toLocNoSnapshot :: PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
     toLocNoSnapshot name = do
-      mver1 <- getLatestHackageVersion name UsePreferredVersions
-      mver <-
-        case mver1 of
-          Just _ -> pure mver1
+      mloc1 <- getLatestHackageLocation name UsePreferredVersions
+      mloc <-
+        case mloc1 of
+          Just _ -> pure mloc1
           Nothing -> do
             updated <- updateHackageIndex $ Just $ "Could not find package " <> fromString (packageNameString name) <> ", updating"
             case updated of
-              UpdateOccurred -> getLatestHackageVersion name UsePreferredVersions
+              UpdateOccurred -> getLatestHackageLocation name UsePreferredVersions
               NoUpdateOccurred -> pure Nothing
-      case mver of
+      case mloc of
         Nothing -> do
           candidates <- getHackageTypoCorrections name
           pure $ Left $ concat
@@ -88,21 +89,16 @@ unpackPackages mSnapshotDef dest input = do
                 then ""
                 else ". Perhaps you meant: " ++ intercalate ", " (map packageNameString candidates)
             ]
-        Just pir@(PackageIdentifierRevision _ ver _) -> pure $ Right
-          ( RPLIHackage pir Nothing
-          , PackageIdentifier name ver
-          )
+        Just loc -> pure $ Right (loc, packageLocationIdent loc)
 
-    toLocSnapshot :: SnapshotDef -> PackageName -> RIO env (Either String (RawPackageLocationImmutable, PackageIdentifier))
-    toLocSnapshot sd name =
-        go $ concatMap rslLocations $ sdSnapshots sd
-      where
-        go [] = pure $ Left $ "Package does not appear in snapshot: " ++ packageNameString name
-        go (loc:locs) = do
-          ident@(PackageIdentifier name' _) <- getRawPackageLocationIdent loc
-          if name == name'
-            then pure $ Right (loc, ident)
-            else go locs
+    toLocSnapshot :: RawSnapshot -> PackageName -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
+    toLocSnapshot snapshot name =
+        case Map.lookup name (rsPackages snapshot) of
+          Nothing ->
+            pure $ Left $ "Package does not appear in snapshot: " ++ packageNameString name
+          Just sp -> do
+            loc <- completePackageLocation (rspLocation sp)
+            pure $ Right (loc, packageLocationIdent loc)
 
     -- Possible future enhancement: parse names as name + version range
     parse s =

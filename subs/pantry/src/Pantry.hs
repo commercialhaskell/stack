@@ -136,7 +136,7 @@ module Pantry
   , unpackPackageLocation
   , getPackageLocationName
   , getRawPackageLocationIdent
-  , getPackageLocationIdent
+  , packageLocationIdent
   , getRawPackageLocationTreeKey
   , getPackageLocationTreeKey
 
@@ -1298,13 +1298,12 @@ getPackageLocationName = fmap pkgName . getRawPackageLocationIdent
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --
 -- @since 0.1.0.0
-getPackageLocationIdent
-  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
-  -> RIO env PackageIdentifier
-getPackageLocationIdent (PLIHackage ident _ _) = pure ident
-getPackageLocationIdent (PLIRepo _ pm) = pure $ pmIdent pm
-getPackageLocationIdent (PLIArchive _ pm) = pure $ pmIdent pm
+packageLocationIdent
+  :: PackageLocationImmutable
+  -> PackageIdentifier
+packageLocationIdent (PLIHackage ident _ _) = ident
+packageLocationIdent (PLIRepo _ pm) = pmIdent pm
+packageLocationIdent (PLIArchive _ pm) = pmIdent pm
 
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --

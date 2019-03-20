@@ -46,6 +46,7 @@ import           Options.Applicative.Complicated
 import           Options.Applicative.Simple (simpleVersion)
 #endif
 import           Options.Applicative.Types (ParserHelp(..))
+import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -94,7 +95,6 @@ import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarb
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
-import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -672,9 +672,12 @@ unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
 unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
 unpackCmd (names, Just dstPath) = withConfigAndLock $ do
     mresolver <- view $ globalOptsL.to globalResolver
-    mSnapshotDef <- mapM (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
+    mSnapshot <- forM mresolver $ \resolver -> do
+      concrete <- makeConcreteResolver resolver
+      loc <- completeSnapshotLocation concrete
+      loadSnapshot loc
     dstPath' <- resolveDir' $ T.unpack dstPath
-    unpackPackages mSnapshotDef dstPath' names
+    unpackPackages mSnapshot dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> RIO Runner ()

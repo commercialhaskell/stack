@@ -71,7 +71,7 @@ additionalDepPackage buildHaddocks pl = do
         (gpdio, name, _cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
         pure (name, gpdio NoPrintWarnings)
       PLImmutable pli -> do
-        PackageIdentifier name _ <- getPackageLocationIdent pli
+        let PackageIdentifier name _ = packageLocationIdent pli
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
   return DepPackage
