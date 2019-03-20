@@ -34,7 +34,7 @@ options =
                  "Update Pantry databse from Hackage"
                  (const update)
                  (pure ())
-      addCommand "checktargetavailable"
+      addCommand "check-target-available"
                  "Check if target snapshot isn't yet on Github"
                  checkTargetAvailable
                  parseTarget
@@ -42,7 +42,7 @@ options =
                  "Generate constraints file from build-constraints.yaml"
                  constraints
                  parseTarget
-      addCommand "snapshotincomplete"
+      addCommand "snapshot-incomplete"
                  "Generate incomplete snapshot"
                  (const snapshotIncomplete)
                  (pure ())
@@ -50,7 +50,7 @@ options =
                  "Complete locations in incomplete snapshot"
                  (const snapshot)
                  (pure ())
-      addCommand "checksnapshot"
+      addCommand "check-snapshot"
                  "Check snapshot consistency"
                  (const checkSnapshot)
                  (pure ())
@@ -62,15 +62,15 @@ options =
                  "Build Stack project for a Stackage snapshot"
                  build
                  parseJobs
-      addCommand "uploaddocs"
+      addCommand "upload-docs"
                  "Upload documentation to an S3 bucket"
                  uploadDocs'
                  parseTarget
-      addCommand "uploadgithub"
+      addCommand "upload-github"
                  "Commit and push snapshot definition to Github repository"
                  uploadGithub'
                  parseTarget
-      addCommand "hackagedistro"
+      addCommand "hackage-distro"
                  "Upload list of snapshot packages on Hackage as a distro"
                  hackageDistro
                  parseTarget
