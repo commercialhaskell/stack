@@ -167,7 +167,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: HasConfig env
+  :: HasConfig env -- FIXME try knocking this down to HasRunner and initializing the Config appropriately here
   => Maybe String
   -> SourceOpts
   -> RIO env ()

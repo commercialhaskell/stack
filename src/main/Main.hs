@@ -683,7 +683,7 @@ upgradeCmd upgradeOpts' = do
       logError "You cannot use the --resolver option with the upgrade command"
       liftIO exitFailure
     Nothing ->
-      withGlobalConfig $
+      withNoProject $ withConfig $
       upgrade
 #ifdef USE_GIT_INFO
         (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
@@ -940,12 +940,12 @@ initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
     pwd <- getCurrentDir
     go <- view globalOptsL
-    withGlobalConfig (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withNoProject $ withConfig (initProject IsInitCmd pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
 newCmd (newOpts,initOpts) =
-    withGlobalConfig $ do
+    withNoProject $ withConfig $ do
         dir <- new newOpts (forceOverwrite initOpts)
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $ do

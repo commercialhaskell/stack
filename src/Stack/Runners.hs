@@ -9,7 +9,7 @@ module Stack.Runners
     , withEnvConfig
     , withDefaultEnvConfig
     , withConfig
-    , withGlobalConfig
+    , withNoProject
     , withRunnerGlobal
     ) where
 
@@ -26,23 +26,23 @@ import           Stack.Types.Config
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
--- | Loads global config, ignoring any configuration which would be
--- loaded due to $PWD.
-withGlobalConfig
-    :: RIO Config ()
-    -> RIO Runner ()
-withGlobalConfig inner =
-    local (set stackYamlLocL SYLNoProject) $
-    loadConfig $ \config ->
-    runRIO config inner
+-- | Ensure that no project settings are used when running 'withConfig'.
+withNoProject :: RIO Runner a -> RIO Runner a
+withNoProject = local (set stackYamlLocL SYLNoProject) -- FIXME consider adding a warning when overriding, or using SYLNoConfig
 
--- For now the non-locking version just unlocks immediately.
--- That is, there's still a serialization point.
+-- | Helper for 'withEnvConfig' which passes in some default arguments:
+--
+-- * No targets are requested
+--
+-- * Default command line build options are assumed
 withDefaultEnvConfig
     :: RIO EnvConfig a
     -> RIO Config a
 withDefaultEnvConfig = withEnvConfig AllowNoTargets defaultBuildOptsCLI
 
+-- | Upgrade a 'Config' environment to a 'BuildConfig' environment by
+-- performing further parsing of project-specific configuration. This
+-- is intended to be run inside a call to 'withConfig'.
 withBuildConfig :: RIO BuildConfig a -> RIO Config a
 withBuildConfig inner = do
   bconfig <- loadBuildConfig
