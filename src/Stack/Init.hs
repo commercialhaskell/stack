@@ -34,7 +34,7 @@ import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
 import           Stack.Constants
-import           Stack.Snapshot                  (loadResolver)
+import           Stack.Snapshot                  (loadResolver, loadSnapshotGlobalHints)
 import           Stack.Solver
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -426,7 +426,7 @@ checkBundleResolver
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd initOpts bundle sd = do
-    result <- checkSnapBuildPlan gpds Nothing sd Nothing
+    result <- checkSnapBuildPlan gpds Nothing sd loadSnapshotGlobalHints
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do
@@ -485,7 +485,7 @@ checkBundleResolver whichCmd initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          (compiler, _) <- getResolverConstraints Nothing sd
+          (compiler, _) <- getResolverConstraints <$> loadSnapshotGlobalHints sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

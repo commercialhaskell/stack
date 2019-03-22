@@ -49,7 +49,7 @@ import           Stack.Config (loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Setup
 import           Stack.Setup.Installed
-import           Stack.Snapshot (loadSnapshot)
+import           Stack.Snapshot (loadSnapshotCompiler)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -280,7 +280,7 @@ setupCompiler compiler = do
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
     => WantedCompiler
-    -> (ActualCompiler -> RIO env a)
+    -> (ActualCompiler -> RIO (WithGHC env) a)
     -> RIO env a
 setupCabalEnv compiler inner = do
   mpaths <- setupCompiler compiler
@@ -289,7 +289,7 @@ setupCabalEnv compiler inner = do
               $ augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
                                (view envVarsL menv0)
   menv <- mkProcessContext envMap
-  withProcessContext menv $ do
+  runWithGHC menv $ do
     mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
@@ -361,7 +361,7 @@ solveResolverSpec cabalDirs
   logInfo $ "Using resolver: " <> RIO.display (sdResolverName sd)
   let wantedCompilerVersion = sdWantedCompilerVersion sd
   setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
-    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) sd
+    (compilerVer, snapConstraints) <- getResolverConstraints <$> loadSnapshotCompiler compilerVersion sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -461,18 +461,13 @@ solveResolverSpec cabalDirs
 -- return the compiler version, package versions and packages flags
 -- for that resolver.
 getResolverConstraints
-    :: (HasConfig env, HasGHCVariant env)
-    => Maybe ActualCompiler -- ^ actually installed compiler
-    -> SnapshotDef
-    -> RIO env
-         (ActualCompiler,
-          Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints mcompilerVersion sd = do
-    ls <- loadSnapshot mcompilerVersion sd
-    return (lsCompilerVersion ls, lsConstraints ls)
+    :: LoadedSnapshot
+    -> (ActualCompiler, Map PackageName (Version, Map FlagName Bool))
+getResolverConstraints ls =
+    (lsCompilerVersion ls, lsConstraints)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
-    lsConstraints ls = Map.union
+    lsConstraints = Map.union
       (Map.map lpiConstraints (lsPackages ls))
       (Map.map lpiConstraints (lsGlobals ls))
 
@@ -641,7 +636,7 @@ solveExtraDeps modStackYaml = do
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
     actualCompiler <- view actualCompilerVersionL
-    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (Just actualCompiler)
+    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (loadSnapshotCompiler actualCompiler)
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)

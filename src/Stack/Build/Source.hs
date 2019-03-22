@@ -137,7 +137,7 @@ loadSourceMap smt boptsCli sma = do
 -- * Make sure things like profiling and haddocks are included in the hash
 --
 hashSourceMapData
-    :: HasBuildConfig env
+    :: (HasBuildConfig env, HasCompiler env)
     => BuildOptsCLI
     -> SourceMap
     -> RIO env SourceMapHash
