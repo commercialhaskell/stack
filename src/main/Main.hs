@@ -467,7 +467,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "Subcommands specific to modifying stack.yaml files"
             (addCommand' ConfigCmd.cfgCmdSetName
                         "Sets a field in the project's stack.yaml to value"
-                        (withConfig . cfgCmdSet)
+                        (withConfig NoReexec . cfgCmdSet)
                         configCmdSetParser)
         addSubCommands'
           "hpc"
@@ -604,24 +604,18 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
-setupCmd sco@SetupCmdOpts{..} = withConfig $ do
-    config <- ask
-    Docker.reexecWithOptionalContainer
-          (Nix.reexecWithOptionalShell $ do
-           (wantedCompiler, compilerCheck, mstack) <-
-               case scoCompilerVersion of
-                   Just v -> return (v, MatchMinor, Nothing)
-                   Nothing -> do
-                       bc <- liftIO $ runRIO config loadBuildConfig
-                       return ( view wantedCompilerVersionL bc
-                              , configCompilerCheck config
-                              , Just $ view stackYamlL bc
-                              )
-           runRIO config $ setup sco wantedCompiler compilerCheck mstack
-           )
+setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
+  (wantedCompiler, compilerCheck, mstack) <-
+    case scoCompilerVersion of
+      Just v -> return (v, MatchMinor, Nothing)
+      Nothing -> withBuildConfig $ (,,)
+        <$> view wantedCompilerVersionL
+        <*> view (configL.to configCompilerCheck)
+        <*> (Just <$> view stackYamlL)
+  setup sco wantedCompiler compilerCheck mstack
 
 cleanCmd :: CleanOpts -> RIO Runner ()
-cleanCmd = withConfig . withBuildConfig . clean
+cleanCmd = withConfig NoReexec . withBuildConfig . clean
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
@@ -632,7 +626,7 @@ buildCmd opts = do
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
     liftIO exitFailure
   local (over globalOptsL modifyGO) $
-    withConfig $
+    withConfig YesReexec $
     case boptsCLIFileWatch opts of
       FileWatchPoll -> fileWatchPoll stderr (inner . Just)
       FileWatch -> fileWatch stderr (inner . Just)
@@ -665,7 +659,7 @@ uninstallCmd _ = do
 -- | Unpack packages to the filesystem
 unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
 unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
-unpackCmd (names, Just dstPath) = withConfig $ do
+unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
     mresolver <- view $ globalOptsL.to globalResolver
     mSnapshotDef <- mapM (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
     dstPath' <- resolveDir' $ T.unpack dstPath
@@ -673,7 +667,7 @@ unpackCmd (names, Just dstPath) = withConfig $ do
 
 -- | Update the package index
 updateCmd :: () -> RIO Runner ()
-updateCmd () = withConfig (void (updateHackageIndex Nothing))
+updateCmd () = withConfig NoReexec (void (updateHackageIndex Nothing))
 
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts' = do
@@ -683,7 +677,7 @@ upgradeCmd upgradeOpts' = do
       logError "You cannot use the --resolver option with the upgrade command"
       liftIO exitFailure
     Nothing ->
-      withNoProject $ withConfig $
+      withNoProject $ withConfig NoReexec $
       upgrade
 #ifdef USE_GIT_INFO
         (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
@@ -709,7 +703,7 @@ uploadCmd sdistOpts = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
-    withConfig $ withDefaultEnvConfig $ do
+    withConfig YesReexec $ withDefaultEnvConfig $ do
         unless (null invalid) $ do
             let invalidList = bulletedList $ map (PP.style File . fromString) invalid
             prettyErrorL
@@ -762,7 +756,7 @@ uploadCmd sdistOpts = do
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
-    withConfig $ withDefaultEnvConfig $ do -- No locking needed.
+    withConfig YesReexec $ withDefaultEnvConfig $ do
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
             then do
@@ -800,28 +794,23 @@ execCmd :: ExecOpts -> RIO Runner ()
 execCmd ExecOpts {..} =
     case eoExtra of
         ExecOptsPlain ->
-          withConfig $
-            Docker.reexecWithOptionalContainer -- FIXME doesn't withDefaultEnvConfig do this?
-                    (withDefaultEnvConfig $ do
-                        config <- view configL
-                        menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-                        withProcessContext menv $ do
-                            (cmd, args) <- case (eoCmd, eoArgs) of
-                                (ExecCmd cmd, args) -> return (cmd, args)
-                                (ExecRun, args) -> getRunCmd args
-                                (ExecGhc, args) -> return ("ghc", args)
-                                (ExecRunGhc, args) -> return ("runghc", args)
+          withConfig YesReexec $ withDefaultEnvConfig $ do
+            config <- view configL
+            menv <- liftIO $ configProcessContextSettings config plainEnvSettings
+            withProcessContext menv $ do
+                (cmd, args) <- case (eoCmd, eoArgs) of
+                    (ExecCmd cmd, args) -> return (cmd, args)
+                    (ExecRun, args) -> getRunCmd args
+                    (ExecGhc, args) -> return ("ghc", args)
+                    (ExecRunGhc, args) -> return ("runghc", args)
 
-                            -- FIXME this looks like it's running Nix
-                            -- at the wrong point in the pipeline
-                            config' <- view configL -- load up a second time to get the modified env
-                            runRIO config' $ Nix.reexecWithOptionalShell (exec cmd args))
+                exec cmd args
         ExecOptsEmbellished {..} -> do
             let targets = concatMap words eoPackages
                 boptsCLI = defaultBuildOptsCLI
                            { boptsCLITargets = map T.pack targets
                            }
-            withConfig $ withEnvConfig AllowNoTargets boptsCLI $ do
+            withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
               unless (null targets) $ Stack.Build.build Nothing
 
               config <- view configL
@@ -905,7 +894,7 @@ ghciCmd ghciOpts =
           , boptsCLIFlags = ghciFlags ghciOpts
           , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
           }
-  in withConfig $ withEnvConfig AllowNoTargets boptsCLI $ do
+  in withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
     bopts <- view buildOptsL
     -- override env so running of tests and benchmarks is disabled
     let boptsLocal = bopts
@@ -917,35 +906,35 @@ ghciCmd ghciOpts =
 
 -- | List packages in the project.
 idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> RIO Runner ()
-idePackagesCmd = withConfig . withBuildConfig . uncurry IDE.listPackages
+idePackagesCmd = withConfig NoReexec . withBuildConfig . uncurry IDE.listPackages
 
 -- | List targets in the project.
 ideTargetsCmd :: IDE.OutputStream -> RIO Runner ()
-ideTargetsCmd = withConfig . withBuildConfig . IDE.listTargets
+ideTargetsCmd = withConfig NoReexec . withBuildConfig . IDE.listTargets
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> RIO Runner ()
-dockerPullCmd () = withConfig $ Docker.preventInContainer Docker.pull
+dockerPullCmd () = withConfig NoReexec $ Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> RIO Runner ()
-dockerResetCmd = withConfig . Docker.preventInContainer . Docker.reset
+dockerResetCmd = withConfig NoReexec . Docker.preventInContainer . Docker.reset
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> RIO Runner ()
-dockerCleanupCmd = withConfig . Docker.preventInContainer . Docker.cleanup
+dockerCleanupCmd = withConfig NoReexec . Docker.preventInContainer . Docker.cleanup
 
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
     pwd <- getCurrentDir
     go <- view globalOptsL
-    withNoProject $ withConfig (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withNoProject $ withConfig YesReexec (initProject IsInitCmd pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
 newCmd (newOpts,initOpts) =
-    withNoProject $ withConfig $ do
+    withNoProject $ withConfig YesReexec $ do
         dir <- new newOpts (forceOverwrite initOpts)
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $ do
@@ -954,16 +943,16 @@ newCmd (newOpts,initOpts) =
 
 -- | List the available templates.
 templatesCmd :: () -> RIO Runner ()
-templatesCmd () = withConfig templatesHelp
+templatesCmd () = withConfig NoReexec templatesHelp
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> RIO Runner ()
-solverCmd = withConfig . withDefaultEnvConfig . solveExtraDeps
+solverCmd = withConfig YesReexec . withDefaultEnvConfig . solveExtraDeps
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()
-queryCmd selectors = withConfig $ withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors = withConfig YesReexec $ withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
@@ -971,11 +960,11 @@ hpcReportCmd hropts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
         boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
-    withConfig $ withEnvConfig AllowNoTargets boptsCLI $
+    withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
 
 freezeCmd :: FreezeOpts -> RIO Runner ()
-freezeCmd freezeOpts = withConfig $ withDefaultEnvConfig $ freeze freezeOpts
+freezeCmd freezeOpts = withConfig YesReexec $ withDefaultEnvConfig $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | InvalidPathForExec FilePath

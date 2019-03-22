@@ -27,7 +27,7 @@ import           RIO.Process
 hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
 hoogleCmd (args,setup,rebuild,startServer) =
   local (over globalOptsL modifyGO) $
-  withConfig $
+  withConfig YesReexec $
   withDefaultEnvConfig $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath

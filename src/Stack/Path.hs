@@ -54,7 +54,7 @@ path keys =
                T.putStrLn $ prefix <> extractPath pathInfo
            runHaddock x = local
              (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
-             withConfig .
+             withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
              withDefaultEnvConfig
        -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
        -- withDefaultEnvConfig each time, need to figure out what

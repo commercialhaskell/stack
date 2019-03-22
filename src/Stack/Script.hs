@@ -84,7 +84,7 @@ scriptCmd opts = do
       else longWay file scriptDir
 
   longWay file scriptDir =
-    withConfig $
+    withConfig YesReexec $
     withDefaultEnvConfig $ do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use

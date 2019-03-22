@@ -4,6 +4,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Utilities for running stack commands.
+--
+-- Instead of using Has-style classes below, the type signatures use
+-- concrete environments to try and avoid accidentally rerunning
+-- configuration parsing. For example, we want @withConfig $
+-- withConfig $ ...@ to fail.
 module Stack.Runners
     ( withBuildConfig
     , withEnvConfig
@@ -11,6 +16,7 @@ module Stack.Runners
     , withConfig
     , withNoProject
     , withRunnerGlobal
+    , ShouldReexec (..)
     ) where
 
 import           Stack.Prelude
@@ -48,6 +54,11 @@ withBuildConfig inner = do
   bconfig <- loadBuildConfig
   runRIO bconfig inner
 
+-- | Upgrade a 'Config' environment to an 'EnvConfig' environment by
+-- performing further parsing of project-specific configuration (like
+-- 'withBuildConfig') and then setting up a build environment
+-- toolchain. This is intended to be run inside a call to
+-- 'withConfig'.
 withEnvConfig
     :: NeedTargets
     -> BuildOptsCLI
@@ -56,26 +67,36 @@ withEnvConfig
     -- this will be run in a Docker container.
     -> RIO Config a
 withEnvConfig needTargets boptsCLI inner =
-  Docker.reexecWithOptionalContainer $
-  Nix.reexecWithOptionalShell $ withBuildConfig $ do
+  withBuildConfig $ do
     envConfig <- setupEnv needTargets boptsCLI Nothing
     logDebug "Starting to execute command inside EnvConfig"
     runRIO envConfig inner
 
+-- | If the settings justify it, should we reexec inside Docker or Nix?
+data ShouldReexec = YesReexec | NoReexec
+
 -- | Load the configuration. Convenience function used
 -- throughout this module.
 withConfig
-  :: RIO Config a
+  :: ShouldReexec
+  -> RIO Config a
   -> RIO Runner a
-withConfig inner =
+withConfig shouldReexec inner =
     loadConfig $ \config -> do
       -- If we have been relaunched in a Docker container, perform in-container initialization
       -- (switch UID, etc.).  We do this after first loading the configuration since it must
       -- happen ASAP but needs a configuration.
       view (globalOptsL.to globalDockerEntrypoint) >>=
         traverse_ (Docker.entrypoint config)
-      runRIO config inner
+      runRIO config $
+        case shouldReexec of
+          YesReexec ->
+            Docker.reexecWithOptionalContainer $
+            Nix.reexecWithOptionalShell inner
+          NoReexec -> inner
 
+-- | Use the 'GlobalOpts' to create a 'Runner' and run the provided
+-- action.
 withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do
   colorWhen <-

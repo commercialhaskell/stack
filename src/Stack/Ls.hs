@@ -31,7 +31,7 @@ import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
 import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
-import Stack.Runners (withConfig, withDefaultEnvConfig)
+import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
@@ -225,7 +225,7 @@ localSnaptoText xs = T.intercalate "\n" $ L.map T.pack xs
 
 handleLocal :: LsCmdOpts -> RIO Runner ()
 handleLocal lsOpts = do
-    (instRoot :: Path Abs Dir) <- withConfig $ withDefaultEnvConfig installationRootDeps
+    (instRoot :: Path Abs Dir) <- withConfig YesReexec $ withDefaultEnvConfig installationRootDeps
     isStdoutTerminal <- view terminalL
     let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
@@ -279,7 +279,7 @@ lsCmd lsOpts =
                 Local -> handleLocal lsOpts
                 Remote -> handleRemote lsOpts
         LsDependencies depOpts -> listDependenciesCmd False depOpts
-        LsStyles stylesOpts -> withConfig $ listStylesCmd stylesOpts
+        LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts
 
 -- | List the dependencies
 listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Runner ()
