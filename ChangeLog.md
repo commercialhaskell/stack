@@ -127,6 +127,8 @@ Other enhancements:
 * Both `stack dot` and `stack ls dependencies` accept a
   `--global-hints` flag to bypass the need for an installed GHC. See
   [#4390](https://github.com/commercialhaskell/stack/issues/4390).
+* Less verbose output from `stack setup` on Windows. See
+  [#1212](https://github.com/commercialhaskell/stack/issues/1212).
 
 Bug fixes:
 
