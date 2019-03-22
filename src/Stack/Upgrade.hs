@@ -18,8 +18,8 @@ import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
-import           Stack.Config
 import           Stack.Constants
+import           Stack.Runners
 import           Stack.Setup
 import           Stack.Types.Config
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
@@ -90,10 +90,9 @@ data UpgradeOpts = UpgradeOpts
     }
     deriving Show
 
-upgrade :: HasConfig env
-        => Maybe String -- ^ git hash at time of building, if known
+upgrade :: Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
-        -> RIO env ()
+        -> RIO Runner ()
 upgrade builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
@@ -116,8 +115,8 @@ upgrade builtHash (UpgradeOpts mbo mso) =
     binary bo = binaryUpgrade bo
     source so = sourceUpgrade builtHash so
 
-binaryUpgrade :: HasConfig env => BinaryOpts -> RIO env ()
-binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
+binaryUpgrade :: BinaryOpts -> RIO Runner ()
+binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexec $ do
     platforms0 <-
       case mplatform of
         Nothing -> preferredPlatforms
@@ -167,10 +166,9 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: HasConfig env -- FIXME try knocking this down to HasRunner and initializing the Config appropriately here
-  => Maybe String
+  :: Maybe String
   -> SourceOpts
-  -> RIO env ()
+  -> RIO Runner ()
 sourceUpgrade builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     mdir <- case gitRepo of
@@ -205,7 +203,11 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 when osIsWindows $
                   void $ liftIO $ hSupportsANSIWithoutEmulation stdout
                 return $ Just $ tmp </> relDirStackProgName
-      Nothing -> do
+      -- We need to access the Pantry database to find out about the
+      -- latest Stack available on Hackage. We first use a standard
+      -- Config to do this, and once we have the source load up the
+      -- stack.yaml from inside that source.
+      Nothing -> withConfig NoReexec $ do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
         mversion <- getLatestHackageVersion "stack" UsePreferredVersions
@@ -233,15 +235,11 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
           { globalResolver = Nothing -- always use the resolver settings in the stack.yaml file
           , globalStackYaml = SYLOverride $ dir </> stackDotYaml
           }
+        boptsCLI = defaultBuildOptsCLI
+          { boptsCLITargets = ["stack"]
+          }
     forM_ mdir $ \dir ->
       local (over globalOptsL (modifyGO dir)) $
-      loadConfig $ \config -> do
-        bconfig <- runRIO config loadBuildConfig
-        let boptsCLI = defaultBuildOptsCLI
-                { boptsCLITargets = ["stack"]
-                }
-        envConfig1 <- runRIO bconfig $ setupEnv AllowNoTargets boptsCLI $ Just $
-            "Try rerunning with --install-ghc to install the correct GHC into " <>
-            T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
-        runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
-            build Nothing
+      withConfig NoReexec $ withEnvConfig AllowNoTargets boptsCLI $
+      local (set (buildOptsL.buildOptsInstallExesL) True) $
+      build Nothing
