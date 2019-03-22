@@ -22,11 +22,11 @@ module Stack.Docker
   ,entrypoint
   ,preventInContainer
   ,pull
-  ,reexecWithOptionalContainer
   ,reset
   ,reExecArgName
   ,StackDockerException(..)
   ,getProjectRoot
+  ,runContainerAndExit
   ) where
 
 import           Stack.Prelude
@@ -174,21 +174,6 @@ getCmdArgs docker imageInfo isRemoteDocker = do
     cmdArgs args exePath = do
         let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
         return (mountPath, args, [], [Mount exePath mountPath])
-
--- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
--- Otherwise, runs the inner action.
-reexecWithOptionalContainer
-    :: HasConfig env
-    => RIO env a
-    -> RIO env a
-reexecWithOptionalContainer inner =
-  do config <- view configL
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     if | inContainer && not isReExec -> throwIO OnlyOnHostException
-        | inContainer -> inner
-        | not (dockerEnable (configDocker config)) -> inner
-        | otherwise -> runContainerAndExit
 
 -- | Error if running in a container.
 preventInContainer :: MonadIO m => m () -> m ()

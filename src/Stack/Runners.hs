@@ -29,6 +29,8 @@ import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
 import           Stack.Types.Config
+import           Stack.Types.Docker (dockerEnable)
+import           Stack.Types.Nix (nixEnable)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
@@ -90,10 +92,42 @@ withConfig shouldReexec inner =
         traverse_ (Docker.entrypoint config)
       runRIO config $
         case shouldReexec of
-          YesReexec ->
-            Docker.reexecWithOptionalContainer $
-            Nix.reexecWithOptionalShell inner
+          YesReexec -> reexec inner
           NoReexec -> inner
+
+-- | Perform a Docker or Nix reexec, if warranted. Otherwise run the
+-- inner action.
+reexec :: RIO Config a -> RIO Config a
+reexec inner = do
+  nixEnable' <- asks $ nixEnable . configNix
+  dockerEnable' <- asks $ dockerEnable . configDocker
+  case (nixEnable', dockerEnable') of
+    (True, True) -> throwString "Cannot use both Docker and Nix at the same time"
+    (False, False) -> inner
+
+    -- Want to use Nix
+    (True, False) -> do
+      whenM getInContainer $ throwString "Cannot use Nix from within a Docker container"
+      inShell <- getInNixShell
+      if inShell
+        then do
+          isReexec <- view reExecL
+          if isReexec
+            then inner
+            else throwString "In Nix shell but reExecL is False"
+        else Nix.runShellAndExit
+
+    -- Want to use Docker
+    (False, True) -> do
+      whenM getInNixShell $ throwString "Cannot use Docker from within a Nix shell"
+      inContainer <- getInContainer
+      if inContainer
+        then do
+          isReexec <- view reExecL
+          if isReexec
+            then inner
+            else throwIO Docker.OnlyOnHostException
+        else Docker.runContainerAndExit
 
 -- | Use the 'GlobalOpts' to create a 'Runner' and run the provided
 -- action.
