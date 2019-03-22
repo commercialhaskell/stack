@@ -206,7 +206,7 @@ Discussions are typically opened by maintainers and contributors.
 
 Support questions are requests for assistance in using Stack. They must have a
 clear set of steps followed by the user and a desired outcome. Support requests
-sometimes overlap with bug reports, handled next. Supports requests are closed
+sometimes overlap with bug reports, handled next. Support requests are closed
 when:
 
 * The user decides their question is answered
