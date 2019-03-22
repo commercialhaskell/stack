@@ -36,7 +36,11 @@ import           System.Terminal (getTerminalWidth)
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withNoProject :: RIO Runner a -> RIO Runner a
-withNoProject = local (set stackYamlLocL SYLNoProject) -- FIXME consider adding a warning when overriding, or using SYLNoConfig
+withNoProject inner = do
+  oldSYL <- view stackYamlLocL
+  case oldSYL of
+    SYLDefault -> local (set stackYamlLocL SYLNoProject) inner
+    _ -> throwString "Cannot use this command with options which override the stack.yaml location"
 
 -- | Helper for 'withEnvConfig' which passes in some default arguments:
 --
