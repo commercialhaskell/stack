@@ -42,8 +42,8 @@ import qualified Distribution.Version as C
 import qualified RIO
 import           Stack.Constants
 import           Stack.Package
-import           Stack.Snapshot
-import           Stack.Types.BuildPlan
+import           Stack.SourceMap
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
@@ -148,7 +148,7 @@ gpdPackageDeps
     -> Platform
     -> Map FlagName Bool
     -> Map PackageName VersionRange
-gpdPackageDeps gpd cv platform flags =
+gpdPackageDeps gpd ac platform flags =
     Map.filterWithKey (const . (/= name)) (packageDependencies pkgConfig pkgDesc)
     where
         name = gpdPackageName gpd
@@ -160,7 +160,7 @@ gpdPackageDeps gpd cv platform flags =
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
             , packageConfigGhcOptions = []
-            , packageConfigCompilerVersion = cv
+            , packageConfigCompilerVersion = ac
             , packageConfigPlatform = platform
             }
 
@@ -335,20 +335,25 @@ instance Show BuildPlanCheck where
 -- the packages.
 checkSnapBuildPlan
     :: (HasConfig env, HasGHCVariant env)
-    => [GenericPackageDescription]
+    => [ResolvedPath Dir]
     -> Maybe (Map PackageName (Map FlagName Bool))
-    -> SnapshotDef
-    -> Maybe ActualCompiler
+    -> SnapshotCandidate env
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan gpds flags snapshotDef mactualCompiler = do
+checkSnapBuildPlan pkgDirs flags snapCandidate = do
     platform <- view platformL
-    rs <- loadSnapshot mactualCompiler snapshotDef
+    sma <- snapCandidate pkgDirs
+    gpds <- liftIO $ forM (Map.elems $ smaProject sma) (cpGPD . ppCommon)
 
     let
-        compiler = lsCompilerVersion rs
+        compiler = smaCompiler sma
+        globalVersion (GlobalPackageVersion v) = v
+        depVersion dep | PLImmutable loc <- dpLocation dep =
+                           Just $ packageLocationVersion loc
+                       | otherwise =
+                           Nothing
         snapPkgs = Map.union
-          (lpiVersion <$> lsGlobals rs)
-          (lpiVersion <$> lsPackages rs)
+          (Map.mapMaybe depVersion $ smaDeps sma)
+          (Map.map globalVersion $ smaGlobal sma)
         (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
         cerrs = compilerErrors compiler errs
 
@@ -371,44 +376,43 @@ checkSnapBuildPlan gpds flags snapshotDef mactualCompiler = do
 -- best as possible with the given 'GenericPackageDescription's.
 selectBestSnapshot
     :: (HasConfig env, HasGHCVariant env)
-    => [GenericPackageDescription]
+    => [ResolvedPath Dir]
     -> NonEmpty SnapName
-    -> RIO env (SnapshotDef, BuildPlanCheck)
-selectBestSnapshot gpds snaps = do
+    -> RIO env (SnapshotCandidate env, RawSnapshotLocation, BuildPlanCheck)
+selectBestSnapshot pkgDirs snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
     let resolverStackage (LTS x y) = ltsSnapshotLocation x y
         resolverStackage (Nightly d) = nightlySnapshotLocation d
-    F.foldr1 go (NonEmpty.map (getResult <=< flip loadResolver Nothing . resolverStackage) snaps)
+    F.foldr1 go (NonEmpty.map (getResult . resolverStackage) snaps)
     where
         go mold mnew = do
-            old@(_snap, bpc) <- mold
+            old@(_snap, _loc, bpc) <- mold
             case bpc of
                 BuildPlanCheckOk {} -> return old
                 _ -> fmap (betterSnap old) mnew
 
-        getResult snap = do
-            result <- checkSnapBuildPlan gpds Nothing snap
-              -- Rely on global package hints.
-              Nothing
-            reportResult result snap
-            return (snap, result)
+        getResult loc = do
+            candidate <- loadProjectSnapshotCandidate loc NoPrintWarnings False
+            result <- checkSnapBuildPlan pkgDirs Nothing candidate
+            reportResult result loc
+            return (candidate, loc, result)
 
-        betterSnap (s1, r1) (s2, r2)
-          | compareBuildPlanCheck r1 r2 /= LT = (s1, r1)
-          | otherwise = (s2, r2)
+        betterSnap (s1, l1, r1) (s2, l2, r2)
+          | compareBuildPlanCheck r1 r2 /= LT = (s1, l1, r1)
+          | otherwise = (s2, l2, r2)
 
-        reportResult BuildPlanCheckOk {} snap = do
-            logInfo $ "* Matches " <> RIO.display (sdResolverName snap)
+        reportResult BuildPlanCheckOk {} loc = do
+            logInfo $ "* Matches " <> RIO.display loc
             logInfo ""
 
-        reportResult r@BuildPlanCheckPartial {} snap = do
-            logWarn $ "* Partially matches " <> RIO.display (sdResolverName snap)
+        reportResult r@BuildPlanCheckPartial {} loc = do
+            logWarn $ "* Partially matches " <> RIO.display loc
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
-        reportResult r@BuildPlanCheckFail {} snap = do
-            logWarn $ "* Rejected " <> RIO.display (sdResolverName snap)
+        reportResult r@BuildPlanCheckFail {} loc = do
+            logWarn $ "* Rejected " <> RIO.display loc
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)

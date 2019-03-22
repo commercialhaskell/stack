@@ -137,6 +137,7 @@ module Pantry
   , getPackageLocationName
   , getRawPackageLocationIdent
   , packageLocationIdent
+  , packageLocationVersion
   , getRawPackageLocationTreeKey
   , getPackageLocationTreeKey
 
@@ -1304,6 +1305,16 @@ packageLocationIdent
 packageLocationIdent (PLIHackage ident _ _) = ident
 packageLocationIdent (PLIRepo _ pm) = pmIdent pm
 packageLocationIdent (PLIArchive _ pm) = pmIdent pm
+
+-- | Get version of the package at the given location.
+--
+-- @since 0.1.0.0
+packageLocationVersion
+  :: PackageLocationImmutable
+  -> Version
+packageLocationVersion (PLIHackage pident _ _) = pkgVersion pident
+packageLocationVersion (PLIRepo _ pm) = pkgVersion (pmIdent pm)
+packageLocationVersion (PLIArchive _ pm) = pkgVersion (pmIdent pm)
 
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --

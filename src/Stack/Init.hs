@@ -23,21 +23,20 @@ import qualified Data.Map.Strict                 as Map
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
-import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text               as C
 import qualified Distribution.Version            as C
 import           Path
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack                     as Meta
+import           RIO.FilePath                    (dropTrailingPathSeparator)
 import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
 import           Stack.Constants
-import           Stack.Snapshot                  (loadResolver)
+import           Stack.SourceMap
 import           Stack.Solver
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.Version
@@ -71,8 +70,17 @@ initProject whichCmd currDir initOpts mresolver = do
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
-
-    (sd, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd initOpts mresolver bundle
+    let makeRelDir dir =
+            case stripProperPrefix currDir dir of
+                Nothing
+                    | currDir == dir -> "."
+                    | otherwise -> assert False $ toFilePathNoTrailingSep dir
+                Just rel -> toFilePathNoTrailingSep rel
+        fpToPkgDir fp =
+            let absDir = parent fp
+            in ResolvedPath (RelFilePath $ T.pack $ makeRelDir absDir) absDir
+        pkgDirs = Map.map (fpToPkgDir . fst) bundle
+    (snapshotLoc, flags, extraDeps, rbundle) <- getDefaultResolver whichCmd initOpts mresolver pkgDirs
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
@@ -104,36 +112,29 @@ initProject whichCmd currDir initOpts mresolver = do
 
         userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
 
-        gpds = Map.elems $ fmap snd rbundle
+        gpdByDir = Map.fromList [ (parent fp, gpd) | (fp, gpd) <- Map.elems bundle]
+        gpds = Map.elems $
+          Map.mapMaybe (flip Map.lookup gpdByDir . resolvedAbsolute) rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
       PLImmutable <$> completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
-            , projectPackages = RelFilePath . T.pack <$> pkgs
+            , projectPackages = resolvedRelative <$> Map.elems rbundle
             , projectDependencies = map toRawPL deps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
-            , projectResolver = sdResolver sd
+            , projectResolver = snapshotLoc
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
             , projectCurator = Nothing
             }
 
-        makeRelDir dir =
-            case stripProperPrefix currDir dir of
-                Nothing
-                    | currDir == dir -> "."
-                    | otherwise -> assert False $ toFilePathNoTrailingSep dir
-                Just rel -> toFilePathNoTrailingSep rel
-
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
-        pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
-        toPkg dir = makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
+    logInfo $ "Initialising configuration using resolver: " <> display snapshotLoc
     logInfo $ "Total number of user packages considered: "
                <> display (Map.size bundle + length dupPkgs)
 
@@ -339,64 +340,69 @@ getDefaultResolver
     => WhichSolverCmd
     -> InitOpts
     -> Maybe AbstractResolver
-    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
-       -- ^ Src package name: cabal dir, cabal package description
+    -> Map PackageName (ResolvedPath Dir)
+    -- ^ Src package name: cabal dir
     -> RIO env
-         ( SnapshotDef
+         ( RawSnapshotLocation
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
-         , Map PackageName (Path Abs File, C.GenericPackageDescription))
+         , Map PackageName (ResolvedPath Dir))
        -- ^ ( Resolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver whichCmd initOpts mresolver bundle = do
-    sd <- maybe selectSnapResolver (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
-    getWorkingResolverPlan whichCmd initOpts bundle sd
+getDefaultResolver whichCmd initOpts mresolver pkgDirs = do
+    (candidate, loc) <- case mresolver of
+      Nothing -> selectSnapResolver
+      Just ar -> do
+        sl <- makeConcreteResolver ar
+        c <- loadProjectSnapshotCandidate sl NoPrintWarnings False
+        return (c, sl)
+    getWorkingResolverPlan whichCmd initOpts pkgDirs candidate loc
     where
         -- TODO support selecting best across regular and custom snapshots
         selectSnapResolver = do
-            let gpds = Map.elems (fmap snd bundle)
             snaps <- fmap getRecommendedSnapshots getSnapshots'
-            (s, r) <- selectBestSnapshot gpds snaps
+            (c, l, r) <- selectBestSnapshot (Map.elems pkgDirs) snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot whichCmd snaps)
-                _ -> return s
+                _ -> return (c, l)
 
 getWorkingResolverPlan
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> InitOpts
-    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
-       -- ^ Src package name: cabal dir, cabal package description
-    -> SnapshotDef
+    -> Map PackageName (ResolvedPath Dir)
+    -- ^ Src packages: cabal dir
+    -> SnapshotCandidate env
+    -> RawSnapshotLocation
     -> RIO env
-         ( SnapshotDef
+         ( RawSnapshotLocation
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
-         , Map PackageName (Path Abs File, C.GenericPackageDescription))
+         , Map PackageName (ResolvedPath Dir))
        -- ^ ( SnapshotDef
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getWorkingResolverPlan whichCmd initOpts bundle sd = do
-    logInfo $ "Selected resolver: " <> display (sdResolverName sd)
-    go bundle
+getWorkingResolverPlan whichCmd initOpts pkgDirs0 snapCandidate snapLoc = do
+    logInfo $ "Selected resolver: " <> display snapLoc
+    go pkgDirs0
     where
-        go info = do
-            eres <- checkBundleResolver whichCmd initOpts info sd
+        go pkgDirs = do
+            eres <- checkBundleResolver whichCmd initOpts snapLoc snapCandidate (Map.elems pkgDirs)
             -- if some packages failed try again using the rest
             case eres of
-                Right (f, edeps)-> return (sd, f, edeps, info)
+                Right (f, edeps)-> return (snapLoc, f, edeps, pkgDirs)
                 Left ignored
                     | Map.null available -> do
                         logWarn "*** Could not find a working plan for any of \
                                  \the user packages.\nProceeding to create a \
                                  \config anyway."
-                        return (sd, Map.empty, Map.empty, Map.empty)
+                        return (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
-                        when (Map.size available == Map.size info) $
+                        when (Map.size available == Map.size pkgDirs) $
                             error "Bug: No packages to ignore"
 
                         if length ignored > 1 then do
@@ -413,24 +419,25 @@ getWorkingResolverPlan whichCmd initOpts bundle sd = do
                     where
                       indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
                       isAvailable k _ = k `notElem` ignored
-                      available       = Map.filterWithKey isAvailable info
+                      available       = Map.filterWithKey isAvailable pkgDirs
 
 checkBundleResolver
     :: (HasConfig env, HasGHCVariant env)
     => WhichSolverCmd
     -> InitOpts
-    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
-       -- ^ Src package name: cabal dir, cabal package description
-    -> SnapshotDef
+    -> RawSnapshotLocation
+    -> SnapshotCandidate env
+    -> [ResolvedPath Dir]
+    -- ^ Src package dirs
     -> RIO env
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
-checkBundleResolver whichCmd initOpts bundle sd = do
-    result <- checkSnapBuildPlan gpds Nothing sd Nothing
+checkBundleResolver whichCmd initOpts snapshotLoc snapCandidate pkgDirs = do
+    result <- checkSnapBuildPlan pkgDirs Nothing snapCandidate
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do
-            shouldUseSolver <- case (resolver, initOpts) of
+            shouldUseSolver <- case (snapshotLoc, initOpts) of
                 (_, InitOpts { useSolver = True }) -> return True
                 (RSLCompiler _, _) -> do
                     logInfo "Using solver because a compiler resolver was specified."
@@ -445,30 +452,28 @@ checkBundleResolver whichCmd initOpts bundle sd = do
                         warnPartial result
                         logWarn "*** Omitting packages with unsatisfied dependencies"
                         return $ Left $ failedUserPkgs e
-                    else throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
+                    else throwM $ ResolverPartial whichCmd snapshotTxt (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
-                           <> display (sdResolverName sd)
+                           <> display snapshotLoc
                 logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
+            | otherwise -> throwM $ ResolverMismatch whichCmd snapshotTxt (show result)
     where
-      resolver = sdResolver sd
+      snapshotTxt = utf8BuilderToText $ display snapshotLoc
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          logWarn $ "*** Resolver " <> display (sdResolverName sd)
+          logWarn $ "*** Resolver " <> display snapshotLoc
                       <> " will need external packages: "
           logWarn $ display $ indent $ T.pack $ show res
 
       failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 
-      gpds        = Map.elems (fmap snd bundle)
-      solve flags = do
-          let cabalDirs      = map parent (Map.elems (fmap fst bundle))
-              srcConstraints = mergeConstraints (gpdPackages gpds) flags
+      bundle = error "bundle"
 
-          eresult <- solveResolverSpec cabalDirs (sd, srcConstraints, Map.empty)
+      solve flags = do
+          eresult <- error "solveResolverSpec cabalDirs (sd, srcConstraints, Map.empty)"
           case eresult of
               Right (src, ext) ->
                   return $ Right (fmap snd (Map.union src ext), fmap fst ext)
@@ -485,7 +490,7 @@ checkBundleResolver whichCmd initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          (compiler, _) <- getResolverConstraints Nothing sd
+          (compiler, _) <- error "getResolverConstraints Nothing sd"
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

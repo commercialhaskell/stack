@@ -17,6 +17,8 @@ module Stack.SourceMap
     , globalsFromHints
     , getCompilerInfo
     , immutableLocSha
+    , loadProjectSnapshotCandidate
+    , SnapshotCandidate
     ) where
 
 import Data.ByteString.Builder (byteString, lazyByteString)
@@ -251,3 +253,28 @@ immutableLocSha = byteString . treeKeyToBs . locationTreeKey
     locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
     locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
     treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
+
+type SnapshotCandidate env
+     = [ResolvedPath Dir] -> RIO env (SMActual GlobalPackageVersion)
+
+loadProjectSnapshotCandidate ::
+       (HasConfig env)
+    => RawSnapshotLocation
+    -> PrintWarnings
+    -> Bool
+    -> RIO env (SnapshotCandidate env)
+loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
+    snapshot <- fmap fst . loadAndCompleteSnapshot =<< completeSnapshotLocation loc
+    deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
+    let wc = snapshotCompiler snapshot
+    globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc
+    return $ \projectPackages -> do
+        prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
+            pp <- mkProjectPackage printWarnings resolved buildHaddocks
+            pure (cpName $ ppCommon pp, pp)
+        return SMActual
+              { smaCompiler = wantedToActual $ snapshotCompiler snapshot
+              , smaProject = prjPkgs
+              , smaDeps = Map.difference deps prjPkgs
+              , smaGlobal = globals
+              }

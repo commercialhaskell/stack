@@ -640,8 +640,10 @@ solveExtraDeps modStackYaml = do
         srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
-    actualCompiler <- view actualCompilerVersionL
-    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (Just actualCompiler)
+    pkgDirs <- for cabalDirs $ \absDir -> do
+        relDir <- toFilePath <$> makeRelativeToCurrentDir absDir
+        pure $ ResolvedPath (RelFilePath $ T.pack relDir) absDir
+    resolverResult <- checkSnapBuildPlan pkgDirs (Just oldSrcFlags) sd
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
