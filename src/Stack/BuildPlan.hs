@@ -400,15 +400,15 @@ selectBestSnapshot gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            logInfo $ "* Matches " <> RIO.display (sdResolverName snap)
+            logInfo $ "* Matches " <> RIO.display (sdResolver snap)
             logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            logWarn $ "* Partially matches " <> RIO.display (sdResolverName snap)
+            logWarn $ "* Partially matches " <> RIO.display (sdResolver snap)
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            logWarn $ "* Rejected " <> RIO.display (sdResolverName snap)
+            logWarn $ "* Rejected " <> RIO.display (sdResolver snap)
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)

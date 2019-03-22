@@ -1029,8 +1029,8 @@ data ConfigException
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
-  | ResolverMismatch WhichSolverCmd !Text String -- Text == resolver name, sdName
-  | ResolverPartial WhichSolverCmd !Text String -- Text == resolver name, sdName
+  | ResolverMismatch WhichSolverCmd !RawSnapshotLocation String
+  | ResolverPartial WhichSolverCmd !RawSnapshotLocation String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1093,7 +1093,7 @@ instance Show ConfigException where
         ]
     show (ResolverMismatch whichCmd resolver errDesc) = concat
         [ "Resolver '"
-        , T.unpack resolver
+        , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
@@ -1101,7 +1101,7 @@ instance Show ConfigException where
         ]
     show (ResolverPartial whichCmd resolver errDesc) = concat
         [ "Resolver '"
-        , T.unpack resolver
+        , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , showOptions whichCmd

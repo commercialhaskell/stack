@@ -133,7 +133,7 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
+    logInfo $ "Initialising configuration using resolver: " <> display (sdResolver sd)
     logInfo $ "Total number of user packages considered: "
                <> display (Map.size bundle + length dupPkgs)
 
@@ -381,7 +381,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd initOpts bundle sd = do
-    logInfo $ "Selected resolver: " <> display (sdResolverName sd)
+    logInfo $ "Selected resolver: " <> display (sdResolver sd)
     go bundle
     where
         go info = do
@@ -445,19 +445,19 @@ checkBundleResolver whichCmd initOpts bundle sd = do
                         warnPartial result
                         logWarn "*** Omitting packages with unsatisfied dependencies"
                         return $ Left $ failedUserPkgs e
-                    else throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
+                    else throwM $ ResolverPartial whichCmd (sdResolver sd) (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
-                           <> display (sdResolverName sd)
+                           <> display (sdResolver sd)
                 logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
+            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolver sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          logWarn $ "*** Resolver " <> display (sdResolverName sd)
+          logWarn $ "*** Resolver " <> display (sdResolver sd)
                       <> " will need external packages: "
           logWarn $ display $ indent $ T.pack $ show res
 
