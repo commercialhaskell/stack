@@ -274,9 +274,9 @@ renderStackYaml p ignoredPackages dupPackages =
         , "packages:"
         , "- some-directory"
         , "- https://example.com/foo/bar/baz-0.0.2.tar.gz"
-        , " subdirs:"
-        , " - auto-update"
-        , " - wai"
+        , "  subdirs:"
+        , "  - auto-update"
+        , "  - wai"
         ]
 
     extraDepsHelp = commentHelp
