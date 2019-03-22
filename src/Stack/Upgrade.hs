@@ -244,4 +244,4 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
         runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
-            build Nothing Nothing
+            build Nothing

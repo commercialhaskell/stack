@@ -66,7 +66,6 @@ import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
-import           System.FileLock (FileLock, unlockFile)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout)
 import           System.IO.Error (isDoesNotExistError)
@@ -178,33 +177,18 @@ getCmdArgs docker imageInfo isRemoteDocker = do
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
---
--- This takes an optional release action which should be taken IFF control is
--- transferring away from the current process to the intra-container one.  The main use
--- for this is releasing a lock.  After launching reexecution, the host process becomes
--- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
     :: HasConfig env
-    => Maybe (RIO env ())
-    -> IO (Maybe FileLock)
+    => RIO env a
     -> RIO env a
-    -> RIO env a
-reexecWithOptionalContainer mbefore mrelease inner =
+reexecWithOptionalContainer inner =
   do config <- view configL
      inContainer <- getInContainer
      isReExec <- view reExecL
-     if | inContainer && not isReExec && isJust mbefore ->
-            throwIO OnlyOnHostException
+     if | inContainer && not isReExec -> throwIO OnlyOnHostException
         | inContainer -> inner
-        | not (dockerEnable (configDocker config)) ->
-            fromMaybeAction mbefore *> inner
-        | otherwise ->
-            do liftIO $ mrelease >>= traverse_ unlockFile
-               runContainerAndExit
-                 (fromMaybeAction mbefore)
-  where
-    fromMaybeAction Nothing = return ()
-    fromMaybeAction (Just hook) = hook
+        | not (dockerEnable (configDocker config)) -> inner
+        | otherwise -> runContainerAndExit
 
 -- | Error if running in a container.
 preventInContainer :: MonadIO m => m () -> m ()
@@ -215,11 +199,8 @@ preventInContainer inner =
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit
-  :: HasConfig env
-  => RIO env ()  -- ^ Action to run before
-  -> RIO env void
-runContainerAndExit before = do
+runContainerAndExit :: HasConfig env => RIO env void
+runContainerAndExit = do
      config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
@@ -332,7 +313,6 @@ runContainerAndExit before = do
          ,[image]
          ,[cmnd]
          ,args])
-     before
 -- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
 -- `docker` process so that it can handle the signals directly?
 #ifndef WINDOWS
