@@ -76,6 +76,9 @@ Behavior changes:
   never been used yet, and there are no plans to implement signature
   verification.
 
+* Always use `--exact-configuration` (should mostly be a non-user-visible
+  enhancement).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get

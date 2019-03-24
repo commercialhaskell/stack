@@ -772,7 +772,6 @@ getConfigCache :: HasEnvConfig env
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
-    useExactConf <- view $ configL.to configAllowNewer
     let extra =
             -- We enable tests if the test suite dependencies are already
             -- installed, so that we avoid unnecessary recompilation based on
@@ -780,12 +779,12 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
             -- 'stack test'. See:
             -- https://github.com/commercialhaskell/stack/issues/805
             case taskType of
-                TTLocalMutable lp ->
+                TTLocalMutable _ ->
                   -- FIXME: make this work with exact-configuration.
                   -- Not sure how to plumb the info atm. See
                   -- https://github.com/commercialhaskell/stack/issues/2049
-                  [ "--enable-tests" | enableTest || (not useExactConf && depsPresent installedMap (lpTestDeps lp))] ++
-                  [ "--enable-benchmarks" | enableBench || (not useExactConf && depsPresent installedMap (lpBenchDeps lp))]
+                  [ "--enable-tests" | enableTest] ++
+                  [ "--enable-benchmarks" | enableBench]
                 TTRemotePackage{} -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
@@ -1741,15 +1740,6 @@ checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
             Map.unions (cache : newToCache)
     return warnings
 checkForUnlistedFiles TTRemotePackage{} _ _ = return []
-
--- | Determine if all of the dependencies given are installed
-depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
-depsPresent installedMap deps = all
-    (\(name, range) ->
-        case Map.lookup name installedMap of
-            Just (_, installed) -> installedVersion installed `withinRange` range
-            Nothing -> False)
-    (Map.toList deps)
 
 -- | Implements running a package's tests. Also handles producing
 -- coverage reports if coverage is enabled.
