@@ -210,7 +210,7 @@ sometimes overlap with bug reports, handled next. Support requests are closed
 when:
 
 * The user decides their question is answered
-* No clarification to questions from the Stack team is given for 7 days
+* No clarification to questions from the Stack team is given for 30 days
 * The question is determined out of scope by the Stack team
 
 ### Bug report
@@ -224,7 +224,7 @@ outcome. Bug reports are closed when:
 * The bug is fixed on the `master` or `stable` branch (NOTE: we do not wait for
   fixes to be released before closing issues)
 * The Stack team is unable to reproduce the issue
-* No clarification to questions from the Stack team is given for 7 days
+* No clarification to questions from the Stack team is given for 30 days
 * The bug is determined to be out of scope by the Stack team, such as being an
   upstream issue
 
