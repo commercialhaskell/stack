@@ -29,13 +29,14 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Build
+import           Stack.Types.Config (HasCompiler)
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
 import           System.FilePath (searchPathSeparator)
 import           RIO.Process
 
 -- | Get the global package database
-getGlobalDB :: (HasProcessContext env, HasLogFunc env)
+getGlobalDB :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
             => WhichCompiler -> RIO env (Path Abs Dir)
 getGlobalDB wc = do
     logDebug "Getting global package database location"
@@ -52,7 +53,7 @@ getGlobalDB wc = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (HasProcessContext env, HasLogFunc env)
+ghcPkg :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
        => WhichCompiler
        -> [Path Abs Dir]
        -> [String]
@@ -72,7 +73,7 @@ ghcPkg wc pkgDbs args = do
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase
-  :: (HasProcessContext env, HasLogFunc env)
+  :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
   => WhichCompiler -> Path Abs Dir -> RIO env ()
 createDatabase wc db = do
     exists <- doesFileExist (db </> relFilePackageCache)
@@ -117,7 +118,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
     -> String -- ^ package identifier, or GhcPkgId
@@ -136,7 +137,7 @@ findGhcPkgField wc pkgDbs name field = do
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
 -- | Get the version of the package
-findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env)
+findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
                   => WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
                   -> PackageName
@@ -149,7 +150,7 @@ findGhcPkgVersion wc pkgDbs name = do
 
 -- | unregister list of package ghcids, batching available from GHC 8.0.1,
 -- using GHC package id where available (from GHC 7.9)
-unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env)
+unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
                     => WhichCompiler
                     -> Path Abs Dir -- ^ package database
                     -> NonEmpty (Either PackageIdentifier GhcPkgId)
@@ -167,7 +168,7 @@ unregisterGhcPkgIds wc pkgDb epgids = do
             epgids
 
 -- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: (HasProcessContext env, HasLogFunc env)
+getCabalPkgVer :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
                => WhichCompiler -> RIO env Version
 getCabalPkgVer wc = do
     logDebug "Getting Cabal package version"

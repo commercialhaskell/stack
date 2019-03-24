@@ -145,6 +145,7 @@ module Stack.Types.Config
   -- * Lens helpers
   ,wantedCompilerVersionL
   ,actualCompilerVersionL
+  ,HasCompiler
   ,buildOptsL
   ,globalOptsL
   ,buildOptsInstallExesL
@@ -1440,7 +1441,7 @@ plainEnvSettings = EnvSettings
 --
 -- https://github.com/commercialhaskell/stack/issues/1052
 getCompilerPath
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasCompiler env)
     => WhichCompiler
     -> m (Path Abs File)
 getCompilerPath wc = do
@@ -1819,7 +1820,7 @@ class HasConfig env => HasBuildConfig env where
         envConfigBuildConfig
         (\x y -> x { envConfigBuildConfig = y })
 
-class (HasBuildConfig env, HasSourceMap env) => HasEnvConfig env where
+class (HasBuildConfig env, HasSourceMap env, HasCompiler env) => HasEnvConfig env where
     envConfigL :: Lens' env EnvConfig
 
 -----------------------------------
@@ -1869,6 +1870,7 @@ instance HasBuildConfig BuildConfig where
     {-# INLINE buildConfigL #-}
 instance HasBuildConfig EnvConfig
 
+instance HasCompiler EnvConfig
 instance HasEnvConfig EnvConfig where
     envConfigL = id
     {-# INLINE envConfigL #-}
@@ -1915,6 +1917,10 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 -- different from the actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
+
+-- | An environment which ensures that the given compiler is available
+-- on the PATH. This class is used for the type alone, and has no methods.
+class HasCompiler env
 
 class HasSourceMap env where
   sourceMapL :: Lens' env SourceMap

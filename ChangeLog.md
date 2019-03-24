@@ -129,6 +129,8 @@ Other enhancements:
   [#4390](https://github.com/commercialhaskell/stack/issues/4390).
 * Add the `stack config env` command for getting shell script environment
   variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
+* Less verbose output from `stack setup` on Windows. See
+  [#1212](https://github.com/commercialhaskell/stack/issues/1212).
 
 Bug fixes:
 

@@ -656,7 +656,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ planUnregisterLocal plan
 
 unregisterPackages ::
-       (HasProcessContext env, HasLogFunc env, HasPlatform env)
+       (HasProcessContext env, HasLogFunc env, HasPlatform env, HasCompiler env)
     => ActualCompiler
     -> Path Abs Dir
     -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))

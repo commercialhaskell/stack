@@ -32,9 +32,13 @@ module Stack.Setup
   , preferredPlatforms
   , downloadStackReleaseInfo
   , downloadStackExe
+  -- * WithGHC
+  , WithGHC (..)
+  , runWithGHC
   ) where
 
 import qualified    Codec.Archive.Tar as Tar
+import              Conduit
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
@@ -43,12 +47,11 @@ import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
-import              Data.Conduit (await, yield, awaitForever)
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
-import              Data.Conduit.Process.Typed (eceStderr)
+import              Data.Conduit.Process.Typed (eceStderr, createSource)
 import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
 import qualified    Data.HashMap.Strict as HashMap
@@ -211,11 +214,10 @@ instance Show SetupException where
         "I don't know how to install GHC on your system configuration, please install manually"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (HasBuildConfig env, HasGHCVariant env)
-         => NeedTargets
+setupEnv :: NeedTargets
          -> BuildOptsCLI
          -> Maybe Text -- ^ Message to give user when necessary GHC is not available
-         -> RIO env EnvConfig
+         -> RIO BuildConfig EnvConfig
 setupEnv needTargets boptsCLI mResolveMissingGHC = do
     config <- view configL
     bc <- view buildConfigL
@@ -250,21 +252,14 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                     (view envVarsL menv0)
     menv <- mkProcessContext env
 
-    -- FIXME currently this fails with SkipDownloadcompiler
-    (compilerVer, cabalVer, globaldb) <- withProcessContext menv $ runConcurrently $ (,,)
+    (compilerVer, cabalVer, globaldb) <- runWithGHC menv $ runConcurrently $ (,,)
         <$> Concurrently (getCompilerVersion wc)
         <*> Concurrently (getCabalPkgVer wc)
         <*> Concurrently (getGlobalDB wc)
 
     logDebug "Resolving package entries"
 
-    -- Set up a modified environment which includes the modified PATH
-    -- that GHC can be found on. This is needed for looking up global
-    -- package information and ghc fingerprint (result from 'ghc --info').
-    let bcPath :: BuildConfig
-        bcPath = set envOverrideSettingsL (\_ -> return menv) $
-                 set processContextL menv bc
-    (sourceMap, sourceMapHash) <- runRIO bcPath $ do
+    (sourceMap, sourceMapHash) <- runWithGHC menv $ do
       smActual <- actualFromGhc (bcSMWanted bc) compilerVer
       let actualPkgs = Map.keysSet (smaDeps smActual) <>
                        Map.keysSet (smaProject smActual)
@@ -291,9 +286,9 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
     deps <- runRIO envConfig0 packageDatabaseDeps
-    withProcessContext menv $ createDatabase wc deps
+    runWithGHC menv $ createDatabase wc deps
     localdb <- runRIO envConfig0 packageDatabaseLocal
-    withProcessContext menv $ createDatabase wc localdb
+    runWithGHC menv $ createDatabase wc localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
@@ -372,6 +367,45 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         , envConfigCompilerBuild = mCompilerBuild
         }
 
+-- | A modified env which we know has an installed compiler on the PATH.
+newtype WithGHC env = WithGHC env
+
+insideL :: Lens' (WithGHC env) env
+insideL = lens (\(WithGHC x) -> x) (\_ -> WithGHC)
+
+instance HasLogFunc env => HasLogFunc (WithGHC env) where
+  logFuncL = insideL.logFuncL
+instance HasRunner env => HasRunner (WithGHC env) where
+  runnerL = insideL.runnerL
+instance HasProcessContext env => HasProcessContext (WithGHC env) where
+  processContextL = insideL.processContextL
+instance HasStylesUpdate env => HasStylesUpdate (WithGHC env) where
+  stylesUpdateL = insideL.stylesUpdateL
+instance HasTerm env => HasTerm (WithGHC env) where
+  useColorL = insideL.useColorL
+  termWidthL = insideL.termWidthL
+instance HasPantryConfig env => HasPantryConfig (WithGHC env) where
+  pantryConfigL = insideL.pantryConfigL
+instance HasConfig env => HasPlatform (WithGHC env)
+instance HasConfig env => HasGHCVariant (WithGHC env)
+instance HasConfig env => HasConfig (WithGHC env) where
+  configL = insideL.configL
+instance HasBuildConfig env => HasBuildConfig (WithGHC env) where
+  buildConfigL = insideL.buildConfigL
+instance HasCompiler (WithGHC env)
+
+-- | Set up a modified environment which includes the modified PATH
+-- that GHC can be found on. This is needed for looking up global
+-- package information and ghc fingerprint (result from 'ghc --info').
+runWithGHC :: HasConfig env => ProcessContext -> RIO (WithGHC env) a -> RIO env a
+runWithGHC pc inner = do
+  env <- ask
+  let envg
+        = WithGHC $
+          set envOverrideSettingsL (\_ -> return pc) $
+          set processContextL pc env
+  runRIO envg inner
+
 -- | special helper for GHCJS which needs an updated source map
 -- only project dependencies should get included otherwise source map hash will
 -- get changed and EnvConfig will become inconsistent
@@ -383,7 +417,7 @@ rebuildEnv :: EnvConfig
 rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let bc = envConfigBuildConfig envConfig
         compilerVer = smCompiler $ envConfigSourceMap envConfig
-    runRIO bc $ do
+    runRIO (WithGHC bc) $ do
         smActual <- actualFromGhc (bcSMWanted bc) compilerVer
         let actualPkgs = Map.keysSet (smaDeps smActual) <> Map.keysSet (smaProject smActual)
             prunedActual = smActual {
@@ -1497,7 +1531,32 @@ setup7z si = do
                         , "-y"
                         , toFilePath archive
                         ]
-                ec <- proc cmd args runProcess
+                let archiveDisplay = fromString $ FP.takeFileName $ toFilePath archive
+                    isExtract = FP.takeExtension (toFilePath archive) == ".tar"
+                logInfo $
+                  (if isExtract then "Extracting " else "Decompressing ") <>
+                  archiveDisplay <> "..."
+                ec <-
+                  proc cmd args $ \pc ->
+                  if isExtract
+                    then withProcess (setStdout createSource pc) $ \p -> do
+                        total <- runConduit
+                            $ getStdout p
+                           .| filterCE (== 10) -- newline characters
+                           .| foldMC
+                                (\count bs -> do
+                                    let count' = count + S.length bs
+                                    logSticky $ "Extracted " <> RIO.display count' <> " files"
+                                    pure count'
+                                )
+                                0
+                        logStickyDone $
+                          "Extracted total of " <>
+                          RIO.display total <>
+                          " files from " <>
+                          archiveDisplay
+                        waitExitCode p
+                    else runProcess pc
                 when (ec /= ExitSuccess)
                     $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz

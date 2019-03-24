@@ -147,6 +147,7 @@ instance HasProcessContext Ctx where
 instance HasBuildConfig Ctx
 instance HasSourceMap Ctx where
     sourceMapL = envConfigL.sourceMapL
+instance HasCompiler Ctx
 instance HasEnvConfig Ctx where
     envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
