@@ -164,6 +164,8 @@ Bug fixes:
 * Using `--ghc-options` with `stack script --compile` now works.
 * Ensure the detailed-0.9 type tests work.
   See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
+* Extra include and lib dirs are now order-dependent. See
+  [#4527](https://github.com/commercialhaskell/stack/issues/4527).
 
 ## v1.9.3
 

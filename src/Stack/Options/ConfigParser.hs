@@ -2,7 +2,6 @@
 module Stack.Options.ConfigParser where
 
 import           Data.Char
-import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Path
@@ -88,20 +87,20 @@ configOptsParser currentDir hide0 =
            <> help "Number of concurrent jobs to run"
            <> hide
             ))
-    <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
+    <*> many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
            <> completer dirCompleter
            <> help "Extra directories to check for C header files"
            <> hide
-            )))
-    <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
+            ))
+    <*> many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
            <> completer dirCompleter
            <> help "Extra directories to check for libraries"
            <> hide
-            )))
+            ))
     <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"

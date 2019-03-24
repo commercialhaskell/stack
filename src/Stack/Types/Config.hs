@@ -301,9 +301,9 @@ data Config =
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
          -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: !(Set FilePath)
+         ,configExtraIncludeDirs    :: ![FilePath]
          -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: !(Set FilePath)
+         ,configExtraLibDirs        :: ![FilePath]
          -- ^ --extra-lib-dirs arguments
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
@@ -703,9 +703,9 @@ data ConfigMonoid =
     -- ^ Used for overriding the GHC build
     ,configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: !(Set FilePath)
+    ,configMonoidExtraIncludeDirs    :: ![FilePath]
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: !(Set FilePath)
+    ,configMonoidExtraLibDirs        :: ![FilePath]
     -- ^ See: 'configExtraLibDirs'
     , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
@@ -808,10 +808,10 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
     configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
     configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
-    configMonoidExtraIncludeDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
-        obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
-    configMonoidExtraLibDirs <- fmap (Set.map (toFilePath rootDir FilePath.</>)) $
-        obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
+    configMonoidExtraIncludeDirs <- map (toFilePath rootDir FilePath.</>) <$>
+        obj ..:?  configMonoidExtraIncludeDirsName ..!= []
+    configMonoidExtraLibDirs <- map (toFilePath rootDir FilePath.</>) <$>
+        obj ..:?  configMonoidExtraLibDirsName ..!= []
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
     configMonoidOverrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
