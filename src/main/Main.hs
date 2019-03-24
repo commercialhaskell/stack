@@ -464,7 +464,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                           dockerCleanupOptsParser)
         addSubCommands'
             ConfigCmd.cfgCmdName
-            "Subcommands specific to modifying stack.yaml files"
+            "Subcommands for accessing and modifying configuration values"
             (do
                addCommand' ConfigCmd.cfgCmdSetName
                           "Sets a field in the project's stack.yaml to value"
