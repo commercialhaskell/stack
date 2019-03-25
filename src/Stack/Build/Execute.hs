@@ -1245,7 +1245,17 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                 ] ++
                                 (case compiler of
                                     Ghc -> []
-                                    Ghcjs -> ["-build-runner"])
+                                    Ghcjs -> ["-build-runner"]) ++
+
+                                -- Apply GHC options
+                                -- https://github.com/commercialhaskell/stack/issues/4526
+                                map T.unpack (
+                                  Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config) ++
+                                  case configApplyGhcOptions config of
+                                    AGOEverything -> boptsCLIGhcOptions eeBuildOptsCLI
+                                    AGOTargets -> []
+                                    AGOLocals -> [])
+
                             liftIO $ atomicModifyIORef' eeCustomBuilt $
                                 \oldCustomBuilt -> (Set.insert (packageName package) oldCustomBuilt, ())
                             return outputFile
