@@ -120,8 +120,6 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | InvalidGhcOptionsSpecification [PackageName]
   | TargetParseException [Text]
-  | SolverGiveUp String
-  | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
@@ -289,15 +287,6 @@ instance Show StackBuildException where
         $ "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
 
-    show (SolverGiveUp msg) = concat
-        [ "\nSolver could not resolve package dependencies.\n"
-        , "You can try the following:\n"
-        , msg
-        ]
-    show SolverMissingCabalInstall = unlines
-        [ "Solver requires that cabal be on your PATH"
-        , "Try running 'stack install cabal-install'"
-        ]
     show (SomeTargetsNotBuildable xs) =
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
         T.unpack (renderPkgComponents xs) ++

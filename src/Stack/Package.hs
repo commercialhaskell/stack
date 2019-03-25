@@ -60,7 +60,6 @@ import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Prelude hiding (Display (..))
-import           Stack.Types.BuildPlan (ExeName (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId

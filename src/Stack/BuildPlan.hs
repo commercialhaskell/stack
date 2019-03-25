@@ -16,8 +16,6 @@ module Stack.BuildPlan
     , checkSnapBuildPlan
     , DepError(..)
     , DepErrors
-    , gpdPackageDeps
-    , gpdPackages
     , removeSrcPkgDefaultFlags
     , selectBestSnapshot
     , showItems

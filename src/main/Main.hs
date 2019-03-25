@@ -86,7 +86,6 @@ import           Stack.Options.NewParser
 import           Stack.Options.NixParser
 import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
-import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.Path
 import           Stack.Runners
@@ -95,7 +94,6 @@ import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarb
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
-import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
@@ -295,10 +293,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Create stack project config from cabal or hpack package specifications"
                     initCmd
                     initOptsParser
-        addCommand' "solver"
-                    "Add missing extra-deps to stack project config"
-                    solverCmd
-                    solverOptsParser
         addCommand' "setup"
                     "Get the appropriate GHC for your project"
                     setupCmd
@@ -972,7 +966,7 @@ initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
     pwd <- getCurrentDir
     go <- view globalOptsL
-    withGlobalConfigAndLock (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withGlobalConfigAndLock (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
@@ -982,18 +976,11 @@ newCmd (newOpts,initOpts) =
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $ do
             go <- view globalOptsL
-            initProject IsNewCmd dir initOpts (globalResolver go)
+            initProject dir initOpts (globalResolver go)
 
 -- | List the available templates.
 templatesCmd :: () -> RIO Runner ()
 templatesCmd _ = withConfigAndLock templatesHelp
-
--- | Fix up extra-deps for a project
-solverCmd :: Bool -- ^ modify stack.yaml automatically?
-          -> RIO Runner ()
-solverCmd fixStackYaml =
-    withConfig $
-    withDefaultEnvConfigAndLock (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()

@@ -14,6 +14,7 @@ import           Data.List.Split            (splitWhen)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Set                   as Set
 import           Distribution.Compiler      (CompilerFlavor (..))
+import           Distribution.ModuleName    (ModuleName)
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
 import           Distribution.Types.PackageName (mkPackageName)
@@ -31,7 +32,6 @@ import           Stack.Options.ScriptParser
 import           Stack.Runners
 import           Stack.Setup                (withNewLocalBuildTargets)
 import           Stack.SourceMap            (getCompilerInfo, immutableLocSha)
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
