@@ -174,6 +174,8 @@ Bug fixes:
   See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
 * Extra include and lib dirs are now order-dependent. See
   [#4527](https://github.com/commercialhaskell/stack/issues/4527).
+* Apply GHC options when building a `Setup.hs` file. See
+  [#4526](https://github.com/commercialhaskell/stack/issues/4526).
 
 ## v1.9.3
 
