@@ -530,6 +530,7 @@ data HackageSecurityConfig = HackageSecurityConfig
   { hscKeyIds :: ![Text]
   , hscKeyThreshold :: !Int
   , hscDownloadPrefix :: !Text
+  , hscIgnoreExpiry :: !Bool
   }
   deriving Show
 instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
@@ -538,6 +539,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     Object o <- o' ..: "hackage-security"
     hscKeyIds <- o ..: "keyids"
     hscKeyThreshold <- o ..: "key-threshold"
+    hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
     pure HackageSecurityConfig {..}
 
 -- | An environment which contains a 'PantryConfig'.

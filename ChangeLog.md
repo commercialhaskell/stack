@@ -131,6 +131,11 @@ Other enhancements:
   variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
 * Less verbose output from `stack setup` on Windows. See
   [#1212](https://github.com/commercialhaskell/stack/issues/1212).
+* Add an optional `ignore-expiry` flag to the `hackage-security`
+  section of the `~/.stack/config.yaml`. It allows to disable timestamp
+  expiration verification just like `cabal --ignore-expiry` does.
+  The flag is not enabled by default so that the default functionality
+  is not changed.
 
 Bug fixes:
 

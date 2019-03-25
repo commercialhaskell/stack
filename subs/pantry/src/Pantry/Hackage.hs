@@ -82,7 +82,7 @@ updateHackageIndex
 updateHackageIndex mreason = gateUpdate $ do
     for_ mreason logInfo
     pc <- view pantryConfigL
-    let HackageSecurityConfig keyIds threshold url = pcHackageSecurity pc
+    let HackageSecurityConfig keyIds threshold url ignoreExpiry = pcHackageSecurity pc
     root <- view hackageDirL
     tarball <- view hackageIndexTarballL
     baseURI <-
@@ -109,8 +109,10 @@ updateHackageIndex mreason = gateUpdate $ do
                 repo
                 (map (HS.KeyId . T.unpack) keyIds)
                 (HS.KeyThreshold $ fromIntegral threshold)
-        now <- getCurrentTime
-        HS.checkForUpdates repo (Just now)
+        maybeNow <- if ignoreExpiry
+                      then pure Nothing
+                      else Just <$> getCurrentTime
+        HS.checkForUpdates repo maybeNow
 
     case didUpdate of
       HS.NoUpdates -> logInfo "No package index update available"
