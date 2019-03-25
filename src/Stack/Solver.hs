@@ -358,7 +358,7 @@ solveResolverSpec
 
 solveResolverSpec cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-  logInfo $ "Using resolver: " <> RIO.display (sdResolverName sd)
+  logInfo $ "Using resolver: " <> RIO.display (sdResolver sd)
   let wantedCompilerVersion = sdWantedCompilerVersion sd
   setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
     (compilerVer, snapConstraints) <- getResolverConstraints <$> loadSnapshotCompiler compilerVersion sd
@@ -376,7 +376,7 @@ solveResolverSpec cabalDirs
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
-          ["packages from " <> sdResolverName sd
+          ["packages from " <> utf8BuilderToText (RIO.display (sdResolver sd))
               | not (Map.null snapConstraints)] ++
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
@@ -646,7 +646,7 @@ solveExtraDeps modStackYaml = do
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
         BuildPlanCheckFail {} ->
-            throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
+            throwM $ ResolverMismatch IsSolverCmd (sdResolver sd) (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)

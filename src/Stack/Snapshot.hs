@@ -202,7 +202,7 @@ loadSnapshot mcompiler helper =
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
-      logInfo $ "Loading a snapshot from a SnapshotDef: " <> RIO.display (sdResolverName sd)
+      logInfo $ "Loading a snapshot from a SnapshotDef: " <> RIO.display (sdResolver sd)
       case sdSnapshot sd of
         Nothing -> helper (sdWantedCompilerVersion sd)
         Just (snapshot, sd') -> start sd' >>= inner2 snapshot
