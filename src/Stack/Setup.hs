@@ -443,12 +443,12 @@ withNewLocalBuildTargets targets f = do
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
-    { configExtraIncludeDirs = Set.union
-        (configExtraIncludeDirs config)
-        (Set.fromList (map toFilePathNoTrailingSep includes))
-    , configExtraLibDirs = Set.union
-        (configExtraLibDirs config)
-        (Set.fromList (map toFilePathNoTrailingSep libs))
+    { configExtraIncludeDirs =
+        configExtraIncludeDirs config ++
+        map toFilePathNoTrailingSep includes
+    , configExtraLibDirs =
+        configExtraLibDirs config ++
+        map toFilePathNoTrailingSep libs
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary

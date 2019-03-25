@@ -312,6 +312,9 @@ package-indices:
     - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
     - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
     key-threshold: 3 # number of keys required
+
+    # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
+    ignore-expiry: no
 ```
 
 If you provide a replacement index which does not mirror Hackage, it

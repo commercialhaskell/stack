@@ -131,6 +131,11 @@ Other enhancements:
   variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
 * Less verbose output from `stack setup` on Windows. See
   [#1212](https://github.com/commercialhaskell/stack/issues/1212).
+* Add an optional `ignore-expiry` flag to the `hackage-security`
+  section of the `~/.stack/config.yaml`. It allows to disable timestamp
+  expiration verification just like `cabal --ignore-expiry` does.
+  The flag is not enabled by default so that the default functionality
+  is not changed.
 * environment variable `GHC_ENVIRONMENT` is set to specify dependency
   packages explicitly when running test. This is done to prevent
   ambiguous module name errors in `doctest` tests.
@@ -167,6 +172,8 @@ Bug fixes:
 * Using `--ghc-options` with `stack script --compile` now works.
 * Ensure the detailed-0.9 type tests work.
   See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
+* Extra include and lib dirs are now order-dependent. See
+  [#4527](https://github.com/commercialhaskell/stack/issues/4527).
 
 ## v1.9.3
 
