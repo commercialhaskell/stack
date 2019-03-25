@@ -1833,12 +1833,12 @@ singleTest topts testsToRun ac ee task installedMap = do
                     fp = toFilePath $ eeTempDir ee </> $(mkRelFile "test-ghc-env")
                     snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
                     localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
-                    ghcEnv = mconcat $
-                        "clear-package-db\n" :
-                        "global-package-db\n" :
-                        "package-db " <> fromString snapDBPath <> "\n" :
-                        "package-db " <> fromString localDBPath <> "\n" :
-                        map (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
+                    ghcEnv =
+                        "clear-package-db\n" <>
+                        "global-package-db\n" <>
+                        "package-db " <> fromString snapDBPath <> "\n" <>
+                        "package-db " <> fromString localDBPath <> "\n" <>
+                        foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
                             (thGhcId:packageIds)
                 logInfo $  "package ids: " <> RIO.displayShow packageIds
                 writeFileUtf8Builder fp ghcEnv
