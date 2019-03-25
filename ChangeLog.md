@@ -131,6 +131,9 @@ Other enhancements:
   variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
 * Less verbose output from `stack setup` on Windows. See
   [#1212](https://github.com/commercialhaskell/stack/issues/1212).
+* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+  packages explicitly when running test. This is done to prevent
+  ambiguous module name errors in `doctest` tests.
 
 Bug fixes:
 
