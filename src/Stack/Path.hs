@@ -10,7 +10,6 @@ module Stack.Path
 
 import           Stack.Prelude
 import           Data.List (intercalate)
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)
@@ -186,10 +185,10 @@ paths =
       , WithoutHaddocks $ view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraIncludeDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraIncludeDirs . view configL )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraLibDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraLibDirs . view configL )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piSnapDb )
