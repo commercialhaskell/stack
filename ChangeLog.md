@@ -136,6 +136,9 @@ Other enhancements:
   expiration verification just like `cabal --ignore-expiry` does.
   The flag is not enabled by default so that the default functionality
   is not changed.
+* Include default values for most command line flags in the `--help`
+  output. See
+  [#893](https://github.com/commercialhaskell/stack/issues/893).
 
 Bug fixes:
 

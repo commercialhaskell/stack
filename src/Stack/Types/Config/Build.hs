@@ -64,7 +64,7 @@ data BuildOpts =
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
-            ,boptsKeepTmpFiles :: !(Maybe Bool)
+            ,boptsKeepTmpFiles :: !Bool
             -- ^ Keep intermediate files and build directories
             ,boptsForceDirty :: !Bool
             -- ^ Force treating all local packages as having dirty files
@@ -97,31 +97,31 @@ data BuildOpts =
 
 defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts
-    { boptsLibProfile = False
-    , boptsExeProfile = False
-    , boptsLibStrip = True
-    , boptsExeStrip = True
+    { boptsLibProfile = defaultFirstFalse buildMonoidLibProfile
+    , boptsExeProfile = defaultFirstFalse buildMonoidExeProfile
+    , boptsLibStrip = defaultFirstTrue buildMonoidLibStrip
+    , boptsExeStrip = defaultFirstTrue buildMonoidExeStrip
     , boptsHaddock = False
     , boptsHaddockOpts = defaultHaddockOpts
-    , boptsOpenHaddocks = False
+    , boptsOpenHaddocks = defaultFirstFalse buildMonoidOpenHaddocks
     , boptsHaddockDeps = Nothing
-    , boptsHaddockInternal = False
-    , boptsHaddockHyperlinkSource = True
-    , boptsInstallExes = False
-    , boptsInstallCompilerTool = False
-    , boptsPreFetch = False
+    , boptsHaddockInternal = defaultFirstFalse buildMonoidHaddockInternal
+    , boptsHaddockHyperlinkSource = defaultFirstTrue buildMonoidHaddockHyperlinkSource
+    , boptsInstallExes = defaultFirstFalse buildMonoidInstallExes
+    , boptsInstallCompilerTool = defaultFirstFalse buildMonoidInstallCompilerTool
+    , boptsPreFetch = defaultFirstFalse buildMonoidPreFetch
     , boptsKeepGoing = Nothing
-    , boptsKeepTmpFiles = Nothing
-    , boptsForceDirty = False
-    , boptsTests = False
+    , boptsKeepTmpFiles = defaultFirstFalse buildMonoidKeepTmpFiles
+    , boptsForceDirty = defaultFirstFalse buildMonoidForceDirty
+    , boptsTests = defaultFirstFalse buildMonoidTests
     , boptsTestOpts = defaultTestOpts
-    , boptsBenchmarks = False
+    , boptsBenchmarks = defaultFirstFalse buildMonoidBenchmarks
     , boptsBenchmarkOpts = defaultBenchmarkOpts
-    , boptsReconfigure = False
-    , boptsCabalVerbose = False
-    , boptsSplitObjs = False
+    , boptsReconfigure = defaultFirstFalse buildMonoidReconfigure
+    , boptsCabalVerbose = defaultFirstFalse buildMonoidCabalVerbose
+    , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = []
-    , boptsInterleavedOutput = False
+    , boptsInterleavedOutput = defaultFirstFalse buildMonoidInterleavedOutput
     , boptsDdumpDir = Nothing
     }
 
@@ -186,31 +186,31 @@ data BuildOptsMonoid = BuildOptsMonoid
     { buildMonoidTrace :: !Any
     , buildMonoidProfile :: !Any
     , buildMonoidNoStrip :: !Any
-    , buildMonoidLibProfile :: !(First Bool)
-    , buildMonoidExeProfile :: !(First Bool)
-    , buildMonoidLibStrip :: !(First Bool)
-    , buildMonoidExeStrip :: !(First Bool)
-    , buildMonoidHaddock :: !(First Bool)
+    , buildMonoidLibProfile :: !FirstFalse
+    , buildMonoidExeProfile :: !FirstFalse
+    , buildMonoidLibStrip :: !FirstTrue
+    , buildMonoidExeStrip :: !FirstTrue
+    , buildMonoidHaddock :: !FirstFalse
     , buildMonoidHaddockOpts :: !HaddockOptsMonoid
-    , buildMonoidOpenHaddocks :: !(First Bool)
+    , buildMonoidOpenHaddocks :: !FirstFalse
     , buildMonoidHaddockDeps :: !(First Bool)
-    , buildMonoidHaddockInternal :: !(First Bool)
-    , buildMonoidHaddockHyperlinkSource :: !(First Bool)
-    , buildMonoidInstallExes :: !(First Bool)
-    , buildMonoidInstallCompilerTool :: !(First Bool)
-    , buildMonoidPreFetch :: !(First Bool)
+    , buildMonoidHaddockInternal :: !FirstFalse
+    , buildMonoidHaddockHyperlinkSource :: !FirstTrue
+    , buildMonoidInstallExes :: !FirstFalse
+    , buildMonoidInstallCompilerTool :: !FirstFalse
+    , buildMonoidPreFetch :: !FirstFalse
     , buildMonoidKeepGoing :: !(First Bool)
-    , buildMonoidKeepTmpFiles :: !(First Bool)
-    , buildMonoidForceDirty :: !(First Bool)
-    , buildMonoidTests :: !(First Bool)
+    , buildMonoidKeepTmpFiles :: !FirstFalse
+    , buildMonoidForceDirty :: !FirstFalse
+    , buildMonoidTests :: !FirstFalse
     , buildMonoidTestOpts :: !TestOptsMonoid
-    , buildMonoidBenchmarks :: !(First Bool)
+    , buildMonoidBenchmarks :: !FirstFalse
     , buildMonoidBenchmarkOpts :: !BenchmarkOptsMonoid
-    , buildMonoidReconfigure :: !(First Bool)
-    , buildMonoidCabalVerbose :: !(First Bool)
-    , buildMonoidSplitObjs :: !(First Bool)
+    , buildMonoidReconfigure :: !FirstFalse
+    , buildMonoidCabalVerbose :: !FirstFalse
+    , buildMonoidSplitObjs :: !FirstFalse
     , buildMonoidSkipComponents :: ![Text]
-    , buildMonoidInterleavedOutput :: !(First Bool)
+    , buildMonoidInterleavedOutput :: !FirstFalse
     , buildMonoidDdumpDir :: !(First Text)
     } deriving (Show, Generic)
 
@@ -219,31 +219,31 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     (\o -> do let buildMonoidTrace = Any False
                   buildMonoidProfile = Any False
                   buildMonoidNoStrip = Any False
-              buildMonoidLibProfile <- First <$> o ..:? buildMonoidLibProfileArgName
-              buildMonoidExeProfile <-First <$>  o ..:? buildMonoidExeProfileArgName
-              buildMonoidLibStrip <- First <$> o ..:? buildMonoidLibStripArgName
-              buildMonoidExeStrip <-First <$>  o ..:? buildMonoidExeStripArgName
-              buildMonoidHaddock <- First <$> o ..:? buildMonoidHaddockArgName
+              buildMonoidLibProfile <- FirstFalse <$> o ..:? buildMonoidLibProfileArgName
+              buildMonoidExeProfile <-FirstFalse <$>  o ..:? buildMonoidExeProfileArgName
+              buildMonoidLibStrip <- FirstTrue <$> o ..:? buildMonoidLibStripArgName
+              buildMonoidExeStrip <-FirstTrue <$>  o ..:? buildMonoidExeStripArgName
+              buildMonoidHaddock <- FirstFalse <$> o ..:? buildMonoidHaddockArgName
               buildMonoidHaddockOpts <- jsonSubWarnings (o ..:? buildMonoidHaddockOptsArgName ..!= mempty)
-              buildMonoidOpenHaddocks <- First <$> o ..:? buildMonoidOpenHaddocksArgName
+              buildMonoidOpenHaddocks <- FirstFalse <$> o ..:? buildMonoidOpenHaddocksArgName
               buildMonoidHaddockDeps <- First <$> o ..:? buildMonoidHaddockDepsArgName
-              buildMonoidHaddockInternal <- First <$> o ..:? buildMonoidHaddockInternalArgName
-              buildMonoidHaddockHyperlinkSource <- First <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
-              buildMonoidInstallExes <- First <$> o ..:? buildMonoidInstallExesArgName
-              buildMonoidInstallCompilerTool <- First <$> o ..:? buildMonoidInstallCompilerToolArgName
-              buildMonoidPreFetch <- First <$> o ..:? buildMonoidPreFetchArgName
+              buildMonoidHaddockInternal <- FirstFalse <$> o ..:? buildMonoidHaddockInternalArgName
+              buildMonoidHaddockHyperlinkSource <- FirstTrue <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
+              buildMonoidInstallExes <- FirstFalse <$> o ..:? buildMonoidInstallExesArgName
+              buildMonoidInstallCompilerTool <- FirstFalse <$> o ..:? buildMonoidInstallCompilerToolArgName
+              buildMonoidPreFetch <- FirstFalse <$> o ..:? buildMonoidPreFetchArgName
               buildMonoidKeepGoing <- First <$> o ..:? buildMonoidKeepGoingArgName
-              buildMonoidKeepTmpFiles <- First <$> o ..:? buildMonoidKeepTmpFilesArgName
-              buildMonoidForceDirty <- First <$> o ..:? buildMonoidForceDirtyArgName
-              buildMonoidTests <- First <$> o ..:? buildMonoidTestsArgName
+              buildMonoidKeepTmpFiles <- FirstFalse <$> o ..:? buildMonoidKeepTmpFilesArgName
+              buildMonoidForceDirty <- FirstFalse <$> o ..:? buildMonoidForceDirtyArgName
+              buildMonoidTests <- FirstFalse <$> o ..:? buildMonoidTestsArgName
               buildMonoidTestOpts <- jsonSubWarnings (o ..:? buildMonoidTestOptsArgName ..!= mempty)
-              buildMonoidBenchmarks <- First <$> o ..:? buildMonoidBenchmarksArgName
+              buildMonoidBenchmarks <- FirstFalse <$> o ..:? buildMonoidBenchmarksArgName
               buildMonoidBenchmarkOpts <- jsonSubWarnings (o ..:? buildMonoidBenchmarkOptsArgName ..!= mempty)
-              buildMonoidReconfigure <- First <$> o ..:? buildMonoidReconfigureArgName
-              buildMonoidCabalVerbose <- First <$> o ..:? buildMonoidCabalVerboseArgName
-              buildMonoidSplitObjs <- First <$> o ..:? buildMonoidSplitObjsName
+              buildMonoidReconfigure <- FirstFalse <$> o ..:? buildMonoidReconfigureArgName
+              buildMonoidCabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
+              buildMonoidSplitObjs <- FirstFalse <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
-              buildMonoidInterleavedOutput <- First <$> o ..:? buildMonoidInterleavedOutputName
+              buildMonoidInterleavedOutput <- FirstFalse <$> o ..:? buildMonoidInterleavedOutputName
               buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
               return BuildOptsMonoid{..})
 
@@ -352,28 +352,28 @@ data TestOpts =
 
 defaultTestOpts :: TestOpts
 defaultTestOpts = TestOpts
-    { toRerunTests = True
+    { toRerunTests = defaultFirstTrue toMonoidRerunTests
     , toAdditionalArgs = []
-    , toCoverage = False
-    , toDisableRun = False
+    , toCoverage = defaultFirstFalse toMonoidCoverage
+    , toDisableRun = defaultFirstFalse toMonoidDisableRun
     , toMaximumTimeSeconds = Nothing
     }
 
 data TestOptsMonoid =
   TestOptsMonoid
-    { toMonoidRerunTests :: !(First Bool)
+    { toMonoidRerunTests :: !FirstTrue
     , toMonoidAdditionalArgs :: ![String]
-    , toMonoidCoverage :: !(First Bool)
-    , toMonoidDisableRun :: !(First Bool)
+    , toMonoidCoverage :: !FirstFalse
+    , toMonoidDisableRun :: !FirstFalse
     , toMonoidMaximumTimeSeconds :: !(First (Maybe Int))
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings TestOptsMonoid) where
   parseJSON = withObjectWarnings "TestOptsMonoid"
-    (\o -> do toMonoidRerunTests <- First <$> o ..:? toMonoidRerunTestsArgName
+    (\o -> do toMonoidRerunTests <- FirstTrue <$> o ..:? toMonoidRerunTestsArgName
               toMonoidAdditionalArgs <- o ..:? toMonoidAdditionalArgsName ..!= []
-              toMonoidCoverage <- First <$> o ..:? toMonoidCoverageArgName
-              toMonoidDisableRun <- First <$> o ..:? toMonoidDisableRunArgName
+              toMonoidCoverage <- FirstFalse <$> o ..:? toMonoidCoverageArgName
+              toMonoidDisableRun <- FirstFalse <$> o ..:? toMonoidDisableRunArgName
               toMonoidMaximumTimeSeconds <- First <$> o ..:? toMonoidMaximumTimeSecondsArgName
               return TestOptsMonoid{..})
 

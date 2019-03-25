@@ -13,7 +13,7 @@ import           Stack.Types.Config
 testOptsParser :: Bool -> Parser TestOptsMonoid
 testOptsParser hide0 =
     TestOptsMonoid
-        <$> firstBoolFlags
+        <$> firstBoolFlagsTrue
                 "rerun-tests"
                 "running already successful tests"
                 hide
@@ -26,12 +26,12 @@ testOptsParser hide0 =
                          metavar "TEST_ARGS" <>
                          help "Arguments passed in to the test suite program" <>
                          hide)))
-        <*> optionalFirst
+        <*> optionalFirstFalse
                 (flag' True
                     (long "coverage" <>
                      help "Generate a code coverage report" <>
                      hide))
-        <*> optionalFirst
+        <*> optionalFirstFalse
                 (flag' True
                     (long "no-run-tests" <>
                      help "Disable running of tests. (Tests will still be built.)" <>

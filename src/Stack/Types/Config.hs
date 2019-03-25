@@ -489,7 +489,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
-    , globalMonoidTimeInLog    :: !(First Bool) -- ^ Whether to include timings in logs.
+    , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
@@ -677,7 +677,7 @@ data ConfigMonoid =
     -- ^ Options for the execution environment (nix-shell or container)
     , configMonoidConnectionCount    :: !(First Int)
     -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading      :: !(First Bool)
+    , configMonoidHideTHLoading      :: !FirstTrue
     -- ^ See: 'configHideTHLoading'
     , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
@@ -685,11 +685,11 @@ data ConfigMonoid =
     -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
-    ,configMonoidInstallGHC          :: !(First Bool)
+    ,configMonoidInstallGHC          :: !FirstTrue
     -- ^ See: 'configInstallGHC'
-    ,configMonoidSkipGHCCheck        :: !(First Bool)
+    ,configMonoidSkipGHCCheck        :: !FirstFalse
     -- ^ See: 'configSkipGHCCheck'
-    ,configMonoidSkipMsys            :: !(First Bool)
+    ,configMonoidSkipMsys            :: !FirstFalse
     -- ^ See: 'configSkipMsys'
     ,configMonoidCompilerCheck       :: !(First VersionCheck)
     -- ^ See: 'configCompilerCheck'
@@ -735,11 +735,11 @@ data ConfigMonoid =
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
     ,configMonoidPvpBounds           :: !(First PvpBounds)
     -- ^ See 'configPvpBounds'
-    ,configMonoidModifyCodePage      :: !(First Bool)
+    ,configMonoidModifyCodePage      :: !FirstTrue
     -- ^ See 'configModifyCodePage'
     ,configMonoidExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
     -- ^ See 'configExplicitSetupDeps'
-    ,configMonoidRebuildGhcOptions   :: !(First Bool)
+    ,configMonoidRebuildGhcOptions   :: !FirstFalse
     -- ^ See 'configMonoidRebuildGhcOptions'
     ,configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
@@ -785,7 +785,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- First <$> obj ..:? configMonoidConnectionCountName
-    configMonoidHideTHLoading <- First <$> obj ..:? configMonoidHideTHLoadingName
+    configMonoidHideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
 
     murls :: Maybe Value <- obj ..:? configMonoidUrlsName
     configMonoidLatestSnapshot <-
@@ -798,9 +798,9 @@ parseConfigMonoidObject rootDir obj = do
 
     configMonoidPackageIndices <- First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
     configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
-    configMonoidInstallGHC <- First <$> obj ..:? configMonoidInstallGHCName
-    configMonoidSkipGHCCheck <- First <$> obj ..:? configMonoidSkipGHCCheckName
-    configMonoidSkipMsys <- First <$> obj ..:? configMonoidSkipMsysName
+    configMonoidInstallGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
+    configMonoidSkipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
+    configMonoidSkipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
     configMonoidRequireStackVersion <- IntersectingVersionRange . unVersionRangeJSON <$> (
                                        obj ..:? configMonoidRequireStackVersionName
                                            ..!= VersionRangeJSON anyVersion)
@@ -851,11 +851,11 @@ parseConfigMonoidObject rootDir obj = do
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
     configMonoidLocalProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
-    configMonoidModifyCodePage <- First <$> obj ..:? configMonoidModifyCodePageName
+    configMonoidModifyCodePage <- FirstTrue <$> obj ..:? configMonoidModifyCodePageName
     configMonoidExplicitSetupDeps <-
         (obj ..:? configMonoidExplicitSetupDepsName ..!= mempty)
         >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
-    configMonoidRebuildGhcOptions <- First <$> obj ..:? configMonoidRebuildGhcOptionsName
+    configMonoidRebuildGhcOptions <- FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- First <$> obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
@@ -1939,21 +1939,21 @@ buildOptsL = configL.lens
     (\x y -> x { configBuild = y })
 
 buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidHaddockL = lens (getFirst . buildMonoidHaddock)
-                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = First t})
+buildOptsMonoidHaddockL = lens (getFirstFalse . buildMonoidHaddock)
+                            (\buildMonoid t -> buildMonoid {buildMonoidHaddock = FirstFalse t})
 
 buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidTestsL = lens (getFirst . buildMonoidTests)
-                            (\buildMonoid t -> buildMonoid {buildMonoidTests = First t})
+buildOptsMonoidTestsL = lens (getFirstFalse . buildMonoidTests)
+                            (\buildMonoid t -> buildMonoid {buildMonoidTests = FirstFalse t})
 
 buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidBenchmarksL = lens (getFirst . buildMonoidBenchmarks)
-                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = First t})
+buildOptsMonoidBenchmarksL = lens (getFirstFalse . buildMonoidBenchmarks)
+                            (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = FirstFalse t})
 
 buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidInstallExesL =
-  lens (getFirst . buildMonoidInstallExes)
-       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = First t})
+  lens (getFirstFalse . buildMonoidInstallExes)
+       (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
 
 buildOptsInstallExesL :: Lens' BuildOpts Bool
 buildOptsInstallExesL =

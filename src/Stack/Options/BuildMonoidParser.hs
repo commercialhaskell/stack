@@ -65,99 +65,102 @@ buildOptsMonoidParser hide0 =
                       \debugging symbols." <>
              hideExceptGhci)
     libProfiling =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "library-profiling"
             "library profiling for TARGETs and all its dependencies"
             hide
     exeProfiling =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "executable-profiling"
             "executable profiling for TARGETs and all its dependencies"
             hide
     libStripping =
-        firstBoolFlags
+        firstBoolFlagsTrue
             "library-stripping"
             "library stripping for TARGETs and all its dependencies"
             hide
     exeStripping =
-        firstBoolFlags
+        firstBoolFlagsTrue
             "executable-stripping"
             "executable stripping for TARGETs and all its dependencies"
             hide
     haddock =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "haddock"
             "generating Haddocks the package(s) in this directory/configuration"
             hide
     openHaddocks =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "open"
             "opening the local Haddock documentation in the browser"
             hide
     haddockDeps =
-        firstBoolFlags "haddock-deps" "building Haddocks for dependencies" hide
+        firstBoolFlagsNoDefault
+            "haddock-deps"
+            "building Haddocks for dependencies (default: true if building Haddocks, false otherwise)"
+            hide
     haddockInternal =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "haddock-internal"
             "building Haddocks for internal modules (like cabal haddock --internal)"
             hide
     haddockHyperlinkSource =
-        firstBoolFlags
+        firstBoolFlagsTrue
             "haddock-hyperlink-source"
             "building hyperlinked source for Haddock (like haddock --hyperlinked-source)"
             hide
     copyBins =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
             hide
     copyCompilerTool =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "copy-compiler-tool"
             "copying binaries of targets to compiler-tools-bin (see 'stack path')"
             hide
     keepGoing =
-        firstBoolFlags
+        firstBoolFlagsNoDefault
             "keep-going"
             "continue running after a step fails (default: false for build, true for test/bench)"
             hide
     keepTmpFiles =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "keep-tmp-files"
-            "keep intermediate files and build directories (default: false)"
+            "keep intermediate files and build directories"
             hide
     preFetch =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "prefetch"
              "Fetch packages necessary for the build immediately, useful with --dry-run"
              hide
     forceDirty =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "force-dirty"
             "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change"
             hide
     tests =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "test"
             "testing the package(s) in this directory/configuration"
             hideExceptGhci
     benches =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "bench"
             "benchmarking the package(s) in this directory/configuration"
             hideExceptGhci
     reconfigure =
-        firstBoolFlags
+        firstBoolFlagsFalse
              "reconfigure"
              "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files"
             hide
     cabalVerbose =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "cabal-verbose"
             "Ask Cabal to be verbose in its output"
             hide
     splitObjs =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "split-objs"
             ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
             hide
@@ -169,7 +172,7 @@ buildOptsMonoidParser hide0 =
                  help "Skip given component, can be specified multiple times" <>
                  hide)))
     interleavedOutput =
-        firstBoolFlags
+        firstBoolFlagsFalse
             "interleaved-output"
             "Print concurrent GHC output to the console with a prefix for the package name"
             hide

@@ -23,7 +23,7 @@ globalOptsParser currentDir kind defLogLevel =
     optionalFirst (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optionalFirst (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     (First <$> logLevelOptsParser hide0 defLogLevel) <*>
-    firstBoolFlags
+    firstBoolFlagsTrue
         "time-in-log"
         "inclusion of timings in logs, for the purposes of using diff with logs"
         hide <*>
@@ -31,7 +31,7 @@ globalOptsParser currentDir kind defLogLevel =
     optionalFirst (abstractResolverOptsParser hide0) <*>
     pure (First Nothing) <*> -- resolver root is only set via the script command
     optionalFirst (compilerOptsParser hide0) <*>
-    firstBoolFlags
+    firstBoolFlagsNoDefault
         "terminal"
         "overriding terminal detection in the case of running in a false terminal"
         hide <*>
@@ -82,7 +82,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
-    , globalTimeInLog = fromFirst True globalMonoidTimeInLog
+    , globalTimeInLog = fromFirstTrue globalMonoidTimeInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler

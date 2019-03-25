@@ -168,7 +168,7 @@ spec = beforeAll setup $ do
       boptsInstallExes `shouldBe` True
       boptsPreFetch `shouldBe` True
       boptsKeepGoing `shouldBe` Just True
-      boptsKeepTmpFiles `shouldBe` Just True
+      boptsKeepTmpFiles `shouldBe` True
       boptsForceDirty `shouldBe` True
       boptsTests `shouldBe` True
       boptsTestOpts `shouldBe` TestOpts {toRerunTests = True

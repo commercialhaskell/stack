@@ -373,7 +373,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
     createTempDirFunction
-        | Just True <- boptsKeepTmpFiles bopts = withKeepSystemTempDir
+        | boptsKeepTmpFiles bopts = withKeepSystemTempDir
         | otherwise = withSystemTempDir
 
     dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()

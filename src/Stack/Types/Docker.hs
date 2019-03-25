@@ -75,11 +75,11 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Optional username for Docker registry.
   ,dockerMonoidRegistryPassword :: !(First String)
     -- ^ Optional password for Docker registry.
-  ,dockerMonoidAutoPull :: !(First Bool)
+  ,dockerMonoidAutoPull :: !FirstFalse
     -- ^ Automatically pull new images.
-  ,dockerMonoidDetach :: !(First Bool)
+  ,dockerMonoidDetach :: !FirstFalse
     -- ^ Whether to run a detached container
-  ,dockerMonoidPersist :: !(First Bool)
+  ,dockerMonoidPersist :: !FirstFalse
     -- ^ Create a persistent container (don't remove it when finished).  Implied by
     -- `dockerDetach`.
   ,dockerMonoidContainerName :: !(First String)
@@ -114,9 +114,9 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName
               dockerMonoidRegistryPassword <- First <$> o ..:? dockerRegistryPasswordArgName
-              dockerMonoidAutoPull         <- First <$> o ..:? dockerAutoPullArgName
-              dockerMonoidDetach           <- First <$> o ..:? dockerDetachArgName
-              dockerMonoidPersist          <- First <$> o ..:? dockerPersistArgName
+              dockerMonoidAutoPull         <- FirstFalse <$> o ..:? dockerAutoPullArgName
+              dockerMonoidDetach           <- FirstFalse <$> o ..:? dockerDetachArgName
+              dockerMonoidPersist          <- FirstFalse <$> o ..:? dockerPersistArgName
               dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []

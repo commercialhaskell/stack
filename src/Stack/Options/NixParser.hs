@@ -13,10 +13,12 @@ import           Stack.Types.Nix
 nixOptsParser :: Bool -> Parser NixOptsMonoid
 nixOptsParser hide0 = overrideActivation <$>
   (NixOptsMonoid
-  <$> firstBoolFlags nixCmdName
+  <$> firstBoolFlagsNoDefault
+                     nixCmdName
                      "use of a Nix-shell. Implies 'system-ghc: true'"
                      hide
-  <*> firstBoolFlags "nix-pure"
+  <*> firstBoolFlagsNoDefault
+                     "nix-pure"
                      "use of a pure Nix-shell. Implies '--nix' and 'system-ghc: true'"
                      hide
   <*> optionalFirst
@@ -45,7 +47,8 @@ nixOptsParser hide0 = overrideActivation <$>
                metavar "PATH_OPTIONS" <>
                help "Additional options to override NIX_PATH parts (notably 'nixpkgs')" <>
                hide))
-  <*> firstBoolFlags "nix-add-gc-roots"
+  <*> firstBoolFlagsFalse
+                     "nix-add-gc-roots"
                      "addition of packages to the nix GC roots so nix-collect-garbage doesn't remove them"
                      hide
   )
