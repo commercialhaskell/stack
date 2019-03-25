@@ -178,11 +178,25 @@ maintainers team makes no guarantees about regularly checking them.
 now the most important thing is to direct users to a single destination.*
 
 
+## Issue vs pull request
+
+Sometimes it is ambiguous whether something should be opened as an issue to
+discuss a change, versus a pull request including the change. A guiding
+principle here is: if it will take longer to open an issue than a PR, open the
+PR. As an extreme example: if you have a small documentation typo correction,
+open a PR, it will _definitely_ take less time than opening an issue and
+describing the change you'd like to make. This logic can sometimes apply to
+minor code changes. Use your best judgement.
+
+
 ## Issue closing policy
 
 We need to strike a balance in issue handling between keeping a maintainable
 set of issues&mdash;thereby making the lives of maintainers, contributors, and
-users easier&mdash;and allowing legitimate issues to remain open.
+users easier&mdash;and allowing legitimate issues to remain open. The end goal
+of this is: any open issue indicates "this deserves attention in the near
+future." Before this policy existed, issues actually meant "maybe someone will
+deal with this someday."
 
 The policy for closing an issue depends entirely on the type of issue we're
 looking at.
@@ -190,6 +204,12 @@ looking at.
 When closing an issue, please provide a brief explanation for why the issue was
 closed, such as a reference to a PR, a comment about lack of clarification,
 etc.
+
+__NOTE__ The following sections establish rules under which a bug report will
+be closed by the maintainer team. The goal is to avoid a situation where issues
+linger in an indeterminate state. The maintainer team is allowed to disregard
+these "rules" at any point. In other words: the goal isn't to allow people to
+"lawyer" issues.
 
 ### Discussion
 
