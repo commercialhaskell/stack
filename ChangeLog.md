@@ -136,6 +136,9 @@ Other enhancements:
   expiration verification just like `cabal --ignore-expiry` does.
   The flag is not enabled by default so that the default functionality
   is not changed.
+* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+  packages explicitly when running test. This is done to prevent
+  ambiguous module name errors in `doctest` tests.
 
 Bug fixes:
 

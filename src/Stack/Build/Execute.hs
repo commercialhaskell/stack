@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Perform a build
 module Stack.Build.Execute
@@ -1809,22 +1810,39 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
+                -- doctest relies on template-haskell in QuickCheck-based tests
+                thGhcId <- case find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
+                                (Map.toList $ eeGlobalDumpPkgs ee) of
+                  Just (ghcId, _) -> return ghcId
+                  Nothing -> error "template-haskell is a wired-in GHC boot library but it wasn't found"
                 packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
                     let pkgId = PackageIdentifier name nullVersion
                     case Map.lookupGT pkgId allDepsMap of
                         Just (PackageIdentifier name' version, ghcPkgId)
                             | name' == name && dvType dv == AsLibrary &&
                               version `withinRange` dvVersionRange dv ->
-                            return $ Just (unGhcPkgId ghcPkgId)
+                            return $ Just ghcPkgId
                         _ -> do
                             logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
                             return Nothing
-                -- env var HASKELL_PACKAGE_IDS is used by doctest so module names for
+                -- env variable GHC_ENVIRONMENT is set for doctest so module names for
                 -- packages with proper dependencies should no longer get ambiguous
                 -- see e.g. https://github.com/doctest/issues/119
-                let usePackageIds pc = modifyEnvVars pc $ \envVars ->
-                      Map.insert "HASKELL_PACKAGE_IDS" (T.unwords packageIds) envVars
-                menv <- liftIO $ usePackageIds =<< configProcessContextSettings config EnvSettings
+                let setEnv f pc = modifyEnvVars pc $ \envVars ->
+                      Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
+                    fp = toFilePath $ eeTempDir ee </> $(mkRelFile "test-ghc-env")
+                    snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
+                    localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
+                    ghcEnv =
+                        "clear-package-db\n" <>
+                        "global-package-db\n" <>
+                        "package-db " <> fromString snapDBPath <> "\n" <>
+                        "package-db " <> fromString localDBPath <> "\n" <>
+                        foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
+                            (thGhcId:packageIds)
+                logInfo $  "package ids: " <> RIO.displayShow packageIds
+                writeFileUtf8Builder fp ghcEnv
+                menv <- liftIO $ setEnv fp =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
