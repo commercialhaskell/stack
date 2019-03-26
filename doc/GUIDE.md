@@ -581,7 +581,7 @@ stack will complain that it needs a `cabal-install` installation. Let's get that
 cueball:~/yackage-0.8.0$ stack install cabal-install
 ```
 
-Then run the above `stack init` command above again and it will succeed.
+Then run the above `stack init` command again and it will succeed.
 
 As you can verify by viewing `stack.yaml`, three external dependencies were added
 by stack init under the `extra-deps` field. Of course, you could have added the
