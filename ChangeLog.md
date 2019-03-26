@@ -139,6 +139,9 @@ Other enhancements:
 * Include default values for most command line flags in the `--help`
   output. See
   [#893](https://github.com/commercialhaskell/stack/issues/893).
+* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+  packages explicitly when running test. This is done to prevent
+  ambiguous module name errors in `doctest` tests.
 
 Bug fixes:
 
@@ -174,6 +177,8 @@ Bug fixes:
   See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
 * Extra include and lib dirs are now order-dependent. See
   [#4527](https://github.com/commercialhaskell/stack/issues/4527).
+* Apply GHC options when building a `Setup.hs` file. See
+  [#4526](https://github.com/commercialhaskell/stack/issues/4526).
 
 ## v1.9.3
 

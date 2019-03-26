@@ -84,8 +84,8 @@ scriptCmd opts = do
       else longWay file scriptDir
 
   longWay file scriptDir =
-    withConfig $
-    withDefaultEnvConfigAndLock $ \lk -> do
+    withConfig YesReexec $
+    withDefaultEnvConfig $ do
       -- Some warnings in case the user somehow tries to set a
       -- stack.yaml location. Note that in this functions we use
       -- logError instead of logWarn because, when using the
@@ -133,7 +133,7 @@ scriptCmd opts = do
                 else do
                     logDebug "Missing packages, performing installation"
                     let targets = map (T.pack . packageNameString) $ Set.toList targetsSet
-                    withNewLocalBuildTargets targets $ Stack.Build.build Nothing lk
+                    withNewLocalBuildTargets targets $ Stack.Build.build Nothing
 
         let ghcArgs = concat
                 [ ["-i", "-i" ++ toFilePath scriptDir]
@@ -149,7 +149,6 @@ scriptCmd opts = do
                     SEOptimize -> ["-O2"]
                 , soGhcOptions opts
                 ]
-        munlockFile lk -- Unlock before transferring control away.
         case soCompile opts of
           SEInterpret -> exec ("run" ++ compilerExeName wc)
                 (ghcArgs ++ toFilePath file : soArgs opts)

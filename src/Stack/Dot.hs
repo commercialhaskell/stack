@@ -99,7 +99,7 @@ createPrunedDependencyGraph :: DotOpts
                             -> RIO Runner
                                  (Set PackageName,
                                   Map PackageName (Set PackageName, DotPayload))
-createPrunedDependencyGraph dotOpts = withConfig $ withDotConfig dotOpts $ do
+createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
@@ -383,12 +383,12 @@ localPackageToPackage lp =
 withDotConfig
     :: DotOpts
     -> RIO DotConfig a
-    -> RIO Config a
+    -> RIO Runner a
 withDotConfig opts inner =
   local (over globalOptsL modifyGO) $
     if dotGlobalHints opts
-      then withBuildConfig withGlobalHints
-      else withReal
+      then withConfig NoReexec $ withBuildConfig withGlobalHints
+      else withConfig YesReexec withReal
   where
     withGlobalHints = do
       bconfig <- view buildConfigL

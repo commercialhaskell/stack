@@ -343,7 +343,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
         -- only new local targets could appear here
-        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing Nothing
+        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing
         case eres of
             Right () -> return ()
             Left err -> do
