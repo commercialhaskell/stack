@@ -27,7 +27,7 @@ import           RIO.Process
 hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
 hoogleCmd (args,setup,rebuild,startServer) =
   local (over globalOptsL modifyGO) $
-  withConfig $
+  withConfig YesReexec $
   withDefaultEnvConfig $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
@@ -69,7 +69,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
     buildHaddocks = do
       config <- view configL
       runRIO config $ -- a bit weird that we have to drop down like this
-        catch (withDefaultEnvConfigAndLock $ Stack.Build.build Nothing)
+        catch (withDefaultEnvConfig $ Stack.Build.build Nothing)
               (\(_ :: ExitCode) -> return ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
@@ -112,7 +112,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                     hooglePackageIdentifier
                 }
         runRIO config $ catch -- Also a bit weird
-                 (withEnvConfigAndLock
+                 (withEnvConfig
                       NeedTargets
                       boptsCLI $
                       Stack.Build.build Nothing

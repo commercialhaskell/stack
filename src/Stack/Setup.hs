@@ -1374,7 +1374,7 @@ buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> m ()
 buildInGhcjsEnv envConfig = do
     runRIO (set (buildOptsL.buildOptsInstallExesL) True $
             set (buildOptsL.buildOptsHaddockL) False envConfig) $
-        build Nothing Nothing
+        build Nothing
 
 getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
 getCabalInstallVersion = do
