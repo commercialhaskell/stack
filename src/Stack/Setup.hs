@@ -1941,12 +1941,16 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     platform <- view platformL
 
+    -- We need to call getExecutablePath before we overwrite the
+    -- currently running binary: after that, Linux will append
+    -- (deleted) to the filename.
+    currExe <- liftIO getExecutablePath
+
     liftIO $ do
       setFileExecutable (toFilePath tmpFile)
 
       testExe tmpFile
 
-      currExe <- getExecutablePath
       case platform of
           Platform _ Cabal.Windows | FP.equalFilePath (toFilePath destFile) currExe -> do
               old <- parseAbsFile (toFilePath destFile ++ ".old")
@@ -1959,7 +1963,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     logInfo $ "New stack executable available at " <> fromString (toFilePath destFile)
 
-    when checkPath $ performPathChecking destFile
+    when checkPath $ performPathChecking destFile currExe
       `catchAny` (logError . displayShow)
   where
 
@@ -2018,9 +2022,9 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 performPathChecking
     :: HasConfig env
     => Path Abs File -- ^ location of the newly downloaded file
+    -> String -- ^ currently running executable
     -> RIO env ()
-performPathChecking newFile = do
-  executablePath <- liftIO getExecutablePath
+performPathChecking newFile executablePath = do
   executablePath' <- parseAbsFile executablePath
   unless (toFilePath newFile == executablePath) $ do
     logInfo $ "Also copying stack executable to " <> fromString executablePath
