@@ -1363,7 +1363,7 @@ loadGhcjsEnvConfig stackYaml binPath inner =
   where
     modifyGO go = go
       { globalConfigMonoid = mempty
-        { configMonoidInstallGHC = First (Just True)
+        { configMonoidInstallGHC = FirstTrue (Just True)
         , configMonoidLocalBinPath = First (Just (toFilePath binPath))
         }
       , globalResolver = Nothing

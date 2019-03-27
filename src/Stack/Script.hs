@@ -62,7 +62,7 @@ scriptCmd opts = do
     let scriptDir = parent file
         modifyGO go = go
             { globalConfigMonoid = (globalConfigMonoid go)
-                { configMonoidInstallGHC = First $ Just True
+                { configMonoidInstallGHC = FirstTrue $ Just True
                 }
             , globalStackYaml = SYLNoConfig $ soScriptExtraDeps opts
             }

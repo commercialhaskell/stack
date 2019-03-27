@@ -223,13 +223,13 @@ configFromConfigMonoid
            "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
            configMonoidLatestSnapshot
          clConnectionCount = fromFirst 8 configMonoidConnectionCount
-         configHideTHLoading = fromFirst True configMonoidHideTHLoading
+         configHideTHLoading = fromFirstTrue configMonoidHideTHLoading
 
          configGHCVariant = getFirst configMonoidGHCVariant
          configGHCBuild = getFirst configMonoidGHCBuild
-         configInstallGHC = fromFirst True configMonoidInstallGHC
-         configSkipGHCCheck = fromFirst False configMonoidSkipGHCCheck
-         configSkipMsys = fromFirst False configMonoidSkipMsys
+         configInstallGHC = fromFirstTrue configMonoidInstallGHC
+         configSkipGHCCheck = fromFirstFalse configMonoidSkipGHCCheck
+         configSkipMsys = fromFirstFalse configMonoidSkipMsys
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -315,9 +315,9 @@ configFromConfigMonoid
          configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
-         configModifyCodePage = fromFirst True configMonoidModifyCodePage
+         configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
-         configRebuildGhcOptions = fromFirst False configMonoidRebuildGhcOptions
+         configRebuildGhcOptions = fromFirstFalse configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromFirst False configMonoidAllowNewer
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
