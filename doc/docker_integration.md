@@ -199,7 +199,7 @@ otherwise noted.
       # If true, the image will be pulled from the registry automatically, without
       # needing to run `stack docker pull`.  See the "security" section of this
       # document for implications of enabling this.
-      auto-pull: false
+      auto-pull: true
 
       # If true, the container will be run "detached" (in the background).  Refer
       # to the Docker users guide for information about how to manage containers.

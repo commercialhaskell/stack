@@ -75,7 +75,7 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Optional username for Docker registry.
   ,dockerMonoidRegistryPassword :: !(First String)
     -- ^ Optional password for Docker registry.
-  ,dockerMonoidAutoPull :: !FirstFalse
+  ,dockerMonoidAutoPull :: !FirstTrue
     -- ^ Automatically pull new images.
   ,dockerMonoidDetach :: !FirstFalse
     -- ^ Whether to run a detached container
@@ -114,7 +114,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName
               dockerMonoidRegistryPassword <- First <$> o ..:? dockerRegistryPasswordArgName
-              dockerMonoidAutoPull         <- FirstFalse <$> o ..:? dockerAutoPullArgName
+              dockerMonoidAutoPull         <- FirstTrue <$> o ..:? dockerAutoPullArgName
               dockerMonoidDetach           <- FirstFalse <$> o ..:? dockerDetachArgName
               dockerMonoidPersist          <- FirstFalse <$> o ..:? dockerPersistArgName
               dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
