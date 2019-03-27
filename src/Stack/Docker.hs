@@ -235,11 +235,15 @@ runContainerAndExit = do
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      hostBinDirPath <- parseAbsDir hostBinDir
+     let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
+     when (isNothing mpath) $ do
+       logWarn "The Docker image does not set the PATH env var"
+       logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
      newPathEnv <- either throwM return $ augmentPath
                       ( toFilePath <$>
                       [ hostBinDirPath
                       , sandboxHomeDir </> relDirDotLocal </> relDirBin])
-                      (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
+                      mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
      liftIO

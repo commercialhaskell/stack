@@ -146,6 +146,9 @@ Other enhancements:
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)
+* Warn when a Docker image does not include a `PATH` environment
+  variable. See
+  [#2472](https://github.com/commercialhaskell/stack/issues/2742)
 
 Bug fixes:
 
