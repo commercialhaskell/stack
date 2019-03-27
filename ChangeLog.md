@@ -196,6 +196,8 @@ Bug fixes:
 - Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
 - Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
+* Hackage credentials are not world-readable. See
+  [#2159](https://github.com/commercialhaskell/stack/issues/2159).
 
 ## v1.9.3
 

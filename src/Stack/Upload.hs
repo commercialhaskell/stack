@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
     ( -- * Upload
@@ -12,14 +13,16 @@ module Stack.Upload
       -- * Credentials
     , HackageCreds
     , loadCreds
+    , writeFilePrivate
     ) where
 
 import           Stack.Prelude
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
-                                                        decode', encode,
+                                                        decode', toEncoding, fromEncoding,
                                                         object, withObject,
                                                         (.:), (.=))
+import           Data.ByteString.Builder               (lazyByteString)
 import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
@@ -35,9 +38,10 @@ import           Network.HTTP.StackClient              (Request, RequestBody(Req
                                                         displayDigestAuthException)
 import           Stack.Types.Config
 import           System.Directory                      (createDirectoryIfMissing,
-                                                        removeFile)
-import           System.FilePath                       ((</>), takeFileName)
+                                                        removeFile, renameFile)
+import           System.FilePath                       ((</>), takeFileName, takeDirectory)
 import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
+import           System.PosixCompat.Files              (setFileMode)
 
 -- | Username and password to log into Hackage.
 --
@@ -67,9 +71,13 @@ loadCreds :: Config -> IO HackageCreds
 loadCreds config = do
   fp <- credsFile config
   elbs <- tryIO $ L.readFile fp
-  case either (const Nothing) Just elbs >>= decode' of
+  case either (const Nothing) Just elbs >>= \lbs -> (lbs, ) <$> decode' lbs of
     Nothing -> fromPrompt fp
-    Just mkCreds -> do
+    Just (lbs, mkCreds) -> do
+      -- Ensure privacy, for cleaning up old versions of Stack that
+      -- didn't do this
+      writeFilePrivate fp $ lazyByteString lbs
+
       unless (configSaveHackageCreds config) $ do
         putStrLn "WARNING: You've set save-hackage-creds to false"
         putStrLn "However, credentials were found at:"
@@ -90,11 +98,33 @@ loadCreds config = do
           "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
         putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
         when shouldSave $ do
-          L.writeFile fp (encode hc)
+          writeFilePrivate fp $ fromEncoding $ toEncoding hc
           putStrLn "Saved!"
           hFlush stdout
 
       return hc
+
+-- | Write contents to a file which is always private.
+--
+-- For history of this function, see:
+--
+-- * https://github.com/commercialhaskell/stack/issues/2159#issuecomment-477948928
+--
+-- * https://github.com/commercialhaskell/stack/pull/4665
+writeFilePrivate :: MonadIO m => FilePath -> Builder -> m ()
+writeFilePrivate fp builder = liftIO $ withTempFile (takeDirectory fp) (takeFileName fp) $ \fpTmp h -> do
+  -- Temp file is created such that only current user can read and write it.
+  -- See docs for openTempFile: https://www.stackage.org/haddock/lts-13.14/base-4.12.0.0/System-IO.html#v:openTempFile
+
+  -- Write to the file and close the handle.
+  hPutBuilder h builder
+  hClose h
+
+  -- Make sure the destination file, if present, is writeable
+  void $ tryIO $ setFileMode fp 0o600
+
+  -- And atomically move
+  renameFile fpTmp fp
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
