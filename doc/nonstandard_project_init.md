@@ -79,17 +79,11 @@ default so as to avoid unnecessary recompilation time.
   - https://github.com/commercialhaskell/stack/issues/464
 
 ## Using git Repositories
-stack has support for packages that reside in remote git locations.
 
-Example:
-
-```
-packages:
-- '.'
-- location:
-    git: https://github.com/kolmodin/binary
-    commit: 8debedd3fcb6525ac0d7de2dd49217dce2abc0d9
-```
+Stack has support for packages that reside in remote git locations. Please see
+the [YAML configuration
+documentation](yaml_configuration.md#git-and-mercurial-repos) for more
+information.
 
 ### Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/254
