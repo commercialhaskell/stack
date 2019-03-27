@@ -42,7 +42,6 @@ import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
@@ -367,7 +366,6 @@ runGhci
     -> RIO env ()
 runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     config <- view configL
-    wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
         shouldHidePackages =
           fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
@@ -405,10 +403,11 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     logInfo $
       "Configuring GHCi with the following packages: " <>
       mconcat (intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
+    compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
             withProcessContext menv $ exec
-                 (fromMaybe (compilerExeName wc) ghciGhcCommand)
+                 (fromMaybe compilerExeName ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
                  -- not include CWD. If there aren't any packages, CWD
@@ -425,7 +424,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                 [_] -> do
                     menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
                     output <- withProcessContext menv
-                            $ runGrabFirstLine (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                            $ runGrabFirstLine (fromMaybe compilerExeName ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     -- Since usage of 'exec' does not return, we cannot do any cleanup

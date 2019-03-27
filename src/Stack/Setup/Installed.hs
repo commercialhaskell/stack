@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -16,7 +15,6 @@ module Stack.Setup.Installed
     , toolString
     , toolNameString
     , parseToolText
-    , ExtraDirs (..)
     , extraDirs
     , installDir
     , tempInstallDir
@@ -31,7 +29,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
-import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -98,12 +95,13 @@ ghcjsWarning = unwords
 getCompilerVersion
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
+  -> Path Abs File -- ^ executable
   -> RIO env ActualCompiler
-getCompilerVersion wc =
+getCompilerVersion wc exe = do
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"
-            bs <- fst <$> proc "ghc" ["--numeric-version"] readProcess_
+            bs <- fst <$> proc (toFilePath exe) ["--numeric-version"] readProcess_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- ACGhc <$> parseVersionThrowing (T.unpack $ T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
@@ -114,7 +112,7 @@ getCompilerVersion wc =
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- fst <$> proc "ghcjs" ["--version"] readProcess_
+            bs <- fst <$> proc (toFilePath exe) ["--version"] readProcess_
             let (rest, ghcVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
                 (_, ghcjsVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd rest
             ACGhcjs <$> parseVersionThrowing ghcjsVersion <*> parseVersionThrowing ghcVersion
@@ -178,17 +176,6 @@ extraDirs tool = do
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
     isGHCJS n = "ghcjs" == n
-
-data ExtraDirs = ExtraDirs
-    { edBins :: ![Path Abs Dir]
-    , edInclude :: ![Path Abs Dir]
-    , edLib :: ![Path Abs Dir]
-    } deriving (Show, Generic)
-instance Semigroup ExtraDirs where
-    (<>) = mappenddefault
-instance Monoid ExtraDirs where
-    mempty = memptydefault
-    mappend = (<>)
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir

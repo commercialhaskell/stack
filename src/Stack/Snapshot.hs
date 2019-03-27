@@ -414,7 +414,7 @@ loadCompiler :: forall env.
              => ActualCompiler
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
-  m <- ghcPkgDump (whichCompiler cv) []
+  m <- ghcPkgDump []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv

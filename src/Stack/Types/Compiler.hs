@@ -11,10 +11,8 @@ module Stack.Types.Compiler
   , WhichCompiler (..)
   , getGhcVersion
   , whichCompiler
-  , compilerExeName
   , compilerVersionText
   , compilerVersionString
-  , haddockExeName
   , isWantedCompiler
   , wantedToActual
   , actualToWanted
@@ -89,11 +87,3 @@ isWantedCompiler _ _ _ = False
 getGhcVersion :: ActualCompiler -> Version
 getGhcVersion (ACGhc v) = v
 getGhcVersion (ACGhcjs _ v) = v
-
-compilerExeName :: WhichCompiler -> String
-compilerExeName Ghc = "ghc"
-compilerExeName Ghcjs = "ghcjs"
-
-haddockExeName :: WhichCompiler -> String
-haddockExeName Ghc = "haddock"
-haddockExeName Ghcjs = "haddock-ghcjs"

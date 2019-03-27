@@ -30,7 +30,6 @@ import           RIO.PrettyPrint
 import           Stack.Constants
 import           Stack.PackageDump
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
@@ -100,13 +99,12 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
     -> Map GhcPkgId DumpPackage  -- ^ Local package dump
     -> [LocalPackage]
     -> RIO env ()
-generateLocalHaddockIndex wc bco localDumpPkgs locals = do
+generateLocalHaddockIndex bco localDumpPkgs locals = do
     let dumpPackages =
             mapMaybe
                 (\LocalPackage{lpPackage = Package{..}} ->
@@ -116,7 +114,6 @@ generateLocalHaddockIndex wc bco localDumpPkgs locals = do
                 locals
     generateHaddockIndex
         "local packages"
-        wc
         bco
         dumpPackages
         "."
@@ -124,20 +121,18 @@ generateLocalHaddockIndex wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
     -> Map GhcPkgId DumpPackage  -- ^ Global dump information
     -> Map GhcPkgId DumpPackage  -- ^ Snapshot dump information
     -> Map GhcPkgId DumpPackage  -- ^ Local dump information
     -> [LocalPackage]
     -> RIO env ()
-generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
+generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
     let deps = (mapMaybe (`lookupDumpPackage` allDumpPkgs) . nubOrd . findTransitiveDepends . mapMaybe getGhcPkgId) locals
         depDocDir = localDepsDocDir bco
     generateHaddockIndex
         "local packages and dependencies"
-        wc
         bco
         deps
         ".."
@@ -167,16 +162,14 @@ generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs lo
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
     -> Map GhcPkgId DumpPackage  -- ^ Global package dump
     -> Map GhcPkgId DumpPackage  -- ^ Snapshot package dump
     -> RIO env ()
-generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
+generateSnapHaddockIndex bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
         "snapshot packages"
-        wc
         bco
         (Map.elems snapshotDumpPkgs ++ Map.elems globalDumpPkgs)
         "."
@@ -184,15 +177,14 @@ generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => Text
-    -> WhichCompiler
     -> BaseConfigOpts
     -> [DumpPackage]
     -> FilePath
     -> Path Abs Dir
     -> RIO env ()
-generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
+generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
     ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
@@ -211,8 +203,9 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                   " in\n" <>
                   fromString (toFilePath destIndexFile)
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
+                haddockExeName <- toFilePath <$> cpHaddock
                 withWorkingDir (toFilePath destDir) $ readProcessNull
-                    (haddockExeName wc)
+                    haddockExeName
                     (map (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                         [bcoSnapDB bco, bcoLocalDB bco] ++
                      hoAdditionalArgs (boptsHaddockOpts (bcoBuildOpts bco)) ++

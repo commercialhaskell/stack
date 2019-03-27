@@ -98,7 +98,6 @@ import           Stack.Snapshot (loadResolver)
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
-import           Stack.Types.Compiler
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Unpack
@@ -805,8 +804,8 @@ execCmd ExecOpts {..} =
                 (cmd, args) <- case (eoCmd, eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
                     (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> return ("ghc", args)
-                    (ExecRunGhc, args) -> return ("runghc", args)
+                    (ExecGhc, args) -> getGhcCmd [] args
+                    (ExecRunGhc, args) -> getRunGhcCmd [] args
 
                 exec cmd args
         ExecOptsEmbellished {..} -> do
@@ -827,17 +826,16 @@ execCmd ExecOpts {..} =
                 (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
                     (ExecCmd cmd, args) -> return (cmd, args)
                     (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> getGhcCmd "" eoPackages args
+                    (ExecGhc, args) -> getGhcCmd eoPackages args
                     -- NOTE: This doesn't work for GHCJS, because it doesn't have
                     -- a runghcjs binary.
-                    (ExecRunGhc, args) ->
-                        getGhcCmd "run" eoPackages args
+                    (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
                 runWithPath eoCwd $ exec cmd args
   where
       -- return the package-id of the first package in GHC_PACKAGE_PATH
-      getPkgId wc name = do
-          mId <- findGhcPkgField wc [] name "id"
+      getPkgId name = do
+          mId <- findGhcPkgField [] name "id"
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
@@ -845,8 +843,8 @@ execCmd ExecOpts {..} =
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
                   exitFailure
 
-      getPkgOpts wc pkgs =
-          map ("-package-id=" ++) <$> mapM (getPkgId wc) pkgs
+      getPkgOpts pkgs =
+          map ("-package-id=" ++) <$> mapM getPkgId pkgs
 
       getRunCmd args = do
           packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
@@ -867,10 +865,15 @@ execCmd ExecOpts {..} =
                   logError "No executables found."
                   liftIO exitFailure
 
-      getGhcCmd prefix pkgs args = do
-          wc <- view $ actualCompilerVersionL.whichCompilerL
-          pkgopts <- getPkgOpts wc pkgs
-          return (prefix ++ compilerExeName wc, pkgopts ++ args)
+      getGhcCmd pkgs args = do
+          pkgopts <- getPkgOpts pkgs
+          compiler <- view $ compilerPathsL.to cpCompiler
+          return (toFilePath compiler, pkgopts ++ args)
+
+      getRunGhcCmd pkgs args = do
+          pkgopts <- getPkgOpts pkgs
+          interpret <- cpInterpreter
+          return (toFilePath interpret, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
       runWithPath path callback = case path of

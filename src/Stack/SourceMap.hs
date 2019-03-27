@@ -120,15 +120,14 @@ getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
        (HasLogFunc env, HasProcessContext env, HasCompiler env)
-    => ActualCompiler
-    -> RIO env (Map PackageName DumpedGlobalPackage)
-globalsFromDump compiler = do
+    => RIO env (Map PackageName DumpedGlobalPackage)
+globalsFromDump = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
         toGlobals ds =
           Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
-    toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
+    toGlobals <$> ghcPkgDump [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
@@ -151,7 +150,7 @@ actualFromGhc ::
     -> ActualCompiler
     -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-    globals <- globalsFromDump ac
+    globals <- globalsFromDump
     return
         SMActual
         { smaCompiler = ac
@@ -236,12 +235,9 @@ pruneGlobals globals deps =
   in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
      Map.map ReplacedGlobalPackage prunedGlobals
 
-getCompilerInfo :: (HasConfig env) => WhichCompiler -> RIO env Builder
-getCompilerInfo wc = do
-    let compilerExe =
-            case wc of
-                Ghc -> "ghc"
-                Ghcjs -> "ghcjs"
+getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
+getCompilerInfo = do
+    compilerExe <- view $ compilerPathsL.to cpCompiler.to toFilePath
     lazyByteString . fst <$> proc compilerExe ["--info"] readProcess_
 
 immutableLocSha :: PackageLocationImmutable -> Builder

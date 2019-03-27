@@ -149,6 +149,10 @@ Other enhancements:
 * Warn when a Docker image does not include a `PATH` environment
   variable. See
   [#2472](https://github.com/commercialhaskell/stack/issues/2742)
+* When using `system-ghc: true`, Stack will now find the appropriate GHC
+  installation based on the version suffix, allowing you to more easily switch
+  between various system-installed GHCs. See
+  [#2433](https://github.com/commercialhaskell/stack/issues/2433).
 
 Bug fixes:
 

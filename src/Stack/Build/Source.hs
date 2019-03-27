@@ -35,7 +35,6 @@ import              Stack.Build.Target
 import              Stack.Package
 import              Stack.SourceMap
 import              Stack.Types.Build
-import              Stack.Types.Compiler (whichCompiler)
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
@@ -142,9 +141,8 @@ hashSourceMapData
     -> SourceMap
     -> RIO env SourceMapHash
 hashSourceMapData boptsCli sm = do
-    let wc = whichCompiler $ smCompiler sm
-    compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath wc
-    compilerInfo <- getCompilerInfo wc
+    compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath
+    compilerInfo <- getCompilerInfo
     immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
     bc <- view buildConfigL
     let -- extra bytestring specifying GHC options supposed to be applied to

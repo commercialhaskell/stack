@@ -241,25 +241,24 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    (mghcBin, mCompilerBuild, _) <- ensureCompiler sopts
+    compilerPaths <- ensureCompiler sopts
+    let ghcBin = cpExtraDirs compilerPaths
+        compilerVer = cpCompilerVersion compilerPaths
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
     menv0 <- view processContextL
     env <- either throwM (return . removeHaskellEnvVars)
                $ augmentPathMap
-                    (map toFilePath $ maybe [] edBins mghcBin)
+                    (map toFilePath $ edBins ghcBin)
                     (view envVarsL menv0)
     menv <- mkProcessContext env
 
-    (compilerVer, cabalVer, globaldb) <- runWithGHC menv $ runConcurrently $ (,,)
-        <$> Concurrently (getCompilerVersion wc)
-        <*> Concurrently (getCabalPkgVer wc)
-        <*> Concurrently (getGlobalDB wc)
+    globaldb <- liftIO $ cpGlobalDB' compilerPaths compilerPaths
 
     logDebug "Resolving package entries"
 
-    (sourceMap, sourceMapHash) <- runWithGHC menv $ do
+    (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
       smActual <- actualFromGhc (bcSMWanted bc) compilerVer
       let actualPkgs = Map.keysSet (smaDeps smActual) <>
                        Map.keysSet (smaProject smActual)
@@ -270,13 +269,14 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
       sourceMapHash <- hashSourceMapData boptsCLI sourceMap
       pure (sourceMap, sourceMapHash)
 
+    cabalVersion <- runRIO compilerPaths cpCabalVersion
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
-            , envConfigCabalVersion = cabalVer
             , envConfigBuildOptsCLI = boptsCLI
             , envConfigSourceMap = sourceMap
             , envConfigSourceMapHash = sourceMapHash
-            , envConfigCompilerBuild = mCompilerBuild
+            , envConfigCompilerPaths = compilerPaths
+            , envConfigCabalVersion = cabalVersion
             }
 
     -- extra installation bin directories
@@ -286,9 +286,9 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
     deps <- runRIO envConfig0 packageDatabaseDeps
-    runWithGHC menv $ createDatabase wc deps
+    runWithGHC menv compilerPaths $ createDatabase deps
     localdb <- runRIO envConfig0 packageDatabaseLocal
-    runWithGHC menv $ createDatabase wc localdb
+    runWithGHC menv compilerPaths $ createDatabase localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
@@ -354,24 +354,24 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     envOverride <- liftIO $ getProcessContext' minimalEnvSettings
     return EnvConfig
         { envConfigBuildConfig = bc
-            { bcConfig = maybe id addIncludeLib mghcBin
+            { bcConfig = addIncludeLib ghcBin
                        $ set processContextL envOverride
                          (view configL bc)
                 { configProcessContextSettings = getProcessContext'
                 }
             }
-        , envConfigCabalVersion = cabalVer
         , envConfigBuildOptsCLI = boptsCLI
         , envConfigSourceMap = sourceMap
         , envConfigSourceMapHash = sourceMapHash
-        , envConfigCompilerBuild = mCompilerBuild
+        , envConfigCompilerPaths = compilerPaths
+        , envConfigCabalVersion = cabalVersion
         }
 
 -- | A modified env which we know has an installed compiler on the PATH.
-newtype WithGHC env = WithGHC env
+data WithGHC env = WithGHC !CompilerPaths !env
 
 insideL :: Lens' (WithGHC env) env
-insideL = lens (\(WithGHC x) -> x) (\_ -> WithGHC)
+insideL = lens (\(WithGHC _ x) -> x) (\(WithGHC cp _) -> WithGHC cp)
 
 instance HasLogFunc env => HasLogFunc (WithGHC env) where
   logFuncL = insideL.logFuncL
@@ -392,16 +392,17 @@ instance HasConfig env => HasConfig (WithGHC env) where
   configL = insideL.configL
 instance HasBuildConfig env => HasBuildConfig (WithGHC env) where
   buildConfigL = insideL.buildConfigL
-instance HasCompiler (WithGHC env)
+instance HasCompiler (WithGHC env) where
+  compilerPathsL = to (\(WithGHC cp _) -> cp)
 
 -- | Set up a modified environment which includes the modified PATH
 -- that GHC can be found on. This is needed for looking up global
 -- package information and ghc fingerprint (result from 'ghc --info').
-runWithGHC :: HasConfig env => ProcessContext -> RIO (WithGHC env) a -> RIO env a
-runWithGHC pc inner = do
+runWithGHC :: HasConfig env => ProcessContext -> CompilerPaths -> RIO (WithGHC env) a -> RIO env a
+runWithGHC pc cp inner = do
   env <- ask
   let envg
-        = WithGHC $
+        = WithGHC cp $
           set envOverrideSettingsL (\_ -> return pc) $
           set processContextL pc env
   runRIO envg inner
@@ -416,8 +417,9 @@ rebuildEnv :: EnvConfig
     -> RIO env EnvConfig
 rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let bc = envConfigBuildConfig envConfig
+        cp = envConfigCompilerPaths envConfig
         compilerVer = smCompiler $ envConfigSourceMap envConfig
-    runRIO (WithGHC bc) $ do
+    runRIO (WithGHC cp bc) $ do
         smActual <- actualFromGhc (bcSMWanted bc) compilerVer
         let actualPkgs = Map.keysSet (smaDeps smActual) <> Map.keysSet (smaProject smActual)
             prunedActual = smActual {
@@ -452,12 +454,12 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
-ensureCompiler :: (HasConfig env, HasGHCVariant env)
+ensureCompiler :: forall env. (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> RIO env (Maybe ExtraDirs, Maybe CompilerBuild, Bool)
+               -> RIO env CompilerPaths
 ensureCompiler sopts = do
-    let wc = whichCompiler (wantedToActual (soptsWantedCompiler sopts))
-    when (getGhcVersion (wantedToActual (soptsWantedCompiler sopts)) < mkVersion [7, 8]) $ do
+    let wanted = soptsWantedCompiler sopts
+    when (getGhcVersion (wantedToActual wanted) < mkVersion [7, 8]) $ do
         logWarn "Stack will almost certainly fail with GHC below version 7.8"
         logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
@@ -467,16 +469,16 @@ ensureCompiler sopts = do
         if soptsUseSystem sopts
             then do
                 logDebug "Getting system compiler version"
-                getSystemCompiler wc
+                getSystemCompiler wanted
             else return Nothing
 
     Platform expectedArch _ <- view platformL
 
-    let canUseCompiler compilerVersion arch
+    let canUseCompiler (compilerVersion, arch, _dir)
             | soptsSkipGhcCheck sopts = True
             | otherwise = isWanted compilerVersion && arch == expectedArch
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
-        needLocal = not (any (uncurry canUseCompiler) msystem)
+        needLocal = not (any canUseCompiler msystem)
 
     getSetupInfo' <- memoizeRef (getSetupInfo (soptsSetupInfoYaml sopts))
 
@@ -508,8 +510,13 @@ ensureCompiler sopts = do
 
         -- If we need to install a GHC or MSYS, try to do so
         -- Return the additional directory paths of GHC & MSYS.
-    (mtools, compilerBuild) <- if needLocal
-        then do
+    (compilerTool, mmsys2Tool, compilerBuild) <-
+      case msystem of
+        Just system | canUseCompiler system -> do
+            -- Have the right ghc, may still need msys
+            mmsys2Tool <- getMmsys2Tool
+            return (Left system, mmsys2Tool, CompilerBuildStandard)
+        _ -> do
 
             -- Install GHC
             ghcVariant <- view ghcVariantL
@@ -518,7 +525,7 @@ ensureCompiler sopts = do
             installed <- listInstalled localPrograms
 
             possibleCompilers <-
-                    case wc of
+                    case whichCompiler $ wantedToActual wanted of
                         Ghc -> do
                             ghcBuilds <- getGhcBuilds
                             forM ghcBuilds $ \ghcBuild -> do
@@ -550,8 +557,8 @@ ensureCompiler sopts = do
                             if soptsUseSystem sopts
                                 then return False
                                 else do
-                                    msystemGhc <- getSystemCompiler wc
-                                    return (any (uncurry canUseCompiler) msystemGhc)
+                                    msystemGhc <- getSystemCompiler wanted
+                                    return (any canUseCompiler msystemGhc)
                         let suggestion = fromMaybe
                                 (mconcat
                                      ([ "To install the correct GHC into "
@@ -563,7 +570,7 @@ ensureCompiler sopts = do
                                       ]))
                                 (soptsResolveMissingGHC sopts)
                         throwM $ CompilerVersionMismatch
-                            msystem
+                            ((\(x, y, _) -> (x, y)) <$> msystem)
                             (soptsWantedCompiler sopts, expectedArch)
                             ghcVariant
                             (case possibleCompilers of
@@ -575,38 +582,92 @@ ensureCompiler sopts = do
 
             -- Install msys2 on windows, if necessary
             mmsys2Tool <- getMmsys2Tool
-            return (Just (Just compilerTool, mmsys2Tool), compilerBuild)
-        -- Have the right ghc, may still need msys
-        else do
-            mmsys2Tool <- getMmsys2Tool
-            return (Just (Nothing, mmsys2Tool), CompilerBuildStandard)
+            return (Right compilerTool, mmsys2Tool, compilerBuild)
 
-    mpaths <- case mtools of
-        Nothing -> return Nothing
-        Just (compilerTool, mmsys2Tool) -> do
-            -- Add GHC's and MSYS's paths to the config.
-            let idents = catMaybes [compilerTool, mmsys2Tool]
-            paths <- mapM extraDirs idents
-            return $ Just $ mconcat paths
+    paths <- do
+      -- Add GHC's and MSYS's paths to the config.
+      compilerPath <-
+        case compilerTool of
+          Left (_, _, dir) -> pure ExtraDirs { edBins = [dir], edInclude = [], edLib = [] }
+          Right tool -> extraDirs tool
+      msysPath <- for mmsys2Tool extraDirs
+      return $ compilerPath <> fold msysPath
 
-    menv <-
-        case mpaths of
-            Nothing -> view processContextL
-            Just ed -> do
-                menv0 <- view processContextL
-                m <- either throwM return
-                   $ augmentPathMap (toFilePath <$> edBins ed) (view envVarsL menv0)
-                mkProcessContext (removeHaskellEnvVars m)
+    menv <- do
+      let ed = paths
+      menv0 <- view processContextL
+      m <- either throwM return
+         $ augmentPathMap (toFilePath <$> edBins ed) (view envVarsL menv0)
+      mkProcessContext (removeHaskellEnvVars m)
 
-    case mtools of
-        Just (Just (ToolGhcjs cv), _) ->
+    case compilerTool of
+        Right (ToolGhcjs cv) ->
             withProcessContext menv
           $ ensureGhcjsBooted cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
-        _ -> return ()
+        _ -> pure ()
 
-    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck wc
+    let findHelper getName = do
+          eres <- withProcessContext menv $ findExecutable $ getName $ whichCompiler $ wantedToActual wanted
+          case eres of
+            Left e -> throwIO e
+            Right res -> parseAbsFile res
 
-    return (mpaths, Just compilerBuild, needLocal)
+    -- FIXME this could be much smarter most likely
+    compiler <- findHelper $ \case
+                               Ghc -> "ghc"
+                               Ghcjs -> "ghcjs"
+    pkg <- findHelper $ \case
+                               Ghc -> "ghc-pkg"
+                               Ghcjs -> "ghcjs-pkg"
+    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck compiler
+
+    config <- view configL
+    let refHelper :: RIO (WithGHC Config) a -> RIO env (CompilerPaths -> IO a)
+        refHelper f = do
+          ref <- newIORef Nothing
+          pure $ \cp -> do
+            mres <- readIORef ref
+            case mres of
+              Just res -> pure res
+              Nothing -> do
+                res <- runRIO (WithGHC cp config) $ withProcessContext menv f
+                writeIORef ref $ Just res
+                pure res
+    cabalPkgVer <- refHelper getCabalPkgVer
+    globaldb <- refHelper getGlobalDB
+    compilerVer <- getCompilerVersion (whichCompiler (wantedToActual wanted)) compiler
+
+    env <- ask
+    let refHelperFind f = do
+          ref <- newIORef Nothing
+          pure $ \_ -> do
+            mres <- readIORef ref
+            case mres of
+              Just res -> pure res
+              Nothing -> do
+                res <- runRIO env $ findHelper f
+                writeIORef ref $ Just res
+                pure res
+    interpreter <- refHelperFind
+                 $ \case
+                      Ghc -> "runghc"
+                      Ghcjs -> "runghcjs"
+    haddock <- refHelperFind
+             $ \case
+                  Ghc -> "haddock"
+                  Ghcjs -> "haddock-ghcjs"
+    return CompilerPaths
+      { cpExtraDirs = paths
+      , cpBuild = Just compilerBuild -- FIXME is this always Just? Remove the Maybe?
+      , cpSandboxed = needLocal
+      , cpCompilerVersion = compilerVer
+      , cpCompiler = compiler
+      , cpPkg = pkg
+      , cpInterpreter' = interpreter
+      , cpHaddock' = haddock
+      , cpCabalVersion' = cabalPkgVer
+      , cpGlobalDB' = globaldb
+      }
 
 -- | Determine which GHC builds to use depending on which shared libraries are available
 -- on the system.
@@ -763,31 +824,38 @@ ensureDockerStackExe containerPlatform = do
 -- | Get the version of the system compiler, if available
 getSystemCompiler
   :: (HasProcessContext env, HasLogFunc env)
-  => WhichCompiler
-  -> RIO env (Maybe (ActualCompiler, Arch))
-getSystemCompiler wc = do
-    let exeName = case wc of
-            Ghc -> "ghc"
-            Ghcjs -> "ghcjs"
-    exists <- doesExecutableExist exeName
-    if exists
-        then do
-            eres <- proc exeName ["--info"] $ tryAny . fmap fst . readProcess_
-            let minfo = do
-                    Right lbs <- Just eres
-                    pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
-                    version <- lookup "Project version" pairs_ >>= parseVersionThrowing
-                    arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
-                    return (version, arch)
-            case (wc, minfo) of
-                (Ghc, Just (version, arch)) -> return (Just (ACGhc version, arch))
-                (Ghcjs, Just (_, arch)) -> do
-                    eversion <- tryAny $ getCompilerVersion Ghcjs
-                    case eversion of
-                        Left _ -> return Nothing
-                        Right version -> return (Just (version, arch))
-                (_, Nothing) -> return Nothing
-        else return Nothing
+  => WantedCompiler
+  -> RIO env (Maybe (ActualCompiler, Arch, Path Abs Dir))
+getSystemCompiler wanted = do
+    let actual = wantedToActual wanted
+        wc = whichCompiler actual
+        exeName = compilerVersionString actual
+    logDebug $ "Looking for executable named " <> fromString exeName
+    mexe <- findExecutable exeName
+    case mexe of
+      Left e -> do
+        logDebug $ "No such executable found on the PATH: " <> displayShow e
+        pure Nothing
+      Right exe -> do
+        logDebug $ "Found executable at " <> fromString exe
+        exePath <- parseAbsFile exe
+        let exeDir = parent exePath
+        eres <- proc exe ["--info"] $ tryAny . fmap fst . readProcess_
+        logDebug $ "--info results: " <> displayShow eres
+        let minfo = do
+                Right lbs <- Just eres
+                pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
+                version <- lookup "Project version" pairs_ >>= parseVersionThrowing
+                arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
+                return (version, arch)
+        case (wc, minfo) of
+            (Ghc, Just (version, arch)) -> return (Just (ACGhc version, arch, exeDir))
+            (Ghcjs, Just (_, arch)) -> do
+                eversion <- tryAny $ getCompilerVersion Ghcjs exePath
+                case eversion of
+                    Left _ -> return Nothing
+                    Right version -> return (Just (version, arch, exeDir))
+            (_, Nothing) -> return Nothing
 
 -- | Download the most recent SetupInfo
 getSetupInfo :: HasConfig env => String -> RIO env SetupInfo
@@ -1684,18 +1752,15 @@ chunksOverTime diff = do
 
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (HasProcessContext env, HasLogFunc env)
-            => WhichCompiler
-            -> RIO env ()
-sanityCheck wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
+            => Path Abs File -> RIO env ()
+sanityCheck ghc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> relFileMainHs
     liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
         ]
-    let exeName = compilerExeName wc
-    ghc <- findExecutable exeName >>= either throwM parseAbsFile
     logDebug $ "Performing a sanity check on: " <> fromString (toFilePath ghc)
-    eres <- withWorkingDir (toFilePath dir) $ proc exeName
+    eres <- withWorkingDir (toFilePath dir) $ proc (toFilePath ghc)
         [ fp
         , "-no-user-package-db"
         ] $ try . readProcess_
