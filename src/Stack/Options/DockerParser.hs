@@ -46,7 +46,7 @@ dockerOptsParser hide0 =
                         hide <>
                         metavar "PASSWORD" <>
                         help "Docker registry password")
-    <*> firstBoolFlagsFalse
+    <*> firstBoolFlagsTrue
                        (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
                        hide

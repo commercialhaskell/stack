@@ -256,6 +256,8 @@ Behavior changes:
   download a template, stack will check whether that template had
   been downloaded before. In that case, the cached version will be
   used. See [#3850](https://github.com/commercialhaskell/stack/issues/3850).
+* The new default for `--docker-auto-pull` is enabled. See
+  [#3332](https://github.com/commercialhaskell/stack/issues/3332).
 
 Other enhancements:
 

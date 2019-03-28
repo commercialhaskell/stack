@@ -69,7 +69,7 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
                 dockerMonoidRegistryLogin
         dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
         dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
-        dockerAutoPull = fromFirstFalse dockerMonoidAutoPull
+        dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
         dockerDetach = fromFirstFalse dockerMonoidDetach
         dockerPersist = fromFirstFalse dockerMonoidPersist
         dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
