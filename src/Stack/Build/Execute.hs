@@ -1850,7 +1850,6 @@ singleTest topts testsToRun ac ee task installedMap = do
                         "package-db " <> fromString localDBPath <> "\n" <>
                         foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
                             (thGhcId:packageIds)
-                logInfo $  "package ids: " <> RIO.displayShow packageIds
                 writeFileUtf8Builder fp ghcEnv
                 menv <- liftIO $ setEnv fp =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
