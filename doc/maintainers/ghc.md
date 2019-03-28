@@ -6,7 +6,7 @@
 
         git clone git@github.com:commercialhaskell/ghc.git
         cd ghc
-        git remote add upstream git@github.com:ghc/ghc.git
+        git remote add upstream https://gitlab.haskell.org/ghc/ghc.git
         git fetch upstream
         git push origin ghc-X.Y.Z-release
 
@@ -57,7 +57,7 @@ For GHC >= 7.10.2, set the `GHC_VERSION` environment variable to the version to 
 then, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
 
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
-    git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
+    git clone -b ghc-${GHC_VERSION}-release --recursive https://gitlab.haskell.org/ghc/ghc.git ghc-${GHC_VERSION} && \
     cd ghc-${GHC_VERSION}/ && \
     cp mk/build.mk.sample mk/build.mk && \
     sed -i 's/^#BuildFlavour *= *perf$/BuildFlavour = perf/' mk/build.mk && \
@@ -71,7 +71,7 @@ GHC 7.8.4 is slightly different:
 
     export GHC_VERSION=7.8.4 && \
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
-    git clone -b ghc-${GHC_VERSION}-release --recursive git://github.com/ghc/ghc ghc-${GHC_VERSION} && \
+    git clone -b ghc-${GHC_VERSION}-release --recursive https://gitlab.haskell.org/ghc/ghc.git ghc-${GHC_VERSION} && \
     cd ghc-${GHC_VERSION}/ && \
     ./sync-all --extra --nofib -r git://git.haskell.org get -b ghc-7.8 && \
     cp mk/build.mk.sample mk/build.mk && \

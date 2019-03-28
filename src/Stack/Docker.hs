@@ -588,7 +588,10 @@ inspects :: (HasProcessContext env, HasLogFunc env)
          => [String] -> RIO env (Map String Inspect)
 inspects [] = return Map.empty
 inspects images =
-  do maybeInspectOut <- try (readDockerProcess ("inspect" : images))
+  do maybeInspectOut <-
+       -- not using 'readDockerProcess' as the error from a missing image
+       -- needs to be recovered.
+       try (BL.toStrict . fst <$> proc "docker" ("inspect" : images) readProcess_)
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -774,11 +777,16 @@ removeDirectoryContents path excludeDirs excludeFiles =
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ReadProcessException' exception if the
--- process fails.  Logs process's stderr using @logError@.
+-- process fails.
+--
+-- The stderr output is passed straight through, which is desirable for some cases
+-- e.g. docker pull, in which docker uses stderr for progress output.
+--
+-- Use 'readProcess_' directly to customize this.
 readDockerProcess
     :: (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
-readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
+readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir

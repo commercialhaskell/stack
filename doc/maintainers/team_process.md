@@ -178,8 +178,92 @@ maintainers team makes no guarantees about regularly checking them.
 now the most important thing is to direct users to a single destination.*
 
 
-## Old issue closing policy
+## Issue vs pull request
 
-We have yet to settle on a precise guide for closing out old issues, but, for
-now, if you happen across something that could easily be marked as resolved,
-please do so.
+Sometimes it is ambiguous whether something should be opened as an issue to
+discuss a change, versus a pull request including the change. A guiding
+principle here is: if it will take longer to open an issue than a PR, open the
+PR. As an extreme example: if you have a small documentation typo correction,
+open a PR, it will _definitely_ take less time than opening an issue and
+describing the change you'd like to make. This logic can sometimes apply to
+minor code changes. Use your best judgement.
+
+
+## Issue closing policy
+
+We need to strike a balance in issue handling between keeping a maintainable
+set of issues&mdash;thereby making the lives of maintainers, contributors, and
+users easier&mdash;and allowing legitimate issues to remain open. The end goal
+of this is: any open issue indicates "this deserves attention in the near
+future." Before this policy existed, issues actually meant "maybe someone will
+deal with this someday."
+
+The policy for closing an issue depends entirely on the type of issue we're
+looking at.
+
+When closing an issue, please provide a brief explanation for why the issue was
+closed, such as a reference to a PR, a comment about lack of clarification,
+etc.
+
+__NOTE__ The following sections establish rules under which a bug report will
+be closed by the maintainer team. The goal is to avoid a situation where issues
+linger in an indeterminate state. The maintainer team is allowed to disregard
+these "rules" at any point. In other words: the goal isn't to allow people to
+"lawyer" issues.
+
+### Discussion
+
+Some issues are for discussing the project. These issues should start with a
+clear question, have an owner, and be closed when either:
+
+* The original question has been answered
+* There is no clear question or owner
+* No progress has been made in 30 days
+
+Discussions are typically opened by maintainers and contributors.
+
+### Support
+
+Support questions are requests for assistance in using Stack. They must have a
+clear set of steps followed by the user and a desired outcome. Support requests
+sometimes overlap with bug reports, handled next. Support requests are closed
+when:
+
+* The user decides their question is answered
+* No clarification to questions from the Stack team is given for 30 days
+* The question is determined out of scope by the Stack team
+
+### Bug report
+
+A bug report describes a misbehavior in Stack itself. There are some cases
+where an issue may appear somewhere between a support request and a bug report.
+The Stack team will determine which category an issue falls into. Bug reports
+must include clear reproduction steps, an expected outcome, and an actual
+outcome. Bug reports are closed when:
+
+* The bug is fixed on the `master` or `stable` branch (NOTE: we do not wait for
+  fixes to be released before closing issues)
+* The Stack team is unable to reproduce the issue
+* No clarification to questions from the Stack team is given for 30 days
+* The bug is determined to be out of scope by the Stack team, such as being an
+  upstream issue
+
+### Feature request
+
+Feature requests are usually clear, but sometimes have overlap with one of the
+above topics. Determination of an issue being a feature request will be made by
+the Stack team. Features are closed when:
+
+* The feature is implemented on the `master` or `stable` branch
+* The Stack team decides that the feature is not desired in the project
+* If no one offers to implement the feature for 30 days
+
+Note that, to account for the last bullet, we have a
+[Wishlist](https://github.com/commercialhaskell/stack/wiki/Wishlist) wiki page. We
+recommend closing issues with a message such as the following:
+
+> Closing due to lack of implementation progress in the past 30 days. We
+> attempt to keep the Stack issue tracker focused on active work items. If you
+> are still interested in this feature and would like to see it implemented in
+> the future, please add it to the
+> [Wishlist](https://github.com/commercialhaskell/stack/wiki/Wishlist) Wiki page.
