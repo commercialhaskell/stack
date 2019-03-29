@@ -21,10 +21,12 @@ module Pantry.Types
   , Version
   , PackageIdentifier (..)
   , Revision (..)
+  , ModuleName
   , CabalFileInfo (..)
   , PrintWarnings (..)
   , PackageNameP (..)
   , VersionP (..)
+  , ModuleNameP (..)
   , PackageIdentifierRevision (..)
   , pirForHash
   , FileType (..)
@@ -101,6 +103,7 @@ module Pantry.Types
   , PackageMetadata (..)
   , toRawPM
   , cabalFileName
+  , SnapshotCacheHash (..)
   ) where
 
 import RIO
@@ -110,7 +113,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
-import RIO.Time (toGregorian, Day)
+import RIO.Time (toGregorian, Day, fromGregorianValid)
 import qualified RIO.Map as Map
 import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -527,6 +530,7 @@ data HackageSecurityConfig = HackageSecurityConfig
   { hscKeyIds :: ![Text]
   , hscKeyThreshold :: !Int
   , hscDownloadPrefix :: !Text
+  , hscIgnoreExpiry :: !Bool
   }
   deriving Show
 instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
@@ -535,6 +539,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     Object o <- o' ..: "hackage-security"
     hscKeyIds <- o ..: "keyids"
     hscKeyThreshold <- o ..: "key-threshold"
+    hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
     pure HackageSecurityConfig {..}
 
 -- | An environment which contains a 'PantryConfig'.
@@ -606,6 +611,18 @@ instance PersistField VersionP where
       Nothing -> Left $ "Invalid version number: " <> T.pack str
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
+  sqlType _ = SqlString
+
+newtype ModuleNameP = ModuleNameP ModuleName
+  deriving (Show)
+instance PersistField ModuleNameP where
+  toPersistValue (ModuleNameP mn) = PersistText $ T.pack $ moduleNameString mn
+  fromPersistValue v = do
+    str <- fromPersistValue v
+    case parseModuleName str of
+      Nothing -> Left $ "Invalid module name: " <> T.pack str
+      Just pn -> Right $ ModuleNameP pn
+instance PersistFieldSql ModuleNameP where
   sqlType _ = SqlString
 
 -- | How to choose a cabal file for a package from Hackage. This is to
@@ -1225,6 +1242,12 @@ parseVersionThrowing str =
 parseVersionRange :: String -> Maybe VersionRange
 parseVersionRange = Distribution.Text.simpleParse
 
+-- | Parse a module name from a 'String'.
+--
+-- @since 0.1.0.0
+parseModuleName :: String -> Maybe ModuleName
+parseModuleName = Distribution.Text.simpleParse
+
 -- | Parse a flag name from a 'String'.
 --
 -- @since 0.1.0.0
@@ -1677,7 +1700,9 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLocation)) where
 
 instance Display SnapshotLocation where
   display (SLCompiler compiler) = display compiler
-  display (SLUrl url blob) = display url <> " (" <> display blob <> ")"
+  display (SLUrl url blob) =
+    fromMaybe (display url) (specialRawSnapshotLocation url) <>
+    " (" <> display blob <> ")"
   display (SLFilePath resolved) = display (resolvedRelative resolved)
 
 -- | Parse a 'Text' into an 'Unresolved' 'RawSnapshotLocation'.
@@ -1788,12 +1813,46 @@ instance NFData RawSnapshotLocation
 
 instance Display RawSnapshotLocation where
   display (RSLCompiler compiler) = display compiler
-  display (RSLUrl url Nothing) = display url
-  display (RSLUrl url (Just blob)) = display url <> " (" <> display blob <> ")"
+  display (RSLUrl url Nothing) = fromMaybe (display url) $ specialRawSnapshotLocation url
+  display (RSLUrl url (Just blob)) =
+    fromMaybe (display url) (specialRawSnapshotLocation url) <>
+    " (" <> display blob <> ")"
   display (RSLFilePath resolved) = display (resolvedRelative resolved)
+
+-- | For nicer display purposes: present a 'RawSnapshotLocation' as a
+-- short form like lts-13.13 if possible.
+specialRawSnapshotLocation :: Text -> Maybe Utf8Builder
+specialRawSnapshotLocation url = do
+  t1 <- T.stripPrefix "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/" url
+  parseLTS t1 <|> parseNightly t1
+  where
+    popInt :: Text -> Maybe (Int, Text)
+    popInt t0 =
+      -- Would be nice if this function did overflow checking for us
+      case decimal t0 of
+        Left _ -> Nothing
+        Right (x, rest) -> (, rest) <$> do
+          if (x :: Integer) > fromIntegral (maxBound :: Int)
+            then Nothing
+            else Just (fromIntegral x)
+
+    parseLTS t1 = do
+      t2 <- T.stripPrefix "lts/" t1
+      (major, t3) <- popInt t2
+      (minor, ".yaml") <- T.stripPrefix "/" t3 >>= popInt
+      Just $ "lts-" <> display major <> "." <> display minor
+    parseNightly t1 = do
+      t2 <- T.stripPrefix "nightly/" t1
+      (year, t3) <- popInt t2
+      (month, t4) <- T.stripPrefix "/" t3 >>= popInt
+      (day, ".yaml") <- T.stripPrefix "/" t4 >>= popInt
+      date <- fromGregorianValid (fromIntegral year) month day
+      Just $ "nightly-" <> displayShow date
 
 instance ToJSON RawSnapshotLocation where
   toJSON (RSLCompiler compiler) = object ["compiler" .= compiler]
+  toJSON (RSLUrl url Nothing)
+    | Just x <- specialRawSnapshotLocation url = String $ utf8BuilderToText x
   toJSON (RSLUrl url mblob) = object
     $ "url" .= url
     : maybe [] blobKeyPairs mblob
@@ -1838,8 +1897,6 @@ toRawSL (SLFilePath fp) = RSLFilePath fp
 data RawSnapshot = RawSnapshot
   { rsCompiler :: !WantedCompiler
   -- ^ The compiler wanted for this snapshot.
-  , rsName :: !Text
-  -- ^ The 'slName' from the top 'SnapshotLayer'.
   , rsPackages :: !(Map PackageName RawSnapshotPackage)
   -- ^ Packages available in this snapshot for installation. This will be
   -- applied on top of any globally available packages.
@@ -1853,8 +1910,6 @@ data RawSnapshot = RawSnapshot
 data Snapshot = Snapshot
   { snapshotCompiler :: !WantedCompiler
   -- ^ The compiler wanted for this snapshot.
-  , snapshotName :: !Text
-  -- ^ The 'slName' from the top 'SnapshotLayer'.
   , snapshotPackages :: !(Map PackageName SnapshotPackage)
   -- ^ Packages available in this snapshot for installation. This will be
   -- applied on top of any globally available packages.
@@ -1907,10 +1962,6 @@ data RawSnapshotLayer = RawSnapshotLayer
   -- 'Nothing' if using 'SLCompiler'.
   --
   -- @since 0.1.0.0
-  , rslName :: !Text
-  -- ^ A user-friendly way of referring to this resolver.
-  --
-  -- @since 0.1.0.0
   , rslLocations :: ![RawPackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   --
@@ -1945,7 +1996,6 @@ instance ToJSON RawSnapshotLayer where
   toJSON rsnap = object $ concat
     [ ["resolver" .= rslParent rsnap]
     , maybe [] (\compiler -> ["compiler" .= compiler]) (rslCompiler rsnap)
-    , ["name" .= rslName rsnap]
     , ["packages" .= rslLocations rsnap]
     , if Set.null (rslDropPackages rsnap)
         then []
@@ -1963,6 +2013,7 @@ instance ToJSON RawSnapshotLayer where
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
   parseJSON = withObjectWarnings "Snapshot" $ \o -> do
+    _ :: Maybe Text <- o ..:? "name" -- avoid warnings for old snapshot format
     mcompiler <- o ..:? "compiler"
     mresolver <- jsonSubWarningsT $ o ...:? ["snapshot", "resolver"]
     unresolvedSnapshotParent <-
@@ -1975,7 +2026,6 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
             (RSLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
             _ -> pure (sl, mcompiler)
 
-    rslName <- o ..: "name"
     unresolvedLocs <- jsonSubWarningsT (o ..:? "packages" ..!= [])
     rslDropPackages <- Set.map unCabalString <$> (o ..:? "drop-packages" ..!= Set.empty)
     rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
@@ -2016,10 +2066,6 @@ data SnapshotLayer = SnapshotLayer
   -- 'Nothing' if using 'SLCompiler'.
   --
   -- @since 0.1.0.0
-  , slName :: !Text
-  -- ^ A user-friendly way of referring to this resolver.
-  --
-  -- @since 0.1.0.0
   , slLocations :: ![PackageLocationImmutable]
   -- ^ Where to grab all of the packages from.
   --
@@ -2051,7 +2097,6 @@ instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
     , ["compiler" .= slCompiler snap]
-    , ["name" .= slName snap]
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
@@ -2066,10 +2111,12 @@ toRawSnapshotLayer :: SnapshotLayer -> RawSnapshotLayer
 toRawSnapshotLayer sl = RawSnapshotLayer
   { rslParent = toRawSL (slParent sl)
   , rslCompiler = slCompiler sl
-  , rslName = slName sl
   , rslLocations = map toRawPLI (slLocations sl)
   , rslDropPackages = slDropPackages sl
   , rslFlags = slFlags sl
   , rslHidden = slHidden sl
   , rslGhcOptions = slGhcOptions sl
   }
+
+newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
+  deriving (Show)

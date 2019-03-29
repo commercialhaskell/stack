@@ -34,7 +34,7 @@ import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
 import           Stack.Constants
-import           Stack.Snapshot                  (loadResolver)
+import           Stack.Snapshot                  (loadResolver, loadSnapshotGlobalHints)
 import           Stack.Solver
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -133,7 +133,7 @@ initProject whichCmd currDir initOpts mresolver = do
         toPkg dir = makeRelDir dir
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-    logInfo $ "Initialising configuration using resolver: " <> display (sdResolverName sd)
+    logInfo $ "Initialising configuration using resolver: " <> display (sdResolver sd)
     logInfo $ "Total number of user packages considered: "
                <> display (Map.size bundle + length dupPkgs)
 
@@ -274,9 +274,9 @@ renderStackYaml p ignoredPackages dupPackages =
         , "packages:"
         , "- some-directory"
         , "- https://example.com/foo/bar/baz-0.0.2.tar.gz"
-        , " subdirs:"
-        , " - auto-update"
-        , " - wai"
+        , "  subdirs:"
+        , "  - auto-update"
+        , "  - wai"
         ]
 
     extraDepsHelp = commentHelp
@@ -381,7 +381,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan whichCmd initOpts bundle sd = do
-    logInfo $ "Selected resolver: " <> display (sdResolverName sd)
+    logInfo $ "Selected resolver: " <> display (sdResolver sd)
     go bundle
     where
         go info = do
@@ -426,7 +426,7 @@ checkBundleResolver
          (Either [PackageName] ( Map PackageName (Map FlagName Bool)
                                , Map PackageName Version))
 checkBundleResolver whichCmd initOpts bundle sd = do
-    result <- checkSnapBuildPlan gpds Nothing sd Nothing
+    result <- checkSnapBuildPlan gpds Nothing sd loadSnapshotGlobalHints
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         BuildPlanCheckPartial f e -> do
@@ -445,19 +445,19 @@ checkBundleResolver whichCmd initOpts bundle sd = do
                         warnPartial result
                         logWarn "*** Omitting packages with unsatisfied dependencies"
                         return $ Left $ failedUserPkgs e
-                    else throwM $ ResolverPartial whichCmd (sdResolverName sd) (show result)
+                    else throwM $ ResolverPartial whichCmd (sdResolver sd) (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
-                           <> display (sdResolverName sd)
+                           <> display (sdResolver sd)
                 logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolverName sd) (show result)
+            | otherwise -> throwM $ ResolverMismatch whichCmd (sdResolver sd) (show result)
     where
       resolver = sdResolver sd
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
-          logWarn $ "*** Resolver " <> display (sdResolverName sd)
+          logWarn $ "*** Resolver " <> display (sdResolver sd)
                       <> " will need external packages: "
           logWarn $ display $ indent $ T.pack $ show res
 
@@ -485,7 +485,7 @@ checkBundleResolver whichCmd initOpts bundle sd = do
       -- set of packages.
       findOneIndependent packages flags = do
           platform <- view platformL
-          (compiler, _) <- getResolverConstraints Nothing sd
+          (compiler, _) <- getResolverConstraints <$> loadSnapshotGlobalHints sd
           let getGpd pkg = snd (fromMaybe (error "findOneIndependent: getGpd") (Map.lookup pkg bundle))
               getFlags pkg = fromMaybe (error "fromOneIndependent: getFlags") (Map.lookup pkg flags)
               deps pkg = gpdPackageDeps (getGpd pkg) compiler platform

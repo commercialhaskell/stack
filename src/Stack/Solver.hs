@@ -48,8 +48,7 @@ import           Stack.BuildPlan
 import           Stack.Config (loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Setup
-import           Stack.Setup.Installed
-import           Stack.Snapshot (loadSnapshot)
+import           Stack.Snapshot (loadSnapshotCompiler)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
@@ -248,7 +247,7 @@ getCabalConfig dir constraintType constraints = do
 setupCompiler
     :: (HasConfig env, HasGHCVariant env)
     => WantedCompiler
-    -> RIO env (Maybe ExtraDirs)
+    -> RIO env ExtraDirs
 setupCompiler compiler = do
     let msg = Just $ utf8BuilderToText $
           "Compiler version (" <> RIO.display compiler <> ") " <>
@@ -258,7 +257,7 @@ setupCompiler compiler = do
           "compiler available on your PATH."
 
     config <- view configL
-    (dirs, _, _) <- ensureCompiler SetupOpts
+    cpExtraDirs <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
@@ -268,29 +267,27 @@ setupCompiler compiler = do
         , soptsSanityCheck       = False
         , soptsSkipGhcCheck      = False
         , soptsSkipMsys          = configSkipMsys config
-        , soptsUpgradeCabal      = Nothing
         , soptsResolveMissingGHC = msg
         , soptsSetupInfoYaml     = defaultSetupInfoYaml
         , soptsGHCBindistURL     = Nothing
         , soptsGHCJSBootOpts     = ["--clean"]
         }
-    return dirs
 
 -- | Runs the given inner command with an updated configuration that
 -- has the desired GHC on the PATH.
 setupCabalEnv
     :: (HasConfig env, HasGHCVariant env)
     => WantedCompiler
-    -> (ActualCompiler -> RIO env a)
+    -> (ActualCompiler -> RIO (WithGHC env) a)
     -> RIO env a
 setupCabalEnv compiler inner = do
-  mpaths <- setupCompiler compiler
+  paths <- setupCompiler compiler
   menv0 <- view processContextL
   envMap <- either throwM (return . removeHaskellEnvVars)
-              $ augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
+              $ augmentPathMap (toFilePath <$> edBins paths)
                                (view envVarsL menv0)
   menv <- mkProcessContext envMap
-  withProcessContext menv $ do
+  runWithGHC menv undefined $ do
     mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
@@ -306,9 +303,9 @@ setupCabalEnv compiler inner = do
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
-    mver <- getSystemCompiler (whichCompiler (wantedToActual compiler))
+    mver <- getSystemCompiler compiler
     version <- case mver of
-        Just (version, _) -> do
+        Just (version, _, _dir) -> do
             logInfo $ "Using compiler: " <> RIO.display version
             return version
         Nothing -> error "Failed to determine compiler version. \
@@ -359,10 +356,10 @@ solveResolverSpec
 
 solveResolverSpec cabalDirs
                   (sd, srcConstraints, extraConstraints) = do
-  logInfo $ "Using resolver: " <> RIO.display (sdResolverName sd)
+  logInfo $ "Using resolver: " <> RIO.display (sdResolver sd)
   let wantedCompilerVersion = sdWantedCompilerVersion sd
   setupCabalEnv wantedCompilerVersion $ \compilerVersion -> do
-    (compilerVer, snapConstraints) <- getResolverConstraints (Just compilerVersion) sd
+    (compilerVer, snapConstraints) <- getResolverConstraints <$> loadSnapshotCompiler compilerVersion sd
 
     let -- Note - The order in Map.union below is important.
         -- We want to override snapshot with extra deps
@@ -377,7 +374,7 @@ solveResolverSpec cabalDirs
                      ["--ghcjs" | whichCompiler compilerVer == Ghcjs]
 
     let srcNames = T.intercalate " and " $
-          ["packages from " <> sdResolverName sd
+          ["packages from " <> utf8BuilderToText (RIO.display (sdResolver sd))
               | not (Map.null snapConstraints)] ++
           [T.pack (show (Map.size extraConstraints) <> " external packages")
               | not (Map.null extraConstraints)]
@@ -462,18 +459,13 @@ solveResolverSpec cabalDirs
 -- return the compiler version, package versions and packages flags
 -- for that resolver.
 getResolverConstraints
-    :: (HasConfig env, HasGHCVariant env)
-    => Maybe ActualCompiler -- ^ actually installed compiler
-    -> SnapshotDef
-    -> RIO env
-         (ActualCompiler,
-          Map PackageName (Version, Map FlagName Bool))
-getResolverConstraints mcompilerVersion sd = do
-    ls <- loadSnapshot mcompilerVersion sd
-    return (lsCompilerVersion ls, lsConstraints ls)
+    :: LoadedSnapshot
+    -> (ActualCompiler, Map PackageName (Version, Map FlagName Bool))
+getResolverConstraints ls =
+    (lsCompilerVersion ls, lsConstraints)
   where
     lpiConstraints lpi = (lpiVersion lpi, lpiFlags lpi)
-    lsConstraints ls = Map.union
+    lsConstraints = Map.union
       (Map.map lpiConstraints (lsPackages ls))
       (Map.map lpiConstraints (lsGlobals ls))
 
@@ -642,7 +634,7 @@ solveExtraDeps modStackYaml = do
         extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
 
     actualCompiler <- view actualCompilerVersionL
-    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (Just actualCompiler)
+    resolverResult <- checkSnapBuildPlan gpds (Just oldSrcFlags) sd (loadSnapshotCompiler actualCompiler)
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just (mergeConstraints oldSrcs flags, Map.empty)
@@ -652,15 +644,19 @@ solveExtraDeps modStackYaml = do
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
         BuildPlanCheckFail {} ->
-            throwM $ ResolverMismatch IsSolverCmd (sdResolverName sd) (show resolverResult)
+            throwM $ ResolverMismatch IsSolverCmd (sdResolver sd) (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
-    mOldResolver <- view $ configL.to (fmap (projectResolver . fst) . configMaybeProject)
+    config <- view configL
+    let mOldResolver =
+          case configProject config of
+            PCProject (p, _) -> Just $ projectResolver p
+            PCNoProject -> Nothing
+            PCNoConfig _deps -> Nothing
 
-    let
         flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))
         versions = fmap fst edeps
 

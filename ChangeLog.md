@@ -16,6 +16,7 @@ Major changes:
     * Support for archives and repos in the `packages` section has
       been removed. Instead, you must use `extra-deps` for such
       dependencies. `packages` now only supports local filepaths.
+    * Add support for Git repositories containing (recursive) submodules.
     * Addition of new configuration options for specifying a "pantry
       tree" key, which provides more reproducibility around builds,
       and (in the future) will be used for more efficient package
@@ -46,6 +47,10 @@ Major changes:
       been modified to match that of Cabal. In particular, this means
       that for Cabal spec versions less than 2.4, `*.txt` will
       match `foo.txt`, but not `foo.2.txt`.
+* Remove the `stack image` command. With the advent of Docker multistage
+  builds, this functionality is no longer useful. For an example, please see
+  [Building Haskell Apps with
+  Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
@@ -55,6 +60,11 @@ Behavior changes:
   modules, and fixes an issue where `.hs` files in the current
   directory could affect interpretation of the script. See
   [#4538](https://github.com/commercialhaskell/stack/pull/4538)
+
+* When using `stack script`, custom snapshot files will be resolved
+  relative to the directory containing the script.
+
+* Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
 
 Other enhancements:
 
@@ -80,6 +90,8 @@ Other enhancements:
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,
   e.g. `stack unpack packagename`.
+* The components output in the `The main module to load is ambiguous` message
+  now include package names so they can be more easily copy-pasted.
 * Git repos are shared across multiple projects. See
   [#3551](https://github.com/commercialhaskell/stack/issues/3551)
 * Use en_US.UTF-8 locale by default in pure Nix mode so programs won't
@@ -98,6 +110,49 @@ Other enhancements:
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
 * Show snapshot being used when `stack ghci` is invoked outside of a project directory. See
   [#3651](https://github.com/commercialhaskell/stack/issues/3651)
+* The script interpreter now accepts a `--extra-dep` flag for adding
+  packages not present in the snapshot. Currently, this only works
+  with packages from Hackage, not Git repos or archives.
+* When using the script interpreter with `--optimize` or `--compile`,
+  Stack will perform an optimization of checking whether a newer
+  executable exists, making reruns significantly faster. There's a
+  downside to this, however: if you have a multifile script, and
+  change one of the dependency modules, Stack will not automatically
+  detect and recompile.
+* `stack clean` will delete the entire `.stack-work/dist` directory,
+  not just the relevant subdirectory for the current GHC version. See
+  [#4480](https://github.com/commercialhaskell/stack/issues/4480).
+* Add `stack purge` as a shortcut for `stack clean --full`. See
+  [#3863](https://github.com/commercialhaskell/stack/issues/3863).
+* Both `stack dot` and `stack ls dependencies` accept a
+  `--global-hints` flag to bypass the need for an installed GHC. See
+  [#4390](https://github.com/commercialhaskell/stack/issues/4390).
+* Add the `stack config env` command for getting shell script environment
+  variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
+* Less verbose output from `stack setup` on Windows. See
+  [#1212](https://github.com/commercialhaskell/stack/issues/1212).
+* Add an optional `ignore-expiry` flag to the `hackage-security`
+  section of the `~/.stack/config.yaml`. It allows to disable timestamp
+  expiration verification just like `cabal --ignore-expiry` does.
+  The flag is not enabled by default so that the default functionality
+  is not changed.
+* Include default values for most command line flags in the `--help`
+  output. See
+  [#893](https://github.com/commercialhaskell/stack/issues/893).
+* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+  packages explicitly when running test. This is done to prevent
+  ambiguous module name errors in `doctest` tests.
+- Document the way stack interacts with the Cabal library.
+* `get-stack` script now works on Windows CI machines of Appveyor,
+  Travis and Azure Pipelines. See
+  [#4535](https://github.com/commercialhaskell/stack/issues/4535)
+* Warn when a Docker image does not include a `PATH` environment
+  variable. See
+  [#2472](https://github.com/commercialhaskell/stack/issues/2742)
+* When using `system-ghc: true`, Stack will now find the appropriate GHC
+  installation based on the version suffix, allowing you to more easily switch
+  between various system-installed GHCs. See
+  [#2433](https://github.com/commercialhaskell/stack/issues/2433).
 
 Bug fixes:
 
@@ -131,6 +186,16 @@ Bug fixes:
 * Using `--ghc-options` with `stack script --compile` now works.
 * Ensure the detailed-0.9 type tests work.
   See [#4453](https://github.com/commercialhaskell/stack/issues/4453).
+* Extra include and lib dirs are now order-dependent. See
+  [#4527](https://github.com/commercialhaskell/stack/issues/4527).
+* Apply GHC options when building a `Setup.hs` file. See
+  [#4526](https://github.com/commercialhaskell/stack/issues/4526).
+- Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
+- Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
+  downloads and shows a help file, rather than listing available templates.
+- Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
+- Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
+  [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 
 ## v1.9.3
 
@@ -208,6 +273,8 @@ Behavior changes:
   download a template, stack will check whether that template had
   been downloaded before. In that case, the cached version will be
   used. See [#3850](https://github.com/commercialhaskell/stack/issues/3850).
+* The new default for `--docker-auto-pull` is enabled. See
+  [#3332](https://github.com/commercialhaskell/stack/issues/3332).
 
 Other enhancements:
 

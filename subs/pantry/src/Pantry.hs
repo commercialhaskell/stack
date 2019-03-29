@@ -160,6 +160,8 @@ module Pantry
   , getHackageTypoCorrections
   , loadGlobalHints
   , partitionReplacedDependencies
+  , SnapshotCacheHash (..)
+  , withSnapshotCache
   ) where
 
 import RIO
@@ -254,6 +256,7 @@ defaultHackageSecurityConfig = HackageSecurityConfig
       ]
   , hscKeyThreshold = 3
   , hscDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/"
+  , hscIgnoreExpiry = False
   }
 
 -- | Returns the latest version of the given package available from
@@ -803,7 +806,6 @@ completeSnapshotLayer rsnapshot = do
     { slParent = parent'
     , slLocations = pls
     , slCompiler= rslCompiler rsnapshot
-    , slName = rslName rsnapshot
     , slDropPackages = rslDropPackages rsnapshot
     , slFlags = rslFlags rsnapshot
     , slHidden = rslHidden rsnapshot
@@ -893,7 +895,6 @@ loadSnapshotRaw loc = do
     Left wc ->
       pure RawSnapshot
         { rsCompiler = wc
-        , rsName = utf8BuilderToText $ display wc
         , rsPackages = mempty
         , rsDrop = mempty
         }
@@ -913,7 +914,6 @@ loadSnapshotRaw loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       pure RawSnapshot
         { rsCompiler = fromMaybe (rsCompiler snap0) (rslCompiler rsl)
-        , rsName = rslName rsl
         , rsPackages = packages
         , rsDrop = apcDrop unused
         }
@@ -931,7 +931,6 @@ loadSnapshot loc = do
     Left wc ->
       pure RawSnapshot
         { rsCompiler = wc
-        , rsName = utf8BuilderToText $ display wc
         , rsPackages = mempty
         , rsDrop = mempty
         }
@@ -951,7 +950,6 @@ loadSnapshot loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       pure RawSnapshot
         { rsCompiler = fromMaybe (rsCompiler snap0) (rslCompiler rsl)
-        , rsName = rslName rsl
         , rsPackages = packages
         , rsDrop = apcDrop unused
         }
@@ -983,7 +981,6 @@ loadAndCompleteSnapshotRaw loc = do
     Left wc ->
       let snapshot = Snapshot
             { snapshotCompiler = wc
-            , snapshotName = utf8BuilderToText $ display wc
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
@@ -1004,7 +1001,6 @@ loadAndCompleteSnapshotRaw loc = do
       warnUnusedAddPackagesConfig (display loc) unused
       let snapshot = Snapshot
             { snapshotCompiler = fromMaybe (snapshotCompiler snap0) (rslCompiler rsl)
-            , snapshotName = rslName rsl
             , snapshotPackages = packages
             , snapshotDrop = apcDrop unused
             }
@@ -1508,3 +1504,21 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
       else do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
+
+withSnapshotCache
+  :: (HasPantryConfig env, HasLogFunc env)
+  => SnapshotCacheHash
+  -> RIO env (Map PackageName (Set ModuleName))
+  -> ((ModuleName -> RIO env [PackageName]) -> RIO env a)
+  -> RIO env a
+withSnapshotCache hash getModuleMapping f = do
+  mres <- withStorage $ getSnapshotCacheByHash hash
+  cacheId <- case mres of
+    Nothing -> do
+      scId <- withStorage $ getSnapshotCacheId hash
+      packageModules <- getModuleMapping
+      logWarn "Populating snapshot module name cache"
+      withStorage $ storeSnapshotModuleCache scId packageModules
+      return scId
+    Just scId -> pure scId
+  f $ withStorage . loadExposedModulePackages cacheId

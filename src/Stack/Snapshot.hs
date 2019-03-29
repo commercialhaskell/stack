@@ -12,7 +12,8 @@
 -- @LoadedSnapshot@s.
 module Stack.Snapshot
   ( loadResolver
-  , loadSnapshot
+  , loadSnapshotCompiler
+  , loadSnapshotGlobalHints
   , calculatePackagePromotion
   ) where
 
@@ -152,14 +153,45 @@ loadResolver rsl mcompiler = do
     combineHashes :: SHA256 -> SHA256 -> SHA256
     combineHashes x y = SHA256.hashBytes (SHA256.toRaw x <> SHA256.toRaw y)
 
+-- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot' using an installed compiler
+loadSnapshotCompiler
+  :: forall env.
+     (HasConfig env, HasGHCVariant env, HasCompiler env)
+  => ActualCompiler
+  -> SnapshotDef
+  -> RIO env LoadedSnapshot
+loadSnapshotCompiler compiler = loadSnapshot (Just compiler) (\_wanted -> loadCompiler compiler)
+
+-- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot' using global hints
+loadSnapshotGlobalHints
+  :: forall env.
+     (HasConfig env, HasGHCVariant env)
+  => SnapshotDef
+  -> RIO env LoadedSnapshot
+loadSnapshotGlobalHints = loadSnapshot Nothing $ \wanted -> do
+  ghfp <- globalHintsFile
+  mglobalHints <- loadGlobalHints ghfp wanted
+  globalHints <-
+    case mglobalHints of
+      Just x -> pure x
+      Nothing -> do
+        logWarn $ "Unable to load global hints for " <> RIO.display wanted
+        pure mempty
+  return LoadedSnapshot
+    { lsCompilerVersion = wantedToActual wanted
+    , lsGlobals = fromGlobalHints globalHints
+    , lsPackages = Map.empty
+    }
+
 -- | Fully load up a 'SnapshotDef' into a 'LoadedSnapshot'
 loadSnapshot
   :: forall env.
      (HasConfig env, HasGHCVariant env)
   => Maybe ActualCompiler -- ^ installed GHC we should query; if none provided, use the global hints
+  -> (WantedCompiler -> RIO env LoadedSnapshot)
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler =
+loadSnapshot mcompiler helper =
     start
   where
     start sd = do
@@ -170,25 +202,9 @@ loadSnapshot mcompiler =
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
-      logInfo $ "Loading a snapshot from a SnapshotDef: " <> RIO.display (sdResolverName sd)
+      logInfo $ "Loading a snapshot from a SnapshotDef: " <> RIO.display (sdResolver sd)
       case sdSnapshot sd of
-        Nothing ->
-          case mcompiler of
-            Nothing -> do
-              ghfp <- globalHintsFile
-              mglobalHints <- loadGlobalHints ghfp (sdWantedCompilerVersion sd)
-              globalHints <-
-                case mglobalHints of
-                  Just x -> pure x
-                  Nothing -> do
-                    logWarn $ "Unable to load global hints for " <> RIO.display (sdWantedCompilerVersion sd)
-                    pure mempty
-              return LoadedSnapshot
-                { lsCompilerVersion = wantedToActual $ sdWantedCompilerVersion sd
-                , lsGlobals = fromGlobalHints globalHints
-                , lsPackages = Map.empty
-                }
-            Just cv' -> loadCompiler cv'
+        Nothing -> helper (sdWantedCompilerVersion sd)
         Just (snapshot, sd') -> start sd' >>= inner2 snapshot
 
     inner2 snap ls0 = do
@@ -394,11 +410,11 @@ checkDepsMet available m
 -- | Load a snapshot from the given compiler version, using just the
 -- information in the global package database.
 loadCompiler :: forall env.
-                HasConfig env
+                (HasConfig env, HasCompiler env)
              => ActualCompiler
              -> RIO env LoadedSnapshot
 loadCompiler cv = do
-  m <- ghcPkgDump (whichCompiler cv) []
+  m <- ghcPkgDump []
     (conduitDumpPackage .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp))
   return LoadedSnapshot
     { lsCompilerVersion = cv

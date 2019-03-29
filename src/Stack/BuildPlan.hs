@@ -338,11 +338,11 @@ checkSnapBuildPlan
     => [GenericPackageDescription]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotDef
-    -> Maybe ActualCompiler
+    -> (SnapshotDef -> RIO env LoadedSnapshot)
     -> RIO env BuildPlanCheck
-checkSnapBuildPlan gpds flags snapshotDef mactualCompiler = do
+checkSnapBuildPlan gpds flags snapshotDef loadSnapshot = do
     platform <- view platformL
-    rs <- loadSnapshot mactualCompiler snapshotDef
+    rs <- loadSnapshot snapshotDef
 
     let
         compiler = lsCompilerVersion rs
@@ -391,7 +391,7 @@ selectBestSnapshot gpds snaps = do
         getResult snap = do
             result <- checkSnapBuildPlan gpds Nothing snap
               -- Rely on global package hints.
-              Nothing
+              loadSnapshotGlobalHints
             reportResult result snap
             return (snap, result)
 
@@ -400,15 +400,15 @@ selectBestSnapshot gpds snaps = do
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
-            logInfo $ "* Matches " <> RIO.display (sdResolverName snap)
+            logInfo $ "* Matches " <> RIO.display (sdResolver snap)
             logInfo ""
 
         reportResult r@BuildPlanCheckPartial {} snap = do
-            logWarn $ "* Partially matches " <> RIO.display (sdResolverName snap)
+            logWarn $ "* Partially matches " <> RIO.display (sdResolver snap)
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} snap = do
-            logWarn $ "* Rejected " <> RIO.display (sdResolverName snap)
+            logWarn $ "* Rejected " <> RIO.display (sdResolver snap)
             logWarn $ RIO.display $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)

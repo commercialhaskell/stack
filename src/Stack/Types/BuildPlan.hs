@@ -21,7 +21,6 @@ module Stack.Types.BuildPlan
     , ModuleInfo (..)
     , moduleInfoVC
     , sdSnapshots
-    , sdResolverName
     ) where
 
 import qualified Data.Map as Map
@@ -55,12 +54,6 @@ data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/co
     deriving (Show, Eq, Data, Generic, Typeable)
 instance Store SnapshotDef
 instance NFData SnapshotDef
-
-sdResolverName :: SnapshotDef -> Text
-sdResolverName sd =
-  case sdSnapshot sd of
-    Nothing -> utf8BuilderToText $ display $ sdWantedCompilerVersion sd
-    Just (snapshot, _) -> rslName snapshot
 
 sdSnapshots :: SnapshotDef -> [RawSnapshotLayer]
 sdSnapshots sd =

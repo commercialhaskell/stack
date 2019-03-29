@@ -40,11 +40,6 @@
   ]
 }
 
-# Pretty-printing
-- error: {lhs: "fromString . toFilePath", rhs: "display"}
-- ignore: {name: "Use display", within: "warnMultiple"}
-- ignore: {name: "Use display", within: "Text.PrettyPrint.Leijen.Extended"}
-
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.formDataBody", rhs: "Network.HTTP.StackClient.formDataBody"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partBS", rhs: "Network.HTTP.StackClient.partBS"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partFileRequestBody", rhs: "Network.HTTP.StackClient.partFileRequestBody"}

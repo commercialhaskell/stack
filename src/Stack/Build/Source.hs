@@ -14,11 +14,13 @@ module Stack.Build.Source
     , loadSourceMap
     , getLocalFlags
     , addUnlistedToBuildCache
+    , hashSourceMapData
     ) where
 
 import              Stack.Prelude
 import qualified    Pantry.SHA256 as SHA256
 import qualified    Data.ByteString as S
+import              Data.ByteString.Builder (toLazyByteString)
 import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Data.Conduit.List as CL
 import qualified    Distribution.PackageDescription as C
@@ -26,7 +28,6 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
-import qualified    Data.Text as T
 import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Haddock (shouldHaddockDeps)
@@ -34,7 +35,6 @@ import              Stack.Build.Target
 import              Stack.Package
 import              Stack.SourceMap
 import              Stack.Types.Build
-import              Stack.Types.Compiler (whichCompiler, WhichCompiler(..))
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
@@ -42,16 +42,13 @@ import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
-import qualified    RIO.ByteString as B
-import qualified    RIO.ByteString.Lazy as BL
-import              RIO.Process (proc, readProcess_)
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
               => RIO env [LocalPackage]
 projectLocalPackages = do
     sm <- view $ envConfigL.to envConfigSourceMap
-    for (toList $ smProject sm) $ loadLocalPackage sm
+    for (toList $ smProject sm) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
@@ -62,10 +59,10 @@ localDependencies = do
         case dpLocation dp of
             PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
-                Just <$> loadLocalPackage sourceMap pp
+                Just <$> loadLocalPackage pp
             _ -> return Nothing
 
--- | Given the parsed targets and buld command line options constructs
+-- | Given the parsed targets and build command line options constructs
 --   a source map
 loadSourceMap :: HasBuildConfig env
               => SMTargets
@@ -106,8 +103,9 @@ loadSourceMap smt boptsCli sma = do
         maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
         maybeProjectFlags _ = Nothing
         globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
+    logDebug "Checking flags"
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
-    smh <- hashSourceMapData bconfig boptsCli (whichCompiler compiler) deps
+    logDebug "SourceMap constructed"
     return
         SourceMap
         { smTargets = smt
@@ -115,7 +113,6 @@ loadSourceMap smt boptsCli sma = do
         , smProject = project
         , smDeps = deps
         , smGlobal = globals
-        , smHash = smh
         }
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'
@@ -139,29 +136,25 @@ loadSourceMap smt boptsCli sma = do
 -- * Make sure things like profiling and haddocks are included in the hash
 --
 hashSourceMapData
-    :: (HasConfig env)
-    => BuildConfig
-    -> BuildOptsCLI
-    -> WhichCompiler
-    -> Map PackageName DepPackage
+    :: (HasBuildConfig env, HasCompiler env)
+    => BuildOptsCLI
+    -> SourceMap
     -> RIO env SourceMapHash
-hashSourceMapData bc boptsCli wc smDeps = do
-    compilerPath <- encodeUtf8 . T.pack . toFilePath <$> getCompilerPath wc
-    let compilerExe =
-            case wc of
-                Ghc -> "ghc"
-                Ghcjs -> "ghcjs"
-    compilerInfo <- BL.toStrict . fst <$> proc compilerExe ["--info"] readProcess_
-    immDeps <- forM (Map.elems smDeps) depPackageHashableContent
+hashSourceMapData boptsCli sm = do
+    compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath
+    compilerInfo <- getCompilerInfo
+    immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
+    bc <- view buildConfigL
     let -- extra bytestring specifying GHC options supposed to be applied to
         -- GHC boot packages so we'll have differrent hashes when bare
         -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
         -- with profiling or without
-        bootGhcOpts = B.concat $ map encodeUtf8 (generalGhcOptions bc boptsCli False False)
-        hashedContent = compilerPath:compilerInfo:bootGhcOpts:immDeps
-    return $ SourceMapHash (SHA256.hashLazyBytes $ BL.fromChunks hashedContent)
+        bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
+        hashedContent = toLazyByteString $ compilerPath <> compilerInfo <>
+            getUtf8Builder (mconcat bootGhcOpts) <> mconcat immDeps
+    return $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
-depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env ByteString
+depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
 depPackageHashableContent DepPackage {..} = do
     case dpLocation of
         PLMutable _ -> return ""
@@ -169,16 +162,13 @@ depPackageHashableContent DepPackage {..} = do
             let flagToBs (f, enabled) =
                     if enabled
                         then ""
-                        else "-" <> encodeUtf8 (T.pack $ C.unFlagName f)
+                        else "-" <> fromString (C.unFlagName f)
                 flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-                locationTreeKey (PLIHackage _ _ tk) = tk
-                locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
-                locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
-                treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
-                ghcOptions = map encodeUtf8 (cpGhcOptions dpCommon)
+                ghcOptions = map display (cpGhcOptions dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
-                hash = treeKeyToBs $ locationTreeKey pli
-            return $ B.concat ([hash, haddocks] ++ flags ++ ghcOptions)
+                hash = immutableLocSha pli
+            return $ hash <> haddocks <> getUtf8Builder (mconcat flags) <>
+                getUtf8Builder (mconcat ghcOptions)
 
 -- | All flags for a local package.
 getLocalFlags
@@ -236,7 +226,7 @@ splitComponents =
     go a b c (CBench x:xs) = go a b (c . (x:)) xs
 
 loadCommonPackage ::
-       forall env. HasEnvConfig env
+       forall env. (HasBuildConfig env, HasSourceMap env)
     => CommonPackage
     -> RIO env Package
 loadCommonPackage common = do
@@ -247,11 +237,11 @@ loadCommonPackage common = do
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
 -- based on the selected components
 loadLocalPackage ::
-       forall env. HasEnvConfig env
-    => SourceMap
-    -> ProjectPackage
+       forall env. (HasBuildConfig env, HasSourceMap env)
+    => ProjectPackage
     -> RIO env LocalPackage
-loadLocalPackage sm pp = do
+loadLocalPackage pp = do
+    sm <- view sourceMapL
     let common = ppCommon pp
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
@@ -338,10 +328,10 @@ loadLocalPackage sm pp = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    componentFiles <- memoizeRef $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
+    componentFiles <- memoizeRefWith $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
-    checkCacheResults <- memoizeRef $ do
-      componentFiles' <- runMemoized componentFiles
+    checkCacheResults <- memoizeRefWith $ do
+      componentFiles' <- runMemoizedWith componentFiles
       forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (ppRoot pp) component
         checkCacheResult <- checkBuildCache
@@ -503,10 +493,11 @@ calcFci modTime' fp = liftIO $
             }
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig :: (MonadReader env m, HasEnvConfig env)
+getPackageConfig
+  :: (HasBuildConfig env, HasSourceMap env)
   => Map FlagName Bool
   -> [Text]
-  -> m PackageConfig
+  -> RIO env PackageConfig
 getPackageConfig flags ghcOptions = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL

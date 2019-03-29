@@ -14,12 +14,17 @@ module Stack.SourceMap
     , checkFlagsUsedThrowing
     , globalCondCheck
     , pruneGlobals
+    , globalsFromHints
+    , getCompilerInfo
+    , immutableLocSha
     ) where
 
+import Data.ByteString.Builder (byteString, lazyByteString)
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import Distribution.System (Platform(..))
 import Pantry
+import qualified Pantry.SHA256 as SHA256
 import qualified RIO
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -114,16 +119,15 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-       (HasLogFunc env, HasProcessContext env)
-    => ActualCompiler
-    -> RIO env (Map PackageName DumpedGlobalPackage)
-globalsFromDump compiler = do
+       (HasLogFunc env, HasProcessContext env, HasCompiler env)
+    => RIO env (Map PackageName DumpedGlobalPackage)
+globalsFromDump = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
         toGlobals ds =
           Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
-    toGlobals <$> ghcPkgDump (whichCompiler compiler) [] pkgConduit
+    toGlobals <$> ghcPkgDump [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
@@ -141,12 +145,12 @@ globalsFromHints compiler = do
 type DumpedGlobalPackage = DumpPackage
 
 actualFromGhc ::
-       (HasConfig env)
+       (HasConfig env, HasCompiler env)
     => SMWanted
     -> ActualCompiler
     -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-    globals <- globalsFromDump ac
+    globals <- globalsFromDump
     return
         SMActual
         { smaCompiler = ac
@@ -230,3 +234,16 @@ pruneGlobals globals deps =
             dpGhcPkgId dpDepends deps
   in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
      Map.map ReplacedGlobalPackage prunedGlobals
+
+getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
+getCompilerInfo = do
+    compilerExe <- view $ compilerPathsL.to cpCompiler.to toFilePath
+    lazyByteString . fst <$> proc compilerExe ["--info"] readProcess_
+
+immutableLocSha :: PackageLocationImmutable -> Builder
+immutableLocSha = byteString . treeKeyToBs . locationTreeKey
+  where
+    locationTreeKey (PLIHackage _ _ tk) = tk
+    locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
+    locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
+    treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha

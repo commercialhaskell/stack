@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Perform a build
 module Stack.Build.Execute
@@ -80,7 +81,6 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
@@ -205,8 +205,6 @@ data ExecuteEnv = ExecuteEnv
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
     , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
     , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
-    , eeGetGhcPath     :: !(forall m. MonadIO m => m (Path Abs File))
-    , eeGetGhcjsPath   :: !(forall m. MonadIO m => m (Path Abs File))
     , eeCustomBuilt    :: !(IORef (Set PackageName))
     -- ^ Stores which packages with custom-setup have already had their
     -- Setup.hs built.
@@ -290,11 +288,11 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            withWorkingDir (toFilePath tmpdir) (proc (compilerExeName wc) args $ \pc0 -> do
+            compilerPath <- getCompilerPath
+            withWorkingDir (toFilePath tmpdir) (proc (toFilePath compilerPath) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
-                `catch` \ece -> do
-                    compilerPath <- getCompilerPath wc
+                `catch` \ece ->
                     throwM $ SetupHsBuildFailure (eceExitCode ece) Nothing compilerPath args Nothing []
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
@@ -318,8 +316,6 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         idMap <- liftIO $ newTVarIO Map.empty
         config <- view configL
 
-        getGhcPath <- memoizeRef $ getCompilerPath Ghc
-        getGhcjsPath <- memoizeRef $ getCompilerPath Ghcjs
         customBuiltRef <- newIORef Set.empty
 
         -- Create files for simple setup and setup shim, if necessary
@@ -338,7 +334,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
         cabalPkgVer <- view cabalVersionL
-        globalDB <- getGlobalDB =<< view (actualCompilerVersionL.whichCompilerL)
+        globalDB <- cpGlobalDB
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
@@ -366,15 +362,13 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
-            , eeGetGhcPath = runMemoized getGhcPath
-            , eeGetGhcjsPath = runMemoized getGhcjsPath
             , eeCustomBuilt = customBuiltRef
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
     createTempDirFunction
-        | Just True <- boptsKeepTmpFiles bopts = withKeepSystemTempDir
+        | boptsKeepTmpFiles bopts = withKeepSystemTempDir
         | otherwise = withSystemTempDir
 
     dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()
@@ -581,7 +575,6 @@ executePlan' :: HasEnvConfig env
 executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
     cv <- view actualCompilerVersionL
-    let wc = view whichCompilerL cv
     case nonEmpty . Map.toList $ planUnregisterLocal plan of
         Nothing -> return ()
         Just ids -> do
@@ -636,9 +629,9 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (boptsHaddock eeBuildOpts) $ do
         snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
         localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
-        generateLocalHaddockIndex wc eeBaseConfigOpts localDumpPkgs eeLocals
-        generateDepsHaddockIndex wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
-        generateSnapHaddockIndex wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
+        generateLocalHaddockIndex eeBaseConfigOpts localDumpPkgs eeLocals
+        generateDepsHaddockIndex eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
+        generateSnapHaddockIndex eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
         when (boptsOpenHaddocks eeBuildOpts) $ do
             let planPkgs, localPkgs, installedPkgs, availablePkgs
                     :: Map PackageName (PackageIdentifier, InstallLocation)
@@ -657,13 +650,12 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ planUnregisterLocal plan
 
 unregisterPackages ::
-       (HasProcessContext env, HasLogFunc env, HasPlatform env)
+       (HasProcessContext env, HasLogFunc env, HasPlatform env, HasCompiler env)
     => ActualCompiler
     -> Path Abs Dir
     -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
     -> RIO env ()
 unregisterPackages cv localDB ids = do
-    let wc = view whichCompilerL cv
     let logReason ident reason =
             logInfo $
             fromString (packageIdentifierString ident) <> ": unregistering" <>
@@ -672,7 +664,7 @@ unregisterPackages cv localDB ids = do
                 else " (" <> RIO.display reason <> ")"
     let unregisterSinglePkg select (gid, (ident, reason)) = do
             logReason ident reason
-            unregisterGhcPkgIds wc localDB $ select ident gid :| []
+            unregisterGhcPkgIds localDB $ select ident gid :| []
 
     case cv of
         -- GHC versions >= 8.0.1 support batch unregistering of packages. See
@@ -691,7 +683,7 @@ unregisterPackages cv localDB ids = do
                 let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
                 for_ (chunksOfNE batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    unregisterGhcPkgIds wc localDB $ fmap (Right . fst) batch
+                    unregisterGhcPkgIds localDB $ fmap (Right . fst) batch
 
         -- GHC versions >= 7.9 support unregistering of packages via their
         -- GhcPkgId.
@@ -862,10 +854,14 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
+        cp <- view compilerPathsL
         let programNames =
-                if eeCabalPkgVer < mkVersion [1, 22]
-                    then ["ghc", "ghc-pkg"]
-                    else ["ghc", "ghc-pkg", "ghcjs", "ghcjs-pkg"]
+              case cpWhich cp of
+                Ghc ->
+                  [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
+                  , "--with-ghc-pkg=" ++ toFilePath (cpPkg cp)
+                  ]
+                Ghcjs -> []
         exes <- forM programNames $ \name -> do
             mpath <- findExecutable name
             return $ case mpath of
@@ -1226,10 +1222,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         else do
                             ensureDir setupDir
                             compiler <- view $ actualCompilerVersionL.whichCompilerL
-                            compilerPath <-
-                                case compiler of
-                                    Ghc -> eeGetGhcPath
-                                    Ghcjs -> eeGetGhcjsPath
+                            compilerPath <- view $ compilerPathsL.to cpCompiler
                             packageArgs <- getPackageArgs setupDir
                             runExe compilerPath $
                                 [ "--make"
@@ -1246,7 +1239,17 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                                 ] ++
                                 (case compiler of
                                     Ghc -> []
-                                    Ghcjs -> ["-build-runner"])
+                                    Ghcjs -> ["-build-runner"]) ++
+
+                                -- Apply GHC options
+                                -- https://github.com/commercialhaskell/stack/issues/4526
+                                map T.unpack (
+                                  Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config) ++
+                                  case configApplyGhcOptions config of
+                                    AGOEverything -> boptsCLIGhcOptions eeBuildOptsCLI
+                                    AGOTargets -> []
+                                    AGOLocals -> [])
+
                             liftIO $ atomicModifyIORef' eeCustomBuilt $
                                 \oldCustomBuilt -> (Set.insert (packageName package) oldCustomBuilt, ())
                             return outputFile
@@ -1396,7 +1399,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  let ghcPkgExe = ghcPkgExeName wc
+                  ghcPkgExe <- view $ compilerPathsL.to cpPkg.to toFilePath
 
                   -- first unregister everything that needs to be unregistered
                   forM_ allToUnregister $ \packageName -> catchAny
@@ -1421,7 +1424,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case mlib of
             Nothing -> return $ Just $ Executable taskProvides
             Just _ -> do
-                mpkgid <- loadInstalledPkg wc pkgDbs eeSnapshotDumpPkgs pname
+                mpkgid <- loadInstalledPkg pkgDbs eeSnapshotDumpPkgs pname
 
                 return $ Just $
                     case mpkgid of
@@ -1481,7 +1484,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case taskType of
             TTLocalMutable lp -> do
                 when enableTests $ unsetTestSuccess pkgDir
-                caches <- runMemoized $ lpNewBuildCaches lp
+                caches <- runMemoizedWith $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList caches)
             TTRemotePackage{} -> return ()
@@ -1630,9 +1633,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     let sublibName = T.concat ["z-", T.pack $ packageNameString $ packageName package, "-z-", sublib]
                     case parsePackageName $ T.unpack sublibName of
                       Nothing -> return Nothing -- invalid lib, ignored
-                      Just subLibName -> loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar subLibName
+                      Just subLibName -> loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar subLibName
 
-                mpkgid <- loadInstalledPkg wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
+                mpkgid <- loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar (packageName package)
                 case mpkgid of
                     Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
                     Just pkgid -> return (Library ident pkgid Nothing, sublibsPkgIds)
@@ -1661,8 +1664,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         return mpkgid
 
-    loadInstalledPkg wc pkgDbs tvar name = do
-        dps <- ghcPkgDescribe name wc pkgDbs $ conduitDumpPackage .| CL.consume
+    loadInstalledPkg pkgDbs tvar name = do
+        dps <- ghcPkgDescribe name pkgDbs $ conduitDumpPackage .| CL.consume
         case dps of
             [] -> return Nothing
             [dp] -> do
@@ -1723,7 +1726,7 @@ checkExeStatus compiler platform distDir name = do
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> CTime -> Path Abs Dir -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
-    caches <- runMemoized $ lpNewBuildCaches lp
+    caches <- runMemoizedWith $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
             preBuildTime
@@ -1810,22 +1813,38 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
+                -- doctest relies on template-haskell in QuickCheck-based tests
+                thGhcId <- case find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
+                                (Map.toList $ eeGlobalDumpPkgs ee) of
+                  Just (ghcId, _) -> return ghcId
+                  Nothing -> error "template-haskell is a wired-in GHC boot library but it wasn't found"
                 packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
                     let pkgId = PackageIdentifier name nullVersion
                     case Map.lookupGT pkgId allDepsMap of
                         Just (PackageIdentifier name' version, ghcPkgId)
                             | name' == name && dvType dv == AsLibrary &&
                               version `withinRange` dvVersionRange dv ->
-                            return $ Just (unGhcPkgId ghcPkgId)
+                            return $ Just ghcPkgId
                         _ -> do
                             logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
                             return Nothing
-                -- env var HASKELL_PACKAGE_IDS is used by doctest so module names for
+                -- env variable GHC_ENVIRONMENT is set for doctest so module names for
                 -- packages with proper dependencies should no longer get ambiguous
                 -- see e.g. https://github.com/doctest/issues/119
-                let usePackageIds pc = modifyEnvVars pc $ \envVars ->
-                      Map.insert "HASKELL_PACKAGE_IDS" (T.unwords packageIds) envVars
-                menv <- liftIO $ usePackageIds =<< configProcessContextSettings config EnvSettings
+                let setEnv f pc = modifyEnvVars pc $ \envVars ->
+                      Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
+                    fp = toFilePath $ eeTempDir ee </> $(mkRelFile "test-ghc-env")
+                    snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
+                    localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
+                    ghcEnv =
+                        "clear-package-db\n" <>
+                        "global-package-db\n" <>
+                        "package-db " <> fromString snapDBPath <> "\n" <>
+                        "package-db " <> fromString localDBPath <> "\n" <>
+                        foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
+                            (thGhcId:packageIds)
+                writeFileUtf8Builder fp ghcEnv
+                menv <- liftIO $ setEnv fp =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True

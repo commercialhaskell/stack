@@ -10,14 +10,10 @@ module Stack.Ls
   ) where
 
 import Control.Exception (Exception, throw)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader)
 import Control.Monad (when)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Stack.Prelude hiding (Snapshot (..))
-import Stack.Types.Runner
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
 import Data.Text hiding (pack, intercalate)
@@ -30,17 +26,17 @@ import qualified Options.Applicative as OA
 import Options.Applicative ((<|>), idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
+import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
-import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
+import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
-import Stack.Runners (loadConfigWithOpts, withDefaultBuildConfig, withBuildConfigDot)
+import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.PagerEditor (pageText)
 import System.Directory (listDirectory)
-import System.IO (stderr, hPutStrLn)
 
 data LsView
     = Local
@@ -227,11 +223,9 @@ displayLocalSnapshot term xs = renderData term (localSnaptoText xs)
 localSnaptoText :: [String] -> Text
 localSnaptoText xs = T.intercalate "\n" $ L.map T.pack xs
 
-handleLocal
-    :: (HasEnvConfig env)
-    => LsCmdOpts -> RIO env ()
+handleLocal :: LsCmdOpts -> RIO Runner ()
 handleLocal lsOpts = do
-    (instRoot :: Path Abs Dir) <- installationRootDeps
+    (instRoot :: Path Abs Dir) <- withConfig YesReexec $ withDefaultEnvConfig installationRootDeps
     isStdoutTerminal <- view terminalL
     let snapRootDir = parent $ parent instRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
@@ -252,8 +246,8 @@ handleLocal lsOpts = do
         LsStyles _ -> return ()
 
 handleRemote
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
-    => LsCmdOpts -> m ()
+    :: HasRunner env
+    => LsCmdOpts -> RIO env ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
     isStdoutTerminal <- view terminalL
@@ -277,25 +271,24 @@ handleRemote lsOpts = do
   where
     urlInfo = "https://www.stackage.org/snapshots"
 
-lsCmd :: LsCmdOpts -> GlobalOpts -> IO ()
-lsCmd lsOpts go =
+lsCmd :: LsCmdOpts -> RIO Runner ()
+lsCmd lsOpts =
     case lsView lsOpts of
         LsSnapshot SnapshotOpts {..} ->
             case soptViewType of
-                Local -> withDefaultBuildConfig go (handleLocal lsOpts)
-                Remote -> withDefaultBuildConfig go (handleRemote lsOpts)
-        LsDependencies depOpts -> listDependenciesCmd False depOpts go
-        LsStyles stylesOpts -> loadConfigWithOpts go (listStylesCmd stylesOpts)
+                Local -> handleLocal lsOpts
+                Remote -> handleRemote lsOpts
+        LsDependencies depOpts -> listDependenciesCmd False depOpts
+        LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts
 
 -- | List the dependencies
-listDependenciesCmd :: Bool -> ListDepsOpts -> GlobalOpts -> IO ()
-listDependenciesCmd deprecated opts go = do
+listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Runner ()
+listDependenciesCmd deprecated opts = do
     when
         deprecated
-        (hPutStrLn
-             stderr
+        (logWarn
              "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
-    withBuildConfigDot (listDepsDotOpts opts) go $ listDependencies opts
+    listDependencies opts
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd =
@@ -310,8 +303,9 @@ lsViewRemoteCmd =
         (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
 
 -- | List stack's output styles
-listStylesCmd :: ListStylesOpts -> LoadConfig -> IO ()
-listStylesCmd opts lc = do
+listStylesCmd :: ListStylesOpts -> RIO Config ()
+listStylesCmd opts = do
+    lc <- ask
     -- This is the same test as is used in Stack.Types.Runner.withRunner
     let useColor = view useColorL lc
         styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
@@ -319,7 +313,7 @@ listStylesCmd opts lc = do
         showSGR = isComplex && coptSGR opts
         showExample = isComplex && coptExample opts && useColor
         styleReports = L.map (styleReport showSGR showExample) styles
-    T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
+    liftIO $ T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
   where
     styleReport :: Bool -> Bool -> StyleSpec -> Text
     styleReport showSGR showExample (k, sgrs) = k <> "=" <> codes

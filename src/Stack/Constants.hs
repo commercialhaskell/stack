@@ -88,7 +88,6 @@ module Stack.Constants
     ,relFileDockerfile
     ,relDirHaskellStackGhci
     ,relFileGhciScript
-    ,relFileLockfile
     ,relDirCombined
     ,relFileHpcIndexHtml
     ,relDirCustom
@@ -493,9 +492,6 @@ relDirHaskellStackGhci = $(mkRelDir "haskell-stack-ghci")
 
 relFileGhciScript :: Path Rel File
 relFileGhciScript = $(mkRelFile "ghci-script")
-
-relFileLockfile :: Path Rel File
-relFileLockfile = $(mkRelFile "lockfile")
 
 relDirCombined :: Path Rel Dir
 relDirCombined = $(mkRelDir "combined")

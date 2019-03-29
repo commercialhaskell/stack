@@ -22,10 +22,11 @@ module Stack.Docker
   ,entrypoint
   ,preventInContainer
   ,pull
-  ,reexecWithOptionalContainer
   ,reset
   ,reExecArgName
   ,StackDockerException(..)
+  ,getProjectRoot
+  ,runContainerAndExit
   ) where
 
 import           Stack.Prelude
@@ -58,7 +59,6 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Docker.GlobalDB
-import           Stack.Types.Runner
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -82,146 +82,98 @@ import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
 
--- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
--- Otherwise, runs the inner action.
---
--- This takes an optional release action which should be taken IFF control is
--- transferring away from the current process to the intra-container one.  The main use
--- for this is releasing a lock.  After launching reexecution, the host process becomes
--- nothing but an manager for the call into docker and thus may not hold the lock.
-reexecWithOptionalContainer
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> Maybe (RIO env ())
-    -> IO ()
-    -> Maybe (RIO env ())
-    -> Maybe (RIO env ())
-    -> RIO env ()
-reexecWithOptionalContainer mprojectRoot =
-    execWithOptionalContainer mprojectRoot getCmdArgs
-  where
-    getCmdArgs docker imageInfo isRemoteDocker = do
-        config <- view configL
-        deUser <-
-            if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
-                then liftIO $ do
-                  duUid <- User.getEffectiveUserID
-                  duGid <- User.getEffectiveGroupID
-                  duGroups <- nubOrd <$> User.getGroups
-                  duUmask <- Files.setFileCreationMask 0o022
-                  -- Only way to get old umask seems to be to change it, so set it back afterward
-                  _ <- Files.setFileCreationMask duUmask
-                  return (Just DockerUser{..})
-                else return Nothing
-        args <-
-            fmap
-                (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
-                 ,"--" ++ dockerEntrypointArgName
-                 ,show DockerEntrypoint{..}] ++)
-                (liftIO getArgs)
-        case dockerStackExe (configDocker config) of
-            Just DockerStackExeHost
-              | configPlatform config == dockerContainerPlatform -> do
-                  exePath <- liftIO getExecutablePath
-                  cmdArgs args exePath
-              | otherwise -> throwIO UnsupportedStackExeHostPlatformException
-            Just DockerStackExeImage -> do
-                progName <- liftIO getProgName
-                return (FP.takeBaseName progName, args, [], [])
-            Just (DockerStackExePath path) -> do
-                exePath <- liftIO $ canonicalizePath (toFilePath path)
-                cmdArgs args exePath
-            Just DockerStackExeDownload -> exeDownload args
-            Nothing
-              | configPlatform config == dockerContainerPlatform -> do
-                  (exePath,exeTimestamp,misCompatible) <-
+-- | Function to get command and arguments to run in Docker container
+getCmdArgs
+  :: HasConfig env
+  => DockerOpts
+  -> Inspect
+  -> Bool
+  -> RIO env (FilePath,[String],[(String,String)],[Mount])
+getCmdArgs docker imageInfo isRemoteDocker = do
+    config <- view configL
+    deUser <-
+        if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+            then liftIO $ do
+              duUid <- User.getEffectiveUserID
+              duGid <- User.getEffectiveGroupID
+              duGroups <- nubOrd <$> User.getGroups
+              duUmask <- Files.setFileCreationMask 0o022
+              -- Only way to get old umask seems to be to change it, so set it back afterward
+              _ <- Files.setFileCreationMask duUmask
+              return (Just DockerUser{..})
+            else return Nothing
+    args <-
+        fmap
+            (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
+             ,"--" ++ dockerEntrypointArgName
+             ,show DockerEntrypoint{..}] ++)
+            (liftIO getArgs)
+    case dockerStackExe (configDocker config) of
+        Just DockerStackExeHost
+          | configPlatform config == dockerContainerPlatform -> do
+              exePath <- liftIO getExecutablePath
+              cmdArgs args exePath
+          | otherwise -> throwIO UnsupportedStackExeHostPlatformException
+        Just DockerStackExeImage -> do
+            progName <- liftIO getProgName
+            return (FP.takeBaseName progName, args, [], [])
+        Just (DockerStackExePath path) -> do
+            exePath <- liftIO $ canonicalizePath (toFilePath path)
+            cmdArgs args exePath
+        Just DockerStackExeDownload -> exeDownload args
+        Nothing
+          | configPlatform config == dockerContainerPlatform -> do
+              (exePath,exeTimestamp,misCompatible) <-
+                  liftIO $
+                  do exePath <- liftIO getExecutablePath
+                     exeTimestamp <- resolveFile' exePath >>= getModificationTime
+                     isKnown <-
+                         liftIO $
+                         getDockerImageExe
+                             config
+                             (iiId imageInfo)
+                             exePath
+                             exeTimestamp
+                     return (exePath, exeTimestamp, isKnown)
+              case misCompatible of
+                  Just True -> cmdArgs args exePath
+                  Just False -> exeDownload args
+                  Nothing -> do
+                      e <-
+                          try $
+                          sinkProcessStderrStdout
+                              "docker"
+                              [ "run"
+                              , "-v"
+                              , exePath ++ ":" ++ "/tmp/stack"
+                              , iiId imageInfo
+                              , "/tmp/stack"
+                              , "--version"]
+                              sinkNull
+                              sinkNull
+                      let compatible =
+                              case e of
+                                  Left (ProcessExitedUnsuccessfully _ _) ->
+                                      False
+                                  Right _ -> True
                       liftIO $
-                      do exePath <- liftIO getExecutablePath
-                         exeTimestamp <- resolveFile' exePath >>= getModificationTime
-                         isKnown <-
-                             liftIO $
-                             getDockerImageExe
-                                 config
-                                 (iiId imageInfo)
-                                 exePath
-                                 exeTimestamp
-                         return (exePath, exeTimestamp, isKnown)
-                  case misCompatible of
-                      Just True -> cmdArgs args exePath
-                      Just False -> exeDownload args
-                      Nothing -> do
-                          e <-
-                              try $
-                              sinkProcessStderrStdout
-                                  "docker"
-                                  [ "run"
-                                  , "-v"
-                                  , exePath ++ ":" ++ "/tmp/stack"
-                                  , iiId imageInfo
-                                  , "/tmp/stack"
-                                  , "--version"]
-                                  sinkNull
-                                  sinkNull
-                          let compatible =
-                                  case e of
-                                      Left (ProcessExitedUnsuccessfully _ _) ->
-                                          False
-                                      Right _ -> True
-                          liftIO $
-                              setDockerImageExe
-                                  config
-                                  (iiId imageInfo)
-                                  exePath
-                                  exeTimestamp
-                                  compatible
-                          if compatible
-                              then cmdArgs args exePath
-                              else exeDownload args
-            Nothing -> exeDownload args
+                          setDockerImageExe
+                              config
+                              (iiId imageInfo)
+                              exePath
+                              exeTimestamp
+                              compatible
+                      if compatible
+                          then cmdArgs args exePath
+                          else exeDownload args
+        Nothing -> exeDownload args
+  where
     exeDownload args = do
         exePath <- ensureDockerStackExe dockerContainerPlatform
         cmdArgs args (toFilePath exePath)
     cmdArgs args exePath = do
         let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
         return (mountPath, args, [], [Mount exePath mountPath])
-
--- | If Docker is enabled, re-runs the OS command returned by the second argument in a
--- Docker container.  Otherwise, runs the inner action.
---
--- This takes an optional release action just like `reexecWithOptionalContainer`.
-execWithOptionalContainer
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> GetCmdArgs env
-    -> Maybe (RIO env ())
-    -> IO ()
-    -> Maybe (RIO env ())
-    -> Maybe (RIO env ())
-    -> RIO env ()
-execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
-  do config <- view configL
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     if | inContainer && not isReExec && (isJust mbefore || isJust mafter) ->
-            throwIO OnlyOnHostException
-        | inContainer ->
-            liftIO (do inner
-                       exitSuccess)
-        | not (dockerEnable (configDocker config)) ->
-            do fromMaybeAction mbefore
-               liftIO inner
-               fromMaybeAction mafter
-               liftIO exitSuccess
-        | otherwise ->
-            do fromMaybeAction mrelease
-               runContainerAndExit
-                 getCmdArgs
-                 mprojectRoot
-                 (fromMaybeAction mbefore)
-                 (fromMaybeAction mafter)
-  where
-    fromMaybeAction Nothing = return ()
-    fromMaybeAction (Just hook) = hook
 
 -- | Error if running in a container.
 preventInContainer :: MonadIO m => m () -> m ()
@@ -232,17 +184,8 @@ preventInContainer inner =
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit
-  :: HasConfig env
-  => GetCmdArgs env
-  -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
-  -> RIO env ()  -- ^ Action to run before
-  -> RIO env ()  -- ^ Action to run after
-  -> RIO env ()
-runContainerAndExit getCmdArgs
-                    mprojectRoot
-                    before
-                    after = do
+runContainerAndExit :: HasConfig env => RIO env void
+runContainerAndExit = do
      config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
@@ -275,6 +218,7 @@ runContainerAndExit getCmdArgs
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
+     projectRoot <- getProjectRoot
      sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
@@ -291,11 +235,15 @@ runContainerAndExit getCmdArgs
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      hostBinDirPath <- parseAbsDir hostBinDir
+     let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
+     when (isNothing mpath) $ do
+       logWarn "The Docker image does not set the PATH env var"
+       logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
      newPathEnv <- either throwM return $ augmentPath
                       ( toFilePath <$>
                       [ hostBinDirPath
                       , sandboxHomeDir </> relDirDotLocal </> relDirBin])
-                      (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
+                      mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
      liftIO
@@ -354,7 +302,6 @@ runContainerAndExit getCmdArgs
          ,[image]
          ,[cmnd]
          ,args])
-     before
 -- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
 -- `docker` process so that it can handle the signals directly?
 #ifndef WINDOWS
@@ -385,8 +332,7 @@ runContainerAndExit getCmdArgs
          )
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-       Right () -> do after
-                      liftIO exitSuccess
+       Right () -> liftIO exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
@@ -397,7 +343,6 @@ runContainerAndExit getCmdArgs
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    projectRoot = fromMaybeProjectRoot mprojectRoot
     sshRelDir = relDirDotSsh
 
 -- | Clean-up old docker images and containers.
@@ -647,7 +592,10 @@ inspects :: (HasProcessContext env, HasLogFunc env)
          => [String] -> RIO env (Map String Inspect)
 inspects [] = return Map.empty
 inspects images =
-  do maybeInspectOut <- try (readDockerProcess ("inspect" : images))
+  do maybeInspectOut <-
+       -- not using 'readDockerProcess' as the error from a missing image
+       -- needs to be recovered.
+       try (BL.toStrict . fst <$> proc "docker" ("inspect" : images) readProcess_)
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -722,15 +670,14 @@ checkDockerVersion docker =
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
 
 -- | Remove the project's Docker sandbox.
-reset :: (MonadIO m, MonadReader env m, HasConfig env)
-  => Maybe (Path Abs Dir) -> Bool -> m ()
-reset maybeProjectRoot keepHome = do
+reset :: HasConfig env => Bool -> RIO env ()
+reset keepHome = do
+  projectRoot <- getProjectRoot
   dockerSandboxDir <- projectDockerSandboxDir projectRoot
   liftIO (removeDirectoryContents
             dockerSandboxDir
             [homeDirName | keepHome]
             [])
-  where projectRoot = fromMaybeProjectRoot maybeProjectRoot
 
 -- | The Docker container "entrypoint": special actions performed when first entering
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
@@ -834,11 +781,16 @@ removeDirectoryContents path excludeDirs excludeFiles =
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ReadProcessException' exception if the
--- process fails.  Logs process's stderr using @logError@.
+-- process fails.
+--
+-- The stderr output is passed straight through, which is desirable for some cases
+-- e.g. docker pull, in which docker uses stderr for progress output.
+--
+-- Use 'readProcess_' directly to customize this.
 readDockerProcess
     :: (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
-readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
+readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
@@ -853,8 +805,10 @@ decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
 
 -- | Fail with friendly error if project root not set.
-fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRootException)
+getProjectRoot :: HasConfig env => RIO env (Path Abs Dir)
+getProjectRoot = do
+  mroot <- view $ configL.to configProjectRoot
+  maybe (throwIO CannotDetermineProjectRootException) pure mroot
 
 -- | Environment variable that contained the old sandbox ID.
 -- | Use of this variable is deprecated, and only used to detect old images.
@@ -907,10 +861,3 @@ instance FromJSON ImageConfig where
        ImageConfig
          <$> fmap join (o .:? "Env") .!= []
          <*> fmap join (o .:? "Entrypoint") .!= []
-
--- | Function to get command and arguments to run in Docker container
-type GetCmdArgs env
-   = DockerOpts
-  -> Inspect
-  -> Bool
-  -> RIO env (FilePath,[String],[(String,String)],[Mount])

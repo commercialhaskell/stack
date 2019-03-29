@@ -2,7 +2,6 @@
 module Stack.Options.ConfigParser where
 
 import           Data.Char
-import qualified Data.Set                          as Set
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Path
@@ -65,11 +64,11 @@ configOptsParser currentDir hide0 =
     <*> buildOptsMonoidParser hide0
     <*> dockerOptsParser True
     <*> nixOptsParser True
-    <*> firstBoolFlags
+    <*> firstBoolFlagsNoDefault
             "system-ghc"
             "using the system installed GHC (on the PATH) if it is available and its version matches. Disabled by default."
             hide
-    <*> firstBoolFlags
+    <*> firstBoolFlagsTrue
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
             hide
@@ -88,20 +87,20 @@ configOptsParser currentDir hide0 =
            <> help "Number of concurrent jobs to run"
            <> hide
             ))
-    <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
+    <*> many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
            <> completer dirCompleter
            <> help "Extra directories to check for C header files"
            <> hide
-            )))
-    <*> fmap Set.fromList (many ((currentDir FilePath.</>) <$> strOption
+            ))
+    <*> many ((currentDir FilePath.</>) <$> strOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
            <> completer dirCompleter
            <> help "Extra directories to check for libraries"
            <> hide
-            )))
+            ))
     <*> optionalFirst (absFileOption
              ( long "with-gcc"
             <> metavar "PATH-TO-GCC"
@@ -114,11 +113,11 @@ configOptsParser currentDir hide0 =
             <> help "Use HPACK executable (overrides bundled Hpack)"
             <> hide
              ))
-    <*> firstBoolFlags
+    <*> firstBoolFlagsFalse
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
             hide
-    <*> firstBoolFlags
+    <*> firstBoolFlagsFalse
             "skip-msys"
             "skipping the local MSYS installation (Windows only)"
             hide
@@ -129,19 +128,20 @@ configOptsParser currentDir hide0 =
             <> help "Install binaries to DIR"
             <> hide
              ))
-    <*> firstBoolFlags
+    <*> firstBoolFlagsTrue
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"
             hide
-    <*> firstBoolFlags
+    <*> firstBoolFlagsNoDefault
             "allow-different-user"
             ("permission for users other than the owner of the stack root " ++
-                "directory to use a stack installation (POSIX only)")
+                "directory to use a stack installation (POSIX only) " ++
+                "(default: true inside Docker, otherwise false)")
             hide
     <*> fmap toDumpLogs
-            (firstBoolFlags
+            (firstBoolFlagsNoDefault
              "dump-logs"
-             "dump the build output logs for local packages to the console"
+             "dump the build output logs for local packages to the console (default: dump warning logs)"
              hide)
     <*> optionalFirst (option readColorWhen
              ( long "color"

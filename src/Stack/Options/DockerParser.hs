@@ -20,7 +20,8 @@ dockerOptsParser :: Bool -> Parser DockerOptsMonoid
 dockerOptsParser hide0 =
     DockerOptsMonoid
     <$> pure (Any False)
-    <*> firstBoolFlags dockerCmdName
+    <*> firstBoolFlagsNoDefault
+                       dockerCmdName
                        "using a Docker container. --docker implies 'system-ghc: true'"
                        hide
     <*> fmap First
@@ -33,7 +34,8 @@ dockerOptsParser hide0 =
                                                       metavar "IMAGE" <>
                                                       help "Exact Docker image ID (overrides docker-repo)") <|>
          pure Nothing)
-    <*> firstBoolFlags (dockerOptName dockerRegistryLoginArgName)
+    <*> firstBoolFlagsNoDefault
+                       (dockerOptName dockerRegistryLoginArgName)
                        "registry requires login"
                        hide
     <*> firstStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
@@ -44,13 +46,16 @@ dockerOptsParser hide0 =
                         hide <>
                         metavar "PASSWORD" <>
                         help "Docker registry password")
-    <*> firstBoolFlags (dockerOptName dockerAutoPullArgName)
+    <*> firstBoolFlagsTrue
+                       (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
                        hide
-    <*> firstBoolFlags (dockerOptName dockerDetachArgName)
+    <*> firstBoolFlagsFalse
+                       (dockerOptName dockerDetachArgName)
                        "running a detached Docker container"
                        hide
-    <*> firstBoolFlags (dockerOptName dockerPersistArgName)
+    <*> firstBoolFlagsFalse
+                       (dockerOptName dockerPersistArgName)
                        "not deleting container after it exits"
                        hide
     <*> firstStrOption (long (dockerOptName dockerContainerNameArgName) <>
@@ -91,7 +96,8 @@ dockerOptsParser hide0 =
              help (concat [ "Location of "
                           , stackProgName
                           , " executable used in container" ])))
-    <*> firstBoolFlags (dockerOptName dockerSetUserArgName)
+    <*> firstBoolFlagsNoDefault
+                       (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide
     <*> pure (IntersectingVersionRange anyVersion)

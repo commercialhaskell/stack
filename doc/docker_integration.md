@@ -3,11 +3,7 @@
 Docker integration
 ===============================================================================
 
-**Note:** This page is mainly about building Haskell packages inside docker containers.
-If you want to deploy your built Haskell programs into a docker container,
-look [here](GUIDE.md#docker) instead.
-
-`stack` has support for automatically performing builds inside a Docker
+Stack has support for automatically performing builds inside a Docker
 container, using volume mounts and user ID switching to make it mostly seamless.
 FP Complete provides images for use with stack that include GHC, tools, and
 optionally have all of the Stackage LTS packages pre-installed in the global
@@ -21,6 +17,10 @@ See the
 [how stack can use Docker under the hood](https://www.fpcomplete.com/blog/2015/08/stack-docker)
 blog post for more information about the motivation and implementation of stack's
 Docker support.
+
+If you'd like to build Docker images that contain your Haskell
+executables, see [Building Haskell Apps with
+Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
 
 Prerequisites
 -------------------------------------------------------------------------------
@@ -199,7 +199,7 @@ otherwise noted.
       # If true, the image will be pulled from the registry automatically, without
       # needing to run `stack docker pull`.  See the "security" section of this
       # document for implications of enabling this.
-      auto-pull: false
+      auto-pull: true
 
       # If true, the container will be run "detached" (in the background).  Refer
       # to the Docker users guide for information about how to manage containers.

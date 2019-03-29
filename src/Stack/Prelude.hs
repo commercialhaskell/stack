@@ -14,6 +14,12 @@ module Stack.Prelude
   , promptPassword
   , promptBool
   , stackProgName
+  , FirstTrue (..)
+  , fromFirstTrue
+  , defaultFirstTrue
+  , FirstFalse (..)
+  , fromFirstFalse
+  , defaultFirstFalse
   , module X
   ) where
 
@@ -165,3 +171,39 @@ promptBool txt = liftIO $ do
 -- GHC stage restrictions.
 stackProgName :: String
 stackProgName = "stack"
+
+-- | Like @First Bool@, but the default is @True@.
+newtype FirstTrue = FirstTrue { getFirstTrue :: Maybe Bool }
+  deriving (Show, Eq, Ord)
+instance Semigroup FirstTrue where
+  FirstTrue (Just x) <> _ = FirstTrue (Just x)
+  FirstTrue Nothing <> x = x
+instance Monoid FirstTrue where
+  mempty = FirstTrue Nothing
+  mappend = (<>)
+
+-- | Get the 'Bool', defaulting to 'True'
+fromFirstTrue :: FirstTrue -> Bool
+fromFirstTrue = fromMaybe True . getFirstTrue
+
+-- | Helper for filling in default values
+defaultFirstTrue :: (a -> FirstTrue) -> Bool
+defaultFirstTrue _ = True
+
+-- | Like @First Bool@, but the default is @False@.
+newtype FirstFalse = FirstFalse { getFirstFalse :: Maybe Bool }
+  deriving (Show, Eq, Ord)
+instance Semigroup FirstFalse where
+  FirstFalse (Just x) <> _ = FirstFalse (Just x)
+  FirstFalse Nothing <> x = x
+instance Monoid FirstFalse where
+  mempty = FirstFalse Nothing
+  mappend = (<>)
+
+-- | Get the 'Bool', defaulting to 'False'
+fromFirstFalse :: FirstFalse -> Bool
+fromFirstFalse = fromMaybe False . getFirstFalse
+
+-- | Helper for filling in default values
+defaultFirstFalse :: (a -> FirstFalse) -> Bool
+defaultFirstFalse _ = False

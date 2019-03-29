@@ -1,7 +1,3 @@
-{-# ANN module "HLint: ignore" #-}
-#if __GLASGOW_HASKELL__ >= 704
-{-# LANGUAGE Safe #-}
-#endif
 {-# LANGUAGE PatternGuards #-}
 
 -- This template expects CPP definitions for:
@@ -147,6 +143,7 @@ pathSeparator = if isWindows then '\\' else '/'
 -- > Windows: pathSeparators == ['\\', '/']
 -- > Posix:   pathSeparators == ['/']
 -- > pathSeparator `elem` pathSeparators
+{-# ANN pathSeparators "HLint: ignore" #-}
 pathSeparators :: [Char]
 pathSeparators = if isWindows then "\\/" else "/"
 
@@ -1026,5 +1023,6 @@ breakEnd p = spanEnd (not . p)
 -- | The stripSuffix function drops the given suffix from a list. It returns
 -- Nothing if the list did not end with the suffix given, or Just the list
 -- before the suffix, if it does.
+{-# ANN stripSuffix "HLint: ignore" #-}
 stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
 stripSuffix xs ys = fmap reverse $ stripPrefix (reverse xs) (reverse ys)

@@ -42,11 +42,9 @@ import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
-import           Stack.Types.Runner
 import           Stack.Types.SourceMap
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
@@ -344,7 +342,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
         -- only new local targets could appear here
-        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing Nothing
+        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing
         case eres of
             Right () -> return ()
             Left err -> do
@@ -368,7 +366,6 @@ runGhci
     -> RIO env ()
 runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     config <- view configL
-    wc <- view $ actualCompilerVersionL.whichCompilerL
     let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
         shouldHidePackages =
           fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
@@ -406,10 +403,11 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     logInfo $
       "Configuring GHCi with the following packages: " <>
       mconcat (intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
+    compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
             withProcessContext menv $ exec
-                 (fromMaybe (compilerExeName wc) ghciGhcCommand)
+                 (fromMaybe compilerExeName ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
                  -- not include CWD. If there aren't any packages, CWD
@@ -426,7 +424,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                 [_] -> do
                     menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
                     output <- withProcessContext menv
-                            $ runGrabFirstLine (fromMaybe (compilerExeName wc) ghciGhcCommand) ["--version"]
+                            $ runGrabFirstLine (fromMaybe compilerExeName ghciGhcCommand) ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     -- Since usage of 'exec' does not return, we cannot do any cleanup
@@ -561,10 +559,13 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
     renderCandidate c@(pkgName,namedComponent,mainIs) =
         let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . elemIndex c
+            pkgNameText = T.pack (packageNameString pkgName)
         in  candidateIndex candidates <> ". Package `" <>
-            T.pack (packageNameString pkgName) <>
+            pkgNameText <>
             "' component " <>
-            renderComp namedComponent <>
+            -- This is the format that can be directly copy-pasted as
+            -- an argument to `stack ghci`.
+            pkgNameText <> ":" <> renderComp namedComponent <>
             " with main-is file: " <>
             T.pack (toFilePath mainIs)
     candidateIndices = take (length candidates) [1 :: Int ..]
@@ -851,7 +852,9 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       prettyNote $ vsep
           [ flow "No local targets specified, so a plain ghci will be started with no package hiding or package options."
           , ""
-          , flow $ "You are using snapshot: " ++ T.unpack (smwSnapshotName smWanted)
+          , flow $ T.unpack $ utf8BuilderToText $
+                   "You are using snapshot: " <>
+                   RIO.display (smwSnapshotLocation smWanted)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""

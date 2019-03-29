@@ -19,12 +19,10 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
-import           Stack.Runners (loadConfigWithOpts)
+import           Stack.Runners
 import           Stack.Prelude
-import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
@@ -53,10 +51,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         _ -> do
             go' <- globalOptsFromMonoid False mempty
             let go = go' { globalLogLevel = LevelOther "silent" }
-            loadConfigWithOpts go $ \lc -> do
-              bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
-              envConfig <- runRIO bconfig (setupEnv AllowNoTargets defaultBuildOptsCLI Nothing)
-              runRIO envConfig (inner input)
+            withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
@@ -87,8 +82,11 @@ flagCompleter = buildConfigCompleter $ \input -> do
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
              in (if flagEnabled name fl then "-" else "") ++ flname
-        prjFlags = maybe mempty (projectFlags . fst) $
-                   configMaybeProject (bcConfig bconfig)
+        prjFlags =
+          case configProject (bcConfig bconfig) of
+            PCProject (p, _) -> projectFlags p
+            PCNoProject -> mempty
+            PCNoConfig _ -> mempty
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (C.flagName fl) $

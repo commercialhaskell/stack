@@ -21,7 +21,14 @@ main = do
                            , "    │ │ └─┬ ghc-prim 0.5.1.1"
                            , "    │ │   └── rts 1.0"
                            , "    │ └── rts 1.0"
-                           , "    └── transformers 0.5.2.0"
+                           , "    └─┬ transformers 0.5.2.0"
+                           , "      └─┬ base 4.10.1.0"
+                           , "        ├─┬ ghc-prim 0.5.1.1"
+                           , "        │ └── rts 1.0"
+                           , "        ├─┬ integer-gmp 1.0.1.0"
+                           , "        │ └─┬ ghc-prim 0.5.1.1"
+                           , "        │   └── rts 1.0"
+                           , "        └── rts 1.0"
                            ]
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]

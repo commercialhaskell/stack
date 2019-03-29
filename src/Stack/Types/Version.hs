@@ -17,7 +17,6 @@ module Stack.Types.Version
   ,latestApplicableVersion
   ,checkVersion
   ,nextMajorVersion
-  ,UpgradeTo(..)
   ,minorVersion
   ,stackVersion
   ,stackMinorVersion)
@@ -33,9 +32,6 @@ import qualified Distribution.Version as Cabal
 import           Distribution.Version (Version, versionNumbers, withinRange)
 import qualified Paths_stack as Meta
 import           Text.PrettyPrint (render)
-
--- | A Package upgrade; Latest or a specific version.
-data UpgradeTo = Specific Version | Latest deriving (Show)
 
 newtype IntersectingVersionRange =
     IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }

@@ -24,6 +24,7 @@ dotOptsParser externalDefault =
           <*> flagsParser
           <*> testTargets
           <*> benchTargets
+          <*> globalHints
   where includeExternal = boolFlags externalDefault
                                     "external"
                                     "inclusion of external dependencies"
@@ -51,6 +52,9 @@ dotOptsParser externalDefault =
 
         splitNames :: String -> [String]
         splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
+
+        globalHints = switch (long "global-hints" <>
+                              help "Do not require an install GHC; instead, use a hints file for global packages")
 
 -- | Parser for arguments to `stack list-dependencies`.
 listDepsOptsParser :: Parser ListDepsOpts

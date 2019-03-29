@@ -214,6 +214,26 @@ extra-deps:
   commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
 ```
 
+#### Limited [git-annex](https://git-annex.branchable.com) support
+
+Pantry does not support [git-annex](https://git-annex.branchable.com). This is
+because `git archive` does not handle symbolic links outside the work tree. It
+is still possible to use repositories which use git-annex but do not require the
+annex files for the package to be built.
+
+To do so, ensure that any files or directories stored by git-annex are marked
+[export-ignore](https://git-scm.com/docs/git-archive#Documentation/git-archive.txt-export-ignore)
+in the `.gitattributes` file in the repository. See
+[#4579](https://github.com/commercialhaskell/stack/issues/4579) for more
+information.
+
+For example, if the directory `fonts/` is controlled by git-annex, use the
+following line.
+
+```gitattributes
+fonts export-ignore
+```
+
 ### Archives (HTTP(S) or local filepath)
 
 You can use HTTP and HTTPS URLs and local filepaths referring to
@@ -306,8 +326,6 @@ directories is available in snapshots to ensure reproducibility.
 resolver: lts-8.21 # Inherits GHC version and package set
 compiler: ghc-8.0.1 # Overwrites GHC version in the resolver, optional
 
-name: my-snapshot # User-friendly name
-
 # Additional packages, follows extra-deps syntax
 packages:
 - unordered-containers-0.2.7.1
@@ -371,7 +389,6 @@ packages:
   pantry-tree:
     size: 7376
     sha256: ac2601c49cf7bc0f5d66b2793eddc8352f51a6ee989980827a0d0d8169700a03
-name: my-snapshot
 hidden:
   warp: false
   wai: true

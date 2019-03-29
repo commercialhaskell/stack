@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -10,7 +11,6 @@ module Stack.Path
 
 import           Stack.Prelude
 import           Data.List (intercalate)
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)
@@ -21,29 +21,22 @@ import           Path.Extra
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
+import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.Runner
 import qualified System.FilePath as FP
-import           System.IO (stderr)
 import           RIO.PrettyPrint
 import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
-path ::
-       (HasEnvConfig envHaddocks, HasEnvConfig envNoHaddocks)
-    => (RIO envNoHaddocks () -> IO ())
-    -> (RIO envHaddocks () -> IO ())
-    -> [Text]
-    -> IO ()
-path runNoHaddocks runHaddocks keys =
+path :: [Text] -> RIO Runner ()
+path keys =
     do let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
-       liftIO $ forM_ deprecated $ \(oldOption, newOption) -> T.hPutStrLn stderr $ T.unlines
-           [ ""
-           , "'--" <> oldOption <> "' will be removed in a future release."
-           , "Please use '--" <> newOption <> "' instead."
-           , ""
-           ]
+       forM_ deprecated $ \(oldOption, newOption) -> logWarn $
+           "\n" <>
+           "'--" <> display oldOption <> "' will be removed in a future release.\n" <>
+           "Please use '--" <> display newOption <> "' instead.\n" <>
+           "\n"
        let -- filter the chosen paths in flags (keys),
            -- or show all of them if no specific paths chosen.
            goodPaths = filter
@@ -54,48 +47,44 @@ path runNoHaddocks runHaddocks keys =
            toEither (_, k, UseHaddocks p) = Left (k, p)
            toEither (_, k, WithoutHaddocks p) = Right (k, p)
            (with, without) = partitionEithers $ map toEither goodPaths
-           printKeys runEnv extractors single = runEnv $ do
+           printKeys extractors single = do
              pathInfo <- fillPathInfo
              liftIO $ forM_ extractors $ \(key, extractPath) -> do
                let prefix = if single then "" else key <> ": "
                T.putStrLn $ prefix <> extractPath pathInfo
-       printKeys runHaddocks with singlePath
-       printKeys runNoHaddocks without singlePath
+           runHaddock x = local
+             (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
+             withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
+             withDefaultEnvConfig
+       -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
+       -- withDefaultEnvConfig each time, need to figure out what
+       -- purpose is served and whether we can achieve it without two
+       -- completely separate Config setups
+       runHaddock True $ printKeys with singlePath
+       runHaddock False $ printKeys without singlePath
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
      -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
      -- full environment info including GHC paths etc.
-     bc <- view $ envConfigL.buildConfigL
+     piBuildConfig <- view $ envConfigL.buildConfigL
      -- This is the modified 'bin-path',
      -- including the local GHC or MSYS if not configured to operate on
      -- global GHC.
      -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
      -- So it's not the *minimal* override path.
-     snap <- packageDatabaseDeps
-     plocal <- packageDatabaseLocal
-     extra <- packageDatabaseExtra
-     whichCompiler <- view $ actualCompilerVersionL.whichCompilerL
-     global <- GhcPkg.getGlobalDB whichCompiler
-     snaproot <- installationRootDeps
-     localroot <- installationRootLocal
-     toolsDir <- bindirCompilerTools
-     hoogle <- hoogleRoot
-     distDir <- distRelativeDir
-     hpcDir <- hpcReportDir
-     compiler <- getCompilerPath whichCompiler
-     return $ PathInfo bc
-                       snap
-                       plocal
-                       global
-                       snaproot
-                       localroot
-                       toolsDir
-                       hoogle
-                       distDir
-                       hpcDir
-                       extra
-                       compiler
+     piSnapDb <- packageDatabaseDeps
+     piLocalDb <- packageDatabaseLocal
+     piExtraDbs <- packageDatabaseExtra
+     piGlobalDb <- cpGlobalDB
+     piSnapRoot <- installationRootDeps
+     piLocalRoot <- installationRootLocal
+     piToolsDir <- bindirCompilerTools
+     piHoogleRoot <- hoogleRoot
+     piDistDir <- distRelativeDir
+     piHpcDir <- hpcReportDir
+     piCompiler <- getCompilerPath
+     return PathInfo {..}
 
 pathParser :: OA.Parser [Text]
 pathParser =
@@ -109,18 +98,18 @@ pathParser =
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
-    { piBuildConfig  :: BuildConfig
-    , piSnapDb       :: Path Abs Dir
-    , piLocalDb      :: Path Abs Dir
-    , piGlobalDb     :: Path Abs Dir
-    , piSnapRoot     :: Path Abs Dir
-    , piLocalRoot    :: Path Abs Dir
-    , piToolsDir     :: Path Abs Dir
-    , piHoogleRoot   :: Path Abs Dir
+    { piBuildConfig  :: !BuildConfig
+    , piSnapDb       :: !(Path Abs Dir)
+    , piLocalDb      :: !(Path Abs Dir)
+    , piGlobalDb     :: !(Path Abs Dir)
+    , piSnapRoot     :: !(Path Abs Dir)
+    , piLocalRoot    :: !(Path Abs Dir)
+    , piToolsDir     :: !(Path Abs Dir)
+    , piHoogleRoot   :: !(Path Abs Dir)
     , piDistDir      :: Path Rel Dir
-    , piHpcDir       :: Path Abs Dir
-    , piExtraDbs     :: [Path Abs Dir]
-    , piCompiler     :: Path Abs File
+    , piHpcDir       :: !(Path Abs Dir)
+    , piExtraDbs     :: ![Path Abs Dir]
+    , piCompiler     :: !(Path Abs File)
     }
 
 instance HasPlatform PathInfo
@@ -133,6 +122,7 @@ instance HasStylesUpdate PathInfo where
 instance HasTerm PathInfo where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+instance HasGHCVariant PathInfo
 instance HasConfig PathInfo
 instance HasPantryConfig PathInfo where
     pantryConfigL = configL.pantryConfigL
@@ -184,10 +174,10 @@ paths =
       , WithoutHaddocks $ view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraIncludeDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraIncludeDirs . view configL )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraLibDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraLibDirs . view configL )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piSnapDb )
