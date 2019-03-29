@@ -75,6 +75,7 @@ nixCompiler compilerVersion =
             _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
         _ -> Left $ stringException "GHC major version not specified"
     WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
+    WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

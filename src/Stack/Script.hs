@@ -254,6 +254,8 @@ allExposedModules gpd = do
       checkCond (PD.Impl compiler range) = case curCompiler of
         ACGhc version ->
           pure $ compiler == GHC && version `withinRange` range
+        ACGhcGit {} ->
+          pure $ compiler == GHC
         ACGhcjs version _ghcVersion ->
           pure $ compiler == GHCJS && version `withinRange` range
       -- currently we don't do flag checking here

@@ -78,6 +78,7 @@ import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import              Prelude (until)
+import qualified    Pantry
 import qualified    RIO
 import              RIO.List
 import              RIO.PrettyPrint
@@ -512,29 +513,15 @@ ensureCompiler sopts = do
                                         Just x -> return x
                                         Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
                                 let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
-                                Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
+                                Just <$> downloadAndInstallTool (configLocalPrograms config) info tool (installMsys2Windows osKey si)
                             | otherwise -> do
                                 logWarn "Continuing despite missing tool: msys2"
                                 return Nothing
                 _ -> return Nothing
 
-
-        -- If we need to install a GHC or MSYS, try to do so
-        -- Return the additional directory paths of GHC & MSYS.
-    (compilerTool, mmsys2Tool, compilerBuild) <-
-      case msystem of
-        Just system | canUseCompiler system -> do
-            -- Have the right ghc, may still need msys
-            mmsys2Tool <- getMmsys2Tool
-            return (Left system, mmsys2Tool, CompilerBuildStandard)
-        _ -> do
-
-            -- Install GHC
-            ghcVariant <- view ghcVariantL
+    let installGhcBindist installed = do
             config <- view configL
-            let localPrograms = configLocalPrograms config
-            installed <- listInstalled localPrograms
-
+            ghcVariant <- view ghcVariantL
             possibleCompilers <-
                     case whichCompiler $ wantedToActual wanted of
                         Ghc -> do
@@ -591,9 +578,27 @@ ensureCompiler sopts = do
                             (soptsStackYaml sopts)
                             suggestion
 
-            -- Install msys2 on windows, if necessary
-            mmsys2Tool <- getMmsys2Tool
-            return (Right compilerTool, mmsys2Tool, compilerBuild)
+            return (Right compilerTool, compilerBuild)
+
+    -- If we need to install a GHC, try to do so
+    -- Return the additional directory paths of GHC.
+    (compilerTool, compilerBuild) <-
+      case msystem of
+        Just system | canUseCompiler system -> return (Left system, CompilerBuildStandard)
+        _ -> do
+            -- List installed tools
+            config <- view configL
+            let localPrograms = configLocalPrograms config
+            installed <- listInstalled localPrograms
+            logDebug $ "Installed tools: \n - " <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
+            case soptsWantedCompiler sopts of
+               -- shall we build GHC from source?
+               WCGhcGit commitId flavour -> buildGhcFromSource getSetupInfo' installed  (configCompilerRepository config) commitId flavour
+               _ -> installGhcBindist installed
+
+
+    -- Install msys2 on windows, if necessary
+    mmsys2Tool <- getMmsys2Tool
 
     paths <- do
       -- Add GHC's and MSYS's paths to the config.
@@ -679,6 +684,91 @@ ensureCompiler sopts = do
       , cpCabalVersion' = cabalPkgVer
       , cpGlobalDB' = globaldb
       }
+
+buildGhcFromSource :: forall env.
+   ( HasTerm env
+   , HasProcessContext env
+   , HasConfig env
+   ) => Memoized SetupInfo -> [Tool] -> CompilerRepository -> Text -> Text
+   -> RIO env (Either (ActualCompiler, Arch, Path Abs Dir) Tool, CompilerBuild)
+buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId flavour = do
+   config <- view configL
+   let compilerTool = ToolGhcGit commitId flavour
+
+   -- detect when the correct GHC is already installed
+   if compilerTool `elem` installed
+     then return (Right compilerTool,CompilerBuildStandard)
+     else do
+       let repo = Repo
+            { repoCommit = commitId
+            , repoUrl    = url
+            , repoType   = RepoGit
+            , repoSubdir = mempty
+            }
+
+       -- clone the repository and execute the given commands
+       Pantry.withRepo repo $ do
+         threads <- view $ configL.to configJobs
+         let
+           hadrianArgs = fmap T.unpack
+               [ hadrianCmd
+               , "-c"                    -- run ./boot and ./configure
+               , "-j" <> tshow threads   -- parallel build
+               , "--flavour=" <> flavour -- selected flavour
+               , "binary-dist"
+               ]
+           hadrianCmd
+             | osIsWindows = "./hadrian/build.stack.bat"
+             | otherwise   = "./hadrian/build.stack.sh"
+
+         logSticky $ "Building GHC from source with `"
+            <> RIO.display flavour
+            <> "` flavour. It can take a long time (more than one hour)..."
+
+         -- RIO.Process doesn't wrap process' "shell".
+         -- Instead we use "proc" with the "sh" command
+         proc "sh" hadrianArgs runProcess_
+           `catch` \(e :: ExitCodeException) -> do
+              let dispLBS = displayBytesUtf8 . BL8.toStrict
+              logDebug ("Hadrian failed with " <> displayShow (eceExitCode e))
+              logDebug ("stdout: " <> dispLBS (eceStdout e))
+              logDebug ("stderr: " <> dispLBS (eceStderr e))
+              throwM e
+
+         -- find the bindist and install it
+         bindistPath <- parseRelDir "_build/bindist"
+         mcwd <- traverse parseAbsDir =<< view workingDirL
+         let cwd = fromMaybe (error "Invalid working directory") mcwd
+         (_,files) <- listDir (cwd </> bindistPath)
+         let
+           isBindist p = "ghc-" `isPrefixOf` (toFilePath (filename p))
+                         && fileExtension (filename p) == ".xz"
+           mbindist = filter isBindist files
+         case mbindist of
+           [bindist] -> do
+               let bindist' = T.pack (toFilePath bindist)
+                   dlinfo = DownloadInfo
+                             { downloadInfoUrl           = bindist'
+                               -- we can specify a filepath instead of a URL
+                             , downloadInfoContentLength = Nothing
+                             , downloadInfoSha1          = Nothing
+                             , downloadInfoSha256        = Nothing
+                             }
+                   ghcdlinfo = GHCDownloadInfo mempty mempty dlinfo
+                   installer
+                      | osIsWindows = installGHCWindows Nothing
+                      | otherwise   = installGHCPosix Nothing ghcdlinfo
+               si <- runMemoized getSetupInfo'
+               _ <- downloadAndInstallTool
+                 (configLocalPrograms config)
+                 dlinfo
+                 compilerTool
+                 (installer si)
+               return (Right compilerTool, CompilerBuildStandard)
+           _ -> do
+              forM_ files (logDebug . fromString . (" - " ++) . toFilePath)
+              error "Can't find hadrian generated bindist"
+
 
 -- | Determine which GHC builds to use depending on which shared libraries are available
 -- on the system.
@@ -921,12 +1011,11 @@ getInstalledGhcjs installed goodVersion =
 
 downloadAndInstallTool :: HasTerm env
                        => Path Abs Dir
-                       -> SetupInfo
                        -> DownloadInfo
                        -> Tool
-                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> RIO env ())
+                       -> (Path Abs File -> ArchiveType -> Path Abs Dir -> Path Abs Dir -> RIO env ())
                        -> RIO env Tool
-downloadAndInstallTool programsDir si downloadInfo tool installer = do
+downloadAndInstallTool programsDir downloadInfo tool installer = do
     ensureDir programsDir
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
@@ -934,7 +1023,7 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     liftIO $ ignoringAbsence (removeDirRecur tempDir)
     ensureDir tempDir
     unmarkInstalled programsDir tool
-    installer si file at tempDir dir
+    installer file at tempDir dir
     markInstalled programsDir tool
     liftIO $ ignoringAbsence (removeDirRecur tempDir)
     return tool
@@ -971,8 +1060,8 @@ downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL =
     config <- view configL
     let installer =
             case configPlatform config of
-                Platform _ Cabal.Windows -> installGHCWindows selectedVersion
-                _ -> installGHCPosix selectedVersion downloadInfo
+                Platform _ Cabal.Windows -> installGHCWindows (Just selectedVersion)
+                _ -> installGHCPosix (Just selectedVersion) downloadInfo
     logInfo $
         "Preparing to install GHC" <>
         (case ghcVariant of
@@ -985,8 +1074,9 @@ downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL =
     logInfo "This will not interfere with any system-level installation."
     ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
-    downloadAndInstallTool (configLocalPrograms config) si (gdiDownloadInfo downloadInfo) tool installer
-downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = do
+    downloadAndInstallTool (configLocalPrograms config) (gdiDownloadInfo downloadInfo) tool (installer si)
+
+downloadAndInstallCompiler compilerBuild si wanted@WCGhcjs{} versionCheck _mbindistUrl = do
     config <- view configL
     ghcVariant <- view ghcVariantL
     case (ghcVariant, compilerBuild) of
@@ -998,7 +1088,10 @@ downloadAndInstallCompiler compilerBuild si wanted versionCheck _mbindistUrl = d
     logInfo "Preparing to install GHCJS to an isolated location."
     logInfo "This will not interfere with any system-level installation."
     let tool = ToolGhcjs selectedVersion
-    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installGHCJS
+    downloadAndInstallTool (configLocalPrograms config) downloadInfo tool (installGHCJS si)
+
+downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
+    error "downloadAndInstallCompiler: shouldn't be reached with ghc-git"
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
@@ -1138,7 +1231,7 @@ data ArchiveType
     | SevenZ
 
 installGHCPosix :: HasConfig env
-                => Version
+                => Maybe Version
                 -> GHCDownloadInfo
                 -> SetupInfo
                 -> Path Abs File
@@ -1146,7 +1239,7 @@ installGHCPosix :: HasConfig env
                 -> Path Abs Dir
                 -> Path Abs Dir
                 -> RIO env ()
-installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir = do
+installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- view processContextL
     menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
@@ -1171,11 +1264,6 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
     logDebug $ "ziptool: " <> fromString zipTool
     logDebug $ "make: " <> fromString makeTool
     logDebug $ "tar: " <> fromString tarTool
-
-    dir <-
-        liftM (tempDir </>) $
-        parseRelDir $
-        "ghc-" ++ versionString version
 
     let runStep step wd env cmd args = do
           menv' <- modifyEnvVars menv (Map.union env)
@@ -1213,6 +1301,12 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
       " ..."
     logDebug $ "Unpacking " <> fromString (toFilePath archiveFile)
     runStep "unpacking" tempDir mempty tarTool [compOpt : "xf", toFilePath archiveFile]
+
+    dir <- case mversion of
+            Just version -> do
+               relDir <- parseRelDir $ "ghc-" ++ versionString version
+               return (tempDir </> relDir)
+            Nothing      -> expectSingleUnpackedDir archiveFile tempDir
 
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
@@ -1496,16 +1590,16 @@ instance Alternative (CheckDependency env) where
             Right x' -> return $ Right x'
 
 installGHCWindows :: HasConfig env
-                  => Version
+                  => Maybe Version
                   -> SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
                   -> RIO env ()
-installGHCWindows version si archiveFile archiveType _tempDir destDir = do
-    tarComponent <- parseRelDir $ "ghc-" ++ versionString version
-    withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
+installGHCWindows mversion si archiveFile archiveType _tempDir destDir = do
+    tarComponent <- mapM (\v -> parseRelDir $ "ghc-" ++ versionString v) mversion
+    withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
     logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 
 installMsys2Windows :: HasConfig env

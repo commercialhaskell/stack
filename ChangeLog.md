@@ -55,6 +55,11 @@ Major changes:
   builds, this functionality is no longer useful. For an example, please see
   [Building Haskell Apps with
   Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
+* Support building GHC from source (experimental)
+    * Stack now supports building and installing GHC from source. The built GHC
+      is uniquely identified by a commit id and an Hadrian "flavour" (Hadrian is
+      the newer GHC build system), hence `compiler` can be set to use a GHC
+      built from source with `ghc-git-COMMIT-FLAVOUR`
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)

@@ -137,6 +137,7 @@ checkDependencyGraph constraints snapshot = do
     let compiler = rsCompiler snapshot
         compilerVer = case compiler of
           WCGhc v -> v
+          WCGhcGit {} -> error "GHC-GIT is not supported"
           WCGhcjs _ _ -> error "GHCJS is not supported"
     let snapshotPackages =
             Map.fromList

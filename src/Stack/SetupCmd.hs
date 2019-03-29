@@ -105,6 +105,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         }
     let compiler = case wantedCompiler of
             WCGhc _ -> "GHC"
+            WCGhcGit{} -> "GHC (built from source)"
             WCGhcjs {} -> "GHCJS"
     if sandboxedGhc
         then logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"

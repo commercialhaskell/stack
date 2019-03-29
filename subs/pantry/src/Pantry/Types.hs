@@ -1631,6 +1631,7 @@ data HpackExecutable
 -- @since 0.1.0.0
 data WantedCompiler
   = WCGhc !Version
+  | WCGhcGit !Text !Text
   | WCGhcjs
       !Version
       !Version
@@ -1641,6 +1642,8 @@ instance Display WantedCompiler where
   display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
   display (WCGhcjs vghcjs vghc) =
     "ghcjs-" <> fromString (versionString vghcjs) <> "_ghc-" <> fromString (versionString vghc)
+  display (WCGhcGit commit flavour) =
+    "ghc-git-" <> display commit <> "-" <> display flavour
 instance ToJSON WantedCompiler where
   toJSON = toJSON . utf8BuilderToText . display
 instance FromJSON WantedCompiler where
@@ -1659,7 +1662,9 @@ parseWantedCompiler :: Text -> Either PantryException WantedCompiler
 parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
   case T.stripPrefix "ghcjs-" t0 of
     Just t1 -> parseGhcjs t1
-    Nothing -> T.stripPrefix "ghc-" t0 >>= parseGhc
+    Nothing -> case T.stripPrefix "ghc-git-" t0 of
+       Just t1 -> parseGhcGit t1
+       Nothing -> T.stripPrefix "ghc-" t0 >>= parseGhc
   where
     parseGhcjs t1 = do
       let (ghcjsVT, t2) = T.break (== '_') t1
@@ -1667,6 +1672,9 @@ parseWantedCompiler t0 = maybe (Left $ InvalidWantedCompiler t0) Right $
       ghcVT <- T.stripPrefix "_ghc-" t2
       ghcV <- parseVersion $ T.unpack ghcVT
       pure $ WCGhcjs ghcjsV ghcV
+    parseGhcGit t1 = do
+      let (commit, flavour) = T.break (== '-') t1
+      pure $ WCGhcGit commit (T.drop 1 flavour)
     parseGhc = fmap WCGhc . parseVersion . T.unpack
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLocation)) where

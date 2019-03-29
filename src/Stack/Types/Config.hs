@@ -295,6 +295,8 @@ data Config =
          -- ^ On Windows: don't use a sandboxed MSYS
          ,configCompilerCheck       :: !VersionCheck
          -- ^ Specifies which versions of the compiler are acceptable.
+         ,configCompilerRepository  :: !CompilerRepository
+         -- ^ Specifies the repository containing the compiler sources
          ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
@@ -692,6 +694,8 @@ data ConfigMonoid =
     -- ^ See: 'configSkipMsys'
     ,configMonoidCompilerCheck       :: !(First VersionCheck)
     -- ^ See: 'configCompilerCheck'
+    ,configMonoidCompilerRepository  :: !(First CompilerRepository)
+    -- ^ See: 'configCompilerRepository'
     ,configMonoidRequireStackVersion :: !IntersectingVersionRange
     -- ^ See: 'configRequireStackVersion'
     ,configMonoidArch                :: !(First String)
@@ -824,6 +828,7 @@ parseConfigMonoidObject rootDir obj = do
           params <- tobj ..:? configMonoidTemplateParametersName
           return (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
+    configMonoidCompilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
 
     options <- Map.map unGhcOptions <$> obj ..:? configMonoidGhcOptionsName ..!= mempty
 
@@ -962,6 +967,9 @@ configMonoidTemplateParametersName = "params"
 
 configMonoidCompilerCheckName :: Text
 configMonoidCompilerCheckName = "compiler-check"
+
+configMonoidCompilerRepositoryName :: Text
+configMonoidCompilerRepositoryName = "compiler-repository"
 
 configMonoidGhcOptionsName :: Text
 configMonoidGhcOptionsName = "ghc-options"
@@ -1314,6 +1322,7 @@ compilerVersionDir = do
     parseRelDir $ case compilerVersion of
         ACGhc version -> versionString version
         ACGhcjs {} -> compilerVersionString compilerVersion
+        ACGhcGit {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
