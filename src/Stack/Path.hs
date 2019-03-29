@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -66,36 +67,24 @@ fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
      -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
      -- full environment info including GHC paths etc.
-     bc <- view $ envConfigL.buildConfigL
+     piBuildConfig <- view $ envConfigL.buildConfigL
      -- This is the modified 'bin-path',
      -- including the local GHC or MSYS if not configured to operate on
      -- global GHC.
      -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
      -- So it's not the *minimal* override path.
-     snap <- packageDatabaseDeps
-     plocal <- packageDatabaseLocal
-     extra <- packageDatabaseExtra
-     whichCompiler <- view $ actualCompilerVersionL.whichCompilerL
-     global <- GhcPkg.getGlobalDB whichCompiler
-     snaproot <- installationRootDeps
-     localroot <- installationRootLocal
-     toolsDir <- bindirCompilerTools
-     hoogle <- hoogleRoot
-     distDir <- distRelativeDir
-     hpcDir <- hpcReportDir
-     compiler <- getCompilerPath whichCompiler
-     return $ PathInfo bc
-                       snap
-                       plocal
-                       global
-                       snaproot
-                       localroot
-                       toolsDir
-                       hoogle
-                       distDir
-                       hpcDir
-                       extra
-                       compiler
+     piSnapDb <- packageDatabaseDeps
+     piLocalDb <- packageDatabaseLocal
+     piExtraDbs <- packageDatabaseExtra
+     piGlobalDb <- cpGlobalDB
+     piSnapRoot <- installationRootDeps
+     piLocalRoot <- installationRootLocal
+     piToolsDir <- bindirCompilerTools
+     piHoogleRoot <- hoogleRoot
+     piDistDir <- distRelativeDir
+     piHpcDir <- hpcReportDir
+     piCompiler <- getCompilerPath
+     return PathInfo {..}
 
 pathParser :: OA.Parser [Text]
 pathParser =
@@ -109,18 +98,18 @@ pathParser =
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
-    { piBuildConfig  :: BuildConfig
-    , piSnapDb       :: Path Abs Dir
-    , piLocalDb      :: Path Abs Dir
-    , piGlobalDb     :: Path Abs Dir
-    , piSnapRoot     :: Path Abs Dir
-    , piLocalRoot    :: Path Abs Dir
-    , piToolsDir     :: Path Abs Dir
-    , piHoogleRoot   :: Path Abs Dir
+    { piBuildConfig  :: !BuildConfig
+    , piSnapDb       :: !(Path Abs Dir)
+    , piLocalDb      :: !(Path Abs Dir)
+    , piGlobalDb     :: !(Path Abs Dir)
+    , piSnapRoot     :: !(Path Abs Dir)
+    , piLocalRoot    :: !(Path Abs Dir)
+    , piToolsDir     :: !(Path Abs Dir)
+    , piHoogleRoot   :: !(Path Abs Dir)
     , piDistDir      :: Path Rel Dir
-    , piHpcDir       :: Path Abs Dir
-    , piExtraDbs     :: [Path Abs Dir]
-    , piCompiler     :: Path Abs File
+    , piHpcDir       :: !(Path Abs Dir)
+    , piExtraDbs     :: ![Path Abs Dir]
+    , piCompiler     :: !(Path Abs File)
     }
 
 instance HasPlatform PathInfo

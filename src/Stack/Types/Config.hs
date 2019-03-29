@@ -145,7 +145,14 @@ module Stack.Types.Config
   -- * Lens helpers
   ,wantedCompilerVersionL
   ,actualCompilerVersionL
-  ,HasCompiler
+  ,HasCompiler(..)
+  ,CompilerPaths(..)
+  ,cpInterpreter
+  ,cpHaddock
+  ,cpCabalVersion
+  ,cpGlobalDB
+  ,cpWhich
+  ,ExtraDirs(..)
   ,buildOptsL
   ,globalOptsL
   ,buildOptsInstallExesL
@@ -221,7 +228,7 @@ import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           RIO.Process (ProcessContext, HasProcessContext (..), findExecutable)
+import           RIO.Process (ProcessContext, HasProcessContext (..))
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -552,17 +559,11 @@ projectRootL = stackYamlL.to parent
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
-    ,envConfigCabalVersion :: !Version
-    -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
-    -- in the build process.
-    --
-    -- Note that this is not necessarily the same version as the one that stack
-    -- depends on as a library and which is displayed when running
-    -- @stack list-dependencies | grep Cabal@ in the stack project.
     ,envConfigBuildOptsCLI :: !BuildOptsCLI
     ,envConfigSourceMap :: !SourceMap
     ,envConfigSourceMapHash :: !SourceMapHash
-    ,envConfigCompilerBuild :: !(Maybe CompilerBuild)
+    ,envConfigCompilerPaths :: !CompilerPaths
+    ,envConfigCabalVersion :: !Version
     }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
@@ -1275,8 +1276,8 @@ platformGhcRelDir
     :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcRelDir = do
-    ec <- view envConfigL
-    let cbSuffix = maybe "" compilerBuildSuffix $ envConfigCompilerBuild ec
+    cp <- view compilerPathsL
+    let cbSuffix = maybe "" compilerBuildSuffix $ cpBuild cp
     verOnly <- platformGhcVerOnlyRelDirStr
     parseRelDir (mconcat [ verOnly, cbSuffix ])
 
@@ -1440,18 +1441,8 @@ plainEnvSettings = EnvSettings
 -- | Get the path for the given compiler ignoring any local binaries.
 --
 -- https://github.com/commercialhaskell/stack/issues/1052
-getCompilerPath
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasCompiler env)
-    => WhichCompiler
-    -> m (Path Abs File)
-getCompilerPath wc = do
-    config' <- view configL
-    eoWithoutLocals <- liftIO $
-        configProcessContextSettings config' minimalEnvSettings { esLocaleUtf8 = True }
-    eres <- runRIO eoWithoutLocals $ findExecutable $ compilerExeName wc
-    case eres of
-      Left e -> throwM e
-      Right x -> parseAbsFile x
+getCompilerPath :: HasCompiler env => RIO env (Path Abs File)
+getCompilerPath = view $ compilerPathsL.to cpCompiler
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -1870,7 +1861,8 @@ instance HasBuildConfig BuildConfig where
     {-# INLINE buildConfigL #-}
 instance HasBuildConfig EnvConfig
 
-instance HasCompiler EnvConfig
+instance HasCompiler EnvConfig where
+    compilerPathsL = to envConfigCompilerPaths
 instance HasEnvConfig EnvConfig where
     envConfigL = id
     {-# INLINE envConfigL #-}
@@ -1918,9 +1910,75 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
+-- | Paths on the filesystem for the compiler we're using
+data CompilerPaths = CompilerPaths
+  { cpCompilerVersion :: !ActualCompiler
+  , cpBuild :: !(Maybe CompilerBuild)
+  , cpCompiler :: !(Path Abs File)
+  -- | ghc-pkg or equivalent
+  , cpPkg :: !(Path Abs File)
+  -- | runghc, in 'IO' to allow deferring the lookup
+  , cpInterpreter' :: !(CompilerPaths -> IO (Path Abs File))
+  -- | haddock, in 'IO' to allow deferring the lookup
+  , cpHaddock' :: !(CompilerPaths -> IO (Path Abs File))
+  -- | Is this a Stack-sandboxed installation?
+  , cpSandboxed :: !Bool
+  , cpExtraDirs :: !ExtraDirs
+  , cpCabalVersion' :: !(CompilerPaths -> IO Version)
+  -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
+  -- in the build process.
+  --
+  -- Note that this is not necessarily the same version as the one that stack
+  -- depends on as a library and which is displayed when running
+  -- @stack list-dependencies | grep Cabal@ in the stack project.
+  , cpGlobalDB' :: !(CompilerPaths -> IO (Path Abs Dir))
+  -- ^ Global package database
+  }
+
+-- | Helper for 'cpInterpreter''
+cpInterpreter :: HasCompiler env => RIO env (Path Abs File)
+cpInterpreter = do
+  env <- view compilerPathsL
+  liftIO $ cpInterpreter' env env
+
+-- | Helper for 'cpHaddock''
+cpHaddock :: HasCompiler env => RIO env (Path Abs File)
+cpHaddock = do
+  env <- view compilerPathsL
+  liftIO $ cpHaddock' env env
+
+-- | Helper for 'cpCabalVersion''
+cpCabalVersion :: HasCompiler env => RIO env Version
+cpCabalVersion = do
+  env <- view compilerPathsL
+  liftIO $ cpCabalVersion' env env
+
+-- | Helper for 'cpGlobalDB''
+cpGlobalDB :: HasCompiler env => RIO env (Path Abs Dir)
+cpGlobalDB = do
+  env <- view compilerPathsL
+  liftIO $ cpGlobalDB' env env
+
+cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
+cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)
+
+data ExtraDirs = ExtraDirs
+    { edBins :: ![Path Abs Dir]
+    , edInclude :: ![Path Abs Dir]
+    , edLib :: ![Path Abs Dir]
+    } deriving (Show, Generic)
+instance Semigroup ExtraDirs where
+    (<>) = mappenddefault
+instance Monoid ExtraDirs where
+    mempty = memptydefault
+    mappend = (<>)
+
 -- | An environment which ensures that the given compiler is available
--- on the PATH. This class is used for the type alone, and has no methods.
-class HasCompiler env
+-- on the PATH
+class HasCompiler env where
+  compilerPathsL :: SimpleGetter env CompilerPaths
+instance HasCompiler CompilerPaths where
+  compilerPathsL = id
 
 class HasSourceMap env where
   sourceMapL :: Lens' env SourceMap
@@ -1975,10 +2033,8 @@ globalOptsBuildOptsMonoidL =
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
 
-cabalVersionL :: HasEnvConfig env => Lens' env Version
-cabalVersionL = envConfigL.lens
-    envConfigCabalVersion
-    (\x y -> x { envConfigCabalVersion = y })
+cabalVersionL :: HasEnvConfig env => SimpleGetter env Version
+cabalVersionL = envConfigL.to envConfigCabalVersion
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler

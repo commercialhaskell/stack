@@ -25,7 +25,6 @@ import           Path.IO
 import qualified Stack.Build
 import           Stack.Build.Installed
 import           Stack.Constants            (osIsWindows)
-import           Stack.GhcPkg               (ghcPkgExeName)
 import           Stack.PackageDump
 import           Stack.Options.ScriptParser
 import           Stack.Runners
@@ -102,7 +101,6 @@ scriptCmd opts = do
       config <- view configL
       menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
       withProcessContext menv $ do
-        wc <- view $ actualCompilerVersionL.whichCompilerL
         colorFlag <- appropriateGhcColorFlag
 
         targetsSet <-
@@ -120,8 +118,8 @@ scriptCmd opts = do
             -- --simple-output to check which packages are installed
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
-            bss <- sinkProcessStdout
-                (ghcPkgExeName wc)
+            pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
+            bss <- sinkProcessStdout pkg
                 ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
@@ -150,7 +148,9 @@ scriptCmd opts = do
                 , soGhcOptions opts
                 ]
         case soCompile opts of
-          SEInterpret -> exec ("run" ++ compilerExeName wc)
+          SEInterpret -> do
+            interpret <- cpInterpreter
+            exec (toFilePath interpret)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
             -- Use readProcessStdout_ so that (1) if GHC does send any output
@@ -158,8 +158,9 @@ scriptCmd opts = do
             -- stdout, which could break scripts, and (2) if there's an
             -- exception, the standard output we did capture will be reported
             -- to the user.
+            compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
             withWorkingDir (toFilePath scriptDir) $ proc
-              (compilerExeName wc)
+              compilerExeName
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
             exec (toExeName $ toFilePath file) (soArgs opts)
@@ -200,8 +201,7 @@ getPackagesFromModuleNames mns = do
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
     sourceMap <- view $ envConfigL . to envConfigSourceMap
-    let wc = whichCompiler $ smCompiler sourceMap
-    compilerInfo <- getCompilerInfo wc
+    compilerInfo <- getCompilerInfo
     let eitherPliHash (pn, dep) | PLImmutable pli <- dpLocation dep =
                                     Right $ immutableLocSha pli
                                 | otherwise =

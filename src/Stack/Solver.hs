@@ -48,7 +48,6 @@ import           Stack.BuildPlan
 import           Stack.Config (loadConfigYaml)
 import           Stack.Constants (stackDotYaml, wiredInPackages)
 import           Stack.Setup
-import           Stack.Setup.Installed
 import           Stack.Snapshot (loadSnapshotCompiler)
 import           Stack.Types.Build
 import           Stack.Types.BuildPlan
@@ -248,7 +247,7 @@ getCabalConfig dir constraintType constraints = do
 setupCompiler
     :: (HasConfig env, HasGHCVariant env)
     => WantedCompiler
-    -> RIO env (Maybe ExtraDirs)
+    -> RIO env ExtraDirs
 setupCompiler compiler = do
     let msg = Just $ utf8BuilderToText $
           "Compiler version (" <> RIO.display compiler <> ") " <>
@@ -258,7 +257,7 @@ setupCompiler compiler = do
           "compiler available on your PATH."
 
     config <- view configL
-    (dirs, _, _) <- ensureCompiler SetupOpts
+    cpExtraDirs <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing  = configInstallGHC config
         , soptsUseSystem         = configSystemGHC config
         , soptsWantedCompiler    = compiler
@@ -273,7 +272,6 @@ setupCompiler compiler = do
         , soptsGHCBindistURL     = Nothing
         , soptsGHCJSBootOpts     = ["--clean"]
         }
-    return dirs
 
 -- | Runs the given inner command with an updated configuration that
 -- has the desired GHC on the PATH.
@@ -283,13 +281,13 @@ setupCabalEnv
     -> (ActualCompiler -> RIO (WithGHC env) a)
     -> RIO env a
 setupCabalEnv compiler inner = do
-  mpaths <- setupCompiler compiler
+  paths <- setupCompiler compiler
   menv0 <- view processContextL
   envMap <- either throwM (return . removeHaskellEnvVars)
-              $ augmentPathMap (toFilePath <$> maybe [] edBins mpaths)
+              $ augmentPathMap (toFilePath <$> edBins paths)
                                (view envVarsL menv0)
   menv <- mkProcessContext envMap
-  runWithGHC menv $ do
+  runWithGHC menv undefined $ do
     mcabal <- getCabalInstallVersion
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall
@@ -305,9 +303,9 @@ setupCabalEnv compiler inner = do
                 ") is newer than stack has been tested with.  If you run into difficulties, consider downgrading." <> line
             | otherwise -> return ()
 
-    mver <- getSystemCompiler (whichCompiler (wantedToActual compiler))
+    mver <- getSystemCompiler compiler
     version <- case mver of
-        Just (version, _) -> do
+        Just (version, _, _dir) -> do
             logInfo $ "Using compiler: " <> RIO.display version
             return version
         Nothing -> error "Failed to determine compiler version. \

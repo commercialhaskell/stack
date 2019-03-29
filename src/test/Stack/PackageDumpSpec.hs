@@ -11,10 +11,12 @@ import qualified Data.Set                      as Set
 import           Distribution.License          (License(..))
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version          (mkVersion)
+import           Path                          (parseAbsFile)
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Setup
-import           Stack.Types.Compiler
+import           Stack.Types.Compiler          (ActualCompiler (..))
+import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           RIO.Process
 import           Test.Hspec
@@ -209,7 +211,7 @@ spec = do
 
 
     it "sinkMatching" $ runEnvNoLogging $ do
-        m <- ghcPkgDump Ghc []
+        m <- ghcPkgDump []
             $  conduitDumpPackage
             .| sinkMatching (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
         case Map.lookup (mkPackageName "base") m of
@@ -264,4 +266,19 @@ runEnvNoLogging :: RIO (WithGHC LoggedProcessContext) a -> IO a
 runEnvNoLogging inner = do
   envVars <- view envVarsL <$> mkDefaultProcessContext
   menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
-  runRIO (WithGHC (LoggedProcessContext menv mempty)) inner
+  let find name = runRIO menv (findExecutable name) >>= either throwIO parseAbsFile
+  compiler <- find "ghc"
+  pkg <- find "ghc-pkg"
+  let cp = CompilerPaths
+        { cpCompilerVersion = ACGhc $ mkVersion [1, 2, 3]
+        , cpBuild = Nothing
+        , cpCompiler = compiler
+        , cpPkg = pkg
+        , cpInterpreter' = const $ pure undefined
+        , cpHaddock' = const $ pure undefined
+        , cpSandboxed = False
+        , cpExtraDirs = mempty
+        , cpCabalVersion' = const $ pure undefined
+        , cpGlobalDB' = const $ pure undefined
+        }
+  runRIO (WithGHC cp (LoggedProcessContext menv mempty)) inner

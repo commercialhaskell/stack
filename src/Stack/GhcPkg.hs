@@ -12,7 +12,6 @@ module Stack.GhcPkg
   ,createDatabase
   ,unregisterGhcPkgIds
   ,getCabalPkgVer
-  ,ghcPkgExeName
   ,ghcPkgPathEnvVar
   ,mkGhcPackagePath)
   where
@@ -29,7 +28,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Build
-import           Stack.Types.Config (HasCompiler)
+import           Stack.Types.Config (HasCompiler (..), CompilerPaths (..))
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
 import           System.FilePath (searchPathSeparator)
@@ -37,12 +36,12 @@ import           RIO.Process
 
 -- | Get the global package database
 getGlobalDB :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-            => WhichCompiler -> RIO env (Path Abs Dir)
-getGlobalDB wc = do
+            => RIO env (Path Abs Dir)
+getGlobalDB = do
     logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg wc [] ["list", "--global"] >>= either throwIO return
+    bs <- ghcPkg [] ["list", "--global"] >>= either throwIO return
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
     liftIO $ resolveDir' fp
   where
@@ -54,28 +53,27 @@ getGlobalDB wc = do
 
 -- | Run the ghc-pkg executable
 ghcPkg :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-       => WhichCompiler
-       -> [Path Abs Dir]
+       => [Path Abs Dir]
        -> [String]
        -> RIO env (Either SomeException S8.ByteString)
-ghcPkg wc pkgDbs args = do
+ghcPkg pkgDbs args = do
     eres <- go
     case eres of
       Left _ -> do
-        mapM_ (createDatabase wc) pkgDbs
+        mapM_ createDatabase pkgDbs
         go
       Right _ -> return eres
   where
-    go = tryAny
-       $ BL.toStrict . fst
-     <$> proc (ghcPkgExeName wc) args' readProcess_
+    go = do
+      pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
+      tryAny $ BL.toStrict . fst <$> proc pkg args' readProcess_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase
   :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-  => WhichCompiler -> Path Abs Dir -> RIO env ()
-createDatabase wc db = do
+  => Path Abs Dir -> RIO env ()
+createDatabase db = do
     exists <- doesFileExist (db </> relFilePackageCache)
     unless exists $ do
         -- ghc-pkg requires that the database directory does not exist
@@ -96,14 +94,10 @@ createDatabase wc db = do
                 -- finding out it isn't the hard way
                 ensureDir (parent db)
                 return ["init", toFilePath db]
-        void $ proc (ghcPkgExeName wc) args $ \pc ->
+        pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
+        void $ proc pkg args $ \pc ->
           readProcess_ pc `onException`
           logError ("Unable to create package database at " <> fromString (toFilePath db))
-
--- | Get the name to use for "ghc-pkg", given the compiler version.
-ghcPkgExeName :: WhichCompiler -> String
-ghcPkgExeName Ghc = "ghc-pkg"
-ghcPkgExeName Ghcjs = "ghcjs-pkg"
 
 -- | Get the environment variable to use for the package DB paths.
 ghcPkgPathEnvVar :: WhichCompiler -> Text
@@ -119,15 +113,13 @@ packageDbFlags pkgDbs =
 -- | Get the value of a field of the package.
 findGhcPkgField
     :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-    => WhichCompiler
-    -> [Path Abs Dir] -- ^ package databases
+    => [Path Abs Dir] -- ^ package databases
     -> String -- ^ package identifier, or GhcPkgId
     -> Text
     -> RIO env (Maybe Text)
-findGhcPkgField wc pkgDbs name field = do
+findGhcPkgField pkgDbs name field = do
     result <-
         ghcPkg
-            wc
             pkgDbs
             ["field", "--simple-output", name, T.unpack field]
     return $
@@ -138,12 +130,11 @@ findGhcPkgField wc pkgDbs name field = do
 
 -- | Get the version of the package
 findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-                  => WhichCompiler
-                  -> [Path Abs Dir] -- ^ package databases
+                  => [Path Abs Dir] -- ^ package databases
                   -> PackageName
                   -> RIO env (Maybe Version)
-findGhcPkgVersion wc pkgDbs name = do
-    mv <- findGhcPkgField wc pkgDbs (packageNameString name) "version"
+findGhcPkgVersion pkgDbs name = do
+    mv <- findGhcPkgField pkgDbs (packageNameString name) "version"
     case mv of
         Just !v -> return (parseVersion $ T.unpack v)
         _ -> return Nothing
@@ -151,12 +142,11 @@ findGhcPkgVersion wc pkgDbs name = do
 -- | unregister list of package ghcids, batching available from GHC 8.0.1,
 -- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-                    => WhichCompiler
-                    -> Path Abs Dir -- ^ package database
+                    => Path Abs Dir -- ^ package database
                     -> NonEmpty (Either PackageIdentifier GhcPkgId)
                     -> RIO env ()
-unregisterGhcPkgIds wc pkgDb epgids = do
-    eres <- ghcPkg wc [pkgDb] args
+unregisterGhcPkgIds pkgDb epgids = do
+    eres <- ghcPkg [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
@@ -169,11 +159,10 @@ unregisterGhcPkgIds wc pkgDb epgids = do
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-               => WhichCompiler -> RIO env Version
-getCabalPkgVer wc = do
+               => RIO env Version
+getCabalPkgVer = do
     logDebug "Getting Cabal package version"
     mres <- findGhcPkgVersion
-        wc
         [] -- global DB
         cabalPackageName
     maybe (throwIO $ Couldn'tFindPkgId cabalPackageName) return mres
