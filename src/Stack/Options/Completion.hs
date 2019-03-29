@@ -19,13 +19,10 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build.Target (NeedTargets(..))
-import           Stack.Config (loadBuildConfig)
 import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
-import           Stack.Runners (withConfig, withRunnerGlobal)
+import           Stack.Runners
 import           Stack.Prelude
-import           Stack.Setup
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
@@ -54,10 +51,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         _ -> do
             go' <- globalOptsFromMonoid False mempty
             let go = go' { globalLogLevel = LevelOther "silent" }
-            withRunnerGlobal go $ withConfig $ do
-              bconfig <- loadBuildConfig
-              envConfig <- runRIO bconfig (setupEnv AllowNoTargets defaultBuildOptsCLI Nothing)
-              runRIO envConfig (inner input)
+            withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do

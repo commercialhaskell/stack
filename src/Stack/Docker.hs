@@ -22,11 +22,11 @@ module Stack.Docker
   ,entrypoint
   ,preventInContainer
   ,pull
-  ,reexecWithOptionalContainer
   ,reset
   ,reExecArgName
   ,StackDockerException(..)
   ,getProjectRoot
+  ,runContainerAndExit
   ) where
 
 import           Stack.Prelude
@@ -66,7 +66,6 @@ import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
-import           System.FileLock (FileLock, unlockFile)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout)
 import           System.IO.Error (isDoesNotExistError)
@@ -176,36 +175,6 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
         return (mountPath, args, [], [Mount exePath mountPath])
 
--- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
--- Otherwise, runs the inner action.
---
--- This takes an optional release action which should be taken IFF control is
--- transferring away from the current process to the intra-container one.  The main use
--- for this is releasing a lock.  After launching reexecution, the host process becomes
--- nothing but an manager for the call into docker and thus may not hold the lock.
-reexecWithOptionalContainer
-    :: HasConfig env
-    => Maybe (RIO env ())
-    -> IO (Maybe FileLock)
-    -> RIO env a
-    -> RIO env a
-reexecWithOptionalContainer mbefore mrelease inner =
-  do config <- view configL
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     if | inContainer && not isReExec && isJust mbefore ->
-            throwIO OnlyOnHostException
-        | inContainer -> inner
-        | not (dockerEnable (configDocker config)) ->
-            fromMaybeAction mbefore *> inner
-        | otherwise ->
-            do liftIO $ mrelease >>= traverse_ unlockFile
-               runContainerAndExit
-                 (fromMaybeAction mbefore)
-  where
-    fromMaybeAction Nothing = return ()
-    fromMaybeAction (Just hook) = hook
-
 -- | Error if running in a container.
 preventInContainer :: MonadIO m => m () -> m ()
 preventInContainer inner =
@@ -215,11 +184,8 @@ preventInContainer inner =
         else inner
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit
-  :: HasConfig env
-  => RIO env ()  -- ^ Action to run before
-  -> RIO env void
-runContainerAndExit before = do
+runContainerAndExit :: HasConfig env => RIO env void
+runContainerAndExit = do
      config <- view configL
      let docker = configDocker config
      checkDockerVersion docker
@@ -269,11 +235,15 @@ runContainerAndExit before = do
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      hostBinDirPath <- parseAbsDir hostBinDir
+     let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
+     when (isNothing mpath) $ do
+       logWarn "The Docker image does not set the PATH env var"
+       logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
      newPathEnv <- either throwM return $ augmentPath
                       ( toFilePath <$>
                       [ hostBinDirPath
                       , sandboxHomeDir </> relDirDotLocal </> relDirBin])
-                      (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
+                      mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
      liftIO
@@ -332,7 +302,6 @@ runContainerAndExit before = do
          ,[image]
          ,[cmnd]
          ,args])
-     before
 -- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
 -- `docker` process so that it can handle the signals directly?
 #ifndef WINDOWS
@@ -623,7 +592,10 @@ inspects :: (HasProcessContext env, HasLogFunc env)
          => [String] -> RIO env (Map String Inspect)
 inspects [] = return Map.empty
 inspects images =
-  do maybeInspectOut <- try (readDockerProcess ("inspect" : images))
+  do maybeInspectOut <-
+       -- not using 'readDockerProcess' as the error from a missing image
+       -- needs to be recovered.
+       try (BL.toStrict . fst <$> proc "docker" ("inspect" : images) readProcess_)
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -809,11 +781,16 @@ removeDirectoryContents path excludeDirs excludeFiles =
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ReadProcessException' exception if the
--- process fails.  Logs process's stderr using @logError@.
+-- process fails.
+--
+-- The stderr output is passed straight through, which is desirable for some cases
+-- e.g. docker pull, in which docker uses stderr for progress output.
+--
+-- Use 'readProcess_' directly to customize this.
 readDockerProcess
     :: (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
-readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_ -- FIXME stderr isn't logged with logError, should it be?
+readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
 
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir

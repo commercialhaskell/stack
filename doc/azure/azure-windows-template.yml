@@ -1,0 +1,35 @@
+jobs:
+- job: ${{ parameters.name }}
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    matrix:
+      stack:
+        BUILD: stack
+        STACK_YAML: stack.yaml
+      stack-lts-13:
+        BUILD: stack
+        STACK_YAML: stack-lts-13.yaml
+      stack-lts-12:
+        BUILD: stack
+        ARGS: "--resolver lts-12.26"
+      stack-lts-11:
+        BUILD: stack
+        ARGS: "--resolver lts-11"
+      stack-lts-10:
+        BUILD: stack
+        ARGS: "--resolver lts-10"
+      stack-lts-9:
+        BUILD: stack
+        ARGS: "--resolver lts-9"
+    maxParallel: 6
+  steps:
+  - bash: |
+      export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
+      curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
+      unzip -o /usr/bin/stack.zip -d /usr/bin/
+      stack --install-ghc $ARGS test --bench --only-dependencies
+      stack $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
+    env:
+      OS_NAME: ${{ parameters.os }}
+    displayName: 'Installation ${{parameters.os}} & Test'

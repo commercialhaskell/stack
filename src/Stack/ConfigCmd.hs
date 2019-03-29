@@ -11,21 +11,29 @@ module Stack.ConfigCmd
        ,configCmdSetParser
        ,cfgCmdSet
        ,cfgCmdSetName
+       ,configCmdEnvParser
+       ,cfgCmdEnv
+       ,cfgCmdEnvName
        ,cfgCmdName) where
 
 import           Stack.Prelude
 import qualified Data.ByteString as S
+import qualified Data.Map.Merge.Strict as Map
 import qualified Data.HashMap.Strict as HMap
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Options.Applicative.Builder.Extra
 import           Pantry (completeSnapshotLocation, loadSnapshot)
 import           Path
+import qualified RIO.Map as Map
+import           RIO.Process (envVarsL)
 import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
 import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
+import           System.Environment (getEnvironment)
 
 data ConfigCmdSet
     = ConfigCmdSetResolver (Unresolved AbstractResolver)
@@ -101,6 +109,9 @@ cfgCmdName = "config"
 cfgCmdSetName :: String
 cfgCmdSetName = "set"
 
+cfgCmdEnvName :: String
+cfgCmdEnvName = "env"
+
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
     OA.hsubparser $
@@ -148,3 +159,39 @@ readBool = do
 
 boolArgument :: OA.Parser Bool
 boolArgument = OA.argument readBool (OA.metavar "true|false" <> OA.completeWith ["true", "false"])
+
+configCmdEnvParser :: OA.Parser EnvSettings
+configCmdEnvParser = EnvSettings
+  <$> boolFlags True "locals" "include local package information" mempty
+  <*> boolFlags True "ghc-package-path" "set GHC_PACKAGE_PATH variable" mempty
+  <*> boolFlags True "stack-exe" "set STACK_EXE environment variable" mempty
+  <*> boolFlags False "locale-utf8" "set the GHC_CHARENC environment variable to UTF8" mempty
+  <*> boolFlags False "keep-ghc-rts" "keep any GHC_RTS environment variables" mempty
+
+data EnvVarAction = EVASet !Text | EVAUnset
+  deriving Show
+
+cfgCmdEnv :: EnvSettings -> RIO EnvConfig ()
+cfgCmdEnv es = do
+  origEnv <- liftIO $ Map.fromList . map (first fromString) <$> getEnvironment
+  mkPC <- view $ configL.to configProcessContextSettings
+  pc <- liftIO $ mkPC es
+  let newEnv = pc ^. envVarsL
+      actions = Map.merge
+        (pure EVAUnset)
+        (Map.traverseMissing $ \_k new -> pure (EVASet new))
+        (Map.zipWithMaybeAMatched $ \_k old new -> pure $
+            if fromString old == new
+              then Nothing
+              else Just (EVASet new))
+        origEnv
+        newEnv
+      toLine key EVAUnset = "unset " <> encodeUtf8Builder key <> ";\n"
+      toLine key (EVASet value) =
+        encodeUtf8Builder key <> "='" <>
+        encodeUtf8Builder (T.concatMap escape value) <> -- TODO more efficient to use encodeUtf8BuilderEscaped
+        "'; export " <>
+        encodeUtf8Builder key <> ";\n"
+      escape '\'' = "'\"'\"'"
+      escape c = T.singleton c
+  hPutBuilder stdout $ Map.foldMapWithKey toLine actions

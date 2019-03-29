@@ -8,7 +8,7 @@ images. This script and its Dockerfiles are used for building images for LTS >=
 Usage
 -----
 
-    ./build.sh [--push] [--dry-run] lts-X.Y|lts-X|lts]"
+    ./build.sh [--push] [--dry-run] [--small] lts-X.Y|lts-X|lts]"
 
 Options
 -------
@@ -19,6 +19,8 @@ Options
 
 `--dry-run`: print the important commands that will be run, but don't actually
     run them
+
+`--small`: build the small variant of the image
 
 Argument
 ---------

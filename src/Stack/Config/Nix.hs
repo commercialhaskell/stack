@@ -33,7 +33,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
         nixInitFile = getFirst nixMonoidInitFile
         nixShellOptions = fromFirst [] nixMonoidShellOptions
                           ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
-        nixAddGCRoots   = fromFirst False nixMonoidAddGCRoots
+        nixAddGCRoots   = fromFirstFalse nixMonoidAddGCRoots
 
     -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
     osIsNixOS <- isNixOS

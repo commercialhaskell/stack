@@ -17,6 +17,7 @@ import qualified RIO.Text as T
 import qualified Data.Yaml as Yaml
 import Data.Aeson.Extended (WithJSONWarnings (..))
 import qualified Data.ByteString.Char8 as S8
+import RIO.Time (Day (..))
 
 hh :: HasCallStack => String -> Property -> Spec
 hh name p = it name $ do
@@ -94,3 +95,18 @@ spec = do
         "name: 'test'\n" ++
         "compiler: ghc-8.0.1\n"
       rslParent `shouldBe` RSLCompiler (WCGhc (mkVersion [8, 0, 1]))
+
+    hh "rendering an LTS gives a nice name" $ property $ do
+      (major, minor) <- forAll $ (,)
+        <$> Gen.integral (Range.linear 1 10000)
+        <*> Gen.integral (Range.linear 1 10000)
+      liftIO $
+        Yaml.toJSON (ltsSnapshotLocation major minor) `shouldBe`
+        Yaml.String (T.pack $ concat ["lts-", show major, ".", show minor])
+
+    hh "rendering a nightly gives a nice name" $ property $ do
+      days <- forAll $ Gen.integral $ Range.linear 1 10000000
+      let day = ModifiedJulianDay days
+      liftIO $
+        Yaml.toJSON (nightlySnapshotLocation day) `shouldBe`
+        Yaml.String (T.pack $ "nightly-" ++ show day)

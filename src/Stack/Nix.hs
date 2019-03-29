@@ -7,9 +7,9 @@
 
 -- | Run commands in a nix-shell
 module Stack.Nix
-  (reexecWithOptionalShell
-  ,nixCmdName
+  (nixCmdName
   ,nixHelpOptName
+  ,runShellAndExit
   ) where
 
 import           Stack.Prelude
@@ -18,7 +18,7 @@ import           Data.Version (showVersion)
 import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.Config (getInNixShell, getInContainer, loadBuildConfig)
+import           Stack.Config (getInContainer, loadBuildConfig)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
@@ -29,26 +29,9 @@ import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
 
--- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
--- Otherwise, runs the inner action.
-reexecWithOptionalShell :: RIO Config a -> RIO Config a
-reexecWithOptionalShell inner = do
-  inShell <- launchInShell
-  if inShell
-    then runShellAndExit
-    else inner
-
-launchInShell :: HasConfig env => RIO env Bool
-launchInShell = do
-  nixEnable' <- view $ configL.to configNix.to nixEnable
-  inShell <- getInNixShell
-  inContainer <- getInContainer
-  isReExec <- view reExecL
-  pure $ nixEnable' && not inShell && (not isReExec || inContainer)
-
 runShellAndExit :: RIO Config void
 runShellAndExit = do
-   inContainer <- getInContainer
+   inContainer <- getInContainer -- TODO we can probably assert that this is False based on Stack.Runners now
    origArgs <- liftIO getArgs
    let args | inContainer = origArgs  -- internal-re-exec version already passed
               -- first stack when restarting in the container

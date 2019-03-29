@@ -45,7 +45,6 @@ import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
-import           System.FileLock (FileLock, unlockFile)
 import           System.Terminal (fixCodePage)
 
 -- | Build.
@@ -55,9 +54,8 @@ import           System.Terminal (fixCodePage)
 --   modifications to the snapshot to be performed by this build.
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
-      -> Maybe FileLock
       -> RIO env ()
-build msetLocalFiles mbuildLk = do
+build msetLocalFiles = do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -89,16 +87,6 @@ build msetLocalFiles mbuildLk = do
       [] -> return ()
       localsIdents -> throwM $ LocalPackagesPresent localsIdents
 
-    -- If our work to do is all local, let someone else have a turn with the snapshot.
-    -- They won't damage what's already in there.
-    case (mbuildLk, allLocal plan) of
-       -- NOTE: This policy is too conservative.  In the future we should be able to
-       -- schedule unlocking as an Action that happens after all non-local actions are
-       -- complete.
-      (Just lk,True) -> do logDebug "All installs are local; releasing snapshot lock early."
-                           liftIO $ unlockFile lk
-      _ -> return ()
-
     checkCabalVersion
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
@@ -115,14 +103,6 @@ build msetLocalFiles mbuildLk = do
                          installedMap
                          (smtTargets $ smTargets sourceMap)
                          plan
-
--- | If all the tasks are local, they don't mutate anything outside of our local directory.
-allLocal :: Plan -> Bool
-allLocal =
-    all (== Local) .
-    map taskLocation .
-    Map.elems .
-    planTasks
 
 justLocals :: Plan -> [PackageIdentifier]
 justLocals =

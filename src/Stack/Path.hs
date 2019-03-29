@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -10,7 +11,6 @@ module Stack.Path
 
 import           Stack.Prelude
 import           Data.List (intercalate)
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Lens.Micro (lens)
@@ -54,7 +54,7 @@ path keys =
                T.putStrLn $ prefix <> extractPath pathInfo
            runHaddock x = local
              (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
-             withConfig .
+             withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
              withDefaultEnvConfig
        -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
        -- withDefaultEnvConfig each time, need to figure out what
@@ -67,36 +67,24 @@ fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
      -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
      -- full environment info including GHC paths etc.
-     bc <- view $ envConfigL.buildConfigL
+     piBuildConfig <- view $ envConfigL.buildConfigL
      -- This is the modified 'bin-path',
      -- including the local GHC or MSYS if not configured to operate on
      -- global GHC.
      -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
      -- So it's not the *minimal* override path.
-     snap <- packageDatabaseDeps
-     plocal <- packageDatabaseLocal
-     extra <- packageDatabaseExtra
-     whichCompiler <- view $ actualCompilerVersionL.whichCompilerL
-     global <- GhcPkg.getGlobalDB whichCompiler
-     snaproot <- installationRootDeps
-     localroot <- installationRootLocal
-     toolsDir <- bindirCompilerTools
-     hoogle <- hoogleRoot
-     distDir <- distRelativeDir
-     hpcDir <- hpcReportDir
-     compiler <- getCompilerPath whichCompiler
-     return $ PathInfo bc
-                       snap
-                       plocal
-                       global
-                       snaproot
-                       localroot
-                       toolsDir
-                       hoogle
-                       distDir
-                       hpcDir
-                       extra
-                       compiler
+     piSnapDb <- packageDatabaseDeps
+     piLocalDb <- packageDatabaseLocal
+     piExtraDbs <- packageDatabaseExtra
+     piGlobalDb <- cpGlobalDB
+     piSnapRoot <- installationRootDeps
+     piLocalRoot <- installationRootLocal
+     piToolsDir <- bindirCompilerTools
+     piHoogleRoot <- hoogleRoot
+     piDistDir <- distRelativeDir
+     piHpcDir <- hpcReportDir
+     piCompiler <- getCompilerPath
+     return PathInfo {..}
 
 pathParser :: OA.Parser [Text]
 pathParser =
@@ -110,18 +98,18 @@ pathParser =
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
-    { piBuildConfig  :: BuildConfig
-    , piSnapDb       :: Path Abs Dir
-    , piLocalDb      :: Path Abs Dir
-    , piGlobalDb     :: Path Abs Dir
-    , piSnapRoot     :: Path Abs Dir
-    , piLocalRoot    :: Path Abs Dir
-    , piToolsDir     :: Path Abs Dir
-    , piHoogleRoot   :: Path Abs Dir
+    { piBuildConfig  :: !BuildConfig
+    , piSnapDb       :: !(Path Abs Dir)
+    , piLocalDb      :: !(Path Abs Dir)
+    , piGlobalDb     :: !(Path Abs Dir)
+    , piSnapRoot     :: !(Path Abs Dir)
+    , piLocalRoot    :: !(Path Abs Dir)
+    , piToolsDir     :: !(Path Abs Dir)
+    , piHoogleRoot   :: !(Path Abs Dir)
     , piDistDir      :: Path Rel Dir
-    , piHpcDir       :: Path Abs Dir
-    , piExtraDbs     :: [Path Abs Dir]
-    , piCompiler     :: Path Abs File
+    , piHpcDir       :: !(Path Abs Dir)
+    , piExtraDbs     :: ![Path Abs Dir]
+    , piCompiler     :: !(Path Abs File)
     }
 
 instance HasPlatform PathInfo
@@ -186,10 +174,10 @@ paths =
       , WithoutHaddocks $ view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraIncludeDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraIncludeDirs . view configL )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , WithoutHaddocks $ T.intercalate ", " . map T.pack . Set.elems . configExtraLibDirs . view configL )
+      , WithoutHaddocks $ T.intercalate ", " . map T.pack . configExtraLibDirs . view configL )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piSnapDb )

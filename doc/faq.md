@@ -44,7 +44,9 @@ directory. None of this should affect any existing Haskell tools at all.
 
 ## What is the relationship between stack and cabal?
 
-* Cabal-the-library is used by stack to build your Haskell code.
+* Cabal-the-library is used by stack to build your Haskell code. See the
+  [Architecture: Plan Execution](architecture.md#plan-execution) section for
+  more detail, including how the Cabal version is chosen.
 * cabal-install (the executable) is used by stack for its dependency solver
   functionality.
 * A .cabal file is provided for each package, and defines all package-level
@@ -56,6 +58,9 @@ directory. None of this should affect any existing Haskell tools at all.
   file. Project initialization is something that is still being discussed and
   there may be more options here for new projects in the future (see issue
   [253](https://github.com/commercialhaskell/stack/issues/253))
+
+For detail on the differences between a `stack.yaml` and Cabal package file, see
+[stack.yaml vs cabal package file](stack_yaml_vs_cabal_package_file.md).
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
@@ -314,6 +319,10 @@ packages and the tools. See [Docker integration](docker_integration.md) for deta
 
 See the [Travis CI instructions](travis_ci.md)
 
+## How do I use this with Azure CI?
+
+See the [Azure CI instructions](azure_ci.md)
+
 ## What is licensing restrictions on Windows?
 
 Currently on Windows GHC produces binaries linked statically with [GNU Multiple
@@ -407,7 +416,7 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 ## I get strange `ld` errors about recompiling with "-fPIC"
 
-(Updated in December 2017)
+(Updated in January 2019)
 
 This is related to more recent versions of Linux distributions that have GCC
 with PIE enabled by default.  The continuously-updated distros like Arch, in
@@ -430,6 +439,12 @@ will no longer be necessary for stack >= 1.7).
 If you are experiencing this with GHC >= 8.0.2, try running `stack setup
 --reinstall` if you've upgraded your Linux distribution or you set up GHC
 before late December 2017.
+
+If GHC doesn't recognize your C compiler as being able to use `-no-pie`,
+this can happen even with GCC and Clang, it might be necessary to enable
+this feature manually. To do this, just change
+`("C compiler supports -no-pie", "NO"),` to `("C compiler supports -no-pie", "YES"),`
+in the file `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-VER/settings`.
 
 If you are still having trouble after trying the above, check the following
 for more possible workarounds:

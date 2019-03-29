@@ -30,24 +30,22 @@ import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
-import           Stack.Types.Compiler
+import           Stack.Types.Config (HasCompiler (..), CompilerPaths (..))
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> [Path Abs Dir] -- ^ if empty, use global
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
 ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => PackageName
-    -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
@@ -55,17 +53,17 @@ ghcPkgDescribe pkgName' = ghcPkgCmdArgs ["describe", "--simple-output", packageN
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => [String]
-    -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgCmdArgs cmd wc mpkgDbs sink = do
+ghcPkgCmdArgs cmd mpkgDbs sink = do
     case reverse mpkgDbs of
-        (pkgDb:_) -> createDatabase wc pkgDb -- TODO maybe use some retry logic instead?
+        (pkgDb:_) -> createDatabase pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    sinkProcessStdout (ghcPkgExeName wc) args sink'
+    pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
+    sinkProcessStdout pkg args sink'
   where
     args = concat
         [ case mpkgDbs of

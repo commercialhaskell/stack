@@ -257,6 +257,7 @@ defaultHackageSecurityConfig = HackageSecurityConfig
       ]
   , hscKeyThreshold = 3
   , hscDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/"
+  , hscIgnoreExpiry = False
   }
 
 -- | Returns the latest version of the given package available from

@@ -277,9 +277,9 @@ renderStackYaml p ignoredPackages dupPackages =
         , "packages:"
         , "- some-directory"
         , "- https://example.com/foo/bar/baz-0.0.2.tar.gz"
-        , " subdirs:"
-        , " - auto-update"
-        , " - wai"
+        , "  subdirs:"
+        , "  - auto-update"
+        , "  - wai"
         ]
 
     extraDepsHelp = commentHelp
@@ -441,16 +441,15 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
                     warnPartial result
                     logWarn "*** Omitting packages with unsatisfied dependencies"
                     return $ Left $ failedUserPkgs e
-                else throwM $ ResolverPartial snapshotTxt (show result)
+                else throwM $ ResolverPartial snapshotLoc (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
                            <> display snapshotLoc
                 logWarn $ display $ indent $ T.pack $ show result
                 return $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch snapshotTxt (show result)
+            | otherwise -> throwM $ ResolverMismatch snapshotLoc (show result)
     where
-      snapshotTxt = utf8BuilderToText $ display snapshotLoc
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
           logWarn $ "*** Resolver " <> display snapshotLoc

@@ -337,8 +337,8 @@ data BioInput = BioInput
     , biAddPackages :: ![PackageName]
     , biBuildInfo :: !BuildInfo
     , biDotCabalPaths :: ![DotCabalPath]
-    , biConfigLibDirs :: !(Set FilePath)
-    , biConfigIncludeDirs :: !(Set FilePath)
+    , biConfigLibDirs :: ![FilePath]
+    , biConfigIncludeDirs :: ![FilePath]
     , biComponentName :: !NamedComponent
     , biCabalVersion :: !Version
     }
@@ -406,8 +406,7 @@ generateBuildInfoOpts BioInput {..} =
     toIncludeDir "." = Just biCabalDir
     toIncludeDir relDir = concatAndColapseAbsDir biCabalDir relDir
     includeOpts =
-        map ("-I" <>) (configExtraIncludeDirs <> pkgIncludeOpts)
-    configExtraIncludeDirs = S.toList biConfigIncludeDirs
+        map ("-I" <>) (biConfigIncludeDirs <> pkgIncludeOpts)
     pkgIncludeOpts =
         [ toFilePathNoTrailingSep absDir
         | dir <- includeDirs biBuildInfo
@@ -415,8 +414,7 @@ generateBuildInfoOpts BioInput {..} =
         ]
     libOpts =
         map ("-l" <>) (extraLibs biBuildInfo) <>
-        map ("-L" <>) (configExtraLibDirs <> pkgLibDirs)
-    configExtraLibDirs = S.toList biConfigLibDirs
+        map ("-L" <>) (biConfigLibDirs <> pkgLibDirs)
     pkgLibDirs =
         [ toFilePathNoTrailingSep absDir
         | dir <- extraLibDirs biBuildInfo
