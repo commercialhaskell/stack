@@ -44,15 +44,33 @@ uploadGithub target = do
         createDirIfMissing True $ parent snapshotFile
         runConduitRes $ sourceFile srcFilename .| sinkFile (toFilePath snapshotFile)
 
-        git ["add", toFilePath snapshotFile]
-        git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
-        git ["push", "origin", "HEAD:master"]
+        void $ git ["add", toFilePath snapshotFile]
+        void $ git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
+        void $ git ["push", "origin", "HEAD:master"]
 
+checkoutSnapshotsRepo ::
+       ( HasLogFunc env
+       , HasProcessContext env
+       , MonadReader env m
+       , MonadIO m
+       , MonadThrow m
+       )
+    => Target
+    -> m ([String] -> m (), Path Abs File)
 checkoutSnapshotsRepo t = checkoutRepo t dir url
   where
     url = "git@github.com:commercialhaskell/stackage-next"
     dir = $(mkRelDir "stackage-snapshots")
 
+checkoutConstraintsRepo ::
+       ( HasLogFunc env
+       , HasProcessContext env
+       , MonadReader env m
+       , MonadIO m
+       , MonadThrow m
+       )
+    => Target
+    -> m ([String] -> m (), Path Abs File)
 checkoutConstraintsRepo t = checkoutRepo t dir url
   where
     url = "git@github.com:commercialhaskell/stackage-constraints-next"

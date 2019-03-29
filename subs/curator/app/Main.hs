@@ -9,7 +9,6 @@ import Network.HTTP.Client (parseUrlThrow)
 import Network.HTTP.Download (download)
 import Options.Applicative.Simple hiding (action)
 import qualified Pantry
-import Path
 import Path.IO (doesFileExist, resolveFile', resolveDir')
 import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
