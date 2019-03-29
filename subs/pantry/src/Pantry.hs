@@ -279,7 +279,7 @@ getLatestHackageVersion name preferred =
 --
 -- @since 0.1.0.0
 getLatestHackageLocation
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageLocationImmutable)
@@ -291,10 +291,10 @@ getLatestHackageLocation name preferred = do
         (_rev, cfKey) <- fst <$> Map.maxViewWithKey revisions
         pure (version, cfKey)
 
-  fmap join . forM mVerCfKey $ \(version, cfKey@(BlobKey sha _)) -> do
-    mTreeKey <- withStorage $ loadHackageTreeKey name version sha
-    forM mTreeKey $ \treeKey ->
-      pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+  forM mVerCfKey $ \(version, cfKey@(BlobKey sha size)) -> do
+    let pir = PackageIdentifierRevision name version (CFIHash sha (Just size))
+    treeKey <- getHackageTarballKey pir
+    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
 
 -- | Returns the latest revision of the given package version available from
 -- Hackage.
