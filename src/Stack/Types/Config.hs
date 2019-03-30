@@ -614,12 +614,14 @@ data Project = Project
     -- ^ Extra configuration intended exclusively for usage by the
     -- curator tool. In other words, this is /not/ part of the
     -- documented and exposed Stack API. SUBJECT TO CHANGE.
+    , projectDropPackages :: !(Set PackageName)
+    -- ^ Packages to drop from the 'projectResolver'.
     }
   deriving Show
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator) = object $ concat
+    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
       [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
@@ -628,6 +630,7 @@ instance ToJSON Project where
       , ["packages" .= packages]
       , ["resolver" .= resolver]
       , maybe [] (\c -> ["curator" .= c]) mcurator
+      , if Set.null drops then [] else ["drop-packages" .= Set.map CabalString drops]
       ]
 
 -- | Extra configuration intended exclusively for usage by the
@@ -1444,6 +1447,7 @@ parseProjectAndConfigMonoid rootDir =
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         mcurator <- jsonSubWarningsT (o ..:? "curator")
+        drops <- o ..:? "drop-packages" ..!= mempty
         return $ do
           deps' <- mapM (resolvePaths (Just rootDir)) deps
           resolver' <- resolvePaths (Just rootDir) resolver
@@ -1456,6 +1460,7 @@ parseProjectAndConfigMonoid rootDir =
                   , projectDependencies = concatMap toList (deps' :: [NonEmpty RawPackageLocation])
                   , projectFlags = flags
                   , projectCurator = mcurator
+                  , projectDropPackages = Set.map unCabalString drops
                   }
           pure $ ProjectAndConfigMonoid project config
 

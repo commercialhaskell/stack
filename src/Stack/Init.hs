@@ -130,6 +130,7 @@ initProject currDir initOpts mresolver = do
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
             , projectCurator = Nothing
+            , projectDropPackages = mempty
             }
 
         makeRel = fmap toFilePath . makeRelativeToCurrentDir

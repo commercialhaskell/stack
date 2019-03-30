@@ -70,6 +70,8 @@ Behavior changes:
 
 * Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
 
+* Support the `drop-packages` field in `stack.yaml`
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
