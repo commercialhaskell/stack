@@ -153,6 +153,7 @@ Other enhancements:
   installation based on the version suffix, allowing you to more easily switch
   between various system-installed GHCs. See
   [#2433](https://github.com/commercialhaskell/stack/issues/2433).
+* Store caches in SQLite database instead of files.
 
 Bug fixes:
 

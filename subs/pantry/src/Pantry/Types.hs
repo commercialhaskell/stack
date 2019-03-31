@@ -138,7 +138,6 @@ import qualified Distribution.Text
 import qualified Hpack.Config as Hpack
 import Distribution.ModuleName (ModuleName)
 import Distribution.Types.Version (Version, mkVersion)
-import Data.Store (Size (..), Store (..))
 import Network.HTTP.Client (parseRequest)
 import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
@@ -197,7 +196,7 @@ cabalFileName name =
 --
 -- @since 0.1.0.0
 newtype Revision = Revision Word
-    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Store, Display, PersistField, PersistFieldSql)
+    deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Display, PersistField, PersistFieldSql)
 
 newtype Storage = Storage (Pool SqlBackend)
 
@@ -272,10 +271,8 @@ data ResolvedPath t = ResolvedPath
   , resolvedAbsolute :: !(Path Abs t)
   -- ^ Absolute path resolved against base directory loaded from.
   }
-  deriving (Show, Eq, Data, Generic, Ord)
+  deriving (Show, Eq, Generic, Ord)
 instance NFData (ResolvedPath t)
-instance Store (ResolvedPath Dir)
-instance Store (ResolvedPath File)
 
 -- | Location to load a package from. Can either be immutable (see
 -- 'PackageLocationImmutable') or a local directory which is expected
@@ -286,9 +283,8 @@ instance Store (ResolvedPath File)
 data RawPackageLocation
   = RPLImmutable !RawPackageLocationImmutable
   | RPLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Generic)
 instance NFData RawPackageLocation
-instance Store RawPackageLocation
 
 -- | Location to load a package from. Can either be immutable (see
 -- 'PackageLocationImmutable') or a local directory which is expected
@@ -298,9 +294,8 @@ instance Store RawPackageLocation
 data PackageLocation
   = PLImmutable !PackageLocationImmutable
   | PLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Generic)
 instance NFData PackageLocation
-instance Store PackageLocation
 
 instance Display PackageLocation where
   display (PLImmutable loc) = display loc
@@ -321,10 +316,9 @@ data RawPackageLocationImmutable
   = RPLIHackage !PackageIdentifierRevision !(Maybe TreeKey)
   | RPLIArchive !RawArchive !RawPackageMetadata
   | RPLIRepo    !Repo !RawPackageMetadata
-  deriving (Show, Eq, Ord, Data, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance NFData RawPackageLocationImmutable
-instance Store RawPackageLocationImmutable
 
 instance Display RawPackageLocationImmutable where
   display (RPLIHackage pir _tree) = display pir <> " (from Hackage)"
@@ -347,9 +341,8 @@ data PackageLocationImmutable
   = PLIHackage !PackageIdentifier !BlobKey !TreeKey
   | PLIArchive !Archive !PackageMetadata
   | PLIRepo    !Repo !PackageMetadata
-  deriving (Generic, Show, Eq, Ord, Data, Typeable)
+  deriving (Generic, Show, Eq, Ord, Typeable)
 instance NFData PackageLocationImmutable
-instance Store PackageLocationImmutable
 
 instance Display PackageLocationImmutable where
   display (PLIHackage ident _cabalHash _tree) =
@@ -407,9 +400,8 @@ data RawArchive = RawArchive
   --
   -- @since 0.1.0.0
   }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
+    deriving (Generic, Show, Eq, Ord, Typeable)
 
-instance Store RawArchive
 instance NFData RawArchive
 
 -- | A package archive, could be from a URL or a local file
@@ -435,8 +427,7 @@ data Archive = Archive
   --
   -- @since 0.1.0.0
   }
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store Archive
+    deriving (Generic, Show, Eq, Ord, Typeable)
 instance NFData Archive
 
 -- | Convert archive to its "raw" equivalent.
@@ -451,8 +442,7 @@ toRawArchive archive =
 --
 -- @since 0.1.0.0
 data RepoType = RepoGit | RepoHg
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store RepoType
+    deriving (Generic, Show, Eq, Ord, Typeable)
 instance NFData RepoType
 instance PersistField RepoType where
   toPersistValue RepoGit = toPersistValue (1 :: Int32)
@@ -488,8 +478,7 @@ data Repo = Repo
   --
   -- @since 0.1.0.0
   }
-    deriving (Generic, Eq, Ord, Data, Typeable)
-instance Store Repo
+    deriving (Generic, Eq, Ord, Typeable)
 instance NFData Repo
 instance Show Repo where
   show = T.unpack . utf8BuilderToText . display
@@ -555,7 +544,7 @@ class HasPantryConfig env where
 --
 -- @since 0.1.0.0
 newtype FileSize = FileSize Word
-  deriving (Show, Eq, Ord, Data, Typeable, Generic, Display, Hashable, NFData, Store, PersistField, PersistFieldSql, ToJSON, FromJSON)
+  deriving (Show, Eq, Ord, Typeable, Generic, Display, Hashable, NFData, PersistField, PersistFieldSql, ToJSON, FromJSON)
 
 -- | A key for looking up a blob, which combines the SHA256 hash of
 -- the contents and the file size.
@@ -567,8 +556,7 @@ newtype FileSize = FileSize Word
 --
 -- @since 0.1.0.0
 data BlobKey = BlobKey !SHA256 !FileSize
-  deriving (Eq, Ord, Data, Typeable, Generic)
-instance Store BlobKey
+  deriving (Eq, Ord, Typeable, Generic)
 instance NFData BlobKey
 
 instance Show BlobKey where
@@ -652,8 +640,7 @@ data CabalFileInfo
   -- reproducibility.
   --
   -- @since 0.1.0.0
-    deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store CabalFileInfo
+    deriving (Generic, Show, Eq, Ord, Typeable)
 instance NFData CabalFileInfo
 instance Hashable CabalFileInfo
 
@@ -669,7 +656,7 @@ instance Display CabalFileInfo where
 --
 -- @since 0.1.0.0
 data PackageIdentifierRevision = PackageIdentifierRevision !PackageName !Version !CabalFileInfo
-  deriving (Generic, Eq, Ord, Data, Typeable)
+  deriving (Generic, Eq, Ord, Typeable)
 instance NFData PackageIdentifierRevision
 
 instance Show PackageIdentifierRevision where
@@ -1084,7 +1071,7 @@ hpackSafeFilePath =
 --
 -- @since 0.1.0.0
 newtype TreeKey = TreeKey BlobKey
-  deriving (Show, Eq, Ord, Generic, Data, Typeable, ToJSON, FromJSON, NFData, Store, Display)
+  deriving (Show, Eq, Ord, Generic, Typeable, ToJSON, FromJSON, NFData, Display)
 
 -- | Represents the contents of a tree, which is a mapping from
 -- relative file paths to 'TreeEntry's.
@@ -1288,9 +1275,8 @@ data OptionalSubdirs
   = OSSubdirs !(NonEmpty Text)
   | OSPackageMetadata !Text !RawPackageMetadata
   -- ^ subdirectory and package metadata
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Generic)
 instance NFData OptionalSubdirs
-instance Store OptionalSubdirs
 
 -- | Metadata provided by a config file for archives and repos. This
 -- information can be used for optimized lookups of information like
@@ -1316,8 +1302,7 @@ data RawPackageMetadata = RawPackageMetadata
     --
     -- @since 0.1.0.0
   }
-  deriving (Show, Eq, Ord, Generic, Data, Typeable)
-instance Store RawPackageMetadata
+  deriving (Show, Eq, Ord, Generic, Typeable)
 instance NFData RawPackageMetadata
 
 instance Display RawPackageMetadata where
@@ -1345,8 +1330,8 @@ data PackageMetadata = PackageMetadata
     --
     -- @since 0.1.0.0
   }
-  deriving (Show, Eq, Ord, Generic, Data, Typeable)
-instance Store PackageMetadata
+  deriving (Show, Eq, Ord, Generic, Typeable)
+-- i PackageMetadata
 instance NFData PackageMetadata
 
 instance Display PackageMetadata where
@@ -1368,7 +1353,7 @@ toRawPM pm = RawPackageMetadata (Just name) (Just version) (Just $ pmTreeKey pm)
 --
 -- @since 0.1.0.0
 newtype RelFilePath = RelFilePath Text
-  deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Data, Typeable, Store, NFData, Display)
+  deriving (Show, ToJSON, FromJSON, Eq, Ord, Generic, Typeable, NFData, Display)
 
 -- | Location that an archive is stored at
 --
@@ -1382,8 +1367,7 @@ data ArchiveLocation
     -- ^ Archive stored at a local file path
     --
     -- @since 0.1.0.0
-  deriving (Show, Eq, Ord, Generic, Data, Typeable)
-instance Store ArchiveLocation
+  deriving (Show, Eq, Ord, Generic, Typeable)
 instance NFData ArchiveLocation
 
 instance Display ArchiveLocation where
@@ -1642,9 +1626,8 @@ data WantedCompiler
       !Version
       !Version
     -- ^ GHCJS version followed by GHC version
- deriving (Show, Eq, Ord, Data, Generic)
+ deriving (Show, Eq, Ord, Generic)
 instance NFData WantedCompiler
-instance Store WantedCompiler
 instance Display WantedCompiler where
   display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
   display (WCGhcjs vghcjs vghc) =
@@ -1806,9 +1789,8 @@ data RawSnapshotLocation
     -- ^ Snapshot at a local file path.
     --
     -- @since 0.1.0.0
-  deriving (Show, Eq, Data, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
-instance Store RawSnapshotLocation
 instance NFData RawSnapshotLocation
 
 instance Display RawSnapshotLocation where
@@ -1876,8 +1858,7 @@ data SnapshotLocation
     -- ^ Snapshot at a local file path.
     --
     -- @since 0.1.0.0
-  deriving (Show, Eq, Data, Ord, Generic)
-instance Store SnapshotLocation
+  deriving (Show, Eq, Ord, Generic)
 instance NFData SnapshotLocation
 
 instance ToJSON SnapshotLocation where
@@ -1987,9 +1968,8 @@ data RawSnapshotLayer = RawSnapshotLayer
   --
   -- @since 0.1.0.0
   }
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Generic)
 
-instance Store RawSnapshotLayer
 instance NFData RawSnapshotLayer
 
 instance ToJSON RawSnapshotLayer where
@@ -2035,21 +2015,6 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
 
-instance Store PackageIdentifierRevision where
-  size =
-    VarSize $ \(PackageIdentifierRevision name version cfi) ->
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f name) +
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f version) +
-    (case size of
-       ConstSize x -> x
-       VarSize f -> f cfi)
-  peek = PackageIdentifierRevision <$> peek <*> peek <*> peek
-  poke (PackageIdentifierRevision name version cfi) = poke name *> poke version *> poke cfi
-
 -- | A single layer of a snapshot, i.e. a specific YAML configuration file.
 --
 -- @since 0.1.0.0
@@ -2091,7 +2056,7 @@ data SnapshotLayer = SnapshotLayer
   --
   -- @since 0.1.0.0
   }
-  deriving (Show, Eq, Data, Generic)
+  deriving (Show, Eq, Generic)
 
 instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat

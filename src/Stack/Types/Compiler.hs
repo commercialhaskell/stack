@@ -16,10 +16,10 @@ module Stack.Types.Compiler
   , isWantedCompiler
   , wantedToActual
   , actualToWanted
+  , parseActualCompiler
   ) where
 
 import           Data.Aeson
-import           Data.Data
 import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Version
@@ -40,7 +40,6 @@ data ActualCompiler
         !Version -- GHCJS version
         !Version -- GHC version
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store ActualCompiler
 instance NFData ActualCompiler
 instance Display ActualCompiler where
     display (ACGhc x) = display (WCGhc x)

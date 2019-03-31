@@ -96,6 +96,7 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
+- resource-pool
 - resourcet
 - retry >= 0.7
 - rio
@@ -103,7 +104,6 @@ dependencies:
 - semigroups
 - split
 - stm
-- store-core # FIXME remove
 - streaming-commons
 - tar
 - template-haskell
@@ -215,6 +215,7 @@ library:
   - Stack.Package
   - Stack.PackageDump
   - Stack.Path
+  - Stack.PersistentTH
   - Stack.Prelude
   - Stack.Runners
   - Stack.Script
@@ -228,7 +229,6 @@ library:
   - Stack.Snapshot
   - Stack.Solver
   - Stack.SourceMap
-  - Stack.StoreTH
   - Stack.Types.Build
   - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild

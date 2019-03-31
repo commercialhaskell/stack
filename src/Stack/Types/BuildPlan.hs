@@ -1,31 +1,25 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE TypeFamilies               #-}
 -- | Shared types for various stackage packages.
 module Stack.Types.BuildPlan
     ( -- * Types
       SnapshotDef (..)
-    , snapshotDefVC
     , ExeName (..)
     , LoadedSnapshot (..)
-    , loadedSnapshotVC
     , LoadedPackageInfo (..)
     , C.ModuleName
     , ModuleInfo (..)
-    , moduleInfoVC
     , sdSnapshots
     ) where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Data.Store.Version
 import qualified Distribution.ModuleName as C
 import           Distribution.ModuleName (ModuleName)
 import           Pantry
@@ -51,8 +45,7 @@ data SnapshotDef = SnapshotDef -- To be removed as part of https://github.com/co
     , sdWantedCompilerVersion :: !WantedCompiler
     , sdUniqueHash :: !SHA256
     }
-    deriving (Show, Eq, Data, Generic, Typeable)
-instance Store SnapshotDef
+    deriving (Show, Eq, Generic, Typeable)
 instance NFData SnapshotDef
 
 sdSnapshots :: SnapshotDef -> [RawSnapshotLayer]
@@ -61,12 +54,9 @@ sdSnapshots sd =
     Nothing -> []
     Just (snap, sd') -> snap : sdSnapshots sd'
 
-snapshotDefVC :: VersionConfig SnapshotDef
-snapshotDefVC = storeVersionConfig "sd-v3" "MpkgNx8qOHakJTSePR1czDElNiU="
-
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Typeable)
 
 -- | A fully loaded snapshot combined , including information gleaned from the
 -- global database and parsing cabal files.
@@ -81,8 +71,7 @@ data LoadedSnapshot = LoadedSnapshot
   -- ^ Snapshots themselves may not have a filepath in them, but once
   -- we start adding in local configuration it's possible.
   }
-    deriving (Generic, Show, Data, Eq, Typeable)
-instance Store LoadedSnapshot
+    deriving (Generic, Show, Eq, Typeable)
 instance NFData LoadedSnapshot
 
 {-
@@ -135,13 +124,6 @@ configuration. Otherwise, we don't cache.
 
 -}
 
-loadedSnapshotVC :: VersionConfig LoadedSnapshot
-#if MIN_VERSION_template_haskell(2,14,0)
-loadedSnapshotVC = storeVersionConfig "ls-v6" "RV5MidVhkF2v-PlFB5-tfpcX5xQ="
-#else
-loadedSnapshotVC = storeVersionConfig "ls-v6" "BAaL0KUsgRTQy26PtlMz0TSt-Kw="
-#endif
-
 -- | Information on a single package for the 'LoadedSnapshot' which
 -- can be installed.
 --
@@ -176,15 +158,13 @@ data LoadedPackageInfo loc = LoadedPackageInfo
     -- ^ Should this package be hidden in the database. Affects the
     -- script interpreter's module name import parser.
     }
-    deriving (Generic, Show, Eq, Data, Typeable, Functor)
-instance Store a => Store (LoadedPackageInfo a)
+  deriving (Generic, Show, Eq, Typeable, Functor)
 instance NFData a => NFData (LoadedPackageInfo a)
 
 newtype ModuleInfo = ModuleInfo
     { miModules      :: Map ModuleName (Set PackageName)
     }
-  deriving (Show, Eq, Ord, Generic, Typeable, Data)
-instance Store ModuleInfo
+  deriving (Show, Eq, Ord, Generic, Typeable)
 instance NFData ModuleInfo
 
 instance Semigroup ModuleInfo where
@@ -194,6 +174,3 @@ instance Semigroup ModuleInfo where
 instance Monoid ModuleInfo where
   mempty = ModuleInfo mempty
   mappend = (<>)
-
-moduleInfoVC :: VersionConfig ModuleInfo
-moduleInfoVC = storeVersionConfig "mi-v2" "8ImAfrwMVmqoSoEpt85pLvFeV3s="

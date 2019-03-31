@@ -37,7 +37,6 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Package
 import           Stack.PackageDump
 import           Stack.SourceMap (loadGlobalHints)
-import           Stack.StoreTH
 import           Stack.Types.BuildPlan
 import           Stack.Types.GhcPkgId
 import           Stack.Types.VersionIntervals
@@ -191,14 +190,13 @@ loadSnapshot
   -> (WantedCompiler -> RIO env LoadedSnapshot)
   -> SnapshotDef
   -> RIO env LoadedSnapshot
-loadSnapshot mcompiler helper =
+loadSnapshot _mcompiler helper =
     start
   where
-    start sd = do
-      path <- configLoadedSnapshotCache
-        sd
-        (maybe GISSnapshotHints GISCompiler mcompiler)
-      decodeOrLoadLoadedSnapshot path (inner sd)
+    start sd =
+      -- FIXME: this used to save/load from a cache using 'Store', but is removed
+      -- by https://github.com/commercialhaskell/stack/pull/4670
+      inner sd
 
     inner :: SnapshotDef -> RIO env LoadedSnapshot
     inner sd = do
