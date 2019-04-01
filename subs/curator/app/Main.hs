@@ -131,9 +131,9 @@ constraints target =
         downloaded <- download req buildConstraintsPath
         unless downloaded $
           error $ "Could not download build-constraints.yaml from Github"
-        logInfo "Writing constraints.yaml"
-        loadStackageConstraints "build-constraints.yaml" >>=
-          liftIO . encodeFile constraintsFilename
+      logInfo "Writing constraints.yaml"
+      loadStackageConstraints "build-constraints.yaml" >>=
+        liftIO . encodeFile constraintsFilename
 
 snapshotIncomplete :: RIO PantryApp ()
 snapshotIncomplete = do
