@@ -42,6 +42,10 @@ Major changes:
       packages depending on it being no longer available as a dependency,
       such packages need to be added explicitly when needed. See
       [#4510] (https://github.com/commercialhaskell/stack/issues/4510).
+    * Cabal solver integration was not updated to support newer
+      `cabal-install` versions so `stack solver` command was removed as
+      well as a related option `--solver` from `stack new` and
+      `stack init`.
 * Upgrade to Cabal 2.4
     * Note that, in this process, the behavior of file globbing has
       been modified to match that of Cabal. In particular, this means
