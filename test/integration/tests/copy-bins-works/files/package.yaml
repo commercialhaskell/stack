@@ -1,0 +1,9 @@
+name: foo
+version: 0
+
+executables:
+  bar:
+    source-dirs: src
+    main: Main.hs
+    dependencies:
+    - base
