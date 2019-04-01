@@ -5,10 +5,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 import Curator hiding (Snapshot)
 import Data.Yaml (encodeFile, decodeFileThrow)
-import Network.HTTP.Client (parseUrlThrow)
+import Network.HTTP.Client (httpLbs, newManager, parseUrlThrow, responseBody)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Download (download)
 import Options.Applicative.Simple hiding (action)
 import qualified Pantry
+import Path (toFilePath)
 import Path.IO (doesFileExist, resolveFile', resolveDir')
 import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
@@ -122,18 +124,18 @@ constraints target =
     _ -> do
       buildConstraintsPath <- resolveFile' "build-constraints.yaml"
       exists <- doesFileExist buildConstraintsPath
-      if exists
-      then do
-        logInfo "Reusing already existing file build-constraints.yaml"
-      else do
-        logInfo $ "Downloading build-constraints from commercialhaskell/stackage"
-        req <- parseUrlThrow "https://raw.githubusercontent.com/commercialhaskell/stackage/master/build-constraints.yaml"
-        downloaded <- download req buildConstraintsPath
-        unless downloaded $
-          error $ "Could not download build-constraints.yaml from Github"
+      stackageConstraints <- if exists
+        then do
+          logInfo "Reusing already existing file build-constraints.yaml"
+          loadStackageConstraints $ toFilePath buildConstraintsPath
+        else do
+          logInfo $ "Downloading build-constraints from commercialhaskell/stackage"
+          req <- parseUrlThrow "https://raw.githubusercontent.com/commercialhaskell/stackage/master/build-constraints.yaml"
+          man <- liftIO $ newManager tlsManagerSettings
+          liftIO (httpLbs req man) >>=
+            loadStackageConstraintsBs . BL.toStrict . responseBody
       logInfo "Writing constraints.yaml"
-      loadStackageConstraints "build-constraints.yaml" >>=
-        liftIO . encodeFile constraintsFilename
+      liftIO $ encodeFile constraintsFilename stackageConstraints
 
 snapshotIncomplete :: RIO PantryApp ()
 snapshotIncomplete = do

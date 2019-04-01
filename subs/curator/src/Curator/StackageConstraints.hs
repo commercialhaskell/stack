@@ -6,6 +6,7 @@
 -- @commercialhaskell/stackage@.
 module Curator.StackageConstraints
   ( loadStackageConstraints
+  , loadStackageConstraintsBs
   ) where
 
 import Pantry
@@ -128,6 +129,9 @@ convertPackages =
 
 loadStackageConstraints :: FilePath -> RIO env Constraints
 loadStackageConstraints = decodeFileThrow >=> convert
+
+loadStackageConstraintsBs :: ByteString -> RIO env Constraints
+loadStackageConstraintsBs = decodeThrow >=> convert
 
 convert :: SC -> RIO env Constraints
 convert sc0 = do

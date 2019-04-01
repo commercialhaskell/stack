@@ -6,12 +6,14 @@ ghc-options:
 
 dependencies:
 - base
-- rio
+- http-client
+- http-client-tls
 - pantry
-- yaml
 - path
 - path-io
+- rio
 - rio-prettyprint
+- yaml
 
 library:
   source-dirs: src
@@ -28,8 +30,6 @@ library:
   - cryptonite
   - cryptonite-conduit
   - html-conduit
-  - http-client
-  - http-client-tls
   - memory
   - mime-types
   - mtl
@@ -44,6 +44,5 @@ executables:
     main: Main.hs
     dependencies:
     - curator
-    - http-client
     - http-download
     - optparse-simple
