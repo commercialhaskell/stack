@@ -39,8 +39,7 @@ evalOptsParser meta =
 
 -- | Parser for extra options to exec command
 execOptsExtraParser :: Parser ExecOptsExtra
-execOptsExtraParser = eoPlainParser <|>
-                      ExecOptsEmbellished
+execOptsExtraParser = ExecOptsExtra
                          <$> eoEnvSettingsParser
                          <*> eoPackagesParser
                          <*> eoRtsOptionsParser
@@ -68,11 +67,6 @@ execOptsExtraParser = eoPlainParser <|>
         ( long "rts-options"
         <> help "Explicit RTS options to pass to application"
         <> metavar "RTSFLAG"))
-
-    eoPlainParser :: Parser ExecOptsExtra
-    eoPlainParser = flag' ExecOptsPlain
-                          (long "plain" <>
-                           help "Use an unmodified environment (only useful with Docker)")
 
     eoCwdParser :: Parser (Maybe FilePath)
     eoCwdParser = optional

@@ -76,6 +76,8 @@ Behavior changes:
   never been used yet, and there are no plans to implement signature
   verification.
 
+* Remove the `--plain` option for the `exec` family of commands
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get

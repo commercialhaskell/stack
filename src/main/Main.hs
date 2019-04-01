@@ -776,44 +776,33 @@ sdistCmd sdistOpts =
 -- | Execute a command.
 execCmd :: ExecOpts -> RIO Runner ()
 execCmd ExecOpts {..} =
-    case eoExtra of
-        ExecOptsPlain ->
-          withConfig YesReexec $ withDefaultEnvConfig $ do
-            config <- view configL
-            menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-            withProcessContext menv $ do
-                (cmd, args) <- case (eoCmd, eoArgs) of
-                    (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> getGhcCmd [] args
-                    (ExecRunGhc, args) -> getRunGhcCmd [] args
+  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
+    unless (null targets) $ Stack.Build.build Nothing
 
-                exec cmd args
-        ExecOptsEmbellished {..} -> do
-            let targets = concatMap words eoPackages
-                boptsCLI = defaultBuildOptsCLI
-                           { boptsCLITargets = map T.pack targets
-                           }
-            withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
-              unless (null targets) $ Stack.Build.build Nothing
+    config <- view configL
+    menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+    withProcessContext menv $ do
+      -- Add RTS options to arguments
+      let argsWithRts args = if null eoRtsOptions
+                  then args :: [String]
+                  else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
+      (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
+          (ExecCmd cmd, args) -> return (cmd, args)
+          (ExecRun, args) -> getRunCmd args
+          (ExecGhc, args) -> getGhcCmd eoPackages args
+          -- NOTE: This doesn't work for GHCJS, because it doesn't have
+          -- a runghcjs binary.
+          (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
-              config <- view configL
-              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
-              withProcessContext menv $ do
-                -- Add RTS options to arguments
-                let argsWithRts args = if null eoRtsOptions
-                            then args :: [String]
-                            else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
-                (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
-                    (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> getGhcCmd eoPackages args
-                    -- NOTE: This doesn't work for GHCJS, because it doesn't have
-                    -- a runghcjs binary.
-                    (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
-
-                runWithPath eoCwd $ exec cmd args
+      runWithPath eoCwd $ exec cmd args
   where
+      ExecOptsExtra {..} = eoExtra
+
+      targets = concatMap words eoPackages
+      boptsCLI = defaultBuildOptsCLI
+                 { boptsCLITargets = map T.pack targets
+                 }
+
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId name = do
           mId <- findGhcPkgField [] name "id"
