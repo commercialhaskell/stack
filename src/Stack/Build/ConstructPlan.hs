@@ -42,7 +42,6 @@ import           Stack.Package
 import           Stack.PackageDump
 import           Stack.SourceMap
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -1009,10 +1008,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
          [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> pretty (defaultUserConfigPath stackRoot) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
-      ) ++
-      [ "  *" <+> align (flow "Consider trying 'stack solver', which uses the cabal-install solver to attempt to find some working build configuration. This can be convenient when dealing with many complicated constraint errors, but results may be unpredictable.")
-      , line <> line
-      ] ++ addExtraDepsRecommendations
+      ) ++ addExtraDepsRecommendations
 
   where
     exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions

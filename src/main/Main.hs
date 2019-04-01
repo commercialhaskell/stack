@@ -46,6 +46,7 @@ import           Options.Applicative.Complicated
 import           Options.Applicative.Simple (simpleVersion)
 #endif
 import           Options.Applicative.Types (ParserHelp(..))
+import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -85,7 +86,6 @@ import           Stack.Options.NewParser
 import           Stack.Options.NixParser
 import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
-import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.Path
 import           Stack.Runners
@@ -94,8 +94,6 @@ import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarb
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
 import qualified Stack.Sig as Sig
-import           Stack.Snapshot (loadResolver)
-import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -293,10 +291,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Create stack project config from cabal or hpack package specifications"
                     initCmd
                     initOptsParser
-        addCommand' "solver"
-                    "Add missing extra-deps to stack project config"
-                    solverCmd
-                    solverOptsParser
         addCommand' "setup"
                     "Get the appropriate GHC for your project"
                     setupCmd
@@ -664,9 +658,12 @@ unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
 unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
 unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
     mresolver <- view $ globalOptsL.to globalResolver
-    mSnapshotDef <- mapM (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
+    mSnapshot <- forM mresolver $ \resolver -> do
+      concrete <- makeConcreteResolver resolver
+      loc <- completeSnapshotLocation concrete
+      loadSnapshot loc
     dstPath' <- resolveDir' $ T.unpack dstPath
-    unpackPackages mSnapshotDef dstPath' names
+    unpackPackages mSnapshot dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> RIO Runner ()
@@ -936,7 +933,7 @@ initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
     pwd <- getCurrentDir
     go <- view globalOptsL
-    withNoProject $ withConfig YesReexec (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withNoProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
@@ -946,16 +943,11 @@ newCmd (newOpts,initOpts) =
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $ do
             go <- view globalOptsL
-            initProject IsNewCmd dir initOpts (globalResolver go)
+            initProject dir initOpts (globalResolver go)
 
 -- | Display instructions for how to use templates
 templatesCmd :: () -> RIO Runner ()
 templatesCmd () = withConfig NoReexec templatesHelp
-
--- | Fix up extra-deps for a project
-solverCmd :: Bool -- ^ modify stack.yaml automatically?
-          -> RIO Runner ()
-solverCmd = withConfig YesReexec . withDefaultEnvConfig . solveExtraDeps
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()

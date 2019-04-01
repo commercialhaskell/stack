@@ -17,6 +17,8 @@ module Stack.SourceMap
     , globalsFromHints
     , getCompilerInfo
     , immutableLocSha
+    , loadProjectSnapshotCandidate
+    , SnapshotCandidate
     ) where
 
 import Data.ByteString.Builder (byteString, lazyByteString)
@@ -71,7 +73,7 @@ additionalDepPackage buildHaddocks pl = do
         (gpdio, name, _cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
         pure (name, gpdio NoPrintWarnings)
       PLImmutable pli -> do
-        PackageIdentifier name _ <- getPackageLocationIdent pli
+        let PackageIdentifier name _ = packageLocationIdent pli
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
   return DepPackage
@@ -247,3 +249,28 @@ immutableLocSha = byteString . treeKeyToBs . locationTreeKey
     locationTreeKey (PLIArchive _ pm) = pmTreeKey pm
     locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
     treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
+
+type SnapshotCandidate env
+     = [ResolvedPath Dir] -> RIO env (SMActual GlobalPackageVersion)
+
+loadProjectSnapshotCandidate ::
+       (HasConfig env)
+    => RawSnapshotLocation
+    -> PrintWarnings
+    -> Bool
+    -> RIO env (SnapshotCandidate env)
+loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
+    snapshot <- fmap fst . loadAndCompleteSnapshot =<< completeSnapshotLocation loc
+    deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
+    let wc = snapshotCompiler snapshot
+    globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc
+    return $ \projectPackages -> do
+        prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
+            pp <- mkProjectPackage printWarnings resolved buildHaddocks
+            pure (cpName $ ppCommon pp, pp)
+        return SMActual
+              { smaCompiler = wantedToActual $ snapshotCompiler snapshot
+              , smaProject = prjPkgs
+              , smaDeps = Map.difference deps prjPkgs
+              , smaGlobal = globals
+              }

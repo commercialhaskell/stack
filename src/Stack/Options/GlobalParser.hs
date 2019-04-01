@@ -95,7 +95,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
 initOptsParser :: Parser InitOpts
 initOptsParser =
     InitOpts <$> searchDirs
-             <*> solver <*> omitPackages
+             <*> omitPackages
              <*> overwrite <*> fmap not ignoreSubDirs
   where
     searchDirs =
@@ -109,5 +109,3 @@ initOptsParser =
                        help "Force overwriting an existing stack.yaml")
     omitPackages = switch (long "omit-packages" <>
                            help "Exclude conflicting or incompatible user packages")
-    solver = switch (long "solver" <>
-             help "Use a dependency solver to determine extra dependencies")

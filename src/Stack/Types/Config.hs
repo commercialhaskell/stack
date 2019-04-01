@@ -65,8 +65,6 @@ module Stack.Types.Config
   -- ** ConfigException
   ,HpackExecutable(..)
   ,ConfigException(..)
-  -- ** WhichSolverCmd
-  ,WhichSolverCmd(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
@@ -103,7 +101,7 @@ module Stack.Types.Config
   ,SCM(..)
   -- * Paths
   ,bindirSuffix
-  ,configLoadedSnapshotCache
+--  ,configLoadedSnapshotCache
   ,GlobalInfoSource(..)
   ,getProjectWorkDir
   ,docDirSuffix
@@ -209,14 +207,14 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
-import qualified Pantry.SHA256 as SHA256
+-- import qualified Pantry.SHA256 as SHA256
 import           Path
 import qualified Paths_stack as Meta
 import           RIO.PrettyPrint (HasTerm (..))
 import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString, HasStylesUpdate (..))
 import           Stack.Constants
-import           Stack.Types.BuildPlan
+-- import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -608,7 +606,7 @@ data Project = Project
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !RawSnapshotLocation
-    -- ^ How we resolve which @SnapshotDef@ to use
+    -- ^ How we resolve which @Snapshot@ to use
     , projectCompiler :: !(Maybe WantedCompiler)
     -- ^ Override the compiler in 'projectResolver'
     , projectExtraPackageDBs :: ![FilePath]
@@ -1029,9 +1027,9 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
-  | ResolverMismatch WhichSolverCmd !RawSnapshotLocation String
-  | ResolverPartial WhichSolverCmd !RawSnapshotLocation String
+  | NoMatchingSnapshot (NonEmpty SnapName)
+  | ResolverMismatch !RawSnapshotLocation String
+  | ResolverPartial !RawSnapshotLocation String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1085,30 +1083,27 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot whichCmd names) = concat
+    show (NoMatchingSnapshot names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         (NonEmpty.toList names)
-        , showOptions whichCmd Don'tSuggestSolver
+        , resolveOptions
         ]
-    show (ResolverMismatch whichCmd resolver errDesc) = concat
+    show (ResolverMismatch resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
-        , showOptions whichCmd Don'tSuggestSolver
+        , resolveOptions
         ]
-    show (ResolverPartial whichCmd resolver errDesc) = concat
+    show (ResolverPartial resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
-        , showOptions whichCmd
-            (case whichCmd of
-                IsSolverCmd -> Don'tSuggestSolver
-                _ -> SuggestSolver)
+        , resolveOptions
         ]
     show (NoSuchDirectory dir) =
         "No directory could be located matching the supplied path: " ++ dir
@@ -1160,25 +1155,12 @@ instance Show ConfigException where
         goLoc loc = "- " ++ show loc
 instance Exception ConfigException
 
-showOptions :: WhichSolverCmd -> SuggestSolver -> String
-showOptions whichCmd suggestSolver = unlines $ "\nThis may be resolved by:" : options
-  where
-    options =
-        (case suggestSolver of
-            SuggestSolver -> [useSolver]
-            Don'tSuggestSolver -> []) ++
-        (case whichCmd of
-            IsSolverCmd -> [useResolver]
-            IsInitCmd -> both
-            IsNewCmd -> both)
-    both = [omitPackages, useResolver]
-    useSolver    = "    - Using '--solver' to ask cabal-install to generate extra-deps, atop the chosen snapshot."
-    omitPackages = "    - Using '--omit-packages' to exclude mismatching package(s)."
-    useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
-
-data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
-
-data SuggestSolver = SuggestSolver | Don'tSuggestSolver
+resolveOptions :: String
+resolveOptions =
+  unlines [ "\nThis may be resolved by:"
+          , "    - Using '--omit-packages' to exclude mismatching package(s)."
+          , "    - Using '--resolver' to specify a matching snapshot/resolver"
+          ]
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
@@ -1357,22 +1339,22 @@ flagCacheLocal = do
     root <- installationRootLocal
     return $ root </> relDirFlagCache
 
--- | Where to store 'LoadedSnapshot' caches
-configLoadedSnapshotCache
-  :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
-  => SnapshotDef
-  -> GlobalInfoSource
-  -> m (Path Abs File)
-configLoadedSnapshotCache sd gis = do
-    root <- view stackRootL
-    platform <- platformGhcVerOnlyRelDir
-    file <- parseRelFile $ T.unpack (SHA256.toHexText $ sdUniqueHash sd) ++ ".cache"
-    gis' <- parseRelDir $
-          case gis of
-            GISSnapshotHints -> "__snapshot_hints__"
-            GISCompiler cv -> compilerVersionString cv
-    -- Yes, cached plans differ based on platform
-    return (root </> relDirLoadedSnapshotCache </> platform </> gis' </> file)
+-- -- | Where to store 'LoadedSnapshot' caches
+-- configLoadedSnapshotCache
+--   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
+--   => SnapshotDef
+--   -> GlobalInfoSource
+--   -> m (Path Abs File)
+-- configLoadedSnapshotCache sd gis = do
+--     root <- view stackRootL
+--     platform <- platformGhcVerOnlyRelDir
+--     file <- parseRelFile $ T.unpack (SHA256.toHexText $ sdUniqueHash sd) ++ ".cache"
+--     gis' <- parseRelDir $
+--           case gis of
+--             GISSnapshotHints -> "__snapshot_hints__"
+--             GISCompiler cv -> compilerVersionString cv
+--     -- Yes, cached plans differ based on platform
+--     return (root </> relDirLoadedSnapshotCache </> platform </> gis' </> file)
 
 -- | Where do we get information on global packages for loading up a
 -- 'LoadedSnapshot'?

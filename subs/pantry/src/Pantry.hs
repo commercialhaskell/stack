@@ -136,7 +136,8 @@ module Pantry
   , unpackPackageLocation
   , getPackageLocationName
   , getRawPackageLocationIdent
-  , getPackageLocationIdent
+  , packageLocationIdent
+  , packageLocationVersion
   , getRawPackageLocationTreeKey
   , getPackageLocationTreeKey
 
@@ -280,7 +281,7 @@ getLatestHackageVersion name preferred =
 --
 -- @since 0.1.0.0
 getLatestHackageLocation
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageLocationImmutable)
@@ -292,10 +293,10 @@ getLatestHackageLocation name preferred = do
         (_rev, cfKey) <- fst <$> Map.maxViewWithKey revisions
         pure (version, cfKey)
 
-  fmap join . forM mVerCfKey $ \(version, cfKey@(BlobKey sha _)) -> do
-    mTreeKey <- withStorage $ loadHackageTreeKey name version sha
-    forM mTreeKey $ \treeKey ->
-      pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+  forM mVerCfKey $ \(version, cfKey@(BlobKey sha size)) -> do
+    let pir = PackageIdentifierRevision name version (CFIHash sha (Just size))
+    treeKey <- getHackageTarballKey pir
+    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
 
 -- | Returns the latest revision of the given package version available from
 -- Hackage.
@@ -1299,13 +1300,22 @@ getPackageLocationName = fmap pkgName . getRawPackageLocationIdent
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --
 -- @since 0.1.0.0
-getPackageLocationIdent
-  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageLocationImmutable
-  -> RIO env PackageIdentifier
-getPackageLocationIdent (PLIHackage ident _ _) = pure ident
-getPackageLocationIdent (PLIRepo _ pm) = pure $ pmIdent pm
-getPackageLocationIdent (PLIArchive _ pm) = pure $ pmIdent pm
+packageLocationIdent
+  :: PackageLocationImmutable
+  -> PackageIdentifier
+packageLocationIdent (PLIHackage ident _ _) = ident
+packageLocationIdent (PLIRepo _ pm) = pmIdent pm
+packageLocationIdent (PLIArchive _ pm) = pmIdent pm
+
+-- | Get version of the package at the given location.
+--
+-- @since 0.1.0.0
+packageLocationVersion
+  :: PackageLocationImmutable
+  -> Version
+packageLocationVersion (PLIHackage pident _ _) = pkgVersion pident
+packageLocationVersion (PLIRepo _ pm) = pkgVersion (pmIdent pm)
+packageLocationVersion (PLIArchive _ pm) = pkgVersion (pmIdent pm)
 
 -- | Get the 'PackageIdentifier' of the package at the given location.
 --
