@@ -420,6 +420,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     isWarning :: Text -> Bool
     isWarning t = ": Warning:" `T.isSuffixOf` t -- prior to GHC 8
                || ": warning:" `T.isInfixOf` t -- GHC 8 is slightly different
+               || "mwarning:" `T.isInfixOf` t -- colorized output
 
     dumpLog :: String -> (Path Abs Dir, Path Abs File) -> RIO env ()
     dumpLog msgSuffix (pkgDir, filepath) = do
