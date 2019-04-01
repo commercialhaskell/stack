@@ -76,8 +76,8 @@ Behavior changes:
   never been used yet, and there are no plans to implement signature
   verification.
 
-* Always use `--exact-configuration` (should mostly be a non-user-visible
-  enhancement).
+* Always use the `--exact-configuration` Cabal configuration option when
+  building (should mostly be a non-user-visible enhancement).
 
 Other enhancements:
 
