@@ -72,6 +72,10 @@ Behavior changes:
 
 * Support the `drop-packages` field in `stack.yaml`
 
+* Remove the GPG signing code during uploads. The GPG signatures have
+  never been used yet, and there are no plans to implement signature
+  verification.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get

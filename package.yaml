@@ -221,9 +221,6 @@ library:
   - Stack.Setup
   - Stack.Setup.Installed
   - Stack.SetupCmd
-  - Stack.Sig
-  - Stack.Sig.GPG
-  - Stack.Sig.Sign
   - Stack.SourceMap
   - Stack.StoreTH
   - Stack.Types.Build
@@ -238,7 +235,6 @@ library:
   - Stack.Types.Package
   - Stack.Types.PackageName
   - Stack.Types.Resolver
-  - Stack.Types.Sig
   - Stack.Types.SourceMap
   - Stack.Types.TemplateName
   - Stack.Types.Version
