@@ -36,6 +36,7 @@ import           Distribution.PackageDescription (GenericPackageDescription,
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
 import           Distribution.Text (display)
+import           Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as C
 import qualified RIO
 import           Stack.Constants
@@ -147,9 +148,15 @@ gpdPackageDeps
     -> Map FlagName Bool
     -> Map PackageName VersionRange
 gpdPackageDeps gpd ac platform flags =
-    Map.filterWithKey (const . (/= name)) (packageDependencies pkgConfig pkgDesc)
+    Map.filterWithKey (const . not . isLocalLibrary) (packageDependencies pkgConfig pkgDesc)
     where
+        isLocalLibrary name' = name' == name || name' `Set.member` subs
+
         name = gpdPackageName gpd
+        subs = Set.fromList
+             $ map (C.mkPackageName . unUnqualComponentName . fst)
+             $ C.condSubLibraries gpd
+
         -- Since tests and benchmarks are both enabled, doesn't matter
         -- if we choose modified or unmodified
         pkgDesc = pdpModifiedBuildable $ resolvePackageDescription pkgConfig gpd

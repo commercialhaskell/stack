@@ -218,6 +218,8 @@ Bug fixes:
   [#2159](https://github.com/commercialhaskell/stack/issues/2159).
 * Warnings are dumped from logs even when color is enabled. See
   [#2997](https://github.com/commercialhaskell/stack/issues/2997)
+* `stack init` will now work for cabal files with sublibraries. See
+  [#4408](https://github.com/commercialhaskell/stack/issues/4408)
 
 ## v1.9.3
 
