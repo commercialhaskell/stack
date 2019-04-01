@@ -685,19 +685,23 @@ addPackageDeps package = do
                                 tell mempty { wWarnings = (msg:) }
                               where
                                 msg = T.concat
-                                    [ "WARNING: Ignoring out of range dependency"
-                                    , reason
-                                    , ": "
-                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
-                                    , ". "
+                                    [ "WARNING: Ignoring "
                                     , T.pack $ packageNameString $ packageName package
-                                    , " requires: "
+                                    , "'s bounds on "
+                                    , T.pack $ packageNameString depname
+                                    , " ("
                                     , versionRangeText range
+                                    , "); using "
+                                    , reason
+                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
+                                    , ".\nReason: "
+                                    , reason
+                                    , "."
                                     ]
                         allowNewer <- view $ configL.to configAllowNewer
                         if allowNewer
                             then do
-                                warn_ " (allow-newer enabled)"
+                                warn_ "allow-newer enabled"
                                 return True
                             else do
                                 -- We ignore dependency information for packages in a snapshot
@@ -705,7 +709,7 @@ addPackageDeps package = do
                                 y <- inSnapshot depname (adrVersion adr)
                                 if x && y
                                     then do
-                                        warn_ " (trusting snapshot over cabal file dependency information)"
+                                        warn_ "trusting snapshot over cabal file dependency information"
                                         return True
                                     else return False
                 if inRange
