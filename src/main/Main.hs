@@ -93,7 +93,6 @@ import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
-import qualified Stack.Sig as Sig
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -321,12 +320,12 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            (sdistOptsParser True)
+            sdistOptsParser
         addCommand'
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            (sdistOptsParser False)
+            sdistOptsParser
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dot
@@ -688,7 +687,7 @@ upgradeCmd upgradeOpts' = do
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> RIO Runner ()
-uploadCmd (SDistOpts [] _ _ _ _ _ _) = do
+uploadCmd (SDistOpts [] _ _ _ _) = do
     prettyErrorL
         [ flow "To upload the current package, please run"
         , PP.style Shell "stack upload ."
@@ -729,13 +728,7 @@ uploadCmd sdistOpts = do
                   do tarFile <- resolveFile' file
                      liftIO $ do
                        creds <- runMemoized getCreds
-                       Upload.upload hackageUrl creds (toFilePath tarFile)
-                     when
-                         (sdoptsSign sdistOpts)
-                         (void $
-                          Sig.sign
-                              (sdoptsSignServerUrl sdistOpts)
-                              tarFile))
+                       Upload.upload hackageUrl creds (toFilePath tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
@@ -745,14 +738,6 @@ uploadCmd sdistOpts = do
                   creds <- runMemoized getCreds
                   Upload.uploadBytes hackageUrl creds tarName tarBytes
                   forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
-                tarPath <- parseRelFile tarName
-                when
-                    (sdoptsSign sdistOpts)
-                    (void $
-                     Sig.signTarBytes
-                         (sdoptsSignServerUrl sdistOpts)
-                         tarPath
-                         tarBytes)
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
@@ -782,7 +767,6 @@ sdistCmd sdistOpts =
             prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
             checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
-            when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
         where
           copyTarToTarPath tarPath tarName targetDir = liftIO $ do
             let targetTarPath = targetDir FP.</> tarName

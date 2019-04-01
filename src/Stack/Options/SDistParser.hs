@@ -8,19 +8,11 @@ import           Stack.SDist
 import           Stack.Options.HpcReportParser (pvpBoundsOption)
 
 -- | Parser for arguments to `stack sdist` and `stack upload`
-sdistOptsParser :: Bool -- ^ Whether to sign by default `stack upload` does, `stack sdist` doesn't
-                -> Parser SDistOpts
-sdistOptsParser signDefault = SDistOpts <$>
+sdistOptsParser :: Parser SDistOpts
+sdistOptsParser = SDistOpts <$>
   many (strArgument $ metavar "DIR" <> completer dirCompleter) <*>
   optional pvpBoundsOption <*>
   ignoreCheckSwitch <*>
-  (if signDefault
-    then not <$> switch (long "no-signature" <> help "Do not sign & upload signatures")
-    else switch (long "sign" <> help "Sign & upload signatures")) <*>
-  strOption
-  (long "sig-server" <> metavar "URL" <> showDefault <>
-    value "https://sig.commercialhaskell.org" <>
-    help "URL") <*>
   buildPackageOption <*>
   optional (strOption (long "tar-dir" <> help "If specified, copy all the tar to this dir"))
   where
