@@ -1,0 +1,2 @@
+resolver: ghc-8.2.2
+copy-bins: true
