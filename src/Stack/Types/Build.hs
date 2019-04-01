@@ -622,24 +622,18 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | wc == Ghcjs]
-    , ["--exact-configuration" | useExactConf]
+    , ["--exact-configuration"]
     ]
   where
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
     config = view configL econfig
     bopts = bcoBuildOpts bco
 
-    -- TODO: instead always enable this when the cabal version is new
-    -- enough. That way we'll detect bugs with --exact-configuration
-    -- earlier. Cabal also might do less work then.
-    useExactConf = configAllowNewer config
-
     newerCabal = view cabalVersionL econfig >= mkVersion [1, 22]
 
     -- Unioning atop defaults is needed so that all flags are specified
     -- with --exact-configuration.
-    flags | useExactConf = packageFlags package `Map.union` packageDefaultFlags package
-          | otherwise = packageFlags package
+    flags = packageFlags package `Map.union` packageDefaultFlags package
 
     depOptions = map (uncurry toDepOption) $ Map.toList deps
       where

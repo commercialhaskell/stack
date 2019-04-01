@@ -78,6 +78,9 @@ Behavior changes:
 
 * Remove the `--plain` option for the `exec` family of commands
 
+* Always use the `--exact-configuration` Cabal configuration option when
+  building (should mostly be a non-user-visible enhancement).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
