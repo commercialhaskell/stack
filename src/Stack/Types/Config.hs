@@ -429,15 +429,13 @@ data SpecialExecCmd
     | ExecRunGhc
     deriving (Show, Eq)
 
-data ExecOptsExtra
-    = ExecOptsPlain
-    | ExecOptsEmbellished
-        { eoEnvSettings :: !EnvSettings
-        , eoPackages :: ![String]
-        , eoRtsOptions :: ![String]
-        , eoCwd :: !(Maybe FilePath)
-        }
-    deriving (Show)
+data ExecOptsExtra = ExecOptsExtra
+  { eoEnvSettings :: !EnvSettings
+  , eoPackages :: ![String]
+  , eoRtsOptions :: ![String]
+  , eoCwd :: !(Maybe FilePath)
+  }
+  deriving (Show)
 
 data EvalOpts = EvalOpts
     { evalArg :: !String
