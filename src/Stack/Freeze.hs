@@ -26,7 +26,7 @@ freeze (FreezeOpts mode) = do
   let warn = logWarn "No project was found: nothing to freeze"
   case mproject of
     PCProject (p, _) -> doFreeze p mode
-    PCNoProject -> warn
+    PCGlobalProject -> warn
     PCNoConfig _ -> warn
 
 doFreeze ::

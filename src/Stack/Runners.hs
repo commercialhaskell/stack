@@ -14,7 +14,7 @@ module Stack.Runners
     , withEnvConfig
     , withDefaultEnvConfig
     , withConfig
-    , withNoProject
+    , withGlobalProject
     , withRunnerGlobal
     , ShouldReexec (..)
     ) where
@@ -35,11 +35,11 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
 -- | Ensure that no project settings are used when running 'withConfig'.
-withNoProject :: RIO Runner a -> RIO Runner a
-withNoProject inner = do
+withGlobalProject :: RIO Runner a -> RIO Runner a
+withGlobalProject inner = do
   oldSYL <- view stackYamlLocL
   case oldSYL of
-    SYLDefault -> local (set stackYamlLocL SYLNoProject) inner
+    SYLDefault -> local (set stackYamlLocL SYLGlobalProject) inner
     _ -> throwString "Cannot use this command with options which override the stack.yaml location"
 
 -- | Helper for 'withEnvConfig' which passes in some default arguments:

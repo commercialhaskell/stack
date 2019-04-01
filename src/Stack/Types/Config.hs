@@ -363,7 +363,7 @@ configProjectRoot :: Config -> Maybe (Path Abs Dir)
 configProjectRoot c =
   case configProject c of
     PCProject (_, fp) -> Just $ parent fp
-    PCNoProject -> Nothing
+    PCGlobalProject -> Nothing
     PCNoConfig _deps -> Nothing
 
 -- | Which packages do ghc-options on the command line apply to?
@@ -465,7 +465,7 @@ data StackYamlLoc
     -- ^ Use a specific stack.yaml file provided
     | SYLNoConfig ![PackageIdentifierRevision]
     -- ^ Extra dependencies included in the script command line.
-    | SYLNoProject
+    | SYLGlobalProject
     -- ^ Do not look for a project configuration, and use the implicit global.
     deriving Show
 
@@ -478,7 +478,7 @@ data ProjectConfig a
     = PCProject a
     -- ^ Normal run: we want a project, and have one. This comes from
     -- either 'SYLDefault' or 'SYLOverride'.
-    | PCNoProject
+    | PCGlobalProject
     -- ^ No project was found when using 'SYLDefault'. Instead, use
     -- the implicit global.
     | PCNoConfig ![PackageIdentifierRevision]

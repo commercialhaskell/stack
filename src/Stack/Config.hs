@@ -216,7 +216,7 @@ configFromConfigMonoid
      let mproject =
            case configProject of
              PCProject pair -> Just pair
-             PCNoProject -> Nothing
+             PCGlobalProject -> Nothing
              PCNoConfig _deps -> Nothing
      configWorkDir0 <- maybe (return relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
@@ -410,7 +410,7 @@ loadConfig inner = do
     let (mproject', addConfigMonoid) =
           case mproject of
             PCProject (proj, fp, cm) -> (PCProject (proj, fp), (cm:))
-            PCNoProject -> (PCNoProject, id)
+            PCGlobalProject -> (PCGlobalProject, id)
             PCNoConfig deps -> (PCNoConfig deps, id)
     let loadHelper inner2 = do
           userConfigPath <- getDefaultUserConfigPath stackRoot
@@ -435,7 +435,7 @@ loadConfig inner = do
     let withConfig = case mproject of
           PCNoConfig extraDeps -> configNoLocalConfig stackRoot mresolver configArgs extraDeps
           PCProject _project -> loadHelper
-          PCNoProject -> loadHelper
+          PCGlobalProject -> loadHelper
 
     withConfig $ \config -> do
       unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
@@ -472,7 +472,7 @@ loadBuildConfig = do
       PCNoConfig extraDeps -> do
           p <- assert (isJust mresolver) (getEmptyProject mresolver extraDeps)
           return (p, configUserConfigPath config)
-      PCNoProject -> do
+      PCGlobalProject -> do
             logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
@@ -760,7 +760,7 @@ getProjectConfig :: HasLogFunc env
                  -- ^ Override stack.yaml
                  -> RIO env (ProjectConfig (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
-getProjectConfig SYLNoProject = return PCNoProject
+getProjectConfig SYLGlobalProject = return PCGlobalProject
 getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
@@ -769,7 +769,7 @@ getProjectConfig SYLDefault = do
             liftM PCProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            maybe PCNoProject PCProject <$> findInParents getStackDotYaml currDir
+            maybe PCGlobalProject PCProject <$> findInParents getStackDotYaml currDir
   where
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
@@ -796,9 +796,9 @@ loadProjectConfig mstackYaml = do
             logDebug $ "Loading project config file " <>
                         fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             PCProject <$> load fp
-        PCNoProject -> do
+        PCGlobalProject -> do
             logDebug "No project config file found, using defaults."
-            return PCNoProject
+            return PCGlobalProject
         PCNoConfig extraDeps -> do
             logDebug "Ignoring config files"
             return $ PCNoConfig extraDeps
