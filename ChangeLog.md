@@ -204,6 +204,8 @@ Bug fixes:
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 * Hackage credentials are not world-readable. See
   [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* Warnings are dumped from logs even when color is enabled. See
+  [#2997](https://github.com/commercialhaskell/stack/issues/2997)
 
 ## v1.9.3
 
