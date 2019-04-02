@@ -65,8 +65,6 @@ module Stack.Types.Config
   -- ** ConfigException
   ,HpackExecutable(..)
   ,ConfigException(..)
-  -- ** WhichSolverCmd
-  ,WhichSolverCmd(..)
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
@@ -431,15 +429,13 @@ data SpecialExecCmd
     | ExecRunGhc
     deriving (Show, Eq)
 
-data ExecOptsExtra
-    = ExecOptsPlain
-    | ExecOptsEmbellished
-        { eoEnvSettings :: !EnvSettings
-        , eoPackages :: ![String]
-        , eoRtsOptions :: ![String]
-        , eoCwd :: !(Maybe FilePath)
-        }
-    deriving (Show)
+data ExecOptsExtra = ExecOptsExtra
+  { eoEnvSettings :: !EnvSettings
+  , eoPackages :: ![String]
+  , eoRtsOptions :: ![String]
+  , eoCwd :: !(Maybe FilePath)
+  }
+  deriving (Show)
 
 data EvalOpts = EvalOpts
     { evalArg :: !String
@@ -608,7 +604,7 @@ data Project = Project
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
     , projectResolver :: !RawSnapshotLocation
-    -- ^ How we resolve which @SnapshotDef@ to use
+    -- ^ How we resolve which @Snapshot@ to use
     , projectCompiler :: !(Maybe WantedCompiler)
     -- ^ Override the compiler in 'projectResolver'
     , projectExtraPackageDBs :: ![FilePath]
@@ -616,12 +612,14 @@ data Project = Project
     -- ^ Extra configuration intended exclusively for usage by the
     -- curator tool. In other words, this is /not/ part of the
     -- documented and exposed Stack API. SUBJECT TO CHANGE.
+    , projectDropPackages :: !(Set PackageName)
+    -- ^ Packages to drop from the 'projectResolver'.
     }
   deriving Show
 
 instance ToJSON Project where
     -- Expanding the constructor fully to ensure we don't miss any fields.
-    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator) = object $ concat
+    toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
       [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
       , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
@@ -630,6 +628,7 @@ instance ToJSON Project where
       , ["packages" .= packages]
       , ["resolver" .= resolver]
       , maybe [] (\c -> ["curator" .= c]) mcurator
+      , if Set.null drops then [] else ["drop-packages" .= Set.map CabalString drops]
       ]
 
 -- | Extra configuration intended exclusively for usage by the
@@ -1029,9 +1028,9 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot WhichSolverCmd (NonEmpty SnapName)
-  | ResolverMismatch WhichSolverCmd !RawSnapshotLocation String
-  | ResolverPartial WhichSolverCmd !RawSnapshotLocation String
+  | NoMatchingSnapshot (NonEmpty SnapName)
+  | ResolverMismatch !RawSnapshotLocation String
+  | ResolverPartial !RawSnapshotLocation String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -1085,30 +1084,27 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot whichCmd names) = concat
+    show (NoMatchingSnapshot names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         (NonEmpty.toList names)
-        , showOptions whichCmd Don'tSuggestSolver
+        , resolveOptions
         ]
-    show (ResolverMismatch whichCmd resolver errDesc) = concat
+    show (ResolverMismatch resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
         , errDesc
-        , showOptions whichCmd Don'tSuggestSolver
+        , resolveOptions
         ]
-    show (ResolverPartial whichCmd resolver errDesc) = concat
+    show (ResolverPartial resolver errDesc) = concat
         [ "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
-        , showOptions whichCmd
-            (case whichCmd of
-                IsSolverCmd -> Don'tSuggestSolver
-                _ -> SuggestSolver)
+        , resolveOptions
         ]
     show (NoSuchDirectory dir) =
         "No directory could be located matching the supplied path: " ++ dir
@@ -1160,25 +1156,12 @@ instance Show ConfigException where
         goLoc loc = "- " ++ show loc
 instance Exception ConfigException
 
-showOptions :: WhichSolverCmd -> SuggestSolver -> String
-showOptions whichCmd suggestSolver = unlines $ "\nThis may be resolved by:" : options
-  where
-    options =
-        (case suggestSolver of
-            SuggestSolver -> [useSolver]
-            Don'tSuggestSolver -> []) ++
-        (case whichCmd of
-            IsSolverCmd -> [useResolver]
-            IsInitCmd -> both
-            IsNewCmd -> both)
-    both = [omitPackages, useResolver]
-    useSolver    = "    - Using '--solver' to ask cabal-install to generate extra-deps, atop the chosen snapshot."
-    omitPackages = "    - Using '--omit-packages' to exclude mismatching package(s)."
-    useResolver  = "    - Using '--resolver' to specify a matching snapshot/resolver"
-
-data WhichSolverCmd = IsInitCmd | IsSolverCmd | IsNewCmd
-
-data SuggestSolver = SuggestSolver | Don'tSuggestSolver
+resolveOptions :: String
+resolveOptions =
+  unlines [ "\nThis may be resolved by:"
+          , "    - Using '--omit-packages' to exclude mismatching package(s)."
+          , "    - Using '--resolver' to specify a matching snapshot/resolver"
+          ]
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
@@ -1439,6 +1422,7 @@ parseProjectAndConfigMonoid rootDir =
         config <- parseConfigMonoidObject rootDir o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         mcurator <- jsonSubWarningsT (o ..:? "curator")
+        drops <- o ..:? "drop-packages" ..!= mempty
         return $ do
           deps' <- mapM (resolvePaths (Just rootDir)) deps
           resolver' <- resolvePaths (Just rootDir) resolver
@@ -1451,6 +1435,7 @@ parseProjectAndConfigMonoid rootDir =
                   , projectDependencies = concatMap toList (deps' :: [NonEmpty RawPackageLocation])
                   , projectFlags = flags
                   , projectCurator = mcurator
+                  , projectDropPackages = Set.map unCabalString drops
                   }
           pure $ ProjectAndConfigMonoid project config
 

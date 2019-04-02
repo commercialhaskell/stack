@@ -46,6 +46,7 @@ import           Options.Applicative.Complicated
 import           Options.Applicative.Simple (simpleVersion)
 #endif
 import           Options.Applicative.Types (ParserHelp(..))
+import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -85,7 +86,6 @@ import           Stack.Options.NewParser
 import           Stack.Options.NixParser
 import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
-import           Stack.Options.SolverParser
 import           Stack.Options.Utils
 import qualified Stack.Path
 import           Stack.Runners
@@ -93,9 +93,6 @@ import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
 import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.SetupCmd
-import qualified Stack.Sig as Sig
-import           Stack.Snapshot (loadResolver)
-import           Stack.Solver (solveExtraDeps)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -293,10 +290,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Create stack project config from cabal or hpack package specifications"
                     initCmd
                     initOptsParser
-        addCommand' "solver"
-                    "Add missing extra-deps to stack project config"
-                    solverCmd
-                    solverOptsParser
         addCommand' "setup"
                     "Get the appropriate GHC for your project"
                     setupCmd
@@ -327,12 +320,12 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            (sdistOptsParser True)
+            sdistOptsParser
         addCommand'
             "sdist"
             "Create source distribution tarballs"
             sdistCmd
-            (sdistOptsParser False)
+            sdistOptsParser
         addCommand' "dot"
                     "Visualize your project's dependency graph using Graphviz dot"
                     dot
@@ -664,9 +657,12 @@ unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
 unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
 unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
     mresolver <- view $ globalOptsL.to globalResolver
-    mSnapshotDef <- mapM (makeConcreteResolver >=> flip loadResolver Nothing) mresolver
+    mSnapshot <- forM mresolver $ \resolver -> do
+      concrete <- makeConcreteResolver resolver
+      loc <- completeSnapshotLocation concrete
+      loadSnapshot loc
     dstPath' <- resolveDir' $ T.unpack dstPath
-    unpackPackages mSnapshotDef dstPath' names
+    unpackPackages mSnapshot dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> RIO Runner ()
@@ -691,7 +687,7 @@ upgradeCmd upgradeOpts' = do
 
 -- | Upload to Hackage
 uploadCmd :: SDistOpts -> RIO Runner ()
-uploadCmd (SDistOpts [] _ _ _ _ _ _) = do
+uploadCmd (SDistOpts [] _ _ _ _) = do
     prettyErrorL
         [ flow "To upload the current package, please run"
         , PP.style Shell "stack upload ."
@@ -732,13 +728,7 @@ uploadCmd sdistOpts = do
                   do tarFile <- resolveFile' file
                      liftIO $ do
                        creds <- runMemoized getCreds
-                       Upload.upload hackageUrl creds (toFilePath tarFile)
-                     when
-                         (sdoptsSign sdistOpts)
-                         (void $
-                          Sig.sign
-                              (sdoptsSignServerUrl sdistOpts)
-                              tarFile))
+                       Upload.upload hackageUrl creds (toFilePath tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- resolveDir' dir
@@ -748,14 +738,6 @@ uploadCmd sdistOpts = do
                   creds <- runMemoized getCreds
                   Upload.uploadBytes hackageUrl creds tarName tarBytes
                   forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
-                tarPath <- parseRelFile tarName
-                when
-                    (sdoptsSign sdistOpts)
-                    (void $
-                     Sig.signTarBytes
-                         (sdoptsSignServerUrl sdistOpts)
-                         tarPath
-                         tarBytes)
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
@@ -785,7 +767,6 @@ sdistCmd sdistOpts =
             prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
             checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
-            when (sdoptsSign sdistOpts) (void $ Sig.sign (sdoptsSignServerUrl sdistOpts) tarPath)
         where
           copyTarToTarPath tarPath tarName targetDir = liftIO $ do
             let targetTarPath = targetDir FP.</> tarName
@@ -795,44 +776,33 @@ sdistCmd sdistOpts =
 -- | Execute a command.
 execCmd :: ExecOpts -> RIO Runner ()
 execCmd ExecOpts {..} =
-    case eoExtra of
-        ExecOptsPlain ->
-          withConfig YesReexec $ withDefaultEnvConfig $ do
-            config <- view configL
-            menv <- liftIO $ configProcessContextSettings config plainEnvSettings
-            withProcessContext menv $ do
-                (cmd, args) <- case (eoCmd, eoArgs) of
-                    (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> getGhcCmd [] args
-                    (ExecRunGhc, args) -> getRunGhcCmd [] args
+  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
+    unless (null targets) $ Stack.Build.build Nothing
 
-                exec cmd args
-        ExecOptsEmbellished {..} -> do
-            let targets = concatMap words eoPackages
-                boptsCLI = defaultBuildOptsCLI
-                           { boptsCLITargets = map T.pack targets
-                           }
-            withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
-              unless (null targets) $ Stack.Build.build Nothing
+    config <- view configL
+    menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+    withProcessContext menv $ do
+      -- Add RTS options to arguments
+      let argsWithRts args = if null eoRtsOptions
+                  then args :: [String]
+                  else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
+      (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
+          (ExecCmd cmd, args) -> return (cmd, args)
+          (ExecRun, args) -> getRunCmd args
+          (ExecGhc, args) -> getGhcCmd eoPackages args
+          -- NOTE: This doesn't work for GHCJS, because it doesn't have
+          -- a runghcjs binary.
+          (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
-              config <- view configL
-              menv <- liftIO $ configProcessContextSettings config eoEnvSettings
-              withProcessContext menv $ do
-                -- Add RTS options to arguments
-                let argsWithRts args = if null eoRtsOptions
-                            then args :: [String]
-                            else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
-                (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
-                    (ExecCmd cmd, args) -> return (cmd, args)
-                    (ExecRun, args) -> getRunCmd args
-                    (ExecGhc, args) -> getGhcCmd eoPackages args
-                    -- NOTE: This doesn't work for GHCJS, because it doesn't have
-                    -- a runghcjs binary.
-                    (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
-
-                runWithPath eoCwd $ exec cmd args
+      runWithPath eoCwd $ exec cmd args
   where
+      ExecOptsExtra {..} = eoExtra
+
+      targets = concatMap words eoPackages
+      boptsCLI = defaultBuildOptsCLI
+                 { boptsCLITargets = map T.pack targets
+                 }
+
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId name = do
           mId <- findGhcPkgField [] name "id"
@@ -936,7 +906,7 @@ initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
     pwd <- getCurrentDir
     go <- view globalOptsL
-    withNoProject $ withConfig YesReexec (initProject IsInitCmd pwd initOpts (globalResolver go))
+    withNoProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
@@ -946,16 +916,11 @@ newCmd (newOpts,initOpts) =
         exists <- doesFileExist $ dir </> stackDotYaml
         when (forceOverwrite initOpts || not exists) $ do
             go <- view globalOptsL
-            initProject IsNewCmd dir initOpts (globalResolver go)
+            initProject dir initOpts (globalResolver go)
 
 -- | Display instructions for how to use templates
 templatesCmd :: () -> RIO Runner ()
 templatesCmd () = withConfig NoReexec templatesHelp
-
--- | Fix up extra-deps for a project
-solverCmd :: Bool -- ^ modify stack.yaml automatically?
-          -> RIO Runner ()
-solverCmd = withConfig YesReexec . withDefaultEnvConfig . solveExtraDeps
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()

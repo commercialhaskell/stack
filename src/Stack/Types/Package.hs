@@ -22,7 +22,6 @@ import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           Stack.Types.BuildPlan (ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -88,6 +87,10 @@ data PackageLibraries
   = NoLibraries
   | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
  deriving (Show,Typeable)
+
+-- | Name of an executable.
+newtype ExeName = ExeName { unExeName :: Text }
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
 
 -- | Some package info.
 data Package =

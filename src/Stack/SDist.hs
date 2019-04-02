@@ -71,10 +71,6 @@ data SDistOpts = SDistOpts
   -- ^ PVP Bounds overrides
   , sdoptsIgnoreCheck :: Bool
   -- ^ Whether to ignore check of the package for common errors
-  , sdoptsSign :: Bool
-  -- ^ Whether to sign the package
-  , sdoptsSignServerUrl :: String
-  -- ^ The URL of the signature server
   , sdoptsBuildTarball :: Bool
   -- ^ Whether to build the tarball
   , sdoptsTarPath :: Maybe FilePath

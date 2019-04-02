@@ -229,6 +229,29 @@ flags:
 If a specified flag is different than the one specified for a snapshot package,
 then the snapshot package will automatically be promoted to be an extra-dep.
 
+### drop-packages
+
+Packages which, when present in the snapshot specified in `resolver`,
+should not be included in our package. This can be used for a few
+different purposes, e.g.:
+
+* Ensure that packages you don't want used in your project cannot be
+  used in a `package.yaml` file (e.g., for license reasons)
+* Prevent overriding of a global package like `Cabal`. For more
+  information, see
+  [stackage#4425](https://github.com/commercialhaskell/stackage/issues/4425)
+* When using a custom GHC build, avoid incompatible packages (see
+  [this
+  comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
+
+```yaml
+drop-packages:
+- Cabal
+- buggy-package
+- package-with-unacceptable-license
+```
+
+Since Stack 2.0
 
 ### user-message
 

@@ -42,7 +42,6 @@ import           Stack.Package
 import           Stack.PackageDump
 import           Stack.SourceMap
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
@@ -57,12 +56,11 @@ import           RIO.Process (findExecutable, HasProcessContext (..))
 data PackageInfo
     =
       -- | This indicates that the package is already installed, and
-      -- that we shouldn't build it from source. This is always the case
-      -- for snapshot packages.
+      -- that we shouldn't build it from source. This is only the case
+      -- for global packages.
       PIOnlyInstalled InstallLocation Installed
       -- | This indicates that the package isn't installed, and we know
-      -- where to find its source (either a hackage package or a local
-      -- directory).
+      -- where to find its source.
     | PIOnlySource PackageSource
       -- | This indicates that the package is installed and we know
       -- where to find its source. We may want to reinstall from source.
@@ -687,31 +685,31 @@ addPackageDeps package = do
                                 tell mempty { wWarnings = (msg:) }
                               where
                                 msg = T.concat
-                                    [ "WARNING: Ignoring out of range dependency"
-                                    , reason
-                                    , ": "
-                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
-                                    , ". "
+                                    [ "WARNING: Ignoring "
                                     , T.pack $ packageNameString $ packageName package
-                                    , " requires: "
+                                    , "'s bounds on "
+                                    , T.pack $ packageNameString depname
+                                    , " ("
                                     , versionRangeText range
+                                    , "); using "
+                                    , reason
+                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
+                                    , ".\nReason: "
+                                    , reason
+                                    , "."
                                     ]
                         allowNewer <- view $ configL.to configAllowNewer
                         if allowNewer
                             then do
-                                warn_ " (allow-newer enabled)"
+                                warn_ "allow-newer enabled"
                                 return True
                             else do
-                                -- TODO: dependencies between snapshot packages are allowed
-                                -- to ignore bounds, MSS told an idea to tag explicitly
-                                -- dependencies for which bounds could be ignored and why,
-                                -- this needs to be explored,
-                                -- the current designed is based on #3185 for Stackage
+                                -- We ignore dependency information for packages in a snapshot
                                 x <- inSnapshot (packageName package) (packageVersion package)
                                 y <- inSnapshot depname (adrVersion adr)
                                 if x && y
                                     then do
-                                        warn_ " (trusting snapshot over Hackage revisions)"
+                                        warn_ "trusting snapshot over cabal file dependency information"
                                         return True
                                     else return False
                 if inRange
@@ -951,7 +949,7 @@ stripNonDeps deps plan = plan
       modify'(<> Set.singleton pid)
       mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
--- | Is the given package/version combo defined in the snapshot?
+-- | Is the given package/version combo defined in the snapshot or in the global database?
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
     ctx <- ask
@@ -962,6 +960,11 @@ inSnapshot name version = do
                 return $ srcVersion == version
             PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->
                 return $ srcVersion == version
+            -- OnlyInstalled occurs for global database
+            PIOnlyInstalled loc (Library pid _gid _lic) ->
+              assert (loc == Snap) $
+              assert (pkgVersion pid == version) $
+              Just True
             _ -> return False
 
 data ConstructPlanException
@@ -1009,10 +1012,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
          [ "  *" <+> align (flow "Set 'allow-newer: true' in " <+> pretty (defaultUserConfigPath stackRoot) <+> "to ignore all version constraints and build anyway.")
          , line <> line
          ]
-      ) ++
-      [ "  *" <+> align (flow "Consider trying 'stack solver', which uses the cabal-install solver to attempt to find some working build configuration. This can be convenient when dealing with many complicated constraint errors, but results may be unpredictable.")
-      , line <> line
-      ] ++ addExtraDepsRecommendations
+      ) ++ addExtraDepsRecommendations
 
   where
     exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions

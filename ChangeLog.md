@@ -42,6 +42,10 @@ Major changes:
       packages depending on it being no longer available as a dependency,
       such packages need to be added explicitly when needed. See
       [#4510] (https://github.com/commercialhaskell/stack/issues/4510).
+    * Cabal solver integration was not updated to support newer
+      `cabal-install` versions so `stack solver` command was removed as
+      well as a related option `--solver` from `stack new` and
+      `stack init`.
 * Upgrade to Cabal 2.4
     * Note that, in this process, the behavior of file globbing has
       been modified to match that of Cabal. In particular, this means
@@ -65,6 +69,17 @@ Behavior changes:
   relative to the directory containing the script.
 
 * Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
+
+* Support the `drop-packages` field in `stack.yaml`
+
+* Remove the GPG signing code during uploads. The GPG signatures have
+  never been used yet, and there are no plans to implement signature
+  verification.
+
+* Remove the `--plain` option for the `exec` family of commands
+
+* Always use the `--exact-configuration` Cabal configuration option when
+  building (should mostly be a non-user-visible enhancement).
 
 Other enhancements:
 
@@ -199,6 +214,8 @@ Bug fixes:
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 * Hackage credentials are not world-readable. See
   [#2159](https://github.com/commercialhaskell/stack/issues/2159).
+* Warnings are dumped from logs even when color is enabled. See
+  [#2997](https://github.com/commercialhaskell/stack/issues/2997)
 
 ## v1.9.3
 

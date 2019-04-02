@@ -538,8 +538,10 @@ loadBuildConfig = do
       map (second dpLocation) deps0
 
     let packages1 = Map.fromList packages0
-        snPackages = snapshotPackages snapshot `Map.difference` packages1
+        snPackages = snapshotPackages snapshot
+          `Map.difference` packages1
           `Map.difference` Map.fromList deps0
+          `Map.withoutKeys` projectDropPackages project
 
     snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
 
@@ -600,6 +602,7 @@ loadBuildConfig = do
         , projectCompiler = Nothing
         , projectExtraPackageDBs = []
         , projectCurator = Nothing
+        , projectDropPackages = mempty
         }
 
 -- | Check if there are any duplicate package names and, if so, throw an

@@ -82,7 +82,7 @@ firstBoolFlagsTrue name helpSuffix =
 -- | Flag with a Semigroup instance and a default of False
 firstBoolFlagsFalse :: String -> String -> Mod FlagFields FirstFalse -> Parser FirstFalse
 firstBoolFlagsFalse name helpSuffix =
-  enableDisableFlags mempty (FirstFalse (Just False)) (FirstFalse (Just False))
+  enableDisableFlags mempty (FirstFalse (Just True)) (FirstFalse (Just False))
   name $ helpSuffix ++ " (default: disabled)"
 
 -- | Enable/disable flags for any type.

@@ -25,12 +25,12 @@ import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Options.Applicative.Builder.Extra
+import           Pantry (completeSnapshotLocation, loadSnapshot)
 import           Path
 import qualified RIO.Map as Map
 import           RIO.Process (envVarsL)
 import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
 import           Stack.Constants
-import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
@@ -91,7 +91,7 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     newResolver' <- resolvePaths (Just root) newResolver
     concreteResolver <- makeConcreteResolver newResolver'
     -- Check that the snapshot actually exists
-    void $ loadResolver concreteResolver Nothing
+    void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
     return (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
     return (Yaml.Bool bool')
