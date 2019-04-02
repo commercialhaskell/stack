@@ -81,6 +81,10 @@ Behavior changes:
 * Always use the `--exact-configuration` Cabal configuration option when
   building (should mostly be a non-user-visible enhancement).
 
+* No longer supports Cabal versions older than `1.19.2`.  This means
+  projects using snapshots earlier than `lts-3.0` or
+  `nightly-2015-05-05` will no longer build.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
