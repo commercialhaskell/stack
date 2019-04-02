@@ -168,6 +168,8 @@ Other enhancements:
   installation based on the version suffix, allowing you to more easily switch
   between various system-installed GHCs. See
   [#2433](https://github.com/commercialhaskell/stack/issues/2433).
+* `stack init` will now support create a `stack.yaml` file without any local
+  packages. See [#2465](https://github.com/commercialhaskell/stack/issues/2465)
 
 Bug fixes:
 

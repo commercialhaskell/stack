@@ -65,13 +65,11 @@ initProject currDir initOpts mresolver = do
              " exists, use '--force' to overwrite it.")
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
-    let noPkgMsg =  "In order to init, you should have an existing .cabal \
-                    \file. Please try \"stack new\" instead."
-        find  = findCabalDirs (includeSubDirs initOpts)
+    let find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
-    (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs noPkgMsg Nothing
+    (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs Nothing
     let makeRelDir dir =
             case stripProperPrefix currDir dir of
                 Nothing
@@ -507,14 +505,16 @@ ignoredDirs = Set.fromList
 cabalPackagesCheck
     :: (HasConfig env, HasGHCVariant env)
      => [Path Abs Dir]
-     -> String
      -> Maybe String
      -> RIO env
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
-cabalPackagesCheck cabaldirs noPkgMsg dupErrMsg = do
-    when (null cabaldirs) $
-        error noPkgMsg
+cabalPackagesCheck cabaldirs dupErrMsg = do
+    when (null cabaldirs) $ do
+      logWarn "We didn't find any local package directories"
+      logWarn "You may want to create a package with \"stack new\" instead"
+      logWarn "Create an empty project for now"
+      logWarn "If this isn't what you want, please delete the generated \"stack.yaml\""
 
     relpaths <- mapM prettyPath cabaldirs
     logInfo "Using cabal packages:"
