@@ -43,7 +43,7 @@ import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.PersistentTH
+import           Stack.Storage
 import           Stack.Types.Build
 import           Stack.Types.Cache
 import           Stack.Types.Config

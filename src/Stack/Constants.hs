@@ -58,7 +58,7 @@ module Stack.Constants
     ,relDirHoogle
     ,relFileDatabaseHoo
     ,relDirPkgdb
-    ,relFileCaches
+    ,relFileStorage
     ,relDirLoadedSnapshotCache
     ,bindirSuffix
     ,docDirSuffix
@@ -398,8 +398,8 @@ relFileDatabaseHoo = $(mkRelFile "database.hoo")
 relDirPkgdb :: Path Rel Dir
 relDirPkgdb = $(mkRelDir "pkgdb")
 
-relFileCaches :: Path Rel File
-relFileCaches = $(mkRelFile "caches.sqlite3")
+relFileStorage :: Path Rel File
+relFileStorage = $(mkRelFile "stack.sqlite3")
 
 relDirLoadedSnapshotCache :: Path Rel Dir
 relDirLoadedSnapshotCache = $(mkRelDir "loaded-snapshot-cached")

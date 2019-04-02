@@ -64,7 +64,7 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
-import           Stack.PersistentTH (initCacheStorage)
+import           Stack.Storage (initStorage)
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
@@ -360,9 +360,9 @@ configFromConfigMonoid
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
-       (\configPantryConfig -> initCacheStorage
-         (configStackRoot </> relFileCaches)
-         (\configCachePool -> inner Config {..}))
+       (\configPantryConfig -> initStorage
+         (configStackRoot </> relFileStorage)
+         (\configStorage -> inner Config {..}))
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m

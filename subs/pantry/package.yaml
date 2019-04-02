@@ -99,6 +99,7 @@ library:
   - Pantry
   - Pantry.SHA256
   - Pantry.HPack
+  - Pantry.SQLite
 
   # For testing
   - Pantry.Internal

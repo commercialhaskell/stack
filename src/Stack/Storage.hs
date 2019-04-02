@@ -12,9 +12,9 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- | Work with SQLite database used for caches.
-module Stack.PersistentTH
-    ( initCacheStorage
-    , withCacheStorage
+module Stack.Storage
+    ( initStorage
+    , withStorage
     , loadConfigCache
     , saveConfigCache
     , deactiveConfigCache
@@ -23,24 +23,21 @@ module Stack.PersistentTH
     ) where
 
 import qualified Data.ByteString as S
-import Data.Pool (Pool, destroyAllResources)
 import qualified Data.Set as Set
-import Database.Persist.Sql (SqlBackend, runMigrationSilent, runSqlPool)
+import Database.Persist.Sql (SqlBackend)
 import Database.Persist.Sqlite
 import Database.Persist.TH
-import Database.Sqlite (SqliteException)
+import qualified Pantry.SQLite as SQLite
 import Path
-import Path.IO (ensureDir)
-import qualified RIO.Text as T
 import Stack.Prelude hiding (MigrationFailure)
 import Stack.Types.Build
 import Stack.Types.Cache
-import Stack.Types.Config (HasConfig, configCachePool, configL)
+import Stack.Types.Config (HasConfig, configStorage, configL)
 import Stack.Types.GhcPkgId
 
 share [ mkPersist sqlSettings
       , mkDeleteCascade sqlSettings
-      , mkMigrate "migrateAllCache"
+      , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
 ConfigCacheParent sql="config_cache"
@@ -88,58 +85,22 @@ PrecompiledCacheExe
   deriving Show
 |]
 
-data PersistentException =
-    MigrationFailure !(Path Abs File)
-                     !SqliteException
-    deriving (Typeable)
+-- | Initialize the database.
+initStorage
+  :: HasLogFunc env
+  => Path Abs File -- ^ storage file
+  -> (SQLite.Storage -> RIO env a)
+  -> RIO env a
+initStorage =
+  SQLite.initStorage "Stack" migrateAll
 
-instance Exception PersistentException
-
-instance Show PersistentException where
-    show = T.unpack . utf8BuilderToText . display
-
-instance Display PersistentException where
-    display (MigrationFailure fp ex) =
-        "Encountered error while migrating cache database:" <> "\n    " <>
-        displayShow ex <>
-        "\nPlease report this on https://github.com/commercialhaskell/stack/issues" <>
-        "\nAs a workaround you may delete the database in " <>
-        fromString (toFilePath fp) <>
-        " triggering its recreation."
-
--- | Initialize the cache database.
-initCacheStorage ::
-       HasLogFunc env
-    => Path Abs File -- ^ storage file
-    -> (Pool SqlBackend -> RIO env a)
-    -> RIO env a
-initCacheStorage fp inner = do
-    ensureDir $ parent fp
-    bracket
-        (createSqlitePoolFromInfo (sqinfo False) 1)
-        (liftIO . destroyAllResources) $ \pool -> do
-        migrates <-
-            wrapMigrationFailure $
-            runSqlPool (runMigrationSilent migrateAllCache) pool
-        forM_ migrates $ \mig ->
-            logDebug $ "Migration executed: " <> display mig
-    bracket
-        (createSqlitePoolFromInfo (sqinfo True) 1)
-        (liftIO . destroyAllResources) $ \pool -> inner pool
-  where
-    wrapMigrationFailure = handle (throwIO . MigrationFailure fp)
-    sqinfo fk =
-        set extraPragmas ["PRAGMA busy_timeout=2000;"] $
-        set fkEnabled fk $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
-
--- | Run an action in a cache database transaction.
-withCacheStorage ::
+-- | Run an action in a database transaction
+withStorage ::
        (HasConfig env, HasLogFunc env)
     => ReaderT SqlBackend (RIO env) a
     -> RIO env a
-withCacheStorage action = do
-    pool <- view $ configL . to configCachePool
-    runSqlPool action pool
+withStorage inner =
+    SQLite.withStorage inner =<< view (configL . to configStorage)
 
 -- | Internal helper to read the 'ConfigCache'
 readConfigCache ::
@@ -173,7 +134,7 @@ loadConfigCache ::
     => ConfigCacheKey
     -> RIO env (Maybe ConfigCache)
 loadConfigCache key =
-    withCacheStorage $ do
+    withStorage $ do
         mparent <- getBy (UniqueConfigCacheParent key)
         case mparent of
             Nothing -> return Nothing
@@ -189,7 +150,7 @@ saveConfigCache ::
     -> ConfigCache
     -> RIO env ()
 saveConfigCache key new =
-    withCacheStorage $ do
+    withStorage $ do
         mparent <- getBy (UniqueConfigCacheParent key)
         (parentId, mold) <-
             case mparent of
@@ -239,9 +200,12 @@ saveConfigCache key new =
             (configCacheComponents new)
 
 -- | Mark 'ConfigCache' as inactive in the database.
+-- We use a flag instead of deleting the records since, in most cases, the same
+-- cache will be written again within in a few seconds (after
+-- `cabal configure`), so this avoids unnecessary database churn.
 deactiveConfigCache :: HasConfig env => ConfigCacheKey -> RIO env ()
 deactiveConfigCache key =
-    withCacheStorage $
+    withStorage $
     updateWhere
         [ConfigCacheParentKey ==. key]
         [ConfigCacheParentActive =. False]
@@ -270,7 +234,7 @@ loadPrecompiledCache ::
     => PrecompiledCacheKey
     -> RIO env (Maybe (PrecompiledCache Rel))
 loadPrecompiledCache key =
-    withCacheStorage $ fmap snd <$> readPrecompiledCache key
+    withStorage $ fmap snd <$> readPrecompiledCache key
 
 -- | Insert or update 'PrecompiledCache' to the database.
 savePrecompiledCache ::
@@ -279,7 +243,7 @@ savePrecompiledCache ::
     -> PrecompiledCache Rel
     -> RIO env ()
 savePrecompiledCache key new =
-    withCacheStorage $ do
+    withStorage $ do
         mIdOld <- readPrecompiledCache key
         (parentId, mold) <-
             case mIdOld of

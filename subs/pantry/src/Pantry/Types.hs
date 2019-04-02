@@ -773,7 +773,7 @@ data PantryException
   | PackageVersionParseFail !Text
   | InvalidCabalFilePath !(Path Abs File)
   | DuplicatePackageNames !Utf8Builder ![(PackageName, [RawPackageLocationImmutable])]
-  | MigrationFailure !(Path Abs File) !SqliteException
+  | MigrationFailure !Text !(Path Abs File) !SqliteException
 
   deriving Typeable
 instance Exception PantryException where
@@ -952,8 +952,8 @@ instance Display PantryException where
           locs
       )
       pairs'
-  display (MigrationFailure fp ex) =
-    "Encountered error while migrating Pantry database:" <>
+  display (MigrationFailure desc fp ex) =
+    "Encountered error while migrating " <> display desc <> " database:" <>
     "\n    " <> displayShow ex <>
     "\nPlease report this on https://github.com/commercialhaskell/stack/issues" <>
     "\nAs a workaround you may delete Pantry database in " <>

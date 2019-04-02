@@ -875,7 +875,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             , nodirs
             ]
         -- Only write the cache for local packages.  Remote packages are built
-        -- in a temporary directly so the cache would never be used anyway.
+        -- in a temporary directory so the cache would never be used anyway.
         case taskType task of
             TTLocalMutable{} -> writeConfigCache pkgDir newConfigCache
             TTRemotePackage{} -> return ()

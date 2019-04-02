@@ -189,13 +189,11 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Monoid as Monoid
 import           Data.Monoid.Map (MonoidMap(..))
-import           Data.Pool (Pool)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
-import           Database.Persist.Sql (SqlBackend)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform)
@@ -207,6 +205,7 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Pantry.SQLite (Storage)
 import           Path
 import qualified Paths_stack as Meta
 import           RIO.PrettyPrint (HasTerm (..))
@@ -355,8 +354,8 @@ data Config =
          ,configStackRoot           :: !(Path Abs Dir)
          ,configResolver            :: !(Maybe AbstractResolver)
          -- ^ Any resolver override from the command line
-         ,configCachePool           :: !(Pool SqlBackend)
-         -- ^ Database connection pool for caches
+         ,configStorage             :: !Storage
+         -- ^ Database connection pool for Stack database
          }
 
 -- | The project root directory, if in a project.

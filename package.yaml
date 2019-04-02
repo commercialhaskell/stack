@@ -214,7 +214,6 @@ library:
   - Stack.Package
   - Stack.PackageDump
   - Stack.Path
-  - Stack.PersistentTH
   - Stack.Prelude
   - Stack.Runners
   - Stack.Script
@@ -223,6 +222,7 @@ library:
   - Stack.Setup.Installed
   - Stack.SetupCmd
   - Stack.SourceMap
+  - Stack.Storage
   - Stack.Types.Build
   - Stack.Types.CompilerBuild
   - Stack.Types.Compiler
