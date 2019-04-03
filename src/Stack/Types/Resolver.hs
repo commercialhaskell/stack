@@ -68,7 +68,6 @@ data SnapName
     = LTS !Int !Int
     | Nightly !Day
     deriving (Generic, Typeable, Show, Data, Eq)
-instance Store SnapName
 instance NFData SnapName
 instance Display SnapName where
   display = display . renderSnapName

@@ -101,11 +101,9 @@ module Stack.Types.Config
   ,SCM(..)
   -- * Paths
   ,bindirSuffix
---  ,configLoadedSnapshotCache
   ,GlobalInfoSource(..)
   ,getProjectWorkDir
   ,docDirSuffix
-  ,flagCacheLocal
   ,extraBinDirs
   ,hpcReportDir
   ,installationRootDeps
@@ -207,14 +205,13 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
--- import qualified Pantry.SHA256 as SHA256
+import           Pantry.SQLite (Storage)
 import           Path
 import qualified Paths_stack as Meta
 import           RIO.PrettyPrint (HasTerm (..))
 import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString, HasStylesUpdate (..))
 import           Stack.Constants
--- import           Stack.Types.BuildPlan
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -357,6 +354,8 @@ data Config =
          ,configStackRoot           :: !(Path Abs Dir)
          ,configResolver            :: !(Maybe AbstractResolver)
          -- ^ Any resolver override from the command line
+         ,configStorage             :: !Storage
+         -- ^ Database connection pool for Stack database
          }
 
 -- | The project root directory, if in a project.
@@ -1333,29 +1332,6 @@ packageDatabaseLocal = do
 -- | Extra package databases
 packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
 packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
-
--- | Directory for holding flag cache information
-flagCacheLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
-flagCacheLocal = do
-    root <- installationRootLocal
-    return $ root </> relDirFlagCache
-
--- -- | Where to store 'LoadedSnapshot' caches
--- configLoadedSnapshotCache
---   :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
---   => SnapshotDef
---   -> GlobalInfoSource
---   -> m (Path Abs File)
--- configLoadedSnapshotCache sd gis = do
---     root <- view stackRootL
---     platform <- platformGhcVerOnlyRelDir
---     file <- parseRelFile $ T.unpack (SHA256.toHexText $ sdUniqueHash sd) ++ ".cache"
---     gis' <- parseRelDir $
---           case gis of
---             GISSnapshotHints -> "__snapshot_hints__"
---             GISCompiler cv -> compilerVersionString cv
---     -- Yes, cached plans differ based on platform
---     return (root </> relDirLoadedSnapshotCache </> platform </> gis' </> file)
 
 -- | Where do we get information on global packages for loading up a
 -- 'LoadedSnapshot'?

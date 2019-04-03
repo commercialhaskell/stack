@@ -26,7 +26,6 @@ module Pantry.Internal.StaticBytes
   ) where
 
 import RIO hiding (words)
-import Data.Store (Store)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.Vector.Primitive as VP
@@ -42,17 +41,17 @@ import qualified Data.Primitive.ByteArray as BA
 import Data.ByteArray
 
 newtype Bytes8 = Bytes8 Word64
-  deriving (Eq, Ord, Generic, NFData, Hashable, Data, Store)
+  deriving (Eq, Ord, Generic, NFData, Hashable, Data)
 instance Show Bytes8 where
   show (Bytes8 w) = show (fromWordsD 8 [w] :: B.ByteString)
 data Bytes16 = Bytes16 !Bytes8 !Bytes8
-  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data, Store)
+  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data)
 data Bytes32 = Bytes32 !Bytes16 !Bytes16
-  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data, Store)
+  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data)
 data Bytes64 = Bytes64 !Bytes32 !Bytes32
-  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data, Store)
+  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data)
 data Bytes128 = Bytes128 !Bytes64 !Bytes64
-  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data, Store)
+  deriving (Show, Eq, Ord, Generic, NFData, Hashable, Data)
 
 data StaticBytesException
   = NotEnoughBytes

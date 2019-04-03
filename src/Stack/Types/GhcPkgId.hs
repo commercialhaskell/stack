@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | A ghc-pkg id.
 
@@ -16,6 +17,7 @@ import           Stack.Prelude
 import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import qualified Data.Text as T
+import           Database.Persist.Sql (PersistField, PersistFieldSql)
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail
@@ -27,11 +29,10 @@ instance Exception GhcPkgIdParseFail
 
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId = GhcPkgId Text
-  deriving (Eq,Ord,Data,Typeable,Generic)
+  deriving (Eq,Ord,Data,Typeable,Generic,PersistField,PersistFieldSql)
 
 instance Hashable GhcPkgId
 instance NFData GhcPkgId
-instance Store GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString

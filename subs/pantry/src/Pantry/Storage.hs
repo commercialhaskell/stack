@@ -84,13 +84,13 @@ import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import qualified RIO.Text as T
 import RIO.Time (UTCTime, getCurrentTime)
-import Path (Path, Abs, File, Dir, toFilePath, parent, filename, parseAbsDir, fromAbsFile, fromRelFile)
-import Path.IO (ensureDir, listDir, createTempDir, getTempDir, removeDirRecur)
-import Data.Pool (destroyAllResources)
+import Path (Path, Abs, File, Dir, toFilePath, filename, parseAbsDir, fromAbsFile, fromRelFile)
+import Path.IO (listDir, createTempDir, getTempDir, removeDirRecur)
 import Pantry.HPack (hpackVersion, hpack)
 import Conduit
 import Data.Acquire (with)
-import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..), PantryException (MigrationFailure), SnapshotCacheHash (..))
+import Pantry.Types (PackageNameP (..), VersionP (..), SHA256, FileSize (..), FileType (..), HasPantryConfig, BlobKey, Repo (..), TreeKey, SafeFilePath, Revision (..), Package (..), SnapshotCacheHash (..))
+import qualified Pantry.SQLite as SQLite
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 -- Raw blobs
@@ -233,29 +233,15 @@ initStorage
   => Path Abs File -- ^ storage file
   -> (P.Storage -> RIO env a)
   -> RIO env a
-initStorage fp inner = do
-  ensureDir $ parent fp
-  bracket
-    (createSqlitePoolFromInfo (sqinfo False) 1)
-    (liftIO . destroyAllResources) $ \pool -> do
-    migrates <- wrapMigrationFailure $ runSqlPool (runMigrationSilent migrateAll) pool
-    forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
-  bracket
-    (createSqlitePoolFromInfo (sqinfo True) 1)
-    (liftIO . destroyAllResources) $ \pool -> inner (P.Storage pool)
-  where
-    wrapMigrationFailure = handle (throwIO . MigrationFailure fp)
-    sqinfo fk = set extraPragmas ["PRAGMA busy_timeout=2000;"]
-           $ set fkEnabled fk
-           $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
+initStorage =
+  SQLite.initStorage "Pantry" migrateAll
 
 withStorage
   :: (HasPantryConfig env, HasLogFunc env)
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
-withStorage action = do
-  P.Storage pool <- view $ P.pantryConfigL.to P.pcStorage
-  runSqlPool action pool
+withStorage action =
+  SQLite.withStorage action =<< view (P.pantryConfigL.to P.pcStorage)
 
 getPackageNameId
   :: (HasPantryConfig env, HasLogFunc env)

@@ -874,7 +874,11 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             , dirs
             , nodirs
             ]
-        writeConfigCache pkgDir newConfigCache
+        -- Only write the cache for local packages.  Remote packages are built
+        -- in a temporary directory so the cache would never be used anyway.
+        case taskType task of
+            TTLocalMutable{} -> writeConfigCache pkgDir newConfigCache
+            TTRemotePackage{} -> return ()
         writeCabalMod pkgDir newCabalMod
 
     return needConfig
@@ -1352,7 +1356,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     -- the snapshot.
                     Just pc | maybe False
                                     (bcoSnapInstallRoot eeBaseConfigOpts `isProperPrefixOf`)
-                                    (parseAbsFile =<< pcLibrary pc) ->
+                                    (pcLibrary pc) ->
                         return Nothing
                     -- If old precompiled cache files are left around but snapshots are deleted,
                     -- it is possible for the precompiled file to refer to the very library
@@ -1363,7 +1367,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                             allM f (x:xs) = do
                                 b <- f x
                                 if b then allM f xs else return False
-                        b <- liftIO $ allM D.doesFileExist $ maybe id (:) (pcLibrary pc) $ pcExes pc
+                        b <- liftIO $ allM doesFileExist $ maybe id (:) (pcLibrary pc) $ pcExes pc
                         return $ if b then Just pc else Nothing
             _ -> return Nothing
 
@@ -1408,12 +1412,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
                   -- now, register the cached conf files
                   forM_ allToRegister $ \libpath ->
-                    proc ghcPkgExe [ "register", "--force", libpath] readProcess_
+                    proc ghcPkgExe [ "register", "--force", toFilePath libpath] readProcess_
 
         liftIO $ forM_ exes $ \exe -> do
-            D.createDirectoryIfMissing True bindir
-            let dst = bindir FP.</> FP.takeFileName exe
-            createLink exe dst `catchIO` \_ -> D.copyFile exe dst
+            ensureDir bindir
+            let dst = bindir </> filename exe
+            createLink (toFilePath exe) (toFilePath dst) `catchIO` \_ -> copyFile exe dst
         case (mlib, exes) of
             (Nothing, _:_) -> markExeInstalled (taskLocation task) taskProvides
             _ -> return ()
@@ -1431,7 +1435,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         Nothing -> assert False $ Executable taskProvides
                         Just pkgid -> Library taskProvides pkgid Nothing
       where
-        bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
+        bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
     realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal0 announce _outputType -> do

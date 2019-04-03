@@ -170,6 +170,7 @@ Other enhancements:
   [#2433](https://github.com/commercialhaskell/stack/issues/2433).
 * `stack init` will now support create a `stack.yaml` file without any local
   packages. See [#2465](https://github.com/commercialhaskell/stack/issues/2465)
+* Store caches in SQLite database instead of files.
 
 Bug fixes:
 

@@ -58,7 +58,7 @@ module Stack.Constants
     ,relDirHoogle
     ,relFileDatabaseHoo
     ,relDirPkgdb
-    ,relDirFlagCache
+    ,relFileStorage
     ,relDirLoadedSnapshotCache
     ,bindirSuffix
     ,docDirSuffix
@@ -94,7 +94,6 @@ module Stack.Constants
     ,relDirPackageConfInplace
     ,relDirExtraTixFiles
     ,relDirInstalledPackages
-    ,relDirPrecompiled
     ,backupUrlRelPath
     ,relDirDotLocal
     ,relDirDotSsh
@@ -399,8 +398,8 @@ relFileDatabaseHoo = $(mkRelFile "database.hoo")
 relDirPkgdb :: Path Rel Dir
 relDirPkgdb = $(mkRelDir "pkgdb")
 
-relDirFlagCache :: Path Rel Dir
-relDirFlagCache = $(mkRelDir "flag-cache")
+relFileStorage :: Path Rel File
+relFileStorage = $(mkRelFile "stack.sqlite3")
 
 relDirLoadedSnapshotCache :: Path Rel Dir
 relDirLoadedSnapshotCache = $(mkRelDir "loaded-snapshot-cached")
@@ -510,9 +509,6 @@ relDirExtraTixFiles = $(mkRelDir "extra-tix-files")
 
 relDirInstalledPackages :: Path Rel Dir
 relDirInstalledPackages = $(mkRelDir "installed-packages")
-
-relDirPrecompiled :: Path Rel Dir
-relDirPrecompiled = $(mkRelDir "precompiled")
 
 backupUrlRelPath :: Path Rel File
 backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")

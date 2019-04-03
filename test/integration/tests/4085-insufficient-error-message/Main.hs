@@ -76,7 +76,6 @@ spaceInMBJustEnoughToFailInTheExactMoment = 2000
 
 main :: IO ()
 main = do
-  -- @@@ DISABLE THIS TEST, AND MAKE AN ISSUE TO MAKE IT MORE EFFICIENT (https://fpcomplete.slack.com/archives/C24MGQG6S/p1543775070005000)
   buildDockerImageWithStackSourceInside imageTag
   (ec, _, stderr) <- withDockerVolume
     spaceInMBJustEnoughToFailInTheExactMoment

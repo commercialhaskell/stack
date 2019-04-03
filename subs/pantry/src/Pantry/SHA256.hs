@@ -41,7 +41,6 @@ import RIO
 import Data.Aeson
 import Database.Persist.Sql
 import Pantry.Internal.StaticBytes
-import Data.Store (Store)
 import Conduit
 import qualified RIO.Text as T
 
@@ -55,7 +54,7 @@ import qualified Data.ByteArray.Encoding as Mem
 --
 -- @since 0.1.0.0
 newtype SHA256 = SHA256 Bytes32
-    deriving (Generic, Eq, NFData, Data, Typeable, Ord, Hashable, Store)
+    deriving (Generic, Eq, NFData, Data, Typeable, Ord, Hashable)
 
 -- | Exceptions which can occur in this module
 --

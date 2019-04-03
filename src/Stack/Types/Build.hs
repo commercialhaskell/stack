@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -34,9 +33,7 @@ module Stack.Types.Build
     ,installLocationIsMutable
     ,TaskConfigOpts(..)
     ,BuildCache(..)
-    ,buildCacheVC
     ,ConfigCache(..)
-    ,configCacheVC
     ,configureOpts
     ,CachePkgSrc (..)
     ,toCachePkgSrc
@@ -45,7 +42,7 @@ module Stack.Types.Build
     ,FileCacheInfo (..)
     ,ConfigureOpts (..)
     ,PrecompiledCache (..)
-    ,precompiledCacheVC)
+    )
     where
 
 import           Stack.Prelude
@@ -55,10 +52,12 @@ import           Data.Char                       (isSpace)
 import           Data.List.Extra
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
-import           Data.Store.Version
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8With)
 import           Data.Text.Encoding.Error        (lenientDecode)
+import           Database.Persist.Sql            (PersistField(..)
+                                                 ,PersistFieldSql(..)
+                                                 ,SqlType(SqlString))
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
@@ -367,7 +366,7 @@ instance Exception StackBuildException
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
     PkgDeps PackageName
-    deriving (Show,Typeable,Eq,Store,NFData)
+    deriving (Show,Typeable,Eq,NFData)
 
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
@@ -376,9 +375,6 @@ newtype BuildCache = BuildCache
     }
     deriving (Generic, Eq, Show, Typeable, ToJSON, FromJSON)
 instance NFData BuildCache
-
-buildCacheVC :: VersionConfig BuildCache
-buildCacheVC = storeVersionConfig "build-v2" "jpB3Ro38UTc2fLzn4m6mfRPl9vw="
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
@@ -396,20 +392,28 @@ data ConfigCache = ConfigCache
     , configCachePkgSrc :: !CachePkgSrc
     }
     deriving (Generic, Eq, Show, Data, Typeable)
-instance Store ConfigCache
 instance NFData ConfigCache
 
 data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
-    deriving (Generic, Eq, Show, Data, Typeable)
-instance Store CachePkgSrc
+    deriving (Generic, Eq, Read, Show, Data, Typeable)
 instance NFData CachePkgSrc
+
+instance PersistField CachePkgSrc where
+    toPersistValue CacheSrcUpstream = toPersistValue ["upstream" :: String]
+    toPersistValue (CacheSrcLocal fp) = toPersistValue ["local", fp]
+    fromPersistValue x = do
+        y <- fromPersistValue x
+        case y of
+            ["upstream"] -> Right CacheSrcUpstream
+            ["local", fp] -> Right (CacheSrcLocal fp)
+            _ -> Left $ "Unexpected CachePkgSrc value: " <> tshow x
+
+instance PersistFieldSql CachePkgSrc where
+    sqlType _ = SqlString
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
 toCachePkgSrc (PSFilePath lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
-
-configCacheVC :: VersionConfig ConfigCache
-configCacheVC = storeVersionConfig "config-v4" "LbTeTCtFbU0Yc1mbmhAzsIXyPrQ="
 
 -- | A task to perform when building
 data Task = Task
@@ -668,27 +672,18 @@ data ConfigureOpts = ConfigureOpts
     , coNoDirs :: ![String]
     }
     deriving (Show, Eq, Generic, Data, Typeable)
-instance Store ConfigureOpts
 instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
 -- the sublibraries (if present) and all of the executable paths.
-data PrecompiledCache = PrecompiledCache
-    -- Use FilePath instead of Path Abs File for Binary instances
-    { pcLibrary :: !(Maybe FilePath)
+data PrecompiledCache base = PrecompiledCache
+    { pcLibrary :: !(Maybe (Path base File))
     -- ^ .conf file inside the package database
-    , pcSubLibs :: ![FilePath]
+    , pcSubLibs :: ![Path base File]
     -- ^ .conf file inside the package database, for each of the sublibraries
-    , pcExes    :: ![FilePath]
+    , pcExes    :: ![Path base File]
     -- ^ Full paths to executables
     }
-    deriving (Show, Eq, Generic, Data, Typeable)
-instance Store PrecompiledCache
-instance NFData PrecompiledCache
-
-precompiledCacheVC :: VersionConfig PrecompiledCache
-#if MIN_VERSION_template_haskell(2,14,0)
-precompiledCacheVC = storeVersionConfig "precompiled-v2" "1Q08F5_iKDGDMPCuBG0-Av9nEKk="
-#else
-precompiledCacheVC = storeVersionConfig "precompiled-v2" "55vMMtbIlS4UukKnSmjs1SrI01o="
-#endif
+    deriving (Show, Eq, Generic, Typeable)
+instance NFData (PrecompiledCache Abs)
+instance NFData (PrecompiledCache Rel)

@@ -90,7 +90,7 @@ data PackageLibraries
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
 
 -- | Some package info.
 data Package =
