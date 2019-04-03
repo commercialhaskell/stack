@@ -79,7 +79,9 @@ updateHackageIndex
   :: (HasPantryConfig env, HasLogFunc env)
   => Maybe Utf8Builder -- ^ reason for updating, if any
   -> RIO env DidUpdateOccur
-updateHackageIndex mreason = gateUpdate $ do
+updateHackageIndex mreason = do
+  storage <- view $ pantryConfigL.to pcStorage
+  gateUpdate $ withWriteLock_ storage $ do
     for_ mreason logInfo
     pc <- view pantryConfigL
     let HackageSecurityConfig keyIds threshold url ignoreExpiry = pcHackageSecurity pc
@@ -121,6 +123,12 @@ updateHackageIndex mreason = gateUpdate $ do
         updateCache tarball
     logStickyDone "Package index cache populated"
   where
+    -- This is the one action in the Pantry codebase known to hold a
+    -- write lock on the database for an extended period of time. To
+    -- avoid failures due to SQLite locks failing, we take our own
+    -- lock outside of SQLite for this action.
+    --
+    -- See https://github.com/commercialhaskell/stack/issues/4471
     updateCache tarball = withStorage $ do
       -- Alright, here's the story. In theory, we only ever append to
       -- a tarball. Therefore, we can store the last place we

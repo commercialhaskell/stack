@@ -6,6 +6,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -142,7 +143,6 @@ import Network.HTTP.Types (Status, statusCode)
 import Data.Text.Read (decimal)
 import Path (Path, Abs, Dir, File, toFilePath, filename, (</>), parseRelFile)
 import Path.IO (resolveFile, resolveDir)
-import Data.Pool (Pool)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 
@@ -197,7 +197,17 @@ cabalFileName name =
 newtype Revision = Revision Word
     deriving (Generic, Show, Eq, NFData, Data, Typeable, Ord, Hashable, Display, PersistField, PersistFieldSql)
 
-newtype Storage = Storage (Pool SqlBackend)
+-- | Represents a SQL database connection. This used to be a newtype
+-- wrapper around a connection pool. However, when investigating
+-- <https://github.com/commercialhaskell/stack/issues/4471>, it
+-- appeared that holding a pool resulted in overly long write locks
+-- being held on the database. As a result, we now abstract away
+-- whether a pool is used, and the default implementation in
+-- "Pantry.Storage" does not use a pool.
+data Storage = Storage
+  { withStorage_ :: (forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a)
+  , withWriteLock_ :: (forall env a. HasLogFunc env => RIO env a -> RIO env a)
+  }
 
 -- | Configuration value used by the entire pantry package. Create one
 -- using @withPantryConfig@. See also @PantryApp@ for a convenience
