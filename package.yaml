@@ -173,7 +173,6 @@ library:
   - Stack.Coverage
   - Stack.DefaultColorWhen
   - Stack.Docker
-  - Stack.Docker.GlobalDB
   - Stack.Dot
   - Stack.FileWatch
   - Stack.Freeze
@@ -243,7 +242,7 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - System.Permissions
-  - System.Process.PagerEditor
+  - System.Process.Pager
   - System.Terminal
   when:
   - condition: 'os(windows)'

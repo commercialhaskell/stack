@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Stack.Options.DockerParser where
 
-import           Data.Char
 import           Data.List                         (intercalate)
 import qualified Data.Text                         as T
 import           Distribution.Version              (anyVersion)
@@ -9,7 +8,6 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Stack.Docker
-import qualified Stack.Docker                      as Docker
 import           Stack.Prelude
 import           Stack.Options.Utils
 import           Stack.Types.Version
@@ -78,11 +76,6 @@ dockerOptsParser hide0 =
                                 metavar "NAME=VALUE" <>
                                 help ("Set environment variable in container " ++
                                       "(may specify multiple times)")))
-    <*> optionalFirst (absFileOption
-            (long (dockerOptName dockerDatabasePathArgName) <>
-             hide <>
-             metavar "PATH" <>
-             help "Location of image usage tracking database"))
     <*> optionalFirst (option (eitherReader' parseDockerStackExe)
             (let specialOpts =
                      [ dockerStackExeDownloadVal
@@ -105,48 +98,3 @@ dockerOptsParser hide0 =
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     firstStrOption = optionalFirst . option str
     hide = hideMods hide0
-
--- | Parser for docker cleanup arguments.
-dockerCleanupOptsParser :: Parser Docker.CleanupOpts
-dockerCleanupOptsParser =
-  Docker.CleanupOpts <$>
-  (flag' Docker.CleanupInteractive
-         (short 'i' <>
-          long "interactive" <>
-          help "Show cleanup plan in editor and allow changes (default)") <|>
-   flag' Docker.CleanupImmediate
-         (short 'y' <>
-          long "immediate" <>
-          help "Immediately execute cleanup plan") <|>
-   flag' Docker.CleanupDryRun
-         (short 'n' <>
-          long "dry-run" <>
-          help "Display cleanup plan but do not execute") <|>
-   pure Docker.CleanupInteractive) <*>
-  opt (Just 14) "known-images" "LAST-USED" <*>
-  opt Nothing "unknown-images" "CREATED" <*>
-  opt (Just 0) "dangling-images" "CREATED" <*>
-  opt Nothing "stopped-containers" "CREATED" <*>
-  opt Nothing "running-containers" "CREATED"
-  where opt def' name mv =
-          fmap Just
-               (option auto
-                       (long name <>
-                        metavar (mv ++ "-DAYS-AGO") <>
-                        help ("Remove " ++
-                              toDescr name ++
-                              " " ++
-                              map toLower (toDescr mv) ++
-                              " N days ago" ++
-                              case def' of
-                                Just n -> " (default " ++ show n ++ ")"
-                                Nothing -> ""))) <|>
-          flag' Nothing
-                (long ("no-" ++ name) <>
-                 help ("Do not remove " ++
-                       toDescr name ++
-                       case def' of
-                         Just _ -> ""
-                         Nothing -> " (default)")) <|>
-          pure def'
-        toDescr = map (\c -> if c == '-' then ' ' else c)
