@@ -220,6 +220,9 @@ Bug fixes:
   [#2997](https://github.com/commercialhaskell/stack/issues/2997)
 * `stack init` will now work for cabal files with sublibraries. See
   [#4408](https://github.com/commercialhaskell/stack/issues/4408)
+* When the Cabal spec version is newer than the global Cabal version, build
+  against the snapshot's Cabal library. See
+  [#4488](https://github.com/commercialhaskell/stack/issues/4488)
 
 ## v1.9.3
 

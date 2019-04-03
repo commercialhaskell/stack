@@ -114,6 +114,7 @@ data Package =
           ,packageBuildType :: !BuildType                 -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
+          ,packageCabalSpec :: !VersionRange              -- ^ Cabal spec range
           }
  deriving (Show,Typeable)
 

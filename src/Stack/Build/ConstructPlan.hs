@@ -181,12 +181,13 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       prettyWarn $ flow "You are trying to upgrade/downgrade base, which is almost certainly not what you really want. Please, consider using another GHC version if you need a certain version of base, or removing base from extra-deps. See more at https://github.com/commercialhaskell/stack/issues/3940." <> line
 
     econfig <- view envConfigL
-    sources <- getSources
+    globalCabalVersion <- cpCabalVersion
+    sources <- getSources globalCabalVersion
     mcur <- view $ buildConfigL.to bcCurator
 
     let onTarget = void . addDep
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
-    let ctx = mkCtx econfig sources mcur
+    let ctx = mkCtx econfig globalCabalVersion sources mcur
     ((), m, W efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -225,9 +226,10 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
-    mkCtx econfig sources mcur = Ctx
+    mkCtx econfig globalCabalVersion sources mcur = Ctx
         { baseConfigOpts = baseConfigOpts0
-        , loadPackage = \x y z -> runRIO econfig $ loadPackage0 x y z
+        , loadPackage = \x y z -> runRIO econfig $
+            applyForceCustomBuild globalCabalVersion <$> loadPackage0 x y z
         , combinedMap = combineMap sources installedMap
         , ctxEnvConfig = econfig
         , callStack = []
@@ -246,9 +248,12 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     inSourceMap pname = pname `Map.member` smDeps sourceMap ||
                         pname `Map.member` smProject sourceMap
 
-    getSources = do
+    getSources globalCabalVersion = do
+      let loadLocalPackage' pp = do
+            lp <- loadLocalPackage pp
+            pure lp { lpPackage = applyForceCustomBuild globalCabalVersion $ lpPackage lp }
       pPackages <- for (smProject sourceMap) $ \pp -> do
-        lp <- loadLocalPackage pp
+        lp <- loadLocalPackage' pp
         return $ PSFilePath lp
       bopts <- view $ configL.to configBuild
       deps <- for (smDeps sourceMap) $ \dp ->
@@ -257,7 +262,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
-            lp <- loadLocalPackage pp
+            lp <- loadLocalPackage' pp
             return $ PSFilePath lp
       return $ pPackages <> deps
 

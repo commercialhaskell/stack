@@ -24,6 +24,7 @@ module Stack.Package
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageDependencies
+  ,applyForceCustomBuild
   ) where
 
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -52,7 +53,7 @@ import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
-import           Distribution.Version (mkVersion)
+import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
 import           Path as FL
 import           Path.Extra
 import           Path.IO hiding (findFiles)
@@ -183,6 +184,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           (library pkg)
     , packageBuildType = buildType pkg
     , packageSetupDeps = msetupDeps
+    , packageCabalSpec = either orLaterVersion id $ specVersionRaw pkg
     }
   where
     extraLibNames = S.union subLibNames foreignLibNames
@@ -1387,3 +1389,27 @@ mkDepPackage pl = do
     }
 
     -}
+
+-- | Force a package to be treated as a custom build type, see
+-- <https://github.com/commercialhaskell/stack/issues/4488>
+applyForceCustomBuild
+  :: Version -- ^ global Cabal version
+  -> Package
+  -> Package
+applyForceCustomBuild cabalVersion package
+    | forceCustomBuild =
+        package
+          { packageBuildType = Custom
+          , packageDeps = M.insertWith (<>) "Cabal" (DepValue cabalVersionRange AsLibrary)
+                        $ packageDeps package
+          , packageSetupDeps = Just $ M.fromList
+              [ ("Cabal", cabalVersionRange)
+              , ("base", anyVersion)
+              ]
+          }
+    | otherwise = package
+  where
+    cabalVersionRange = packageCabalSpec package
+    forceCustomBuild =
+      packageBuildType package == Simple &&
+      not (cabalVersion `withinRange` cabalVersionRange)
