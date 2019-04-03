@@ -114,7 +114,6 @@ module Stack.Constants
     ,relFileStackDotExe
     ,relFileStackDotTmpDotExe
     ,relFileStackDotTmp
-    ,absDirDockerHostBinDir
     ,ghcShowOptionsOutput
     )
     where
@@ -569,10 +568,6 @@ relFileStackDotTmp = $(mkRelFile "stack.tmp")
 
 relFileStack :: Path Rel File
 relFileStack = $(mkRelFile "stack")
-
--- | Directory where 'stack' executable is bind-mounted in Docker container
-absDirDockerHostBinDir :: Path Abs Dir
-absDirDockerHostBinDir = $(mkAbsDir "/opt/host/bin")
 
 -- Technically, we should be consulting the user's current ghc,
 -- but that would require loading up a BuildConfig.

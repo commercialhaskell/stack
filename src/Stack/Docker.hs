@@ -155,7 +155,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         cmdArgs args exePath
     cmdArgs args exePath = do
         exeBase <- exePath -<.> ""
-        let mountPath = toFilePath (absDirDockerHostBinDir </> filename exeBase)
+        let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
         return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 
 -- | Error if running in a container.
@@ -207,7 +207,7 @@ runContainerAndExit = do
          imageEnvVars = map (break (== '=')) icEnv
          platformVariant = show $ hashRepoName image
          stackRoot = view stackRootL config
-         sandboxHomeDir = sandboxDir </> relDirUnderHome
+         sandboxHomeDir = sandboxDir </> homeDirName
          isTerm = not (dockerDetach docker) &&
                   isStdinTerminal &&
                   isStdoutTerminal &&
@@ -222,9 +222,8 @@ runContainerAndExit = do
        logWarn "The Docker image does not set the PATH env var"
        logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
      newPathEnv <- either throwM return $ augmentPath
-                      ( toFilePath <$>
-                      [ absDirDockerHostBinDir
-                      , sandboxHomeDir </> relDirDotLocal </> relDirBin])
+                      [ hostBinDir
+                      , toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
                       mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
@@ -424,7 +423,7 @@ reset keepHome = do
   dockerSandboxDir <- projectDockerSandboxDir projectRoot
   liftIO (removeDirectoryContents
             dockerSandboxDir
-            [relDirUnderHome | keepHome]
+            [homeDirName | keepHome]
             [])
 
 -- | The Docker container "entrypoint": special actions performed when first entering
@@ -539,6 +538,16 @@ readDockerProcess
     :: (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
 readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
+
+-- | Name of home directory within docker sandbox.
+homeDirName :: Path Rel Dir
+homeDirName = relDirUnderHome
+
+-- | Directory where 'stack' executable is bind-mounted in Docker container
+-- This refers to a path in the Linux *container*, and so should remain a
+-- 'FilePath' (not 'Path Abs Dir') so that it works when the host runs Windows.
+hostBinDir :: FilePath
+hostBinDir = "/opt/host/bin"
 
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
