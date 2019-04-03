@@ -5,7 +5,6 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE RecordWildCards       #-}
 
 -- | Cache information about previous builds
 module Stack.Build.Cache
@@ -132,7 +131,7 @@ tryGetBuildCache dir component = do
 tryGetConfigCache :: HasEnvConfig env
                   => Path Abs Dir -> RIO env (Maybe ConfigCache)
 tryGetConfigCache dir =
-    loadConfigCache $ ConfigCacheKey dir ConfigCacheTypeConfig
+    loadConfigCache $ configCacheKey dir ConfigCacheTypeConfig
 
 -- | Try to read the mod time of the cabal file from the last build
 tryGetCabalMod :: HasEnvConfig env
@@ -159,7 +158,7 @@ writeConfigCache :: HasEnvConfig env
                 -> ConfigCache
                 -> RIO env ()
 writeConfigCache dir =
-    saveConfigCache (ConfigCacheKey dir ConfigCacheTypeConfig)
+    saveConfigCache (configCacheKey dir ConfigCacheTypeConfig)
 
 -- | See 'tryGetCabalMod'
 writeCabalMod :: HasEnvConfig env
@@ -178,7 +177,7 @@ deleteCaches dir
     bfp <- buildCacheFile dir
     removeFileIfExists bfp
     -}
- = deactiveConfigCache $ ConfigCacheKey dir ConfigCacheTypeConfig
+ = deactiveConfigCache $ configCacheKey dir ConfigCacheTypeConfig
 
 flagCacheKey :: (HasEnvConfig env) => Installed -> RIO env ConfigCacheKey
 flagCacheKey installed = do
@@ -186,10 +185,10 @@ flagCacheKey installed = do
     case installed of
         Library _ gid _ ->
             return $
-            ConfigCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
+            configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
         Executable ident ->
             return $
-            ConfigCacheKey
+            configCacheKey
                 installationRoot
                 (ConfigCacheTypeFlagExecutable ident)
 
@@ -254,22 +253,22 @@ checkTestSuccess dir = do
 --
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
-precompiledCacheKey :: HasEnvConfig env
+getPrecompiledCacheKey :: HasEnvConfig env
                     => PackageLocationImmutable
                     -> ConfigureOpts
                     -> Set GhcPkgId -- ^ dependencies
                     -> RIO env PrecompiledCacheKey
-precompiledCacheKey loc copts installedPackageIDs = do
-  pckCompiler <- view actualCompilerVersionL
-  pckCabalVersion <- view cabalVersionL
+getPrecompiledCacheKey loc copts installedPackageIDs = do
+  compiler <- view actualCompilerVersionL
+  cabalVersion <- view cabalVersionL
 
   -- The goal here is to come up with a string representing the
   -- package location which is unique. Luckily @TreeKey@s are exactly
   -- that!
   treeKey <- getPackageLocationTreeKey loc
-  let pckPackageKey = utf8BuilderToText $ display treeKey
+  let packageKey = utf8BuilderToText $ display treeKey
 
-  pckPlatformGhcDir <- platformGhcRelDir
+  platformGhcDir <- platformGhcRelDir
 
   -- In Cabal versions 1.22 and later, the configure options contain the
   -- installed package IDs, which is what we need for a unique hash.
@@ -277,9 +276,9 @@ precompiledCacheKey loc copts installedPackageIDs = do
   -- supplement it with the installed package IDs directly.
   -- See issue: https://github.com/commercialhaskell/stack/issues/1103
   let input = (coNoDirs copts, installedPackageIDs)
-      pckOptionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
+      optionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
 
-  return PrecompiledCacheKey{..}
+  return $ precompiledCacheKey platformGhcDir compiler cabalVersion packageKey optionsHash
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
@@ -292,7 +291,7 @@ writePrecompiledCache :: HasEnvConfig env
                       -> Set Text -- ^ executables
                       -> RIO env ()
 writePrecompiledCache baseConfigOpts loc copts depIDs mghcPkgId sublibs exes = do
-  key <- precompiledCacheKey loc copts depIDs
+  key <- getPrecompiledCacheKey loc copts depIDs
   ec <- view envConfigL
   let stackRootRelative = makeRelative (view stackRootL ec)
   mlibpath <- case mghcPkgId of
@@ -320,7 +319,7 @@ readPrecompiledCache :: forall env. HasEnvConfig env
                      -> Set GhcPkgId -- ^ dependencies
                      -> RIO env (Maybe (PrecompiledCache Abs))
 readPrecompiledCache loc copts depIDs = do
-    key <- precompiledCacheKey loc copts depIDs
+    key <- getPrecompiledCacheKey loc copts depIDs
     mcache <- loadPrecompiledCache key
     maybe (pure Nothing) (fmap Just . mkAbs) mcache
   where
