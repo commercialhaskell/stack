@@ -157,7 +157,7 @@ reexecWithOptionalContainer mprojectRoot =
                                   sinkNull
                           let compatible =
                                   case e of
-                                      Left (ExitCodeException{}) -> False
+                                      Left ExitCodeException{} -> False
                                       Right _ -> True
                           liftIO $
                               setDockerImageExe
@@ -374,7 +374,7 @@ runContainerAndExit getCmdArgs
 #endif
          )
      case e of
-       Left (ExitCodeException{eceExitCode}) -> liftIO (exitWith eceExitCode)
+       Left ExitCodeException{eceExitCode} -> liftIO (exitWith eceExitCode)
        Right () -> do after
                       liftIO exitSuccess
   where
