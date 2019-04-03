@@ -36,7 +36,6 @@ import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
 import           Data.Ord (Down(..))
-import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
@@ -158,8 +157,7 @@ reexecWithOptionalContainer mprojectRoot =
                                   sinkNull
                           let compatible =
                                   case e of
-                                      Left (ProcessExitedUnsuccessfully _ _) ->
-                                          False
+                                      Left (ExitCodeException{}) -> False
                                       Right _ -> True
                           liftIO $
                               setDockerImageExe
@@ -376,7 +374,7 @@ runContainerAndExit getCmdArgs
 #endif
          )
      case e of
-       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
+       Left (ExitCodeException{eceExitCode}) -> liftIO (exitWith eceExitCode)
        Right () -> do after
                       liftIO exitSuccess
   where
