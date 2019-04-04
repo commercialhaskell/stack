@@ -28,8 +28,8 @@ initStorage description migration fp inner = do
     runMigrationSilent migration
   forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
 
-  inner $ Storage
-    { withStorage_ = withSqliteConnInfo (sqinfo False) . runSqlConn
+  withSqlitePoolInfo (sqinfo False) 1 $ \pool -> inner $ Storage
+    { withStorage_ = flip runSqlPool pool
     , withWriteLock_ = withWriteLock fp
     }
   where
@@ -43,15 +43,6 @@ initStorage description migration fp inner = do
            -- the migration scripts may not respect foreign keys. The
            -- rest of the time: enforce those foreign keys.
            $ set fkEnabled (not isMigration)
-
-           -- This one is subtle. Enabling Write-Ahead Logging (WAL)
-           -- mode is persistent: the next usage of the database is
-           -- still in WAL mode until explicitly disabled. Therefore,
-           -- when we're already migrated the database, there's no
-           -- need to waste time reenabling WAL. Skipping this also
-           -- allows us to get slightly more meaningful error messages
-           -- if we run into the SQLITE_BUSY bug again.
-           $ set walEnabled isMigration
 
            $ mkSqliteConnectionInfo (fromString $ toFilePath fp)
 
