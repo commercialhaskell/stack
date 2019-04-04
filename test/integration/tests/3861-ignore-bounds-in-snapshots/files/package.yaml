@@ -3,6 +3,6 @@ version: 0
 
 dependencies:
 - base
-- primitive
+- bad-bounds
 
 library: {}
