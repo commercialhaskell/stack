@@ -2,4 +2,4 @@
 resolver: lts-11.22
 name: remote-snapshot
 packages:
-- archive: https://hackage.haskell.org/package/ghc-prim-0.5.1.1/ghc-prim-0.5.1.1.tar.gz
+- archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/ghc-prim-0.5.1.1.tar.gz

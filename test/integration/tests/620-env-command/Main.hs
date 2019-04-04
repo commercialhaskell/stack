@@ -1,6 +1,7 @@
 import StackTest
 import System.Process
 import Control.Exception (throwIO)
+import Control.Monad (unless)
 
 main :: IO ()
-main = rawSystem "bash" ["run.sh"] >>= throwIO
+main = unless isWindows $ rawSystem "bash" ["run.sh"] >>= throwIO

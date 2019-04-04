@@ -4,34 +4,38 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>))
 import Data.List (filter)
 import System.IO (hPutStrLn, withFile, IOMode(..))
+import Control.Monad (unless)
 
 main :: IO ()
-main = do
+main = unless isWindows $ do
     let
       gitInit = do
          runShell "git init ."
          runShell "git config user.name Test"
          runShell "git config user.email test@test.com"
 
-    createDirectoryIfMissing True "tmpSubSubRepo"
-    withCurrentDirectory "tmpSubSubRepo" $ do
+    let withEmptyDir name inner = do
+          removeDirIgnore name
+          createDirectoryIfMissing True name
+          withCurrentDirectory name inner
+
+    withEmptyDir "tmpSubSubRepo" $ do
       gitInit
       stack ["new", "pkg ", defaultResolverArg]
       runShell "git add pkg"
       runShell "git commit -m SubSubCommit"
 
-    createDirectoryIfMissing True "tmpSubRepo"
-    withCurrentDirectory "tmpSubRepo" $ do
+    withEmptyDir "tmpSubRepo" $ do
       gitInit
       runShell "git submodule add ../tmpSubSubRepo sub"
       runShell "git commit -a -m SubCommit"
 
-    createDirectoryIfMissing True "tmpRepo"
-    withCurrentDirectory "tmpRepo" $ do
+    withEmptyDir "tmpRepo" $ do
       gitInit
       runShell "git submodule add ../tmpSubRepo sub"
       runShell "git commit -a -m Commit"
 
+    removeDirIgnore "tmpPackage"
     stack ["new", defaultResolverArg, "tmpPackage"]
 
     curDir <- getCurrentDirectory
