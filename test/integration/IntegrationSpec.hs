@@ -1,133 +1,222 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import           Control.Applicative
-import           Control.Arrow
-import           Control.Concurrent.Async
-import           Control.Exception
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Lazy         as L
-import           Data.Char
-import           Data.Conduit
-import           Data.Conduit.Binary          (sinkLbs)
-import           Data.Conduit.Filesystem      (sourceDirectoryDeep)
-import qualified Data.Conduit.List            as CL
-import           Data.Conduit.Process
-import           Data.List                    (isSuffixOf, stripPrefix, sort)
-import qualified Data.Map                     as Map
-import           Data.Maybe                   (fromMaybe)
-import           Data.Text.Encoding.Error     (lenientDecode)
-import qualified Data.Text.Lazy               as TL
-import qualified Data.Text.Lazy.Encoding      as TL
-import           Data.Typeable
-import           Prelude -- Fix redundant import warnings
-import           System.Directory
-import           System.Environment
+import           Conduit
+import           Data.List                (stripPrefix)
+import           RIO
+import           RIO.Directory            hiding (findExecutable)
+import           RIO.FilePath
+import           RIO.List                 (partition)
+import qualified RIO.Map                  as Map
+import           RIO.Process
+import qualified RIO.Set                  as Set
+import qualified RIO.Text                 as T
+import           System.Environment       (getArgs, lookupEnv, getExecutablePath)
 import           System.Exit
-import           System.FilePath
-import           System.IO.Temp
+import           System.Info (os)
 import           System.PosixCompat.Files
-import           Test.Hspec
+
+-- This code does not use a test framework so that we get direct
+-- control of how the output is displayed.
 
 main :: IO ()
-main = do
-    srcDir  <- canonicalizePath ""
-    currDir <- canonicalizePath "test/integration"
+main = runSimpleApp $ do
+  logInfo "Initiating Stack integration test running"
 
-    let findExe name = do
-            mexe <- findExecutable name
-            case mexe of
-                Nothing -> error $ name ++ " not found on PATH"
-                Just exe -> return exe
-    runghc <- findExe "runghc"
-    stack <- findExe "stack"
+  args <- liftIO getArgs
+  fast <-
+    case args of
+      [] -> pure Slow
+      ["--fast"] -> pure Fast
+      _ -> error $ "Unknown arguments: " ++ show args
 
-    let testDir = currDir </> "tests"
-    tests <- getDirectoryContents testDir >>= filterM (hasTest testDir) . sort
+  results <- runApp fast $ do
+    logInfo "Running with the following environment"
+    proc "env" [] runProcess_
+    tests <- asks appTestDirs
+    let count = Set.size tests
+        loop !idx rest !accum =
+          case rest of
+            [] -> pure accum
+            next:rest' -> do
+              logInfo $ "Running integration test "
+                     <> display idx
+                     <> "/"
+                     <> display count
+                     <> ": "
+                     <> fromString (takeFileName next)
+              res <- test next
+              loop (idx + 1) rest' (res <> accum)
 
-    envOrig <- getEnvironment
+    loop (1 :: Int) (Set.toList tests) mempty
 
-    withSystemTempDirectory "stackhome" $ \newHome -> do
-        defaultStackRoot <- getAppUserDataDirectory "stack"
-        let newStackRoot = newHome </> takeFileName defaultStackRoot
-            env' = Map.toList
-                 $ Map.insert "STACK_EXE" stack
-                 $ Map.insert "HOME" newHome
-                 $ Map.insert "APPDATA" newHome
-                 $ Map.insert "STACK_ROOT" newStackRoot
-                 $ Map.insert "SRC_DIR" srcDir
-                 $ Map.delete "GHC_PACKAGE_PATH"
-                 $ Map.fromList
-                 $ map (first (map toUpper)) envOrig
-            origStackRoot = fromMaybe defaultStackRoot (lookup "STACK_ROOT" envOrig)
+  let (successes, failures) = partition ((== ExitSuccess) . snd)
+                            $ Map.toList results
 
-        hspec $ mapM_ (test runghc env' currDir origStackRoot newHome newStackRoot) tests
+  unless (null successes) $ do
+    logInfo "Successful tests:"
+    for_ successes $ \(x, _) -> logInfo $ "- " <> display x
+    logInfo ""
 
-hasTest :: FilePath -> FilePath -> IO Bool
-hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
+  if null failures
+    then logInfo "No failures!"
+    else do
+      logInfo "Failed tests:"
+      for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
+      liftIO exitFailure
 
-test :: FilePath -- ^ runghc
-     -> [(String, String)] -- ^ env
-     -> FilePath -- ^ currdir
-     -> FilePath -- ^ origStackRoot
-     -> FilePath -- ^ newHome
-     -> FilePath -- ^ newStackRoot
-     -> String
-     -> Spec
-test runghc env' currDir origStackRoot newHome newStackRoot name = it name $ withDir $ \dir -> do
-    newHomeExists <- doesDirectoryExist newHome
-    when newHomeExists (removeDirectoryRecursive newHome)
-    createDirectoryIfMissing True newStackRoot
-    copyTree toCopyRoot origStackRoot newStackRoot
-    writeFile (newStackRoot </> "config.yaml") "system-ghc: true\ninstall-ghc: false\n"
-    let testDir = currDir </> "tests" </> name
-        mainFile = testDir </> "Main.hs"
-        libDir = currDir </> "lib"
-        cp = (proc runghc
-                [ "-clear-package-db"
-                , "-global-package-db"
-                , "-i" ++ libDir
-                , mainFile
-                ])
-                { cwd = Just dir
-                , env = Just (Map.toList
-                            $ Map.insert "TEST_DIR" testDir
-                            $ Map.fromList env')
-                }
+data Speed = Fast | Slow
 
-    copyTree (const True) (testDir </> "files") dir
+exeExt :: String
+exeExt = if isWindows then ".exe" else ""
 
-    (ClosedStream, outSrc, errSrc, sph) <- streamingProcess cp
-    (out, err, ec) <- runConcurrently $ (,,)
-        <$> Concurrently (outSrc `connect` sinkLbs)
-        <*> Concurrently (errSrc `connect` sinkLbs)
-        <*> Concurrently (waitForStreamingProcess sph)
-    when (ec /= ExitSuccess) $ throwIO $ TestFailure out err ec
+isWindows :: Bool
+isWindows = os == "mingw32"
+
+runApp :: Speed -> RIO App a -> RIO SimpleApp a
+runApp speed inner = do
+  simpleApp <- ask
+  runghc <- findExecutable "runghc" >>= either throwIO pure
+  srcDir <- canonicalizePath ""
+  testsRoot <- canonicalizePath $ srcDir </> "test/integration"
+  libdir <- canonicalizePath $ testsRoot </> "lib"
+  myPath <- liftIO getExecutablePath
+
+  stack <- canonicalizePath $ takeDirectory myPath </> "stack" ++ exeExt
+  logInfo $ "Using stack located at " <> fromString stack
+  proc stack ["--version"] runProcess_
+
+  testDirs
+    <- runConduitRes
+     $ sourceDirectory (testsRoot </> "tests")
+    .| filterMC (liftIO . hasTest)
+    .| foldMapC Set.singleton
+
+  let modifyEnvCommon
+        = Map.insert "SRC_DIR" (fromString srcDir)
+        . Map.insert "STACK_EXE" (fromString stack)
+        . Map.delete "GHC_PACKAGE_PATH"
+        . Map.fromList
+        . map (first T.toUpper)
+        . Map.toList
+
+  case speed of
+    Fast -> do
+      let app = App
+            { appSimpleApp = simpleApp
+            , appRunghc = runghc
+            , appLibDir = libdir
+            , appSetupHome = pure ()
+            , appTestDirs = testDirs
+            }
+      runRIO app $ withModifyEnvVars modifyEnvCommon inner
+    Slow -> do
+      morigStackRoot <- liftIO $ lookupEnv "STACK_ROOT"
+      origStackRoot <-
+        case morigStackRoot of
+          Nothing -> getAppUserDataDirectory "stack"
+          Just x -> pure x
+
+      withSystemTempDirectory "stackhome" $ \newHome -> withSystemTempDirectory "stack" $ \newStackRoot -> do
+        logInfo "Initializing/updating the original Pantry store"
+        proc stack ["update"] runProcess_
+        copyTree (origStackRoot </> "pantry") (newStackRoot </> "pantry")
+        let modifyEnv
+                 = Map.insert "HOME" (fromString newHome)
+                 . Map.insert "APPDATA" (fromString newHome)
+                 . Map.insert "STACK_ROOT" (fromString newStackRoot)
+                 . modifyEnvCommon
+
+            app = App
+              { appSimpleApp = simpleApp
+              , appRunghc = runghc
+              , appLibDir = libdir
+              , appSetupHome = do
+                  newHomeExists <- doesDirectoryExist newHome
+                  when newHomeExists (removeDirectoryRecursive newHome)
+                  createDirectoryIfMissing True newHome
+
+                  createDirectoryIfMissing True newStackRoot
+                  runConduitRes $
+                    sourceDirectory newStackRoot .| mapM_C (\entry -> do
+                      let name = takeFileName entry
+                      unless (name == "." || name == ".." || name == "pantry") $ do
+                        isFile <- doesFileExist entry
+                        if isFile
+                          then removeFile entry
+                          else removeDirectoryRecursive entry
+                      )
+                  writeFileBinary (newStackRoot </> "config.yaml") "system-ghc: true\ninstall-ghc: false\n"
+              , appTestDirs = testDirs
+              }
+
+        runRIO app $ withModifyEnvVars modifyEnv inner
+
+
+hasTest :: FilePath -> IO Bool
+hasTest dir = doesFileExist $ dir </> "Main.hs"
+
+data App = App
+  { appRunghc :: !FilePath
+  , appLibDir :: !FilePath
+  , appSetupHome :: !(RIO App ())
+  , appSimpleApp :: !SimpleApp
+  , appTestDirs :: !(Set FilePath)
+  }
+simpleAppL :: Lens' App SimpleApp
+simpleAppL = lens appSimpleApp (\x y -> x { appSimpleApp = y })
+instance HasLogFunc App where
+  logFuncL = simpleAppL.logFuncL
+instance HasProcessContext App where
+  processContextL = simpleAppL.processContextL
+
+test :: FilePath -- ^ test dir
+     -> RIO App (Map Text ExitCode)
+test testDir = withDir $ \dir -> do
+    join $ asks appSetupHome
+
+    runghc <- asks appRunghc
+    libDir <- asks appLibDir
+    let mainFile = testDir </> "Main.hs"
+
+    copyTree (testDir </> "files") dir
+
+    withSystemTempFile (name <.> "log") $ \logfp logh -> do
+      ec <- withWorkingDir dir
+          $ withModifyEnvVars (Map.insert "TEST_DIR" $ fromString testDir)
+          $ proc runghc
+              [ "-clear-package-db"
+              , "-global-package-db"
+              , "-i" ++ libDir
+              , mainFile
+              ]
+           $ runProcess
+           . setStdin closed
+           . setStdout (useHandleOpen logh)
+           . setStderr (useHandleOpen logh)
+      hClose logh
+
+      case ec of
+        ExitSuccess -> logInfo "Success!"
+        _ -> do
+          logError "Failure, dumping log\n\n"
+          withSourceFile logfp $ \src ->
+            runConduit $ src .| stderrC
+          logError $ "\n\nEnd of log for " <> fromString name
+      pure $ Map.singleton (fromString name) ec
   where
+    name = takeFileName testDir
     withDir = withSystemTempDirectory ("stack-integration-" ++ name)
 
-data TestFailure = TestFailure L.ByteString L.ByteString ExitCode
-    deriving Typeable
-instance Show TestFailure where
-    show (TestFailure out err ec) = concat
-        [ "Exited with " ++ show ec
-        , "\n\nstdout:\n"
-        , toStr out
-        , "\n\nstderr:\n"
-        , toStr err
-        ]
-      where
-        toStr = TL.unpack . TL.decodeUtf8With lenientDecode
-instance Exception TestFailure
-
-copyTree :: (FilePath -> Bool) -> FilePath -> FilePath -> IO ()
-copyTree toCopy src dst =
-    runResourceT (sourceDirectoryDeep False src `connect` CL.mapM_ go)
+copyTree :: MonadIO m => FilePath -> FilePath -> m ()
+copyTree src dst =
+    liftIO $
+    runResourceT (sourceDirectoryDeep False src `connect` mapM_C go)
         `catch` \(_ :: IOException) -> return ()
   where
-    go srcfp = when (toCopy srcfp) $ liftIO $ do
+    go srcfp = liftIO $ do
         Just suffix <- return $ stripPrefix src srcfp
         let dstfp = dst </> stripHeadSeparator suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
@@ -139,16 +228,3 @@ copyTree toCopy src dst =
     stripHeadSeparator fp@(x:xs) = if isPathSeparator x
                                    then xs
                                    else fp
-
-
-toCopyRoot :: FilePath -> Bool
-toCopyRoot srcfp = any (`isSuffixOf` srcfp)
-    -- FIXME command line parameters to control how many of these get
-    -- copied, trade-off of runtime/bandwidth vs isolation of tests
-    [ ".tar"
-    , ".tar.gz"
-    , ".xz"
-    -- , ".gz"
-    , ".7z.exe"
-    , "00-index.cache"
-    ]
