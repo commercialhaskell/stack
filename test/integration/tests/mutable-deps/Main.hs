@@ -3,7 +3,7 @@ import Data.List (isInfixOf)
 import StackTest
 
 main :: IO ()
-main = do
+main = unless isWindows $ do -- depedency issues on Windows
     let expectRecompilation pkgs stderr = forM_ pkgs $ \p ->
           unless ((p ++ ": build") `isInfixOf` stderr) $
           error $ "package " ++ show p ++ " recompilation was expected"

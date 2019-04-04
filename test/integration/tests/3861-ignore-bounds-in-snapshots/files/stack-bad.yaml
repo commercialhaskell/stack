@@ -1,5 +1,8 @@
 resolver: ghc-8.2.2
 extra-deps:
-- ./primitive-0.6.2.0.tar.gz
-# Include an extra package to get a different snapshot hash
-- acme-missiles-0.3
+- ./bad-bounds.tar
+
+# Include a flag to get a different snapshot hash
+flags:
+  bad-bounds:
+    unimportant: true
