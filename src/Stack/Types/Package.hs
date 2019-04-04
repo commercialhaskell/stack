@@ -90,7 +90,7 @@ data PackageLibraries
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Store, NFData, Data, Typeable)
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
 
 -- | Some package info.
 data Package =
@@ -114,6 +114,7 @@ data Package =
           ,packageBuildType :: !BuildType                 -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
+          ,packageCabalSpec :: !VersionRange              -- ^ Cabal spec range
           }
  deriving (Show,Typeable)
 

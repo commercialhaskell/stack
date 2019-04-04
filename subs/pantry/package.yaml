@@ -73,7 +73,6 @@ dependencies:
 - th-lift
 - th-lift-instances
 - mono-traversable
-- store-core
 - safe
 - contravariant
 - syb
@@ -100,6 +99,7 @@ library:
   - Pantry
   - Pantry.SHA256
   - Pantry.HPack
+  - Pantry.SQLite
 
   # For testing
   - Pantry.Internal
@@ -107,8 +107,6 @@ library:
 
   # FIXME must be removed from pantry!
   - Data.Aeson.Extended
-  - Data.Store
-  - Data.Store.Version
 
 tests:
   spec:

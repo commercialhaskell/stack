@@ -57,6 +57,19 @@ instance Show StackScriptException where
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
 scriptCmd opts = do
+    -- Some warnings in case the user somehow tries to set a
+    -- stack.yaml location. Note that in this functions we use
+    -- logError instead of logWarn because, when using the
+    -- interpreter mode, only error messages are shown. See:
+    -- https://github.com/commercialhaskell/stack/issues/3007
+    view (globalOptsL.to globalStackYaml) >>= \case
+      SYLOverride fp -> logError $
+        "Ignoring override stack.yaml file for script command: " <>
+        fromString (toFilePath fp)
+      SYLNoProject -> logError "Ignoring SYLNoProject for script command"
+      SYLDefault -> return ()
+      SYLNoConfig _ -> assert False (return ())
+
     file <- resolveFile' $ soFile opts
     let scriptDir = parent file
         modifyGO go = go
@@ -85,19 +98,6 @@ scriptCmd opts = do
   longWay file scriptDir =
     withConfig YesReexec $
     withDefaultEnvConfig $ do
-      -- Some warnings in case the user somehow tries to set a
-      -- stack.yaml location. Note that in this functions we use
-      -- logError instead of logWarn because, when using the
-      -- interpreter mode, only error messages are shown. See:
-      -- https://github.com/commercialhaskell/stack/issues/3007
-      view (globalOptsL.to globalStackYaml) >>= \case
-        SYLOverride fp -> logError $
-          "Ignoring override stack.yaml file for script command: " <>
-          fromString (toFilePath fp)
-        SYLNoProject -> logError "Ignoring SYLNoProject for script command"
-        SYLDefault -> return ()
-        SYLNoConfig _ -> assert False (return ())
-
       config <- view configL
       menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
       withProcessContext menv $ do

@@ -11,24 +11,13 @@ import           System.Process
 main :: IO ()
 main =
     withFakeHackage $ do
-        disableGpg
         stackRoot <- getEnv "STACK_ROOT"
         -- Ensure there are credentials available for uploading
         createDirectoryIfMissing True (stackRoot </> "upload")
         writeFile
             (stackRoot </> "upload" </> "credentials.json")
             "{\"username\":\"fake\",\"password\":\"fake\"}"
-        -- Test the upload with no signing
-        stack ["upload", "--no-signature", "."]
-        -- Test failure signing
-        stackErr ["upload", "."]
-
--- | Ensure gpg is unusable by putting a broken one on PATH
-disableGpg :: IO ()
-disableGpg = do
-    originalPath <- getEnv "PATH"
-    cwd <- getCurrentDirectory
-    setEnv "PATH" $ (cwd </> "gpg-disabled") ++ ":" ++ originalPath
+        stack ["upload", "."]
 
 -- | Start a fake Hackage server to test the upload
 withFakeHackage :: IO a -> IO a

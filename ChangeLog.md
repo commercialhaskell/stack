@@ -85,6 +85,12 @@ Behavior changes:
   projects using snapshots earlier than `lts-3.0` or
   `nightly-2015-05-05` will no longer build.
 
+* Remove the `stack docker cleanup` command.  Docker itself now has
+  [`docker image prune`](https://docs.docker.com/engine/reference/commandline/image_prune/)
+  and
+  [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
+  which you can use instead.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
@@ -172,6 +178,10 @@ Other enhancements:
   installation based on the version suffix, allowing you to more easily switch
   between various system-installed GHCs. See
   [#2433](https://github.com/commercialhaskell/stack/issues/2433).
+* `stack init` will now support create a `stack.yaml` file without any local
+  packages. See [#2465](https://github.com/commercialhaskell/stack/issues/2465)
+* Store caches in SQLite database instead of files.
+* No longer use "global" Docker image database (`docker.db`).
 
 Bug fixes:
 
@@ -219,6 +229,11 @@ Bug fixes:
   [#2159](https://github.com/commercialhaskell/stack/issues/2159).
 * Warnings are dumped from logs even when color is enabled. See
   [#2997](https://github.com/commercialhaskell/stack/issues/2997)
+* `stack init` will now work for cabal files with sublibraries. See
+  [#4408](https://github.com/commercialhaskell/stack/issues/4408)
+* When the Cabal spec version is newer than the global Cabal version, build
+  against the snapshot's Cabal library. See
+  [#4488](https://github.com/commercialhaskell/stack/issues/4488)
 
 ## v1.9.3
 

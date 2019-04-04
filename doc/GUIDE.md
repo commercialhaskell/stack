@@ -571,6 +571,8 @@ stack init does quite a few things for you behind the scenes:
 Assuming it finds a match, it will write your `stack.yaml` file, and everything
 will work.
 
+(Note: yackage does not currently support hpack, but you can also hpack-convert should you need to generate a package.yaml).
+
 #### External Dependencies
 
 Given that LTS Haskell and Stackage Nightly have ~1400 of the most common
@@ -578,9 +580,9 @@ Haskell packages, this will often be enough to build most packages. However,
 at times, you may find that not all dependencies required may be available in
 the Stackage snapshots.
 
-Let's simulate an unsatisfied dependency by adding acme-missiles to the `.cabal` file
-(yackage does not currently support hpack, but you can also [hpack-convert](https://github.com/yamadapc/hpack-convert)
-should you need to generate a `package.yaml`) build-depends and then re-initing:
+Let's simulate an unsatisfied dependency by adding acme-missiles to the list of dependencies 
+the build requires. This is done by including it in the `Build-depends` section in the .cabal file 
+and then re-initing:
 
 ```
 cueball:~/yackage-0.8.0$ stack init --force

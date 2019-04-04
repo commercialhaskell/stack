@@ -8,7 +8,6 @@ module Stack.Constants.Config
   , distRelativeDir
   , imageStagingDir
   , projectDockerSandboxDir
-  , configCacheFile
   , configCabalMod
   , buildCachesDir
   , testSuccessFile
@@ -65,15 +64,6 @@ testBuiltFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 testBuiltFile dir =
     liftM
         (</> $(mkRelFile "stack-test-built"))
-        (distDirFromDir dir)
-
--- | The filename used for dirtiness check of config.
-configCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => Path Abs Dir      -- ^ Package directory.
-                -> m (Path Abs File)
-configCacheFile dir =
-    liftM
-        (</> $(mkRelFile "stack-config-cache"))
         (distDirFromDir dir)
 
 -- | The filename used for modification check of .cabal

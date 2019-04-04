@@ -16,7 +16,6 @@ import Stack.Prelude
 
 newtype VersionIntervals = VersionIntervals [VersionInterval]
     deriving (Generic, Show, Eq, Data, Typeable)
-instance Store VersionIntervals
 instance NFData VersionIntervals
 
 data VersionInterval = VersionInterval
@@ -25,12 +24,10 @@ data VersionInterval = VersionInterval
   , viUpper :: !(Maybe (Version, Bound))
   }
     deriving (Generic, Show, Eq, Data, Typeable)
-instance Store VersionInterval
 instance NFData VersionInterval
 
 data Bound = ExclusiveBound | InclusiveBound
     deriving (Generic, Show, Eq, Data, Typeable)
-instance Store Bound
 instance NFData Bound
 
 toVersionRange :: VersionIntervals -> C.VersionRange

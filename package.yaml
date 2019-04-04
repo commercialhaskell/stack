@@ -96,6 +96,7 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
+- resource-pool
 - resourcet
 - retry >= 0.7
 - rio
@@ -103,7 +104,6 @@ dependencies:
 - semigroups
 - split
 - stm
-- store-core # FIXME remove
 - streaming-commons
 - tar
 - template-haskell
@@ -173,7 +173,6 @@ library:
   - Stack.Coverage
   - Stack.DefaultColorWhen
   - Stack.Docker
-  - Stack.Docker.GlobalDB
   - Stack.Dot
   - Stack.FileWatch
   - Stack.Freeze
@@ -222,7 +221,7 @@ library:
   - Stack.Setup.Installed
   - Stack.SetupCmd
   - Stack.SourceMap
-  - Stack.StoreTH
+  - Stack.Storage
   - Stack.Types.Build
   - Stack.Types.CompilerBuild
   - Stack.Types.Compiler
@@ -243,7 +242,7 @@ library:
   - Stack.Upgrade
   - Stack.Upload
   - System.Permissions
-  - System.Process.PagerEditor
+  - System.Process.Pager
   - System.Terminal
   when:
   - condition: 'os(windows)'

@@ -448,11 +448,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                           "Reset the Docker sandbox"
                           dockerResetCmd
                           (switch (long "keep-home" <>
-                                   help "Do not delete sandbox's home directory"))
-              addCommand' Docker.dockerCleanupCmdName
-                          "Clean up Docker images and containers"
-                          dockerCleanupCmd
-                          dockerCleanupOptsParser)
+                                   help "Do not delete sandbox's home directory")))
         addSubCommands'
             ConfigCmd.cfgCmdName
             "Subcommands for accessing and modifying configuration values"
@@ -896,10 +892,6 @@ dockerPullCmd () = withConfig NoReexec $ Docker.preventInContainer Docker.pull
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> RIO Runner ()
 dockerResetCmd = withConfig NoReexec . Docker.preventInContainer . Docker.reset
-
--- | Cleanup Docker images and containers.
-dockerCleanupCmd :: Docker.CleanupOpts -> RIO Runner ()
-dockerCleanupCmd = withConfig NoReexec . Docker.preventInContainer . Docker.cleanup
 
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()
