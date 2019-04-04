@@ -57,6 +57,7 @@ import           Data.Text.Encoding              (decodeUtf8With)
 import           Data.Text.Encoding.Error        (lenientDecode)
 import           Database.Persist.Sql            (PersistField(..)
                                                  ,PersistFieldSql(..)
+                                                 ,PersistValue(PersistText)
                                                  ,SqlType(SqlString))
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
@@ -399,14 +400,15 @@ data CachePkgSrc = CacheSrcUpstream | CacheSrcLocal FilePath
 instance NFData CachePkgSrc
 
 instance PersistField CachePkgSrc where
-    toPersistValue CacheSrcUpstream = toPersistValue ["upstream" :: String]
-    toPersistValue (CacheSrcLocal fp) = toPersistValue ["local", fp]
-    fromPersistValue x = do
-        y <- fromPersistValue x
-        case y of
-            ["upstream"] -> Right CacheSrcUpstream
-            ["local", fp] -> Right (CacheSrcLocal fp)
-            _ -> Left $ "Unexpected CachePkgSrc value: " <> tshow x
+    toPersistValue CacheSrcUpstream = PersistText "upstream"
+    toPersistValue (CacheSrcLocal fp) = PersistText ("local:" <> T.pack fp)
+    fromPersistValue (PersistText t) = do
+        if t == "upstream"
+            then Right CacheSrcUpstream
+            else case T.stripPrefix "local:" t of
+                Just fp -> Right $ CacheSrcLocal (T.unpack fp)
+                Nothing -> Left $ "Unexpected CachePkgSrc value: " <> t
+    fromPersistValue _ = Left "Unexpected CachePkgSrc type"
 
 instance PersistFieldSql CachePkgSrc where
     sqlType _ = SqlString

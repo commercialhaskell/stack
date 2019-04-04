@@ -15,9 +15,13 @@
 module Stack.Storage
     ( initStorage
     , withStorage
+    , ConfigCacheKey
+    , configCacheKey
     , loadConfigCache
     , saveConfigCache
     , deactiveConfigCache
+    , PrecompiledCacheKey
+    , precompiledCacheKey
     , loadPrecompiledCache
     , savePrecompiledCache
     , loadDockerImageExeCache
@@ -26,6 +30,7 @@ module Stack.Storage
 
 import qualified Data.ByteString as S
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Database.Persist.Sql (SqlBackend)
 import Database.Persist.Sqlite
@@ -35,7 +40,8 @@ import Path
 import Stack.Prelude hiding (MigrationFailure)
 import Stack.Types.Build
 import Stack.Types.Cache
-import Stack.Types.Config (HasConfig, configStorage, configL)
+import Stack.Types.Compiler
+import Stack.Types.Config (HasConfig, configL, configStorage)
 import Stack.Types.GhcPkgId
 
 share [ mkPersist sqlSettings
@@ -44,43 +50,57 @@ share [ mkPersist sqlSettings
     ]
     [persistLowerCase|
 ConfigCacheParent sql="config_cache"
-  key ConfigCacheKey
-  pkgSrc CachePkgSrc
-  active Bool
-  UniqueConfigCacheParent key sql="unique_config_cache"
+  key Text SafeToRemove
+  directory FilePath "default=(hex(randomblob(16)))"
+  type ConfigCacheType default=''
+  pkgSrc CachePkgSrc default=''
+  active Bool default=0
+  UniqueConfigCacheParent directory type sql="unique_config_cache"
   deriving Show
+
 ConfigCacheDirOption
   parent ConfigCacheParentId sql="config_cache_id"
   index Int
   value String sql="option"
   UniqueConfigCacheDirOption parent index
   deriving Show
+
 ConfigCacheNoDirOption
   parent ConfigCacheParentId sql="config_cache_id"
   index Int
   value String sql="option"
   UniqueConfigCacheNoDirOption parent index
   deriving Show
+
 ConfigCacheDep
   parent ConfigCacheParentId sql="config_cache_id"
   value GhcPkgId sql="ghc_pkg_id"
   UniqueConfigCacheDep parent value
   deriving Show
+
 ConfigCacheComponent
   parent ConfigCacheParentId sql="config_cache_id"
   value S.ByteString sql="component"
   UniqueConfigCacheComponent parent value
   deriving Show
+
 PrecompiledCacheParent sql="precompiled_cache"
-  key PrecompiledCacheKey
+  key Text SafeToRemove
+  platformGhcDir FilePath "default=(hex(randomblob(16)))"
+  compiler Text default=''
+  cabalVersion Text default=''
+  packageKey Text default=''
+  optionsHash ByteString default=''
   library FilePath Maybe
-  UniquePrecompiledCacheParent key sql="unique_precompiled_cache"
+  UniquePrecompiledCacheParent platformGhcDir compiler cabalVersion packageKey optionsHash sql="unique_precompiled_cache"
   deriving Show
+
 PrecompiledCacheSubLib
   parent PrecompiledCacheParentId sql="precompiled_cache_id"
   value FilePath sql="sub_lib"
   UniquePrecompiledCacheSubLib parent value
   deriving Show
+
 PrecompiledCacheExe
   parent PrecompiledCacheParentId sql="precompiled_cache_id"
   value FilePath sql="exe"
@@ -97,13 +117,12 @@ DockerImageExeCache
 |]
 
 -- | Initialize the database.
-initStorage
-  :: HasLogFunc env
-  => Path Abs File -- ^ storage file
-  -> (SQLite.Storage -> RIO env a)
-  -> RIO env a
-initStorage =
-  SQLite.initStorage "Stack" migrateAll
+initStorage ::
+       HasLogFunc env
+    => Path Abs File -- ^ storage file
+    -> (SQLite.Storage -> RIO env a)
+    -> RIO env a
+initStorage = SQLite.initStorage "Stack" migrateAll
 
 -- | Run an action in a database transaction
 withStorage ::
@@ -112,6 +131,13 @@ withStorage ::
     -> RIO env a
 withStorage inner =
     SQLite.withStorage inner =<< view (configL . to configStorage)
+
+-- | Key used to retrieve configuration or flag cache
+type ConfigCacheKey = Unique ConfigCacheParent
+
+-- | Build key used to retrieve configuration or flag cache
+configCacheKey :: Path Abs Dir -> ConfigCacheType -> ConfigCacheKey
+configCacheKey dir = UniqueConfigCacheParent (toFilePath dir)
 
 -- | Internal helper to read the 'ConfigCache'
 readConfigCache ::
@@ -146,7 +172,7 @@ loadConfigCache ::
     -> RIO env (Maybe ConfigCache)
 loadConfigCache key =
     withStorage $ do
-        mparent <- getBy (UniqueConfigCacheParent key)
+        mparent <- getBy key
         case mparent of
             Nothing -> return Nothing
             Just parentEntity@(Entity _ ConfigCacheParent {..})
@@ -160,16 +186,17 @@ saveConfigCache ::
     => ConfigCacheKey
     -> ConfigCache
     -> RIO env ()
-saveConfigCache key new =
+saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
     withStorage $ do
-        mparent <- getBy (UniqueConfigCacheParent key)
+        mparent <- getBy key
         (parentId, mold) <-
             case mparent of
                 Nothing ->
                     (, Nothing) <$>
                     insert
                         ConfigCacheParent
-                            { configCacheParentKey = key
+                            { configCacheParentDirectory = dir
+                            , configCacheParentType = type_
                             , configCacheParentPkgSrc = configCachePkgSrc new
                             , configCacheParentActive = True
                             }
@@ -215,11 +242,28 @@ saveConfigCache key new =
 -- cache will be written again within in a few seconds (after
 -- `cabal configure`), so this avoids unnecessary database churn.
 deactiveConfigCache :: HasConfig env => ConfigCacheKey -> RIO env ()
-deactiveConfigCache key =
+deactiveConfigCache (UniqueConfigCacheParent dir type_) =
     withStorage $
     updateWhere
-        [ConfigCacheParentKey ==. key]
+        [ConfigCacheParentDirectory ==. dir, ConfigCacheParentType ==. type_]
         [ConfigCacheParentActive =. False]
+
+-- | Key used to retrieve to retrieve the precompiled cache
+type PrecompiledCacheKey = Unique PrecompiledCacheParent
+
+-- | Build key used to retrieve to retrieve the precompiled cache
+precompiledCacheKey ::
+       Path Rel Dir
+    -> ActualCompiler
+    -> Version
+    -> Text
+    -> ByteString
+    -> PrecompiledCacheKey
+precompiledCacheKey platformGhcDir compiler cabalVersion =
+    UniquePrecompiledCacheParent
+        (toFilePath platformGhcDir)
+        (compilerVersionText compiler)
+        (T.pack $ versionString cabalVersion)
 
 -- | Internal helper to read the 'PrecompiledCache' from the database
 readPrecompiledCache ::
@@ -228,7 +272,7 @@ readPrecompiledCache ::
     -> ReaderT SqlBackend (RIO env) (Maybe ( PrecompiledCacheParentId
                                            , PrecompiledCache Rel))
 readPrecompiledCache key = do
-    mparent <- getBy (UniquePrecompiledCacheParent key)
+    mparent <- getBy key
     forM mparent $ \(Entity parentId PrecompiledCacheParent {..}) -> do
         pcLibrary <- mapM parseRelFile precompiledCacheParentLibrary
         pcSubLibs <-
@@ -244,8 +288,7 @@ loadPrecompiledCache ::
        (HasConfig env, HasLogFunc env)
     => PrecompiledCacheKey
     -> RIO env (Maybe (PrecompiledCache Rel))
-loadPrecompiledCache key =
-    withStorage $ fmap snd <$> readPrecompiledCache key
+loadPrecompiledCache key = withStorage $ fmap snd <$> readPrecompiledCache key
 
 -- | Insert or update 'PrecompiledCache' to the database.
 savePrecompiledCache ::
@@ -253,22 +296,18 @@ savePrecompiledCache ::
     => PrecompiledCacheKey
     -> PrecompiledCache Rel
     -> RIO env ()
-savePrecompiledCache key new =
+savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPlatformGhcDir precompiledCacheParentCompiler precompiledCacheParentCabalVersion precompiledCacheParentPackageKey precompiledCacheParentOptionsHash) new =
     withStorage $ do
+        let precompiledCacheParentLibrary = fmap toFilePath (pcLibrary new)
         mIdOld <- readPrecompiledCache key
         (parentId, mold) <-
             case mIdOld of
-                Nothing ->
-                    (, Nothing) <$>
-                    insert
-                        (PrecompiledCacheParent
-                             key
-                             (toFilePath <$> pcLibrary new))
+                Nothing -> (, Nothing) <$> insert PrecompiledCacheParent {..}
                 Just (parentId, old) -> do
                     update
                         parentId
                         [ PrecompiledCacheParentLibrary =.
-                          fmap toFilePath (pcLibrary new)
+                          precompiledCacheParentLibrary
                         ]
                     return (parentId, Just old)
         updateSet
