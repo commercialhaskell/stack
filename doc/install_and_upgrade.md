@@ -10,9 +10,12 @@ or:
 
     wget -qO- https://get.haskellstack.org/ | sh
 
-Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
-[Fedora](#fedora),
-[Arch Linux](#arch-linux) and [FreeBSD](#freebsd).
+
+Note that this script will ask for root access using `sudo` in order
+to use your platform's package manager to install dependencies and to
+install to `/usr/local/bin`.  If you prefer more control, follow the
+manual installation instructions for your platform below.
+
 Binaries for other operating systems are listed below, and available on
 [the GitHub release page](https://github.com/fpco/stack/releases). For the
 future, we are open to supporting more OSes (to request one, please
@@ -249,7 +252,7 @@ or:
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
 * Ensure you have required system dependencies installed.  These include GCC, GNU make, xz, perl, libgmp, libffi, and zlib.  We also recommend Git and GPG.  To install these using your package manager:
-    * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg`
+    * Debian / Ubuntu: `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase`
     * Fedora / CentOS: `sudo dnf install perl make automake gcc gmp-devel libffi zlib xz tar git gnupg` (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
         * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
           need to run `sudo dnf install ncurses-compat-libs`. If this package is
