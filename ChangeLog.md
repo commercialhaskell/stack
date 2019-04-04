@@ -27,6 +27,9 @@ Bug fixes:
 - Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
 - Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
+- Docker: fix detection of expected subprocess failures.  This fixes
+  downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
+  extra error when the in-container re-exec'ed `stack` exits with failure.
 
 ## v1.9.3
 
