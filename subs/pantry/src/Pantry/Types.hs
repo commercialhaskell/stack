@@ -124,7 +124,6 @@ import Data.Aeson.Extended
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
 import Database.Persist.Sql
-import Database.Sqlite (SqliteException)
 import Pantry.SHA256 (SHA256)
 import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
@@ -773,7 +772,7 @@ data PantryException
   | PackageVersionParseFail !Text
   | InvalidCabalFilePath !(Path Abs File)
   | DuplicatePackageNames !Utf8Builder ![(PackageName, [RawPackageLocationImmutable])]
-  | MigrationFailure !Text !(Path Abs File) !SqliteException
+  | MigrationFailure !Text !(Path Abs File) !SomeException
 
   deriving Typeable
 instance Exception PantryException where

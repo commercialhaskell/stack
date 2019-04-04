@@ -1,3 +1,8 @@
 resolver: ghc-8.2.2
 packages:
-- ./primitive-0.6.2.0.tar.gz
+- ./bad-bounds.tar
+
+# Include a flag to get a different snapshot hash
+flags:
+  bad-bounds:
+    unimportant: false

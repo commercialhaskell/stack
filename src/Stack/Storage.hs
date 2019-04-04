@@ -24,11 +24,14 @@ module Stack.Storage
     , precompiledCacheKey
     , loadPrecompiledCache
     , savePrecompiledCache
+    , loadDockerImageExeCache
+    , saveDockerImageExeCache
     ) where
 
 import qualified Data.ByteString as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import Data.Time.Clock (UTCTime)
 import Database.Persist.Sql (SqlBackend)
 import Database.Persist.Sqlite
 import Database.Persist.TH
@@ -102,6 +105,14 @@ PrecompiledCacheExe
   parent PrecompiledCacheParentId sql="precompiled_cache_id"
   value FilePath sql="exe"
   UniquePrecompiledCacheExe parent value
+  deriving Show
+
+DockerImageExeCache
+  imageHash Text
+  exePath FilePath
+  exeTimestamp UTCTime
+  compatible Bool
+  DockerImageExeCacheUnique imageHash exePath exeTimestamp
   deriving Show
 |]
 
@@ -315,6 +326,37 @@ savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPla
             (toFilePathSet $ pcExes new)
   where
     toFilePathSet = Set.fromList . map toFilePath
+
+-- | Get the record of whether an executable is compatible with a Docker image
+loadDockerImageExeCache ::
+       (HasConfig env, HasLogFunc env)
+    => Text
+    -> Path Abs File
+    -> UTCTime
+    -> RIO env (Maybe Bool)
+loadDockerImageExeCache imageId exePath exeTimestamp =
+    withStorage $
+    fmap (dockerImageExeCacheCompatible . entityVal) <$>
+    getBy (DockerImageExeCacheUnique imageId (toFilePath exePath) exeTimestamp)
+
+-- | Sest the record of whether an executable is compatible with a Docker image
+saveDockerImageExeCache ::
+       (HasConfig env, HasLogFunc env)
+    => Text
+    -> Path Abs File
+    -> UTCTime
+    -> Bool
+    -> RIO env ()
+saveDockerImageExeCache imageId exePath exeTimestamp compatible =
+    void $
+    withStorage $
+    upsert
+        (DockerImageExeCache
+             imageId
+             (toFilePath exePath)
+             exeTimestamp
+             compatible)
+        []
 
 -- | Efficiently update a set of values stored in a database table
 updateSet ::

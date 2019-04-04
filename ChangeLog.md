@@ -81,6 +81,12 @@ Behavior changes:
 * Always use the `--exact-configuration` Cabal configuration option when
   building (should mostly be a non-user-visible enhancement).
 
+* Remove the `stack docker cleanup` command.  Docker itself now has
+  [`docker image prune`](https://docs.docker.com/engine/reference/commandline/image_prune/)
+  and
+  [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
+  which you can use instead.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
@@ -171,6 +177,7 @@ Other enhancements:
 * `stack init` will now support create a `stack.yaml` file without any local
   packages. See [#2465](https://github.com/commercialhaskell/stack/issues/2465)
 * Store caches in SQLite database instead of files.
+* No longer use "global" Docker image database (`docker.db`).
 
 Bug fixes:
 

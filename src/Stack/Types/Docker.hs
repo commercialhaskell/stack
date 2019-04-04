@@ -49,8 +49,6 @@ data DockerOpts = DockerOpts
     -- ^ Volumes to mount in the container.
   ,dockerEnv :: ![String]
     -- ^ Environment variables to set in the container.
-  ,dockerDatabasePath :: !(Path Abs File)
-    -- ^ Location of image usage database.
   ,dockerStackExe :: !(Maybe DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerSetUser :: !(Maybe Bool)
@@ -91,8 +89,6 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Volumes to mount in the container
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
-  ,dockerMonoidDatabasePath :: !(First (Path Abs File))
-    -- ^ Location of image usage database.
   ,dockerMonoidStackExe :: !(First DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerMonoidSetUser :: !(First Bool)
@@ -121,7 +117,6 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
               dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
-              dockerMonoidDatabasePath     <- First <$> o ..:? dockerDatabasePathArgName
               dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
               dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
               dockerMonoidRequireDockerVersion
@@ -215,8 +210,6 @@ data StackDockerException
       -- ^ @docker inspect@ failed.
     | NotPulledException String
       -- ^ Image does not exist.
-    | InvalidCleanupCommandException String
-      -- ^ Input to @docker cleanup@ has invalid command.
     | InvalidImagesOutputException String
       -- ^ Invalid output from @docker images@.
     | InvalidPSOutputException String
@@ -262,8 +255,6 @@ instance Show StackDockerException where
                ,"\n\nRun '"
                ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
                ,"' to download it, then try again."]
-    show (InvalidCleanupCommandException line) =
-        concat ["Invalid line in cleanup commands: '",line,"'."]
     show (InvalidImagesOutputException line) =
         concat ["Invalid 'docker images' output line: '",line,"'."]
     show (InvalidPSOutputException line) =
@@ -396,11 +387,7 @@ dockerContainerNameArgName = "container-name"
 dockerPersistArgName :: Text
 dockerPersistArgName = "persist"
 
--- | Docker database path argument name.
-dockerDatabasePathArgName :: Text
-dockerDatabasePathArgName = "database-path"
-
--- | Docker database path argument name.
+-- | Docker stack executable argument name.
 dockerStackExeArgName :: Text
 dockerStackExeArgName = "stack-exe"
 
@@ -438,10 +425,6 @@ dockerHelpOptName = dockerCmdName ++ "-help"
 -- | Command-line argument for @docker pull@.
 dockerPullCmdName :: String
 dockerPullCmdName = "pull"
-
--- | Command-line argument for @docker cleanup@.
-dockerCleanupCmdName :: String
-dockerCleanupCmdName = "cleanup"
 
 -- | Command-line option for @--internal-re-exec-version@.
 reExecArgName :: String
