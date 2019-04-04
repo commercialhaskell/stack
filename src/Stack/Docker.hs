@@ -8,15 +8,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
-  (cleanup
-  ,CleanupOpts(..)
-  ,CleanupAction(..)
-  ,dockerCleanupCmdName
-  ,dockerCmdName
+  (dockerCmdName
   ,dockerHelpOptName
   ,dockerPullCmdName
   ,entrypoint
@@ -30,27 +25,23 @@ module Stack.Docker
   ) where
 
 import           Stack.Prelude
-import           Control.Monad.Writer (execWriter,runWriter,tell)
 import qualified Crypto.Hash as Hash (Digest, MD5, hash)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
-import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import           Data.Char (isSpace,toUpper,isAscii,isDigit)
+import           Data.Char (isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
 import           Data.Conduit.Process.Typed hiding (proc)
-import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf)
+import           Data.List (dropWhileEnd,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
-import           Data.Ord (Down(..))
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
+import           Data.Time (UTCTime)
 import           Data.Version (showVersion)
 import           Distribution.Version (mkVersion)
-import           GHC.Exts (sortWith)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
@@ -58,24 +49,21 @@ import qualified Paths_stack as Meta
 import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Docker.GlobalDB
+import           Stack.Setup (ensureDockerStackExe)
+import           Stack.Storage (loadDockerImageExeCache,saveDockerImageExeCache)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
 import qualified System.FilePath as FP
-import           System.IO (stderr,stdin,stdout)
+import           System.IO (stderr,stdin)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
-import           System.Process.PagerEditor (editByteString)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 import           RIO.Process
-import           Text.Printf (printf)
 
 #ifndef WINDOWS
 import           System.Posix.Signals
@@ -111,26 +99,22 @@ getCmdArgs docker imageInfo isRemoteDocker = do
     case dockerStackExe (configDocker config) of
         Just DockerStackExeHost
           | configPlatform config == dockerContainerPlatform -> do
-              exePath <- liftIO getExecutablePath
+              exePath <- resolveFile' =<< liftIO getExecutablePath
               cmdArgs args exePath
           | otherwise -> throwIO UnsupportedStackExeHostPlatformException
         Just DockerStackExeImage -> do
             progName <- liftIO getProgName
             return (FP.takeBaseName progName, args, [], [])
         Just (DockerStackExePath path) -> do
-            exePath <- liftIO $ canonicalizePath (toFilePath path)
-            cmdArgs args exePath
+            cmdArgs args path
         Just DockerStackExeDownload -> exeDownload args
         Nothing
           | configPlatform config == dockerContainerPlatform -> do
               (exePath,exeTimestamp,misCompatible) <-
-                  liftIO $
-                  do exePath <- liftIO getExecutablePath
-                     exeTimestamp <- resolveFile' exePath >>= getModificationTime
+                  do exePath <- resolveFile' =<< liftIO getExecutablePath
+                     exeTimestamp <- getModificationTime exePath
                      isKnown <-
-                         liftIO $
-                         getDockerImageExe
-                             config
+                         loadDockerImageExeCache
                              (iiId imageInfo)
                              exePath
                              exeTimestamp
@@ -145,8 +129,8 @@ getCmdArgs docker imageInfo isRemoteDocker = do
                               "docker"
                               [ "run"
                               , "-v"
-                              , exePath ++ ":" ++ "/tmp/stack"
-                              , iiId imageInfo
+                              , toFilePath exePath ++ ":" ++ "/tmp/stack"
+                              , T.unpack (iiId imageInfo)
                               , "/tmp/stack"
                               , "--version"]
                               sinkNull
@@ -156,13 +140,11 @@ getCmdArgs docker imageInfo isRemoteDocker = do
                                   Left (ProcessExitedUnsuccessfully _ _) ->
                                       False
                                   Right _ -> True
-                      liftIO $
-                          setDockerImageExe
-                              config
-                              (iiId imageInfo)
-                              exePath
-                              exeTimestamp
-                              compatible
+                      saveDockerImageExeCache
+                          (iiId imageInfo)
+                          exePath
+                          exeTimestamp
+                          compatible
                       if compatible
                           then cmdArgs args exePath
                           else exeDownload args
@@ -170,10 +152,11 @@ getCmdArgs docker imageInfo isRemoteDocker = do
   where
     exeDownload args = do
         exePath <- ensureDockerStackExe dockerContainerPlatform
-        cmdArgs args (toFilePath exePath)
+        cmdArgs args exePath
     cmdArgs args exePath = do
-        let mountPath = hostBinDir FP.</> FP.takeBaseName exePath
-        return (mountPath, args, [], [Mount exePath mountPath])
+        exeBase <- exePath -<.> ""
+        let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
+        return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 
 -- | Error if running in a container.
 preventInContainer :: MonadIO m => m () -> m ()
@@ -194,7 +177,7 @@ runContainerAndExit = do
        <$> getEnvironment
        <*> hIsTerminalDeviceOrMinTTY stdin
        <*> hIsTerminalDeviceOrMinTTY stderr
-       <*> (parseAbsDir =<< getHomeDirectory)
+       <*> getHomeDir
      isStdoutTerminal <- view terminalL
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
@@ -234,21 +217,17 @@ runContainerAndExit = do
                          -- This is fixed in Docker 1.9.1, but will leave the workaround
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
-     hostBinDirPath <- parseAbsDir hostBinDir
      let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
      when (isNothing mpath) $ do
        logWarn "The Docker image does not set the PATH env var"
        logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
      newPathEnv <- either throwM return $ augmentPath
-                      ( toFilePath <$>
-                      [ hostBinDirPath
-                      , sandboxHomeDir </> relDirDotLocal </> relDirBin])
+                      [ hostBinDir
+                      , toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
                       mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
-     liftIO
-       (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ ensureDir [sandboxHomeDir, stackRoot])
+     liftIO $ mapM_ ensureDir [sandboxHomeDir, stackRoot]
      -- Since $HOME is now mounted in the same place in the container we can
      -- just symlink $HOME/.ssh to the right place for the stack docker user
      let sshDir = homeDir </> sshRelDir
@@ -345,238 +324,6 @@ runContainerAndExit = do
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
     sshRelDir = relDirDotSsh
 
--- | Clean-up old docker images and containers.
-cleanup :: HasConfig env => CleanupOpts -> RIO env ()
-cleanup opts = do
-     config <- view configL
-     let docker = configDocker config
-     checkDockerVersion docker
-     imagesOut <- readDockerProcess ["images","--no-trunc","-f","dangling=false"]
-     danglingImagesOut <- readDockerProcess ["images","--no-trunc","-f","dangling=true"]
-     runningContainersOut <- readDockerProcess ["ps","-a","--no-trunc","-f","status=running"]
-     restartingContainersOut <- readDockerProcess ["ps","-a","--no-trunc","-f","status=restarting"]
-     exitedContainersOut <- readDockerProcess ["ps","-a","--no-trunc","-f","status=exited"]
-     pausedContainersOut <- readDockerProcess ["ps","-a","--no-trunc","-f","status=paused"]
-     let imageRepos = parseImagesOut imagesOut
-         danglingImageHashes = Map.keys (parseImagesOut danglingImagesOut)
-         runningContainers = parseContainersOut runningContainersOut ++
-                             parseContainersOut restartingContainersOut
-         stoppedContainers = parseContainersOut exitedContainersOut ++
-                             parseContainersOut pausedContainersOut
-     inspectMap <- inspects (Map.keys imageRepos ++
-                             danglingImageHashes ++
-                             map fst stoppedContainers ++
-                             map fst runningContainers)
-     (imagesLastUsed,curTime) <-
-       liftIO ((,) <$> getDockerImagesLastUsed config
-                   <*> getZonedTime)
-     let planWriter = buildPlan curTime
-                                imagesLastUsed
-                                imageRepos
-                                danglingImageHashes
-                                stoppedContainers
-                                runningContainers
-                                inspectMap
-         plan = toLazyByteString (execWriter planWriter)
-     plan' <- case dcAction opts of
-                CleanupInteractive ->
-                  liftIO (editByteString (intercalate "-" [stackProgName
-                                                          ,dockerCmdName
-                                                          ,dockerCleanupCmdName
-                                                          ,"plan"])
-                                         plan)
-                CleanupImmediate -> return plan
-                CleanupDryRun -> do liftIO (LBS.hPut stdout plan)
-                                    return LBS.empty
-     mapM_ performPlanLine
-           (reverse (filter filterPlanLine (lines (LBS.unpack plan'))))
-     allImageHashesOut <- readDockerProcess ["images","-aq","--no-trunc"]
-     liftIO (pruneDockerImagesLastUsed config (lines (decodeUtf8 allImageHashesOut)))
-  where
-    filterPlanLine line =
-      case line of
-        c:_ | isSpace c -> False
-        _ -> True
-    performPlanLine line =
-      case filter (not . null) (words (takeWhile (/= '#') line)) of
-        [] -> return ()
-        (c:_):t:v:_ ->
-          do args <- if | toUpper c == 'R' && t == imageStr ->
-                            do logInfo $
-                                 "Removing image: '" <>
-                                 fromString v <>
-                                 "'"
-                               return ["rmi",v]
-                        | toUpper c == 'R' && t == containerStr ->
-                            do logInfo $
-                                 "Removing container: '" <>
-                                 fromString v <>
-                                 "'"
-                               return ["rm","-f",v]
-                        | otherwise -> throwM (InvalidCleanupCommandException line)
-             e <- try (readDockerProcess args)
-             case e of
-               Left ex ->
-                 logError $
-                   "Could not remove: '" <>
-                   fromString v <>
-                   "': " <>
-                   displayShow (ex :: ExitCodeException)
-               Right _ -> return ()
-        _ -> throwM (InvalidCleanupCommandException line)
-    parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
-      where parseImageRepo :: String -> (String, [String])
-            parseImageRepo line =
-              case words line of
-                repo:tag:hash:_
-                  | repo == "<none>" -> (hash,[])
-                  | tag == "<none>" -> (hash,[repo])
-                  | otherwise -> (hash,[repo ++ ":" ++ tag])
-                _ -> impureThrow (InvalidImagesOutputException line)
-    parseContainersOut = map parseContainer . drop 1 . lines . decodeUtf8
-      where parseContainer line =
-              case words line of
-                hash:image:rest | last:_ <- reverse rest -> (hash,(image,last))
-                _ -> impureThrow (InvalidPSOutputException line)
-    buildPlan curTime
-              imagesLastUsed
-              imageRepos
-              danglingImageHashes
-              stoppedContainers
-              runningContainers
-              inspectMap =
-      do case dcAction opts of
-           CleanupInteractive ->
-             do buildStrLn
-                  (concat
-                     ["# STACK DOCKER CLEANUP PLAN"
-                     ,"\n#"
-                     ,"\n# When you leave the editor, the lines in this plan will be processed."
-                     ,"\n#"
-                     ,"\n# Lines that begin with 'R' denote an image or container that will be."
-                     ,"\n# removed.  You may change the first character to/from 'R' to remove/keep"
-                     ,"\n# and image or container that would otherwise be kept/removed."
-                     ,"\n#"
-                     ,"\n# To cancel the cleanup, delete all lines in this file."
-                     ,"\n#"
-                     ,"\n# By default, the following images/containers will be removed:"
-                     ,"\n#"])
-                buildDefault dcRemoveKnownImagesLastUsedDaysAgo "Known images last used"
-                buildDefault dcRemoveUnknownImagesCreatedDaysAgo "Unknown images created"
-                buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
-                buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
-                buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
-                buildStrLn
-                  (concat
-                     ["#"
-                     ,"\n# The default plan can be adjusted using command-line arguments."
-                     ,"\n# Run '" ++ unwords [stackProgName, dockerCmdName, dockerCleanupCmdName] ++
-                      " --help' for details."
-                     ,"\n#"])
-           _ -> buildStrLn
-                  (unlines
-                    ["# Lines that begin with 'R' denote an image or container that will be."
-                    ,"# removed."])
-         buildSection "KNOWN IMAGES (pulled/used by stack)"
-                      imagesLastUsed
-                      buildKnownImage
-         buildSection "UNKNOWN IMAGES (not managed by stack)"
-                      (sortCreated (Map.toList (foldl' (\m (h,_) -> Map.delete h m)
-                                                       imageRepos
-                                                       imagesLastUsed)))
-                      buildUnknownImage
-         buildSection "DANGLING IMAGES (no named references and not depended on by other images)"
-                      (sortCreated (map (,()) danglingImageHashes))
-                      buildDanglingImage
-         buildSection "STOPPED CONTAINERS"
-                      (sortCreated stoppedContainers)
-                      (buildContainer (dcRemoveStoppedContainersCreatedDaysAgo opts))
-         buildSection "RUNNING CONTAINERS"
-                      (sortCreated runningContainers)
-                      (buildContainer (dcRemoveRunningContainersCreatedDaysAgo opts))
-      where
-        buildDefault accessor description =
-          case accessor opts of
-            Just days -> buildStrLn ("#   - " ++ description ++ " at least " ++ showDays days ++ ".")
-            Nothing -> return ()
-        sortCreated =
-            sortWith (\(_,_,x) -> Down x) .
-             mapMaybe (\(h,r) ->
-                case Map.lookup h inspectMap of
-                    Nothing -> Nothing
-                    Just ii -> Just (h,r,iiCreated ii))
-        buildSection sectionHead items itemBuilder =
-          do let (anyWrote,b) = runWriter (forM items itemBuilder)
-             when (or anyWrote) $
-                do buildSectionHead sectionHead
-                   tell b
-        buildKnownImage (imageHash,lastUsedProjects) =
-          case Map.lookup imageHash imageRepos of
-            Just repos@(_:_) ->
-              do case lastUsedProjects of
-                   (l,_):_ -> forM_ repos (buildImageTime (dcRemoveKnownImagesLastUsedDaysAgo opts) l)
-                   _ -> forM_ repos buildKeepImage
-                 forM_ lastUsedProjects buildProject
-                 buildInspect imageHash
-                 return True
-            _ -> return False
-        buildUnknownImage (hash, repos, created) =
-          case repos of
-            [] -> return False
-            _ -> do forM_ repos (buildImageTime (dcRemoveUnknownImagesCreatedDaysAgo opts) created)
-                    buildInspect hash
-                    return True
-        buildDanglingImage (hash, (), created) =
-          do buildImageTime (dcRemoveDanglingImagesCreatedDaysAgo opts) created hash
-             buildInspect hash
-             return True
-        buildContainer removeAge (hash,(image,name),created) =
-          do let disp = name ++ " (image: " ++ image ++ ")"
-             buildTime containerStr removeAge created disp
-             buildInspect hash
-             return True
-        buildProject (lastUsedTime, projectPath) =
-          buildInfo ("Last used " ++
-                     showDaysAgo lastUsedTime ++
-                     " in " ++
-                     projectPath)
-        buildInspect hash =
-          case Map.lookup hash inspectMap of
-            Just Inspect{iiCreated,iiVirtualSize} ->
-              buildInfo ("Created " ++
-                         showDaysAgo iiCreated ++
-                         maybe ""
-                               (\s -> " (size: " ++
-                                      printf "%g" (fromIntegral s / 1024.0 / 1024.0 :: Float) ++
-                                      "M)")
-                               iiVirtualSize)
-            Nothing -> return ()
-        showDays days =
-          case days of
-            0 -> "today"
-            1 -> "yesterday"
-            n -> show n ++ " days ago"
-        showDaysAgo oldTime = showDays (daysAgo oldTime)
-        daysAgo oldTime =
-          let ZonedTime (LocalTime today _) zone = curTime
-              LocalTime oldDay _ = utcToLocalTime zone oldTime
-          in diffDays today oldDay
-        buildImageTime = buildTime imageStr
-        buildTime t removeAge time disp =
-          case removeAge of
-            Just d | daysAgo time >= d -> buildStrLn ("R " ++ t ++ " " ++ disp)
-            _ -> buildKeep t disp
-        buildKeep t d = buildStrLn ("  " ++ t ++ " " ++ d)
-        buildKeepImage = buildKeep imageStr
-        buildSectionHead s = buildStrLn ("\n#\n# " ++ s ++ "\n#\n")
-        buildInfo = buildStrLn . ("        # " ++)
-        buildStrLn l = do buildStr l
-                          tell (charUtf8 '\n')
-        buildStr = tell . stringUtf8
-
-    imageStr = "image"
-    containerStr = "container"
-
 -- | Inspect Docker image or container.
 inspect :: (HasProcessContext env, HasLogFunc env)
         => String -> RIO env (Maybe Inspect)
@@ -589,7 +336,7 @@ inspect image =
 
 -- | Inspect multiple Docker images and/or containers.
 inspects :: (HasProcessContext env, HasLogFunc env)
-         => [String] -> RIO env (Map String Inspect)
+         => [String] -> RIO env (Map Text Inspect)
 inspects [] = return Map.empty
 inspects images =
   do maybeInspectOut <-
@@ -797,6 +544,8 @@ homeDirName :: Path Rel Dir
 homeDirName = relDirUnderHome
 
 -- | Directory where 'stack' executable is bind-mounted in Docker container
+-- This refers to a path in the Linux *container*, and so should remain a
+-- 'FilePath' (not 'Path Abs Dir') so that it works when the host runs Windows.
 hostBinDir :: FilePath
 hostBinDir = "/opt/host/bin"
 
@@ -815,27 +564,11 @@ getProjectRoot = do
 oldSandboxIdEnvVar :: String
 oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
 
--- | Options for 'cleanup'.
-data CleanupOpts = CleanupOpts
-  { dcAction                                :: !CleanupAction
-  , dcRemoveKnownImagesLastUsedDaysAgo      :: !(Maybe Integer)
-  , dcRemoveUnknownImagesCreatedDaysAgo     :: !(Maybe Integer)
-  , dcRemoveDanglingImagesCreatedDaysAgo    :: !(Maybe Integer)
-  , dcRemoveStoppedContainersCreatedDaysAgo :: !(Maybe Integer)
-  , dcRemoveRunningContainersCreatedDaysAgo :: !(Maybe Integer) }
-  deriving (Show)
-
--- | Cleanup action.
-data CleanupAction = CleanupInteractive
-                   | CleanupImmediate
-                   | CleanupDryRun
-  deriving (Show)
-
 -- | Parsed result of @docker inspect@.
 data Inspect = Inspect
   {iiConfig      :: ImageConfig
   ,iiCreated     :: UTCTime
-  ,iiId          :: String
+  ,iiId          :: Text
   ,iiVirtualSize :: Maybe Integer}
   deriving (Show)
 

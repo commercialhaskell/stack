@@ -35,7 +35,7 @@ import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
-import System.Process.PagerEditor (pageText)
+import System.Process.Pager (pageText)
 import System.Directory (listDirectory)
 
 data LsView

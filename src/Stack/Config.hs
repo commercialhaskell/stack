@@ -258,7 +258,7 @@ configFromConfigMonoid
 
      let configBuild = buildOptsFromMonoid configMonoidBuildOpts
      configDocker <-
-         dockerOptsFromMonoid (fmap fst mproject) configStackRoot configResolver configMonoidDockerOpts
+         dockerOptsFromMonoid (fmap fst mproject) configResolver configMonoidDockerOpts
      configNix <- nixOptsFromMonoid configMonoidNixOpts os
 
      configSystemGHC <-

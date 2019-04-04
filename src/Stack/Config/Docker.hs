@@ -10,8 +10,6 @@ import           Data.List (find)
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
 import           Distribution.Version (simplifyVersionRange)
-import           Path
-import           Stack.Constants
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -47,11 +45,10 @@ addDefaultTag base mproject maresolver = do
 dockerOptsFromMonoid
     :: MonadThrow m
     => Maybe Project
-    -> Path Abs Dir
     -> Maybe AbstractResolver
     -> DockerOptsMonoid
     -> m DockerOpts
-dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
+dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
     let dockerImage =
           case getFirst dockerMonoidRepoOrImage of
             Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
@@ -79,7 +76,6 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
         dockerSetUser = getFirst dockerMonoidSetUser
         dockerRequireDockerVersion =
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-        dockerDatabasePath = fromFirst (stackRoot </> relFileDockerDb) dockerMonoidDatabasePath
         dockerStackExe = getFirst dockerMonoidStackExe
 
     return DockerOpts{..}
@@ -91,8 +87,6 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
 data StackDockerConfigException
     = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
     -- ^ Only LTS resolvers are supported for default image tag.
-    | InvalidDatabasePathException SomeException
-    -- ^ Invalid global database path.
     deriving (Typeable)
 
 -- | Exception instance for StackDockerConfigException.
@@ -110,7 +104,6 @@ instance Show StackDockerConfigException where
             , "\nUse an LTS resolver, or set the '"
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
-    show (InvalidDatabasePathException ex) = "Invalid database path: " ++ show ex
 
 -- | Parse an LTS major and minor number from a snapshot URL.
 --

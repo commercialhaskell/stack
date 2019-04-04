@@ -81,7 +81,6 @@ module Stack.Constants
     ,relDirLocal
     ,relDirUsr
     ,relDirInclude
-    ,relFileDockerDb
     ,relFileIndexHtml
     ,relDirAll
     ,relFilePackageCache
@@ -470,9 +469,6 @@ relDirUsr = $(mkRelDir "usr")
 
 relDirInclude :: Path Rel Dir
 relDirInclude = $(mkRelDir "include")
-
-relFileDockerDb :: Path Rel File
-relFileDockerDb = $(mkRelFile "docker.db")
 
 relFileIndexHtml :: Path Rel File
 relFileIndexHtml = $(mkRelFile "index.html")

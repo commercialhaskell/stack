@@ -119,27 +119,6 @@ enabled.
 `stack docker pull` pulls an image from the Docker registry for the first time,
 or updates the image by pulling the latest version.
 
-### cleanup - Clean up old images and containers
-
-Docker images can take up quite a lot of disk space, and it's easy for them to
-build up if you switch between projects or your projects update their images.
-This sub-command will help to remove old images and containers.
-
-By default, `stack docker cleanup` will bring up an editor showing the images
-and containers on your system, with any stack images that haven't been used
-in the last seven days marked for removal.  You can add or remove the `R` in
-the left-most column to flag or unflag an image/container for removal.  When
-you save the file and quit the text editor, those images marked for removal
-will be deleted from your system.  If you wish to abort the cleanup, delete
-all the lines from your editor.
-
-If you use Docker for purposes other than stack, you may have other images on
-your system as well.  These will also appear in a separate section, but they
-will not be marked for removal by default.
-
-Run `stack docker cleanup --help` to see additional options to customize its
-behaviour.
-
 ### reset - Reset the Docker "sandbox"
 
 In order to preserve the contents of the in-container home directory between
@@ -236,12 +215,6 @@ otherwise noted.
       env:
         - "FOO=BAR"
         - "BAR=BAZ QUUX"
-
-      # Location of database used to track image usage, which `stack docker cleanup`
-      # uses to determine which images should be kept.  On shared systems, it may
-      # be useful to override this in the global configuration file so that
-      # all users share a single database.
-      database-path: "~/.stack/docker.db"
 
       # Location of a Docker container-compatible 'stack' executable with the
       # matching version. This executable must be built on linux-x86_64 and
