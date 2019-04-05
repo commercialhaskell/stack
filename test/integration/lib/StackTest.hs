@@ -92,7 +92,7 @@ replGetLine = fmap replStdout ask >>= liftIO . hGetLine
 replGetChar :: Repl Char
 replGetChar = fmap replStdout ask >>= liftIO . hGetChar
 
-runRepl :: FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
+runRepl :: HasCallStack => FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
 runRepl cmd args actions = do
     logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Just rStdin, Just rStdout, Just rStderr, ph) <-
@@ -114,7 +114,7 @@ runRepl cmd args actions = do
     runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
     waitForProcess ph
 
-repl :: [String] -> Repl () -> IO ()
+repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
     stackExe' <- stackExe
     ec <- runRepl stackExe' ("repl":args) action
@@ -123,7 +123,7 @@ repl args action = do
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
 
-stackStderr :: [String] -> IO (ExitCode, String)
+stackStderr :: HasCallStack => [String] -> IO (ExitCode, String)
 stackStderr args = do
     stackExe' <- stackExe
     logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
@@ -133,7 +133,7 @@ stackStderr args = do
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.
-stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
+stackCheckStderr :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
     (ec, err) <- stackStderr args
     if ec /= ExitSuccess
@@ -142,17 +142,17 @@ stackCheckStderr args check = do
 
 -- | Same as 'stackCheckStderr', but ensures that the Stack process
 -- fails.
-stackErrStderr :: [String] -> (String -> IO ()) -> IO ()
+stackErrStderr :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackErrStderr args check = do
     (ec, err) <- stackStderr args
     if ec == ExitSuccess
         then error "Stack process succeeded, but it shouldn't"
         else check err
 
-runEx :: FilePath -> String -> IO (ExitCode, String, String)
+runEx :: HasCallStack => FilePath -> String -> IO (ExitCode, String, String)
 runEx cmd args = runEx' cmd $ words args
 
-runEx' :: FilePath -> [String] -> IO (ExitCode, String, String)
+runEx' :: HasCallStack => FilePath -> [String] -> IO (ExitCode, String, String)
 runEx' cmd args = do
     logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (ec, out, err) <- readProcessWithExitCode cmd args ""
@@ -165,7 +165,7 @@ runEx' cmd args = do
 --
 -- Take care with newlines; if the output includes a newline character that
 -- should not be there, use 'Data.List.Extra.trimEnd' to remove it.
-stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
+stackCheckStdout :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
     stackExe' <- stackExe
     (ec, out, _) <- runEx' stackExe' args
@@ -173,7 +173,7 @@ stackCheckStdout args check = do
         then error $ "Exited with exit code: " ++ show ec
         else check out
 
-doesNotExist :: FilePath -> IO ()
+doesNotExist :: HasCallStack => FilePath -> IO ()
 doesNotExist fp = do
     logInfo $ "doesNotExist " ++ fp
     exists <- doesFileOrDirExist fp
@@ -181,7 +181,7 @@ doesNotExist fp = do
       (Right msg) -> error msg
       (Left _) -> return ()
 
-doesExist :: FilePath -> IO ()
+doesExist :: HasCallStack => FilePath -> IO ()
 doesExist fp = do
     logInfo $ "doesExist " ++ fp
     exists <- doesFileOrDirExist fp
@@ -189,7 +189,7 @@ doesExist fp = do
       (Right _) -> return ()
       (Left _) -> error "No file or directory exists"
 
-doesFileOrDirExist :: FilePath -> IO (Either () String)
+doesFileOrDirExist :: HasCallStack => FilePath -> IO (Either () String)
 doesFileOrDirExist fp = do
     isFile <- doesFileExist fp
     if isFile
@@ -200,12 +200,12 @@ doesFileOrDirExist fp = do
                 then return (Right ("Directory exists: " ++ fp))
                 else return (Left ())
 
-copy :: FilePath -> FilePath -> IO ()
+copy :: HasCallStack => FilePath -> FilePath -> IO ()
 copy src dest = do
     logInfo ("Copy " ++ show src ++ " to " ++ show dest)
     System.Directory.copyFile src dest
 
-fileContentsMatch :: FilePath -> FilePath -> IO ()
+fileContentsMatch :: HasCallStack => FilePath -> FilePath -> IO ()
 fileContentsMatch f1 f2 = do
     doesExist f1
     doesExist f2
@@ -259,21 +259,21 @@ defaultResolverArg :: String
 defaultResolverArg = "--resolver=lts-11.22"
 
 -- | Remove a file and ignore any warnings about missing files.
-removeFileIgnore :: FilePath -> IO ()
+removeFileIgnore :: HasCallStack => FilePath -> IO ()
 removeFileIgnore fp = removeFile fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
 
 -- | Remove a directory and ignore any warnings about missing files.
-removeDirIgnore :: FilePath -> IO ()
+removeDirIgnore :: HasCallStack => FilePath -> IO ()
 removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
 
 -- | Changes working directory to Stack source directory
-withSourceDirectory :: IO () -> IO ()
+withSourceDirectory :: HasCallStack => IO () -> IO ()
 withSourceDirectory action = do
   dir <- stackSrc
   currentDirectory <- getCurrentDirectory
