@@ -11,7 +11,6 @@ import Curator.Types
 import Path
 import Path.IO
 import RIO
-import RIO.FilePath (dropExtension)
 import RIO.Process
 import RIO.Time
 
@@ -39,13 +38,13 @@ uploadGithub target = do
     upload checkoutSnapshotsRepo snapshotFilename
   where
     upload checkout srcFilename = do
-        (git, snapshotFile) <- checkout target
+        (git, snapshotFile, snapshotName) <- checkout target
 
         createDirIfMissing True $ parent snapshotFile
         runConduitRes $ sourceFile srcFilename .| sinkFile (toFilePath snapshotFile)
 
         void $ git ["add", toFilePath snapshotFile]
-        void $ git ["commit", "-m", "Checking in " ++ (dropExtension $ toFilePath $ filename snapshotFile)]
+        void $ git ["commit", "-m", "Checking in " ++ snapshotName]
         void $ git ["push", "origin", "HEAD:master"]
 
 checkoutSnapshotsRepo ::
@@ -56,7 +55,7 @@ checkoutSnapshotsRepo ::
        , MonadThrow m
        )
     => Target
-    -> m ([String] -> m (), Path Abs File)
+    -> m ([String] -> m (), Path Abs File, String)
 checkoutSnapshotsRepo t = checkoutRepo t dir url
   where
     url = "git@github.com:commercialhaskell/stackage-next"
@@ -70,7 +69,7 @@ checkoutConstraintsRepo ::
        , MonadThrow m
        )
     => Target
-    -> m ([String] -> m (), Path Abs File)
+    -> m ([String] -> m (), Path Abs File, String)
 checkoutConstraintsRepo t = checkoutRepo t dir url
   where
     url = "git@github.com:commercialhaskell/stackage-constraints-next"
@@ -86,7 +85,7 @@ checkoutRepo ::
     => Target
     -> Path Rel Dir
     -> String
-    -> m ([String] -> m (), Path Abs File)
+    -> m ([String] -> m (), Path Abs File, String)
 checkoutRepo target dirName repoUrl = do
     root <- fmap (</> $(mkRelDir "curator")) $ getAppUserDataDir "stackage"
 
@@ -99,19 +98,23 @@ checkoutRepo target dirName repoUrl = do
 
         git = runIn repoDir "git"
 
-    relSnapshotPath <- case target of
+    (relSnapshotPath, snapshotName) <- case target of
         TargetNightly d -> do
             let (year, month, day) = toGregorian d
             year' <- parseRelDir (show year)
             month' <- parseRelDir (show month)
             day' <- parseRelFile (show day)
             fname <- day' <.> "yaml"
-            pure $ $(mkRelDir "nightly") </> year' </> month' </> fname
+            pure ( $(mkRelDir "nightly") </> year' </> month' </> fname
+                 , "nightly-" <> show year <> "-" <> show month <> "-" <> show day
+                 )
         TargetLts x y -> do
             major <- parseRelDir (show x)
             minor <- parseRelFile (show y)
             fname <- minor <.> "yaml"
-            pure $ $(mkRelDir "lts") </> major </> fname
+            pure ( $(mkRelDir "lts") </> major </> fname
+                 , "lts-" <> show x <> "-" <> show y
+                 )
 
     let destSnapshotFile = repoDir </> relSnapshotPath
 
@@ -127,4 +130,4 @@ checkoutRepo target dirName repoUrl = do
     whenM (liftIO $ doesFileExist destSnapshotFile)
         $ error $ "File already exists: " ++ toFilePath destSnapshotFile
 
-    return (git, destSnapshotFile)
+    return (git, destSnapshotFile, snapshotName)
