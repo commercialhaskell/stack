@@ -55,7 +55,7 @@ uploadDocs input' name bucket = do
         inner = do
           let threads = 16
               size = threads * 2
-          queue <- liftIO $ newTBQueueIO size
+          queue <- liftIO $ newTBQueueIO (fromIntegral size)
           isOpenVar <- liftIO $ newTVarIO True
           let readIO' = liftIO $ atomically $
                   (Just <$> readTBQueue queue) <|>
