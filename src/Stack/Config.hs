@@ -36,7 +36,6 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
-import           Data.ByteString.Builder (toLazyByteString)
 import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
@@ -53,7 +52,6 @@ import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~))
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, strOption, long, help)
-import qualified Pantry.SHA256 as SHA256
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -174,41 +172,18 @@ getLatestResolver = do
                listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
     pure $ fromMaybe (nightlySnapshotLocation (snapshotsNightly snapshots)) mlts
 
--- | Create a 'Config' value when we're not using any local
--- configuration files (e.g., the script command)
-configNoLocalConfig
-    :: HasRunner env
-    => Path Abs Dir -- ^ stack root
-    -> Maybe AbstractResolver
-    -> ConfigMonoid
-    -> [PackageIdentifierRevision]
-    -> (Config -> RIO env a)
-    -> RIO env a
-configNoLocalConfig _ Nothing _ _ _ = throwIO NoResolverWhenUsingNoLocalConfig
-configNoLocalConfig stackRoot (Just resolver) configMonoid extraDeps inner = do
-    userConfigPath <- liftIO $ getFakeConfigPath stackRoot resolver
-    configFromConfigMonoid
-      stackRoot
-      userConfigPath
-      False
-      (Just resolver)
-      (PCNoConfig extraDeps)
-      configMonoid
-      inner
-
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
     :: HasRunner env
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
-    -> Bool -- ^ allow locals?
     -> Maybe AbstractResolver
     -> ProjectConfig (Project, Path Abs File)
     -> ConfigMonoid
     -> (Config -> RIO env a)
     -> RIO env a
 configFromConfigMonoid
-    configStackRoot configUserConfigPath configAllowLocals configResolver
+    configStackRoot configUserConfigPath configResolver
     configProject ConfigMonoid{..} inner = do
      -- If --stack-work is passed, prefer it. Otherwise, if STACK_WORK
      -- is set, use that. If neither, use the default ".stack-work"
@@ -216,8 +191,13 @@ configFromConfigMonoid
      let mproject =
            case configProject of
              PCProject pair -> Just pair
-             PCNoProject -> Nothing
-             PCNoConfig _deps -> Nothing
+             PCGlobalProject -> Nothing
+             PCNoProject _deps -> Nothing
+         configAllowLocals =
+           case configProject of
+             PCProject _ -> True
+             PCGlobalProject -> True
+             PCNoProject _ -> False
      configWorkDir0 <- maybe (return relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
      let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
          configLatestSnapshot = fromFirst
@@ -355,8 +335,16 @@ configFromConfigMonoid
          Nothing -> pure defaultHackageSecurityConfig
          Just [hsc] -> pure hsc
          Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
+     mpantryRoot <- liftIO $ lookupEnv "PANTRY_ROOT"
+     pantryRoot <-
+       case mpantryRoot of
+         Just dir ->
+           case parseAbsDir dir of
+             Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
+             Just x -> pure x
+         Nothing -> pure $ configStackRoot </> relDirPantry
      withPantryConfig
-       (configStackRoot </> relDirPantry)
+       pantryRoot
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
@@ -402,32 +390,26 @@ loadConfig inner = do
     let (mproject', addConfigMonoid) =
           case mproject of
             PCProject (proj, fp, cm) -> (PCProject (proj, fp), (cm:))
-            PCNoProject -> (PCNoProject, id)
-            PCNoConfig deps -> (PCNoConfig deps, id)
-    let loadHelper inner2 = do
-          userConfigPath <- getDefaultUserConfigPath stackRoot
-          extraConfigs0 <- getExtraConfigs userConfigPath >>=
-              mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
-          let extraConfigs =
-                -- non-project config files' existence of a docker section should never default docker
-                -- to enabled, so make it look like they didn't exist
-                map (\c -> c {configMonoidDockerOpts =
-                                  (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
-                    extraConfigs0
+            PCGlobalProject -> (PCGlobalProject, id)
+            PCNoProject deps -> (PCNoProject deps, id)
 
+    userConfigPath <- getDefaultUserConfigPath stackRoot
+    extraConfigs0 <- getExtraConfigs userConfigPath >>=
+        mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
+    let extraConfigs =
+          -- non-project config files' existence of a docker section should never default docker
+          -- to enabled, so make it look like they didn't exist
+          map (\c -> c {configMonoidDockerOpts =
+                            (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}})
+              extraConfigs0
+
+    let withConfig =
           configFromConfigMonoid
             stackRoot
             userConfigPath
-            True -- allow locals
             mresolver
             mproject'
             (mconcat $ configArgs : addConfigMonoid extraConfigs)
-            inner2
-
-    let withConfig = case mproject of
-          PCNoConfig extraDeps -> configNoLocalConfig stackRoot mresolver configArgs extraDeps
-          PCProject _project -> loadHelper
-          PCNoProject -> loadHelper
 
     withConfig $ \config -> do
       unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
@@ -461,10 +443,13 @@ loadBuildConfig = do
       PCProject (project, fp) -> do
           forM_ (projectUserMsg project) (logWarn . fromString)
           return (project, fp)
-      PCNoConfig extraDeps -> do
-          p <- assert (isJust mresolver) (getEmptyProject mresolver extraDeps)
+      PCNoProject extraDeps -> do
+          p <-
+            case mresolver of
+              Nothing -> throwIO NoResolverWhenUsingNoProject
+              Just _ -> getEmptyProject mresolver extraDeps
           return (p, configUserConfigPath config)
-      PCNoProject -> do
+      PCGlobalProject -> do
             logDebug "Run from outside a project, using implicit global project config"
             destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
@@ -752,7 +737,7 @@ getProjectConfig :: HasLogFunc env
                  -- ^ Override stack.yaml
                  -> RIO env (ProjectConfig (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
-getProjectConfig SYLNoProject = return PCNoProject
+getProjectConfig SYLGlobalProject = return PCGlobalProject
 getProjectConfig SYLDefault = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
@@ -761,7 +746,7 @@ getProjectConfig SYLDefault = do
             liftM PCProject $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            maybe PCNoProject PCProject <$> findInParents getStackDotYaml currDir
+            maybe PCGlobalProject PCProject <$> findInParents getStackDotYaml currDir
   where
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
@@ -771,7 +756,7 @@ getProjectConfig SYLDefault = do
         if exists
             then return $ Just fp
             else return Nothing
-getProjectConfig (SYLNoConfig extraDeps) = return $ PCNoConfig extraDeps
+getProjectConfig (SYLNoProject extraDeps) = return $ PCNoProject extraDeps
 
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
@@ -788,12 +773,12 @@ loadProjectConfig mstackYaml = do
             logDebug $ "Loading project config file " <>
                         fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
             PCProject <$> load fp
-        PCNoProject -> do
+        PCGlobalProject -> do
             logDebug "No project config file found, using defaults."
-            return PCNoProject
-        PCNoConfig extraDeps -> do
+            return PCGlobalProject
+        PCNoProject extraDeps -> do
             logDebug "Ignoring config files"
-            return $ PCNoConfig extraDeps
+            return $ PCNoProject extraDeps
   where
     load fp = do
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
@@ -834,29 +819,6 @@ getDefaultUserConfigPath stackRoot = do
         ensureDir (parent path)
         liftIO $ S.writeFile (toFilePath path) defaultConfigYaml
     return path
-
--- | Get a fake configuration file location, used when doing a "no
--- config" run (the script command).
-getFakeConfigPath
-    :: (MonadIO m, MonadThrow m)
-    => Path Abs Dir -- ^ stack root
-    -> AbstractResolver
-    -> m (Path Abs File)
-getFakeConfigPath stackRoot ar = do
-  asString <-
-    case ar of
-      ARResolver r -> pure $ T.unpack $ SHA256.toHexText $ SHA256.hashLazyBytes $ toLazyByteString $ getUtf8Builder $ display r
-      _ -> throwM $ InvalidResolverForNoLocalConfig $ show ar
-  -- This takeWhile is an ugly hack. We don't actually need this
-  -- path for anything useful. But if we take the raw value for
-  -- a custom snapshot, it will be unparseable in a PATH.
-  -- Therefore, we add in this silly "strip up to :".
-  -- Better would be to defer figuring out this value until
-  -- after we have a fully loaded snapshot with a hash.
-  asDir <- parseRelDir $ takeWhile (/= ':') asString
-  let full = stackRoot </> relDirScript </> asDir </> relFileConfigYaml
-  ensureDir (parent full)
-  return full
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

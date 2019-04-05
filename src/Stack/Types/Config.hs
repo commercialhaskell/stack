@@ -363,8 +363,8 @@ configProjectRoot :: Config -> Maybe (Path Abs Dir)
 configProjectRoot c =
   case configProject c of
     PCProject (_, fp) -> Just $ parent fp
-    PCNoProject -> Nothing
-    PCNoConfig _deps -> Nothing
+    PCGlobalProject -> Nothing
+    PCNoProject _deps -> Nothing
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets
@@ -463,9 +463,10 @@ data StackYamlLoc
     -- ^ Use the standard parent-directory-checking logic
     | SYLOverride !(Path Abs File)
     -- ^ Use a specific stack.yaml file provided
-    | SYLNoConfig ![PackageIdentifierRevision]
-    -- ^ Extra dependencies included in the script command line.
-    | SYLNoProject
+    | SYLNoProject ![PackageIdentifierRevision]
+    -- ^ Do not load up a project, just user configuration. Include
+    -- the given extra dependencies with the resolver.
+    | SYLGlobalProject
     -- ^ Do not look for a project configuration, and use the implicit global.
     deriving Show
 
@@ -478,12 +479,11 @@ data ProjectConfig a
     = PCProject a
     -- ^ Normal run: we want a project, and have one. This comes from
     -- either 'SYLDefault' or 'SYLOverride'.
-    | PCNoProject
+    | PCGlobalProject
     -- ^ No project was found when using 'SYLDefault'. Instead, use
     -- the implicit global.
-    | PCNoConfig ![PackageIdentifierRevision]
-    -- ^ Use a no config run, which explicitly ignores any local
-    -- configuration values. This comes from 'SYLNoConfig'.
+    | PCNoProject ![PackageIdentifierRevision]
+    -- ^ Use a no project run. This comes from 'SYLNoProject'.
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
@@ -1037,8 +1037,7 @@ data ConfigException
   | UserDoesn'tOwnDirectory (Path Abs Dir)
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
-  | NoResolverWhenUsingNoLocalConfig
-  | InvalidResolverForNoLocalConfig String
+  | NoResolverWhenUsingNoProject
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   deriving Typeable
 instance Show ConfigException where
@@ -1142,8 +1141,7 @@ instance Show ConfigException where
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
-    show NoResolverWhenUsingNoLocalConfig = "When using the script command, you must provide a resolver argument"
-    show (InvalidResolverForNoLocalConfig ar) = "The script command requires a specific resolver, you provided " ++ ar
+    show NoResolverWhenUsingNoProject = "When using the script command, you must provide a resolver argument"
     show (DuplicateLocalPackageNames pairs) = concat
         $ "The same package name is used in multiple local packages\n"
         : map go pairs

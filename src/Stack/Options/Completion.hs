@@ -85,8 +85,8 @@ flagCompleter = buildConfigCompleter $ \input -> do
         prjFlags =
           case configProject (bcConfig bconfig) of
             PCProject (p, _) -> projectFlags p
-            PCNoProject -> mempty
-            PCNoConfig _ -> mempty
+            PCGlobalProject -> mempty
+            PCNoProject _ -> mempty
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
             Map.lookup (C.flagName fl) $

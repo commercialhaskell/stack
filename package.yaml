@@ -277,17 +277,6 @@ executables:
       cpp-options: -DHIDE_DEP_VERSIONS
     - condition: flag(supported-build)
       cpp-options: -DSUPPORTED_BUILD
-tests:
-  stack-test:
-    main: Spec.hs
-    source-dirs: src/test
-    ghc-options:
-    - -threaded
-    dependencies:
-    - QuickCheck
-    - hspec
-    - stack
-    - smallcheck
   stack-integration-test:
     main: IntegrationSpec.hs
     source-dirs:
@@ -303,6 +292,17 @@ tests:
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false
+tests:
+  stack-test:
+    main: Spec.hs
+    source-dirs: src/test
+    ghc-options:
+    - -threaded
+    dependencies:
+    - QuickCheck
+    - hspec
+    - stack
+    - smallcheck
 flags:
   static:
     description: Pass -static/-pthread to ghc when linking the stack binary.

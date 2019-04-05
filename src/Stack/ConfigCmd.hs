@@ -66,8 +66,8 @@ cfgCmdSet cmd = do
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
                          PCProject stackYaml -> return stackYaml
-                         PCNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         PCNoConfig _extraDeps -> throwString "config command used when no local configuration available"
+                         PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
