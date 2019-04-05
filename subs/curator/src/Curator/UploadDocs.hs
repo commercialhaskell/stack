@@ -91,12 +91,9 @@ uploadDocs input' name bucket = do
           } 
     runRIO uploadEnv $ runResourceT $ do
         inner
---        ((), _, hoogles) <- inner --  (env', bucket) mempty
         hoogles <- readIORef =<< view (to ueHoogleFiles)
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
-        -- logF <- view logFuncL
-        -- withReaderT _ -- runRIO UploadEnv{ueEnv = env', ueBucket = bucket, ueLogFunc = logFunc} $
         upload' True (name <> "/hoogle/orig.tar") $ sourceLazy lbs
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
@@ -116,16 +113,14 @@ data UploadEnv = UploadEnv
 instance HasLogFunc UploadEnv where
   logFuncL = lens ueLogFunc (\x y -> x { ueLogFunc = y })
 
-upload' :: -- (MonadResource m, MonadReader UploadEnv m) =>
-           Bool -- ^ compress?
+upload' :: Bool -- ^ compress?
         -> Text -- ^ S3 key
         -> ConduitT () ByteString (ResourceT (RIO UploadEnv)) ()
         -> ResourceT (RIO UploadEnv) ()
 upload' toCompress name src = do
     UploadEnv{ueEnv = env, ueBucket = bucket} <- ask
     let loop i = do
-            eres <- -- liftResourceT $
-              tryAny $ runConduit $ src .| upload toCompress env bucket name
+            eres <- tryAny $ runConduit $ src .| upload toCompress env bucket name
             case eres of
                 Left e
                     | i > maxAttempts -> throwIO e
