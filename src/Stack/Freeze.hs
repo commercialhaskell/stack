@@ -27,7 +27,7 @@ freeze (FreezeOpts mode) = do
   case mproject of
     PCProject (p, _) -> doFreeze p mode
     PCGlobalProject -> warn
-    PCNoConfig _ -> warn
+    PCNoProject _ -> warn
 
 doFreeze ::
        (HasProcessContext env, HasLogFunc env, HasPantryConfig env)

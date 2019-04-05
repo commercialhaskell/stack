@@ -178,6 +178,9 @@ Other enhancements:
   packages. See [#2465](https://github.com/commercialhaskell/stack/issues/2465)
 * Store caches in SQLite database instead of files.
 * No longer use "global" Docker image database (`docker.db`).
+* User config files are respected for the script command. See
+  [#3705](https://github.com/commercialhaskell/stack/issues/3705),
+  [#3887](https://github.com/commercialhaskell/stack/issues/3887).
 
 Bug fixes:
 
