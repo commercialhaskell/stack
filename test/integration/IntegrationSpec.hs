@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import           Conduit
@@ -108,7 +109,7 @@ runApp speed inner = do
             { appSimpleApp = simpleApp
             , appRunghc = runghc
             , appLibDir = libdir
-            , appSetupHome = pure ()
+            , appSetupHome = id
             , appTestDirs = testDirs
             }
       runRIO app $ withModifyEnvVars modifyEnvCommon inner
@@ -119,40 +120,31 @@ runApp speed inner = do
           Nothing -> getAppUserDataDirectory "stack"
           Just x -> pure x
 
-      withSystemTempDirectory "stackhome" $ \newHome -> withSystemTempDirectory "stack" $ \newStackRoot -> do
-        logInfo "Initializing/updating the original Pantry store"
-        proc stack ["update"] runProcess_
-        copyTree (origStackRoot </> "pantry") (newStackRoot </> "pantry")
-        let modifyEnv
-                 = Map.insert "HOME" (fromString newHome)
-                 . Map.insert "APPDATA" (fromString newHome)
-                 . Map.insert "STACK_ROOT" (fromString newStackRoot)
-                 . modifyEnvCommon
+      logInfo "Initializing/updating the original Pantry store"
+      proc stack ["update"] runProcess_
 
-            app = App
-              { appSimpleApp = simpleApp
-              , appRunghc = runghc
-              , appLibDir = libdir
-              , appSetupHome = do
-                  newHomeExists <- doesDirectoryExist newHome
-                  when newHomeExists (removeDirectoryRecursive newHome)
-                  createDirectoryIfMissing True newHome
+      pantryRoot <- canonicalizePath $ origStackRoot </> "pantry"
+      let modifyEnv
+               = Map.insert "PANTRY_ROOT" (fromString pantryRoot)
+               . modifyEnvCommon
 
-                  createDirectoryIfMissing True newStackRoot
-                  runConduitRes $
-                    sourceDirectory newStackRoot .| mapM_C (\entry -> do
-                      let name = takeFileName entry
-                      unless (name == "." || name == ".." || name == "pantry") $ do
-                        isFile <- doesFileExist entry
-                        if isFile
-                          then removeFile entry
-                          else removeDirectoryRecursive entry
-                      )
-                  writeFileBinary (newStackRoot </> "config.yaml") "system-ghc: true\ninstall-ghc: false\n"
-              , appTestDirs = testDirs
-              }
+          app = App
+            { appSimpleApp = simpleApp
+            , appRunghc = runghc
+            , appLibDir = libdir
+            , appSetupHome = \inner' -> withSystemTempDirectory "home" $ \newHome -> do
+                let newStackRoot = newHome </> ".stack"
+                createDirectoryIfMissing True newStackRoot
+                let modifyEnv'
+                      = Map.insert "HOME" (fromString newHome)
+                      . Map.insert "APPDATA" (fromString newHome)
+                      . Map.insert "STACK_ROOT" (fromString newStackRoot)
+                writeFileBinary (newStackRoot </> "config.yaml") "system-ghc: true\ninstall-ghc: false\n"
+                withModifyEnvVars modifyEnv' inner'
+            , appTestDirs = testDirs
+            }
 
-        runRIO app $ withModifyEnvVars modifyEnv inner
+      runRIO app $ withModifyEnvVars modifyEnv inner
 
 
 hasTest :: FilePath -> IO Bool
@@ -161,7 +153,7 @@ hasTest dir = doesFileExist $ dir </> "Main.hs"
 data App = App
   { appRunghc :: !FilePath
   , appLibDir :: !FilePath
-  , appSetupHome :: !(RIO App ())
+  , appSetupHome :: !(forall a. RIO App a -> RIO App a)
   , appSimpleApp :: !SimpleApp
   , appTestDirs :: !(Set FilePath)
   }
@@ -172,11 +164,15 @@ instance HasLogFunc App where
 instance HasProcessContext App where
   processContextL = simpleAppL.processContextL
 
+-- | Call 'appSetupHome' on the inner action
+withHome :: RIO App a -> RIO App a
+withHome inner = do
+  app <- ask
+  appSetupHome app inner
+
 test :: FilePath -- ^ test dir
      -> RIO App (Map Text ExitCode)
-test testDir = withDir $ \dir -> do
-    join $ asks appSetupHome
-
+test testDir = withDir $ \dir -> withHome $ do
     runghc <- asks appRunghc
     libDir <- asks appLibDir
     let mainFile = testDir </> "Main.hs"

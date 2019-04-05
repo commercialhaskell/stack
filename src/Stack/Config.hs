@@ -355,8 +355,16 @@ configFromConfigMonoid
          Nothing -> pure defaultHackageSecurityConfig
          Just [hsc] -> pure hsc
          Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
+     mpantryRoot <- liftIO $ lookupEnv "PANTRY_ROOT"
+     pantryRoot <-
+       case mpantryRoot of
+         Just dir ->
+           case parseAbsDir dir of
+             Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
+             Just x -> pure x
+         Nothing -> pure $ configStackRoot </> relDirPantry
      withPantryConfig
-       (configStackRoot </> relDirPantry)
+       pantryRoot
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
