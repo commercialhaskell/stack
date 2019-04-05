@@ -295,9 +295,9 @@ Run:
 
 ## Path
 
-You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.
+You can install stack by copying it anywhere on your PATH environment variable. A good place to install is the same directory where stack itself will install executables. On Windows, that directory is `%APPDATA%\local\bin`, e.g. `c:\Users\Michael\AppData\Roaming\local\bin`. For other systems, it's `$HOME/.local/bin`.
 
-If you don't have that directory in your PATH, you may need to update your PATH (such as by editing .bashrc).
+If you don't have that directory in your PATH, you may need to update your PATH (such as by editing `~/.bashrc`).
 
 If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
