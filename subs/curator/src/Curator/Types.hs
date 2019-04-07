@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Curator.Types
@@ -9,6 +10,7 @@ module Curator.Types
   , Revisions (..)
   , ComponentAction (..)
   , Component (..)
+  , Target (..)
   ) where
 
 import RIO
@@ -17,6 +19,7 @@ import Distribution.Types.VersionRange (VersionRange)
 import Data.Yaml
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
+import RIO.Time
 
 type Maintainer = Text
 
@@ -162,3 +165,9 @@ data Component
   | CompTestSuite
   | CompBenchmark
   deriving Eq
+
+data Target
+    = TargetNightly !Day
+    | TargetLts !Int
+                !Int
+    deriving (Show)

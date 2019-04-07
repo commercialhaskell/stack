@@ -6,11 +6,14 @@ ghc-options:
 
 dependencies:
 - base
-- rio
+- http-client
+- http-client-tls
 - pantry
-- yaml
+- path
 - path-io
+- rio
 - rio-prettyprint
+- yaml
 
 library:
   source-dirs: src
@@ -18,7 +21,22 @@ library:
   - Curator
   dependencies:
   - Cabal
-  - path
+  - amazonka
+  - amazonka-s3
+  - blaze-html
+  - bytestring
+  - conduit
+  - conduit-extra
+  - cryptonite
+  - cryptonite-conduit
+  - html-conduit
+  - memory
+  - mime-types
+  - mtl
+  - resourcet
+  - tar
+  - xml-conduit
+  - xml-types
 
 executables:
   curator:
@@ -26,4 +44,5 @@ executables:
     main: Main.hs
     dependencies:
     - curator
-    - optparse-generic
+    - http-download
+    - optparse-simple
