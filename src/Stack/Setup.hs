@@ -345,7 +345,18 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                                         [ toFilePathNoTrailingSep deps
                                         , ""
                                         ])
-                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir) env
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
+
+                          -- Make sure that any .ghc.environment files
+                          -- are ignored, since we're settting up our
+                          -- own package databases. See
+                          -- https://github.com/commercialhaskell/stack/issues/4706
+                        $ (case cpCompilerVersion compilerPaths of
+                             ACGhc version | version >= mkVersion [8, 4, 4] ->
+                               Map.insert "GHC_ENVIRONMENT" "-"
+                             _ -> id)
+
+                          env
 
                     () <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
@@ -1773,6 +1784,7 @@ removeHaskellEnvVars :: Map Text Text -> Map Text Text
 removeHaskellEnvVars =
     Map.delete "GHCJS_PACKAGE_PATH" .
     Map.delete "GHC_PACKAGE_PATH" .
+    Map.delete "GHC_ENVIRONMENT" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
     Map.delete "HASKELL_DIST_DIR" .
