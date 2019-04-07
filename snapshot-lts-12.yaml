@@ -10,3 +10,7 @@ packages:
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
