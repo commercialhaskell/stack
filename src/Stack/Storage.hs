@@ -130,7 +130,7 @@ withStorage ::
     => ReaderT SqlBackend (RIO env) a
     -> RIO env a
 withStorage inner =
-    SQLite.withStorage inner =<< view (configL . to configStorage)
+    flip SQLite.withStorage_ inner =<< view (configL . to configStorage)
 
 -- | Key used to retrieve configuration or flag cache
 type ConfigCacheKey = Unique ConfigCacheParent

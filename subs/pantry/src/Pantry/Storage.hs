@@ -241,7 +241,7 @@ withStorage
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withStorage action =
-  SQLite.withStorage action =<< view (P.pantryConfigL.to P.pcStorage)
+  flip SQLite.withStorage_ action =<< view (P.pantryConfigL.to P.pcStorage)
 
 getPackageNameId
   :: (HasPantryConfig env, HasLogFunc env)

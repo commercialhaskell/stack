@@ -1,2 +1,6 @@
 resolver: nightly-2018-12-01
 name: snapshot-for-building-stack-with-ghc-8.6.2
+
+packages:
+- persistent-2.9.2@rev:0
+- persistent-sqlite-2.9.3@rev:0

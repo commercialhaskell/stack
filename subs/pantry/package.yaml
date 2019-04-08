@@ -45,9 +45,8 @@ dependencies:
 - cryptonite
 - cryptonite-conduit
 - persistent
-- persistent-sqlite >= 2.8.2
+- persistent-sqlite >= 2.9.3
 - persistent-template
-- resource-pool
 - Cabal >= 2.4
 - path-io
 - rio-orphans
@@ -62,6 +61,7 @@ dependencies:
 - resourcet
 - rio-prettyprint
 - mtl
+- filelock
 
 # FIXME remove when we drop store
 - integer-gmp
