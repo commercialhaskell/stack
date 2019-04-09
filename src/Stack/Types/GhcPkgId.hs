@@ -18,6 +18,7 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.Text
 import qualified Data.Text as T
 import           Database.Persist.Sql (PersistField, PersistFieldSql)
+import           Prelude (Read (..))
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail
@@ -36,6 +37,8 @@ instance NFData GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString
+instance Read GhcPkgId where
+  readsPrec i = map (first (GhcPkgId . T.pack)) . readsPrec i
 
 instance FromJSON GhcPkgId where
   parseJSON = withText "GhcPkgId" $ \t ->

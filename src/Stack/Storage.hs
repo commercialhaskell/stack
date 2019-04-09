@@ -26,23 +26,33 @@ module Stack.Storage
     , savePrecompiledCache
     , loadDockerImageExeCache
     , saveDockerImageExeCache
+    , loadCompilerPaths
+    , saveCompilerPaths
     ) where
 
 import qualified Data.ByteString as S
+import Data.Coerce (coerce)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Database.Persist.Sql (SqlBackend)
 import Database.Persist.Sqlite
 import Database.Persist.TH
+import Distribution.Text (simpleParse, display)
+import Foreign.C.Types (CTime (..))
 import qualified Pantry.SQLite as SQLite
 import Path
+import Path.IO (resolveFile', resolveDir')
+import qualified RIO.FilePath as FP
 import Stack.Prelude hiding (MigrationFailure)
 import Stack.Types.Build
 import Stack.Types.Cache
 import Stack.Types.Compiler
-import Stack.Types.Config (HasConfig, configL, configStorage)
+import Stack.Types.CompilerBuild (CompilerBuild)
+import Stack.Types.Config (HasConfig, configL, configStorage, CompilerPaths (..), GhcPkgExe (..))
 import Stack.Types.GhcPkgId
+import System.Posix.Types (COff (..))
+import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
 
 share [ mkPersist sqlSettings
       , mkDeleteCascade sqlSettings
@@ -114,6 +124,33 @@ DockerImageExeCache
   compatible Bool
   DockerImageExeCacheUnique imageHash exePath exeTimestamp
   deriving Show
+
+CompilerCache
+  actualVersion ActualCompiler
+  arch Text
+
+  -- Include ghc executable size and modified time for sanity checking entries
+  ghcPath FilePath
+  ghcSize Int64
+  ghcModified Int64
+
+  ghcPkgPath FilePath
+  runghcPath FilePath
+  haddockPath FilePath
+
+  cabalVersion Text
+  globalDb FilePath
+  globalDbCacheSize Int64
+  globalDbCacheModified Int64
+  info ByteString
+
+  -- This is the ugliest part of this table, simply storing a Show/Read version of the
+  -- data. We could do a better job with normalized data and proper table structure.
+  -- However, recomputing this value in the future if the data representation changes
+  -- is very cheap, so we'll take the easy way out for now.
+  globalDump Text
+
+  UniqueGhcInfo ghcPath
 |]
 
 -- | Initialize the database.
@@ -412,3 +449,85 @@ updateList recordCons parentFieldCons parentId indexFieldCons old new =
         insertMany_ $
             map (uncurry $ recordCons parentId) $
             Set.toList (Set.difference newSet oldSet)
+
+-- | Load compiler information, if available, and confirm that the
+-- referenced files are unchanged. May throw exceptions!
+loadCompilerPaths
+  :: HasConfig env
+  => Path Abs File -- ^ compiler executable
+  -> CompilerBuild
+  -> Bool -- ^ sandboxed?
+  -> RIO env (Maybe CompilerPaths)
+loadCompilerPaths compiler build sandboxed = do
+  mres <- withStorage $ getBy $ UniqueGhcInfo $ toFilePath compiler
+  for mres $ \(Entity _ CompilerCache {..}) -> do
+    compilerStatus <- liftIO $ getFileStatus $ toFilePath compiler
+    when
+      (compilerCacheGhcSize /= coerce (fileSize compilerStatus) ||
+       compilerCacheGhcModified /= coerce (modificationTime compilerStatus))
+      (throwString "Compiler file metadata mismatch, ignoring cache")
+    globalDbStatus <- liftIO $ getFileStatus $ compilerCacheGlobalDb FP.</> "package.cache"
+    when
+      (compilerCacheGlobalDbCacheSize /= coerce (fileSize globalDbStatus) ||
+       compilerCacheGlobalDbCacheModified /= coerce (modificationTime globalDbStatus))
+      (throwString "Global package cache file metadata mismatch, ignoring cache")
+
+    -- We could use parseAbsFile instead of resolveFile' below to
+    -- bypass some system calls, at the cost of some really wonky
+    -- error messages in case someone screws up their GHC installation
+    pkgexe <- resolveFile' compilerCacheGhcPkgPath
+    runghc <- resolveFile' compilerCacheRunghcPath
+    haddock <- resolveFile' compilerCacheHaddockPath
+    globaldb <- resolveDir' compilerCacheGlobalDb
+
+    cabalVersion <- parseVersionThrowing $ T.unpack compilerCacheCabalVersion
+    globalDump <-
+      case readMaybe $ T.unpack compilerCacheGlobalDump of
+        Nothing -> throwString "Global dump did not parse correctly"
+        Just globalDump -> pure globalDump
+    arch <-
+      case simpleParse $ T.unpack compilerCacheArch of
+        Nothing -> throwString $ "Invalid arch: " ++ show compilerCacheArch
+        Just arch -> pure arch
+
+    pure CompilerPaths
+      { cpCompiler = compiler
+      , cpCompilerVersion = compilerCacheActualVersion
+      , cpArch = arch
+      , cpBuild = build
+      , cpPkg = GhcPkgExe pkgexe
+      , cpInterpreter = runghc
+      , cpHaddock = haddock
+      , cpSandboxed = sandboxed
+      , cpCabalVersion = cabalVersion
+      , cpGlobalDB = globaldb
+      , cpGhcInfo = compilerCacheInfo
+      , cpGlobalDump = globalDump
+      }
+
+-- | Save compiler information. May throw exceptions!
+saveCompilerPaths
+  :: HasConfig env
+  => CompilerPaths
+  -> RIO env ()
+saveCompilerPaths CompilerPaths {..} = withStorage $ do
+  deleteBy $ UniqueGhcInfo $ toFilePath cpCompiler
+  compilerStatus <- liftIO $ getFileStatus $ toFilePath cpCompiler
+  globalDbStatus <- liftIO $ getFileStatus $ toFilePath $ cpGlobalDB </> $(mkRelFile "package.cache")
+  let GhcPkgExe pkgexe = cpPkg
+  insert_ CompilerCache
+    { compilerCacheActualVersion = cpCompilerVersion
+    , compilerCacheGhcPath = toFilePath cpCompiler
+    , compilerCacheGhcSize = coerce $ fileSize compilerStatus
+    , compilerCacheGhcModified = coerce $ modificationTime compilerStatus
+    , compilerCacheGhcPkgPath = toFilePath pkgexe
+    , compilerCacheRunghcPath = toFilePath cpInterpreter
+    , compilerCacheHaddockPath = toFilePath cpHaddock
+    , compilerCacheCabalVersion = T.pack $ versionString cpCabalVersion
+    , compilerCacheGlobalDb = toFilePath cpGlobalDB
+    , compilerCacheGlobalDbCacheSize = coerce $ fileSize globalDbStatus
+    , compilerCacheGlobalDbCacheModified = coerce $ modificationTime globalDbStatus
+    , compilerCacheInfo = cpGhcInfo
+    , compilerCacheGlobalDump = tshow cpGlobalDump
+    , compilerCacheArch = T.pack $ Distribution.Text.display cpArch
+    }

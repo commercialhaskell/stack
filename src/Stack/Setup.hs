@@ -89,6 +89,7 @@ import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath,
 import              Stack.Prelude hiding (Display (..))
 import              Stack.SourceMap
 import              Stack.Setup.Installed
+import              Stack.Storage (loadCompilerPaths, saveCompilerPaths)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild
@@ -709,13 +710,13 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
     pure (cp, paths)
 
 pathsFromCompiler
-  :: forall env. (HasLogFunc env, HasProcessContext env)
+  :: forall env. HasConfig env
   => WhichCompiler
   -> CompilerBuild
   -> Bool
   -> Path Abs File -- ^ executable filepath
   -> RIO env CompilerPaths
-pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
+pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny onErr $ do
     let dir = toFilePath $ parent compiler
         suffixNoVersion
           | osIsWindows = ".exe"
@@ -818,6 +819,22 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
       }
   where
     onErr = throwIO . InvalidGhcAt compiler
+
+    withCache inner = do
+      eres <- tryAny $ loadCompilerPaths compiler compilerBuild isSandboxed
+      mres <-
+        case eres of
+          Left e -> do
+            logWarn $ "Trouble loading CompilerPaths cache: " <> displayShow e
+            pure Nothing
+          Right x -> pure x
+      case mres of
+        Just cp -> cp <$ logDebug "Loaded compiler information from cache"
+        Nothing -> do
+          cp <- inner
+          saveCompilerPaths cp `catchAny` \e ->
+            logWarn ("Unable to save CompilerPaths cache: " <> displayShow e)
+          pure cp
 
 buildGhcFromSource :: forall env.
    ( HasTerm env
