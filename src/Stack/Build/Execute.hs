@@ -2080,9 +2080,8 @@ extraBuildOptions :: (HasEnvConfig env, HasRunner env)
                   => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
     colorOpt <- appropriateGhcColorFlag
-    let ddumpOpts = " -keep-hi-files"
-        optsFlag = compilerOptionsCabalFlag wc
-        baseOpts = ddumpOpts ++ maybe "" (" " ++) colorOpt
+    let optsFlag = compilerOptionsCabalFlag wc
+        baseOpts = maybe "" (" " ++) colorOpt
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
