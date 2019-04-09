@@ -30,7 +30,7 @@ import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
-import           Stack.Types.Config (HasCompiler (..), CompilerPaths (..))
+import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), getGhcPkgExe)
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
@@ -59,11 +59,11 @@ ghcPkgCmdArgs
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
 ghcPkgCmdArgs cmd mpkgDbs sink = do
+    pkgexe@(GhcPkgExe pkgPath) <- getGhcPkgExe
     case reverse mpkgDbs of
-        (pkgDb:_) -> createDatabase pkgDb -- TODO maybe use some retry logic instead?
+        (pkgDb:_) -> createDatabase pkgexe pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
-    sinkProcessStdout pkg args sink'
+    sinkProcessStdout (toFilePath pkgPath) args sink'
   where
     args = concat
         [ case mpkgDbs of

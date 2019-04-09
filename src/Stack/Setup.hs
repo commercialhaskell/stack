@@ -18,7 +18,6 @@ module Stack.Setup
   ( setupEnv
   , ensureCompiler
   , ensureDockerStackExe
-  , getSystemCompiler
   , getCabalInstallVersion
   , SetupOpts (..)
   , defaultSetupInfoYaml
@@ -160,6 +159,7 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | GHCJSNotBooted
                     | DockerStackExeNotFound Version Text
                     | UnsupportedSetupConfiguration
+                    | InvalidGhcAt (Path Abs File) SomeException
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -213,6 +213,8 @@ instance Show SetupException where
         , "' option to specify a location"]
     show UnsupportedSetupConfiguration =
         "I don't know how to install GHC on your system configuration, please install manually"
+    show (InvalidGhcAt compiler e) =
+        "Found an invalid compiler at " ++ show (toFilePath compiler) ++ ": " ++ displayException e
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: NeedTargets
@@ -255,8 +257,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                     (view envVarsL menv0)
     menv <- mkProcessContext env
 
-    globaldb <- liftIO $ cpGlobalDB' compilerPaths compilerPaths
-
     logDebug "Resolving package entries"
 
     (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
@@ -270,14 +270,12 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
       sourceMapHash <- hashSourceMapData boptsCLI sourceMap
       pure (sourceMap, sourceMapHash)
 
-    cabalVersion <- runRIO compilerPaths cpCabalVersion
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bc
             , envConfigBuildOptsCLI = boptsCLI
             , envConfigSourceMap = sourceMap
             , envConfigSourceMapHash = sourceMapHash
             , envConfigCompilerPaths = compilerPaths
-            , envConfigCabalVersion = cabalVersion
             }
 
     -- extra installation bin directories
@@ -287,11 +285,11 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     localsPath <- either throwM return $ augmentPath (toFilePath <$> mkDirs True) mpath
 
     deps <- runRIO envConfig0 packageDatabaseDeps
-    runWithGHC menv compilerPaths $ createDatabase deps
+    runWithGHC menv compilerPaths $ createDatabase (cpPkg compilerPaths) deps
     localdb <- runRIO envConfig0 packageDatabaseLocal
-    runWithGHC menv compilerPaths $ createDatabase localdb
+    runWithGHC menv compilerPaths $ createDatabase (cpPkg compilerPaths) localdb
     extras <- runReaderT packageDatabaseExtra envConfig0
-    let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
+    let mkGPP locals = mkGhcPackagePath locals localdb deps extras $ cpGlobalDB compilerPaths
 
     distDir <- runReaderT distRelativeDir envConfig0 >>= canonicalizePath
 
@@ -376,7 +374,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         , envConfigSourceMap = sourceMap
         , envConfigSourceMapHash = sourceMapHash
         , envConfigCompilerPaths = compilerPaths
-        , envConfigCabalVersion = cabalVersion
         }
 
 -- | A modified env which we know has an installed compiler on the PATH.
@@ -600,6 +597,7 @@ ensureCompiler sopts = do
     -- Install msys2 on windows, if necessary
     mmsys2Tool <- getMmsys2Tool
 
+    -- FIXME get the actual compiler path right here!
     paths <- do
       -- Add GHC's and MSYS's paths to the config.
       compilerPath <-
@@ -622,56 +620,70 @@ ensureCompiler sopts = do
           $ ensureGhcjsBooted cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
         _ -> pure ()
 
-    let findHelper getName = do
+    let findHelper getName = do -- FIXME remove
           eres <- withProcessContext menv $ findExecutable $ getName $ whichCompiler $ wantedToActual wanted
           case eres of
             Left e -> throwIO e
             Right res -> parseAbsFile res
 
-    -- FIXME this could be much smarter most likely
     compiler <- findHelper $ \case
                                Ghc -> "ghc"
                                Ghcjs -> "ghcjs"
-    pkg <- findHelper $ \case
+    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck compiler
+    pathsFromCompiler (whichCompiler (wantedToActual wanted)) compilerBuild menv needLocal paths compiler
+
+pathsFromCompiler
+  :: (HasLogFunc env, HasProcessContext env)
+  => WhichCompiler
+  -> CompilerBuild
+  -> ProcessContext
+  -> Bool
+  -> ExtraDirs
+  -> Path Abs File -- ^ executable filepath
+  -> RIO env CompilerPaths
+pathsFromCompiler wc compilerBuild menv needLocal paths compiler = handleAny onErr $ withProcessContext menv $ do
+    let findHelper getName = do
+          eres <- findExecutable $ getName wc
+          case eres of
+            Left e -> throwIO e
+            Right res -> parseAbsFile res
+    pkg <- fmap GhcPkgExe $ findHelper $ \case
                                Ghc -> "ghc-pkg"
                                Ghcjs -> "ghcjs-pkg"
-    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck compiler
 
-    config <- view configL
-    let refHelper :: RIO (WithGHC Config) a -> RIO env (CompilerPaths -> IO a)
-        refHelper f = do
-          ref <- newIORef Nothing
-          pure $ \cp -> do
-            mres <- readIORef ref
-            case mres of
-              Just res -> pure res
-              Nothing -> do
-                res <- runRIO (WithGHC cp config) $ withProcessContext menv f
-                writeIORef ref $ Just res
-                pure res
-    cabalPkgVer <- refHelper getCabalPkgVer
-    globaldb <- refHelper getGlobalDB
-    compilerVer <- getCompilerVersion (whichCompiler (wantedToActual wanted)) compiler
+    cabalPkgVer <- getCabalPkgVer pkg
+    compilerVer <- getCompilerVersion wc compiler
 
     env <- ask
-    let refHelperFind f = do
-          ref <- newIORef Nothing
-          pure $ \_ -> do
-            mres <- readIORef ref
-            case mres of
-              Just res -> pure res
-              Nothing -> do
-                res <- runRIO env $ findHelper f
-                writeIORef ref $ Just res
-                pure res
-    interpreter <- refHelperFind
-                 $ \case
+    interpreter <- runRIO env $ findHelper $
+                   \case
                       Ghc -> "runghc"
                       Ghcjs -> "runghcjs"
-    haddock <- refHelperFind
-             $ \case
+    haddock <- runRIO env $ findHelper $
+               \case
                   Ghc -> "haddock"
                   Ghcjs -> "haddock-ghcjs"
+    info <- proc (toFilePath compiler) ["--info"]
+          $ fmap (toStrictBytes . fst) . readProcess_
+
+    eglobaldb <- tryAny $
+      case decodeUtf8' info of
+        Left e -> throwString $ "GHC info is not valid UTF-8: " ++ show e
+        Right text ->
+          case readMaybe $ T.unpack text of
+            Nothing -> throwString "GHC info does not parse as a list of pairs"
+            Just (pairs' :: [(String, String)]) ->
+              case lookup "Global Package DB" pairs' of
+                Nothing -> throwString "Key 'Global Package DB' not found in GHC info"
+                Just db -> parseAbsDir db
+    globaldb <-
+      case eglobaldb of
+        Left e -> do
+          logWarn "Parsing global DB from GHC info failed"
+          logWarn $ displayShow e
+          logWarn "Asking ghc-pkg directly"
+          getGlobalDB pkg
+        Right x -> pure x
     return CompilerPaths
       { cpExtraDirs = paths
       , cpBuild = Just compilerBuild -- FIXME is this always Just? Remove the Maybe?
@@ -679,11 +691,14 @@ ensureCompiler sopts = do
       , cpCompilerVersion = compilerVer
       , cpCompiler = compiler
       , cpPkg = pkg
-      , cpInterpreter' = interpreter
-      , cpHaddock' = haddock
-      , cpCabalVersion' = cabalPkgVer
-      , cpGlobalDB' = globaldb
+      , cpInterpreter = interpreter
+      , cpHaddock = haddock
+      , cpCabalVersion = cabalPkgVer
+      , cpGlobalDB = globaldb
+      , cpGhcInfo = info
       }
+  where
+    onErr = throwIO . InvalidGhcAt compiler
 
 buildGhcFromSource :: forall env.
    ( HasTerm env

@@ -334,7 +334,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
         cabalPkgVer <- view cabalVersionL
-        globalDB <- cpGlobalDB
+        globalDB <- view $ compilerPathsL.to cpGlobalDB
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
@@ -665,7 +665,8 @@ unregisterPackages cv localDB ids = do
                 else " (" <> RIO.display reason <> ")"
     let unregisterSinglePkg select (gid, (ident, reason)) = do
             logReason ident reason
-            unregisterGhcPkgIds localDB $ select ident gid :| []
+            pkg <- getGhcPkgExe
+            unregisterGhcPkgIds pkg localDB $ select ident gid :| []
 
     case cv of
         -- GHC versions >= 8.0.1 support batch unregistering of packages. See
@@ -684,7 +685,8 @@ unregisterPackages cv localDB ids = do
                 let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
                 for_ (chunksOfNE batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    unregisterGhcPkgIds localDB $ fmap (Right . fst) batch
+                    pkg <- getGhcPkgExe
+                    unregisterGhcPkgIds pkg localDB $ fmap (Right . fst) batch
 
         -- GHC versions >= 7.9 support unregistering of packages via their
         -- GhcPkgId.
@@ -855,11 +857,12 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         deleteCaches pkgDir
         announce
         cp <- view compilerPathsL
+        let (GhcPkgExe pkgPath) = cpPkg cp
         let programNames =
               case cpWhich cp of
                 Ghc ->
                   [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
-                  , "--with-ghc-pkg=" ++ toFilePath (cpPkg cp)
+                  , "--with-ghc-pkg=" ++ toFilePath pkgPath
                   ]
                 Ghcjs -> []
         exes <- forM programNames $ \name -> do
@@ -1403,16 +1406,16 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  ghcPkgExe <- view $ compilerPathsL.to cpPkg.to toFilePath
+                  GhcPkgExe ghcPkgExe <- getGhcPkgExe
 
                   -- first unregister everything that needs to be unregistered
                   forM_ allToUnregister $ \packageName -> catchAny
-                      (readProcessNull ghcPkgExe [ "unregister", "--force", packageName])
+                      (readProcessNull (toFilePath ghcPkgExe) [ "unregister", "--force", packageName])
                       (const (return ()))
 
                   -- now, register the cached conf files
                   forM_ allToRegister $ \libpath ->
-                    proc ghcPkgExe [ "register", "--force", toFilePath libpath] readProcess_
+                    proc (toFilePath ghcPkgExe) [ "register", "--force", toFilePath libpath] readProcess_
 
         liftIO $ forM_ exes $ \exe -> do
             ensureDir bindir

@@ -21,7 +21,7 @@ module Stack.SourceMap
     , SnapshotCandidate
     ) where
 
-import Data.ByteString.Builder (byteString, lazyByteString)
+import Data.ByteString.Builder (byteString)
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import Distribution.System (Platform(..))
@@ -238,9 +238,7 @@ pruneGlobals globals deps =
      Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
-getCompilerInfo = do
-    compilerExe <- view $ compilerPathsL.to cpCompiler.to toFilePath
-    lazyByteString . fst <$> proc compilerExe ["--info"] readProcess_
+getCompilerInfo = view $ compilerPathsL.to (byteString . cpGhcInfo)
 
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey

@@ -28,20 +28,22 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types.Build
-import           Stack.Types.Config (HasCompiler (..), CompilerPaths (..))
+import           Stack.Types.Config (GhcPkgExe (..))
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
 import           System.FilePath (searchPathSeparator)
 import           RIO.Process
 
 -- | Get the global package database
-getGlobalDB :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-            => RIO env (Path Abs Dir)
-getGlobalDB = do
+getGlobalDB
+  :: (HasProcessContext env, HasLogFunc env)
+  => GhcPkgExe
+  -> RIO env (Path Abs Dir)
+getGlobalDB pkgexe = do
     logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg [] ["list", "--global"] >>= either throwIO return
+    bs <- ghcPkg pkgexe [] ["list", "--global"] >>= either throwIO return
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
     liftIO $ resolveDir' fp
   where
@@ -52,28 +54,31 @@ getGlobalDB = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-       => [Path Abs Dir]
-       -> [String]
-       -> RIO env (Either SomeException S8.ByteString)
-ghcPkg pkgDbs args = do
+ghcPkg
+  :: (HasProcessContext env, HasLogFunc env)
+  => GhcPkgExe
+  -> [Path Abs Dir]
+  -> [String]
+  -> RIO env (Either SomeException S8.ByteString)
+ghcPkg pkgexe@(GhcPkgExe pkgPath) pkgDbs args = do
     eres <- go
     case eres of
       Left _ -> do
-        mapM_ createDatabase pkgDbs
+        mapM_ (createDatabase pkgexe) pkgDbs
         go
       Right _ -> return eres
   where
-    go = do
-      pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
-      tryAny $ BL.toStrict . fst <$> proc pkg args' readProcess_
+    pkg = toFilePath pkgPath
+    go = tryAny $ BL.toStrict . fst <$> proc pkg args' readProcess_
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase
-  :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-  => Path Abs Dir -> RIO env ()
-createDatabase db = do
+  :: (HasProcessContext env, HasLogFunc env)
+  => GhcPkgExe
+  -> Path Abs Dir
+  -> RIO env ()
+createDatabase (GhcPkgExe pkgPath) db = do
     exists <- doesFileExist (db </> relFilePackageCache)
     unless exists $ do
         -- ghc-pkg requires that the database directory does not exist
@@ -94,8 +99,7 @@ createDatabase db = do
                 -- finding out it isn't the hard way
                 ensureDir (parent db)
                 return ["init", toFilePath db]
-        pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
-        void $ proc pkg args $ \pc ->
+        void $ proc (toFilePath pkgPath) args $ \pc ->
           readProcess_ pc `onException`
           logError ("Unable to create package database at " <> fromString (toFilePath db))
 
@@ -112,14 +116,16 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField
-    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-    => [Path Abs Dir] -- ^ package databases
+    :: (HasProcessContext env, HasLogFunc env)
+    => GhcPkgExe
+    -> [Path Abs Dir] -- ^ package databases
     -> String -- ^ package identifier, or GhcPkgId
     -> Text
     -> RIO env (Maybe Text)
-findGhcPkgField pkgDbs name field = do
+findGhcPkgField pkgexe pkgDbs name field = do
     result <-
         ghcPkg
+            pkgexe
             pkgDbs
             ["field", "--simple-output", name, T.unpack field]
     return $
@@ -128,25 +134,16 @@ findGhcPkgField pkgDbs name field = do
             Right bs ->
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
--- | Get the version of the package
-findGhcPkgVersion :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-                  => [Path Abs Dir] -- ^ package databases
-                  -> PackageName
-                  -> RIO env (Maybe Version)
-findGhcPkgVersion pkgDbs name = do
-    mv <- findGhcPkgField pkgDbs (packageNameString name) "version"
-    case mv of
-        Just !v -> return (parseVersion $ T.unpack v)
-        _ -> return Nothing
-
 -- | unregister list of package ghcids, batching available from GHC 8.0.1,
 -- using GHC package id where available (from GHC 7.9)
-unregisterGhcPkgIds :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-                    => Path Abs Dir -- ^ package database
-                    -> NonEmpty (Either PackageIdentifier GhcPkgId)
-                    -> RIO env ()
-unregisterGhcPkgIds pkgDb epgids = do
-    eres <- ghcPkg [pkgDb] args
+unregisterGhcPkgIds
+  :: (HasProcessContext env, HasLogFunc env)
+  => GhcPkgExe
+  -> Path Abs Dir -- ^ package database
+  -> NonEmpty (Either PackageIdentifier GhcPkgId)
+  -> RIO env ()
+unregisterGhcPkgIds pkgexe pkgDb epgids = do
+    eres <- ghcPkg pkgexe [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
@@ -158,14 +155,16 @@ unregisterGhcPkgIds pkgDb epgids = do
             epgids
 
 -- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-               => RIO env Version
-getCabalPkgVer = do
+getCabalPkgVer
+  :: (HasProcessContext env, HasLogFunc env)
+  => GhcPkgExe
+  -> RIO env Version
+getCabalPkgVer pkgexe = do
     logDebug "Getting Cabal package version"
-    mres <- findGhcPkgVersion
-        [] -- global DB
-        cabalPackageName
-    maybe (throwIO $ Couldn'tFindPkgId cabalPackageName) return mres
+
+    mv <- findGhcPkgField pkgexe [] (packageNameString cabalPackageName) "version"
+    maybe (throwIO $ Couldn'tFindPkgId cabalPackageName) pure $
+      mv >>= parseVersion . T.unpack
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
