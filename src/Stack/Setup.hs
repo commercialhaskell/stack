@@ -628,40 +628,56 @@ ensureCompiler sopts = do
     compiler <- findHelper $ \case
                                Ghc -> "ghc"
                                Ghcjs -> "ghcjs"
-    when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck compiler
-    cp <- pathsFromCompiler (whichCompiler (wantedToActual wanted)) compilerBuild menv needLocal compiler
+    when (soptsSanityCheck sopts) $ sanityCheck compiler
+    cp <- pathsFromCompiler (whichCompiler (wantedToActual wanted)) compilerBuild needLocal compiler
     pure (cp, paths)
 
 pathsFromCompiler
-  :: (HasLogFunc env, HasProcessContext env)
+  :: forall env. (HasLogFunc env, HasProcessContext env)
   => WhichCompiler
   -> CompilerBuild
-  -> ProcessContext
   -> Bool
   -> Path Abs File -- ^ executable filepath
   -> RIO env CompilerPaths
-pathsFromCompiler wc compilerBuild menv needLocal compiler = handleAny onErr $ withProcessContext menv $ do
-    let findHelper getName = do
-          eres <- findExecutable $ getName wc
-          case eres of
-            Left e -> throwIO e
-            Right res -> parseAbsFile res
+pathsFromCompiler wc compilerBuild needLocal compiler = handleAny onErr $ do
+    let dir = toFilePath $ parent compiler
+        suffixNoVersion
+          | osIsWindows = ".exe"
+          | otherwise = ""
+        suffixWithVersion = do
+          let prefix =
+                case wc of
+                  Ghc -> "ghc-"
+                  Ghcjs -> "ghcjs-"
+          stripPrefix prefix $ toFilePath $ filename compiler
+        suffixes = suffixNoVersion : maybeToList suffixWithVersion
+        findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
+        findHelper getNames = do
+          let toTry = [dir ++ name ++ suffix | suffix <- suffixes, name <- getNames wc]
+              loop [] = throwString $ "Could not find any of: " <> show toTry
+              loop (guessedPath':rest) = do
+                guessedPath <- parseAbsFile guessedPath'
+                exists <- doesFileExist guessedPath
+                if exists
+                  then pure guessedPath
+                  else loop rest
+          logDebug $ "Looking for executable(s): " <> displayShow toTry
+          loop toTry
     pkg <- fmap GhcPkgExe $ findHelper $ \case
-                               Ghc -> "ghc-pkg"
-                               Ghcjs -> "ghcjs-pkg"
+                               Ghc -> ["ghc-pkg"]
+                               Ghcjs -> ["ghcjs-pkg"]
 
     cabalPkgVer <- getCabalPkgVer pkg
     compilerVer <- getCompilerVersion wc compiler
 
-    env <- ask
-    interpreter <- runRIO env $ findHelper $
+    interpreter <- findHelper $
                    \case
-                      Ghc -> "runghc"
-                      Ghcjs -> "runghcjs"
-    haddock <- runRIO env $ findHelper $
+                      Ghc -> ["runghc"]
+                      Ghcjs -> ["runghcjs"]
+    haddock <- findHelper $
                \case
-                  Ghc -> "haddock"
-                  Ghcjs -> "haddock-ghcjs"
+                  Ghc -> ["haddock", "haddock-ghc"]
+                  Ghcjs -> ["haddock-ghcjs"]
     info <- proc (toFilePath compiler) ["--info"]
           $ fmap (toStrictBytes . fst) . readProcess_
 
