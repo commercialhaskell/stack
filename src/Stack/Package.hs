@@ -27,8 +27,8 @@ module Stack.Package
   ,applyForceCustomBuild
   ) where
 
-import           Data.Binary.Get (runGetOrFail)
-import qualified Data.ByteString.Lazy.Char8 as CL8
+import qualified Data.Binary.Get as Binary
+import qualified Data.ByteString.Lazy.Internal as BL (defaultChunkSize)
 import           Data.List (isPrefixOf, unzip, find)
 import           Data.Maybe (maybe, fromMaybe)
 import qualified Data.Map.Strict as M
@@ -71,6 +71,7 @@ import qualified System.Directory as D
 import           System.FilePath (replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
+import qualified RIO.ByteString as B
 import           RIO.Process
 import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (Style (Module))
@@ -1092,31 +1093,38 @@ getDependencies component dirs dotCabalPath =
         case stripSourceDir sourceDir of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
-                let dumpHIPath =
+                let hiPath =
                         FilePath.replaceExtension
                             (toFilePath (dumpHIDir </> fileRel))
                             ".hi"
-                dumpHIExists <- liftIO $ D.doesFileExist dumpHIPath
+                dumpHIExists <- liftIO $ D.doesFileExist hiPath
                 if dumpHIExists
-                    then parseDumpHI dumpHIPath
+                    then parseHI hiPath
                     else return (S.empty, [])
 
--- | Parse a .dump-hi file into a set of modules and files.
-parseDumpHI
+-- | Parse a .hi file into a set of modules and files.
+parseHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
-parseDumpHI dumpHIPath = do
+parseHI hiPath = do
   dir <- asks (parent . ctxFile)
-  content <- liftIO $ CL8.readFile dumpHIPath
-  case runGetOrFail getInterface content of
-    Left (_, _, msg) -> do
+  result <- liftIO $ withBinaryFile hiPath ReadMode $ \h ->
+    let feed :: Binary.Decoder Interface -> IO (Either String Interface)
+        feed (Binary.Done _ _ x) = pure $ Right x
+        feed (Binary.Fail _ _ str) = pure $ Left str
+        feed (Binary.Partial k) = do
+          chunk <- B.hGetSome h BL.defaultChunkSize
+          feed $ k $ if B.null chunk then Nothing else Just chunk
+     in feed (Binary.runGetIncremental getInterface :: Binary.Decoder Interface)
+  case result of
+    Left msg -> do
       prettyWarnL
         [ flow "Failed to decode module interface:"
-        , style File $ fromString dumpHIPath
+        , style File $ fromString hiPath
         , flow "Decoding failure:"
         , style Error $ fromString msg
         ]
       pure (S.empty, [])
-    Right (_, _, iface) -> do
+    Right iface -> do
       let
         moduleNames = fmap (fromString . unFastString . fst) . unList . dmods . deps
         resolveFileDependency file = do
@@ -1124,7 +1132,7 @@ parseDumpHI dumpHIPath = do
           when (isNothing resolved) $
             prettyWarnL
             [ flow "Dependent file listed in:"
-            , style File $ fromString dumpHIPath
+            , style File $ fromString hiPath
             , flow "does not exist:"
             , style File $ fromString file
             ]
