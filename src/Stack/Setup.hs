@@ -799,6 +799,9 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
           logWarn "Asking ghc-pkg directly"
           withProcessContext menv $ getGlobalDB pkg
         Right x -> pure x
+
+    globalDump <- withProcessContext menv $ globalsFromDump pkg
+
     return CompilerPaths
       { cpBuild = compilerBuild
       , cpArch = arch
@@ -811,6 +814,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
       , cpCabalVersion = cabalPkgVer
       , cpGlobalDB = globaldb
       , cpGhcInfo = infobs
+      , cpGlobalDump = globalDump
       }
   where
     onErr = throwIO . InvalidGhcAt compiler

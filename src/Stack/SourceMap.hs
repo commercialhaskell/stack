@@ -19,6 +19,7 @@ module Stack.SourceMap
     , immutableLocSha
     , loadProjectSnapshotCandidate
     , SnapshotCandidate
+    , globalsFromDump
     ) where
 
 import Data.ByteString.Builder (byteString)
@@ -121,15 +122,16 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-       (HasLogFunc env, HasProcessContext env, HasCompiler env)
-    => RIO env (Map PackageName DumpedGlobalPackage)
-globalsFromDump = do
+       (HasLogFunc env, HasProcessContext env)
+    => GhcPkgExe
+    -> RIO env (Map PackageName DumpedGlobalPackage)
+globalsFromDump pkgexe = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
         toGlobals ds =
           Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
-    toGlobals <$> ghcPkgDump [] pkgConduit
+    toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
@@ -152,7 +154,7 @@ actualFromGhc ::
     -> ActualCompiler
     -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-    globals <- globalsFromDump
+    globals <- view $ compilerPathsL.to cpGlobalDump
     return
         SMActual
         { smaCompiler = ac

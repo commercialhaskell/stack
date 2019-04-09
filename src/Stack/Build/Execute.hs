@@ -1672,7 +1672,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         return mpkgid
 
     loadInstalledPkg pkgDbs tvar name = do
-        dps <- ghcPkgDescribe name pkgDbs $ conduitDumpPackage .| CL.consume
+        pkgexe <- getGhcPkgExe
+        dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
         case dps of
             [] -> return Nothing
             [dp] -> do

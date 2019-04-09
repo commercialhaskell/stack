@@ -142,6 +142,7 @@ module Stack.Types.Config
   ,wantedCompilerVersionL
   ,actualCompilerVersionL
   ,HasCompiler(..)
+  ,DumpPackage(..)
   ,CompilerPaths(..)
   ,GhcPkgExe(..)
   ,getGhcPkgExe
@@ -192,6 +193,8 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.License as C
+import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform, Arch)
@@ -213,6 +216,7 @@ import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
+import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
@@ -1882,6 +1886,23 @@ newtype GhcPkgExe = GhcPkgExe (Path Abs File)
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
 getGhcPkgExe = view $ compilerPathsL.to cpPkg
 
+-- | Dump information for a single package
+data DumpPackage = DumpPackage
+    { dpGhcPkgId :: !GhcPkgId
+    , dpPackageIdent :: !PackageIdentifier
+    , dpParentLibIdent :: !(Maybe PackageIdentifier)
+    , dpLicense :: !(Maybe C.License)
+    , dpLibDirs :: ![FilePath]
+    , dpLibraries :: ![Text]
+    , dpHasExposedModules :: !Bool
+    , dpExposedModules :: !(Set ModuleName)
+    , dpDepends :: ![GhcPkgId]
+    , dpHaddockInterfaces :: ![FilePath]
+    , dpHaddockHtml :: !(Maybe FilePath)
+    , dpIsExposed :: !Bool
+    }
+    deriving (Show, Eq)
+
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
   { cpCompilerVersion :: !ActualCompiler
@@ -1907,6 +1928,7 @@ data CompilerPaths = CompilerPaths
   -- ^ Global package database
   , cpGhcInfo :: !ByteString
   -- ^ Output of @ghc --info@
+  , cpGlobalDump :: !(Map PackageName DumpPackage)
   }
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler

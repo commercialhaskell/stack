@@ -25,41 +25,41 @@ import qualified Data.Conduit.Text as CT
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified RIO.Text as T
-import qualified Distribution.License as C
-import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.Text as C
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
-import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), getGhcPkgExe)
+import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), DumpPackage (..))
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-    => [Path Abs Dir] -- ^ if empty, use global
+    :: (HasProcessContext env, HasLogFunc env)
+    => GhcPkgExe
+    -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgDump = ghcPkgCmdArgs ["dump"]
+ghcPkgDump pkgexe = ghcPkgCmdArgs pkgexe ["dump"]
 
 -- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDescribe
     :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-    => PackageName
+    => GhcPkgExe
+    -> PackageName
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgDescribe pkgName' = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName']
+ghcPkgDescribe pkgexe pkgName' = ghcPkgCmdArgs pkgexe ["describe", "--simple-output", packageNameString pkgName']
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs
-    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
-    => [String]
+    :: (HasProcessContext env, HasLogFunc env)
+    => GhcPkgExe
+    -> [String]
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgCmdArgs cmd mpkgDbs sink = do
-    pkgexe@(GhcPkgExe pkgPath) <- getGhcPkgExe
+ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = do
     case reverse mpkgDbs of
         (pkgDb:_) -> createDatabase pkgexe pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
@@ -135,23 +135,6 @@ sinkMatching allowed =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False
             _ -> True
-
--- | Dump information for a single package
-data DumpPackage = DumpPackage
-    { dpGhcPkgId :: !GhcPkgId
-    , dpPackageIdent :: !PackageIdentifier
-    , dpParentLibIdent :: !(Maybe PackageIdentifier)
-    , dpLicense :: !(Maybe C.License)
-    , dpLibDirs :: ![FilePath]
-    , dpLibraries :: ![Text]
-    , dpHasExposedModules :: !Bool
-    , dpExposedModules :: !(Set ModuleName)
-    , dpDepends :: ![GhcPkgId]
-    , dpHaddockInterfaces :: ![FilePath]
-    , dpHaddockHtml :: !(Maybe FilePath)
-    , dpIsExposed :: !Bool
-    }
-    deriving (Show, Eq)
 
 data PackageDumpException
     = MissingSingleField Text (Map Text [Line])
