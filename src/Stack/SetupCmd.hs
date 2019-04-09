@@ -88,7 +88,7 @@ setup
     -> RIO env ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
-    sandboxedGhc <- cpSandboxed <$> ensureCompiler SetupOpts
+    sandboxedGhc <- (cpSandboxed . fst) <$> ensureCompiler SetupOpts
         { soptsInstallIfMissing = True
         , soptsUseSystem = configSystemGHC && not scoForceReinstall
         , soptsWantedCompiler = wantedCompiler

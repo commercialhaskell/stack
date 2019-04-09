@@ -1895,7 +1895,6 @@ data CompilerPaths = CompilerPaths
   , cpHaddock :: !(Path Abs File)
   -- | Is this a Stack-sandboxed installation?
   , cpSandboxed :: !Bool
-  , cpExtraDirs :: !ExtraDirs
   , cpCabalVersion :: !Version
   -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
   -- in the build process.

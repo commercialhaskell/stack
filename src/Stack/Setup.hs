@@ -244,9 +244,8 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsGHCJSBootOpts = ["--clean"]
             }
 
-    compilerPaths <- ensureCompiler sopts
-    let ghcBin = cpExtraDirs compilerPaths
-        compilerVer = cpCompilerVersion compilerPaths
+    (compilerPaths, ghcBin) <- ensureCompiler sopts
+    let compilerVer = cpCompilerVersion compilerPaths
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -465,7 +464,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: forall env. (HasConfig env, HasGHCVariant env)
                => SetupOpts
-               -> RIO env CompilerPaths
+               -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts = do
     let wanted = soptsWantedCompiler sopts
     when (getGhcVersion (wantedToActual wanted) < mkVersion [7, 8]) $ do
@@ -630,7 +629,8 @@ ensureCompiler sopts = do
                                Ghc -> "ghc"
                                Ghcjs -> "ghcjs"
     when (soptsSanityCheck sopts) $ withProcessContext menv $ sanityCheck compiler
-    pathsFromCompiler (whichCompiler (wantedToActual wanted)) compilerBuild menv needLocal paths compiler
+    cp <- pathsFromCompiler (whichCompiler (wantedToActual wanted)) compilerBuild menv needLocal compiler
+    pure (cp, paths)
 
 pathsFromCompiler
   :: (HasLogFunc env, HasProcessContext env)
@@ -638,10 +638,9 @@ pathsFromCompiler
   -> CompilerBuild
   -> ProcessContext
   -> Bool
-  -> ExtraDirs
   -> Path Abs File -- ^ executable filepath
   -> RIO env CompilerPaths
-pathsFromCompiler wc compilerBuild menv needLocal paths compiler = handleAny onErr $ withProcessContext menv $ do
+pathsFromCompiler wc compilerBuild menv needLocal compiler = handleAny onErr $ withProcessContext menv $ do
     let findHelper getName = do
           eres <- findExecutable $ getName wc
           case eres of
@@ -685,8 +684,7 @@ pathsFromCompiler wc compilerBuild menv needLocal paths compiler = handleAny onE
           getGlobalDB pkg
         Right x -> pure x
     return CompilerPaths
-      { cpExtraDirs = paths
-      , cpBuild = Just compilerBuild -- FIXME is this always Just? Remove the Maybe?
+      { cpBuild = Just compilerBuild -- FIXME is this always Just? Remove the Maybe?
       , cpSandboxed = needLocal
       , cpCompilerVersion = compilerVer
       , cpCompiler = compiler
