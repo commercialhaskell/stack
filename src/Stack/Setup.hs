@@ -723,13 +723,13 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
         suffixNoVersion
           | osIsWindows = ".exe"
           | otherwise = ""
-        suffixWithVersion = do
+        msuffixWithVersion = do
           let prefix =
                 case wc of
                   Ghc -> "ghc-"
                   Ghcjs -> "ghcjs-"
-          stripPrefix prefix $ toFilePath $ filename compiler
-        suffixes = suffixNoVersion : maybeToList suffixWithVersion
+          fmap ("-" ++) $ stripPrefix prefix $ toFilePath $ filename compiler
+        suffixes = maybe id (:) msuffixWithVersion [suffixNoVersion]
         findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
         findHelper getNames = do
           let toTry = [dir ++ name ++ suffix | suffix <- suffixes, name <- getNames wc]
@@ -1062,7 +1062,7 @@ sourceSystemCompilers
   -> ConduitT i (Path Abs File) (RIO env) ()
 sourceSystemCompilers wanted = do
   searchPath <- view exeSearchPathL
-  for_ searchPath $ \dir -> for names $ \name -> do
+  for_ names $ \name -> for_ searchPath $ \dir -> do
     fp <- parseAbsFile $ addExe $ dir FP.</> name
     exists <- doesFileExist fp
     when exists $ yield fp
@@ -1070,8 +1070,8 @@ sourceSystemCompilers wanted = do
     names =
       case wanted of
         WCGhc version ->
-          [ "ghc"
-          , "ghc-" ++ versionString version
+          [ "ghc-" ++ versionString version
+          , "ghc"
           ]
         WCGhcjs{} -> ["ghcjs"]
         WCGhcGit{} -> [] -- ^ only use sandboxed versions
