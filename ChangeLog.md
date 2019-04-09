@@ -160,7 +160,7 @@ Other enhancements:
 * Include default values for most command line flags in the `--help`
   output. See
   [#893](https://github.com/commercialhaskell/stack/issues/893).
-* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+* Set the `GHC_ENVIRONMENT` environment variable to specify dependency
   packages explicitly when running test. This is done to prevent
   ambiguous module name errors in `doctest` tests.
 - Document the way stack interacts with the Cabal library.
@@ -181,6 +181,13 @@ Other enhancements:
 * User config files are respected for the script command. See
   [#3705](https://github.com/commercialhaskell/stack/issues/3705),
   [#3887](https://github.com/commercialhaskell/stack/issues/3887).
+* Set the `GHC_ENVIRONMENT` environment variable to `-` to tell GHC to
+  ignore any such files when GHC is new enough (>= 8.4.4), otherwise
+  simply unset the variable. This allows Stack to have control of
+  package databases when running commands like `stack exec ghci`, even
+  in the presence of implicit environment files created by `cabal
+  new-build`. See
+  [#4706](https://github.com/commercialhaskell/stack/issues/4706).
 
 Bug fixes:
 
