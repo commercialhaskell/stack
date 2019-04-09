@@ -31,9 +31,6 @@ module Stack.Setup
   , preferredPlatforms
   , downloadStackReleaseInfo
   , downloadStackExe
-  -- * WithGHC
-  , WithGHC (..)
-  , runWithGHC
   ) where
 
 import qualified    Codec.Archive.Tar as Tar

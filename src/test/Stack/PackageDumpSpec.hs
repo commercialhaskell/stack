@@ -14,9 +14,6 @@ import           Distribution.Version          (mkVersion)
 import           Path                          (parseAbsFile)
 import           Stack.PackageDump
 import           Stack.Prelude
-import           Stack.Setup
-import           Stack.Types.Compiler          (ActualCompiler (..))
-import           Stack.Types.CompilerBuild     (CompilerBuild (..))
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           RIO.Process
@@ -211,8 +208,8 @@ spec = do
             }
 
 
-    it "sinkMatching" $ runEnvNoLogging $ do
-        m <- ghcPkgDump []
+    it "sinkMatching" $ runEnvNoLogging $ \pkgexe -> do
+        m <- ghcPkgDump pkgexe []
             $  conduitDumpPackage
             .| sinkMatching (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
         case Map.lookup (mkPackageName "base") m of
@@ -263,23 +260,10 @@ checkDepsPresent prunes selected =
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
-runEnvNoLogging :: RIO (WithGHC LoggedProcessContext) a -> IO a
+runEnvNoLogging :: (GhcPkgExe -> RIO LoggedProcessContext a) -> IO a
 runEnvNoLogging inner = do
   envVars <- view envVarsL <$> mkDefaultProcessContext
   menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
   let find name = runRIO menv (findExecutable name) >>= either throwIO parseAbsFile
-  compiler <- find "ghc"
-  pkg <- find "ghc-pkg"
-  let cp = CompilerPaths
-        { cpCompilerVersion = ACGhc $ mkVersion [1, 2, 3]
-        , cpBuild = CompilerBuildStandard
-        , cpCompiler = compiler
-        , cpPkg = pkg
-        , cpInterpreter' = const $ pure undefined
-        , cpHaddock' = const $ pure undefined
-        , cpSandboxed = False
-        , cpExtraDirs = mempty
-        , cpCabalVersion' = const $ pure undefined
-        , cpGlobalDB' = const $ pure undefined
-        }
-  runRIO (WithGHC cp (LoggedProcessContext menv mempty)) inner
+  pkg <- GhcPkgExe <$> find "ghc-pkg"
+  runRIO (LoggedProcessContext menv mempty) (inner pkg)
