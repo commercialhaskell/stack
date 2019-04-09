@@ -11,7 +11,6 @@ module Stack.GhcPkg
   ,findGhcPkgField
   ,createDatabase
   ,unregisterGhcPkgIds
-  ,getCabalPkgVer
   ,ghcPkgPathEnvVar
   ,mkGhcPackagePath)
   where
@@ -27,7 +26,6 @@ import           Path (parent, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
-import           Stack.Types.Build
 import           Stack.Types.Config (GhcPkgExe (..))
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
@@ -153,18 +151,6 @@ unregisterGhcPkgIds pkgexe pkgDb epgids = do
             (\ident -> [packageIdentifierString ident])
             (\gid -> ["--ipid", ghcPkgIdString gid]))
             epgids
-
--- | Get the version of Cabal from the global package database.
-getCabalPkgVer
-  :: (HasProcessContext env, HasLogFunc env)
-  => GhcPkgExe
-  -> RIO env Version
-getCabalPkgVer pkgexe = do
-    logDebug "Getting Cabal package version"
-
-    mv <- findGhcPkgField pkgexe [] (packageNameString cabalPackageName) "version"
-    maybe (throwIO $ Couldn'tFindPkgId cabalPackageName) pure $
-      mv >>= parseVersion . T.unpack
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
