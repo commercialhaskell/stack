@@ -16,6 +16,7 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Setup
 import           Stack.Types.Compiler          (ActualCompiler (..))
+import           Stack.Types.CompilerBuild     (CompilerBuild (..))
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           RIO.Process
@@ -271,7 +272,7 @@ runEnvNoLogging inner = do
   pkg <- find "ghc-pkg"
   let cp = CompilerPaths
         { cpCompilerVersion = ACGhc $ mkVersion [1, 2, 3]
-        , cpBuild = Nothing
+        , cpBuild = CompilerBuildStandard
         , cpCompiler = compiler
         , cpPkg = pkg
         , cpInterpreter' = const $ pure undefined

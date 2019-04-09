@@ -1262,7 +1262,7 @@ platformGhcRelDir
     => m (Path Rel Dir)
 platformGhcRelDir = do
     cp <- view compilerPathsL
-    let cbSuffix = maybe "" compilerBuildSuffix $ cpBuild cp
+    let cbSuffix = compilerBuildSuffix $ cpBuild cp
     verOnly <- platformGhcVerOnlyRelDirStr
     parseRelDir (mconcat [ verOnly, cbSuffix ])
 
@@ -1885,7 +1885,7 @@ getGhcPkgExe = view $ compilerPathsL.to cpPkg
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
   { cpCompilerVersion :: !ActualCompiler
-  , cpBuild :: !(Maybe CompilerBuild)
+  , cpBuild :: !CompilerBuild
   , cpCompiler :: !(Path Abs File)
   -- | ghc-pkg or equivalent
   , cpPkg :: !GhcPkgExe

@@ -684,7 +684,7 @@ pathsFromCompiler wc compilerBuild menv needLocal compiler = handleAny onErr $ w
           getGlobalDB pkg
         Right x -> pure x
     return CompilerPaths
-      { cpBuild = Just compilerBuild -- FIXME is this always Just? Remove the Maybe?
+      { cpBuild = compilerBuild
       , cpSandboxed = needLocal
       , cpCompilerVersion = compilerVer
       , cpCompiler = compiler
