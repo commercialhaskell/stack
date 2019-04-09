@@ -1060,7 +1060,7 @@ sourceSystemCompilers
 sourceSystemCompilers wanted = do
   searchPath <- view exeSearchPathL
   for_ names $ \name -> for_ searchPath $ \dir -> do
-    fp <- parseAbsFile $ addExe $ dir FP.</> name
+    fp <- resolveFile' $ addExe $ dir FP.</> name
     exists <- doesFileExist fp
     when exists $ yield fp
   where
