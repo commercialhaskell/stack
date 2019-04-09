@@ -28,6 +28,7 @@ module Stack.Package
   ) where
 
 import qualified Data.Binary.Get as Binary
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Internal as BL (defaultChunkSize)
 import           Data.List (isPrefixOf, unzip, find)
 import           Data.Maybe (maybe, fromMaybe)
@@ -1126,7 +1127,7 @@ parseHI hiPath = do
       pure (S.empty, [])
     Right iface -> do
       let
-        moduleNames = fmap (fromString . unFastString . fst) . unList . dmods . deps
+        moduleNames = fmap (fromString . B8.unpack . fst) . unList . dmods . deps
         resolveFileDependency file = do
           resolved <- liftIO (forgivingAbsence (resolveFile dir file)) >>= rejectMissingFile
           when (isNothing resolved) $

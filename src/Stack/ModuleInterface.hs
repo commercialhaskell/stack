@@ -1,6 +1,5 @@
 module Stack.ModuleInterface
     ( Interface(..)
-    , FastString(..)
     , List(..)
     , Dictionary(..)
     , Module(..)
@@ -14,7 +13,9 @@ module Stack.ModuleInterface
 import           Control.Monad   (replicateM, replicateM_, when)
 import           Data.Binary
 import           Data.Binary.Get (bytesRead, getInt64be, getWord32be,
-                                  getWord64be, getWord8, lookAhead, skip)
+                                  getWord64be, getWord8, lookAhead, skip,
+                                  getByteString)
+import           Data.ByteString (ByteString)
 import           Data.Bool       (bool)
 import           Data.Char       (chr)
 import           Data.Functor    (void, ($>))
@@ -27,18 +28,14 @@ import           Numeric         (showHex)
 
 type IsBoot = Bool
 
-type ModuleName = FastString
+type ModuleName = ByteString
 
 newtype List a = List
     { unList :: [a]
     } deriving (Show)
 
-newtype FastString = FastString
-    { unFastString :: String
-    } deriving (Show)
-
 newtype Dictionary = Dictionary
-    { unDictionary :: V.Vector FastString
+    { unDictionary :: V.Vector ByteString
     } deriving (Show)
 
 newtype Module = Module
@@ -87,25 +84,24 @@ getList f = do
 getTuple :: Get a -> Get b -> Get (a, b)
 getTuple f g = (,) <$> f <*> g
 
-getFastString :: Get FastString
-getFastString = do
+getByteStringSized :: Get ByteString
+getByteStringSized = do
     size <- getInt64be
-    FastString . fmap (chr . fromIntegral) <$>
-        replicateM (fromIntegral size) getWord8
+    getByteString (fromIntegral size)
 
 getDictionary :: Int -> Get Dictionary
 getDictionary ptr = do
     offset <- bytesRead
     skip $ ptr - fromIntegral offset
     size <- fromIntegral <$> getInt64be
-    Dictionary <$> V.replicateM size getFastString
+    Dictionary <$> V.replicateM size getByteStringSized
 
-getCachedFS :: Dictionary -> Get FastString
-getCachedFS d = go =<< getWord32be
+getCachedBS :: Dictionary -> Get ByteString
+getCachedBS d = go =<< getWord32be
   where
     go i =
         case unDictionary d V.!? fromIntegral i of
-            Just fs -> pure fs
+            Just bs -> pure bs
             Nothing -> fail $ "Invalid dictionary index: " <> show i
 
 getFP :: Get ()
@@ -120,11 +116,11 @@ getInterface721 d = do
     void getBool
     Interface <$> getDependencies <*> getUsage
   where
-    getModule = getCachedFS d *> (Module <$> getCachedFS d)
+    getModule = getCachedBS d *> (Module <$> getCachedBS d)
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -136,8 +132,8 @@ getInterface721 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 _ -> fail $ "Invalid usageType: " <> show usageType
 
@@ -150,11 +146,11 @@ getInterface741 d = do
     void getBool
     Interface <$> getDependencies <*> getUsage
   where
-    getModule = getCachedFS d *> (Module <$> getCachedFS d)
+    getModule = getCachedBS d *> (Module <$> getCachedBS d)
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -166,8 +162,8 @@ getInterface741 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getWord64be <* getWord64be
                 _ -> fail $ "Invalid usageType: " <> show usageType
@@ -181,11 +177,11 @@ getInterface761 d = do
     void getBool
     Interface <$> getDependencies <*> getUsage
   where
-    getModule = getCachedFS d *> (Module <$> getCachedFS d)
+    getModule = getCachedBS d *> (Module <$> getCachedBS d)
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -197,8 +193,8 @@ getInterface761 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getWord64be <* getWord64be
                 _ -> fail $ "Invalid usageType: " <> show usageType
@@ -212,11 +208,11 @@ getInterface781 d = do
     void getBool
     Interface <$> getDependencies <*> getUsage
   where
-    getModule = getCachedFS d *> (Module <$> getCachedFS d)
+    getModule = getCachedBS d *> (Module <$> getCachedBS d)
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -228,8 +224,8 @@ getInterface781 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getFP
                 _ -> fail $ "Invalid usageType: " <> show usageType
@@ -243,11 +239,11 @@ getInterface801 d = do
     void getBool
     Interface <$> getDependencies <*> getUsage
   where
-    getModule = getCachedFS d *> (Module <$> getCachedFS d)
+    getModule = getCachedBS d *> (Module <$> getCachedBS d)
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -259,8 +255,8 @@ getInterface801 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getFP
                 3 -> getModule *> getFP $> Nothing
@@ -279,15 +275,15 @@ getInterface821 d = do
     getModule = do
         idType <- getWord8
         case idType of
-            0 -> void $ getCachedFS d
+            0 -> void $ getCachedBS d
             _ ->
                 void $
-                getCachedFS d *> getList (getTuple (getCachedFS d) getModule)
-        Module <$> getCachedFS d
+                getCachedBS d *> getList (getTuple (getCachedBS d) getModule)
+        Module <$> getCachedBS d
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -299,8 +295,8 @@ getInterface821 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getFP
                 3 -> getModule *> getFP $> Nothing
@@ -319,15 +315,15 @@ getInterface841 d = do
     getModule = do
         idType <- getWord8
         case idType of
-            0 -> void $ getCachedFS d
+            0 -> void $ getCachedBS d
             _ ->
                 void $
-                getCachedFS d *> getList (getTuple (getCachedFS d) getModule)
-        Module <$> getCachedFS d
+                getCachedBS d *> getList (getTuple (getCachedBS d) getModule)
+        Module <$> getCachedBS d
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
         pure (List [])
@@ -339,8 +335,8 @@ getInterface841 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getFP
                 3 -> getModule *> getFP $> Nothing
@@ -359,18 +355,18 @@ getInterface861 d = do
     getModule = do
         idType <- getWord8
         case idType of
-            0 -> void $ getCachedFS d
+            0 -> void $ getCachedBS d
             _ ->
                 void $
-                getCachedFS d *> getList (getTuple (getCachedFS d) getModule)
-        Module <$> getCachedFS d
+                getCachedBS d *> getList (getTuple (getCachedBS d) getModule)
+        Module <$> getCachedBS d
     getDependencies =
         withBlockPrefix $
-        Dependencies <$> getList (getTuple (getCachedFS d) getBool) <*>
-        getList (getTuple (getCachedFS d) getBool) <*>
+        Dependencies <$> getList (getTuple (getCachedBS d) getBool) <*>
+        getList (getTuple (getCachedBS d) getBool) <*>
         getList getModule <*>
         getList getModule <*>
-        getList (getCachedFS d)
+        getList (getCachedBS d)
     getUsage = withBlockPrefix $ List . catMaybes . unList <$> getList go
       where
         go :: Get (Maybe Usage)
@@ -379,8 +375,8 @@ getInterface861 d = do
             case usageType of
                 0 -> getModule *> getFP *> getBool $> Nothing
                 1 ->
-                    getCachedFS d *> getFP *> getMaybe getFP *>
-                    getList (getTuple (getWord8 *> getCachedFS d) getFP) *>
+                    getCachedBS d *> getFP *> getMaybe getFP *>
+                    getList (getTuple (getWord8 *> getCachedBS d) getFP) *>
                     getBool $> Nothing
                 2 -> Just . Usage <$> getString <* getFP
                 3 -> getModule *> getFP $> Nothing
