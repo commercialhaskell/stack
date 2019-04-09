@@ -468,8 +468,13 @@ ensureCompilerAndMsys
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
+  didWarn <- warnUnsupportedCompiler $ getGhcVersion $ wantedToActual $ soptsWantedCompiler sopts
+
   getSetupInfo' <- memoizeRef (getSetupInfo (soptsSetupInfoYaml sopts))
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
+
+  warnUnsupportedCompilerCabal cp didWarn
+
   mmsys2Tool <- ensureMsys sopts getSetupInfo'
   paths <-
     case mmsys2Tool of
@@ -478,6 +483,52 @@ ensureCompilerAndMsys sopts = do
         msys2Paths <- extraDirs msys2Tool
         pure $ ghcPaths <> msys2Paths
   pure (cp, paths)
+
+-- | See <https://github.com/commercialhaskell/stack/issues/4246>
+warnUnsupportedCompiler :: HasLogFunc env => Version -> RIO env Bool
+warnUnsupportedCompiler ghcVersion = do
+  if
+    | ghcVersion < mkVersion [7, 8] -> do
+        logWarn $
+          "Stack will almost certainly fail with GHC below version 7.8, requested " <>
+          fromString (versionString ghcVersion)
+        logWarn "Valiantly attempting to run anyway, but I know this is doomed"
+        logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
+        logWarn ""
+        pure True
+    | ghcVersion >= mkVersion [8, 7] -> do
+        logWarn $
+          "Stack has not been tested with GHC versions above 8.6, and using " <>
+          fromString (versionString ghcVersion) <>
+          ", this may fail"
+        pure True
+    | otherwise -> do
+        logDebug "Asking for a supported GHC version"
+        pure False
+
+-- | See <https://github.com/commercialhaskell/stack/issues/4246>
+warnUnsupportedCompilerCabal
+  :: HasLogFunc env
+  => CompilerPaths
+  -> Bool -- ^ already warned about GHC?
+  -> RIO env ()
+warnUnsupportedCompilerCabal cp didWarn = do
+  unless didWarn $ void $ warnUnsupportedCompiler $ getGhcVersion $ cpCompilerVersion cp
+  let cabalVersion = cpCabalVersion cp
+
+  if
+    | cabalVersion < mkVersion [1, 19, 2] -> do
+        logWarn $ "Stack no longer supported Cabal versions below 1.19.2,"
+        logWarn $ "but version " <> fromString (versionString cabalVersion) <> "was found."
+        logWarn "This invocation will most likely fail."
+        logWarn "To fix this, either use a newer version of Stack or a newer resolver"
+        logWarn "Acceptable resolvers: lts-3.0/nightly-2015-05-05 or later"
+    | cabalVersion >= mkVersion [2, 5] ->
+        logWarn $
+          "Stack has not been tested with Cabal versions above 2.4, but version " <>
+          fromString (versionString cabalVersion) <>
+          " was found, this may fail"
+    | otherwise -> pure ()
 
 -- | Ensure that the msys toolchain is installed if necessary and
 -- provide the PATHs to add if necessary
@@ -590,11 +641,6 @@ ensureCompiler
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-    when (getGhcVersion (wantedToActual wanted) < mkVersion [7, 8]) $ do
-        logWarn "Stack will almost certainly fail with GHC below version 7.8"
-        logWarn "Valiantly attempting to run anyway, but I know this is doomed"
-        logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
-        logWarn ""
 
     msystem <-
         if soptsUseSystem sopts
