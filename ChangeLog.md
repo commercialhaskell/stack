@@ -88,7 +88,9 @@ Behavior changes:
   which you can use instead.
 
 * Interleaved output is now turned on by default, see
-  [#4702](https://github.com/commercialhaskell/stack/issues/4702).
+  [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
+  addition, the `packagename> ` prefix is no longer included in
+  interelaved mode when only building a single target.
 
 Other enhancements:
 
