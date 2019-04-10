@@ -708,31 +708,33 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
 
        -- clone the repository and execute the given commands
        Pantry.withRepo repo $ do
+         -- withRepo is guaranteed to set workingDirL, so let's get it
+         mcwd <- traverse parseAbsDir =<< view workingDirL
+         let cwd = fromMaybe (error "Invalid working directory") mcwd
+
          threads <- view $ configL.to configJobs
          let
            hadrianArgs = fmap T.unpack
-               [ hadrianCmd
-               , "-c"                    -- run ./boot and ./configure
+               [ "-c"                    -- run ./boot and ./configure
                , "-j" <> tshow threads   -- parallel build
                , "--flavour=" <> flavour -- selected flavour
                , "binary-dist"
                ]
            hadrianCmd
-             | osIsWindows = "./hadrian/build.stack.bat"
-             | otherwise   = "./hadrian/build.stack.sh"
+             | osIsWindows = hadrianCmdWindows
+             | otherwise   = hadrianCmdPosix
 
          logSticky $ "Building GHC from source with `"
             <> RIO.display flavour
             <> "` flavour. It can take a long time (more than one hour)..."
 
-         -- RIO.Process doesn't wrap process' "shell".
-         -- Instead we use "proc" with the "sh" command
-         proc "sh" hadrianArgs runProcess_
+         -- We need to provide an absolute path to the script since
+         -- the process package only sets working directory _after_
+         -- discovering the executable
+         proc (toFilePath (cwd </> hadrianCmd)) hadrianArgs runProcess_
 
          -- find the bindist and install it
          bindistPath <- parseRelDir "_build/bindist"
-         mcwd <- traverse parseAbsDir =<< view workingDirL
-         let cwd = fromMaybe (error "Invalid working directory") mcwd
          (_,files) <- listDir (cwd </> bindistPath)
          let
            isBindist p = "ghc-" `isPrefixOf` (toFilePath (filename p))
