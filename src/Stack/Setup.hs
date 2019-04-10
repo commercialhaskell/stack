@@ -728,12 +728,6 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
          -- RIO.Process doesn't wrap process' "shell".
          -- Instead we use "proc" with the "sh" command
          proc "sh" hadrianArgs runProcess_
-           `catch` \(e :: ExitCodeException) -> do
-              let dispLBS = displayBytesUtf8 . BL8.toStrict
-              logDebug ("Hadrian failed with " <> displayShow (eceExitCode e))
-              logDebug ("stdout: " <> dispLBS (eceStdout e))
-              logDebug ("stderr: " <> dispLBS (eceStderr e))
-              throwM e
 
          -- find the bindist and install it
          bindistPath <- parseRelDir "_build/bindist"
