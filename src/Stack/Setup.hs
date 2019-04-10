@@ -44,7 +44,6 @@ import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
-import qualified    Data.ByteString.Lazy.Char8 as BL8
 import              Data.Char (isSpace)
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
@@ -572,9 +571,6 @@ installGhcBindist sopts getSetupInfo' installed = do
     Platform expectedArch _ <- view platformL
     let wanted = soptsWantedCompiler sopts
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
-        canUseCompiler (compilerVersion, arch, _dir)
-            | soptsSkipGhcCheck sopts = True
-            | otherwise = isWanted compilerVersion && arch == expectedArch
     config <- view configL
     ghcVariant <- view ghcVariantL
     possibleCompilers <-
@@ -606,21 +602,13 @@ installGhcBindist sopts getSetupInfo' installed = do
                     (soptsCompilerCheck sopts)
                     (soptsGHCBindistURL sopts)
             | otherwise -> do
-                recommendSystemGhc <-
-                    if soptsUseSystem sopts
-                        then return False
-                        else do
-                            msystemGhc <- getSystemCompiler wanted
-                            return (any canUseCompiler msystemGhc)
                 let suggestion = fromMaybe
                         (mconcat
-                             ([ "To install the correct GHC into "
-                              , T.pack (toFilePath (configLocalPrograms config))
-                              , ", try running \"stack setup\" or use the \"--install-ghc\" flag."
-                              ] ++
-                              [ " To use your system GHC installation, run \"stack config set system-ghc --global true\", or use the \"--system-ghc\" flag."
-                              | recommendSystemGhc
-                              ]))
+                             [ "To install the correct GHC into "
+                             , T.pack (toFilePath (configLocalPrograms config))
+                             , ", try running \"stack setup\" or use the \"--install-ghc\" flag."
+                             , " To use your system GHC installation, run \"stack config set system-ghc --global true\", or use the \"--system-ghc\" flag."
+                             ])
                         (soptsResolveMissingGHC sopts)
                 throwM $ CompilerVersionMismatch
                     Nothing -- FIXME ((\(x, y, _) -> (x, y)) <$> msystem)
@@ -641,27 +629,49 @@ ensureCompiler
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-
-    msystem <-
-        if soptsUseSystem sopts
-            then do
-                logDebug "Getting system compiler version"
-                getSystemCompiler wanted
-            else return Nothing
+        wc = whichCompiler $ wantedToActual wanted
 
     Platform expectedArch _ <- view platformL
 
-    let canUseCompiler (compilerVersion, arch, _dir)
-            | soptsSkipGhcCheck sopts = True
-            | otherwise = isWanted compilerVersion && arch == expectedArch
+    let canUseCompiler cp
+            | soptsSkipGhcCheck sopts = pure cp
+            | not $ isWanted $ cpCompilerVersion cp = throwString "Not the compiler version we want"
+            | cpArch cp /= expectedArch = throwString "Not the architecture we want"
+            | otherwise = pure cp
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
-    (compilerBuild, mcompiler, isSandboxed, paths, mcompilerTool) <-
-      case msystem of
-        Just system@(_, _, compiler) | canUseCompiler system -> do
-          let paths = ExtraDirs { edBins = [parent compiler], edInclude = [], edLib = [] }
-          return (CompilerBuildStandard, Just compiler, False, paths, Nothing)
-        _ -> do
+    let checkCompiler :: Path Abs File -> RIO env (Maybe CompilerPaths)
+        checkCompiler compiler = do
+          eres <- tryAny $ pathsFromCompiler wc CompilerBuildStandard False compiler >>= canUseCompiler
+          case eres of
+            Left e -> do
+              logDebug $ "Not using compiler at " <> displayShow (toFilePath compiler) <> ": " <> displayShow e
+              pure Nothing
+            Right cp -> pure $ Just cp
+
+    mcp <-
+        if soptsUseSystem sopts
+            then do
+                logDebug "Getting system compiler version"
+                runConduit $
+                  sourceSystemCompilers wanted .|
+                  concatMapMC checkCompiler .|
+                  await
+            else return Nothing
+    case mcp of
+      Nothing -> ensureSandboxedCompiler sopts getSetupInfo'
+      Just cp -> do
+        let paths = ExtraDirs { edBins = [parent $ cpCompiler cp], edInclude = [], edLib = [] }
+        pure (cp, paths)
+
+ensureSandboxedCompiler
+  :: HasConfig env
+  => SetupOpts
+  -> Memoized SetupInfo
+  -> RIO env (CompilerPaths, ExtraDirs)
+ensureSandboxedCompiler sopts getSetupInfo' = do
+    let wanted = soptsWantedCompiler sopts
+    (compilerBuild, mcompiler, isSandboxed, paths, mcompilerTool) <- do
             -- List installed tools
             config <- view configL
             let localPrograms = configLocalPrograms config
@@ -739,7 +749,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
     menv0 <- view processContextL
     menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
     cabalPkgVer <- withProcessContext menv $ getCabalPkgVer pkg
-    compilerVer <- getCompilerVersion wc compiler
 
     interpreter <- findHelper $
                    \case
@@ -749,19 +758,39 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
                \case
                   Ghc -> ["haddock", "haddock-ghc"]
                   Ghcjs -> ["haddock-ghcjs"]
-    info <- proc (toFilePath compiler) ["--info"]
-          $ fmap (toStrictBytes . fst) . readProcess_
+    infobs <- proc (toFilePath compiler) ["--info"]
+            $ fmap (toStrictBytes . fst) . readProcess_
+    infotext <-
+      case decodeUtf8' infobs of
+        Left e -> throwString $ "GHC info is not valid UTF-8: " ++ show e
+        Right info -> pure info
+    infoPairs :: [(String, String)] <-
+      case readMaybe $ T.unpack infotext of
+        Nothing -> throwString "GHC info does not parse as a list of pairs"
+        Just infoPairs -> pure infoPairs
+    let infoMap = Map.fromList infoPairs
 
     eglobaldb <- tryAny $
-      case decodeUtf8' info of
-        Left e -> throwString $ "GHC info is not valid UTF-8: " ++ show e
-        Right text ->
-          case readMaybe $ T.unpack text of
-            Nothing -> throwString "GHC info does not parse as a list of pairs"
-            Just (pairs' :: [(String, String)]) ->
-              case lookup "Global Package DB" pairs' of
-                Nothing -> throwString "Key 'Global Package DB' not found in GHC info"
-                Just db -> parseAbsDir db
+      case Map.lookup "Global Package DB" infoMap of
+        Nothing -> throwString "Key 'Global Package DB' not found in GHC info"
+        Just db -> parseAbsDir db
+
+    arch <-
+      case Map.lookup "Target platform" infoMap of
+        Nothing -> throwString "Key 'Target platform' not found in GHC info"
+        Just targetPlatform ->
+          case simpleParse $ takeWhile (/= '-') targetPlatform of
+            Nothing -> throwString $ "Invalid target platform in GHC info: " ++ show targetPlatform
+            Just arch -> pure arch
+    compilerVer <-
+      case wc of
+        Ghc ->
+          case Map.lookup "Project version" infoMap of
+            Nothing -> do
+              logWarn "Key 'Project version' not found in GHC info"
+              getCompilerVersion wc compiler
+            Just versionString' -> ACGhc <$> parseVersionThrowing versionString'
+        Ghcjs -> getCompilerVersion wc compiler
     globaldb <-
       case eglobaldb of
         Left e -> do
@@ -772,6 +801,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
         Right x -> pure x
     return CompilerPaths
       { cpBuild = compilerBuild
+      , cpArch = arch
       , cpSandboxed = isSandboxed
       , cpCompilerVersion = compilerVer
       , cpCompiler = compiler
@@ -780,7 +810,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = handleAny onErr $ do
       , cpHaddock = haddock
       , cpCabalVersion = cabalPkgVer
       , cpGlobalDB = globaldb
-      , cpGhcInfo = info
+      , cpGhcInfo = infobs
       }
   where
     onErr = throwIO . InvalidGhcAt compiler
@@ -1018,40 +1048,29 @@ ensureDockerStackExe containerPlatform = do
         downloadStackExe platforms sri stackExeDir False (const $ return ())
     return stackExePath
 
--- | Get the version of the system compiler, if available
-getSystemCompiler
+-- | Get all executables on the path that might match the wanted compiler
+sourceSystemCompilers
   :: (HasProcessContext env, HasLogFunc env)
   => WantedCompiler
-  -> RIO env (Maybe (ActualCompiler, Arch, Path Abs File))
-getSystemCompiler wanted = do
-    let actual = wantedToActual wanted
-        wc = whichCompiler actual
-        exeName = compilerVersionString actual
-    logDebug $ "Looking for executable named " <> fromString exeName
-    mexe <- findExecutable exeName
-    case mexe of
-      Left e -> do
-        logDebug $ "No such executable found on the PATH: " <> displayShow e
-        pure Nothing
-      Right exe -> do
-        logDebug $ "Found executable at " <> fromString exe
-        exePath <- parseAbsFile exe
-        eres <- proc exe ["--info"] $ tryAny . fmap fst . readProcess_
-        logDebug $ "--info results: " <> displayShow eres
-        let minfo = do
-                Right lbs <- Just eres
-                pairs_ <- readMaybe $ BL8.unpack lbs :: Maybe [(String, String)]
-                version <- lookup "Project version" pairs_ >>= parseVersionThrowing
-                arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
-                return (version, arch)
-        case (wc, minfo) of
-            (Ghc, Just (version, arch)) -> return (Just (ACGhc version, arch, exePath))
-            (Ghcjs, Just (_, arch)) -> do
-                eversion <- tryAny $ getCompilerVersion Ghcjs exePath
-                case eversion of
-                    Left _ -> return Nothing
-                    Right version -> return (Just (version, arch, exePath))
-            (_, Nothing) -> return Nothing
+  -> ConduitT i (Path Abs File) (RIO env) ()
+sourceSystemCompilers wanted = do
+  searchPath <- view exeSearchPathL
+  for_ searchPath $ \dir -> for names $ \name -> do
+    fp <- parseAbsFile $ addExe $ dir FP.</> name
+    exists <- doesFileExist fp
+    when exists $ yield fp
+  where
+    names =
+      case wanted of
+        WCGhc version ->
+          [ "ghc"
+          , "ghc-" ++ versionString version
+          ]
+        WCGhcjs{} -> ["ghcjs"]
+        WCGhcGit{} -> [] -- ^ only use sandboxed versions
+    addExe
+      | osIsWindows = (++ ".exe")
+      | otherwise = id
 
 -- | Download the most recent SetupInfo
 getSetupInfo :: HasConfig env => String -> RIO env SetupInfo

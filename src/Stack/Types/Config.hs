@@ -194,7 +194,7 @@ import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
-import           Distribution.System (Platform)
+import           Distribution.System (Platform, Arch)
 import qualified Distribution.Text
 import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
@@ -1885,6 +1885,7 @@ getGhcPkgExe = view $ compilerPathsL.to cpPkg
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
   { cpCompilerVersion :: !ActualCompiler
+  , cpArch :: !Arch
   , cpBuild :: !CompilerBuild
   , cpCompiler :: !(Path Abs File)
   -- | ghc-pkg or equivalent
