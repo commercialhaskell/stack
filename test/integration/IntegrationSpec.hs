@@ -29,8 +29,9 @@ main = runSimpleApp $ do
   args <- liftIO getArgs
   fast <-
     case args of
-      [] -> pure Slow
+      [] -> pure Normal
       ["--fast"] -> pure Fast
+      ["--superslow"] -> pure Superslow
       _ -> error $ "Unknown arguments: " ++ show args
 
   results <- runApp fast $ do
@@ -68,7 +69,7 @@ main = runSimpleApp $ do
       for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
       liftIO exitFailure
 
-data Speed = Fast | Slow
+data Speed = Fast | Normal | Superslow
 
 exeExt :: String
 exeExt = if isWindows then ".exe" else ""
@@ -99,6 +100,10 @@ runApp speed inner = do
         = Map.insert "SRC_DIR" (fromString srcDir)
         . Map.insert "STACK_EXE" (fromString stack)
         . Map.delete "GHC_PACKAGE_PATH"
+        . Map.insert "STACK_TEST_SPEED"
+            (case speed of
+              Superslow -> "SUPERSLOW"
+              _ -> "NORMAL")
         . Map.fromList
         . map (first T.toUpper)
         . Map.toList
@@ -113,7 +118,7 @@ runApp speed inner = do
             , appTestDirs = testDirs
             }
       runRIO app $ withModifyEnvVars modifyEnvCommon inner
-    Slow -> do
+    _ -> do
       morigStackRoot <- liftIO $ lookupEnv "STACK_ROOT"
       origStackRoot <-
         case morigStackRoot of
