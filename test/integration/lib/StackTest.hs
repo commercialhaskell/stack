@@ -290,4 +290,7 @@ superslow inner = do
     Just "SUPERSLOW" -> do
       logInfo "Running superslow test, hold on to your butts"
       inner
-    _ -> error $ "Invalid value for STACK_TEST_SPEED env var: " ++ show mres
+    Nothing -> do
+      logInfo "No STACK_TEST_SPEED specified. Executing superslow test, hold on to your butts"
+      inner
+    Just x -> error $ "Invalid value for STACK_TEST_SPEED env var: " ++ show x

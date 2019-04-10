@@ -2,14 +2,14 @@ import StackTest
 import System.Directory (withCurrentDirectory)
 
 main :: IO ()
-main = do
+main = superslow $ do
     -- cleanup previous failing test...
     removeDirIgnore "tmpPackage"
 
     stack ["new", "--resolver=lts-13.11", "tmpPackage"]
 
     -- use a commit which is known to succeed with hadrian binary-dist
-    let commitId = "33b0a291898b6a35d822fde59864c5c94a53d039"
+    let commitId = "be0dde8e3c27ca56477d1d1801bb77621f3618e1"
         flavour  = "quick"
 
     withCurrentDirectory "tmpPackage" $ do
