@@ -172,7 +172,7 @@ buildOptsMonoidParser hide0 =
                  help "Skip given component, can be specified multiple times" <>
                  hide)))
     interleavedOutput =
-        firstBoolFlagsFalse
+        firstBoolFlagsTrue
             "interleaved-output"
             "Print concurrent GHC output to the console with a prefix for the package name"
             hide

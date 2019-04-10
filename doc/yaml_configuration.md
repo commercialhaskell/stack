@@ -714,8 +714,8 @@ build:
   cabal-verbose: false
   split-objs: false
 
-  # Since 1.8
-  interleaved-output: false
+  # Since 1.8. Starting with 2.0, the default is true
+  interleaved-output: true
 
   # Since 1.10
   ddump-dir: ""
