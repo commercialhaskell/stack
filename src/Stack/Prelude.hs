@@ -58,7 +58,7 @@ withKeepSystemTempDir str inner = withRunInIO $ \run -> do
 
 -- | Consume the stdout and stderr of a process feeding strict 'ByteString's to the consumers.
 --
--- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ExitCodeException' if the process itself fails.
 sinkProcessStderrStdout
   :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command

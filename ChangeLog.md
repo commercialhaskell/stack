@@ -254,6 +254,9 @@ Bug fixes:
 * When the Cabal spec version is newer than the global Cabal version, build
   against the snapshot's Cabal library. See
   [#4488](https://github.com/commercialhaskell/stack/issues/4488)
+- Docker: fix detection of expected subprocess failures.  This fixes
+  downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
+  extra error when the in-container re-exec'ed `stack` exits with failure.
 
 ## v1.9.3
 
