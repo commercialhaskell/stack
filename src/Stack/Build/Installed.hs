@@ -117,7 +117,8 @@ loadDatabase :: HasEnvConfig env
              -> RIO env ([LoadHelper], [DumpPackage])
 loadDatabase installMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
-    (lhs1', dps) <- ghcPkgDump (fmap snd (maybeToList mdb))
+    pkgexe <- getGhcPkgExe
+    (lhs1', dps) <- ghcPkgDump pkgexe (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage .| sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'

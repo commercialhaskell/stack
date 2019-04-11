@@ -121,6 +121,15 @@ checkCabalVersion = do
             "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
             versionString cabalVer ++
             " was found."
+    -- Since --exact-configuration is always passed, some old cabal
+    -- versions can no longer be used. See the following link for why
+    -- it's 1.19.2:
+    -- https://github.com/haskell/cabal/blob/580fe6b6bf4e1648b2f66c1cb9da9f1f1378492c/cabal-install/Distribution/Client/Setup.hs#L592
+    when (cabalVer < mkVersion [1, 19, 2]) $ throwM $
+        CabalVersionException $
+            "Stack no longer supports Cabal versions older than 1.19.2, but version " ++
+            versionString cabalVer ++
+            " was found.  To fix this, consider updating the resolver to lts-3.0 or later / nightly-2015-05-05 or later."
 
 newtype CabalVersionException = CabalVersionException { unCabalVersionException :: String }
     deriving (Typeable)

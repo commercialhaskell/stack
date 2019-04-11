@@ -801,7 +801,8 @@ execCmd ExecOpts {..} =
 
       -- return the package-id of the first package in GHC_PACKAGE_PATH
       getPkgId name = do
-          mId <- findGhcPkgField [] name "id"
+          pkg <- getGhcPkgExe
+          mId <- findGhcPkgField pkg [] name "id"
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
@@ -838,7 +839,7 @@ execCmd ExecOpts {..} =
 
       getRunGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs
-          interpret <- cpInterpreter
+          interpret <- view $ compilerPathsL.to cpInterpreter
           return (toFilePath interpret, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()

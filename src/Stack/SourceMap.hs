@@ -19,9 +19,10 @@ module Stack.SourceMap
     , immutableLocSha
     , loadProjectSnapshotCandidate
     , SnapshotCandidate
+    , globalsFromDump
     ) where
 
-import Data.ByteString.Builder (byteString, lazyByteString)
+import Data.ByteString.Builder (byteString)
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import Distribution.System (Platform(..))
@@ -121,15 +122,16 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-       (HasLogFunc env, HasProcessContext env, HasCompiler env)
-    => RIO env (Map PackageName DumpedGlobalPackage)
-globalsFromDump = do
+       (HasLogFunc env, HasProcessContext env)
+    => GhcPkgExe
+    -> RIO env (Map PackageName DumpedGlobalPackage)
+globalsFromDump pkgexe = do
     let pkgConduit =
             conduitDumpPackage .|
             CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
         toGlobals ds =
           Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
-    toGlobals <$> ghcPkgDump [] pkgConduit
+    toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
 globalsFromHints ::
        HasConfig env
@@ -152,7 +154,7 @@ actualFromGhc ::
     -> ActualCompiler
     -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-    globals <- globalsFromDump
+    globals <- view $ compilerPathsL.to cpGlobalDump
     return
         SMActual
         { smaCompiler = ac
@@ -238,9 +240,7 @@ pruneGlobals globals deps =
      Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
-getCompilerInfo = do
-    compilerExe <- view $ compilerPathsL.to cpCompiler.to toFilePath
-    lazyByteString . fst <$> proc compilerExe ["--info"] readProcess_
+getCompilerInfo = view $ compilerPathsL.to (byteString . cpGhcInfo)
 
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey

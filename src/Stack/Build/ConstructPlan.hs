@@ -181,7 +181,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       prettyWarn $ flow "You are trying to upgrade/downgrade base, which is almost certainly not what you really want. Please, consider using another GHC version if you need a certain version of base, or removing base from extra-deps. See more at https://github.com/commercialhaskell/stack/issues/3940." <> line
 
     econfig <- view envConfigL
-    globalCabalVersion <- cpCabalVersion
+    globalCabalVersion <- view $ compilerPathsL.to cpCabalVersion
     sources <- getSources globalCabalVersion
     mcur <- view $ buildConfigL.to bcCurator
 

@@ -142,11 +142,10 @@ module Stack.Types.Config
   ,wantedCompilerVersionL
   ,actualCompilerVersionL
   ,HasCompiler(..)
+  ,DumpPackage(..)
   ,CompilerPaths(..)
-  ,cpInterpreter
-  ,cpHaddock
-  ,cpCabalVersion
-  ,cpGlobalDB
+  ,GhcPkgExe(..)
+  ,getGhcPkgExe
   ,cpWhich
   ,ExtraDirs(..)
   ,buildOptsL
@@ -194,9 +193,11 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.License as C
+import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
-import           Distribution.System (Platform)
+import           Distribution.System (Platform, Arch)
 import qualified Distribution.Text
 import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
@@ -215,6 +216,7 @@ import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
+import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Nix
 import           Stack.Types.Resolver
@@ -560,7 +562,6 @@ data EnvConfig = EnvConfig
     ,envConfigSourceMap :: !SourceMap
     ,envConfigSourceMapHash :: !SourceMapHash
     ,envConfigCompilerPaths :: !CompilerPaths
-    ,envConfigCabalVersion :: !Version
     }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
@@ -1265,7 +1266,7 @@ platformGhcRelDir
     => m (Path Rel Dir)
 platformGhcRelDir = do
     cp <- view compilerPathsL
-    let cbSuffix = maybe "" compilerBuildSuffix $ cpBuild cp
+    let cbSuffix = compilerBuildSuffix $ cpBuild cp
     verOnly <- platformGhcVerOnlyRelDirStr
     parseRelDir (mconcat [ verOnly, cbSuffix ])
 
@@ -1878,54 +1879,57 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
+-- | Location of the ghc-pkg executable
+newtype GhcPkgExe = GhcPkgExe (Path Abs File)
+
+-- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
+getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
+getGhcPkgExe = view $ compilerPathsL.to cpPkg
+
+-- | Dump information for a single package
+data DumpPackage = DumpPackage
+    { dpGhcPkgId :: !GhcPkgId
+    , dpPackageIdent :: !PackageIdentifier
+    , dpParentLibIdent :: !(Maybe PackageIdentifier)
+    , dpLicense :: !(Maybe C.License)
+    , dpLibDirs :: ![FilePath]
+    , dpLibraries :: ![Text]
+    , dpHasExposedModules :: !Bool
+    , dpExposedModules :: !(Set ModuleName)
+    , dpDepends :: ![GhcPkgId]
+    , dpHaddockInterfaces :: ![FilePath]
+    , dpHaddockHtml :: !(Maybe FilePath)
+    , dpIsExposed :: !Bool
+    }
+    deriving (Show, Eq)
+
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
   { cpCompilerVersion :: !ActualCompiler
-  , cpBuild :: !(Maybe CompilerBuild)
+  , cpArch :: !Arch
+  , cpBuild :: !CompilerBuild
   , cpCompiler :: !(Path Abs File)
   -- | ghc-pkg or equivalent
-  , cpPkg :: !(Path Abs File)
-  -- | runghc, in 'IO' to allow deferring the lookup
-  , cpInterpreter' :: !(CompilerPaths -> IO (Path Abs File))
+  , cpPkg :: !GhcPkgExe
+  -- | runghc
+  , cpInterpreter :: !(Path Abs File)
   -- | haddock, in 'IO' to allow deferring the lookup
-  , cpHaddock' :: !(CompilerPaths -> IO (Path Abs File))
+  , cpHaddock :: !(Path Abs File)
   -- | Is this a Stack-sandboxed installation?
   , cpSandboxed :: !Bool
-  , cpExtraDirs :: !ExtraDirs
-  , cpCabalVersion' :: !(CompilerPaths -> IO Version)
+  , cpCabalVersion :: !Version
   -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
   -- in the build process.
   --
   -- Note that this is not necessarily the same version as the one that stack
   -- depends on as a library and which is displayed when running
   -- @stack list-dependencies | grep Cabal@ in the stack project.
-  , cpGlobalDB' :: !(CompilerPaths -> IO (Path Abs Dir))
+  , cpGlobalDB :: !(Path Abs Dir)
   -- ^ Global package database
+  , cpGhcInfo :: !ByteString
+  -- ^ Output of @ghc --info@
+  , cpGlobalDump :: !(Map PackageName DumpPackage)
   }
-
--- | Helper for 'cpInterpreter''
-cpInterpreter :: HasCompiler env => RIO env (Path Abs File)
-cpInterpreter = do
-  env <- view compilerPathsL
-  liftIO $ cpInterpreter' env env
-
--- | Helper for 'cpHaddock''
-cpHaddock :: HasCompiler env => RIO env (Path Abs File)
-cpHaddock = do
-  env <- view compilerPathsL
-  liftIO $ cpHaddock' env env
-
--- | Helper for 'cpCabalVersion''
-cpCabalVersion :: HasCompiler env => RIO env Version
-cpCabalVersion = do
-  env <- view compilerPathsL
-  liftIO $ cpCabalVersion' env env
-
--- | Helper for 'cpGlobalDB''
-cpGlobalDB :: HasCompiler env => RIO env (Path Abs Dir)
-cpGlobalDB = do
-  env <- view compilerPathsL
-  liftIO $ cpGlobalDB' env env
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
 cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)
@@ -2001,8 +2005,8 @@ globalOptsBuildOptsMonoidL =
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
 
-cabalVersionL :: HasEnvConfig env => SimpleGetter env Version
-cabalVersionL = envConfigL.to envConfigCabalVersion
+cabalVersionL :: HasCompiler env => SimpleGetter env Version
+cabalVersionL = compilerPathsL.to cpCabalVersion
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler
