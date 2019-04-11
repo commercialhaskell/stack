@@ -1071,7 +1071,7 @@ sourceSystemCompilers wanted = do
           , "ghc"
           ]
         WCGhcjs{} -> ["ghcjs"]
-        WCGhcGit{} -> [] -- ^ only use sandboxed versions
+        WCGhcGit{} -> [] -- only use sandboxed versions
     addExe
       | osIsWindows = (++ ".exe")
       | otherwise = id
