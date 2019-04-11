@@ -18,6 +18,12 @@
 # Make pull requests at:
 # https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh
 #
+# Note that this script will ask for root access using `sudo` in order to use
+# your platform's package manager to install dependencies and to install to
+# `/usr/local/bin`.  If you prefer more control, follow the manual
+# installation instructions for your platform at:
+# https://docs.haskellstack.org/en/stable/install_and_upgrade/
+#
 
 STACK_VERSION="1.9.3"
 HOME_LOCAL_BIN="$HOME/.local/bin"
@@ -131,9 +137,14 @@ print_bindist_notice() {
 # If not, the given command is run as is
 # When requesting root permission, always show the command and never re-use cached credentials.
 sudocmd() {
+  reason="$1"; shift
   if command -v sudo >/dev/null; then
-    echo "sudo $@"
-    # -k: Disable cached credentials.
+    echo
+    echo "About to use 'sudo' to run the following command as root:"
+    echo "    $@"
+    echo "in order to $reason."
+    echo
+    # -k: Disable cached credentials (force prompt for password).
     sudo -k "$@"
   else
     "$@"
@@ -528,7 +539,7 @@ install_from_bindist() {
         info "$destdir directory does not exist; creating it..."
         # First try to create directory as current user, then try with sudo if it fails.
         if ! mkdir -p "$destdir" 2>/dev/null; then
-            if ! sudocmd mkdir -p "$destdir"; then
+            if ! sudocmd "create the destination directory" mkdir -p "$destdir"; then
                 die "Could not create directory: $DEST"
             fi
         fi
@@ -536,7 +547,7 @@ install_from_bindist() {
     # First attempt to install 'stack' as current user, then try with sudo if it fails
     info "Installing Stack to: $DEST..."
     if ! install -c -m 0755 "$STACK_TEMP_EXE" "$destdir" 2>/dev/null; then
-      if ! sudocmd install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_EXE" "$destdir"; then
+      if ! sudocmd "copy 'stack' to the destination directory" install -c -o 0 -g 0 -m 0755 "$STACK_TEMP_EXE" "$destdir"; then
         die "Install to $DEST failed"
       fi
     fi
@@ -598,37 +609,37 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  if dpkg-query -W "$@" > /dev/null; then
+  if ! dpkg-query -W "$@"|grep -v '^\S\+\s\+.\+$' > /dev/null; then
     info "Already installed!"
-  elif ! sudocmd apt-get install -y ${QUIET:+-qq} "$@"; then
+  elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq} "$@"; then
     die "Installing apt packages failed.  Please run 'apt-get update' and try again."
   fi
 }
 
 # Install packages using dnf
 dnf_install_pkgs() {
-  if ! sudocmd dnf install -y ${QUIET:+-q} "$@"; then
+  if ! sudocmd "install required system dependencies" dnf install -y ${QUIET:+-q} "$@"; then
     die "Installing dnf packages failed.  Please run 'dnf check-update' and try again."
   fi
 }
 
 # Install packages using yum
 yum_install_pkgs() {
-  if ! sudocmd yum install -y ${QUIET:+-q} "$@"; then
+  if ! sudocmd "install required system dependencies" yum install -y ${QUIET:+-q} "$@"; then
     die "Installing yum packages failed.  Please run 'yum check-update' and try again."
   fi
 }
 
 # Install packages using apk
 apk_install_pkgs() {
-  if ! sudocmd apk add --update ${QUIET:+-q} "$@"; then
+  if ! sudocmd "install required system dependencies" apk add --update ${QUIET:+-q} "$@"; then
     die "Installing apk packages failed.  Please run 'apk update' and try again."
   fi
 }
 
 # Install packages using pkg
 pkg_install_pkgs() {
-    if ! sudocmd pkg install -y "$@"; then
+    if ! sudocmd "install required system dependencies" pkg install -y "$@"; then
         die "Installing pkg packages failed.  Please run 'pkg update' and try again."
     fi
 }
