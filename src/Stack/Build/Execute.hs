@@ -993,14 +993,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 inner package cabalfp dir
 
     withOutputType pkgDir package inner
+        -- Not in interleaved mode. When building a single wanted package, dump
+        -- to the console with no prefix.
+        | console = inner $ OTConsole mempty
+
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
             inner $ OTConsole $ fromString (packageNameString (packageName package)) <> "> "
-
-        -- Not in interleaved mode. When building a single wanted package, dump
-        -- to the console with no prefix.
-        | console = inner $ OTConsole mempty
 
         -- Neither condition applies, dump to a file.
         | otherwise = do

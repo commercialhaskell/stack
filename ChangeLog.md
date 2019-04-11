@@ -92,6 +92,11 @@ Behavior changes:
   [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
   which you can use instead.
 
+* Interleaved output is now turned on by default, see
+  [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
+  addition, the `packagename> ` prefix is no longer included in
+  interelaved mode when only building a single target.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
