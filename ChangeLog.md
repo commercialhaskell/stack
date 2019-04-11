@@ -92,6 +92,10 @@ Behavior changes:
   [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
   which you can use instead.
 
+* No longer supports Cabal versions older than `1.19.2`.  This means
+  projects using snapshots earlier than `lts-3.0` or
+  `nightly-2015-05-05` will no longer build.
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
