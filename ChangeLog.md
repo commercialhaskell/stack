@@ -86,15 +86,15 @@ Behavior changes:
 * Always use the `--exact-configuration` Cabal configuration option when
   building (should mostly be a non-user-visible enhancement).
 
+* No longer supports Cabal versions older than `1.19.2`.  This means
+  projects using snapshots earlier than `lts-3.0` or
+  `nightly-2015-05-05` will no longer build.
+
 * Remove the `stack docker cleanup` command.  Docker itself now has
   [`docker image prune`](https://docs.docker.com/engine/reference/commandline/image_prune/)
   and
   [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
   which you can use instead.
-
-* No longer supports Cabal versions older than `1.19.2`.  This means
-  projects using snapshots earlier than `lts-3.0` or
-  `nightly-2015-05-05` will no longer build.
 
 Other enhancements:
 
