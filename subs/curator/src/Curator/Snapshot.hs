@@ -377,9 +377,9 @@ getPkgInfo constraints compilerVer pname rsp = do
                        ]
         collectDeps tree getBI =
           let deps0 = collectDeps0 tree getBI
-              (sublibs, otherDeps) =
-                partition (\d -> Map.member (depPkgName d) sublibraries)  deps0
-              sublibDeps = Map.foldr (<>) mempty $
+              partitionSublibs = partition (\d -> Map.member (depPkgName d) sublibraries)
+              (sublibs, otherDeps) = partitionSublibs deps0
+              (_intraDeps, sublibDeps) = partitionSublibs . Map.foldr (<>) mempty $
                 Map.restrictKeys sublibraries (Set.fromList $ map depPkgName sublibs)
           in sublibDeps <> otherDeps
         toCheck skip comp getBI condTree = (skip, comp, collectDeps condTree getBI)
