@@ -36,7 +36,6 @@ import           Data.Conduit.Process.Typed hiding (proc)
 import           Data.List (dropWhileEnd,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
-import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
@@ -137,8 +136,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
                               sinkNull
                       let compatible =
                               case e of
-                                  Left (ProcessExitedUnsuccessfully _ _) ->
-                                      False
+                                  Left ExitCodeException{} -> False
                                   Right _ -> True
                       saveDockerImageExeCache
                           (iiId imageInfo)
@@ -310,7 +308,7 @@ runContainerAndExit = do
 #endif
          )
      case e of
-       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
+       Left ExitCodeException{eceExitCode} -> liftIO (exitWith eceExitCode)
        Right () -> liftIO exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
