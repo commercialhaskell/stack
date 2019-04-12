@@ -9,7 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches.
 module Stack.Storage
@@ -31,7 +31,6 @@ module Stack.Storage
     ) where
 
 import qualified Data.ByteString as S
-import Data.Coerce (coerce)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
@@ -450,6 +449,16 @@ updateList recordCons parentFieldCons parentId indexFieldCons old new =
             map (uncurry $ recordCons parentId) $
             Set.toList (Set.difference newSet oldSet)
 
+-- | Type-restricted version of 'fromIntegral' to ensure we're making
+-- the value bigger, not smaller.
+sizeToInt64 :: COff -> Int64
+sizeToInt64 (COff i) = fromIntegral i -- fromIntegral added for 32-bit systems
+
+-- | Type-restricted version of 'fromIntegral' to ensure we're making
+-- the value bigger, not smaller.
+timeToInt64 :: CTime -> Int64
+timeToInt64 (CTime i) = fromIntegral i -- fromIntegral added for 32-bit systems
+
 -- | Load compiler information, if available, and confirm that the
 -- referenced files are unchanged. May throw exceptions!
 loadCompilerPaths
@@ -463,13 +472,13 @@ loadCompilerPaths compiler build sandboxed = do
   for mres $ \(Entity _ CompilerCache {..}) -> do
     compilerStatus <- liftIO $ getFileStatus $ toFilePath compiler
     when
-      (compilerCacheGhcSize /= coerce (fileSize compilerStatus) ||
-       compilerCacheGhcModified /= coerce (modificationTime compilerStatus))
+      (compilerCacheGhcSize /= sizeToInt64 (fileSize compilerStatus) ||
+       compilerCacheGhcModified /= timeToInt64 (modificationTime compilerStatus))
       (throwString "Compiler file metadata mismatch, ignoring cache")
     globalDbStatus <- liftIO $ getFileStatus $ compilerCacheGlobalDb FP.</> "package.cache"
     when
-      (compilerCacheGlobalDbCacheSize /= coerce (fileSize globalDbStatus) ||
-       compilerCacheGlobalDbCacheModified /= coerce (modificationTime globalDbStatus))
+      (compilerCacheGlobalDbCacheSize /= sizeToInt64 (fileSize globalDbStatus) ||
+       compilerCacheGlobalDbCacheModified /= timeToInt64 (modificationTime globalDbStatus))
       (throwString "Global package cache file metadata mismatch, ignoring cache")
 
     -- We could use parseAbsFile instead of resolveFile' below to
@@ -518,15 +527,15 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
   insert_ CompilerCache
     { compilerCacheActualVersion = cpCompilerVersion
     , compilerCacheGhcPath = toFilePath cpCompiler
-    , compilerCacheGhcSize = coerce $ fileSize compilerStatus
-    , compilerCacheGhcModified = coerce $ modificationTime compilerStatus
+    , compilerCacheGhcSize = sizeToInt64 $ fileSize compilerStatus
+    , compilerCacheGhcModified = timeToInt64 $ modificationTime compilerStatus
     , compilerCacheGhcPkgPath = toFilePath pkgexe
     , compilerCacheRunghcPath = toFilePath cpInterpreter
     , compilerCacheHaddockPath = toFilePath cpHaddock
     , compilerCacheCabalVersion = T.pack $ versionString cpCabalVersion
     , compilerCacheGlobalDb = toFilePath cpGlobalDB
-    , compilerCacheGlobalDbCacheSize = coerce $ fileSize globalDbStatus
-    , compilerCacheGlobalDbCacheModified = coerce $ modificationTime globalDbStatus
+    , compilerCacheGlobalDbCacheSize = sizeToInt64 $ fileSize globalDbStatus
+    , compilerCacheGlobalDbCacheModified = timeToInt64 $ modificationTime globalDbStatus
     , compilerCacheInfo = cpGhcInfo
     , compilerCacheGlobalDump = tshow cpGlobalDump
     , compilerCacheArch = T.pack $ Distribution.Text.display cpArch
