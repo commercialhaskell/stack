@@ -145,10 +145,16 @@ listDependencies opts = do
   if listDepsTree opts then
     do
       liftIO $ Text.putStrLn "Packages"
-      liftIO $ printTree opts 0 [] pkgs resultGraph
+      liftIO $ printTree opts 0 [] (treeRoots opts pkgs) resultGraph
     else
       void (Map.traverseWithKey go (snd <$> resultGraph))
       where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
+
+treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
+treeRoots opts projectPackages = let targets = dotTargets $ listDepsDotOpts opts
+                                  in if null targets
+                                        then projectPackages
+                                        else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
 printTree :: ListDepsOpts
           -> Int
@@ -161,12 +167,15 @@ printTree opts depth remainingDepsCounts packages dependencyMap =
   where
     toSeq = Seq.fromList . Set.toList
     go index name = let newDepsCounts = remainingDepsCounts ++ [Set.size packages - index - 1]
-                        (deps, payload) = (Map.!) dependencyMap name
-                     in do
+                     in
+                      case Map.lookup name dependencyMap of
+                        Just (deps, payload) -> do
                           printTreeNode opts depth newDepsCounts deps payload name
                           if Just depth == dotDependencyDepth (listDepsDotOpts opts)
                              then return ()
                              else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+                        -- TODO: Define this behaviour, maybe return an error?
+                        Nothing -> return ()
 
 printTreeNode :: ListDepsOpts
               -> Int
