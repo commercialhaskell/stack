@@ -151,10 +151,11 @@ listDependencies opts = do
       where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
-treeRoots opts projectPackages = let targets = dotTargets $ listDepsDotOpts opts
-                                  in if null targets
-                                        then projectPackages
-                                        else Set.fromList $ map (mkPackageName . Text.unpack) targets
+treeRoots opts projectPackages' =
+  let targets = dotTargets $ listDepsDotOpts opts
+   in if null targets
+        then projectPackages'
+        else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
 printTree :: ListDepsOpts
           -> Int
