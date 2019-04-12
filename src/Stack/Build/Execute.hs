@@ -1193,6 +1193,9 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         OTLogFile _ h ->
                             proc (toFilePath exeName) fullArgs
                           $ runProcess_
+                            -- Don't use closed, since that can break
+                            -- ./configure scripts. See:
+                            -- https://github.com/commercialhaskell/stack/pull/4722
                           . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
