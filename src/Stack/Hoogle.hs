@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -23,7 +24,9 @@ import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
+#if !MIN_VERSION_rio(0,1,9)
 import           System.Exit
+#endif
 import           RIO.Process
 
 -- | Hoogle command.

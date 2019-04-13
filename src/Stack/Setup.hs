@@ -93,7 +93,9 @@ import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
+#if !MIN_VERSION_rio(0,1,9)
 import              System.Exit (ExitCode (..), exitFailure)
+#endif
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP

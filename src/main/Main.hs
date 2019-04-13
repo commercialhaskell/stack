@@ -105,7 +105,9 @@ import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
+#if !MIN_VERSION_rio(0,1,9)
 import           System.Exit
+#endif
 import           System.FilePath (isValid, pathSeparator)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hPrint, hGetEncoding, hSetEncoding)

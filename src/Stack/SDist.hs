@@ -24,7 +24,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
-import           Data.Data (cast)
+import           Data.Data (cast, gmapT)
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE

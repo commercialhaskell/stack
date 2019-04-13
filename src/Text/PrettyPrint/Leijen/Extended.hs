@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -124,7 +125,11 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as LTB
+#if !MIN_VERSION_rio(0,1,9)
 import Stack.Prelude hiding (Display (..))
+#else
+import Stack.Prelude hiding (Display (..), empty)
+#endif
 import System.Console.ANSI (Color(..), ColorIntensity(..), ConsoleLayer(..), ConsoleIntensity(..), SGR(..), setSGRCode, hSupportsANSI)
 import qualified Text.PrettyPrint.Annotated.Leijen as P
 import Text.PrettyPrint.Annotated.Leijen hiding ((<>), display)
