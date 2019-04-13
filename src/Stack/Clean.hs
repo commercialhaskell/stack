@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -19,7 +20,9 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
+#if !MIN_VERSION_rio(0,1,9)
 import           System.Exit (exitFailure)
+#endif
 
 -- | Deletes build artifacts in the current project.
 --
