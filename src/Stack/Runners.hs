@@ -187,7 +187,7 @@ shouldUpgradeCheck = do
     let yesterday = addUTCTime (-24 * 60 * 60) now
     checks <- upgradeChecksSince yesterday
     when (checks == 0) $ do
-      mversion <- getLatestHackageVersion "stack" UsePreferredVersions -- FIXME ensure it doesn't force an update ever
+      mversion <- getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions
       case mversion of
         Just (PackageIdentifierRevision _ version _) | version > mkVersion' Paths_stack.version -> do
           logWarn "<<<<<<<<<<<<<<<<<<"

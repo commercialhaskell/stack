@@ -343,7 +343,7 @@ resolveRawTarget sma allLocs (ri, rt) =
               ]
             -- Not present at all, add it from Hackage
             Nothing -> do
-              mrev <- getLatestHackageRevision name version
+              mrev <- getLatestHackageRevision YesRequireHackageIndex name version
               pure $ case mrev of
                 Nothing -> deferToConstructPlan name
                 Just (_rev, cfKey, treeKey) -> Right ResolveResult
@@ -355,7 +355,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   }
 
     hackageLatest name = do
-        mloc <- getLatestHackageLocation name UsePreferredVersions
+        mloc <- getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
         pure $ case mloc of
           Nothing -> deferToConstructPlan name
           Just loc -> do
@@ -368,7 +368,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   }
 
     hackageLatestRevision name version = do
-        mrev <- getLatestHackageRevision name version
+        mrev <- getLatestHackageRevision YesRequireHackageIndex name version
         pure $ case mrev of
           Nothing -> deferToConstructPlan name
           Just (_rev, cfKey, treeKey) -> Right ResolveResult

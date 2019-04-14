@@ -5,6 +5,7 @@
 module Pantry.Hackage
   ( updateHackageIndex
   , DidUpdateOccur (..)
+  , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackageTarball
   , getHackageTarballKey
@@ -335,7 +336,7 @@ fuzzyLookupCandidates
   -> Version
   -> RIO env FuzzyResults
 fuzzyLookupCandidates name ver0 = do
-  m <- getHackagePackageVersions UsePreferredVersions name
+  m <- getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions name
   if Map.null m
     then FRNameNotFound <$> getHackageTypoCorrections name
     else
@@ -390,18 +391,37 @@ getHackageTypoCorrections name1 =
 data UsePreferredVersions = UsePreferredVersions | IgnorePreferredVersions
   deriving Show
 
+-- | Require that the Hackage index is populated.
+--
+-- @since 0.1.0.0
+data RequireHackageIndex
+  = YesRequireHackageIndex
+    -- ^ If there is nothing in the Hackage index, then perform an update
+  | NoRequireHackageIndex
+    -- ^ Do not perform an update
+  deriving Show
+
+initializeIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => RequireHackageIndex
+  -> RIO env ()
+initializeIndex NoRequireHackageIndex = pure ()
+initializeIndex YesRequireHackageIndex = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+
 -- | Returns the versions of the package available on Hackage.
 --
 -- @since 0.1.0.0
 getHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
-  => UsePreferredVersions
+  => RequireHackageIndex
+  -> UsePreferredVersions
   -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getHackagePackageVersions usePreferred name = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersions req usePreferred name = do
+  initializeIndex req
   withStorage $ do
     mpreferred <-
       case usePreferred of
@@ -420,13 +440,12 @@ getHackagePackageVersions usePreferred name = do
 -- @since 0.1.0.0
 getHackagePackageVersionRevisions
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> Version -- ^ package version
   -> RIO env (Map Revision BlobKey)
-getHackagePackageVersionRevisions name version = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersionRevisions req name version = do
+  initializeIndex req
   withStorage $
     Map.map snd <$> loadHackagePackageVersion name version
 
