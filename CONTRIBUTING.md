@@ -166,11 +166,13 @@ We use [Azure](https://dev.azure.com/commercialhaskell/stack/_build)
 to do CI builds on Stack. There are two types of build which happens
 there:
 
-### Unit based build
+### Test suite build
 
-This build runs only the unit tests in the Stack codebase. These are
-the rules for triggering it:
-* CI will run this if commits are pushed to stable,master branch
+This builds the code with `--pedantic`, performs hlint checks and it
+runs all test suites on multiple GHC/OS configuration. These are the
+rules for triggering it:
+
+* CI will run this if commits are pushed to stable, master branch
 * CI will run this for any branches starting with `ci/`
 * CI will run this for all new PR's.
 
@@ -180,7 +182,10 @@ This build runs the integration tests in the Stack codebase. This is
 scheduled to run daily once for both the stable and master branches.
 
 Also, you can manually run this on a specific branch from the Azure UI
-if you have the appropriate permissions.
+if you have the appropriate permissions. If you'd specifically like a
+branch or PR to run integration tests, add a comment in the PR and we
+can queue one up.
+
 
 ### Skipping build
 
