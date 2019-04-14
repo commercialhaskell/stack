@@ -22,7 +22,7 @@ spec = do
           hClose h :: IO ()
           abs' <- resolveFile' fp
           globalOpts <- globalOptsFromMonoid False mempty
-          withRunnerGlobal globalOpts { globalLogLevel = LevelError } $ inner abs'
+          withRunnerGlobal globalOpts { globalLogLevel = LevelOther "silent" } $ inner abs'
     it' "unknown compiler" $ \fp -> do
       mmap <- loadGlobalHints fp $ WCGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])
       liftIO $ mmap `shouldBe` Nothing
