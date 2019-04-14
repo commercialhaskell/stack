@@ -1072,4 +1072,12 @@ Build output when disabled:
 ...
 ```
 
+### recommend-stack-upgrade
+
+When Stack notices that a new version of Stack is available, should it notify the user?
+
+```yaml
+recommend-stack-upgrade: true
+```
+
 Since 2.0

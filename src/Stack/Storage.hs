@@ -28,6 +28,8 @@ module Stack.Storage
     , saveDockerImageExeCache
     , loadCompilerPaths
     , saveCompilerPaths
+    , upgradeChecksSince
+    , logUpgradeCheck
     ) where
 
 import qualified Data.ByteString as S
@@ -151,6 +153,10 @@ CompilerCache
   globalDump Text
 
   UniqueCompilerInfo ghcPath
+
+-- History of checks for whether we should upgrade Stack
+UpgradeCheck
+  timestamp UTCTime
 |]
 
 -- | Initialize the database.
@@ -544,3 +550,11 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
     , compilerCacheGlobalDump = tshow cpGlobalDump
     , compilerCacheArch = T.pack $ Distribution.Text.display cpArch
     }
+
+-- | How many upgrade checks have occurred since the given timestamp?
+upgradeChecksSince :: HasConfig env => UTCTime -> RIO env Int
+upgradeChecksSince since = withStorage $ count [UpgradeCheckTimestamp >=. since]
+
+-- | Log in the database that an upgrade check occurred at the given time.
+logUpgradeCheck :: HasConfig env => UTCTime -> RIO env ()
+logUpgradeCheck = withStorage . insert_ . UpgradeCheck

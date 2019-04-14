@@ -362,6 +362,8 @@ data Config =
          -- ^ Database connection pool for Stack database
          ,configHideSourcePaths     :: !Bool
          -- ^ Enable GHC hiding source paths?
+         ,configRecommendUpgrade    :: !Bool
+         -- ^ Recommend a Stack upgrade?
          }
 
 -- | The project root directory, if in a project.
@@ -768,6 +770,8 @@ data ConfigMonoid =
     , configMonoidStyles             :: !StylesUpdate
     , configMonoidHideSourcePaths    :: !FirstTrue
     -- ^ See 'configHideSourcePaths'
+    , configMonoidRecommendUpgrade   :: !FirstTrue
+    -- ^ See 'configRecommendUpgrade'
     }
   deriving (Show, Generic)
 
@@ -884,6 +888,7 @@ parseConfigMonoidObject rootDir obj = do
                                               <|> configMonoidStylesGB
 
     configMonoidHideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
+    configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
 
     return ConfigMonoid {..}
   where
@@ -1037,6 +1042,9 @@ configMonoidStylesGBName = "stack-colours"
 
 configMonoidHideSourcePathsName :: Text
 configMonoidHideSourcePathsName = "hide-source-paths"
+
+configMonoidRecommendUpgradeName :: Text
+configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
