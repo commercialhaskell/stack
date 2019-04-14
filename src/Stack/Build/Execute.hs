@@ -908,7 +908,7 @@ announceTask task x = logInfo $
 -- console (with some prefix).
 data OutputType
   = OTLogFile !(Path Abs File) !Handle
-  | OTConsole !Utf8Builder
+  | OTConsole !(Maybe Utf8Builder)
 
 -- | This sets up a context for executing build steps which need to run
 -- Cabal (via a compiled Setup.hs).  In particular it does the following:
@@ -998,12 +998,12 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
     withOutputType pkgDir package inner
         -- Not in interleaved mode. When building a single wanted package, dump
         -- to the console with no prefix.
-        | console = inner $ OTConsole mempty
+        | console = inner $ OTConsole Nothing
 
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
-            inner $ OTConsole $ fromString (packageNameString (packageName package)) <> "> "
+            inner $ OTConsole $ Just $ fromString (packageNameString (packageName package)) <> "> "
 
         -- Neither condition applies, dump to a file.
         | otherwise = do
@@ -1199,7 +1199,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                           . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
-                        OTConsole prefix ->
+                        OTConsole mprefix ->
+                            let prefix = fold mprefix in
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                                 (outputSink KeepTHLoading LevelWarn compilerVer prefix)
                                 (outputSink stripTHLoading LevelInfo compilerVer prefix)
@@ -1878,10 +1879,17 @@ singleTest topts testsToRun ac ee task installedMap = do
                             liftIO $ hFlush stderr
                           OTLogFile _ _ -> pure ()
 
-                        let output setter =
+                        let output =
                                 case outputType of
-                                    OTConsole _ -> id
-                                    OTLogFile _ h -> setter (useHandleOpen h)
+                                    OTConsole Nothing -> Nothing <$ inherit
+                                    OTConsole (Just prefix) -> fmap
+                                      (\src -> Just $ runConduit $ src .|
+                                               CT.decodeUtf8Lenient .|
+                                               CT.lines .|
+                                               CL.map stripCR .|
+                                               CL.mapM_ (\t -> logInfo $ prefix <> RIO.display t))
+                                      createSource
+                                    OTLogFile _ h -> Nothing <$ useHandleOpen h
                             optionalTimeout action
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
                                     timeout (maxSecs * 1000000) action
@@ -1899,10 +1907,15 @@ singleTest topts testsToRun ac ee task installedMap = do
                                        show (logPath, mkUnqualComponentName (T.unpack testName))
                                 else pure mempty
                             let pc = setStdin (byteStringInput stdinBS)
-                                   $ output setStdout
-                                   $ output setStderr
+                                   $ setStdout output
+                                   $ setStderr output
                                      pc0
-                            runProcess pc
+                            withProcess pc $ \p -> do
+                              case (getStdout p, getStderr p) of
+                                (Nothing, Nothing) -> pure ()
+                                (Just x, Just y) -> concurrently_ x y
+                                (x, y) -> assert False $ concurrently_ (fromMaybe (pure ()) x) (fromMaybe (pure ()) y)
+                              waitExitCode p
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
                         case outputType of
