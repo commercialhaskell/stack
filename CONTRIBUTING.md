@@ -182,6 +182,13 @@ scheduled to run daily once for both the stable and master branches.
 Also, you can manually run this on a specific branch from the Azure UI
 if you have the appropriate permissions.
 
+### Skipping build
+
+There are times (like a minor type fix) where you don't want the CI to
+run. For those cases, you can add `[skip ci]` or `[ci skip]` in your
+commit message to skip the builds. For more details, [refer
+here](https://github.com/Microsoft/azure-pipelines-agent/issues/858#issuecomment-475768046).
+
 ## Slack channel
 
 If you're making deep changes and real-time communcation with the Stack team
