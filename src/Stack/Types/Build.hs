@@ -629,9 +629,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration"]
+    , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]
   where
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
+    cv = view (actualCompilerVersionL.to getGhcVersion) econfig
+
+    hideSourcePaths ghcVersion = ghcVersion >= mkVersion [8, 2] && configHideSourcePaths config
+
     config = view configL econfig
     bopts = bcoBuildOpts bco
 

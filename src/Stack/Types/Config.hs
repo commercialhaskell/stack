@@ -883,6 +883,8 @@ parseConfigMonoidObject rootDir obj = do
     let configMonoidStyles = fromMaybe mempty $   configMonoidStylesUS
                                               <|> configMonoidStylesGB
 
+    configMonoidHideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
+
     return ConfigMonoid {..}
   where
     handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
@@ -1032,6 +1034,9 @@ configMonoidStylesUSName = "stack-colors"
 
 configMonoidStylesGBName :: Text
 configMonoidStylesGBName = "stack-colours"
+
+configMonoidHideSourcePathsName :: Text
+configMonoidHideSourcePathsName = "hide-source-paths"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
