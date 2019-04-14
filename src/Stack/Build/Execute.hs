@@ -208,6 +208,8 @@ data ExecuteEnv = ExecuteEnv
     , eeCustomBuilt    :: !(IORef (Set PackageName))
     -- ^ Stores which packages with custom-setup have already had their
     -- Setup.hs built.
+    , eeLargestPackageName :: !(Maybe Int)
+    -- ^ For nicer interleaved output: track the largest package name size
     }
 
 buildSetupArgs :: [String]
@@ -307,9 +309,10 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> [DumpPackage] -- ^ global packages
                -> [DumpPackage] -- ^ snapshot packages
                -> [DumpPackage] -- ^ local packages
+               -> Maybe Int -- ^ largest package name, for nicer interleaved output
                -> (ExecuteEnv -> RIO env a)
                -> RIO env a
-withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
+withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName inner =
     createTempDirFunction stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
@@ -363,6 +366,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
             , eeCustomBuilt = customBuiltRef
+            , eeLargestPackageName = mlargestPackageName
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
@@ -476,7 +480,8 @@ executePlan :: HasEnvConfig env
 executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
     logDebug "Executing the build plan"
     bopts <- view buildOptsL
-    withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
+    withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName
+      (executePlan' installedMap targets plan)
 
     copyExecutables (planInstallExes plan)
 
@@ -491,6 +496,11 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
     withProcessContext menv' $
       forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
       proc cmd args runProcess_
+  where
+    mlargestPackageName =
+      Set.lookupMax $
+      Set.map (length . packageNameString) $
+      Map.keysSet (planTasks plan) <> Map.keysSet (planFinals plan)
 
 copyExecutables
     :: HasEnvConfig env
@@ -1003,7 +1013,12 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
-            inner $ OTConsole $ Just $ fromString (packageNameString (packageName package)) <> "> "
+            let name = packageNameString (packageName package)
+                paddedName =
+                  case eeLargestPackageName of
+                    Nothing -> name
+                    Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
+             in inner $ OTConsole $ Just $ fromString paddedName <> "> "
 
         -- Neither condition applies, dump to a file.
         | otherwise = do

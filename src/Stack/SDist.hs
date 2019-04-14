@@ -316,7 +316,7 @@ getSDistFileList lp =
         baseConfigOpts <- mkBaseConfigOpts boptsCli
         locals <- projectLocalPackages
         withExecuteEnv bopts boptsCli baseConfigOpts locals
-            [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
+            [] [] [] Nothing -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
             withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
