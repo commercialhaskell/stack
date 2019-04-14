@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
 module Stack.ConfigSpec where
@@ -84,7 +85,7 @@ noException = const False
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let logLevel = LevelDebug
+  let logLevel = LevelOther "silent"
   -- TODO(danburton): not use inTempDir
   let inTempDir action = do
         currentDirectory <- getCurrentDirectory
