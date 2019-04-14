@@ -360,6 +360,8 @@ data Config =
          -- ^ Any resolver override from the command line
          ,configStorage             :: !Storage
          -- ^ Database connection pool for Stack database
+         ,configHideSourcePaths     :: !Bool
+         -- ^ Enable GHC hiding source paths?
          }
 
 -- | The project root directory, if in a project.
@@ -764,6 +766,8 @@ data ConfigMonoid =
     , configMonoidColorWhen          :: !(First ColorWhen)
     -- ^ When to use 'ANSI' colors
     , configMonoidStyles             :: !StylesUpdate
+    , configMonoidHideSourcePaths    :: !FirstTrue
+    -- ^ See 'configHideSourcePaths'
     }
   deriving (Show, Generic)
 
