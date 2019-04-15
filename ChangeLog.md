@@ -101,6 +101,10 @@ Behavior changes:
   addition, the `packagename> ` prefix is no longer included in
   interelaved mode when only building a single target.
 
+* The `-fhide-source-paths` GHC option is now enabled by default and
+  can be disabled via the `hide-source-paths` configuration option in
+  `stack.yaml`. See [#3784](https://github.com/commercialhaskell/stack/issues/3784)
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
