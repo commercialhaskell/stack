@@ -202,6 +202,7 @@ Other enhancements:
   in the presence of implicit environment files created by `cabal
   new-build`. See
   [#4706](https://github.com/commercialhaskell/stack/issues/4706).
+* Use a database cache table to speed up discovery of installed GHCs
 
 Bug fixes:
 

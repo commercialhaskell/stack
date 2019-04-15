@@ -1881,6 +1881,7 @@ wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 -- | Location of the ghc-pkg executable
 newtype GhcPkgExe = GhcPkgExe (Path Abs File)
+  deriving Show
 
 -- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
@@ -1901,7 +1902,7 @@ data DumpPackage = DumpPackage
     , dpHaddockHtml :: !(Maybe FilePath)
     , dpIsExposed :: !Bool
     }
-    deriving (Show, Eq)
+    deriving (Show, Read, Eq)
 
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
@@ -1930,6 +1931,7 @@ data CompilerPaths = CompilerPaths
   -- ^ Output of @ghc --info@
   , cpGlobalDump :: !(Map PackageName DumpPackage)
   }
+  deriving Show
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
 cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)

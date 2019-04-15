@@ -22,6 +22,8 @@ module Stack.Types.Compiler
   ) where
 
 import           Data.Aeson
+import           Database.Persist
+import           Database.Persist.Sql
 import qualified Data.Text as T
 import           Data.Text (Text)
 import           Stack.Prelude
@@ -60,6 +62,11 @@ instance FromJSONKey ActualCompiler where
         case parseActualCompiler k of
             Left _ -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
             Right parsed -> return parsed
+instance PersistField ActualCompiler where
+  toPersistValue = toPersistValue . compilerVersionText
+  fromPersistValue = (mapLeft tshow . parseActualCompiler) <=< fromPersistValue
+instance PersistFieldSql ActualCompiler where
+  sqlType _ = SqlString
 
 wantedToActual :: WantedCompiler -> ActualCompiler
 wantedToActual (WCGhc x) = ACGhc x
