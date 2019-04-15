@@ -18,7 +18,6 @@ import           RIO.Process
 import qualified RIO.Set                  as Set
 import qualified RIO.Text                 as T
 import           System.Environment       (lookupEnv, getExecutablePath)
-import           System.Exit
 import           System.Info (os)
 import           System.PosixCompat.Files
 
@@ -63,7 +62,7 @@ main = runSimpleApp $ do
     else do
       logInfo "Failed tests:"
       for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
-      liftIO exitFailure
+      exitFailure
 
 data Options = Options
   { optSpeed :: Maybe Speed
