@@ -1046,12 +1046,16 @@ a yaml configuration file.
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
 
-### hide-source-directories
+### hide-source-paths
 
 Stack will use the `-fhide-source-paths` option by default for GHC >= 8.2, unless this
-option is set to `false`. 
+option is set to `false` as in the following example:
 
-When enabled:
+```yaml
+hide-source-paths: false
+```
+
+Build output when enabled:
 
 ```
 ...
@@ -1060,10 +1064,12 @@ When enabled:
 ...
 ```
 
-When disabled:
+Build output when disabled:
 
 ```
 ...
 [1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
 ...
 ```
+
+Since 2.0
