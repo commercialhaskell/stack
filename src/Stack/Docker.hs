@@ -60,9 +60,7 @@ import           Stack.Types.Docker
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
-#if !MIN_VERSION_rio(0,1,9)
 import           System.Exit (exitSuccess, exitWith, ExitCode(..))
-#endif
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout)
 import           System.IO.Error (isDoesNotExistError)
@@ -202,12 +200,12 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
             throwIO OnlyOnHostException
         | inContainer ->
             liftIO (do inner
-                       exitSuccess)
+                       System.Exit.exitSuccess)
         | not (dockerEnable (configDocker config)) ->
             do fromMaybeAction mbefore
                liftIO inner
                fromMaybeAction mafter
-               liftIO exitSuccess
+               liftIO System.Exit.exitSuccess
         | otherwise ->
             do fromMaybeAction mrelease
                runContainerAndExit
@@ -378,9 +376,9 @@ runContainerAndExit getCmdArgs
 #endif
          )
      case e of
-       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
+       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (System.Exit.exitWith ec)
        Right () -> do after
-                      liftIO exitSuccess
+                      liftIO System.Exit.exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)

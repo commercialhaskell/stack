@@ -172,12 +172,7 @@ module Stack.Types.Config
 
 import           Control.Monad.Writer (tell)
 import           Crypto.Hash (hashWith, SHA1(..))
-#if !MIN_VERSION_rio(0,1,9)
-import           Control.Monad.Fail
-import           Stack.Prelude hiding (fail)
-#else
 import           Stack.Prelude
-#endif
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(Bool, String),
@@ -889,7 +884,7 @@ parseConfigMonoidObject rootDir obj = do
 
     return ConfigMonoid {..}
   where
-    handleExplicitSetupDep :: (Monad m, MonadFail m) => (Text, Bool) -> m (Maybe PackageName, Bool)
+    handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
     handleExplicitSetupDep (name', b) = do
         name <-
             if name' == "*"
