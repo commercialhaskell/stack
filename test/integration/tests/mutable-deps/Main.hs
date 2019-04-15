@@ -1,19 +1,23 @@
 import Control.Monad (forM_, unless, when)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, stripPrefix)
 import StackTest
 
 main :: IO ()
 main = unless isWindows $ do -- depedency issues on Windows
-    let expectRecompilation pkgs stderr = forM_ pkgs $ \p ->
-          unless ((p ++ ": build") `isInfixOf` stderr) $
+    let isBuild package line =
+          case stripPrefix package line of
+            Just x -> "> build" `isInfixOf` line
+            Nothing -> False
+        expectRecompilation pkgs stderr = forM_ pkgs $ \p ->
+          unless (any (isBuild p) $ lines stderr) $
           error $ "package " ++ show p ++ " recompilation was expected"
         expectNoRecompilation pkgs stderr = forM_ pkgs $ \p ->
-          when ((p ++ ": build") `isInfixOf` stderr) $
+          when (any (isBuild p) $ lines stderr) $
           error $ "package " ++ show p ++ " recompilation was not expected"
-        mutablePackages = [ "filepath-1.4.1.2"
-                          , "directory-1.3.0.2"
-                          , "filemanip-0.3.6.3"
-                          , "files-1.0.0"
+        mutablePackages = [ "filepath"
+                          , "directory"
+                          , "filemanip"
+                          , "files"
                           ]
     stackCheckStderr ["build"] $ expectRecompilation mutablePackages
     stackCheckStderr ["build" , "--profile"] $ expectRecompilation mutablePackages
