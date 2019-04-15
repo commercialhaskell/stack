@@ -93,9 +93,7 @@ import              Stack.Types.Runner
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
-#if !MIN_VERSION_rio(0,1,9)
 import              System.Exit (ExitCode (..), exitFailure)
-#endif
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -1128,7 +1126,7 @@ installGHCPosix version downloadInfo _ archiveFile archiveType tempDir destDir =
                         "The following directories may now contain files, but won't be used by stack:" <> line <>
                         "  -" <+> display tempDir <> line <>
                         "  -" <+> display destDir <> line
-                    liftIO exitFailure
+                    liftIO System.Exit.exitFailure
 
     logSticky $
       "Unpacking GHC into " <>
@@ -1320,7 +1318,7 @@ bootGhcjs ghcjsVersion stackYaml destDir bootOpts = do
         buildInGhcjsEnv envConfig $ defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
         let failedToFindErr = do
                 logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
-                liftIO exitFailure
+                liftIO System.Exit.exitFailure
         when shouldInstallCabal $ do
             mcabal' <- withProcessContext menv' getCabalInstallVersion
             case mcabal' of

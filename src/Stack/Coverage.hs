@@ -244,7 +244,7 @@ generateHpcReportForTargets opts = do
                              case nc of
                                  CTest testName ->
                                      liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
-                                 _ -> liftIO . fail $
+                                 _ -> fail $
                                      "Can't specify anything except test-suites as hpc report targets (" ++
                                      packageNameString name ++
                                      " is used with a non test-suite target)"

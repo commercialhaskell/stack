@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -20,9 +19,7 @@ import           Stack.Config (getLocalPackages)
 import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
 import           Stack.Types.PackageName
 import           Stack.Types.Config
-#if !MIN_VERSION_rio(0,1,9)
 import           System.Exit (exitFailure)
-#endif
 
 -- | Deletes build artifacts in the current project.
 --
@@ -30,7 +27,7 @@ import           System.Exit (exitFailure)
 clean :: HasEnvConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
     failures <- mapM cleanDir =<< dirsToDelete cleanOpts
-    when (or failures) $ liftIO exitFailure
+    when (or failures) $ liftIO System.Exit.exitFailure
   where
     cleanDir dir =
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
