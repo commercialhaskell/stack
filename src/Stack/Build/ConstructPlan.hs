@@ -697,7 +697,6 @@ addPackageDeps package = do
                                     , " ("
                                     , versionRangeText range
                                     , "); using "
-                                    , reason
                                     , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
                                     , ".\nReason: "
                                     , reason

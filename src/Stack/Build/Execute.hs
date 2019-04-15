@@ -908,11 +908,20 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         withWorkingDir (toFilePath pkgDir) $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
           logWarn $ "Unable to run autoreconf: " <> displayShow ex
 
-announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
-announceTask task x = logInfo $
-    fromString (packageIdentifierString (taskProvides task)) <>
-    ": " <>
-    RIO.display x
+-- | Make a padded prefix for log messages
+packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
+packageNamePrefix ee name' =
+  let name = packageNameString name'
+      paddedName =
+        case eeLargestPackageName ee of
+          Nothing -> name
+          Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
+   in fromString paddedName <> "> "
+
+announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Text -> RIO env ()
+announceTask ee task action = logInfo $
+    packageNamePrefix ee (pkgName (taskProvides task)) <>
+    RIO.display action
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
@@ -951,13 +960,13 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> OutputType
                      -> RIO env a)
                   -> RIO env a
-withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
+withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withOutputType pkgDir package $ \outputType ->
     withCabal package pkgDir outputType $ \cabal ->
     inner0 package cabalfp pkgDir cabal announce outputType
   where
-    announce = announceTask task
+    announce = announceTask ee task
 
     wanted =
         case taskType of
@@ -1013,12 +1022,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
-            let name = packageNameString (packageName package)
-                paddedName =
-                  case eeLargestPackageName of
-                    Nothing -> name
-                    Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
-             in inner $ OTConsole $ Just $ fromString paddedName <> "> "
+             inner $ OTConsole $ Just $ packageNamePrefix ee $ packageName package
 
         -- Neither condition applies, dump to a file.
         | otherwise = do
@@ -1395,7 +1399,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
-        announceTask task "using precompiled package"
+        announceTask ee task "using precompiled package"
 
         -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
         -- from their old snapshot to the new one. However, we must unregister any such library in the new
