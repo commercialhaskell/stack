@@ -699,11 +699,21 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
               ensureGhcjsBooted cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
             _ -> pure ()
 
-          let name =
-                case wc of
-                  Ghc -> "ghc"
-                  Ghcjs -> "ghcjs"
-          withProcessContext menv $ findExecutable name >>= either throwIO parseAbsFile
+          let names =
+                case wanted of
+                  WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
+                  WCGhcGit{} -> ["ghc"]
+                  WCGhcjs{} -> ["ghcjs"]
+              loop [] = do
+                logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
+                logError $ "Could not find it on the paths " <> displayShow (edBins paths)
+                throwString "Could not find sandboxed compiler"
+              loop (x:xs) = do
+                res <- findExecutable x
+                case res of
+                  Left _ -> loop xs
+                  Right y -> parseAbsFile y
+          withProcessContext menv $ loop names
 
     when (soptsSanityCheck sopts) $ sanityCheck compiler
     cp <- pathsFromCompiler wc compilerBuild isSandboxed compiler
