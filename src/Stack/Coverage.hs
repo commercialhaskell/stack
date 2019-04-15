@@ -25,7 +25,6 @@ import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import           Distribution.Version (mkVersion)
 import           Path
@@ -357,31 +356,28 @@ generateHpcMarkupIndex = do
                   , pathToHtml testsuite
                   , "</a></td></tr>"
                   ]
-    liftIO $ T.writeFile (toFilePath outputFile) $ T.concat $
-        [ "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">"
+    writeBinaryFileAtomic outputFile $
+        "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">" <>
         -- Part of the css from HPC's output HTML
-        , "<style type=\"text/css\">"
-        , "table.dashboard { border-collapse: collapse; border: solid 1px black }"
-        , ".dashboard td { border: solid 1px black }"
-        , ".dashboard th { border: solid 1px black }"
-        , "</style>"
-        , "</head>"
-        , "<body>"
-        ] ++
+        "<style type=\"text/css\">" <>
+        "table.dashboard { border-collapse: collapse; border: solid 1px black }" <>
+        ".dashboard td { border: solid 1px black }" <>
+        ".dashboard th { border: solid 1px black }" <>
+        "</style>" <>
+        "</head>" <>
+        "<body>" <>
         (if null rows
             then
-                [ "<b>No hpc_index.html files found in \""
-                , pathToHtml outputDir
-                , "\".</b>"
-                ]
+                "<b>No hpc_index.html files found in \"" <>
+                encodeUtf8Builder (pathToHtml outputDir) <>
+                "\".</b>"
             else
-                [ "<table class=\"dashboard\" width=\"100%\" boder=\"1\"><tbody>"
-                , "<p><b>NOTE: This is merely a listing of the html files found in the coverage reports directory.  Some of these reports may be old.</b></p>"
-                , "<tr><th>Package</th><th>TestSuite</th><th>Modification Time</th></tr>"
-                ] ++
-                rows ++
-                ["</tbody></table>"]) ++
-        ["</body></html>"]
+                "<table class=\"dashboard\" width=\"100%\" boder=\"1\"><tbody>" <>
+                "<p><b>NOTE: This is merely a listing of the html files found in the coverage reports directory.  Some of these reports may be old.</b></p>" <>
+                "<tr><th>Package</th><th>TestSuite</th><th>Modification Time</th></tr>" <>
+                foldMap encodeUtf8Builder rows <>
+                "</tbody></table>") <>
+        "</body></html>"
     unless (null rows) $
         logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
             fromString (toFilePath outputFile)
@@ -429,7 +425,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
         pkgIdStr = packageIdentifierString pkgId
         notFoundErr = return $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
         extractField path = do
-            contents <- liftIO $ T.readFile (toFilePath path)
+            contents <- readFileUtf8 (toFilePath path)
             case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
                 Just result -> return $ Right result
                 Nothing -> notFoundErr

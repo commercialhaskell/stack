@@ -20,10 +20,12 @@ module Stack.Prelude
   , FirstFalse (..)
   , fromFirstFalse
   , defaultFirstFalse
+  , writeBinaryFileAtomic
   , module X
   ) where
 
 import           RIO                  as X
+import           RIO.File             as X
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
@@ -44,6 +46,8 @@ import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
+
+import Conduit
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
@@ -209,3 +213,14 @@ fromFirstFalse = fromMaybe False . getFirstFalse
 -- | Helper for filling in default values
 defaultFirstFalse :: (a -> FirstFalse) -> Bool
 defaultFirstFalse _ = False
+
+-- | Write a @Builder@ to a file and atomically rename.
+--
+-- In the future: replace with a function in rio
+writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
+writeBinaryFileAtomic fp builder =
+  liftIO $
+  runConduitRes $
+  yield builder .|
+  unsafeBuilderToByteString .|
+  sinkFileCautious (toFilePath fp)

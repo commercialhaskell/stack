@@ -11,6 +11,7 @@ module Stack.Lock
     ) where
 
 import Data.Aeson.Extended
+import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -122,9 +123,9 @@ lockCachedWanted stackFile resolver fillWanted = do
                              lockLocations $ pliCompleted <> prjCompleted
                            }
     when (newLocked /= locked) $
-      writeFileBinary (toFilePath lockFile) $
+      writeBinaryFileAtomic lockFile $
         header <>
-        Yaml.encode newLocked
+        byteString (Yaml.encode newLocked)
     pure wanted
   where
     header =

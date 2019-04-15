@@ -124,6 +124,7 @@ module Stack.Constants
     )
     where
 
+import           Data.ByteString.Builder (byteString)
 import           Data.Char (toUpper)
 import           Data.FileEmbed (embedFile, makeRelativeToProject)
 import qualified Data.Set as Set
@@ -432,8 +433,8 @@ relDirLibexec = $(mkRelDir "libexec")
 relDirEtc :: Path Rel Dir
 relDirEtc = $(mkRelDir "etc")
 
-setupGhciShimCode :: ByteString
-setupGhciShimCode = $(do
+setupGhciShimCode :: Builder
+setupGhciShimCode = byteString $(do
     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
     embedFile path)
 

@@ -13,7 +13,6 @@ module Stack.Init
 import           Stack.Prelude
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC
-import qualified Data.ByteString.Lazy            as L
 import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
@@ -160,8 +159,7 @@ initProject currDir initOpts mresolver = do
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
         <> fromString reldest
-    liftIO $ L.writeFile (toFilePath dest)
-           $ B.toLazyByteString
+    writeBinaryFileAtomic dest
            $ renderStackYaml p
                (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
                (map (makeRelDir . parent) dupPkgs)
