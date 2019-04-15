@@ -1,4 +1,4 @@
-resolver: lts-12.0
+resolver: lts-13.15
 
 # docker:
 #   enable: true
@@ -16,10 +16,6 @@ flags:
   stack:
     hide-dependency-versions: true
     supported-build: true
-extra-deps:
-- infer-license-0.2.0@rev:0
-- hpack-0.29.6@rev:0
-- githash-0.1.0.1@rev:0
 
 ghc-options:
    "$locals": -fhide-source-paths

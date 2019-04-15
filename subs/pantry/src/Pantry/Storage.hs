@@ -375,8 +375,9 @@ loadHackageCabalFile name version cfi = do
         pure $ blobTableContents bt
   where
     withHackEnt = traverse $ \(Entity _ h) -> do
-      Just blob <- get $ hackageCabalCabal h
-      pure $ blobTableContents blob
+      mblob <- get $ hackageCabalCabal h
+      case mblob of
+        Just blob -> pure $ blobTableContents blob
 
 loadLatestCacheUpdate
   :: (HasPantryConfig env, HasLogFunc env)
@@ -479,7 +480,10 @@ loadTreeById
   => TreeSId
   -> ReaderT SqlBackend (RIO env) (TreeKey, Tree)
 loadTreeById tid = do
-  Just ts <- get tid
+  mts <- get tid
+  ts <-
+    case mts of
+      Just ts -> pure ts
   tree <- loadTreeByEnt $ Entity tid ts
   key <- getBlobKey $ treeSKey ts
   pure (TreeKey key, tree)
