@@ -124,6 +124,7 @@ data StackBuildException
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
   | LocalPackagesPresent [PackageIdentifier]
+  | CouldNotLockDistDir !(Path Abs File)
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -310,6 +311,11 @@ instance Show StackBuildException where
     show (LocalPackagesPresent locals) = unlines
       $ "Local packages are not allowed when using the script command. Packages found:"
       : map (\ident -> "- " ++ packageIdentifierString ident) locals
+    show (CouldNotLockDistDir lockFile) = unlines
+      [ "Locking the dist directory failed, try to lock file:"
+      , "  " ++ toFilePath lockFile
+      , "Maybe you're running another copy of Stack?"
+      ]
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =

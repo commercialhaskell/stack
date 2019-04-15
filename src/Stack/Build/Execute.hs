@@ -84,6 +84,7 @@ import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
 import           System.Exit (ExitCode (..))
+import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive))
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
@@ -995,7 +996,19 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
 
     withPackage inner =
         case taskType of
-            TTLocalMutable lp -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
+            TTLocalMutable lp -> do
+              let root = parent $ lpCabalFile lp
+              distDir <- distRelativeDir
+              let lockFile = root </> distDir </> relFileBuildLock
+              ensureDir $ parent lockFile
+              -- Make sure we're the only ones, see https://github.com/commercialhaskell/stack/issues/2730
+              mres <-
+                withRunInIO $ \run ->
+                withTryFileLock (toFilePath lockFile) Exclusive $ \_lock ->
+                run $ inner (lpPackage lp) (lpCabalFile lp) root
+              case mres of
+                Just res -> pure res
+                Nothing -> throwIO $ CouldNotLockDistDir lockFile
             TTRemotePackage _ package pkgloc -> do
                 suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
                 let dir = eeTempDir </> suffix

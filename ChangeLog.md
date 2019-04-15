@@ -113,6 +113,11 @@ Behavior changes:
   means that Stack will no longer have to force reconfigures as often. See
   [#3554](https://github.com/commercialhaskell/stack/issues/3554).
 
+* When building a package, Stack takes a lock on the dist directory in
+  use to avoid multiple runs of Stack from trampling each others'
+  files. See
+  [#2730](https://github.com/commercialhaskell/stack/issues/2730).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
