@@ -840,8 +840,10 @@ ensureConfig :: HasEnvConfig env
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
+    -- See https://github.com/commercialhaskell/stack/issues/3554
+    taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
-        if boptsReconfigure eeBuildOpts || taskAnyMissing task
+        if boptsReconfigure eeBuildOpts || (taskAnyMissing task && taskAnyMissingHack)
             then return True
             else do
                 -- We can ignore the components portion of the config
