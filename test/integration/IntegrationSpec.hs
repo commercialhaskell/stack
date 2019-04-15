@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -6,15 +7,17 @@
 
 import           Conduit
 import           Data.List                (stripPrefix)
+import           Options.Generic
 import           RIO
+import           RIO.Char                 (toLower)
 import           RIO.Directory            hiding (findExecutable)
 import           RIO.FilePath
-import           RIO.List                 (partition)
+import           RIO.List                 (isInfixOf, partition)
 import qualified RIO.Map                  as Map
 import           RIO.Process
 import qualified RIO.Set                  as Set
 import qualified RIO.Text                 as T
-import           System.Environment       (getArgs, lookupEnv, getExecutablePath)
+import           System.Environment       (lookupEnv, getExecutablePath)
 import           System.Exit
 import           System.Info (os)
 import           System.PosixCompat.Files
@@ -26,15 +29,8 @@ main :: IO ()
 main = runSimpleApp $ do
   logInfo "Initiating Stack integration test running"
 
-  args <- liftIO getArgs
-  fast <-
-    case args of
-      [] -> pure Normal
-      ["--fast"] -> pure Fast
-      ["--superslow"] -> pure Superslow
-      _ -> error $ "Unknown arguments: " ++ show args
-
-  results <- runApp fast $ do
+  options <- getRecord "Stack integration tests"
+  results <- runApp options $ do
     logInfo "Running with the following environment"
     proc "env" [] runProcess_
     tests <- asks appTestDirs
@@ -69,7 +65,23 @@ main = runSimpleApp $ do
       for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
       liftIO exitFailure
 
+data Options = Options
+  { optSpeed :: Maybe Speed
+  , optMatch :: Maybe String
+  } deriving Generic
+
+instance ParseRecord Options where
+  parseRecord = parseRecordWithModifiers modifiers
+    where
+      optName = map toLower . drop 3
+      modifiers = defaultModifiers { fieldNameModifier = optName
+                                   , shortNameModifier = firstLetter . optName
+                                   }
+
 data Speed = Fast | Normal | Superslow
+  deriving (Read, Generic)
+
+instance ParseField Speed
 
 exeExt :: String
 exeExt = if isWindows then ".exe" else ""
@@ -77,8 +89,9 @@ exeExt = if isWindows then ".exe" else ""
 isWindows :: Bool
 isWindows = os == "mingw32"
 
-runApp :: Speed -> RIO App a -> RIO SimpleApp a
-runApp speed inner = do
+runApp :: Options -> RIO App a -> RIO SimpleApp a
+runApp options inner = do
+  let speed = fromMaybe Normal $ optSpeed options
   simpleApp <- ask
   runghc <- findExecutable "runghc" >>= either throwIO pure
   srcDir <- canonicalizePath ""
@@ -90,10 +103,14 @@ runApp speed inner = do
   logInfo $ "Using stack located at " <> fromString stack
   proc stack ["--version"] runProcess_
 
+  let matchTest = case optMatch options of
+        Nothing -> const True
+        Just str -> (str `isInfixOf`)
   testDirs
     <- runConduitRes
      $ sourceDirectory (testsRoot </> "tests")
     .| filterMC (liftIO . hasTest)
+    .| filterC matchTest
     .| foldMapC Set.singleton
 
   let modifyEnvCommon

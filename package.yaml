@@ -287,8 +287,9 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - hspec
     - filepath
+    - hspec
+    - optparse-generic
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false
