@@ -149,7 +149,7 @@ CompilerCache
   -- is very cheap, so we'll take the easy way out for now.
   globalDump Text
 
-  UniqueGhcInfo ghcPath
+  UniqueCompilerInfo ghcPath
 |]
 
 -- | Initialize the database.
@@ -468,7 +468,7 @@ loadCompilerPaths
   -> Bool -- ^ sandboxed?
   -> RIO env (Maybe CompilerPaths)
 loadCompilerPaths compiler build sandboxed = do
-  mres <- withStorage $ getBy $ UniqueGhcInfo $ toFilePath compiler
+  mres <- withStorage $ getBy $ UniqueCompilerInfo $ toFilePath compiler
   for mres $ \(Entity _ CompilerCache {..}) -> do
     compilerStatus <- liftIO $ getFileStatus $ toFilePath compiler
     when
@@ -520,7 +520,7 @@ saveCompilerPaths
   => CompilerPaths
   -> RIO env ()
 saveCompilerPaths CompilerPaths {..} = withStorage $ do
-  deleteBy $ UniqueGhcInfo $ toFilePath cpCompiler
+  deleteBy $ UniqueCompilerInfo $ toFilePath cpCompiler
   compilerStatus <- liftIO $ getFileStatus $ toFilePath cpCompiler
   globalDbStatus <- liftIO $ getFileStatus $ toFilePath $ cpGlobalDB </> $(mkRelFile "package.cache")
   let GhcPkgExe pkgexe = cpPkg
