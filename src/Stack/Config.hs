@@ -309,6 +309,7 @@ configFromConfigMonoid
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
+         configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of

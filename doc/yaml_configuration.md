@@ -1045,3 +1045,31 @@ a yaml configuration file.
 
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
+
+### hide-source-paths
+
+Stack will use the `-fhide-source-paths` option by default for GHC >= 8.2, unless this
+option is set to `false` as in the following example:
+
+```yaml
+hide-source-paths: false
+```
+
+Build output when enabled:
+
+```
+...
+[1 of 2] Compiling Lib
+[2 of 2] Compiling Paths_test_pr
+...
+```
+
+Build output when disabled:
+
+```
+...
+[1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
+...
+```
+
+Since 2.0
