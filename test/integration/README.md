@@ -23,7 +23,7 @@ One simple way to run a single test is:
 A more thorough way to run the tests is with
 
 ```shell
-$ stack test --flag stack:integration-tests stack:test:stack-integration-test
+$ stack build --flag stack:integration-tests stack --interleaved-output --exec stack-integration-test
 ```
 
 Note that this command can take a _long_ time. It's also more thorough
