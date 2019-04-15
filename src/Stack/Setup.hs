@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-} -- ghc < 7.10
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
@@ -11,8 +10,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Stack.Setup
   ( setupEnv
@@ -105,13 +102,8 @@ import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Permissions (setFileExecutable)
 import              Text.Printf (printf)
-
-#if !WINDOWS
-import              System.Uname (uname, release)
+import              System.Uname (getRelease)
 import              Data.List.Split (splitOn)
-import              Foreign.C (throwErrnoIfMinus1_, peekCString)
-import              Foreign.Marshal (alloca)
-#endif
 
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
@@ -985,11 +977,7 @@ getGhcBuilds = do
                         -- the 'ldconfig -p' output on Arch or Slackware even when it exists.
                         -- There doesn't seem to be an easy way to get the true list of directories
                         -- to scan for shared libs, but this works for our particular cases.
-                            let extraPaths = []
-#if !WINDOWS
-                                 ++ [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
-#endif
-                            matches <- filterM (doesFileExist .(</> lib)) extraPaths
+                            matches <- filterM (doesFileExist .(</> lib)) usrLibDirs
                             case matches of
                                 [] -> logDebug ("Did not find shared library " <> libD)
                                     >> return False
@@ -1015,7 +1003,6 @@ getGhcBuilds = do
                         [] -> CompilerBuildStandard
                         _ -> CompilerBuildSpecialized (intercalate "-" c))
                     libComponents
-#if !WINDOWS
             Platform _ Cabal.FreeBSD -> do
                 let getMajorVer = readMaybe <=< headMaybe . (splitOn ".")
                 majorVer <- getMajorVer <$> sysRelease
@@ -1026,7 +1013,6 @@ getGhcBuilds = do
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuilds [CompilerBuildSpecialized releaseStr]
-#endif
             _ -> useBuilds [CompilerBuildStandard]
     useBuilds builds = do
         logDebug $
@@ -1034,7 +1020,6 @@ getGhcBuilds = do
           mconcat (intersperse ", " (map (fromString . compilerBuildName) builds))
         return builds
 
-#if !WINDOWS
 -- | Encode an OpenBSD version (like "6.1") into a valid argument for
 -- CompilerBuildSpecialized, so "maj6-min1". Later version numbers are prefixed
 -- with "r".
@@ -1051,13 +1036,9 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
 sysRelease :: HasLogFunc env => RIO env String
 sysRelease =
   handleIO (\e -> do
-               logWarn $ "Could not query OS version" <> displayShow e
-               return "") .
-  liftIO .
-  alloca $ \ ptr ->
-             do throwErrnoIfMinus1_ "uname" $ uname ptr
-                peekCString $ release ptr
-#endif
+               logWarn $ "Could not query OS version: " <> displayShow e
+               return "")
+  (liftIO getRelease)
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)

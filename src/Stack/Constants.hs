@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-} -- keep TH usage here
@@ -117,6 +118,8 @@ module Stack.Constants
     ,ghcShowOptionsOutput
     ,hadrianCmdWindows
     ,hadrianCmdPosix
+    ,usrLibDirs
+    ,testGhcEnvRelFile
     )
     where
 
@@ -584,3 +587,15 @@ hadrianCmdWindows = $(mkRelFile "hadrian/build.stack.bat")
 -- | Relative path inside a GHC repo to the Hadrian build shell script
 hadrianCmdPosix :: Path Rel File
 hadrianCmdPosix = $(mkRelFile "hadrian/build.stack.sh")
+
+-- | Used in Stack.Setup for detecting libtinfo, see comments at use site
+usrLibDirs :: [Path Abs Dir]
+#if WINDOWS
+usrLibDirs = []
+#else
+usrLibDirs = [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
+#endif
+
+-- | Relative file path for a temporary GHC environment file for tests
+testGhcEnvRelFile :: Path Rel File
+testGhcEnvRelFile = $(mkRelFile "test-ghc-env")

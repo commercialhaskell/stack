@@ -8,7 +8,6 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Perform a build
 module Stack.Build.Execute
@@ -1855,7 +1854,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 -- see e.g. https://github.com/doctest/issues/119
                 let setEnv f pc = modifyEnvVars pc $ \envVars ->
                       Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
-                    fp = toFilePath $ eeTempDir ee </> $(mkRelFile "test-ghc-env")
+                    fp = toFilePath $ eeTempDir ee </> testGhcEnvRelFile
                     snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
                     localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
                     ghcEnv =
