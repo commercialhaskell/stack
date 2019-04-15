@@ -391,6 +391,8 @@ data ConfigCache = ConfigCache
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
     , configCachePkgSrc :: !CachePkgSrc
+    , configCachePathEnvVar :: !Text
+    -- ^ Value of the PATH env var, see <https://github.com/commercialhaskell/stack/issues/3138>
     }
     deriving (Generic, Eq, Show, Data, Typeable)
 instance NFData ConfigCache

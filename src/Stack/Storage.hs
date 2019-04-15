@@ -64,6 +64,7 @@ ConfigCacheParent sql="config_cache"
   type ConfigCacheType default=''
   pkgSrc CachePkgSrc default=''
   active Bool default=0
+  pathEnvVar Text default=''
   UniqueConfigCacheParent directory type sql="unique_config_cache"
   deriving Show
 
@@ -199,6 +200,7 @@ readConfigCache (Entity parentId ConfigCacheParent {..}) = do
     configCacheComponents <-
         Set.fromList . map (configCacheComponentValue . entityVal) <$>
         selectList [ConfigCacheComponentParent ==. parentId] []
+    let configCachePathEnvVar = configCacheParentPathEnvVar
     return ConfigCache {..}
 
 -- | Load 'ConfigCache' from the database.
@@ -235,6 +237,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
                             , configCacheParentType = type_
                             , configCacheParentPkgSrc = configCachePkgSrc new
                             , configCacheParentActive = True
+                            , configCacheParentPathEnvVar = configCachePathEnvVar new
                             }
                 Just parentEntity@(Entity parentId _) -> do
                     old <- readConfigCache parentEntity

@@ -105,6 +105,10 @@ Behavior changes:
   can be disabled via the `hide-source-paths` configuration option in
   `stack.yaml`. See [#3784](https://github.com/commercialhaskell/stack/issues/3784)
 
+* Stack will reconfigure a package if you modify your `PATH` environment
+  variable. See
+  [#3138](https://github.com/commercialhaskell/stack/issues/3138).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get

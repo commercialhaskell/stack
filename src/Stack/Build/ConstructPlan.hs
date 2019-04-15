@@ -49,6 +49,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
+import           System.Environment (lookupEnv)
 import           System.IO (putStrLn)
 import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
@@ -124,6 +125,7 @@ data Ctx = Ctx
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     , mcurator       :: !(Maybe Curator)
+    , pathEnvVar     :: !Text
     }
 
 instance HasPlatform Ctx
@@ -187,7 +189,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     let onTarget = void . addDep
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
-    let ctx = mkCtx econfig globalCabalVersion sources mcur
+    pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+    let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
     ((), m, W efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
@@ -226,7 +229,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   where
     hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
-    mkCtx econfig globalCabalVersion sources mcur = Ctx
+    mkCtx econfig globalCabalVersion sources mcur pathEnvVar' = Ctx
         { baseConfigOpts = baseConfigOpts0
         , loadPackage = \x y z -> runRIO econfig $
             applyForceCustomBuild globalCabalVersion <$> loadPackage0 x y z
@@ -236,6 +239,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         , wanted = Map.keysSet (smtTargets $ smTargets sourceMap)
         , localNames = Map.keysSet (smProject sourceMap)
         , mcurator = mcur
+        , pathEnvVar = pathEnvVar'
         }
 
     prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
@@ -788,6 +792,7 @@ checkDirtiness ps installed package present = do
                     PSFilePath lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSRemote{} -> Set.empty
             , configCachePkgSrc = toCachePkgSrc ps
+            , configCachePathEnvVar = pathEnvVar ctx
             }
         config = view configL ctx
     mreason <-
