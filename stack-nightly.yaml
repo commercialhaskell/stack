@@ -5,6 +5,7 @@ packages:
 
 extra-deps:
 - resolv-0.1.1.2@rev:0
+- rio-0.1.9.2@rev:0
 
 # docker:
 #   enable: true

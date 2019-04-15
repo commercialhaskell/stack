@@ -31,6 +31,8 @@ extra-deps:
 - windns-0.1.0.0@rev:0
 - hackage-security-0.5.3.0@rev:2
 - cabal-doctest-1.0.6@rev:2
+- rio-0.1.9.2@rev:0
+- unliftio-0.2.10@rev:0
 
 # Avoid https://github.com/commercialhaskell/stack/issues/4125
 # (triggered because later versions of persistent transitively depends
