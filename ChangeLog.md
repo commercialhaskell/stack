@@ -218,6 +218,8 @@ Other enhancements:
   new-build`. See
   [#4706](https://github.com/commercialhaskell/stack/issues/4706).
 * Use a database cache table to speed up discovery of installed GHCs
+* You can specify multiple `--test-arguments` options. See
+  [#2226](https://github.com/commercialhaskell/stack/issues/2226)
 
 Bug fixes:
 
