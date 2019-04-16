@@ -1,3 +1,4 @@
 resolver: lts-11.22
 packages:
 - .
+- subproject

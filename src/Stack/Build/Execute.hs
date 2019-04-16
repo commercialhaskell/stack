@@ -8,7 +8,6 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Perform a build
 module Stack.Build.Execute
@@ -83,7 +82,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
 import qualified System.Directory as D
-import           System.Environment (getExecutablePath)
+import           System.Environment (getExecutablePath, lookupEnv)
 import           System.Exit (ExitCode (..))
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
@@ -208,6 +207,10 @@ data ExecuteEnv = ExecuteEnv
     , eeCustomBuilt    :: !(IORef (Set PackageName))
     -- ^ Stores which packages with custom-setup have already had their
     -- Setup.hs built.
+    , eeLargestPackageName :: !(Maybe Int)
+    -- ^ For nicer interleaved output: track the largest package name size
+    , eePathEnvVar :: !Text
+    -- ^ Value of the PATH environment variable
     }
 
 buildSetupArgs :: [String]
@@ -307,9 +310,10 @@ withExecuteEnv :: forall env a. HasEnvConfig env
                -> [DumpPackage] -- ^ global packages
                -> [DumpPackage] -- ^ snapshot packages
                -> [DumpPackage] -- ^ local packages
+               -> Maybe Int -- ^ largest package name, for nicer interleaved output
                -> (ExecuteEnv -> RIO env a)
                -> RIO env a
-withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages inner =
+withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName inner =
     createTempDirFunction stackProgName $ \tmpdir -> do
         configLock <- liftIO $ newMVar ()
         installLock <- liftIO $ newMVar ()
@@ -334,11 +338,12 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
         cabalPkgVer <- view cabalVersionL
-        globalDB <- cpGlobalDB
+        globalDB <- view $ compilerPathsL.to cpGlobalDB
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
         let totalWanted = length $ filter lpWanted locals
+        pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
         inner ExecuteEnv
             { eeBuildOpts = bopts
             , eeBuildOptsCLI = boptsCli
@@ -363,6 +368,8 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeLocalDumpPkgs = localPackagesTVar
             , eeLogFiles = logFilesTChan
             , eeCustomBuilt = customBuiltRef
+            , eeLargestPackageName = mlargestPackageName
+            , eePathEnvVar = pathEnvVar
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
@@ -476,7 +483,8 @@ executePlan :: HasEnvConfig env
 executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
     logDebug "Executing the build plan"
     bopts <- view buildOptsL
-    withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap targets plan)
+    withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName
+      (executePlan' installedMap targets plan)
 
     copyExecutables (planInstallExes plan)
 
@@ -491,6 +499,11 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
     withProcessContext menv' $
       forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
       proc cmd args runProcess_
+  where
+    mlargestPackageName =
+      Set.lookupMax $
+      Set.map (length . packageNameString) $
+      Map.keysSet (planTasks plan) <> Map.keysSet (planFinals plan)
 
 copyExecutables
     :: HasEnvConfig env
@@ -665,7 +678,8 @@ unregisterPackages cv localDB ids = do
                 else " (" <> RIO.display reason <> ")"
     let unregisterSinglePkg select (gid, (ident, reason)) = do
             logReason ident reason
-            unregisterGhcPkgIds localDB $ select ident gid :| []
+            pkg <- getGhcPkgExe
+            unregisterGhcPkgIds pkg localDB $ select ident gid :| []
 
     case cv of
         -- GHC versions >= 8.0.1 support batch unregistering of packages. See
@@ -684,7 +698,8 @@ unregisterPackages cv localDB ids = do
                 let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
                 for_ (chunksOfNE batchSize ids) $ \batch -> do
                     for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    unregisterGhcPkgIds localDB $ fmap (Right . fst) batch
+                    pkg <- getGhcPkgExe
+                    unregisterGhcPkgIds pkg localDB $ fmap (Right . fst) batch
 
         -- GHC versions >= 7.9 support unregistering of packages via their
         -- GhcPkgId.
@@ -813,6 +828,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                     TTLocalMutable lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTRemotePackage{} -> Set.empty
             , configCachePkgSrc = taskCachePkgSrc
+            , configCachePathEnvVar = eePathEnvVar
             }
         allDepsMap = Map.union missing' taskPresent
     return (allDepsMap, cache)
@@ -829,8 +845,10 @@ ensureConfig :: HasEnvConfig env
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
+    -- See https://github.com/commercialhaskell/stack/issues/3554
+    taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
-        if boptsReconfigure eeBuildOpts || taskAnyMissing task
+        if boptsReconfigure eeBuildOpts || (taskAnyMissing task && taskAnyMissingHack)
             then return True
             else do
                 -- We can ignore the components portion of the config
@@ -855,11 +873,12 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         deleteCaches pkgDir
         announce
         cp <- view compilerPathsL
+        let (GhcPkgExe pkgPath) = cpPkg cp
         let programNames =
               case cpWhich cp of
                 Ghc ->
                   [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
-                  , "--with-ghc-pkg=" ++ toFilePath (cpPkg cp)
+                  , "--with-ghc-pkg=" ++ toFilePath pkgPath
                   ]
                 Ghcjs -> []
         exes <- forM programNames $ \name -> do
@@ -895,17 +914,26 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         withWorkingDir (toFilePath pkgDir) $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
           logWarn $ "Unable to run autoreconf: " <> displayShow ex
 
-announceTask :: HasLogFunc env => Task -> Text -> RIO env ()
-announceTask task x = logInfo $
-    fromString (packageIdentifierString (taskProvides task)) <>
-    ": " <>
-    RIO.display x
+-- | Make a padded prefix for log messages
+packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
+packageNamePrefix ee name' =
+  let name = packageNameString name'
+      paddedName =
+        case eeLargestPackageName ee of
+          Nothing -> name
+          Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
+   in fromString paddedName <> "> "
+
+announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Text -> RIO env ()
+announceTask ee task action = logInfo $
+    packageNamePrefix ee (pkgName (taskProvides task)) <>
+    RIO.display action
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
 data OutputType
   = OTLogFile !(Path Abs File) !Handle
-  | OTConsole !Utf8Builder
+  | OTConsole !(Maybe Utf8Builder)
 
 -- | This sets up a context for executing build steps which need to run
 -- Cabal (via a compiled Setup.hs).  In particular it does the following:
@@ -938,13 +966,13 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> OutputType
                      -> RIO env a)
                   -> RIO env a
-withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
+withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withOutputType pkgDir package $ \outputType ->
     withCabal package pkgDir outputType $ \cabal ->
     inner0 package cabalfp pkgDir cabal announce outputType
   where
-    announce = announceTask task
+    announce = announceTask ee task
 
     wanted =
         case taskType of
@@ -993,14 +1021,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                 inner package cabalfp dir
 
     withOutputType pkgDir package inner
+        -- Not in interleaved mode. When building a single wanted package, dump
+        -- to the console with no prefix.
+        | console = inner $ OTConsole Nothing
+
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
-            inner $ OTConsole $ fromString (packageNameString (packageName package)) <> "> "
-
-        -- Not in interleaved mode. When building a single wanted package, dump
-        -- to the console with no prefix.
-        | console = inner $ OTConsole mempty
+             inner $ OTConsole $ Just $ packageNamePrefix ee $ packageName package
 
         -- Neither condition applies, dump to a file.
         | otherwise = do
@@ -1190,10 +1218,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffi
                         OTLogFile _ h ->
                             proc (toFilePath exeName) fullArgs
                           $ runProcess_
+                            -- Don't use closed, since that can break
+                            -- ./configure scripts. See:
+                            -- https://github.com/commercialhaskell/stack/pull/4722
                           . setStdin (byteStringInput "")
                           . setStdout (useHandleOpen h)
                           . setStderr (useHandleOpen h)
-                        OTConsole prefix ->
+                        OTConsole mprefix ->
+                            let prefix = fold mprefix in
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                                 (outputSink KeepTHLoading LevelWarn compilerVer prefix)
                                 (outputSink stripTHLoading LevelInfo compilerVer prefix)
@@ -1373,7 +1405,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
         wc <- view $ actualCompilerVersionL.whichCompilerL
-        announceTask task "using precompiled package"
+        announceTask ee task "using precompiled package"
 
         -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
         -- from their old snapshot to the new one. However, we must unregister any such library in the new
@@ -1403,16 +1435,16 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 withModifyEnvVars modifyEnv $ do
-                  ghcPkgExe <- view $ compilerPathsL.to cpPkg.to toFilePath
+                  GhcPkgExe ghcPkgExe <- getGhcPkgExe
 
                   -- first unregister everything that needs to be unregistered
                   forM_ allToUnregister $ \packageName -> catchAny
-                      (readProcessNull ghcPkgExe [ "unregister", "--force", packageName])
+                      (readProcessNull (toFilePath ghcPkgExe) [ "unregister", "--force", packageName])
                       (const (return ()))
 
                   -- now, register the cached conf files
                   forM_ allToRegister $ \libpath ->
-                    proc ghcPkgExe [ "register", "--force", toFilePath libpath] readProcess_
+                    proc (toFilePath ghcPkgExe) [ "register", "--force", toFilePath libpath] readProcess_
 
         liftIO $ forM_ exes $ \exe -> do
             ensureDir bindir
@@ -1669,7 +1701,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         return mpkgid
 
     loadInstalledPkg pkgDbs tvar name = do
-        dps <- ghcPkgDescribe name pkgDbs $ conduitDumpPackage .| CL.consume
+        pkgexe <- getGhcPkgExe
+        dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
         case dps of
             [] -> return Nothing
             [dp] -> do
@@ -1828,7 +1861,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 -- see e.g. https://github.com/doctest/issues/119
                 let setEnv f pc = modifyEnvVars pc $ \envVars ->
                       Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
-                    fp = toFilePath $ eeTempDir ee </> $(mkRelFile "test-ghc-env")
+                    fp = toFilePath $ eeTempDir ee </> testGhcEnvRelFile
                     snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
                     localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
                     ghcEnv =
@@ -1871,10 +1904,17 @@ singleTest topts testsToRun ac ee task installedMap = do
                             liftIO $ hFlush stderr
                           OTLogFile _ _ -> pure ()
 
-                        let output setter =
+                        let output =
                                 case outputType of
-                                    OTConsole _ -> id
-                                    OTLogFile _ h -> setter (useHandleOpen h)
+                                    OTConsole Nothing -> Nothing <$ inherit
+                                    OTConsole (Just prefix) -> fmap
+                                      (\src -> Just $ runConduit $ src .|
+                                               CT.decodeUtf8Lenient .|
+                                               CT.lines .|
+                                               CL.map stripCR .|
+                                               CL.mapM_ (\t -> logInfo $ prefix <> RIO.display t))
+                                      createSource
+                                    OTLogFile _ h -> Nothing <$ useHandleOpen h
                             optionalTimeout action
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
                                     timeout (maxSecs * 1000000) action
@@ -1892,15 +1932,20 @@ singleTest topts testsToRun ac ee task installedMap = do
                                        show (logPath, mkUnqualComponentName (T.unpack testName))
                                 else pure mempty
                             let pc = setStdin (byteStringInput stdinBS)
-                                   $ output setStdout
-                                   $ output setStderr
+                                   $ setStdout output
+                                   $ setStderr output
                                      pc0
-                            runProcess pc
+                            withProcess pc $ \p -> do
+                              case (getStdout p, getStderr p) of
+                                (Nothing, Nothing) -> pure ()
+                                (Just x, Just y) -> concurrently_ x y
+                                (x, y) -> assert False $ concurrently_ (fromMaybe (pure ()) x) (fromMaybe (pure ()) y)
+                              waitExitCode p
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
                         case outputType of
-                          OTConsole _ -> logInfo ""
-                          OTLogFile _ _ -> pure ()
+                          OTConsole Nothing -> logInfo ""
+                          _ -> pure ()
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
                         -- tidiness.

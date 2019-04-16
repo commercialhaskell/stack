@@ -118,8 +118,8 @@ scriptCmd opts = do
             -- --simple-output to check which packages are installed
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
-            pkg <- view $ compilerPathsL.to cpPkg.to toFilePath
-            bss <- sinkProcessStdout pkg
+            GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
+            bss <- sinkProcessStdout (toFilePath pkg)
                 ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
@@ -149,7 +149,7 @@ scriptCmd opts = do
                 ]
         case soCompile opts of
           SEInterpret -> do
-            interpret <- cpInterpreter
+            interpret <- view $ compilerPathsL.to cpInterpreter
             exec (toFilePath interpret)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
@@ -254,6 +254,8 @@ allExposedModules gpd = do
       checkCond (PD.Impl compiler range) = case curCompiler of
         ACGhc version ->
           pure $ compiler == GHC && version `withinRange` range
+        ACGhcGit {} ->
+          pure $ compiler == GHC
         ACGhcjs version _ghcVersion ->
           pure $ compiler == GHCJS && version `withinRange` range
       -- currently we don't do flag checking here

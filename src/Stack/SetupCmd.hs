@@ -88,7 +88,7 @@ setup
     -> RIO env ()
 setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
     Config{..} <- view configL
-    sandboxedGhc <- cpSandboxed <$> ensureCompiler SetupOpts
+    sandboxedGhc <- cpSandboxed . fst <$> ensureCompilerAndMsys SetupOpts
         { soptsInstallIfMissing = True
         , soptsUseSystem = configSystemGHC && not scoForceReinstall
         , soptsWantedCompiler = wantedCompiler
@@ -105,6 +105,7 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         }
     let compiler = case wantedCompiler of
             WCGhc _ -> "GHC"
+            WCGhcGit{} -> "GHC (built from source)"
             WCGhcjs {} -> "GHCJS"
     if sandboxedGhc
         then logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"

@@ -76,7 +76,7 @@ fillPathInfo = do
      piSnapDb <- packageDatabaseDeps
      piLocalDb <- packageDatabaseLocal
      piExtraDbs <- packageDatabaseExtra
-     piGlobalDb <- cpGlobalDB
+     piGlobalDb <- view $ compilerPathsL.to cpGlobalDB
      piSnapRoot <- installationRootDeps
      piLocalRoot <- installationRootLocal
      piToolsDir <- bindirCompilerTools

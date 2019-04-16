@@ -37,7 +37,7 @@ import           System.IO.Echo (withoutInputEcho)
 
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
+import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
 import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
@@ -58,7 +58,7 @@ withKeepSystemTempDir str inner = withRunInIO $ \run -> do
 
 -- | Consume the stdout and stderr of a process feeding strict 'ByteString's to the consumers.
 --
--- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ProcessExitedUnsuccessfully' if the process itself fails.
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ExitCodeException' if the process itself fails.
 sinkProcessStderrStdout
   :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command
@@ -70,6 +70,9 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
   proc name args $ \pc0 -> do
     let pc = setStdout createSource
            $ setStderr createSource
+           -- Don't use closed, since that can break ./configure scripts
+           -- See https://github.com/commercialhaskell/stack/pull/4722
+           $ setStdin (byteStringInput "")
              pc0
     withProcess_ pc $ \p ->
       runConduit (getStderr p .| sinkStderr) `concurrently`

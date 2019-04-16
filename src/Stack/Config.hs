@@ -65,6 +65,7 @@ import           Stack.Build.Haddock (shouldHaddockDeps)
 import           Stack.Storage (initStorage)
 import           Stack.SourceMap
 import           Stack.Types.Build
+import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
@@ -207,6 +208,9 @@ configFromConfigMonoid
          configHideTHLoading = fromFirstTrue configMonoidHideTHLoading
 
          configGHCVariant = getFirst configMonoidGHCVariant
+         configCompilerRepository = fromFirst
+            defaultCompilerRepository
+            configMonoidCompilerRepository
          configGHCBuild = getFirst configMonoidGHCBuild
          configInstallGHC = fromFirstTrue configMonoidInstallGHC
          configSkipGHCCheck = fromFirstFalse configMonoidSkipGHCCheck
@@ -305,6 +309,7 @@ configFromConfigMonoid
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
+         configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of

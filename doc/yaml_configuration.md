@@ -450,6 +450,80 @@ compiler: ghcjs-0.1.0.20150924_ghc-7.10.2
 compiler-check: match-exact
 ```
 
+#### Building GHC from source (experimental)
+
+(Since 2.0)
+
+Stack supports building the GHC compiler from source. The version to build and
+to use is defined by a a Git commit ID and an Hadrian "flavour" (Hadrian is the
+build system of GHC) with the following syntax:
+
+```yaml
+compiler: ghc-git-COMMIT-FLAVOUR
+```
+
+In the following example the commit ID is "5be7ad..." and the flavour is
+"quick":
+
+```yaml
+compiler: ghc-git-5be7ad7861c8d39f60b7101fd8d8e816ff50353a-quick
+```
+
+By default the code is retrieved from the main GHC repository. If you want to
+select another repository, set the "compiler-repository" option:
+
+```yaml
+compiler-repository: git://my/ghc/repository
+# default
+# compiler-repository: https://gitlab.haskell.org/ghc/ghc.git
+```
+
+Note that Stack doesn't check the compiler version when it uses a compiler built
+from source. Moreover it is assumed that the built compiler is recent enough as
+Stack doesn't enable any known workaround to make older compilers work.
+
+Building the compiler can take a very long time (more than one hour). Hint: for
+faster build times, use Hadrian flavours that disable documentation generation.
+
+#### Global packages
+
+The GHC compiler you build from sources may depend on unreleased versions of
+some global packages (e.g. Cabal). It may be an issue if a package you try to
+build with this compiler depends on such global packages because Stack may not
+be able to find versions of those packages (on Hackage, etc.) that are
+compatible with the compiler.
+
+The easiest way to deal with this issue is to drop the offending packages as
+follows. Instead of using the packages specified in the resolver, the global
+packages bundled with GHC will be used.
+
+```yaml
+drop-packages:
+- Cabal
+- ...
+```
+
+Another way to deal with this issue is to add the relevant packages as
+`extra-deps` built from source. To avoid mismatching versions, you can use
+exactly the same commit id you used to build GHC as follows:
+
+```
+extra-deps:
+- git: https://gitlab.haskell.org/ghc/ghc.git
+  commit: 5be7ad7861c8d39f60b7101fd8d8e816ff50353a
+  subdirs:
+    - libraries/Cabal/Cabal
+    - libraries/...
+```
+
+#### Bootstrapping compiler
+
+Building GHC from source requires a working GHC (known as the bootstrap
+compiler). As we use a Stack based version of Hadrian (`hadrian/build.stack.sh` in
+GHC sources), the bootstrap compiler is configured into `hadrian/stack.yaml` and
+fully managed by Stack.
+
+
 ### ghc-options
 
 (Since 0.1.4)
@@ -714,8 +788,8 @@ build:
   cabal-verbose: false
   split-objs: false
 
-  # Since 1.8
-  interleaved-output: false
+  # Since 1.8. Starting with 2.0, the default is true
+  interleaved-output: true
 
   # Since 1.10
   ddump-dir: ""
@@ -971,3 +1045,31 @@ a yaml configuration file.
 
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
+
+### hide-source-paths
+
+Stack will use the `-fhide-source-paths` option by default for GHC >= 8.2, unless this
+option is set to `false` as in the following example:
+
+```yaml
+hide-source-paths: false
+```
+
+Build output when enabled:
+
+```
+...
+[1 of 2] Compiling Lib
+[2 of 2] Compiling Paths_test_pr
+...
+```
+
+Build output when disabled:
+
+```
+...
+[1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
+...
+```
+
+Since 2.0

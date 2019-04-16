@@ -86,8 +86,7 @@ interpreterArgsSpec =
                            Left _ -> True
                            Right _ -> False
 
-      showInput i = "BEGIN =>" ++ i ++ "<= END"
-      testAndCheck checker out inp = it (showInput inp) $ checker out inp
+      testAndCheck checker out inp = it (show inp) $ checker out inp
 
       checkLines args = forM_
         (interpreterGenValid lineComment args)

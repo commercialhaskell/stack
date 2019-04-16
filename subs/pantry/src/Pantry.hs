@@ -63,6 +63,7 @@ module Pantry
     -- ** Repos
   , Repo (..)
   , RepoType (..)
+  , withRepo
 
     -- ** Package location
   , RawPackageLocation (..)

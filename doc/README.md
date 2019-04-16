@@ -17,7 +17,7 @@ It features:
 
 #### How to install
 
-For many Un*x operating systems, all you need to do is run:
+For most Un*x operating systems, the easiest way to install is to run:
 
     curl -sSL https://get.haskellstack.org/ | sh
 
@@ -28,9 +28,15 @@ or:
 On Windows, you can download and install the
 [Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
-For detailed instructions and downloads, including many additional
-operating systems, check out the
-[install and upgrade page](install_and_upgrade.md).
+For other operating systems and direct downloads, check out the
+[install and upgrade guide](install_and_upgrade.md).
+
+Note that the [get.haskellstack.org](https://get.haskellstack.org/)
+script will ask for root access using `sudo` in order to use your
+platform's package manager to install dependencies and to install to
+`/usr/local/bin`.  If you prefer more control, follow the manual
+installation instructions in the
+[install and upgrade guide](install_and_upgrade.md).
 
 #### Quick Start Guide
 

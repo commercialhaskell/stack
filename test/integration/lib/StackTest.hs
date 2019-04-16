@@ -280,3 +280,17 @@ withSourceDirectory action = do
   let enterDir = setCurrentDirectory dir
       exitDir = setCurrentDirectory currentDirectory
   bracket_ enterDir exitDir action
+
+-- | Mark a test as superslow, only to be run when explicitly requested.
+superslow :: HasCallStack => IO () -> IO ()
+superslow inner = do
+  mres <- lookupEnv "STACK_TEST_SPEED"
+  case mres of
+    Just "NORMAL" -> logInfo "Skipping superslow test"
+    Just "SUPERSLOW" -> do
+      logInfo "Running superslow test, hold on to your butts"
+      inner
+    Nothing -> do
+      logInfo "No STACK_TEST_SPEED specified. Executing superslow test, hold on to your butts"
+      inner
+    Just x -> error $ "Invalid value for STACK_TEST_SPEED env var: " ++ show x

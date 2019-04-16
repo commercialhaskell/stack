@@ -391,6 +391,8 @@ data ConfigCache = ConfigCache
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
     , configCachePkgSrc :: !CachePkgSrc
+    , configCachePathEnvVar :: !Text
+    -- ^ Value of the PATH env var, see <https://github.com/commercialhaskell/stack/issues/3138>
     }
     deriving (Generic, Eq, Show, Data, Typeable)
 instance NFData ConfigCache
@@ -629,9 +631,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
     , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration"]
+    , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]
   where
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
+    cv = view (actualCompilerVersionL.to getGhcVersion) econfig
+
+    hideSourcePaths ghcVersion = ghcVersion >= mkVersion [8, 2] && configHideSourcePaths config
+
     config = view configL econfig
     bopts = bcoBuildOpts bco
 

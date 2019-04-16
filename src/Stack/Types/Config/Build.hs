@@ -121,7 +121,7 @@ defaultBuildOpts = BuildOpts
     , boptsCabalVerbose = defaultFirstFalse buildMonoidCabalVerbose
     , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = []
-    , boptsInterleavedOutput = defaultFirstFalse buildMonoidInterleavedOutput
+    , boptsInterleavedOutput = defaultFirstTrue buildMonoidInterleavedOutput
     , boptsDdumpDir = Nothing
     }
 
@@ -210,7 +210,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidCabalVerbose :: !FirstFalse
     , buildMonoidSplitObjs :: !FirstFalse
     , buildMonoidSkipComponents :: ![Text]
-    , buildMonoidInterleavedOutput :: !FirstFalse
+    , buildMonoidInterleavedOutput :: !FirstTrue
     , buildMonoidDdumpDir :: !(First Text)
     } deriving (Show, Generic)
 
@@ -243,7 +243,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidCabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
               buildMonoidSplitObjs <- FirstFalse <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
-              buildMonoidInterleavedOutput <- FirstFalse <$> o ..:? buildMonoidInterleavedOutputName
+              buildMonoidInterleavedOutput <- FirstTrue <$> o ..:? buildMonoidInterleavedOutputName
               buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
               return BuildOptsMonoid{..})
 

@@ -55,6 +55,11 @@ Major changes:
   builds, this functionality is no longer useful. For an example, please see
   [Building Haskell Apps with
   Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
+* Support building GHC from source (experimental)
+    * Stack now supports building and installing GHC from source. The built GHC
+      is uniquely identified by a commit id and an Hadrian "flavour" (Hadrian is
+      the newer GHC build system), hence `compiler` can be set to use a GHC
+      built from source with `ghc-git-COMMIT-FLAVOUR`
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
@@ -81,11 +86,32 @@ Behavior changes:
 * Always use the `--exact-configuration` Cabal configuration option when
   building (should mostly be a non-user-visible enhancement).
 
+* No longer supports Cabal versions older than `1.19.2`.  This means
+  projects using snapshots earlier than `lts-3.0` or
+  `nightly-2015-05-05` will no longer build.
+
 * Remove the `stack docker cleanup` command.  Docker itself now has
   [`docker image prune`](https://docs.docker.com/engine/reference/commandline/image_prune/)
   and
   [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
   which you can use instead.
+
+* Interleaved output is now turned on by default, see
+  [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
+  addition, the `packagename> ` prefix is no longer included in
+  interelaved mode when only building a single target.
+
+* The `-fhide-source-paths` GHC option is now enabled by default and
+  can be disabled via the `hide-source-paths` configuration option in
+  `stack.yaml`. See [#3784](https://github.com/commercialhaskell/stack/issues/3784)
+
+* Stack will reconfigure a package if you modify your `PATH` environment
+  variable. See
+  [#3138](https://github.com/commercialhaskell/stack/issues/3138).
+
+* For GHC 8.4 and later, disable the "shadowed dependencies" workaround. This
+  means that Stack will no longer have to force reconfigures as often. See
+  [#3554](https://github.com/commercialhaskell/stack/issues/3554).
 
 Other enhancements:
 
@@ -160,7 +186,7 @@ Other enhancements:
 * Include default values for most command line flags in the `--help`
   output. See
   [#893](https://github.com/commercialhaskell/stack/issues/893).
-* environment variable `GHC_ENVIRONMENT` is set to specify dependency
+* Set the `GHC_ENVIRONMENT` environment variable to specify dependency
   packages explicitly when running test. This is done to prevent
   ambiguous module name errors in `doctest` tests.
 - Document the way stack interacts with the Cabal library.
@@ -181,6 +207,14 @@ Other enhancements:
 * User config files are respected for the script command. See
   [#3705](https://github.com/commercialhaskell/stack/issues/3705),
   [#3887](https://github.com/commercialhaskell/stack/issues/3887).
+* Set the `GHC_ENVIRONMENT` environment variable to `-` to tell GHC to
+  ignore any such files when GHC is new enough (>= 8.4.4), otherwise
+  simply unset the variable. This allows Stack to have control of
+  package databases when running commands like `stack exec ghci`, even
+  in the presence of implicit environment files created by `cabal
+  new-build`. See
+  [#4706](https://github.com/commercialhaskell/stack/issues/4706).
+* Use a database cache table to speed up discovery of installed GHCs
 
 Bug fixes:
 
@@ -233,6 +267,9 @@ Bug fixes:
 * When the Cabal spec version is newer than the global Cabal version, build
   against the snapshot's Cabal library. See
   [#4488](https://github.com/commercialhaskell/stack/issues/4488)
+- Docker: fix detection of expected subprocess failures.  This fixes
+  downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
+  extra error when the in-container re-exec'ed `stack` exits with failure.
 
 ## v1.9.3
 
