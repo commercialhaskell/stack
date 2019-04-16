@@ -109,6 +109,10 @@ Behavior changes:
   variable. See
   [#3138](https://github.com/commercialhaskell/stack/issues/3138).
 
+* For GHC 8.4 and later, disable the "shadowed dependencies" workaround. This
+  means that Stack will no longer have to force reconfigures as often. See
+  [#3554](https://github.com/commercialhaskell/stack/issues/3554).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get
