@@ -1,22 +1,43 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Pantry.TypesSpec (spec) where
+{-# LANGUAGE FlexibleInstances #-}
 
-import Test.Hspec
+module Pantry.TypesSpec
+    ( spec
+    ) where
+
+import Data.Aeson.Extended
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.NonEmpty hiding (map)
+import Data.Semigroup
+import qualified Data.Vector as Vector
+import qualified Data.Yaml as Yaml
+import Distribution.Types.PackageName (mkPackageName)
+import Distribution.Types.Version (mkVersion)
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Pantry
+import Pantry.Internal
+    ( Tree(..)
+    , TreeEntry(..)
+    , mkSafeFilePath
+    , parseTree
+    , renderTree
+    )
 import qualified Pantry.SHA256 as SHA256
-import Pantry.Internal (parseTree, renderTree, Tree (..), TreeEntry (..), mkSafeFilePath)
+import qualified Path as Path
 import RIO
-import Distribution.Types.Version (mkVersion)
+import qualified RIO.HashMap as HM
 import qualified RIO.Text as T
-import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended (WithJSONWarnings (..))
-import qualified Data.ByteString.Char8 as S8
+import Test.Hspec
+import Text.RawString.QQ
 import RIO.Time (Day (..))
 
 hh :: HasCallStack => String -> Property -> Spec
@@ -29,6 +50,22 @@ genBlobKey = BlobKey <$> genSha256 <*> (FileSize <$> (Gen.word (Range.linear 1 1
 
 genSha256 :: Gen SHA256
 genSha256 = SHA256.hashBytes <$> Gen.bytes (Range.linear 1 500)
+
+samplePLIRepo :: ByteString
+samplePLIRepo =
+    [r|
+subdir: wai
+cabal-file:
+  size: 1765
+  sha256: eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410
+name: wai
+version: 3.2.1.2
+git: https://github.com/yesodweb/wai.git
+pantry-tree:
+  size: 714
+  sha256: ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2
+commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
+|]
 
 spec :: Spec
 spec = do
@@ -110,3 +147,56 @@ spec = do
       liftIO $
         Yaml.toJSON (nightlySnapshotLocation day) `shouldBe`
         Yaml.String (T.pack $ "nightly-" ++ show day)
+    it "FromJSON instance for Repo" $ do
+      repValue <-
+        case Yaml.decodeThrow samplePLIRepo of
+          Just x -> pure x
+          Nothing -> fail "Can't parse Repo"
+      let repoValue =
+              Repo
+                  { repoSubdir = "wai"
+                  , repoType = RepoGit
+                  , repoCommit =
+                        "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
+                  , repoUrl = "https://github.com/yesodweb/wai.git"
+                  }
+      repValue `shouldBe` repoValue
+    it "FromJSON instance for PackageMetadata" $ do
+      pkgMeta <-
+        case Yaml.decodeThrow samplePLIRepo of
+          Just x -> pure x
+          Nothing -> fail "Can't parse Repo"
+      let cabalSha =
+              SHA256.fromHexBytes
+                  "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
+          pantrySha =
+              SHA256.fromHexBytes
+                  "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2"
+      (csha, psha) <- case (cabalSha, pantrySha) of
+        (Right csha, Right psha) -> pure (csha, psha)
+        _ -> fail "Failed decoding sha256"
+      let pkgValue =
+              PackageMetadata
+                  { pmIdent =
+                        PackageIdentifier
+                            (mkPackageName "wai")
+                            (mkVersion [3, 2, 1, 2])
+                  , pmTreeKey = TreeKey (BlobKey psha (FileSize 714))
+                  , pmCabal = BlobKey csha (FileSize 1765)
+                  }
+      pkgMeta `shouldBe` pkgValue
+    it "parseHackageText parses" $ do
+      let txt =
+              "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
+          hsha =
+              SHA256.fromHexBytes
+                  "df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1"
+      sha <- case hsha of
+        Right sha' -> pure sha'
+        _ -> fail "parseHackagetext: failed decoding the sha256"
+      let Right (pkgIdentifier, blobKey) = parseHackageText txt
+      blobKey `shouldBe` (BlobKey sha (FileSize 5058))
+      pkgIdentifier `shouldBe`
+          PackageIdentifier
+              (mkPackageName "persistent")
+              (mkVersion [2, 8, 2])

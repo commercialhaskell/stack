@@ -44,7 +44,7 @@ module Pantry.Types
   , renderTree
   , parseTree
   , SHA256
-  , Unresolved
+  , Unresolved (..)
   , resolvePaths
   , Package (..)
   , PackageCabal (..)
@@ -91,6 +91,7 @@ module Pantry.Types
   , RawSnapshotLocation (..)
   , SnapshotLocation (..)
   , toRawSL
+  , parseHackageText
   , parseRawSnapshotLocation
   , RawSnapshotLayer (..)
   , SnapshotLayer (..)
@@ -105,6 +106,7 @@ module Pantry.Types
   , toRawPM
   , cabalFileName
   , SnapshotCacheHash (..)
+  , bsToBlobKey
   ) where
 
 import RIO
@@ -292,7 +294,7 @@ instance NFData (ResolvedPath t)
 data RawPackageLocation
   = RPLImmutable !RawPackageLocationImmutable
   | RPLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 instance NFData RawPackageLocation
 
 -- | Location to load a package from. Can either be immutable (see
@@ -303,12 +305,16 @@ instance NFData RawPackageLocation
 data PackageLocation
   = PLImmutable !PackageLocationImmutable
   | PLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 instance NFData PackageLocation
 
 instance Display PackageLocation where
   display (PLImmutable loc) = display loc
   display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
+
+instance ToJSON PackageLocation where
+  toJSON (PLImmutable pli) = toJSON pli
+  toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
 
 -- | Convert `PackageLocation` to its "raw" equivalent
 --
@@ -503,6 +509,16 @@ instance Display Repo where
     (if T.null subdir
       then mempty
       else " in subdirectory " <> display subdir)
+instance FromJSON Repo where
+    parseJSON =
+        withObject "Repo" $ \o -> do
+            repoSubdir <- o .: "subdir"
+            repoCommit <- o .: "commit"
+            (repoType, repoUrl) <-
+                (o .: "git" >>= \url -> pure (RepoGit, url)) <|>
+                (o .: "hg" >>= \url -> pure (RepoHg, url))
+            pure Repo {..}
+
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
@@ -683,6 +699,32 @@ instance FromJSON PackageIdentifierRevision where
       Left e -> fail $ show e
       Right pir -> pure pir
 
+-- | Parse a hackage text.
+parseHackageText :: Text -> Either PantryException (PackageIdentifier, BlobKey)
+parseHackageText t = maybe (Left $ PackageIdentifierRevisionParseFail t) Right $ do
+  let (identT, cfiT) = T.break (== '@') t
+  PackageIdentifier name version <- parsePackageIdentifier $ T.unpack identT
+  (csha, csize) <-
+    case splitColon cfiT of
+      Just ("@sha256", shaSizeT) -> do
+        let (shaT, sizeT) = T.break (== ',') shaSizeT
+        sha <- either (const Nothing) Just $ SHA256.fromHexText shaT
+        msize <-
+          case T.stripPrefix "," sizeT of
+            Nothing -> Nothing
+            Just sizeT' ->
+              case decimal sizeT' of
+                Right (size', "") -> Just $ (sha, FileSize size')
+                _ -> Nothing
+        pure msize
+      _ -> Nothing
+  pure $ (PackageIdentifier name version, BlobKey csha csize)
+
+splitColon :: Text -> Maybe (Text, Text)
+splitColon t' =
+    let (x, y) = T.break (== ':') t'
+     in (x, ) <$> T.stripPrefix ":" y
+
 -- | Parse a 'PackageIdentifierRevision'
 --
 -- @since 0.1.0.0
@@ -710,10 +752,6 @@ parsePackageIdentifierRevision t = maybe (Left $ PackageIdentifierRevisionParseF
       Nothing -> pure CFILatest
       _ -> Nothing
   pure $ PackageIdentifierRevision name version cfi
-  where
-    splitColon t' =
-      let (x, y) = T.break (== ':') t'
-       in (x, ) <$> T.stripPrefix ":" y
 
 data Mismatch a = Mismatch
   { mismatchExpected :: !a
@@ -1350,6 +1388,18 @@ instance Display PackageMetadata where
     , "cabal file == " <> display (pmCabal pm)
     ]
 
+instance FromJSON PackageMetadata where
+    parseJSON =
+        withObject "PackageMetadata" $ \o -> do
+            pmCabal :: BlobKey  <- o .: "cabal-file"
+            pantryTree :: BlobKey <- o .: "pantry-tree"
+            CabalString pkgName  <- o .: "name"
+            CabalString pkgVersion <- o .: "version"
+            let pmTreeKey = TreeKey pantryTree
+                pmIdent = PackageIdentifier {..}
+            pure PackageMetadata {..}
+
+
 -- | Conver package metadata to its "raw" equivalent.
 --
 -- @since 0.1.0.0
@@ -1462,6 +1512,54 @@ rpmToPairs (RawPackageMetadata mname mversion mtree mcabal) = concat
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
   ]
 
+instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
+    parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v <|> github v
+                  <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
+        where
+          repoObject :: Value -> Parser (WithJSONWarnings (Unresolved PackageLocationImmutable))
+          repoObject value = do
+            pm <- parseJSON value
+            repo <- parseJSON value
+            pure $ noJSONWarnings $ pure $ PLIRepo repo pm
+
+          archiveObject value = do
+            pm <- parseJSON value
+            withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
+              Unresolved mkArchiveLocation <- parseArchiveLocationObject o
+              archiveHash <- o ..: "sha256"
+              archiveSize <- o ..: "size"
+              archiveSubdir <- o ..:? "subdir" ..!= ""
+              pure $ Unresolved $ \mdir -> do
+                archiveLocation <- mkArchiveLocation mdir
+                pure $ PLIArchive Archive {..} pm
+              ) value
+
+          hackageObject value =
+             withObjectWarnings "UnresolvedPackagelocationimmutable.PLIHackage (Object)" (\o -> do
+                      treeKey <- o ..: "pantry-tree"
+                      htxt <- o ..: "hackage"
+                      case parseHackageText htxt of
+                        Left e -> fail $ show e
+                        Right (pkgIdentifier, blobKey) ->
+                          pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)) value
+
+          github value = do
+            pm <- parseJSON value
+            withObjectWarnings "UnresolvedPackagelocationimmutable.PLIArchive:github" (\o -> do
+              GitHubRepo ghRepo <- o ..: "github"
+              commit <- o ..: "commit"
+              let archiveLocation = ALUrl $ T.concat
+                    [ "https://github.com/"
+                    , ghRepo
+                    , "/archive/"
+                    , commit
+                    , ".tar.gz"
+                    ]
+              archiveHash <- o ..: "sha256"
+              archiveSize <- o ..: "size"
+              archiveSubdir <- o ..: "subdir"
+              pure $ pure $ PLIArchive Archive {..} pm) value
+
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where
   parseJSON v
       = http v
@@ -1470,7 +1568,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
     <|> repo v
     <|> archiveObject v
     <|> github v
-    <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
+    <|> fail ("Could not parse a UnresolvedRawPackageLocationImmutable from: " ++ show v)
     where
       http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
       http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
@@ -2102,3 +2200,10 @@ toRawSnapshotLayer sl = RawSnapshotLayer
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
+
+-- | Creates BlobKey for an input ByteString
+--
+-- @sinc 0.1.0.0
+bsToBlobKey :: ByteString -> BlobKey
+bsToBlobKey bs =
+    BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))

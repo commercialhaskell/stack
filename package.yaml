@@ -183,6 +183,7 @@ library:
   - Stack.IDE
   - Stack.Init
   - Stack.Ls
+  - Stack.Lock
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
@@ -302,6 +303,7 @@ tests:
     dependencies:
     - QuickCheck
     - hspec
+    - raw-strings-qq
     - stack
     - smallcheck
 flags:
