@@ -184,6 +184,7 @@ library:
   - Stack.IDE
   - Stack.Init
   - Stack.Ls
+  - Stack.ModuleInterface
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
