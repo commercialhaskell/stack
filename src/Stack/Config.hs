@@ -296,6 +296,7 @@ configFromConfigMonoid
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = getFirst configMonoidScmInit
+         configCabalConfigOpts = coerce configMonoidCabalConfigOpts
          configGhcOptionsByName = coerce configMonoidGhcOptionsByName
          configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations

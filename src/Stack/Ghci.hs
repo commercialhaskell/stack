@@ -627,12 +627,17 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
           (cpGhcOptions . ppCommon <$> M.lookup name smProject)
           <|>
           (cpGhcOptions . dpCommon <$> M.lookup name smDeps)
+        sourceMapCabalConfigOpts = fromMaybe [] $
+          (cpCabalConfigOpts . ppCommon <$> M.lookup name smProject)
+          <|>
+          (cpCabalConfigOpts . dpCommon <$> M.lookup name smDeps)
         config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = getLocalFlags buildOptsCLI name
             , packageConfigGhcOptions = sourceMapGhcOptions
+            , packageConfigCabalConfigOpts = sourceMapCabalConfigOpts
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }

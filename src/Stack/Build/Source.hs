@@ -85,6 +85,8 @@ loadSourceMap smt boptsCli sma = do
                 flags = getLocalFlags boptsCli name
                 ghcOptions =
                   generalGhcOptions bconfig boptsCli isTarget isProjectPackage
+                cabalConfigOpts =
+                  loadCabalConfigOpts bconfig (cpName common) isTarget isProjectPackage
             in common
                { cpFlags =
                      if M.null flags
@@ -92,6 +94,8 @@ loadSourceMap smt boptsCli sma = do
                          else flags
                , cpGhcOptions =
                      ghcOptions ++ cpGhcOptions common
+               , cpCabalConfigOpts =
+                     cabalConfigOpts ++ cpCabalConfigOpts common
                , cpHaddocks =
                      if isTarget
                          then boptsHaddock bopts
@@ -165,10 +169,12 @@ depPackageHashableContent DepPackage {..} = do
                         else "-" <> fromString (C.unFlagName f)
                 flags = map flagToBs $ Map.toList (cpFlags dpCommon)
                 ghcOptions = map display (cpGhcOptions dpCommon)
+                cabalConfigOpts = map display (cpCabalConfigOpts dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
                 hash = immutableLocSha pli
             return $ hash <> haddocks <> getUtf8Builder (mconcat flags) <>
-                getUtf8Builder (mconcat ghcOptions)
+                getUtf8Builder (mconcat ghcOptions) <>
+                getUtf8Builder (mconcat cabalConfigOpts)
 
 -- | All flags for a local package.
 getLocalFlags
@@ -181,6 +187,21 @@ getLocalFlags boptsCli name = Map.unions
     ]
   where
     cliFlags = boptsCLIFlags boptsCli
+
+-- | Get the options to pass to @./Setup.hs configure@
+loadCabalConfigOpts :: BuildConfig -> PackageName -> Bool -> Bool -> [Text]
+loadCabalConfigOpts bconfig name isTarget isLocal = concat
+    [ Map.findWithDefault [] CCKEverything (configCabalConfigOpts config)
+    , if isLocal
+        then Map.findWithDefault [] CCKLocals (configCabalConfigOpts config)
+        else []
+    , if isTarget
+        then Map.findWithDefault [] CCKTargets (configCabalConfigOpts config)
+        else []
+    , Map.findWithDefault [] (CCKPackage name) (configCabalConfigOpts config)
+    ]
+  where
+    config = view configL bconfig
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.
@@ -230,7 +251,7 @@ loadCommonPackage ::
     => CommonPackage
     -> RIO env Package
 loadCommonPackage common = do
-    config <- getPackageConfig (cpFlags common) (cpGhcOptions common)
+    config <- getPackageConfig (cpFlags common) (cpGhcOptions common) (cpCabalConfigOpts common)
     gpkg <- liftIO $ cpGPD common
     return $ resolvePackage config gpkg
 
@@ -245,7 +266,7 @@ loadLocalPackage pp = do
     let common = ppCommon pp
     bopts <- view buildOptsL
     mcurator <- view $ buildConfigL.to bcCurator
-    config <- getPackageConfig (cpFlags common) (cpGhcOptions common)
+    config <- getPackageConfig (cpFlags common) (cpGhcOptions common) (cpCabalConfigOpts common)
     gpkg <- ppGPD pp
     let name = cpName common
         mtarget = M.lookup name (smtTargets $ smTargets sm)
@@ -496,9 +517,10 @@ calcFci modTime' fp = liftIO $
 getPackageConfig
   :: (HasBuildConfig env, HasSourceMap env)
   => Map FlagName Bool
-  -> [Text]
+  -> [Text] -- ^ GHC options
+  -> [Text] -- ^ cabal config opts
   -> RIO env PackageConfig
-getPackageConfig flags ghcOptions = do
+getPackageConfig flags ghcOptions cabalConfigOpts = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   return PackageConfig
@@ -506,6 +528,7 @@ getPackageConfig flags ghcOptions = do
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = flags
     , packageConfigGhcOptions = ghcOptions
+    , packageConfigCabalConfigOpts = cabalConfigOpts
     , packageConfigCompilerVersion = compilerVersion
     , packageConfigPlatform = platform
     }

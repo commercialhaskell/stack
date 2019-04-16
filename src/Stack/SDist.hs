@@ -511,6 +511,7 @@ getDefaultPackageConfig = do
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = mempty
     , packageConfigGhcOptions = []
+    , packageConfigCabalConfigOpts = []
     , packageConfigCompilerVersion = compilerVersion
     , packageConfigPlatform = platform
     }

@@ -585,6 +585,24 @@ on an options change, but this behavior can be changed back with the following:
 rebuild-ghc-options: true
 ```
 
+### configure-options
+
+Options which are passed to the configure step of the Cabal build process.
+These can either be set by package name, or using the `$everything`,
+`$targets`, and `$locals` special keys. These special keys have the same
+meaning as in `ghc-options`.
+
+```yaml
+configure-options:
+  $everything:
+  - --with-gcc
+  - /some/path
+  my-package:
+  - --another-flag
+```
+
+(Since 2.0)
+
 ### ghc-variant
 
 (Since 0.1.5)

@@ -244,9 +244,10 @@ loadPackage
   :: (HasBuildConfig env, HasSourceMap env)
   => PackageLocationImmutable
   -> Map FlagName Bool
-  -> [Text]
+  -> [Text] -- ^ GHC options
+  -> [Text] -- ^ Cabal configure options
   -> RIO env Package
-loadPackage loc flags ghcOptions = do
+loadPackage loc flags ghcOptions cabalConfigOpts = do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig
@@ -254,6 +255,7 @@ loadPackage loc flags ghcOptions = do
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcOptions = ghcOptions
+        , packageConfigCabalConfigOpts = cabalConfigOpts
         , packageConfigCompilerVersion = compiler
         , packageConfigPlatform = platform
         }

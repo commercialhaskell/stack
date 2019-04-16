@@ -38,6 +38,7 @@ data CommonPackage = CommonPackage
   , cpFlags :: !(Map FlagName Bool)
   -- ^ overrides default flags
   , cpGhcOptions :: ![Text] -- also lets us know if we're doing profiling
+  , cpCabalConfigOpts :: ![Text]
   , cpHaddocks :: !Bool
   }
 

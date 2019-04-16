@@ -135,6 +135,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageFiles = pkgFiles
     , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
+    , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]

@@ -56,6 +56,7 @@ mkProjectPackage printWarnings dir buildHaddocks = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpCabalConfigOpts = mempty
                   , cpHaddocks = buildHaddocks
                   }
      }
@@ -86,6 +87,7 @@ additionalDepPackage buildHaddocks pl = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpCabalConfigOpts = mempty
                   , cpHaddocks = buildHaddocks
                   }
     }
@@ -107,6 +109,7 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
                   , cpName = name
                   , cpFlags = spFlags
                   , cpGhcOptions = spGhcOptions
+                  , cpCabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
                   , cpHaddocks = buildHaddocks
                   }
     }
