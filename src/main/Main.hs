@@ -866,7 +866,7 @@ ghciCmd ghciOpts =
           { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
           , boptsCLIInitialBuildSteps = True
           , boptsCLIFlags = ghciFlags ghciOpts
-          , boptsCLIGhcOptions = ghciGhcOptions ghciOpts
+          , boptsCLIGhcOptions = map T.pack (ghciGhcOptions ghciOpts)
           }
   in withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
     bopts <- view buildOptsL

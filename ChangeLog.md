@@ -275,6 +275,8 @@ Bug fixes:
 - Docker: fix detection of expected subprocess failures.  This fixes
   downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
+* The `stack ghci` command's `--ghc-options` flag now parses multiple options.
+  See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
 
 ## v1.9.3
 
