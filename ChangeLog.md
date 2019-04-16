@@ -60,6 +60,7 @@ Major changes:
       is uniquely identified by a commit id and an Hadrian "flavour" (Hadrian is
       the newer GHC build system), hence `compiler` can be set to use a GHC
       built from source with `ghc-git-COMMIT-FLAVOUR`
+* Support for lock files for pinning exact project dependency versions
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
