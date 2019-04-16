@@ -925,10 +925,10 @@ packageNamePrefix ee name' =
           Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
    in fromString paddedName <> "> "
 
-announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Text -> RIO env ()
+announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Utf8Builder -> RIO env ()
 announceTask ee task action = logInfo $
     packageNamePrefix ee (pkgName (taskProvides task)) <>
-    RIO.display action
+    action
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
@@ -963,7 +963,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -- argument, but we provide both to avoid recalculating `parent` of the `File`.
                      -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
-                     -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
+                     -> (Utf8Builder -> RIO env ())      -- An 'announce' function, for different build phases
                      -> OutputType
                      -> RIO env a)
                   -> RIO env a
@@ -1491,7 +1491,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
 
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
@@ -1514,7 +1514,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
-        () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
+        announce ("initial-build-steps" <> RIO.display (annSuffix executableBuildStatuses))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
@@ -1522,7 +1522,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -> Package
         -> Path Abs Dir
         -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
-        -> (Text -> RIO env ())
+        -> (Utf8Builder -> RIO env ())
         -> Map Text ExecutableBuildStatus
         -> RIO env Installed
     realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
@@ -1565,7 +1565,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        () <- announce ("build" <> annSuffix executableBuildStatuses)
+        () <- announce ("build" <> RIO.display (annSuffix executableBuildStatuses))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         let stripTHLoading
@@ -1906,7 +1906,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                             argsDisplay = case args of
                                             [] -> ""
                                             _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
-                        announce $ "test (suite: " <> testName <> argsDisplay <> ")"
+                        announce $ "test (suite: " <> RIO.display testName <> RIO.display argsDisplay <> ")"
 
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
@@ -1964,7 +1964,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         -- tidiness.
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
-                        let announceResult result = announce $ "Test suite " <> testName <> " " <> result
+                        let announceResult result = announce $ "Test suite " <> RIO.display testName <> " " <> result
                         case mec of
                             Just ExitSuccess -> do
                                 announceResult "passed"
