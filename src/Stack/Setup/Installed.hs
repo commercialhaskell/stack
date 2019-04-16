@@ -38,22 +38,19 @@ import           RIO.Process
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs ActualCompiler -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
     | ToolGhcGit !Text !Text   -- ^ e.g. ghc-git-COMMIT_ID-FLAVOUR
     deriving (Eq)
 
 toolString :: Tool -> String
 toolString (Tool ident) = packageIdentifierString ident
-toolString (ToolGhcjs cv) = compilerVersionString cv
 toolString (ToolGhcGit commit flavour) = "ghc-git-" ++ T.unpack commit ++ "-" ++ T.unpack flavour
 
 toolNameString :: Tool -> String
 toolNameString (Tool ident) = packageNameString $ pkgName ident
-toolNameString ToolGhcjs{} = "ghcjs"
 toolNameString ToolGhcGit{} = "ghc-git"
 
 parseToolText :: Text -> Maybe Tool
-parseToolText (parseWantedCompiler -> Right (WCGhcjs x y)) = Just (ToolGhcjs (ACGhcjs x y))
+parseToolText (parseWantedCompiler -> Right WCGhcjs{}) = Nothing
 parseToolText (parseWantedCompiler -> Right (WCGhcGit c f)) = Just (ToolGhcGit c f)
 parseToolText (parsePackageIdentifier . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
@@ -170,17 +167,11 @@ extraDirs tool = do
                 [ dir </> relDirBin
                 ]
             }
-        (_, isGHCJS -> True) -> return mempty
-            { edBins =
-                [ dir </> relDirBin
-                ]
-            }
         (Platform _ x, toolName) -> do
             logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
             return mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
-    isGHCJS n = "ghcjs" == n
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir
