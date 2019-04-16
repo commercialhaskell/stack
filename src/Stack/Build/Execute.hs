@@ -82,7 +82,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
 import qualified System.Directory as D
-import           System.Environment (getExecutablePath)
+import           System.Environment (getExecutablePath, lookupEnv)
 import           System.Exit (ExitCode (..))
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
@@ -209,6 +209,8 @@ data ExecuteEnv = ExecuteEnv
     -- Setup.hs built.
     , eeLargestPackageName :: !(Maybe Int)
     -- ^ For nicer interleaved output: track the largest package name size
+    , eePathEnvVar :: !Text
+    -- ^ Value of the PATH environment variable
     }
 
 buildSetupArgs :: [String]
@@ -341,6 +343,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
         let totalWanted = length $ filter lpWanted locals
+        pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
         inner ExecuteEnv
             { eeBuildOpts = bopts
             , eeBuildOptsCLI = boptsCli
@@ -366,6 +369,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             , eeLogFiles = logFilesTChan
             , eeCustomBuilt = customBuiltRef
             , eeLargestPackageName = mlargestPackageName
+            , eePathEnvVar = pathEnvVar
             } `finally` dumpLogs logFilesTChan totalWanted
   where
     toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
@@ -824,6 +828,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                     TTLocalMutable lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTRemotePackage{} -> Set.empty
             , configCachePkgSrc = taskCachePkgSrc
+            , configCachePathEnvVar = eePathEnvVar
             }
         allDepsMap = Map.union missing' taskPresent
     return (allDepsMap, cache)
