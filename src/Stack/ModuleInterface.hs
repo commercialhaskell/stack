@@ -1,3 +1,6 @@
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Stack.ModuleInterface
     ( Interface(..)
     , List(..)
@@ -6,25 +9,31 @@ module Stack.ModuleInterface
     , Usage(..)
     , Dependencies(..)
     , getInterface
+    , fromFile
     ) where
 
 {- HLINT ignore "Reduce duplication" -}
 
-import           Control.Monad   (replicateM, replicateM_, when)
-import           Data.Binary
-import           Data.Binary.Get (bytesRead, getInt64be, getWord32be,
-                                  getWord64be, getWord8, lookAhead, skip,
-                                  getByteString)
-import           Data.ByteString (ByteString)
-import           Data.Bool       (bool)
-import           Data.Char       (chr)
-import           Data.Functor    (void, ($>))
-import           Data.List       (find)
-import           Data.Maybe      (catMaybes)
-import           Data.Semigroup  ((<>))
-import qualified Data.Vector     as V
-import           Foreign         (sizeOf)
-import           Numeric         (showHex)
+import           Control.Monad                 (replicateM, replicateM_, when)
+import           Data.Binary                   (Get, Word32)
+import           Data.Binary.Get               (Decoder (..), bytesRead,
+                                                getByteString, getInt64be,
+                                                getWord32be, getWord64be,
+                                                getWord8, lookAhead,
+                                                runGetIncremental, skip)
+import           Data.Bool                     (bool)
+import           Data.ByteString.Lazy.Internal (defaultChunkSize)
+import           Data.Char                     (chr)
+import           Data.Functor                  (void, ($>))
+import           Data.List                     (find)
+import           Data.Maybe                    (catMaybes)
+import           Data.Semigroup                ((<>))
+import qualified Data.Vector                   as V
+import           Foreign                       (sizeOf)
+import           GHC.IO.IOMode                 (IOMode (..))
+import           Numeric                       (showHex)
+import           RIO.ByteString                as B (ByteString, hGetSome, null)
+import           System.IO                     (withBinaryFile)
 
 type IsBoot = Bool
 
@@ -32,19 +41,19 @@ type ModuleName = ByteString
 
 newtype List a = List
     { unList :: [a]
-    } deriving (Show)
+    } deriving newtype (Show)
 
 newtype Dictionary = Dictionary
     { unDictionary :: V.Vector ByteString
-    } deriving (Show)
+    } deriving newtype (Show)
 
 newtype Module = Module
     { unModule :: ModuleName
-    } deriving (Show)
+    } deriving newtype (Show)
 
 newtype Usage = Usage
     { unUsage :: FilePath
-    } deriving (Show)
+    } deriving newtype (Show)
 
 data Dependencies = Dependencies
     { dmods    :: List (ModuleName, IsBoot)
@@ -419,3 +428,14 @@ getInterface = do
     case snd <$> find ((version >=) . fst) versions of
         Just f  -> f dict
         Nothing -> fail $ "Unsupported version: " <> version
+
+fromFile :: FilePath -> IO (Either String Interface)
+fromFile fp = withBinaryFile fp ReadMode go
+  where
+    go h =
+      let feed (Done _ _ iface) = pure $ Right iface
+          feed (Fail _ _ msg) = pure $ Left msg
+          feed (Partial k) = do
+            chunk <- hGetSome h defaultChunkSize
+            feed $ k $ if B.null chunk then Nothing else Just chunk
+      in feed $ runGetIncremental getInterface
