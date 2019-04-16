@@ -61,6 +61,9 @@ Major changes:
       the newer GHC build system), hence `compiler` can be set to use a GHC
       built from source with `ghc-git-COMMIT-FLAVOUR`
 
+* Remove support for building GHCJS itself. Future releases of Stack
+  may remove GHCJS support entirely.
+
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
