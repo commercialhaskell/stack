@@ -84,7 +84,7 @@ import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
 import           System.Exit (ExitCode (..))
-import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive))
+import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
@@ -930,6 +930,48 @@ announceTask ee task action = logInfo $
     packageNamePrefix ee (pkgName (taskProvides task)) <>
     action
 
+-- | Ensure we're the only action using the directory.  See
+-- <https://github.com/commercialhaskell/stack/issues/2730>
+withLockedDistDir
+  :: HasEnvConfig env
+  => (Utf8Builder -> RIO env ()) -- ^ announce
+  -> Path Abs Dir -- ^ root directory for package
+  -> RIO env a
+  -> RIO env a
+withLockedDistDir announce root inner = do
+  distDir <- distRelativeDir
+  let lockFP = root </> distDir </> relFileBuildLock
+  ensureDir $ parent lockFP
+
+  mres <-
+    withRunInIO $ \run ->
+    withTryFileLock (toFilePath lockFP) Exclusive $ \_lock ->
+    run inner
+
+  case mres of
+    Just res -> pure res
+    Nothing -> do
+      announce $ "blocking for directory lock on " <> fromString (toFilePath lockFP)
+      stopYellingVar <- newTVarIO False
+      let yell = do
+            doneDelayingVar <- registerDelay 30000000 -- 30 seconds
+            join $ atomically $
+              (do stopYelling' <- readTVar stopYellingVar
+                  checkSTM stopYelling'
+                  pure $ pure ()) <|>
+              (do doneDelaying <- readTVar doneDelayingVar
+                  checkSTM doneDelaying
+                  pure $ do
+                    announce $ "still blocking for directory lock on " <>
+                               fromString (toFilePath lockFP) <>
+                               "; maybe another Stack process is running?"
+                    yell)
+          stopYelling = atomically $ writeTVar stopYellingVar True
+          block = withRunInIO $ \run ->
+            withFileLock (toFilePath lockFP) Exclusive (\_ -> stopYelling *> run inner)
+            `finally` stopYelling
+      runConcurrently $ Concurrently yell *> Concurrently block
+
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
 data OutputType
@@ -998,17 +1040,8 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
         case taskType of
             TTLocalMutable lp -> do
               let root = parent $ lpCabalFile lp
-              distDir <- distRelativeDir
-              let lockFile = root </> distDir </> relFileBuildLock
-              ensureDir $ parent lockFile
-              -- Make sure we're the only ones, see https://github.com/commercialhaskell/stack/issues/2730
-              mres <-
-                withRunInIO $ \run ->
-                withTryFileLock (toFilePath lockFile) Exclusive $ \_lock ->
-                run $ inner (lpPackage lp) (lpCabalFile lp) root
-              case mres of
-                Just res -> pure res
-                Nothing -> throwIO $ CouldNotLockDistDir lockFile
+              withLockedDistDir announce root $
+                inner (lpPackage lp) (lpCabalFile lp) root
             TTRemotePackage _ package pkgloc -> do
                 suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
                 let dir = eeTempDir </> suffix
