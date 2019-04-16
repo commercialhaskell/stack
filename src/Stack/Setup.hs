@@ -659,48 +659,42 @@ ensureSandboxedCompiler
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureSandboxedCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-    (compilerBuild, mcompiler, isSandboxed, paths) <- do
-            -- List installed tools
-            config <- view configL
-            let localPrograms = configLocalPrograms config
-            installed <- listInstalled localPrograms
-            logDebug $ "Installed tools: \n - " <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
-            (compilerTool, compilerBuild) <-
-              case soptsWantedCompiler sopts of
-               -- shall we build GHC from source?
-               WCGhcGit commitId flavour -> buildGhcFromSource getSetupInfo' installed  (configCompilerRepository config) commitId flavour
-               _ -> installGhcBindist sopts getSetupInfo' installed
-            paths <- extraDirs compilerTool
-            pure (compilerBuild, Nothing, True, paths)
+    -- List installed tools
+    config <- view configL
+    let localPrograms = configLocalPrograms config
+    installed <- listInstalled localPrograms
+    logDebug $ "Installed tools: \n - " <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
+    (compilerTool, compilerBuild) <-
+      case soptsWantedCompiler sopts of
+       -- shall we build GHC from source?
+       WCGhcGit commitId flavour -> buildGhcFromSource getSetupInfo' installed  (configCompilerRepository config) commitId flavour
+       _ -> installGhcBindist sopts getSetupInfo' installed
+    paths <- extraDirs compilerTool
 
     let wc = whichCompiler $ wantedToActual wanted
-    compiler <-
-      case mcompiler of
-        Just compiler -> pure compiler
-        Nothing -> do
-          menv0 <- view processContextL
-          m <- either throwM return
-             $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
-          menv <- mkProcessContext (removeHaskellEnvVars m)
+    menv0 <- view processContextL
+    m <- either throwM return
+       $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
+    menv <- mkProcessContext (removeHaskellEnvVars m)
 
-          let names =
-                case wanted of
-                  WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
-                  WCGhcGit{} -> ["ghc"]
-                  WCGhcjs{} -> ["ghcjs"]
-              loop [] = do
-                logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
-                logError $ "Could not find it on the paths " <> displayShow (edBins paths)
-                throwString "Could not find sandboxed compiler"
-              loop (x:xs) = do
-                res <- findExecutable x
-                case res of
-                  Left _ -> loop xs
-                  Right y -> parseAbsFile y
-          withProcessContext menv $ loop names
+    let names =
+          case wanted of
+            WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
+            WCGhcGit{} -> ["ghc"]
+            WCGhcjs{} -> ["ghcjs"]
+        loop [] = do
+          logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
+          logError $ "Could not find it on the paths " <> displayShow (edBins paths)
+          throwString "Could not find sandboxed compiler"
+        loop (x:xs) = do
+          res <- findExecutable x
+          case res of
+            Left _ -> loop xs
+            Right y -> parseAbsFile y
+    compiler <- withProcessContext menv $ loop names
 
     when (soptsSanityCheck sopts) $ sanityCheck compiler
-    cp <- pathsFromCompiler wc compilerBuild isSandboxed compiler
+    cp <- pathsFromCompiler wc compilerBuild True compiler
     pure (cp, paths)
 
 pathsFromCompiler
