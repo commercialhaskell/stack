@@ -211,7 +211,7 @@ If the lock file does not exist, it will be created by:
 If the `stack.yaml.lock` file exists, its last modification time is
 compared against the last modification time of the `stack.yaml` file
 and any local snapshot files. If any of those files is more recent
-than the `stack.yaml` file, and the file hashes in the lock file
+than the `stack.yaml.lock` file, and the file hashes in the lock file
 do not match the files on the filesystem, then the update procedure is
 triggered. Otherwise, the `stack.yaml.lock` file can be used as the
 definition of the snapshot.
