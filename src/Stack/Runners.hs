@@ -20,8 +20,6 @@ module Stack.Runners
     ) where
 
 import           Stack.Prelude
-import           Distribution.Version (mkVersion')
-import qualified Paths_stack
 import           RIO.Process (mkDefaultProcessContext)
 import           RIO.Time (addUTCTime, getCurrentTime)
 import           Stack.Build.Target(NeedTargets(..))
@@ -35,6 +33,7 @@ import           Stack.Storage (upgradeChecksSince, logUpgradeCheck)
 import           Stack.Types.Config
 import           Stack.Types.Docker (dockerEnable)
 import           Stack.Types.Nix (nixEnable)
+import           Stack.Types.Version (stackMinorVersion, stackVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
@@ -189,11 +188,13 @@ shouldUpgradeCheck = do
     when (checks == 0) $ do
       mversion <- getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions
       case mversion of
-        Just (PackageIdentifierRevision _ version _) | version > mkVersion' Paths_stack.version -> do
+        -- Compare the minor version so we avoid patch-level, Hackage-only releases.
+        -- See: https://github.com/commercialhaskell/stack/pull/4729#pullrequestreview-227176315
+        Just (PackageIdentifierRevision _ version _) | minorVersion version > stackMinorVersion -> do
           logWarn "<<<<<<<<<<<<<<<<<<"
           logWarn $
             "You are currently using Stack version " <>
-            fromString (versionString (mkVersion' Paths_stack.version)) <>
+            fromString (versionString stackVersion) <>
             ", but version " <>
             fromString (versionString version) <>
             " is available"
