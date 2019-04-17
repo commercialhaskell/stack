@@ -9,6 +9,7 @@ extra-deps:
 - hpack-0.31.1@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
+- rio-0.1.9.2@rev:0
 
 # docker:
 #   enable: true

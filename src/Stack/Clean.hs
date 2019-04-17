@@ -27,7 +27,7 @@ import           System.Exit (exitFailure)
 clean :: HasEnvConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
     failures <- mapM cleanDir =<< dirsToDelete cleanOpts
-    when (or failures) $ liftIO exitFailure
+    when (or failures) $ liftIO System.Exit.exitFailure
   where
     cleanDir dir =
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do

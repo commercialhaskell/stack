@@ -150,7 +150,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
           (hoogleArgs ++ databaseArg)
           runProcess_
     bail :: RIO EnvConfig a
-    bail = liftIO (exitWith (ExitFailure (-1)))
+    bail = liftIO (System.Exit.exitWith (ExitFailure (-1)))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)

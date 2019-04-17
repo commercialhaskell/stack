@@ -198,12 +198,12 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
             throwIO OnlyOnHostException
         | inContainer ->
             liftIO (do inner
-                       exitSuccess)
+                       System.Exit.exitSuccess)
         | not (dockerEnable (configDocker config)) ->
             do fromMaybeAction mbefore
                liftIO inner
                fromMaybeAction mafter
-               liftIO exitSuccess
+               liftIO System.Exit.exitSuccess
         | otherwise ->
             do fromMaybeAction mrelease
                runContainerAndExit
@@ -374,9 +374,9 @@ runContainerAndExit getCmdArgs
 #endif
          )
      case e of
-       Left ExitCodeException{eceExitCode} -> liftIO (exitWith eceExitCode)
+       Left ExitCodeException{eceExitCode} -> liftIO (System.Exit.exitWith eceExitCode)
        Right () -> do after
-                      liftIO exitSuccess
+                      liftIO System.Exit.exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
