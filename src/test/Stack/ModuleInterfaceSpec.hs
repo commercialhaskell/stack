@@ -12,6 +12,8 @@ import           Test.Hspec            (Spec, describe, it, shouldBe)
 type Version = String
 type Architecture = String
 type Directory = FilePath
+type Usage = String
+type Module = ByteString
 
 versions :: [Version]
 versions = ["ghc822", "ghc844", "ghc864"]
@@ -33,14 +35,15 @@ deserialize d = do
         case result of
             (Left msg) -> fail msg
             (Right iface) -> do
-                hasExpectedUsage iface `shouldBe` True
-                hasExpectedModule iface `shouldBe` True
+                hasExpectedUsage "Test.h" iface `shouldBe` True
+                hasExpectedUsage "README.md" iface `shouldBe` True
+                hasExpectedModule "X" iface `shouldBe` True
 
 -- | `Usage` is the name given by GHC to TH dependency
-hasExpectedUsage :: Iface.Interface -> Bool
-hasExpectedUsage =
-    elem "Test.h" . fmap Iface.unUsage . Iface.unList . Iface.usage
+hasExpectedUsage :: Usage -> Iface.Interface -> Bool
+hasExpectedUsage u =
+    elem u . fmap Iface.unUsage . Iface.unList . Iface.usage
 
-hasExpectedModule :: Iface.Interface -> Bool
-hasExpectedModule =
-    elem "X" . fmap fst . Iface.unList . Iface.dmods . Iface.deps
+hasExpectedModule :: Module -> Iface.Interface -> Bool
+hasExpectedModule m =
+    elem m . fmap fst . Iface.unList . Iface.dmods . Iface.deps
