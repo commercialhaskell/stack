@@ -11,10 +11,10 @@ let
   ];
   generate = version:
     let ghc = haskell.compiler."ghc${version}";
-        main = "Test";
+        main = "Main";
     in ''
-      mkdir -p x64/ghc${version}/
-      ${ghc}/bin/ghc -fforce-recomp -hidir x64/ghc${version} ${main}.hs && \
+      mkdir -p ghc${version}/
+      ${ghc}/bin/ghc -fforce-recomp -hidir ghc${version} ${main}.hs && \
         rm *.o && \
         rm ${main}
   '';

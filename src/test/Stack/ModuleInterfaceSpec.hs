@@ -7,6 +7,7 @@ import           Data.Foldable         (traverse_)
 import           Data.Semigroup        ((<>))
 import qualified Stack.ModuleInterface as Iface
 import           Stack.Prelude         hiding (Version)
+import           System.Directory      (doesFileExist)
 import           Test.Hspec            (Spec, describe, it, shouldBe)
 
 type Version = String
@@ -15,29 +16,37 @@ type Directory = FilePath
 type Usage = String
 type Module = ByteString
 
-versions :: [Version]
-versions = ["ghc822", "ghc844", "ghc864"]
+versions32 :: [Version]
+versions32 = ["ghc7103", "ghc802", "ghc822", "ghc844"]
 
--- TODO: add x32 when generated
-archs :: [Architecture]
-archs = ["x64"]
-
-directories :: [FilePath]
-directories = (<>) <$> ((<> "/") <$> archs) <*> versions
+versions64 :: [Version]
+versions64 = ["ghc822", "ghc844", "ghc864"]
 
 spec :: Spec
-spec = describe "should succesfully deserialize interface from" $ traverse_ deserialize directories
+spec = describe "should succesfully deserialize x32 interface for" $ do
+   traverse_ (deserialize check32) (("x32/" <>) <$> versions32)
+   traverse_ (deserialize check64) (("x64/" <>) <$> versions64)
 
-deserialize :: Directory -> Spec
-deserialize d = do
+check32 :: Iface.Interface -> IO ()
+check32 iface = do
+    hasExpectedUsage "some-dependency.txt" iface `shouldBe` True
+
+check64 :: Iface.Interface -> IO ()
+check64 iface = do
+    hasExpectedUsage "Test.h" iface `shouldBe` True
+    hasExpectedUsage "README.md" iface `shouldBe` True
+    hasExpectedModule "X" iface `shouldBe` True
+
+deserialize :: (Iface.Interface -> IO ()) -> Directory -> Spec
+deserialize check d = do
     it d $ do
-        result <- Iface.fromFile $ "test/files/iface/" <> d <> "/Main.hi"
-        case result of
-            (Left msg) -> fail msg
-            (Right iface) -> do
-                hasExpectedUsage "Test.h" iface `shouldBe` True
-                hasExpectedUsage "README.md" iface `shouldBe` True
-                hasExpectedModule "X" iface `shouldBe` True
+        let ifacePath = "test/files/iface/" <> d <> "/Main.hi"
+        exists <- doesFileExist ifacePath
+        when exists $ do
+            result <- Iface.fromFile ifacePath
+            case result of
+                (Left msg)    -> fail msg
+                (Right iface) -> check iface
 
 -- | `Usage` is the name given by GHC to TH dependency
 hasExpectedUsage :: Usage -> Iface.Interface -> Bool
