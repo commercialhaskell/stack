@@ -14,7 +14,7 @@ module Stack.ModuleInterface
 
 {- HLINT ignore "Reduce duplication" -}
 
-import           Control.Monad                 (replicateM, replicateM_, when)
+import           Control.Monad                 (replicateM, replicateM_)
 import           Data.Binary                   (Get, Word32)
 import           Data.Binary.Get               (Decoder (..), bytesRead,
                                                 getByteString, getInt64be,
@@ -29,7 +29,6 @@ import           Data.List                     (find)
 import           Data.Maybe                    (catMaybes)
 import           Data.Semigroup                ((<>))
 import qualified Data.Vector                   as V
-import           Distribution.System           (Arch (..), buildArch)
 import           GHC.IO.IOMode                 (IOMode (..))
 import           Numeric                       (showHex)
 import           RIO.ByteString                as B (ByteString, hGetSome, null)
@@ -393,17 +392,13 @@ getInterface861 d = do
 
 getInterface :: Get Interface
 getInterface = do
-    let (expectedMagic, bypassDummyPtr) =
-            case buildArch of
-                I386 -> (0x1face, void getWord32be)
-                _    -> (0x1face64, void getWord64be)
     magic <- getWord32be
-    when
-        (magic /= expectedMagic)
-        (fail $
-         "Invalid magic: got: " <> showHex magic "" <> ", expected: " <>
-         showHex expectedMagic "")
-    bypassDummyPtr
+    case magic of
+        -- x32
+        0x1face      -> void getWord32be
+        -- x64
+        0x1face64    -> void getWord64be
+        invalidMagic -> fail $ "Invalid magic: " <> showHex invalidMagic ""
     -- ghc version
     version <- getString
     -- way
