@@ -557,4 +557,6 @@ upgradeChecksSince since = withStorage $ count [UpgradeCheckTimestamp >=. since]
 
 -- | Log in the database that an upgrade check occurred at the given time.
 logUpgradeCheck :: HasConfig env => UTCTime -> RIO env ()
-logUpgradeCheck = withStorage . insert_ . UpgradeCheck
+logUpgradeCheck time = withStorage $ do
+  deleteWhere ([] :: [Filter UpgradeCheck])
+  insert_ $ UpgradeCheck time
