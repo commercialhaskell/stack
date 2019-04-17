@@ -403,12 +403,17 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     logInfo $
       "Configuring GHCi with the following packages: " <>
       mconcat (intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
-    compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
+    (command, addInteractive) <-
+      case ghciGhcCommand of
+        Nothing -> do
+          repl <- view $ compilerPathsL.to cpRepl.to toFilePath
+          pure (repl, id)
+        Just cmd -> pure (cmd, ("--interactive":))
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
             withProcessContext menv $ exec
-                 (fromMaybe compilerExeName ghciGhcCommand)
-                 (("--interactive" : ) $
+                 command
+                 (addInteractive $
                  -- This initial "-i" resets the include directories to
                  -- not include CWD. If there aren't any packages, CWD
                  -- is included.
@@ -424,7 +429,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                 [_] -> do
                     menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
                     output <- withProcessContext menv
-                            $ runGrabFirstLine (fromMaybe compilerExeName ghciGhcCommand) ["--version"]
+                            $ runGrabFirstLine command ["--version"]
                     return $ "Intero" `isPrefixOf` output
                 _ -> return False
     -- Since usage of 'exec' does not return, we cannot do any cleanup

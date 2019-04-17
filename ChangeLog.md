@@ -277,6 +277,10 @@ Bug fixes:
   extra error when the in-container re-exec'ed `stack` exits with failure.
 * The `stack ghci` command's `--ghc-options` flag now parses multiple options.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
+* On Windows, the `ghci.exe` executable behaves differently from `ghc.exe
+  --interactive`. Previously, we used the latter for the `stack ghci` command,
+  which led to misbehavior. We now call `ghci.exe` directly instead. See
+  [#4737](https://github.com/commercialhaskell/stack/issues/4737).
 
 ## v1.9.3
 

@@ -743,6 +743,10 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
                \case
                   Ghc -> ["haddock", "haddock-ghc"]
                   Ghcjs -> ["haddock-ghcjs"]
+    repl <- findHelper $
+            \case
+              Ghc -> ["ghci"]
+              Ghcjs -> ["ghcjs"] -- ugly hack since there's no repl support for GHCJS
     infobs <- proc (toFilePath compiler) ["--info"]
             $ fmap (toStrictBytes . fst) . readProcess_
     infotext <-
@@ -800,6 +804,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
       , cpPkg = pkg
       , cpInterpreter = interpreter
       , cpHaddock = haddock
+      , cpRepl = repl
       , cpCabalVersion = cabalPkgVer
       , cpGlobalDB = globaldb
       , cpGhcInfo = infobs

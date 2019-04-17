@@ -1923,8 +1923,10 @@ data CompilerPaths = CompilerPaths
   , cpPkg :: !GhcPkgExe
   -- | runghc
   , cpInterpreter :: !(Path Abs File)
-  -- | haddock, in 'IO' to allow deferring the lookup
+  -- | haddock
   , cpHaddock :: !(Path Abs File)
+  -- | ghci
+  , cpRepl :: !(Path Abs File)
   -- | Is this a Stack-sandboxed installation?
   , cpSandboxed :: !Bool
   , cpCabalVersion :: !Version

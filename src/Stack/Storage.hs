@@ -41,7 +41,7 @@ import Distribution.Text (simpleParse, display)
 import Foreign.C.Types (CTime (..))
 import qualified Pantry.SQLite as SQLite
 import Path
-import Path.IO (resolveFile', resolveDir')
+import Path.IO (resolveFile', resolveDir', doesFileExist, doesDirExist)
 import qualified RIO.FilePath as FP
 import Stack.Prelude hiding (MigrationFailure)
 import Stack.Types.Build
@@ -137,6 +137,7 @@ CompilerCache
   ghcPkgPath FilePath
   runghcPath FilePath
   haddockPath FilePath
+  replPath FilePath "default=(hex(randomblob(16)))" -- will fail on loading old values, forcing a reload
 
   cabalVersion Text
   globalDb FilePath
@@ -485,13 +486,24 @@ loadCompilerPaths compiler build sandboxed = do
        compilerCacheGlobalDbCacheModified /= timeToInt64 (modificationTime globalDbStatus))
       (throwString "Global package cache file metadata mismatch, ignoring cache")
 
-    -- We could use parseAbsFile instead of resolveFile' below to
-    -- bypass some system calls, at the cost of some really wonky
-    -- error messages in case someone screws up their GHC installation
-    pkgexe <- resolveFile' compilerCacheGhcPkgPath
-    runghc <- resolveFile' compilerCacheRunghcPath
-    haddock <- resolveFile' compilerCacheHaddockPath
-    globaldb <- resolveDir' compilerCacheGlobalDb
+    -- Include an existence test to avoid some very confusing error
+    -- messages if something was deleted.
+    let getFile raw = do
+          path <- resolveFile' raw
+          exists <- doesFileExist path
+          unless exists $ throwString $ "File does not exist: " ++ show raw
+          pure path
+    pkgexe <- getFile compilerCacheGhcPkgPath
+    runghc <- getFile compilerCacheRunghcPath
+    haddock <- getFile compilerCacheHaddockPath
+    repl <- getFile compilerCacheReplPath
+
+    let getDir raw = do
+          path <- resolveDir' raw
+          exists <- doesDirExist path
+          unless exists $ throwString $ "Directory does not exist: " ++ show raw
+          pure path
+    globaldb <- getDir compilerCacheGlobalDb
 
     cabalVersion <- parseVersionThrowing $ T.unpack compilerCacheCabalVersion
     globalDump <-
@@ -511,6 +523,7 @@ loadCompilerPaths compiler build sandboxed = do
       , cpPkg = GhcPkgExe pkgexe
       , cpInterpreter = runghc
       , cpHaddock = haddock
+      , cpRepl = repl
       , cpSandboxed = sandboxed
       , cpCabalVersion = cabalVersion
       , cpGlobalDB = globaldb
@@ -536,6 +549,7 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
     , compilerCacheGhcPkgPath = toFilePath pkgexe
     , compilerCacheRunghcPath = toFilePath cpInterpreter
     , compilerCacheHaddockPath = toFilePath cpHaddock
+    , compilerCacheReplPath = toFilePath cpRepl
     , compilerCacheCabalVersion = T.pack $ versionString cpCabalVersion
     , compilerCacheGlobalDb = toFilePath cpGlobalDB
     , compilerCacheGlobalDbCacheSize = sizeToInt64 $ fileSize globalDbStatus
