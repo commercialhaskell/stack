@@ -29,7 +29,7 @@ import           Data.List                     (find)
 import           Data.Maybe                    (catMaybes)
 import           Data.Semigroup                ((<>))
 import qualified Data.Vector                   as V
-import           Foreign                       (sizeOf)
+import           Distribution.System           (Arch (..), buildArch)
 import           GHC.IO.IOMode                 (IOMode (..))
 import           Numeric                       (showHex)
 import           RIO.ByteString                as B (ByteString, hGetSome, null)
@@ -393,18 +393,17 @@ getInterface861 d = do
 
 getInterface :: Get Interface
 getInterface = do
+    let (expectedMagic, bypassDummyPtr) =
+            case buildArch of
+                I386 -> (0x1face, void getWord32be)
+                _    -> (0x1face64, void getWord64be)
     magic <- getWord32be
-    when (magic /= 0x1face64) (fail $ "Invalid magic: " <> showHex magic "")
-    {-
-      dummy value depending on the wORD_SIZE
-      wORD_SIZE :: Int
-      wORD_SIZE = (#const SIZEOF_HSINT)
-
-      This was used to serialize pointers
-    -}
-    if sizeOf (undefined :: Int) == 4
-        then void getWord32be
-        else void getWord64be
+    when
+        (magic /= expectedMagic)
+        (fail $
+         "Invalid magic: got: " <> showHex magic "" <> ", expected: " <>
+         showHex expectedMagic "")
+    bypassDummyPtr
     -- ghc version
     version <- getString
     -- way
