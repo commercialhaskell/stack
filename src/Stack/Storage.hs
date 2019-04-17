@@ -245,6 +245,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
                         parentId
                         [ ConfigCacheParentPkgSrc =. configCachePkgSrc new
                         , ConfigCacheParentActive =. True
+                        , ConfigCacheParentPathEnvVar =. configCachePathEnvVar new
                         ]
                     return (parentId, Just old)
         updateList
