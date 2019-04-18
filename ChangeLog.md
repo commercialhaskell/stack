@@ -31,6 +31,13 @@ Bug fixes:
   downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
 
+
+## v1.9.3.1
+
+Hackage-only release with no user facing changes (added compatibility
+with `rio-0.1.9.2`).
+
+
 ## v1.9.3
 
 Bug fixes:
