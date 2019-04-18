@@ -1,0 +1,10 @@
+resolver: ghc-8.2.2
+
+extra-deps:
+- acme-missiles-0.3@rev:0
+
+configure-options:
+  name:
+  - this is an invalid option
+  acme-missiles:
+  - this is an invalid option

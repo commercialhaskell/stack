@@ -165,6 +165,7 @@ gpdPackageDeps gpd ac platform flags =
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
             , packageConfigGhcOptions = []
+            , packageConfigCabalConfigOpts = []
             , packageConfigCompilerVersion = ac
             , packageConfigPlatform = platform
             }

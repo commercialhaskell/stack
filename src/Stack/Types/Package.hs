@@ -102,6 +102,7 @@ data Package =
           ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
+          ,packageCabalConfigOpts :: ![Text]              -- ^ Additional options passed to ./Setup.hs configure
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
@@ -216,6 +217,7 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
+                ,packageConfigCabalConfigOpts :: ![Text]          -- ^ ./Setup.hs configure options
                 ,packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
