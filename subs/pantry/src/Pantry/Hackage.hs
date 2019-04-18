@@ -117,12 +117,36 @@ updateHackageIndex mreason = do
         HS.checkForUpdates repo maybeNow
 
     case didUpdate of
-      HS.NoUpdates -> logInfo "No package index update available"
+      HS.NoUpdates -> do
+        x <- needsCacheUpdate tarball
+        if x
+          then do
+            logInfo "No package index update available, but didn't update cache last time, running now"
+            updateCache tarball
+          else logInfo "No package index update available and cache up to date"
       HS.HasUpdates -> do
         logInfo "Updated package index downloaded"
         updateCache tarball
     logStickyDone "Package index cache populated"
   where
+    -- The size of the new index tarball, ignoring the required
+    -- (by the tar spec) 1024 null bytes at the end, which will be
+    -- mutated in the future by other updates.
+    getTarballSize :: MonadIO m => Handle -> m Word
+    getTarballSize h = (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+
+    -- Check if the size of the tarball on the disk matches the value
+    -- in CacheUpdate. If not, we need to perform a cache update, even
+    -- if we didn't download any new information. This can be caused
+    -- by canceling an updateCache call.
+    needsCacheUpdate tarball = do
+      mres <- withStorage loadLatestCacheUpdate
+      case mres of
+        Nothing -> pure True
+        Just (FileSize cachedSize, _sha256) -> do
+          actualSize <- withBinaryFile (toFilePath tarball) ReadMode getTarballSize
+          pure $ cachedSize /= actualSize
+
     -- This is the one action in the Pantry codebase known to hold a
     -- write lock on the database for an extended period of time. To
     -- avoid failures due to SQLite locks failing, we take our own
@@ -152,10 +176,7 @@ updateHackageIndex mreason = do
       (offset, newHash, newSize) <- lift $ withBinaryFile (toFilePath tarball) ReadMode $ \h -> do
         logInfo "Calculating hashes to check for hackage-security rebases or filesystem changes"
 
-        -- The size of the new index tarball, ignoring the required
-        -- (by the tar spec) 1024 null bytes at the end, which will be
-        -- mutated in the future by other updates.
-        newSize :: Word <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+        newSize <- getTarballSize h
         let sinkSHA256 len = takeCE (fromIntegral len) .| SHA256.sinkHash
 
         case minfo of
