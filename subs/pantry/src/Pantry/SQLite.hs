@@ -29,8 +29,15 @@ initStorage description migration fp inner = do
   forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
 
   withSqlitePoolInfo (sqinfo False) 1 $ \pool -> inner $ Storage
-    { withStorage_ = flip runSqlPool pool
-    , withWriteLock_ = withWriteLock fp
+    -- NOTE: Currently, we take a write lock on every action. This is
+    -- a bit heavyweight, but it avoids the SQLITE_BUSY errors
+    -- reported in
+    -- <https://github.com/commercialhaskell/stack/issues/4471>
+    -- completely. We can investigate more elegant solutions in the
+    -- future, such as separate read and write actions or introducing
+    -- smarter retry logic.
+    { withStorage_ = withWriteLock fp . flip runSqlPool pool
+    , withWriteLock_ = id
     }
   where
     wrapMigrationFailure = handleAny (throwIO . MigrationFailure description fp)
