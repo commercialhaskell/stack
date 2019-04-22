@@ -10,25 +10,30 @@ import Pantry.Types
 import Pantry.StaticSHA256
 import Pantry.Storage
 import RIO
+import RIO.FilePath (takeDirectory, takeFileName)
 import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither)
-import RIO.Time (Day, toGregorian)
+import RIO.Time (Day, toGregorian, UTCTime)
+import RIO.Process
+import Data.Time.Format
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
 import Distribution.Types.PackageName (PackageName, mkPackageName)
 import Distribution.PackageDescription (FlagName, mkFlagName)
 import Data.Monoid (Endo (..))
 import Data.Yaml (decodeFileThrow)
+import qualified RIO.Text as T
 
 parseOldStackage
-  :: (HasPantryConfig env, HasLogFunc env)
+  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Either (Int, Int) Day -- ^ LTS or nightly
   -> Text -- ^ rendered name
   -> FilePath
   -> RIO env Snapshot
 parseOldStackage snapName renderedSnapName fp = do
   value <- decodeFileThrow fp
-  case parseEither (parseStackageSnapshot renderedSnapName) value of
+  creationTime <- getGitCreationTime fp
+  case parseEither (parseStackageSnapshot renderedSnapName (Just creationTime)) value of
     Left s -> error $ show (fp, s)
     Right x -> do
       locs <- mapM applyCrlfHack $ snapshotLocations x
@@ -39,8 +44,25 @@ parseOldStackage snapName renderedSnapName fp = do
       pure (PLIHackage (PackageIdentifierRevision name version (CFIHash sha' (Just size'))) mtree)
     applyCrlfHack x = pure x
 
-parseStackageSnapshot :: Text -> Value -> Parser Snapshot
-parseStackageSnapshot snapshotName = withObject "StackageSnapshotDef" $ \o -> do
+getGitCreationTime
+  :: (HasLogFunc env, HasProcessContext env)
+  => FilePath
+  -> RIO env UTCTime
+getGitCreationTime fp =
+  withWorkingDir (takeDirectory fp) $
+  proc "git" ["log", "--format=%ad", "--date=iso-strict", takeFileName fp] $ \pc -> do
+    stdout <- readProcessStdout_ pc
+    case decodeUtf8' $ toStrictBytes stdout of
+      Left e -> error $ show (e, stdout)
+      Right t -> do
+        let str = concat $ take 1 $ reverse $ lines $ T.unpack t
+            format = iso8601DateFormat $ Just $ "%H:%M:%S%z"
+        case parseTimeM False defaultTimeLocale format str of
+          Just created -> pure created
+          Nothing -> error $ "Invalid git log output: " ++ show (str, stdout)
+
+parseStackageSnapshot :: Text -> Maybe UTCTime -> Value -> Parser Snapshot
+parseStackageSnapshot snapshotName snapshotPublishTime = withObject "StackageSnapshotDef" $ \o -> do
     Object si <- o .: "system-info"
     ghcVersion <- si .: "ghc-version"
     let snapshotParent = SLCompiler $ WCGhc $ unCabalString ghcVersion

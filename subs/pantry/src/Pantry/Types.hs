@@ -81,7 +81,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
-import RIO.Time (toGregorian, Day)
+import RIO.Time (toGregorian, Day, UTCTime)
 import qualified RIO.Map as Map
 import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -1197,6 +1197,9 @@ data Snapshot = Snapshot
   -- overriding the hidden settings in a parent snapshot.
   , snapshotGhcOptions :: !(Map PackageName [Text])
   -- ^ GHC options per package
+  , snapshotPublishTime :: !(Maybe UTCTime)
+  -- ^ Publication timestamp for this snapshot. This field is optional, and
+  -- is for informational purposes only.
   }
   deriving (Show, Eq, Data, Generic)
 instance Store Snapshot
@@ -1226,6 +1229,7 @@ instance ToJSON Snapshot where
     , if Map.null (snapshotFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (snapshotFlags snap))]
     , if Map.null (snapshotHidden snap) then [] else ["hidden" .= toCabalStringMap (snapshotHidden snap)]
     , if Map.null (snapshotGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (snapshotGhcOptions snap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (snapshotPublishTime snap)
     ]
 
 parseSnapshot :: Maybe (Path Abs Dir) -> Value -> Parser (WithJSONWarnings (IO Snapshot))
@@ -1244,6 +1248,7 @@ parseSnapshot mdir = withObjectWarnings "Snapshot" $ \o -> do
   snapshotFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
   snapshotHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
   snapshotGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+  snapshotPublishTime <- o ..:? "publish-time"
   pure $ do
     snapshotLocations <- fmap concat $ mapM (resolvePackageLocationImmutable mdir) unresolvedLocs
     snapshotParent <- iosnapshotParent

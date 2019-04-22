@@ -8,6 +8,7 @@ import Curator.Types
 import Pantry
 import qualified RIO.Map as Map
 import Distribution.Types.VersionRange (withinRange)
+import RIO.Time (getCurrentTime)
 
 makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -16,6 +17,7 @@ makeSnapshot
   -> RIO env Snapshot
 makeSnapshot cons name = do
   locs <- traverseValidate (uncurry toLoc) $ Map.toList $ consPackages cons
+  now <- getCurrentTime
   pure Snapshot
     { snapshotParent = SLCompiler $ WCGhc $ consGhcVersion cons
     , snapshotName = name
@@ -24,6 +26,7 @@ makeSnapshot cons name = do
     , snapshotFlags = Map.mapMaybe getFlags (consPackages cons)
     , snapshotHidden = Map.filter id (pcHide <$> consPackages cons)
     , snapshotGhcOptions = mempty
+    , snapshotPublishTime = Just now
     }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)
