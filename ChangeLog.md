@@ -119,6 +119,12 @@ Behavior changes:
   means that Stack will no longer have to force reconfigures as often. See
   [#3554](https://github.com/commercialhaskell/stack/issues/3554).
 
+* Stack will check occassionally if there is a new version available and prompt
+  the user to upgrade. This will not incur any additional network traffic, as
+  it will piggy-back on the existing Hackage index updates. You can set
+  `recommend-stack-upgrade: false` to bypass this. See
+  [#1681](https://github.com/commercialhaskell/stack/issues/1681).
+
 Other enhancements:
 
 * Defer loading up of files for local packages. This allows us to get

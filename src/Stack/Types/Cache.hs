@@ -3,6 +3,7 @@
 
 module Stack.Types.Cache
     ( ConfigCacheType(..)
+    , Action(..)
     ) where
 
 import qualified Data.Text as T
@@ -43,3 +44,13 @@ instance PersistField ConfigCacheType where
 
 instance PersistFieldSql ConfigCacheType where
     sqlType _ = SqlString
+
+data Action
+  = UpgradeCheck
+  deriving (Show, Eq, Ord)
+instance PersistField Action where
+    toPersistValue UpgradeCheck = PersistInt64 1
+    fromPersistValue (PersistInt64 1) = Right UpgradeCheck
+    fromPersistValue x = Left $ T.pack $ "Invalid Action: " ++ show x
+instance PersistFieldSql Action where
+    sqlType _ = SqlInt64
