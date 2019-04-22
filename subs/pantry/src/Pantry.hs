@@ -816,6 +816,7 @@ completeSnapshotLayer rsnapshot = do
     , slFlags = rslFlags rsnapshot
     , slHidden = rslHidden rsnapshot
     , slGhcOptions = rslGhcOptions rsnapshot
+    , slPublishTime = rslPublishTime rsnapshot
     }
 
 traverseConcurrently_
