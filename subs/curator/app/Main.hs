@@ -53,6 +53,10 @@ options =
                  "Check snapshot consistency"
                  (const checkSnapshot)
                  (pure ())
+      addCommand "legacy-snapshot"
+                 "Generate a legacy-format snapshot file"
+                 (const legacySnapshot)
+                 (pure ())
       addCommand "unpack"
                  "Unpack snapshot packages and create a Stack project for it"
                  (const unpackFiles)
@@ -167,6 +171,13 @@ checkSnapshot = do
   decodeFileThrow constraintsFilename >>= \constraints' -> do
     snapshot' <- loadSnapshotYaml
     checkDependencyGraph constraints' snapshot'
+
+legacySnapshot :: RIO PantryApp ()
+legacySnapshot = do
+  logInfo "Generating legacy-style snapshot file in legacy-snapshot.yaml"
+  snapshot' <- loadSnapshotYaml
+  legacy <- toLegacySnapshot snapshot'
+  liftIO $ encodeFile "legacy-snapshot.yaml" legacy
 
 unpackDir :: FilePath
 unpackDir = "unpack-dir"
