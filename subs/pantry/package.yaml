@@ -108,9 +108,7 @@ library:
   - Pantry.Internal
   - Pantry.Internal.StaticBytes
   # For stackage-server
-  - Pantry.Storage
-  - Pantry.Types
-  - Pantry.Hackage
+  - Pantry.Internal.Stackage
 
   # FIXME must be removed from pantry!
   - Data.Aeson.Extended
