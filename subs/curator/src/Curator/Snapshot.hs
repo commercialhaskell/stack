@@ -38,6 +38,7 @@ import RIO.Seq (Seq)
 import qualified RIO.Seq as Seq
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as TP
+import RIO.Time (getCurrentTime)
 
 makeSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -49,6 +50,7 @@ makeSnapshot cons = do
         Map.toList $ consPackages cons
     let snapshotPackages = Set.fromList [ pn | (pn, Just _) <- locs ]
         inSnapshot pn = pn `Set.member` snapshotPackages
+    now <- getCurrentTime
     pure
         RawSnapshotLayer
         { rslParent = RSLCompiler $ WCGhc $ consGhcVersion cons
@@ -60,6 +62,7 @@ makeSnapshot cons = do
         , rslHidden = Map.filterWithKey (\pn hide -> hide && inSnapshot pn)
                       (pcHide <$> consPackages cons)
         , rslGhcOptions = mempty
+        , rslPublishTime = Just now
         }
 
 getFlags :: PackageConstraints -> Maybe (Map FlagName Bool)

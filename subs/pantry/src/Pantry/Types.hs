@@ -114,7 +114,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
-import RIO.Time (toGregorian, Day, fromGregorianValid)
+import RIO.Time (toGregorian, Day, fromGregorianValid, UTCTime)
 import qualified RIO.Map as Map
 import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -1984,6 +1984,10 @@ data RawSnapshotLayer = RawSnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , rslPublishTime :: !(Maybe UTCTime)
+  -- ^ See 'slPublishTime'
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
@@ -2006,6 +2010,7 @@ instance ToJSON RawSnapshotLayer where
     , if Map.null (rslGhcOptions rsnap)
         then []
         else ["ghc-options" .= toCabalStringMap (rslGhcOptions rsnap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (rslPublishTime rsnap)
     ]
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
@@ -2028,6 +2033,7 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
     rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
     rslHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
     rslGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    rslPublishTime <- o ..:? "publish-time"
     pure $ (\rslLocations (rslParent, rslCompiler) -> RawSnapshotLayer {..})
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
@@ -2072,6 +2078,11 @@ data SnapshotLayer = SnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , slPublishTime :: !(Maybe UTCTime)
+  -- ^ Publication timestamp for this snapshot. This field is optional, and
+  -- is for informational purposes only.
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
@@ -2084,6 +2095,7 @@ instance ToJSON SnapshotLayer where
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
     , if Map.null (slHidden snap) then [] else ["hidden" .= toCabalStringMap (slHidden snap)]
     , if Map.null (slGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (slGhcOptions snap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (slPublishTime snap)
     ]
 
 -- | Convert snapshot layer into its "raw" equivalent.
@@ -2098,6 +2110,7 @@ toRawSnapshotLayer sl = RawSnapshotLayer
   , rslFlags = slFlags sl
   , rslHidden = slHidden sl
   , rslGhcOptions = slGhcOptions sl
+  , rslPublishTime = slPublishTime sl
   }
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
