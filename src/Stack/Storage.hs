@@ -154,9 +154,11 @@ CompilerCache
 
   UniqueCompilerInfo ghcPath
 
--- History of checks for whether we should upgrade Stack
-UpgradeCheck
+-- Last time certain actions were performed
+LastPerformed
+  action Action
   timestamp UTCTime
+  UniqueAction action
 |]
 
 -- | Initialize the database.
@@ -553,10 +555,13 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
 
 -- | How many upgrade checks have occurred since the given timestamp?
 upgradeChecksSince :: HasConfig env => UTCTime -> RIO env Int
-upgradeChecksSince since = withStorage $ count [UpgradeCheckTimestamp >=. since]
+upgradeChecksSince since = withStorage $ count
+  [ LastPerformedAction ==. UpgradeCheck
+  , LastPerformedTimestamp >=. since
+  ]
 
 -- | Log in the database that an upgrade check occurred at the given time.
 logUpgradeCheck :: HasConfig env => UTCTime -> RIO env ()
-logUpgradeCheck time = withStorage $ do
-  deleteWhere ([] :: [Filter UpgradeCheck])
-  insert_ $ UpgradeCheck time
+logUpgradeCheck time = withStorage $ void $ upsert
+  (LastPerformed UpgradeCheck time)
+  [LastPerformedTimestamp =. time]
