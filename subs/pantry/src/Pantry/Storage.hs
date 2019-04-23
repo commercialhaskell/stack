@@ -262,17 +262,16 @@ withStorage action =
 -- | This is a helper type to distinguish db queries between different rdbms backends. The important
 -- part is that the affects described in this data type should be semantically equivalent between
 -- the supported engines.
-data RdbmsActions m a = RdbmsActions
-  { raSqlite :: !(ReaderT SqlBackend m a)
+data RdbmsActions env a = RdbmsActions
+  { raSqlite :: !(ReaderT SqlBackend (RIO env) a)
   -- ^ A query that is specific to SQLite
-  , raPostgres :: !(ReaderT SqlBackend m a)
+  , raPostgres :: !(ReaderT SqlBackend (RIO env) a)
   }
 
 -- | This function provides a way to create queries supported by multiple sql backends.
 rdbmsAwareQuery
-  :: MonadIO m
-  => RdbmsActions m a
-  -> ReaderT SqlBackend m a
+  :: RdbmsActions env a
+  -> ReaderT SqlBackend (RIO env) a
 rdbmsAwareQuery RdbmsActions {raSqlite, raPostgres} = do
   rdbms <- connRDBMS <$> ask
   case rdbms of
@@ -282,28 +281,24 @@ rdbmsAwareQuery RdbmsActions {raSqlite, raPostgres} = do
 
 
 getPackageNameById
-  :: MonadIO m
-  => PackageNameId
-  -> ReaderT SqlBackend m (Maybe P.PackageName)
+  :: PackageNameId
+  -> ReaderT SqlBackend (RIO env) (Maybe P.PackageName)
 getPackageNameById = fmap (unPackageNameP . packageNameName <$>) . get
 
 
 getPackageNameId
-  :: MonadIO m
-  => P.PackageName
-  -> ReaderT SqlBackend m PackageNameId
+  :: P.PackageName
+  -> ReaderT SqlBackend (RIO env) PackageNameId
 getPackageNameId = fmap (either entityKey id) . insertBy . PackageName . PackageNameP
 
 getVersionId
-  :: MonadIO m
-  => P.Version
-  -> ReaderT SqlBackend m VersionId
+  :: P.Version
+  -> ReaderT SqlBackend (RIO env) VersionId
 getVersionId = fmap (either entityKey id) . insertBy . Version . VersionP
 
 storeBlob
-  :: MonadIO m
-  => ByteString
-  -> ReaderT SqlBackend m (BlobId, BlobKey)
+  :: ByteString
+  -> ReaderT SqlBackend (RIO env) (BlobId, BlobKey)
 storeBlob bs = do
   let sha = SHA256.hashBytes bs
       size = FileSize $ fromIntegral $ B.length bs
@@ -349,17 +344,17 @@ loadBlob (P.BlobKey sha size) = do
              ". Expected size: " <> display size <>
              ". Actual size: " <> display (blobSize bt))
 
-loadBlobBySHA :: MonadIO m => SHA256 -> ReaderT SqlBackend m (Maybe BlobId)
+loadBlobBySHA :: SHA256 -> ReaderT SqlBackend (RIO env) (Maybe BlobId)
 loadBlobBySHA sha = listToMaybe <$> selectKeysList [BlobSha ==. sha] []
 
-loadBlobById :: MonadIO m => BlobId -> ReaderT SqlBackend m ByteString
+loadBlobById :: BlobId -> ReaderT SqlBackend (RIO env) ByteString
 loadBlobById bid = do
   mbt <- get bid
   case mbt of
     Nothing -> error "loadBlobById: ID doesn't exist in database"
     Just bt -> pure $ blobContents bt
 
-getBlobKey :: MonadIO m => BlobId -> ReaderT SqlBackend m BlobKey
+getBlobKey :: BlobId -> ReaderT SqlBackend (RIO env) BlobKey
 getBlobKey bid = do
   res <- rawSql "SELECT sha, size FROM blob WHERE id=?" [toPersistValue bid]
   case res of
@@ -367,13 +362,13 @@ getBlobKey bid = do
     [(Single sha, Single size)] -> pure $ P.BlobKey sha size
     _ -> error $ "getBlobKey failed due to non-unique ID: " ++ show (bid, res)
 
-getBlobId :: MonadIO m => BlobKey -> ReaderT SqlBackend m (Maybe BlobId)
+getBlobId :: BlobKey -> ReaderT SqlBackend (RIO env) (Maybe BlobId)
 getBlobId (P.BlobKey sha size) = do
   res <- rawSql "SELECT id FROM blob WHERE sha=? AND size=?"
            [toPersistValue sha, toPersistValue size]
   pure $ listToMaybe $ map unSingle res
 
-loadURLBlob :: MonadIO m => Text -> ReaderT SqlBackend m (Maybe ByteString)
+loadURLBlob :: Text -> ReaderT SqlBackend (RIO env) (Maybe ByteString)
 loadURLBlob url = do
   ment <- rawSql
     "SELECT blob.contents\n\
@@ -386,7 +381,7 @@ loadURLBlob url = do
     [] -> pure Nothing
     (Single bs) : _ -> pure $ Just bs
 
-storeURLBlob :: MonadIO m => Text -> ByteString -> ReaderT SqlBackend m ()
+storeURLBlob :: Text -> ByteString -> ReaderT SqlBackend (RIO env) ()
 storeURLBlob url blob = do
   (blobId, _) <- storeBlob blob
   now <- getCurrentTime
@@ -396,15 +391,11 @@ storeURLBlob url blob = do
         , urlBlobTime = now
         }
 
-clearHackageRevisions :: MonadIO m => ReaderT SqlBackend m ()
+clearHackageRevisions :: ReaderT SqlBackend (RIO env) ()
 clearHackageRevisions = deleteWhere ([] :: [Filter HackageCabal])
 
-storeHackageRevision
-  :: MonadIO m
-  => P.PackageName
-  -> P.Version
-  -> BlobId
-  -> ReaderT SqlBackend m ()
+storeHackageRevision ::
+     P.PackageName -> P.Version -> BlobId -> ReaderT SqlBackend (RIO env) ()
 storeHackageRevision name version key = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
@@ -421,9 +412,8 @@ storeHackageRevision name version key = do
     }
 
 loadHackagePackageVersions
-  :: MonadIO m
-  => P.PackageName
-  -> ReaderT SqlBackend m (Map P.Version (Map Revision BlobKey))
+  :: P.PackageName
+  -> ReaderT SqlBackend (RIO env) (Map P.Version (Map Revision BlobKey))
 loadHackagePackageVersions name = do
   nameid <- getPackageNameId name
   -- would be better with esequeleto
@@ -439,10 +429,9 @@ loadHackagePackageVersions name = do
       (version, Map.singleton revision (P.BlobKey key size))
 
 loadHackagePackageVersion
-  :: MonadIO m
-  => P.PackageName
+  :: P.PackageName
   -> P.Version
-  -> ReaderT SqlBackend m (Map Revision (BlobId, P.BlobKey))
+  -> ReaderT SqlBackend (RIO env) (Map Revision (BlobId, P.BlobKey))
 loadHackagePackageVersion name version = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
@@ -459,18 +448,13 @@ loadHackagePackageVersion name version = do
       (revision, (bid, P.BlobKey sha size))
 
 loadLatestCacheUpdate
-  :: MonadIO m
-  => ReaderT SqlBackend m (Maybe (FileSize, SHA256))
+  :: ReaderT SqlBackend (RIO env) (Maybe (FileSize, SHA256))
 loadLatestCacheUpdate =
     fmap go <$> selectFirst [] [Desc CacheUpdateTime]
   where
     go (Entity _ cu) = (cacheUpdateSize cu, cacheUpdateSha cu)
 
-storeCacheUpdate
-  :: MonadIO m
-  => FileSize
-  -> SHA256
-  -> ReaderT SqlBackend m ()
+storeCacheUpdate :: FileSize -> SHA256 -> ReaderT SqlBackend (RIO env) ()
 storeCacheUpdate size sha = do
   now <- getCurrentTime
   insert_ CacheUpdate
@@ -480,12 +464,11 @@ storeCacheUpdate size sha = do
     }
 
 storeHackageTarballInfo
-  :: MonadIO m
-  => P.PackageName
+  :: P.PackageName
   -> P.Version
   -> SHA256
   -> FileSize
-  -> ReaderT SqlBackend m ()
+  -> ReaderT SqlBackend (RIO env) ()
 storeHackageTarballInfo name version sha size = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
@@ -497,10 +480,9 @@ storeHackageTarballInfo name version sha size = do
     }
 
 loadHackageTarballInfo
-  :: MonadIO m
-  => P.PackageName
+  :: P.PackageName
   -> P.Version
-  -> ReaderT SqlBackend m (Maybe (SHA256, FileSize))
+  -> ReaderT SqlBackend (RIO env) (Maybe (SHA256, FileSize))
 loadHackageTarballInfo name version = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
@@ -593,10 +575,8 @@ hpackVersionId = do
       insertBy $
       Version {versionVersion = P.VersionP hpackSoftwareVersion}
 
-getFilePathId
-  :: MonadIO m
-  => SafeFilePath
-  -> ReaderT SqlBackend m FilePathId
+
+getFilePathId :: SafeFilePath -> ReaderT SqlBackend (RIO env) FilePathId
 getFilePathId sfp =
   selectKeysList [FilePathPath ==. sfp] [] >>= \case
     [fpId] -> pure fpId
@@ -685,7 +665,7 @@ getTree tid = do
         Just ts -> pure ts
   loadTreeByEnt $ Entity tid ts
 
-loadTree :: MonadIO m => P.TreeKey -> ReaderT SqlBackend m (Maybe P.Tree)
+loadTree :: P.TreeKey -> ReaderT SqlBackend (RIO env) (Maybe P.Tree)
 loadTree key = do
   ment <- getTreeForKey key
   case ment of
@@ -693,9 +673,8 @@ loadTree key = do
     Just ent -> Just <$> loadTreeByEnt ent
 
 getTreeForKey
-  :: MonadIO m
-  => TreeKey
-  -> ReaderT SqlBackend m (Maybe (Entity Tree))
+  :: TreeKey
+  -> ReaderT SqlBackend (RIO env) (Maybe (Entity Tree))
 getTreeForKey (P.TreeKey key) = do
   mbid <- getBlobId key
   case mbid of
@@ -790,7 +769,7 @@ getHPackCabalFile hpackRecord ts tmap cabalFile = do
         cbTreeEntry = P.TreeEntry cabalKey fileType
         hpackTreeEntry = P.TreeEntry hpackKey fileType
         tree = P.TreeMap $ Map.insert cabalFile cbTreeEntry tmap
-    return $
+    return
         ( P.PCHpack $
           P.PHpack
               { P.phOriginal = hpackTreeEntry
@@ -799,10 +778,7 @@ getHPackCabalFile hpackRecord ts tmap cabalFile = do
               }
         , tree)
 
-loadTreeByEnt
-  :: MonadIO m
-  => Entity Tree
-  -> ReaderT SqlBackend m P.Tree
+loadTreeByEnt :: Entity Tree -> ReaderT SqlBackend (RIO env) P.Tree
 loadTreeByEnt (Entity tid _t) = do
   entries <- rawSql
     "SELECT file_path.path, blob.sha, blob.size, tree_entry.type\n\
@@ -817,12 +793,11 @@ loadTreeByEnt (Entity tid _t) = do
     entries
 
 storeHackageTree
-  :: MonadIO m
-  => P.PackageName
+  :: P.PackageName
   -> P.Version
   -> BlobId
   -> P.TreeKey
-  -> ReaderT SqlBackend m ()
+  -> ReaderT SqlBackend (RIO env) ()
 storeHackageTree name version cabal treeKey' = do
   nameid <- getPackageNameId name
   versionid <- getVersionId version
@@ -835,11 +810,10 @@ storeHackageTree name version cabal treeKey' = do
     [HackageCabalTree =. Just (entityKey ent)]
 
 loadHackageTreeKey
-  :: MonadIO m
-  => P.PackageName
+  :: P.PackageName
   -> P.Version
   -> SHA256
-  -> ReaderT SqlBackend m (Maybe TreeKey)
+  -> ReaderT SqlBackend (RIO env) (Maybe TreeKey)
 loadHackageTreeKey name ver sha = do
   res <- rawSql
     "SELECT treeblob.sha, treeblob.size\n\
@@ -886,13 +860,12 @@ loadHackageTree rpli name ver bid = do
         Just tid -> Just <$> loadPackageById rpli tid
 
 storeArchiveCache
-  :: MonadIO m
-  => Text -- ^ URL
+  :: Text -- ^ URL
   -> Text -- ^ subdir
   -> SHA256
   -> FileSize
   -> P.TreeKey
-  -> ReaderT SqlBackend m ()
+  -> ReaderT SqlBackend (RIO env) ()
 storeArchiveCache url subdir sha size treeKey' = do
   now <- getCurrentTime
   ment <- getTreeForKey treeKey'
@@ -906,10 +879,9 @@ storeArchiveCache url subdir sha size treeKey' = do
     }
 
 loadArchiveCache
-  :: MonadIO m
-  => Text -- ^ URL
+  :: Text -- ^ URL
   -> Text -- ^ subdir
-  -> ReaderT SqlBackend m [(SHA256, FileSize, TreeId)]
+  -> ReaderT SqlBackend (RIO env) [(SHA256, FileSize, TreeId)]
 loadArchiveCache url subdir = map go <$> selectList
   [ ArchiveCacheUrl ==. url
   , ArchiveCacheSubdir ==. subdir
@@ -919,11 +891,10 @@ loadArchiveCache url subdir = map go <$> selectList
     go (Entity _ ac) = (archiveCacheSha ac, archiveCacheSize ac, archiveCacheTree ac)
 
 storeRepoCache
-  :: MonadIO m
-  => Repo
+  :: Repo
   -> Text -- ^ subdir
   -> TreeId
-  -> ReaderT SqlBackend m ()
+  -> ReaderT SqlBackend (RIO env) ()
 storeRepoCache repo subdir tid = do
   now <- getCurrentTime
   insert_ RepoCache
@@ -936,10 +907,9 @@ storeRepoCache repo subdir tid = do
     }
 
 loadRepoCache
-  :: MonadIO m
-  => Repo
+  :: Repo
   -> Text -- ^ subdir
-  -> ReaderT SqlBackend m (Maybe TreeId)
+  -> ReaderT SqlBackend (RIO env) (Maybe TreeId)
 loadRepoCache repo subdir = fmap (repoCacheTree . entityVal) <$> selectFirst
   [ RepoCacheUrl ==. repoUrl repo
   , RepoCacheType ==. repoType repo
@@ -948,11 +918,8 @@ loadRepoCache repo subdir = fmap (repoCacheTree . entityVal) <$> selectFirst
   ]
   [Desc RepoCacheTime]
 
-storePreferredVersion
-  :: MonadIO m
-  => P.PackageName
-  -> Text
-  -> ReaderT SqlBackend m ()
+storePreferredVersion ::
+     P.PackageName -> Text -> ReaderT SqlBackend (RIO env) ()
 storePreferredVersion name p = do
   nameid <- getPackageNameId name
   ment <- getBy $ UniquePreferred nameid
@@ -963,10 +930,8 @@ storePreferredVersion name p = do
       }
     Just (Entity pid _) -> update pid [PreferredVersionsPreferred =. p]
 
-loadPreferredVersion
-  :: MonadIO m
-  => P.PackageName
-  -> ReaderT SqlBackend m (Maybe Text)
+loadPreferredVersion ::
+     P.PackageName -> ReaderT SqlBackend (RIO env) (Maybe Text)
 loadPreferredVersion name = do
   nameid <- getPackageNameId name
   fmap (preferredVersionsPreferred . entityVal) <$> getBy (UniquePreferred nameid)
@@ -1077,9 +1042,7 @@ unpackTreeToDir rpli (toFilePath -> dir) (P.TreeMap m) = do
             perms <- getPermissions dest
             setPermissions dest $ setOwnerExecutable True perms
 
-countHackageCabals
-  :: MonadIO m
-  => ReaderT SqlBackend m Int
+countHackageCabals :: ReaderT SqlBackend (RIO env) Int
 countHackageCabals = do
   res <- rawSql
     "SELECT COUNT(*)\n\
