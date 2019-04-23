@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -258,17 +259,25 @@ withStorage
 withStorage action =
   flip SQLite.withStorage_ action =<< view (P.pantryConfigL.to P.pcStorage)
 
+-- | This is a helper type to distinguish db queries between different rdbms backends. The important
+-- part is that the affects described in this data type should be semantically equivalent between
+-- the supported engines.
+data RdbmsActions m a = RdbmsActions
+  { raSqlite :: !(ReaderT SqlBackend m a)
+  -- ^ A query that is specific to SQLite
+  , raPostgres :: !(ReaderT SqlBackend m a)
+  }
 
+-- | This function provides a way to create queries supported by multiple sql backends.
 rdbmsAwareQuery
   :: MonadIO m
-  => ReaderT SqlBackend m a
+  => RdbmsActions m a
   -> ReaderT SqlBackend m a
-  -> ReaderT SqlBackend m a
-rdbmsAwareQuery postgresQuery sqliteQuery = do
+rdbmsAwareQuery RdbmsActions {raSqlite, raPostgres} = do
   rdbms <- connRDBMS <$> ask
   case rdbms of
-    "postgresql" -> postgresQuery
-    "sqlite" -> sqliteQuery
+    "postgresql" -> raPostgres
+    "sqlite" -> raSqlite
     _ -> error $ "rdbmsAwareQuery: unsupported rdbms '" ++ T.unpack rdbms ++ "'"
 
 
@@ -301,18 +310,26 @@ storeBlob bs = do
   keys <- selectKeysList [BlobSha ==. sha] []
   key <-
     case keys of
-      [] -> rdbmsAwareQuery
-            (do rawExecute
-                  "INSERT INTO blob(sha, size, contents) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
-                  [toPersistValue sha, toPersistValue size, toPersistValue bs]
-                rawSql "SELECT blob.id FROM blob WHERE blob.sha = ?" [toPersistValue sha] >>= \case
-                  [Single key] -> pure key
-                  _ -> error "soreBlob: there was a critical problem storing a blob.")
-            (insert Blob
-                    { blobSha = sha
-                    , blobSize = size
-                    , blobContents = bs
-                    })
+      [] ->
+        rdbmsAwareQuery
+          RdbmsActions
+            { raSqlite =
+                insert Blob {blobSha = sha, blobSize = size, blobContents = bs}
+            , raPostgres =
+                do rawExecute
+                     "INSERT INTO blob(sha, size, contents) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
+                     [ toPersistValue sha
+                     , toPersistValue size
+                     , toPersistValue bs
+                     ]
+                   rawSql
+                     "SELECT blob.id FROM blob WHERE blob.sha = ?"
+                     [toPersistValue sha] >>= \case
+                     [Single key] -> pure key
+                     _ ->
+                       error
+                         "soreBlob: there was a critical problem storing a blob."
+            }
       key:rest -> assert (null rest) (pure key)
   pure (key, P.BlobKey sha size)
 
@@ -571,7 +588,7 @@ hpackVersionId ::
        (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => ReaderT SqlBackend (RIO env) VersionId
 hpackVersionId = do
-    hpackSoftwareVersion <- lift $ hpackVersion
+    hpackSoftwareVersion <- lift hpackVersion
     fmap (either entityKey id) $
       insertBy $
       Version {versionVersion = P.VersionP hpackSoftwareVersion}
@@ -583,15 +600,25 @@ getFilePathId
 getFilePathId sfp =
   selectKeysList [FilePathPath ==. sfp] [] >>= \case
     [fpId] -> pure fpId
-    []     -> rdbmsAwareQuery
-              (do rawExecute
-                    "INSERT INTO file_path(path) VALUES (?) ON CONFLICT DO NOTHING"
-                    [toPersistValue sfp]
-                  rawSql "SELECT id FROM file_path WHERE path = ?" [toPersistValue sfp] >>= \case
-                    [Single key] -> pure key
-                    _ -> error "getFilePathId: there was a critical problem storing a blob.")
-              (insert $ FilePath sfp)
-    _      -> error $ "getFilePathId: FilePath unique constraint key is violated for: " ++ fp
+    [] ->
+      rdbmsAwareQuery
+        RdbmsActions
+          { raSqlite = insert $ FilePath sfp
+          , raPostgres =
+              do rawExecute
+                   "INSERT INTO file_path(path) VALUES (?) ON CONFLICT DO NOTHING"
+                   [toPersistValue sfp]
+                 rawSql
+                   "SELECT id FROM file_path WHERE path = ?"
+                   [toPersistValue sfp] >>= \case
+                   [Single key] -> pure key
+                   _ ->
+                     error
+                       "getFilePathId: there was a critical problem storing a blob."
+          }
+    _ ->
+      error $
+      "getFilePathId: FilePath unique constraint key is violated for: " ++ fp
   where
     fp = T.unpack (P.unSafeFilePath sfp)
 
