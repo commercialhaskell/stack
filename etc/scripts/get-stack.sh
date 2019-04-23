@@ -447,7 +447,7 @@ GETDISTRO
     ubuntu|linuxmint|elementary|neon)
       do_ubuntu_install "$VERSION"
       ;;
-    debian|kali|raspbian)
+    debian|kali|raspbian|mx)
       do_debian_install "$VERSION"
       ;;
     fedora)
@@ -609,7 +609,7 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  if ! dpkg-query -W "$@"|grep -v '^\S\+\s\+.\+$' > /dev/null; then
+  if dpkg-query -W "$@" > /dev/null; then
     info "Already installed!"
   elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq} "$@"; then
     die "Installing apt packages failed.  Please run 'apt-get update' and try again."
