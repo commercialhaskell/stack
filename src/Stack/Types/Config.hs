@@ -53,7 +53,6 @@ module Stack.Types.Config
   ,parseGHCVariant
   ,HasGHCVariant(..)
   ,snapshotsDir
-  ,globalHintsFile
   -- ** EnvConfig & HasEnvConfig
   ,EnvConfig(..)
   ,HasSourceMap(..)
@@ -1246,12 +1245,6 @@ snapshotsDir = do
     root <- view stackRootL
     platform <- platformGhcRelDir
     return $ root </> relDirSnapshots </> platform
-
--- | Cached global hints file
-globalHintsFile :: (MonadReader env m, HasConfig env) => m (Path Abs File)
-globalHintsFile = do
-  root <- view stackRootL
-  pure $ root </> relDirGlobalHints </> relFileGlobalHintsYaml
 
 -- | Installation root for dependencies
 installationRootDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)

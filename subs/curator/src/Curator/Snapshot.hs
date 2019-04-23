@@ -134,18 +134,18 @@ instance Exception TraverseValidateExceptions
 checkDependencyGraph ::
        (HasTerm env, HasProcessContext env, HasPantryConfig env)
     => Constraints
-    -> RawSnapshot
+    -> Snapshot
     -> RIO env ()
 checkDependencyGraph constraints snapshot = do
-    let compiler = rsCompiler snapshot
+    let compiler = snapshotCompiler snapshot
         compilerVer = case compiler of
           WCGhc v -> v
           WCGhcGit {} -> error "GHC-GIT is not supported"
           WCGhcjs _ _ -> error "GHCJS is not supported"
     let snapshotPackages =
             Map.fromList
-                [ (pn, snapshotVersion (rspLocation sp))
-                | (pn, sp) <- Map.toList (rsPackages snapshot)
+                [ (pn, snapshotVersion (spLocation sp))
+                | (pn, sp) <- Map.toList (Pantry.snapshotPackages snapshot)
                 ]
     ghcBootPackages0 <- liftIO $ getBootPackages compilerVer
     let ghcBootPackages = prunedBootPackages ghcBootPackages0 (Map.keysSet snapshotPackages)
@@ -160,7 +160,7 @@ checkDependencyGraph constraints snapshot = do
       Just (Just cabalVersion) -> do
         let isWiredIn pn _ = pn `Set.member` wiredInGhcPackages
             (wiredIn, packages) =
-              Map.partitionWithKey isWiredIn (rsPackages snapshot)
+              Map.partitionWithKey isWiredIn (Pantry.snapshotPackages snapshot)
         if not (Map.null wiredIn)
         then do
           let errMsg = "GHC wired-in package can not be overriden"
@@ -262,8 +262,8 @@ pkgBoundsError dep maintainers mdepVer isBoot users =
     display :: DT.Text a => a -> Text
     display = T.pack . DT.display
 
-snapshotVersion :: RawPackageLocationImmutable -> Maybe Version
-snapshotVersion (RPLIHackage (PackageIdentifierRevision _ v _) _) = Just v
+snapshotVersion :: PackageLocationImmutable -> Maybe Version
+snapshotVersion (PLIHackage (PackageIdentifier _ v) _ _) = Just v
 snapshotVersion _ = Nothing
 
 data DependencyError =
@@ -350,10 +350,10 @@ getPkgInfo ::
     => Constraints
     -> Version
     -> PackageName
-    -> RawSnapshotPackage
+    -> SnapshotPackage
     -> RIO env PkgInfo
-getPkgInfo constraints compilerVer pname rsp = do
-    gpd <- loadCabalFileRawImmutable (rspLocation rsp)
+getPkgInfo constraints compilerVer pname sp = do
+    gpd <- loadCabalFileImmutable (spLocation sp)
     logDebug $ "Extracting deps for " <> displayShow pname
     let mpc = Map.lookup pname (consPackages constraints)
         skipBuild = maybe False pcSkipBuild mpc
@@ -398,7 +398,7 @@ getPkgInfo constraints compilerVer pname rsp = do
                    , comp == CompLibrary || comp == CompExecutable
                    , dep <- deps ]
     return PkgInfo
-      { piVersion = snapshotVersion (rspLocation rsp)
+      { piVersion = snapshotVersion (spLocation sp)
       , piAllDeps = allDeps
       , piTreeDeps = treeDeps
       , piCabalVersion = C.specVersion $ C.packageDescription gpd

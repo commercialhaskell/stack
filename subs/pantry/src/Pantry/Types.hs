@@ -105,6 +105,7 @@ module Pantry.Types
   , toRawPM
   , cabalFileName
   , SnapshotCacheHash (..)
+  , getGlobalHintsFile
   ) where
 
 import RIO
@@ -2115,3 +2116,10 @@ toRawSnapshotLayer sl = RawSnapshotLayer
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
+
+-- | Get the path to the global hints cache file
+getGlobalHintsFile :: HasPantryConfig env => RIO env (Path Abs File)
+getGlobalHintsFile = do
+  root <- view $ pantryConfigL.to pcRootDir
+  globalHintsRelFile <- parseRelFile "global-hints-cache.yaml"
+  pure $ root </> globalHintsRelFile
