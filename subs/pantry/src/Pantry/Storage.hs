@@ -731,7 +731,7 @@ loadPackageById rpli tid = do
                 "loadPackageByid: invalid foreign key " ++ show (treeVersion ts)
             Just (Version (P.VersionP version)) -> pure version
     let ident = P.PackageIdentifier name version
-    (pantry, mtree) <-
+    (packageEntry, mtree) <-
         case treeCabal ts of
             Just keyBlob -> do
                 cabalKey <- getBlobKey keyBlob
@@ -759,7 +759,7 @@ loadPackageById rpli tid = do
         Package
             { packageTreeKey = P.TreeKey blobKey
             , packageTree = mtree
-            , packageCabalEntry = pantry
+            , packageCabalEntry = packageEntry
             , packageIdent = ident
             }
 
