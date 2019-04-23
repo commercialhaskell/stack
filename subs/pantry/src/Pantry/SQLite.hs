@@ -28,6 +28,16 @@ initStorage description migration fp inner = do
     runMigrationSilent migration
   forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
 
+  -- This addresses a weird race condition that can result in a
+  -- deadlock. If multiple threads in the same process try to access
+  -- the database, it's possible that they will end up deadlocking on
+  -- the file lock, due to delays which can occur in the freeing of
+  -- previous locks. I don't fully grok the situation yet, but
+  -- introducing an MVar to ensure that, within a process, only one
+  -- thread is attempting to lock the file is both a valid workaround
+  -- and good practice.
+  baton <- newMVar ()
+
   withSqlitePoolInfo (sqinfo False) 1 $ \pool -> inner $ Storage
     -- NOTE: Currently, we take a write lock on every action. This is
     -- a bit heavyweight, but it avoids the SQLITE_BUSY errors
@@ -36,7 +46,7 @@ initStorage description migration fp inner = do
     -- completely. We can investigate more elegant solutions in the
     -- future, such as separate read and write actions or introducing
     -- smarter retry logic.
-    { withStorage_ = withWriteLock fp . flip runSqlPool pool
+    { withStorage_ = withMVar baton . const . withWriteLock fp . flip runSqlPool pool
     , withWriteLock_ = id
     }
   where
