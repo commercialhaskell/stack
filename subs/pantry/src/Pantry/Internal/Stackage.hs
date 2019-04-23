@@ -6,7 +6,8 @@ module Pantry.Internal.Stackage
 
 import Pantry.Hackage as X
   ( forceUpdateHackageIndex
-  , getHackageTarballOnGPD
+  , getHackageTarball
+  , HackageTarballResult(..)
   )
 import Pantry.Storage as X
   ( BlobId

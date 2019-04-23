@@ -9,13 +9,13 @@ module Pantry.Hackage
   , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackageTarball
-  , getHackageTarballOnGPD
   , getHackageTarballKey
   , getHackageCabalFile
   , getHackagePackageVersions
   , getHackagePackageVersionRevisions
   , getHackageTypoCorrections
   , UsePreferredVersions (..)
+  , HackageTarballResult(..)
   ) where
 
 import RIO
@@ -71,6 +71,17 @@ hackageIndexTarballL = hackageDirL.to (</> indexRelFile)
 --
 -- @since 0.1.0.0
 data DidUpdateOccur = UpdateOccurred | NoUpdateOccurred
+
+
+-- | Information returned by `getHackageTarball`
+--
+-- @since 0.1.0.0
+data HackageTarballResult = HackageTarballResult
+  { htrPackage :: !Package
+  -- ^ Package that was loaded from Hackage tarball
+  , htrFreshPackageInfo :: !(Maybe (GenericPackageDescription, TreeId))
+  -- ^ This information is only available whenever package was just loaded into pantry.
+  }
 
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
@@ -503,16 +514,17 @@ withCachedTree
   -> PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
-  -> RIO env Package
-  -> RIO env Package
+  -> RIO env HackageTarballResult
+  -> RIO env HackageTarballResult
 withCachedTree rpli name ver bid inner = do
   mres <- withStorage $ loadHackageTree rpli name ver bid
   case mres of
-    Just package -> pure package
+    Just package -> pure $ HackageTarballResult package Nothing
     Nothing -> do
-      package <- inner
-      withStorage $ storeHackageTree name ver bid $ packageTreeKey package
-      pure package
+      htr <- inner
+      withStorage $
+        storeHackageTree name ver bid $ packageTreeKey $ htrPackage htr
+      pure htr
 
 getHackageTarballKey
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -521,26 +533,16 @@ getHackageTarballKey
 getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
   mres <- withStorage $ loadHackageTreeKey name ver sha
   case mres of
-    Nothing -> packageTreeKey <$> getHackageTarball pir Nothing
+    Nothing -> packageTreeKey . htrPackage <$> getHackageTarball pir Nothing
     Just key -> pure key
-getHackageTarballKey pir = packageTreeKey <$> getHackageTarball pir Nothing
+getHackageTarballKey pir = packageTreeKey . htrPackage <$> getHackageTarball pir Nothing
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageIdentifierRevision
   -> Maybe TreeKey
-  -> RIO env Package
-getHackageTarball = getHackageTarballOnGPD (\ _ _ -> pure ())
-
--- | Same as `getHackageTarball`, but allows an extra action to be performed on the parsed
--- `GenericPackageDescription` and newly created `TreeId`.
-getHackageTarballOnGPD
-  :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => (TreeId -> GenericPackageDescription -> RIO env ())
-  -> PackageIdentifierRevision
-  -> Maybe TreeKey
-  -> RIO env Package
-getHackageTarballOnGPD onGPD pir mtreeKey = do
+  -> RIO env HackageTarballResult
+getHackageTarball pir mtreeKey = do
   let PackageIdentifierRevision name ver _cfi = pir
   cabalFile <- resolveCabalFileInfo pir
   let rpli = RPLIHackage pir mtreeKey
@@ -562,56 +564,66 @@ getHackageTarballOnGPD onGPD pir mtreeKey = do
             Just pair2 -> pure pair2
     pc <- view pantryConfigL
     let urlPrefix = hscDownloadPrefix $ pcHackageSecurity pc
-        url = mconcat
-          [ urlPrefix
-          , "package/"
-          , T.pack $ Distribution.Text.display name
-          , "-"
-          , T.pack $ Distribution.Text.display ver
-          , ".tar.gz"
-          ]
-    package <- getArchivePackage
-      rpli
-      RawArchive
-        { raLocation = ALUrl url
-        , raHash = Just sha
-        , raSize = Just size
-        , raSubdir = T.empty -- no subdirs on Hackage
-        }
-      RawPackageMetadata
-        { rpmName = Just name
-        , rpmVersion = Just ver
-        , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
-        , rpmCabal = Nothing -- cabal file in the tarball may be different!
-        }
-
+        url =
+          mconcat
+            [ urlPrefix
+            , "package/"
+            , T.pack $ Distribution.Text.display name
+            , "-"
+            , T.pack $ Distribution.Text.display ver
+            , ".tar.gz"
+            ]
+    package <-
+      getArchivePackage
+        rpli
+        RawArchive
+          { raLocation = ALUrl url
+          , raHash = Just sha
+          , raSize = Just size
+          , raSubdir = T.empty -- no subdirs on Hackage
+          }
+        RawPackageMetadata
+          { rpmName = Just name
+          , rpmVersion = Just ver
+          , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
+          , rpmCabal = Nothing -- cabal file in the tarball may be different!
+          }
     case packageTree package of
       TreeMap m -> do
-        let (PCCabalFile (TreeEntry _ ft)) = packageCabalEntry package
+        let ft =
+              case packageCabalEntry package of
+                PCCabalFile (TreeEntry _ ft') -> ft'
+                _ -> error "Impossible: Hackage does not support hpack"
             cabalEntry = TreeEntry cabalFileKey ft
             tree' = TreeMap $ Map.insert (cabalFileName name) cabalEntry m
             ident = PackageIdentifier name ver
-
-        cabalBS <- withStorage $ do
-          let BlobKey sha' _ = cabalFileKey
-          mcabalBS <- loadBlobBySHA sha'
-          case mcabalBS of
-            Nothing -> error $ "Invariant violated, cabal file key: " ++ show cabalFileKey
-            Just bid -> loadBlobById bid
-
+        cabalBS <-
+          withStorage $ do
+            let BlobKey sha' _ = cabalFileKey
+            mcabalBS <- loadBlobBySHA sha'
+            case mcabalBS of
+              Nothing ->
+                error $
+                "Invariant violated, cabal file key: " ++ show cabalFileKey
+              Just bid -> loadBlobById bid
         (_warnings, gpd) <- rawParseGPD (Left rpli) cabalBS
         let gpdIdent = Cabal.package $ Cabal.packageDescription gpd
-        when (ident /= gpdIdent) $ throwIO $
-          MismatchedCabalFileForHackage pir Mismatch
-            { mismatchExpected = ident
-            , mismatchActual = gpdIdent
+        when (ident /= gpdIdent) $
+          throwIO $
+          MismatchedCabalFileForHackage
+            pir
+            Mismatch {mismatchExpected = ident, mismatchActual = gpdIdent}
+        (tid, treeKey') <-
+          withStorage $
+          storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        pure
+          HackageTarballResult
+            { htrPackage =
+                Package
+                  { packageTreeKey = treeKey'
+                  , packageTree = tree'
+                  , packageIdent = ident
+                  , packageCabalEntry = PCCabalFile cabalEntry
+                  }
+            , htrFreshPackageInfo = Just (gpd, tid)
             }
-
-        (tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
-        onGPD tid gpd
-        pure Package
-          { packageTreeKey = treeKey'
-          , packageTree = tree'
-          , packageIdent = ident
-          , packageCabalEntry = PCCabalFile cabalEntry
-          }

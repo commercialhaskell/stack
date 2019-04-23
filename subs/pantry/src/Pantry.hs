@@ -701,7 +701,8 @@ loadPackage
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env Package
-loadPackage (PLIHackage ident cfHash tree) = getHackageTarball (pirForHash ident cfHash) (Just tree)
+loadPackage (PLIHackage ident cfHash tree) =
+  htrPackage <$> getHackageTarball (pirForHash ident cfHash) (Just tree)
 loadPackage pli@(PLIArchive archive pm) = getArchivePackage (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
 loadPackage (PLIRepo repo pm) = getRepo repo (toRawPM pm)
 
@@ -712,7 +713,7 @@ loadPackageRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RIO env Package
-loadPackageRaw (RPLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackageRaw (RPLIHackage pir mtree) = htrPackage <$> getHackageTarball pir mtree
 loadPackageRaw rpli@(RPLIArchive archive pm) = getArchivePackage rpli archive pm
 loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 
