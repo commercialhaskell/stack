@@ -205,7 +205,7 @@ newtype Revision = Revision Word
 -- whether a pool is used, and the default implementation in
 -- "Pantry.Storage" does not use a pool.
 data Storage = Storage
-  { withStorage_ :: forall m a. MonadUnliftIO m => ReaderT SqlBackend m a -> m a
+  { withStorage_ :: forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a
   , withWriteLock_ :: forall env a. HasLogFunc env => RIO env a -> RIO env a
   }
 
