@@ -15,10 +15,8 @@ module Stack.Setup
   ( setupEnv
   , ensureCompilerAndMsys
   , ensureDockerStackExe
-  , getCabalInstallVersion
   , SetupOpts (..)
   , defaultSetupInfoYaml
-  , removeHaskellEnvVars
   , withNewLocalBuildTargets
 
   -- * Stack binary download
@@ -38,7 +36,6 @@ import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Data.Aeson.Extended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
-import              Data.Char (isSpace)
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
 import              Data.Conduit.Lift (evalStateC)
@@ -75,11 +72,9 @@ import qualified    RIO
 import              RIO.List
 import              RIO.PrettyPrint
 import              RIO.Process
-import              Stack.Build (build)
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap, hashSourceMapData)
 import              Stack.Build.Target (NeedTargets(..), parseTargets)
-import              Stack.Config (loadConfig, loadBuildConfig)
 import              Stack.Constants
 import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
@@ -149,6 +144,7 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | DockerStackExeNotFound Version Text
                     | UnsupportedSetupConfiguration
                     | InvalidGhcAt (Path Abs File) SomeException
+                    | NoLongerBuildGhcjs
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -204,6 +200,8 @@ instance Show SetupException where
         "I don't know how to install GHC on your system configuration, please install manually"
     show (InvalidGhcAt compiler e) =
         "Found an invalid compiler at " ++ show (toFilePath compiler) ++ ": " ++ displayException e
+    show NoLongerBuildGhcjs =
+        "Since Stack 2.0, Stack does not support building GHCJS itself"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: NeedTargets
@@ -570,7 +568,7 @@ installGhcBindist sopts getSetupInfo' installed = do
                     forM ghcBuilds $ \ghcBuild -> do
                         ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
                         return (getInstalledTool installed ghcPkgName (isWanted . ACGhc), ghcBuild)
-                Ghcjs -> return [(getInstalledGhcjs installed isWanted, CompilerBuildStandard)]
+                Ghcjs -> return []
     let existingCompilers = concatMap
             (\(installedCompiler, compilerBuild) ->
                 case (installedCompiler, soptsForceReinstall sopts) of
@@ -661,54 +659,42 @@ ensureSandboxedCompiler
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureSandboxedCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-    (compilerBuild, mcompiler, isSandboxed, paths, mcompilerTool) <- do
-            -- List installed tools
-            config <- view configL
-            let localPrograms = configLocalPrograms config
-            installed <- listInstalled localPrograms
-            logDebug $ "Installed tools: \n - " <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
-            (compilerTool, compilerBuild) <-
-              case soptsWantedCompiler sopts of
-               -- shall we build GHC from source?
-               WCGhcGit commitId flavour -> buildGhcFromSource getSetupInfo' installed  (configCompilerRepository config) commitId flavour
-               _ -> installGhcBindist sopts getSetupInfo' installed
-            paths <- extraDirs compilerTool
-            pure (compilerBuild, Nothing, True, paths, Just compilerTool)
+    -- List installed tools
+    config <- view configL
+    let localPrograms = configLocalPrograms config
+    installed <- listInstalled localPrograms
+    logDebug $ "Installed tools: \n - " <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
+    (compilerTool, compilerBuild) <-
+      case soptsWantedCompiler sopts of
+       -- shall we build GHC from source?
+       WCGhcGit commitId flavour -> buildGhcFromSource getSetupInfo' installed  (configCompilerRepository config) commitId flavour
+       _ -> installGhcBindist sopts getSetupInfo' installed
+    paths <- extraDirs compilerTool
 
     let wc = whichCompiler $ wantedToActual wanted
-    compiler <-
-      case mcompiler of
-        Just compiler -> pure compiler
-        Nothing -> do
-          menv0 <- view processContextL
-          m <- either throwM return
-             $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
-          menv <- mkProcessContext (removeHaskellEnvVars m)
+    menv0 <- view processContextL
+    m <- either throwM return
+       $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
+    menv <- mkProcessContext (removeHaskellEnvVars m)
 
-          case mcompilerTool of
-            Just (ToolGhcjs cv) ->
-              withProcessContext menv $
-              ensureGhcjsBooted cv (soptsInstallIfMissing sopts) (soptsGHCJSBootOpts sopts)
-            _ -> pure ()
-
-          let names =
-                case wanted of
-                  WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
-                  WCGhcGit{} -> ["ghc"]
-                  WCGhcjs{} -> ["ghcjs"]
-              loop [] = do
-                logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
-                logError $ "Could not find it on the paths " <> displayShow (edBins paths)
-                throwString "Could not find sandboxed compiler"
-              loop (x:xs) = do
-                res <- findExecutable x
-                case res of
-                  Left _ -> loop xs
-                  Right y -> parseAbsFile y
-          withProcessContext menv $ loop names
+    let names =
+          case wanted of
+            WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
+            WCGhcGit{} -> ["ghc"]
+            WCGhcjs{} -> ["ghcjs"]
+        loop [] = do
+          logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
+          logError $ "Could not find it on the paths " <> displayShow (edBins paths)
+          throwString "Could not find sandboxed compiler"
+        loop (x:xs) = do
+          res <- findExecutable x
+          case res of
+            Left _ -> loop xs
+            Right y -> parseAbsFile y
+    compiler <- withProcessContext menv $ loop names
 
     when (soptsSanityCheck sopts) $ sanityCheck compiler
-    cp <- pathsFromCompiler wc compilerBuild isSandboxed compiler
+    cp <- pathsFromCompiler wc compilerBuild True compiler
     pure (cp, paths)
 
 pathsFromCompiler
@@ -1123,18 +1109,6 @@ getInstalledTool installed name goodVersion =
             else Nothing
     goodPackage _ = Nothing
 
-getInstalledGhcjs :: [Tool]
-                  -> (ActualCompiler -> Bool)
-                  -> Maybe Tool
-getInstalledGhcjs installed goodVersion =
-    if null available
-        then Nothing
-        else Just $ ToolGhcjs $ maximum available
-  where
-    available = mapMaybe goodPackage installed
-    goodPackage (ToolGhcjs cv) = if goodVersion cv then Just cv else Nothing
-    goodPackage _ = Nothing
-
 downloadAndInstallTool :: HasTerm env
                        => Path Abs Dir
                        -> DownloadInfo
@@ -1202,19 +1176,7 @@ downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL =
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) (gdiDownloadInfo downloadInfo) tool (installer si)
 
-downloadAndInstallCompiler compilerBuild si wanted@WCGhcjs{} versionCheck _mbindistUrl = do
-    config <- view configL
-    ghcVariant <- view ghcVariantL
-    case (ghcVariant, compilerBuild) of
-        (GHCStandard, CompilerBuildStandard) -> return ()
-        _ -> throwM GHCJSRequiresStandardVariant
-    (selectedVersion, downloadInfo) <- case Map.lookup "source" $ siGHCJSs si of
-        Nothing -> throwM $ UnknownOSKey "source"
-        Just pairs_ -> getWantedCompilerInfo "source" versionCheck wanted id pairs_
-    logInfo "Preparing to install GHCJS to an isolated location."
-    logInfo "This will not interfere with any system-level installation."
-    let tool = ToolGhcjs selectedVersion
-    downloadAndInstallTool (configLocalPrograms config) downloadInfo tool (installGHCJS si)
+downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO NoLongerBuildGhcjs
 
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
     error "downloadAndInstallCompiler: shouldn't be reached with ghc-git"
@@ -1445,244 +1407,6 @@ installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir 
 
     logStickyDone $ "Installed GHC."
     logDebug $ "GHC installed to " <> fromString (toFilePath destDir)
-
-installGHCJS :: HasConfig env
-             => SetupInfo
-             -> Path Abs File
-             -> ArchiveType
-             -> Path Abs Dir
-             -> Path Abs Dir
-             -> RIO env ()
-installGHCJS si archiveFile archiveType _tempDir destDir = do
-    platform <- view platformL
-    menv0 <- view processContextL
-    -- This ensures that locking is disabled for the invocations of
-    -- stack below.
-    let removeLockVar = Map.delete "STACK_LOCK"
-    menv <- mkProcessContext (removeLockVar (removeHaskellEnvVars (view envVarsL menv0)))
-    logDebug $ "menv = " <> displayShow (view envVarsL menv)
-
-    -- NOTE: this is a bit of a hack - instead of using the temp
-    -- directory, leave the unpacked source tarball in the destination
-    -- directory. This way, the absolute paths in the wrapper scripts
-    -- will point to executables that exist in
-    -- src/.stack-work/install/... - see
-    -- https://github.com/commercialhaskell/stack/issues/1016
-    --
-    -- This is also used by 'ensureGhcjsBooted', because it can use the
-    -- environment of the stack.yaml which came with ghcjs, in order to
-    -- install cabal-install. This lets us also fix the version of
-    -- cabal-install used.
-    let unpackDir = destDir </> relDirSrc
-    runUnpack <- case platform of
-        Platform _ Cabal.Windows -> return $
-            withUnpackedTarball7z "GHCJS" si archiveFile archiveType Nothing unpackDir
-        _ -> do
-            zipTool' <-
-                case archiveType of
-                    TarXz -> return "xz"
-                    TarBz2 -> return "bzip2"
-                    TarGz -> return "gzip"
-                    SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
-            (zipTool, tarTool) <- checkDependencies $ (,)
-                <$> checkDependency zipTool'
-                <*> checkDependency "tar"
-            logDebug $ "ziptool: " <> fromString zipTool
-            logDebug $ "tar: " <> fromString tarTool
-            return $ do
-                liftIO $ ignoringAbsence (removeDirRecur destDir)
-                liftIO $ ignoringAbsence (removeDirRecur unpackDir)
-                withProcessContext menv $ withWorkingDir (toFilePath destDir) $ readProcessNull tarTool ["xf", toFilePath archiveFile]
-                innerDir <- expectSingleUnpackedDir archiveFile destDir
-                renameDir innerDir unpackDir
-
-    logSticky $
-      "Unpacking GHCJS into " <>
-      fromString (toFilePath unpackDir) <>
-      " ..."
-    logDebug $ "Unpacking " <> fromString (toFilePath archiveFile)
-    runUnpack
-
-    logSticky "Setting up GHCJS build environment"
-    let stackYaml = unpackDir </> stackDotYaml
-        destBinDir = destDir </> relDirBin
-    ensureDir destBinDir
-    loadGhcjsEnvConfig stackYaml destBinDir $ \envConfig' -> do
-
-      -- On windows we need to copy options files out of the install dir.  Argh!
-      -- This is done before the build, so that if it fails, things fail
-      -- earlier.
-      mwindowsInstallDir <- case platform of
-          Platform _ Cabal.Windows ->
-              liftM Just $ runRIO envConfig' installationRootLocal
-          _ -> return Nothing
-
-      logSticky "Installing GHCJS (this will take a long time) ..."
-      buildInGhcjsEnv envConfig'
-      -- Copy over *.options files needed on windows.
-      forM_ mwindowsInstallDir $ \dir -> do
-          (_, files) <- listDir (dir </> relDirBin)
-          forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
-              let dest = destDir </> relDirBin </> filename optionsFile
-              liftIO $ ignoringAbsence (removeFile dest)
-              copyFile optionsFile dest
-      logStickyDone "Installed GHCJS."
-
-ensureGhcjsBooted :: HasConfig env
-                  => ActualCompiler -> Bool -> [String]
-                  -> RIO env ()
-ensureGhcjsBooted cv shouldBoot bootOpts = do
-    eres <- try $ sinkProcessStdout "ghcjs" [] (return ())
-    case eres of
-        Right () -> return ()
-        Left ece | "no input files" `S.isInfixOf` LBS.toStrict (eceStderr ece) ->
-            return ()
-        Left ece | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict (eceStderr ece) ->
-            if not shouldBoot then throwM GHCJSNotBooted else do
-                config <- view configL
-                destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
-                let stackYaml = destDir </> relDirSrc </> stackDotYaml
-                -- TODO: Remove 'actualStackYaml' and just use
-                -- 'stackYaml' for a version after 0.1.6. It's for
-                -- compatibility with the directories setup used for
-                -- most of the life of the development branch between
-                -- 0.1.5 and 0.1.6. See
-                -- https://github.com/commercialhaskell/stack/issues/749#issuecomment-147382783
-                -- This only affects the case where GHCJS has been
-                -- installed with an older version and not yet booted.
-                stackYamlExists <- doesFileExist stackYaml
-                ghcjsVersion <- case cv of
-                        ACGhcjs version _ -> return version
-                        _ -> error "ensureGhcjsBooted invoked on non GhcjsVersion"
-                actualStackYaml <- if stackYamlExists then return stackYaml
-                    else
-                        liftM ((destDir </> relDirSrc) </>) $
-                        parseRelFile $ "ghcjs-" ++ versionString ghcjsVersion ++ "/stack.yaml"
-                actualStackYamlExists <- doesFileExist actualStackYaml
-                unless actualStackYamlExists $
-                    throwString "Error: Couldn't find GHCJS stack.yaml in old or new location."
-                bootGhcjs ghcjsVersion actualStackYaml destDir bootOpts
-        Left ece -> throwIO ece
-
-bootGhcjs :: (HasRunner env, HasProcessContext env)
-          => Version -> Path Abs File -> Path Abs Dir -> [String] -> RIO env ()
-bootGhcjs ghcjsVersion stackYaml destDir bootOpts =
-  loadGhcjsEnvConfig stackYaml (destDir </> relDirBin) $ \envConfig -> do
-    menv <- liftIO $ configProcessContextSettings (view configL envConfig) defaultEnvSettings
-    -- Install cabal-install if missing, or if the installed one is old.
-    mcabal <- withProcessContext menv getCabalInstallVersion
-    shouldInstallCabal <- case mcabal of
-        Nothing -> do
-            logInfo "No cabal-install binary found for use with GHCJS."
-            return True
-        Just v
-            | v < mkVersion [1, 22, 4] -> do
-                logInfo $
-                    "The cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
-                    fromString (versionString v) <>
-                    ")."
-                return True
-            | v >= mkVersion [1, 23] -> do
-                logWarn $
-                    "The cabal-install found on PATH is a version stack doesn't know about, version " <>
-                    fromString (versionString v) <>
-                    ". This may or may not work.\n" <>
-                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
-                return False
-            | ghcjsVersion >= mkVersion [0, 2, 0, 20160413] && v >= mkVersion [1, 22, 8] -> do
-                logWarn $
-                    "The cabal-install found on PATH, version " <>
-                    fromString (versionString v) <>
-                    ", is >= 1.22.8.\n" <>
-                    "That version has a bug preventing ghcjs < 0.2.0.20160413 from booting.\n" <>
-                    "See this issue: https://github.com/ghcjs/ghcjs/issues/470"
-                return True
-            | otherwise -> return False
-    let envSettings = EnvSettings
-          { esIncludeLocals = True
-          , esIncludeGhcPackagePath = False
-          , esStackExe = True
-          , esLocaleUtf8 = True
-          , esKeepGhcRts = False
-          }
-    menv' <- liftIO $ configProcessContextSettings (view configL envConfig) envSettings
-    shouldInstallAlex <- runRIO menv $ not <$> doesExecutableExist "alex"
-    shouldInstallHappy <- runRIO menv $ not <$> doesExecutableExist "happy"
-    let bootDepsToInstall =
-          [ "cabal-install" | shouldInstallCabal ] ++
-          [ "alex" | shouldInstallAlex ] ++
-          [ "happy" | shouldInstallHappy ]
-    when (not (null bootDepsToInstall)) $ do
-        logInfo $ "Building tools from source, needed for ghcjs-boot: " <> displayShow bootDepsToInstall
-        let haddockDeps = False
-        envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
-                      defaultBuildOptsCLI { boptsCLITargets = bootDepsToInstall }
-        buildInGhcjsEnv envConfig'
-        let failedToFindErr = do
-                logError "This shouldn't happen, because it gets built to the snapshot bin directory, which should be treated as being on the PATH."
-                liftIO exitFailure
-        when shouldInstallCabal $ do
-            mcabal' <- withProcessContext menv' getCabalInstallVersion
-            case mcabal' of
-                Nothing -> do
-                    logError "Failed to get cabal-install version after installing it."
-                    failedToFindErr
-                Just v | v >= mkVersion [1, 22, 8] && v < mkVersion [1, 23] ->
-                    logWarn $
-                        "Installed version of cabal-install is in a version range which may not work.\n" <>
-                        "See this issue: https://github.com/ghcjs/ghcjs/issues/470\n" <>
-                        "This version is specified by the stack.yaml file included in the ghcjs tarball.\n"
-                _ -> return ()
-        when shouldInstallAlex $ do
-            alexInstalled <- runRIO menv $ doesExecutableExist "alex"
-            when (not alexInstalled) $ do
-                logError "Failed to find 'alex' executable after installing it."
-                failedToFindErr
-        when shouldInstallHappy $ do
-            happyInstalled <- runRIO menv $ doesExecutableExist "happy"
-            when (not happyInstalled) $ do
-                logError "Failed to find 'happy' executable after installing it."
-                failedToFindErr
-    logSticky "Booting GHCJS (this will take a long time) ..."
-    withProcessContext menv' $ proc "ghcjs-boot" bootOpts logProcessStderrStdout
-    logStickyDone "GHCJS booted."
-
-loadGhcjsEnvConfig
-  :: HasRunner env
-  => Path Abs File
-  -> Path b t
-  -> (EnvConfig -> RIO env a)
-  -> RIO env a
-loadGhcjsEnvConfig stackYaml binPath inner =
-    local (over globalOptsL modifyGO) $
-    loadConfig $ \config -> do
-        bconfig <- runRIO config loadBuildConfig
-        envConfig <- runRIO bconfig $ setupEnv AllowNoTargets defaultBuildOptsCLI Nothing
-        inner envConfig
-  where
-    modifyGO go = go
-      { globalConfigMonoid = mempty
-        { configMonoidInstallGHC = FirstTrue (Just True)
-        , configMonoidLocalBinPath = First (Just (toFilePath binPath))
-        }
-      , globalResolver = Nothing
-      , globalStackYaml = SYLOverride stackYaml
-      }
-
-buildInGhcjsEnv :: (HasEnvConfig env, MonadIO m) => env -> m ()
-buildInGhcjsEnv envConfig = do
-    runRIO (set (buildOptsL.buildOptsInstallExesL) True $
-            set (buildOptsL.buildOptsHaddockL) False envConfig) $
-        build Nothing
-
-getCabalInstallVersion :: (HasProcessContext env, HasLogFunc env) => RIO env (Maybe Version)
-getCabalInstallVersion = do
-    ebs <- tryAny $ proc "cabal" ["--numeric-version"] readProcess_
-    case ebs of
-        Left _ ->
-          return Nothing
-        Right (bs, _) ->
-          Just <$> parseVersionThrowing (T.unpack $ T.dropWhileEnd isSpace (T.decodeUtf8 (LBS.toStrict bs)))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.

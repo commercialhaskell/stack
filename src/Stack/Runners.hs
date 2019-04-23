@@ -21,6 +21,7 @@ module Stack.Runners
 
 import           Stack.Prelude
 import           RIO.Process (mkDefaultProcessContext)
+import           RIO.Time (addUTCTime, getCurrentTime)
 import           Stack.Build.Target(NeedTargets(..))
 import           Stack.Config
 import           Stack.Constants
@@ -28,9 +29,11 @@ import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
+import           Stack.Storage (upgradeChecksSince, logUpgradeCheck)
 import           Stack.Types.Config
 import           Stack.Types.Docker (dockerEnable)
 import           Stack.Types.Nix (nixEnable)
+import           Stack.Types.Version (stackMinorVersion, stackVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
@@ -94,7 +97,11 @@ withConfig shouldReexec inner =
       -- happen ASAP but needs a configuration.
       view (globalOptsL.to globalDockerEntrypoint) >>=
         traverse_ (Docker.entrypoint config)
-      runRIO config $
+      runRIO config $ do
+        -- Catching all exceptions here, since we don't want this
+        -- check to ever cause Stack to stop working
+        shouldUpgradeCheck `catchAny` \e ->
+          logError ("Error when running shouldUpgradeCheck: " <> displayShow e)
         case shouldReexec of
           YesReexec -> reexec inner
           NoReexec -> inner
@@ -169,3 +176,34 @@ withRunnerGlobal go inner = do
           | w < minTerminalWidth = minTerminalWidth
           | w > maxTerminalWidth = maxTerminalWidth
           | otherwise = w
+
+-- | Check if we should recommend upgrading Stack and, if so, recommend it.
+shouldUpgradeCheck :: RIO Config ()
+shouldUpgradeCheck = do
+  config <- ask
+  when (configRecommendUpgrade config) $ do
+    now <- getCurrentTime
+    let yesterday = addUTCTime (-24 * 60 * 60) now
+    checks <- upgradeChecksSince yesterday
+    when (checks == 0) $ do
+      mversion <- getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions
+      case mversion of
+        -- Compare the minor version so we avoid patch-level, Hackage-only releases.
+        -- See: https://github.com/commercialhaskell/stack/pull/4729#pullrequestreview-227176315
+        Just (PackageIdentifierRevision _ version _) | minorVersion version > stackMinorVersion -> do
+          logWarn "<<<<<<<<<<<<<<<<<<"
+          logWarn $
+            "You are currently using Stack version " <>
+            fromString (versionString stackVersion) <>
+            ", but version " <>
+            fromString (versionString version) <>
+            " is available"
+          logWarn "You can try to upgrade by running 'stack upgrade'"
+          logWarn $
+            "Tired of seeing this? Add 'recommend-stack-upgrade: false' to " <>
+            fromString (toFilePath (configUserConfigPath config))
+          logWarn ">>>>>>>>>>>>>>>>>>"
+          logWarn ""
+          logWarn ""
+        _ -> pure ()
+      logUpgradeCheck now

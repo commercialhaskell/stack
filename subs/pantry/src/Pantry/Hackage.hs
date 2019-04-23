@@ -5,6 +5,7 @@
 module Pantry.Hackage
   ( updateHackageIndex
   , DidUpdateOccur (..)
+  , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackageTarball
   , getHackageTarballKey
@@ -117,12 +118,36 @@ updateHackageIndex mreason = do
         HS.checkForUpdates repo maybeNow
 
     case didUpdate of
-      HS.NoUpdates -> logInfo "No package index update available"
+      HS.NoUpdates -> do
+        x <- needsCacheUpdate tarball
+        if x
+          then do
+            logInfo "No package index update available, but didn't update cache last time, running now"
+            updateCache tarball
+          else logInfo "No package index update available and cache up to date"
       HS.HasUpdates -> do
         logInfo "Updated package index downloaded"
         updateCache tarball
     logStickyDone "Package index cache populated"
   where
+    -- The size of the new index tarball, ignoring the required
+    -- (by the tar spec) 1024 null bytes at the end, which will be
+    -- mutated in the future by other updates.
+    getTarballSize :: MonadIO m => Handle -> m Word
+    getTarballSize h = (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+
+    -- Check if the size of the tarball on the disk matches the value
+    -- in CacheUpdate. If not, we need to perform a cache update, even
+    -- if we didn't download any new information. This can be caused
+    -- by canceling an updateCache call.
+    needsCacheUpdate tarball = do
+      mres <- withStorage loadLatestCacheUpdate
+      case mres of
+        Nothing -> pure True
+        Just (FileSize cachedSize, _sha256) -> do
+          actualSize <- withBinaryFile (toFilePath tarball) ReadMode getTarballSize
+          pure $ cachedSize /= actualSize
+
     -- This is the one action in the Pantry codebase known to hold a
     -- write lock on the database for an extended period of time. To
     -- avoid failures due to SQLite locks failing, we take our own
@@ -152,10 +177,7 @@ updateHackageIndex mreason = do
       (offset, newHash, newSize) <- lift $ withBinaryFile (toFilePath tarball) ReadMode $ \h -> do
         logInfo "Calculating hashes to check for hackage-security rebases or filesystem changes"
 
-        -- The size of the new index tarball, ignoring the required
-        -- (by the tar spec) 1024 null bytes at the end, which will be
-        -- mutated in the future by other updates.
-        newSize :: Word <- (fromIntegral . max 0 . subtract 1024) <$> hFileSize h
+        newSize <- getTarballSize h
         let sinkSHA256 len = takeCE (fromIntegral len) .| SHA256.sinkHash
 
         case minfo of
@@ -335,7 +357,7 @@ fuzzyLookupCandidates
   -> Version
   -> RIO env FuzzyResults
 fuzzyLookupCandidates name ver0 = do
-  m <- getHackagePackageVersions UsePreferredVersions name
+  m <- getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions name
   if Map.null m
     then FRNameNotFound <$> getHackageTypoCorrections name
     else
@@ -390,18 +412,37 @@ getHackageTypoCorrections name1 =
 data UsePreferredVersions = UsePreferredVersions | IgnorePreferredVersions
   deriving Show
 
+-- | Require that the Hackage index is populated.
+--
+-- @since 0.1.0.0
+data RequireHackageIndex
+  = YesRequireHackageIndex
+    -- ^ If there is nothing in the Hackage index, then perform an update
+  | NoRequireHackageIndex
+    -- ^ Do not perform an update
+  deriving Show
+
+initializeIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => RequireHackageIndex
+  -> RIO env ()
+initializeIndex NoRequireHackageIndex = pure ()
+initializeIndex YesRequireHackageIndex = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+
 -- | Returns the versions of the package available on Hackage.
 --
 -- @since 0.1.0.0
 getHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
-  => UsePreferredVersions
+  => RequireHackageIndex
+  -> UsePreferredVersions
   -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getHackagePackageVersions usePreferred name = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersions req usePreferred name = do
+  initializeIndex req
   withStorage $ do
     mpreferred <-
       case usePreferred of
@@ -420,13 +461,12 @@ getHackagePackageVersions usePreferred name = do
 -- @since 0.1.0.0
 getHackagePackageVersionRevisions
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> Version -- ^ package version
   -> RIO env (Map Revision BlobKey)
-getHackagePackageVersionRevisions name version = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersionRevisions req name version = do
+  initializeIndex req
   withStorage $
     Map.map snd <$> loadHackagePackageVersion name version
 

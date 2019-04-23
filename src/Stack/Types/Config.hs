@@ -62,6 +62,8 @@ module Stack.Types.Config
   -- * Details
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
+  -- ** CabalConfigKey
+  ,CabalConfigKey(..)
   -- ** ConfigException
   ,HpackExecutable(..)
   ,ConfigException(..)
@@ -321,6 +323,8 @@ data Config =
          -- ^ Additional GHC options to apply to specific packages.
          ,configGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
          -- ^ Additional GHC options to apply to categories of packages
+         ,configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
+         -- ^ Additional options to be passed to ./Setup.hs configure
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
@@ -362,6 +366,8 @@ data Config =
          -- ^ Database connection pool for Stack database
          ,configHideSourcePaths     :: !Bool
          -- ^ Enable GHC hiding source paths?
+         ,configRecommendUpgrade    :: !Bool
+         -- ^ Recommend a Stack upgrade?
          }
 
 -- | The project root directory, if in a project.
@@ -371,6 +377,27 @@ configProjectRoot c =
     PCProject (_, fp) -> Just $ parent fp
     PCGlobalProject -> Nothing
     PCNoProject _deps -> Nothing
+
+-- | Which packages do configure opts apply to?
+data CabalConfigKey
+  = CCKTargets -- ^ See AGOTargets
+  | CCKLocals -- ^ See AGOLocals
+  | CCKEverything -- ^ See AGOEverything
+  | CCKPackage !PackageName -- ^ A specific package
+  deriving (Show, Read, Eq, Ord)
+instance FromJSON CabalConfigKey where
+  parseJSON = withText "CabalConfigKey" parseCabalConfigKey
+instance FromJSONKey CabalConfigKey where
+  fromJSONKey = FromJSONKeyTextParser parseCabalConfigKey
+
+parseCabalConfigKey :: Monad m => Text -> m CabalConfigKey
+parseCabalConfigKey "$targets" = pure CCKTargets
+parseCabalConfigKey "$locals" = pure CCKLocals
+parseCabalConfigKey "$everything" = pure CCKEverything
+parseCabalConfigKey name =
+  case parsePackageName $ T.unpack name of
+    Nothing -> fail $ "Invalid CabalConfigKey: " ++ show name
+    Just x -> pure $ CCKPackage x
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions = AGOTargets -- ^ all local targets
@@ -733,6 +760,8 @@ data ConfigMonoid =
     -- ^ See 'configGhcOptionsAll'. Uses 'Monoid.Dual' so that options
     -- from the configs on the right come first, so that they can be
     -- overridden.
+    ,configMonoidCabalConfigOpts     :: !(MonoidMap CabalConfigKey (Monoid.Dual [Text]))
+    -- ^ See 'configCabalConfigOpts'.
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
@@ -768,6 +797,8 @@ data ConfigMonoid =
     , configMonoidStyles             :: !StylesUpdate
     , configMonoidHideSourcePaths    :: !FirstTrue
     -- ^ See 'configHideSourcePaths'
+    , configMonoidRecommendUpgrade   :: !FirstTrue
+    -- ^ See 'configRecommendUpgrade'
     }
   deriving (Show, Generic)
 
@@ -855,6 +886,9 @@ parseConfigMonoidObject rootDir obj = do
         configMonoidGhcOptionsByName = coerce $ Map.fromList
             [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
+    configMonoidCabalConfigOpts' <- obj ..:? "configure-options" ..!= mempty
+    let configMonoidCabalConfigOpts = coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
+
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
@@ -884,6 +918,7 @@ parseConfigMonoidObject rootDir obj = do
                                               <|> configMonoidStylesGB
 
     configMonoidHideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
+    configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
 
     return ConfigMonoid {..}
   where
@@ -1037,6 +1072,9 @@ configMonoidStylesGBName = "stack-colours"
 
 configMonoidHideSourcePathsName :: Text
 configMonoidHideSourcePathsName = "hide-source-paths"
+
+configMonoidRecommendUpgradeName :: Text
+configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

@@ -585,6 +585,24 @@ on an options change, but this behavior can be changed back with the following:
 rebuild-ghc-options: true
 ```
 
+### configure-options
+
+Options which are passed to the configure step of the Cabal build process.
+These can either be set by package name, or using the `$everything`,
+`$targets`, and `$locals` special keys. These special keys have the same
+meaning as in `ghc-options`.
+
+```yaml
+configure-options:
+  $everything:
+  - --with-gcc
+  - /some/path
+  my-package:
+  - --another-flag
+```
+
+(Since 2.0)
+
 ### ghc-variant
 
 (Since 0.1.5)
@@ -1070,6 +1088,14 @@ Build output when disabled:
 ...
 [1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
 ...
+```
+
+### recommend-stack-upgrade
+
+When Stack notices that a new version of Stack is available, should it notify the user?
+
+```yaml
+recommend-stack-upgrade: true
 ```
 
 Since 2.0

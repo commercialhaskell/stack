@@ -157,6 +157,7 @@ module Pantry
     -- * Hackage index
   , updateHackageIndex
   , DidUpdateOccur (..)
+  , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackagePackageVersions
   , getLatestHackageVersion
@@ -270,11 +271,12 @@ defaultHackageSecurityConfig = HackageSecurityConfig
 -- @since 0.1.0.0
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageIdentifierRevision)
-getLatestHackageVersion name preferred =
-  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getHackagePackageVersions preferred name
+getLatestHackageVersion req name preferred =
+  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getHackagePackageVersions req preferred name
   where
     go (version, m) = do
       (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m
@@ -286,12 +288,13 @@ getLatestHackageVersion name preferred =
 -- @since 0.1.0.0
 getLatestHackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageLocationImmutable)
-getLatestHackageLocation name preferred = do
+getLatestHackageLocation req name preferred = do
   mversion <-
-    fmap fst . Map.maxViewWithKey <$> getHackagePackageVersions preferred name
+    fmap fst . Map.maxViewWithKey <$> getHackagePackageVersions req preferred name
   let mVerCfKey = do
         (version, revisions) <- mversion
         (_rev, cfKey) <- fst <$> Map.maxViewWithKey revisions
@@ -308,11 +311,12 @@ getLatestHackageLocation name preferred = do
 -- @since 0.1.0.0
 getLatestHackageRevision
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> Version
   -> RIO env (Maybe (Revision, BlobKey, TreeKey))
-getLatestHackageRevision name version = do
-  revisions <- getHackagePackageVersionRevisions name version
+getLatestHackageRevision req name version = do
+  revisions <- getHackagePackageVersionRevisions req name version
   case fmap fst $ Map.maxViewWithKey revisions of
     Nothing -> pure Nothing
     Just (revision, cfKey@(BlobKey sha size)) -> do
@@ -814,6 +818,7 @@ completeSnapshotLayer rsnapshot = do
     , slFlags = rslFlags rsnapshot
     , slHidden = rslHidden rsnapshot
     , slGhcOptions = rslGhcOptions rsnapshot
+    , slPublishTime = rslPublishTime rsnapshot
     }
 
 traverseConcurrently_

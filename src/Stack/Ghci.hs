@@ -54,7 +54,7 @@ import           System.Permissions (setScriptPerms)
 data GhciOpts = GhciOpts
     { ghciTargets            :: ![Text]
     , ghciArgs               :: ![String]
-    , ghciGhcOptions         :: ![Text]
+    , ghciGhcOptions         :: ![String]
     , ghciFlags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
     , ghciGhcCommand         :: !(Maybe FilePath)
     , ghciNoLoadModules      :: !Bool
@@ -413,7 +413,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                  -- not include CWD. If there aren't any packages, CWD
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
-                  odir <> pkgopts <> extras <> map T.unpack ghciGhcOptions <> ghciArgs)
+                  odir <> pkgopts <> extras <> ghciGhcOptions <> ghciArgs)
         -- TODO: Consider optimizing this check. Perhaps if no
         -- "with-ghc" is specified, assume that it is not using intero.
         checkIsIntero =
@@ -627,12 +627,17 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
           (cpGhcOptions . ppCommon <$> M.lookup name smProject)
           <|>
           (cpGhcOptions . dpCommon <$> M.lookup name smDeps)
+        sourceMapCabalConfigOpts = fromMaybe [] $
+          (cpCabalConfigOpts . ppCommon <$> M.lookup name smProject)
+          <|>
+          (cpCabalConfigOpts . dpCommon <$> M.lookup name smDeps)
         config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = getLocalFlags buildOptsCLI name
             , packageConfigGhcOptions = sourceMapGhcOptions
+            , packageConfigCabalConfigOpts = sourceMapCabalConfigOpts
             , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = view platformL econfig
             }
