@@ -9,6 +9,7 @@ module Pantry.Internal
   , pcHpackExecutable
   , normalizeParents
   , makeTarRelative
+  , getGlobalHintsFile
   ) where
 
 import Control.Exception (assert)

@@ -1,33 +1,28 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Stack.SourceMapSpec (spec) where
+module Pantry.GlobalHintsSpec (spec) where
 
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Version (mkVersion)
-import Stack.Options.GlobalParser (globalOptsFromMonoid)
-import Stack.Prelude
-import Stack.Runners
-import Stack.SourceMap (loadGlobalHints)
-import Stack.Types.Config (globalLogLevel)
+import RIO
+import Pantry (loadGlobalHints, WantedCompiler (..), runPantryAppClean)
+import Pantry.Internal
 import Test.Hspec
 import qualified RIO.Map as Map
-import RIO.ByteString (hPut)
-import Path.IO (resolveFile')
+import Path (toFilePath)
 
 spec :: Spec
 spec = do
-  describe "loadGlobalHints" $ do
-    let it' name inner = it name $ withSystemTempFile "global-hints.yaml" $ \fp h -> do
-          hPut h "this should be ignored"
-          hClose h :: IO ()
-          abs' <- resolveFile' fp
-          globalOpts <- globalOptsFromMonoid False mempty
-          withRunnerGlobal globalOpts { globalLogLevel = LevelOther "silent" } $ inner abs'
-    it' "unknown compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])
+    let it' name inner = it name $ example $ runPantryAppClean $ do
+          file <- getGlobalHintsFile
+          writeFileBinary (toFilePath file) "this should be ignored"
+          inner
+    it' "unknown compiler" $ do
+      mmap <- loadGlobalHints $ WCGhc (mkVersion [0, 0, 0, 0, 0, 0, 0])
       liftIO $ mmap `shouldBe` Nothing
-    it' "known compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [8, 4, 3])
+    it' "known compiler" $ do
+      mmap <- loadGlobalHints $ WCGhc (mkVersion [8, 4, 3])
       case mmap of
         Nothing -> error "not found"
         Just m -> liftIO $ do
@@ -35,8 +30,8 @@ spec = do
           Map.lookup (mkPackageName "base") m `shouldBe` Just (mkVersion [4, 11, 1, 0])
           Map.lookup (mkPackageName "bytestring") m `shouldBe` Just (mkVersion [0, 10, 8, 2])
           Map.lookup (mkPackageName "acme-missiles") m `shouldBe` Nothing
-    it' "older known compiler" $ \fp -> do
-      mmap <- loadGlobalHints fp $ WCGhc (mkVersion [7, 8, 4])
+    it' "older known compiler" $ do
+      mmap <- loadGlobalHints $ WCGhc (mkVersion [7, 8, 4])
       case mmap of
         Nothing -> error "not found"
         Just m -> liftIO $ do
