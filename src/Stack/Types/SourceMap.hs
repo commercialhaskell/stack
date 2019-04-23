@@ -46,7 +46,7 @@ data CommonPackage = CommonPackage
 data FromSnapshot
     = FromSnapshot
     | NotFromSnapshot
-    deriving (Show, Eq)
+    deriving (Show)
 
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage

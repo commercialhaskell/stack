@@ -9,7 +9,6 @@ module Pantry.Internal
   , pcHpackExecutable
   , normalizeParents
   , makeTarRelative
-  , Unresolved (..)
   ) where
 
 import Control.Exception (assert)

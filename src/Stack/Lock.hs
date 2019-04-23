@@ -2,12 +2,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Stack.Lock
     ( lockCachedWanted
     , LockedLocation(..)
-    , LockedPackage(..)
     , Locked(..)
     ) where
 
@@ -17,109 +15,29 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import Pantry
-import Pantry.Internal (Unresolved(..))
-import qualified Pantry.SHA256 as SHA256
 import Path (addFileExtension, parent)
-import Path.IO (doesFileExist, getModificationTime, resolveFile)
-import qualified RIO.ByteString as B
+import Path.IO (doesFileExist)
 import RIO.Process
-import qualified RIO.Text as T
-import RIO.Time (UTCTime)
 import Stack.Prelude
 import Stack.SourceMap
 import Stack.Types.Config
 import Stack.Types.SourceMap
 
-data CompletedSnapshotLocation
-    = CSLFilePath !(ResolvedPath File)
-                  !SHA256
-                  !FileSize
-    | CSLCompiler !WantedCompiler
-    | CSLUrl !Text !BlobKey
+data LockedLocation =
+    LockedLocation RawPackageLocationImmutable
+                   PackageLocationImmutable
     deriving (Show, Eq)
 
-instance ToJSON CompletedSnapshotLocation where
-    toJSON (CSLFilePath fp sha size) =
-        object [ "file" .= resolvedRelative fp
-               , "sha" .= sha
-               , "size" .= size
-               ]
-    toJSON (CSLCompiler c) =
-        object ["compiler" .= toJSON c]
-    toJSON (CSLUrl url (BlobKey sha size)) =
-        object [ "url" .= url
-               , "sha" .= sha
-               , "size" .= size
-               ]
-
-instance FromJSON (WithJSONWarnings (Unresolved CompletedSnapshotLocation)) where
-    parseJSON v = file v <|> url v <|> compiler v
-      where
-        file = withObjectWarnings "CSLFilepath" $ \o -> do
-           ufp <- o ..: "file"
-           sha <- o ..: "sha"
-           size <- o ..: "size"
-           pure $ Unresolved $ \mdir ->
-             case mdir of
-               Nothing -> throwIO $ InvalidFilePathSnapshot ufp
-               Just dir -> do
-                 absolute <- resolveFile dir (T.unpack ufp)
-                 let fp = ResolvedPath (RelFilePath ufp) absolute
-                 pure $ CSLFilePath fp sha size
-        url = withObjectWarnings "CSLUrl" $ \o -> do
-          url' <- o ..: "url"
-          sha <- o ..: "sha"
-          size <- o ..: "size"
-          pure $ Unresolved $ \_ -> pure $ CSLUrl url' (BlobKey sha size)
-        compiler = withObjectWarnings "CSLCompiler" $ \o -> do
-          c <- o ..: "compiler"
-          pure $ Unresolved $ \_ -> pure $ CSLCompiler c
-
-data LockedLocation a b
-    = LockedExact b
-    | LockedCompleted a
-                      b
-    deriving (Show, Eq)
-
-instance (ToJSON a, ToJSON b) => ToJSON (LockedLocation a b) where
-    toJSON (LockedExact o) =
-        object ["exact" .= o]
-    toJSON (LockedCompleted o c) =
+instance ToJSON LockedLocation where
+    toJSON (LockedLocation o c) =
         object [ "original" .= o, "completed" .= c ]
 
-instance ( FromJSON (WithJSONWarnings (Unresolved a))
-         , FromJSON (WithJSONWarnings (Unresolved b))
-         ) =>
-         FromJSON (WithJSONWarnings (Unresolved (LockedLocation a b))) where
-    parseJSON v = withObjectWarnings "LockedLocation" (\o -> lockedExact o <|> lockedCompleted o) v
-      where
-        lockedExact o = do
-          exact <- jsonSubWarnings $ o ..: "exact"
-          pure $ LockedExact <$> exact
-        lockedCompleted o = do
-          original <- jsonSubWarnings $ o ..: "original"
-          completed <- jsonSubWarnings $ o ..: "completed"
-          pure $ LockedCompleted <$> original <*> completed
-
-data LockedPackage = LockedPackage
-    { lpLocation :: !(LockedLocation RawPackageLocationImmutable PackageLocationImmutable)
-    , lpFlags :: !(Map FlagName Bool)
-    , lpHidden :: !Bool
-    , lpGhcOptions :: ![Text]
-    , lpFromSnapshot :: !FromSnapshot
-    } deriving (Show, Eq)
-
-instance ToJSON LockedPackage where
-    toJSON LockedPackage {..} =
-        let toBoolean FromSnapshot = True
-            toBoolean NotFromSnapshot = False
-         in object $ concat
-                [ ["location" .= lpLocation]
-                , if Map.null lpFlags then [] else ["flags" .= toCabalStringMap lpFlags]
-                , if lpFromSnapshot == FromSnapshot then [] else ["from-snapshot" .= toBoolean lpFromSnapshot]
-                , if not lpHidden then [] else ["hidden" .= lpHidden]
-                , if null lpGhcOptions then [] else ["ghc-options" .= lpGhcOptions]
-                ]
+instance FromJSON (WithJSONWarnings (Unresolved LockedLocation)) where
+    parseJSON =
+        withObjectWarnings "LockedLocation" $ \o -> do
+            original <- jsonSubWarnings $ o ..: "original"
+            completed <- jsonSubWarnings $ o ..: "completed"
+            pure $ (\single c -> LockedLocation (unSingleRPLI single) c) <$> original <*> completed
 
 -- Special wrapper extracting only 1 RawPackageLocationImmutable
 -- serialization should not produce locations with multiple subdirs
@@ -131,61 +49,23 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
      do
        WithJSONWarnings unresolvedRPLIs ws <- parseJSON v
        let withWarnings x = WithJSONWarnings x ws
-       pure $ withWarnings $ Unresolved $ \mdir -> do
-         rpli <- NE.head <$> resolvePaths mdir unresolvedRPLIs
-         pure $ SingleRPLI rpli
+       pure $ withWarnings $ SingleRPLI . NE.head <$> unresolvedRPLIs
 
-instance FromJSON (WithJSONWarnings (Unresolved LockedPackage)) where
-    parseJSON = withObjectWarnings "LockedPackage" $ \o -> do
-        let unwrap (LockedExact c) = LockedExact c
-            unwrap (LockedCompleted single c) = LockedCompleted (unSingleRPLI single) c
-        location <- jsonSubWarnings $ o ..: "location"
-        lpFlags <- fmap unCabalStringMap $ o ..:? "flags" ..!= Map.empty
-        lpHidden <- o ..:? "hidden" ..!= False
-        lpGhcOptions <- o ..:? "ghc-options" ..!= []
-        let fromBoolean True = FromSnapshot
-            fromBoolean False = NotFromSnapshot
-        lpFromSnapshot <- fmap fromBoolean $ o ..:? "from-snapshot" ..!= True
-        pure $ (\lpLocation -> LockedPackage {..}) <$> fmap unwrap location
+newtype Locked = Locked [LockedLocation]
 
-data Locked = Locked
-    { lckStackSha :: !SHA256
-    , lckStackSize :: !FileSize
-    , lckCompiler :: WantedCompiler
-    , lckSnapshots :: NE.NonEmpty (LockedLocation RawSnapshotLocation CompletedSnapshotLocation)
-    , lckPackages :: Map PackageName LockedPackage
-    }
-    deriving (Show, Eq)
-
-instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
-    parseJSON = withObjectWarnings "Locked" $ \o -> do
-      stackYaml <- o ..: "stack-yaml"
-      lckStackSha <- stackYaml ..: "sha256"
-      lckStackSize <- stackYaml ..: "size"
-      lckCompiler <- o ..: "compiler"
-      snapshots <- jsonSubWarningsT $ o ..: "snapshots"
-      packages <- fmap unCabalStringMap $ jsonSubWarningsT $ o ..: "packages"
-      pure $ (\lckSnapshots lckPackages -> Locked {..}) <$> sequenceA snapshots <*> sequenceA packages
-
-instance ToJSON Locked where
-    toJSON Locked {..} =
-        object
-            [ "stack-yaml" .= object ["sha256" .= lckStackSha, "size" .= lckStackSize]
-            , "compiler" .= lckCompiler
-            , "snapshots" .= lckSnapshots
-            , "packages" .= toCabalStringMap lckPackages
-            ]
+instance FromJSON (Unresolved Locked) where
+    parseJSON v = do
+      locs <- unWarningParser $ jsonSubWarningsT (lift $  parseJSON v)
+      pure $ Locked <$> sequenceA locs
 
 loadYamlThrow
     :: HasLogFunc env
-    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
+    => (Value -> Yaml.Parser a) -> Path Abs File -> RIO env a
 loadYamlThrow parser path = do
     val <- liftIO $ Yaml.decodeFileThrow (toFilePath path)
     case Yaml.parseEither parser val of
         Left err -> throwIO $ Yaml.AesonException err
-        Right (WithJSONWarnings res warnings) -> do
-            logJSONWarnings (toFilePath path) warnings
-            return res
+        Right res -> return res
 
 lockCachedWanted ::
        (HasPantryConfig env, HasProcessContext env, HasLogFunc env)
@@ -199,162 +79,22 @@ lockCachedWanted ::
 lockCachedWanted stackFile resolver fillWanted = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
     lockExists <- doesFileExist lockFile
-    if not lockExists
-        then do
-            logDebug "Lock file doesn't exist"
-            (snap, slocs, completed) <-
-                loadAndCompleteSnapshotRaw resolver Map.empty
-            let compiler = snapshotCompiler snap
-                snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
-            (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
-            (stackSha, stackSize) <- shaSize stackFile
-            let pkgs = mapMaybe (uncurry $ maybeWantedLockedPackage wanted)
-                                (completed <> prjCompleted)
-            snapshots <- for slocs $ \(orig, sloc) -> do
-                case sloc of
-                    SLFilePath fp -> do
-                        (sha, size) <- shaSize (resolvedAbsolute fp)
-                        pure $ LockedCompleted orig (CSLFilePath fp sha size)
-                    SLCompiler c ->
-                        pure $ LockedExact (CSLCompiler c)
-                    sl@(SLUrl url blobKey) ->
-                        let csurl = CSLUrl url blobKey
-                        in if toRawSL sl == orig
-                           then pure $ LockedExact csurl
-                           else pure $ LockedCompleted orig csurl
-            liftIO $ Yaml.encodeFile (toFilePath lockFile) $
-                Locked { lckStackSha = stackSha
-                       , lckStackSize = stackSize
-                       , lckCompiler = smwCompiler wanted
-                       , lckSnapshots = snapshots
-                       , lckPackages = Map.fromList pkgs
-                       }
-            pure wanted
-        else do
-            lmt <- liftIO $ getModificationTime lockFile
-            unresolvedLocked <- loadYamlThrow parseJSON lockFile
-            locked0 <- resolvePaths (Just $ parent stackFile) unresolvedLocked
-            let pkgLocCache = Map.fromList $
-                    map (lockPair . lpLocation) $ Map.elems (lckPackages locked0)
-                lockPair (LockedExact compl) = (toRawPLI compl, compl)
-                lockPair (LockedCompleted orig compl) = (orig, compl)
-                sha0 = lckStackSha locked0
-                size0 = lckStackSize locked0
-            result <- liftIO $ checkOutdated stackFile lmt size0 sha0
-            let (syOutdated, sySha, sySize) =
-                    case result of
-                        Right () -> (False, sha0, size0)
-                        Left (sha, sz) -> (True, sha, sz)
-            let lockedSnapshots = Map.fromList $ map toPair $ NE.toList (lckSnapshots locked0)
-                toPair (LockedExact compl) = (toRawSL' compl, compl)
-                toPair (LockedCompleted orig compl) = (orig, compl)
-                toRawSL' (CSLCompiler c) = RSLCompiler c
-                toRawSL' (CSLUrl url blobKey) = toRawSL (SLUrl url blobKey)
-                toRawSL' (CSLFilePath fp _ _) = toRawSL (SLFilePath fp)
-            layers <- readSnapshotLayers resolver
-            (outdated, valid) <-
-                fmap partitionEithers . forM (NE.toList layers) $ \(rsloc, sloc) -> liftIO $
-                    let toLockedSL _orig compl@(CSLCompiler _) = LockedExact compl
-                        toLockedSL orig compl@(CSLUrl url bk)
-                          | toRawSL (SLUrl url bk) == orig = LockedExact compl
-                        toLockedSL orig compl = LockedCompleted orig compl
-                        outdatedLoc = Left . toLockedSL rsloc
-                        validLoc =  Right . toLockedSL rsloc
-                    in case Map.lookup rsloc lockedSnapshots of
-                        Nothing ->
-                            case sloc of
-                                SLFilePath fp -> do
-                                    (sha, size) <- shaSize $ resolvedAbsolute fp
-                                    pure $ outdatedLoc (CSLFilePath fp sha size)
-                                SLCompiler c ->
-                                    pure $ outdatedLoc (CSLCompiler c)
-                                SLUrl u bk ->
-                                    pure $ outdatedLoc (CSLUrl u bk)
-                        Just loc@(CSLFilePath fp sha size) -> do
-                            result' <- checkOutdated (resolvedAbsolute fp) lmt size sha
-                            case result' of
-                                Right () -> pure $ validLoc loc
-                                Left (sha', size') ->
-                                    pure $ outdatedLoc (CSLFilePath fp sha' size')
-                        Just immutable ->
-                             pure $ validLoc immutable
-            let lockIsUpToDate = not syOutdated && null outdated
-            if lockIsUpToDate
-                then do
-                    logDebug "Lock file exist and is up-to-date"
-                    let compiler = lckCompiler locked0
-                        pkgs = flip Map.mapWithKey (lckPackages locked0) $ \nm lp haddocks -> do
-                            run <- askRunInIO
-                            let location = case lpLocation lp of
-                                  LockedExact c -> c
-                                  LockedCompleted _ c -> c
-                                common = CommonPackage
-                                    { cpName = nm
-                                    , cpGPD = run $ loadCabalFileImmutable location
-                                    , cpFlags = lpFlags lp
-                                    , cpGhcOptions = lpGhcOptions lp
-                                    , cpHaddocks = haddocks
-                                    }
-                            pure $ DepPackage{ dpLocation = PLImmutable location
-                                             , dpCommon = common
-                                             , dpHidden = lpHidden lp
-                                             , dpFromSnapshot = lpFromSnapshot lp
-                                             }
-                    (wanted, _prjCompleted) <- fillWanted pkgLocCache compiler pkgs
-                    pure wanted
-                else do
-                    logDebug "Lock file exist but is not up-to-date"
-                    (snap, _slocs, completed) <-
-                        loadAndCompleteSnapshotRaw resolver pkgLocCache
-                    let compiler = snapshotCompiler snap
-                        snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
-                    (wanted, prjCompleted) <- fillWanted pkgLocCache compiler snPkgs
-                    let pkgs = mapMaybe (uncurry $  maybeWantedLockedPackage wanted)
-                                        (completed <> prjCompleted)
-                    liftIO $ Yaml.encodeFile (toFilePath lockFile) $
-                        Locked { lckStackSha = sySha
-                               , lckStackSize = sySize
-                               , lckCompiler = smwCompiler wanted
-                               , lckSnapshots = NE.fromList $ outdated ++ valid
-                               , lckPackages = Map.fromList pkgs
-                               }
-                    pure wanted              
-  where
-    maybeWantedLockedPackage wanted rpli pli = do
-        let name = pkgName (packageLocationIdent pli)
-        dp <- Map.lookup name (smwDeps wanted)
-        let common = dpCommon dp
-        pure ( name
-             , LockedPackage { lpFlags = cpFlags common
-                             , lpFromSnapshot = dpFromSnapshot dp
-                             , lpGhcOptions = cpGhcOptions common
-                             , lpHidden = dpHidden dp
-                             , lpLocation =
-                               if toRawPLI pli == rpli
-                               then LockedExact pli
-                               else LockedCompleted rpli pli
-                             }
-             )
-    shaSize fp = do
-        bs <- B.readFile $ toFilePath fp
-        let size = FileSize . fromIntegral $ B.length bs
-            sha = SHA256.hashBytes bs
-        return (sha, size)
-
-checkOutdated ::
-       Path Abs File
-    -> UTCTime
-    -> FileSize
-    -> SHA256
-    -> IO (Either (SHA256, FileSize) ())
-checkOutdated fp dt size sha = do
-    mt <- getModificationTime fp
-    if mt < dt
-        then pure $ Right ()
-        else do
-            bs <- B.readFile $ toFilePath fp
-            let newSize = FileSize . fromIntegral $ B.length bs
-                newSha = SHA256.hashBytes bs
-            if newSize /= size || sha /= newSha
-                then pure $ Left (newSha, newSize)
-                else pure $ Right ()
+    pkgLocCache <- if not lockExists
+                   then do
+                       logDebug "Lock file doesn't exist"
+                       pure Map.empty
+                   else do
+                       logDebug "Using package location completions from a lock file"
+                       unresolvedLocked <- loadYamlThrow parseJSON lockFile
+                       Locked locked0 <- resolvePaths (Just $ parent stackFile) unresolvedLocked
+                       pure $ Map.fromList [(orig, compl) | LockedLocation orig compl <- locked0]
+     
+    (snap, completed) <-
+        loadAndCompleteSnapshotRaw resolver pkgLocCache
+    let compiler = snapshotCompiler snap
+        snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
+    (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
+    liftIO $ Yaml.encodeFile (toFilePath lockFile) $
+        map (uncurry LockedLocation) $
+        prjCompleted <> completed
+    pure wanted

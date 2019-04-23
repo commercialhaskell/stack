@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -70,7 +69,6 @@ module Pantry
   , RawPackageLocation (..)
   , PackageLocation (..)
   , toRawPL
-  , toRawPLI
   , RawPackageLocationImmutable (..)
   , PackageLocationImmutable (..)
 
@@ -94,7 +92,6 @@ module Pantry
   , loadRawSnapshotLayer
   , loadSnapshotLayer
   , loadSnapshot
-  , readSnapshotLayers
   , loadAndCompleteSnapshot
   , loadAndCompleteSnapshotRaw
   , CompletedPLI
@@ -200,12 +197,11 @@ import RIO.PrettyPrint
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended (unWarningParser, (...:?), WithJSONWarnings (..), Value)
+import Data.Aeson.Extended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Pantry.HTTP
 import Data.Char (isHexDigit)
-import Data.List.NonEmpty (NonEmpty((:|)), (<|))
 
 -- | Create a new 'PantryConfig' with the given settings.
 --
@@ -906,7 +902,7 @@ loadSnapshotRaw loc = do
         , rsPackages = mempty
         , rsDrop = mempty
         }
-    Right (rsl, _sha) -> do
+    Right rsl -> do
       snap0 <- loadSnapshotRaw $ rslParent rsl
       (packages, unused) <-
         addPackagesToSnapshot
@@ -963,24 +959,6 @@ loadSnapshot loc = do
         }
 
 type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
-type CompletedSL = (RawSnapshotLocation, SnapshotLocation)
-
--- | Get completed locations of all snapshot layers from a 'RawSnapshotLocation'.
--- Uses only fields 'compiler', 'parent' and 'solver' without parsing other
--- snapshot fields
---
--- @since 0.1.0.0
-readSnapshotLayers ::
-       (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-    => RawSnapshotLocation
-    -> RIO env (NonEmpty CompletedSL)
-readSnapshotLayers loc = do
-  eres <- loadRawSnapshotLayerParent loc
-  case eres of
-    Left wc ->
-      pure $ (RSLCompiler wc, SLCompiler wc) :| []
-    Right (RawSnapshotLayerParent p, sloc) ->
-      (sloc <|) <$> readSnapshotLayers p
 
 -- | Parse a 'Snapshot' (all layers) from a 'SnapshotLocation' noting
 -- any incomplete package locations
@@ -990,7 +968,7 @@ loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
   -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> RIO env (Snapshot, NonEmpty CompletedSL,  [CompletedPLI])
+  -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshot loc cachedPL =
   loadAndCompleteSnapshotRaw (toRawSL loc) cachedPL
 
@@ -1002,7 +980,7 @@ loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
   -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> RIO env (Snapshot, NonEmpty CompletedSL, [CompletedPLI])
+  -> RIO env (Snapshot, [CompletedPLI])
 loadAndCompleteSnapshotRaw loc cachePL = do
   eres <- loadRawSnapshotLayer loc
   case eres of
@@ -1012,9 +990,9 @@ loadAndCompleteSnapshotRaw loc cachePL = do
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
-      in pure (snapshot, (RSLCompiler wc, SLCompiler wc) :| [], [])
-    Right (rsl, sloc) -> do
-      (snap0, slocs0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL
+      in pure (snapshot, [])
+    Right rsl -> do
+      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
           loc
@@ -1033,7 +1011,7 @@ loadAndCompleteSnapshotRaw loc cachePL = do
             , snapshotPackages = packages
             , snapshotDrop = apcDrop unused
             }
-      return (snapshot, sloc <| slocs0, completed0 ++ completed)
+      return (snapshot, completed0 ++ completed)
 
 data SingleOrNot a
   = Single !a
@@ -1165,7 +1143,7 @@ cachedSnapshotCompletePackageLocation cachePackages rpli = do
 -- set.
 --
 -- Returns any of the 'AddPackagesConfig' values not used and also all
--- package location completions.
+-- non-trivial package location completions.
 --
 -- @since 0.1.0.0
 addAndCompletePackagesToSnapshot
@@ -1193,7 +1171,10 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
               , spHidden = Map.findWithDefault False name hiddens
               , spGhcOptions = Map.findWithDefault [] name options
               })
-        pure (p:ps, (rawLoc, complLoc):completed)
+            completed' = if toRawPLI complLoc == rawLoc
+                         then completed
+                         else (rawLoc, complLoc):completed
+        pure (p:ps, completed')
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
         = partitionEithers
@@ -1220,54 +1201,6 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
 
   pure (allPackages, reverse revCompleted, unused)
 
--- helper data type for reading only parent snapshot locaitons
-newtype RawSnapshotLayerParent = RawSnapshotLayerParent RawSnapshotLocation
-
-instance Yaml.FromJSON (Unresolved RawSnapshotLayerParent) where
-  parseJSON = Yaml.withObject "Snapshot" $ \o -> do
-    mcompiler <- o Yaml..:? "compiler"
-    mresolver <- unWarningParser $ o ...:? ["snapshot", "resolver"]
-    unresolvedSnapshotParent <-
-      case (mcompiler, mresolver) of
-        (Nothing, Nothing) -> fail "Snapshot must have either resolver or compiler"
-        (Just compiler, Nothing) -> pure $ pure (RSLCompiler compiler)
-        (_, Just (WithJSONWarnings (Unresolved usl) _)) -> pure $ Unresolved $ \mdir -> do
-          sl <- usl mdir
-          case (sl, mcompiler) of
-            (RSLCompiler c1, Just c2) -> throwIO $ InvalidOverrideCompiler c1 c2
-            _ -> pure sl
-
-    pure $ RawSnapshotLayerParent <$> unresolvedSnapshotParent
-
-loadRawSnapshotLayerParent
-  :: (HasPantryConfig env, HasLogFunc env)
-  => RawSnapshotLocation
-  -> RIO env (Either WantedCompiler (RawSnapshotLayerParent, CompletedSL))
-loadRawSnapshotLayerParent (RSLCompiler compiler) = pure $ Left compiler
-loadRawSnapshotLayerParent sl@(RSLUrl url blob) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
-    bs <- loadFromURL url blob
-    value <- Yaml.decodeThrow bs
-    lparent <- parserHelperLayerParent sl value Nothing
-    pure $ Right (lparent, (sl, SLUrl url (bsToBlobKey bs)))
-loadRawSnapshotLayerParent sl@(RSLFilePath fp) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
-    value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    lparent <- parserHelperLayerParent sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (lparent, (sl, SLFilePath fp))
-
-parserHelperLayerParent
-  :: HasLogFunc env
-  => RawSnapshotLocation
-  -> Value
-  -> Maybe (Path Abs Dir)
-  -> RIO env RawSnapshotLayerParent
-parserHelperLayerParent rsl val mdir =
-  case parseEither Yaml.parseJSON val of
-    Left e -> throwIO $ Couldn'tParseSnapshot rsl e
-    Right x -> do
-      resolvePaths mdir x
-
 -- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --
 -- Returns a 'Left' value if provided an 'SLCompiler'
@@ -1278,19 +1211,19 @@ parserHelperLayerParent rsl val mdir =
 loadRawSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => RawSnapshotLocation
-  -> RIO env (Either WantedCompiler (RawSnapshotLayer, CompletedSL))
+  -> RIO env (Either WantedCompiler RawSnapshotLayer)
 loadRawSnapshotLayer (RSLCompiler compiler) = pure $ Left compiler
 loadRawSnapshotLayer sl@(RSLUrl url blob) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     bs <- loadFromURL url blob
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelperRaw sl value Nothing
-    pure $ Right (snapshot, (sl, SLUrl url (bsToBlobKey bs)))
+    pure $ Right snapshot
 loadRawSnapshotLayer sl@(RSLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot sl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     snapshot <- warningsParserHelperRaw sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, (sl, SLFilePath fp))
+    pure $ Right snapshot
 
 -- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --

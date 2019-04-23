@@ -44,7 +44,7 @@ module Pantry.Types
   , renderTree
   , parseTree
   , SHA256
-  , Unresolved (..)
+  , Unresolved
   , resolvePaths
   , Package (..)
   , PackageCabal (..)
@@ -294,7 +294,7 @@ instance NFData (ResolvedPath t)
 data RawPackageLocation
   = RPLImmutable !RawPackageLocationImmutable
   | RPLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Generic)
 instance NFData RawPackageLocation
 
 -- | Location to load a package from. Can either be immutable (see
@@ -305,16 +305,12 @@ instance NFData RawPackageLocation
 data PackageLocation
   = PLImmutable !PackageLocationImmutable
   | PLMutable !(ResolvedPath Dir)
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Generic)
 instance NFData PackageLocation
 
 instance Display PackageLocation where
   display (PLImmutable loc) = display loc
   display (PLMutable fp) = fromString $ toFilePath $ resolvedAbsolute fp
-
-instance ToJSON PackageLocation where
-  toJSON (PLImmutable pli) = toJSON pli
-  toJSON (PLMutable resolved) = toJSON (resolvedRelative resolved)
 
 -- | Convert `PackageLocation` to its "raw" equivalent
 --
