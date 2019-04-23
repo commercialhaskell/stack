@@ -127,6 +127,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Support MX Linux in get-stack.sh. Fixes
+  [#4769](https://github.com/commercialhaskell/stack/issues/4769).
 * Defer loading up of files for local packages. This allows us to get
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
