@@ -31,7 +31,7 @@ import Pantry.Storage as X
   , loadBlobById
   , migrateAll
   , treeCabal
-  , unBlobKey
+  , Key(unBlobKey)
   )
 import Pantry.Types as X
   ( ModuleNameP(..)

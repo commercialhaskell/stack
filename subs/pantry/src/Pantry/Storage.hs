@@ -66,7 +66,7 @@ module Pantry.Storage
   , EntityField(..)
     -- avoid warnings
   , BlobId
-  , unBlobKey
+  , Key(unBlobKey)
   , HackageCabalId
   , HackageCabal(..)
   , HackageTarballId
