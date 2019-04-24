@@ -92,7 +92,7 @@ withWriteLock desc dbFile inner = do
               -- Now loop printing a message every 1 minute
               forever $ do
                 delay (60 * 1000 * 1000) -- 1 minute
-                  `onException` logInfo ("Acquired the " <> desc <> " database write lock")
+                  `onDoneTalking` logInfo ("Acquired the " <> desc <> " database write lock")
                 logWarn ("Still waiting on the " <> desc <> " database write lock...")
         talkUntil complainer $ \stopComplaining ->
           withFileLock lockFile Exclusive $ const $ do
@@ -111,6 +111,16 @@ type Delay = forall mio. MonadIO mio => Int -> mio ()
 -- called, or if a 'Delay' is currently blocking, the 'Talker' thread
 -- will exit with an exception.
 type StopTalking m = m ()
+
+-- | When a delay was interrupted because we're done talking, perform
+-- this action.
+onDoneTalking
+  :: MonadUnliftIO m
+  => m () -- ^ the delay
+  -> m () -- ^ action to perform
+  -> m ()
+onDoneTalking theDelay theAction =
+  theDelay `withException` \DoneTalking -> theAction
 
 -- | Internal exception used by 'talkUntil' to allow short-circuiting
 -- of the 'Talker'. Should not be used outside of the 'talkUntil'
