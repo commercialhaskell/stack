@@ -109,9 +109,9 @@ constraints target =
   withFixedColorTerm $ case target of
     TargetLts x y | y > 0 -> do
       let prev = y - 1
-          url = concat [ "https://raw.githubusercontent.com/commercialhaskell/stackage-constraints/master/lts-"
+          url = concat [ "https://raw.githubusercontent.com/" ++ constraintsRepo ++ "/master/lts/"
                         , show x
-                        , "."
+                        , "/"
                         , show prev
                         , ".yaml"
                         ]

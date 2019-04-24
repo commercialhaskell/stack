@@ -58,7 +58,7 @@ checkoutSnapshotsRepo ::
     -> m ([String] -> m (), Path Abs File, String)
 checkoutSnapshotsRepo t = checkoutRepo t dir url
   where
-    url = "git@github.com:commercialhaskell/stackage-next"
+    url = "git@github.com:" ++ snapshotsRepo
     dir = $(mkRelDir "stackage-snapshots")
 
 checkoutConstraintsRepo ::
@@ -72,7 +72,7 @@ checkoutConstraintsRepo ::
     -> m ([String] -> m (), Path Abs File, String)
 checkoutConstraintsRepo t = checkoutRepo t dir url
   where
-    url = "git@github.com:commercialhaskell/stackage-constraints-next"
+    url = "git@github.com:" ++ constraintsRepo
     dir = $(mkRelDir "stackage-constraints")
 
 checkoutRepo ::
