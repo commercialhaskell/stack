@@ -11,7 +11,7 @@ import Network.HTTP.Download (download)
 import Options.Applicative.Simple hiding (action)
 import qualified Pantry
 import Path (toFilePath)
-import Path.IO (doesFileExist, resolveFile', resolveDir')
+import Path.IO (doesFileExist, removeFile, resolveFile', resolveDir')
 import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
 import RIO.List (stripPrefix)
@@ -113,9 +113,13 @@ constraints target =
                         , show prev
                         , ".yaml"
                         ]
-      logInfo $ "Reusing constraints.yaml from lts-" <> display x <> "." <> display prev
+      logInfo $ "Will reuse constraints.yaml from lts-" <> display x <> "." <> display prev
       req <- parseUrlThrow url
       constraintsPath <- resolveFile' constraintsFilename
+      exists <- doesFileExist constraintsPath
+      when exists $ do
+        logWarn "Local constraints file will be deleted before downloading reused constraints"
+        removeFile constraintsPath
       downloaded <- download req constraintsPath
       unless downloaded $
         error $ "Could not download constraints.yaml from " <> url
