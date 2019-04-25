@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
 -- | Content addressable Haskell package management, providing for
 -- secure, reproducible acquisition of Haskell package contents and
 -- metadata.
@@ -179,7 +178,7 @@ import qualified RIO.FilePath as FilePath
 import Pantry.Archive
 import Pantry.Repo
 import qualified Pantry.SHA256 as SHA256
-import Pantry.Storage
+import Pantry.Storage hiding (TreeEntry, PackageName, Version)
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
@@ -300,8 +299,8 @@ getLatestHackageLocation req name preferred = do
 
   forM mVerCfKey $ \(version, cfKey@(BlobKey sha size)) -> do
     let pir = PackageIdentifierRevision name version (CFIHash sha (Just size))
-    treeKey <- getHackageTarballKey pir
-    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+    treeKey' <- getHackageTarballKey pir
+    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 
 -- | Returns the latest revision of the given package version available from
 -- Hackage.
@@ -319,8 +318,8 @@ getLatestHackageRevision req name version = do
     Nothing -> pure Nothing
     Just (revision, cfKey@(BlobKey sha size)) -> do
       let cfi = CFIHash sha (Just size)
-      treeKey <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
-      return $ Just (revision, cfKey, treeKey)
+      treeKey' <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
+      return $ Just (revision, cfKey, treeKey')
 
 fetchTreeKeys
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
@@ -703,7 +702,8 @@ loadPackage
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env Package
-loadPackage (PLIHackage ident cfHash tree) = getHackageTarball (pirForHash ident cfHash) (Just tree)
+loadPackage (PLIHackage ident cfHash tree) =
+  htrPackage <$> getHackageTarball (pirForHash ident cfHash) (Just tree)
 loadPackage pli@(PLIArchive archive pm) = getArchivePackage (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
 loadPackage (PLIRepo repo pm) = getRepo repo (toRawPM pm)
 
@@ -714,7 +714,7 @@ loadPackageRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RIO env Package
-loadPackageRaw (RPLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackageRaw (RPLIHackage pir mtree) = htrPackage <$> getHackageTarball pir mtree
 loadPackageRaw rpli@(RPLIArchive archive pm) = getArchivePackage rpli archive pm
 loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 
@@ -740,8 +740,8 @@ completePackageLocation (RPLIHackage pir0@(PackageIdentifierRevision name versio
             pir = PackageIdentifierRevision name version cfi
         logDebug $ "Added in cabal file hash: " <> display pir
         pure (pir, BlobKey sha size)
-  treeKey <- getHackageTarballKey pir
-  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+  treeKey' <- getHackageTarballKey pir
+  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 completePackageLocation pl@(RPLIArchive archive rpm) = do
   -- getArchive checks archive and package metadata
   (sha, size, package) <- getArchive pl archive rpm
@@ -1345,7 +1345,7 @@ getRawPackageLocationTreeKey
   -> RIO env TreeKey
 getRawPackageLocationTreeKey pl =
   case getRawTreeKey pl of
-    Just treeKey -> pure treeKey
+    Just treeKey' -> pure treeKey'
     Nothing ->
       case pl of
         RPLIHackage pir _ -> getHackageTarballKey pir
