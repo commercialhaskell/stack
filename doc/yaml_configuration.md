@@ -425,7 +425,7 @@ that exact revisions can be found, ensuring more reproducible builds.
 
 ### system-ghc
 
-Enables or disables using the GHC available on the PATH.
+Enables or disables using the GHC available on the PATH. (Make sure PATH is explicit, i.e., don't use ~.)
 Useful to enable if you want to save the time, bandwidth or storage space needed to setup an isolated GHC.
 Default is `false` unless the [Docker](docker_integration.md) or [Nix](nix_integration.md) integration is enabled.
 In a Nix-enabled configuration, stack is incompatible with `system-ghc: false`.
