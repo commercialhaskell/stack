@@ -9,6 +9,7 @@ module System.Terminal
 
 import Distribution.Types.Version (mkVersion)
 import Stack.Prelude
+import System.IO (putStrLn)
 import System.Win32 (isMinTTYHandle, withHandleToHANDLE)
 import System.Win32.Console
     ( CONSOLE_SCREEN_BUFFER_INFO(..)
@@ -23,10 +24,11 @@ import System.Win32.Console
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
 getTerminalWidth = do
-    csbi <- getCurrentConsoleScreenBufferInfo
-    return $ Just . rectWidth . srWindow $ csbi
+    getWidth `catchIO` \_ -> return Nothing
   where
-    rectWidth :: SMALL_RECT -> Int
+    getWidth = do
+        csbi <- getCurrentConsoleScreenBufferInfo
+        return $ Just . rectWidth . srWindow $ csbi
     rectWidth SMALL_RECT {left = l, right = r} = fromIntegral $ r - l + 1
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
