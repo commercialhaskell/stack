@@ -3,17 +3,24 @@
 module System.Terminal
 ( getTerminalWidth
 , fixCodePage
-,hIsTerminalDeviceOrMinTTY
+, hIsTerminalDeviceOrMinTTY
 ) where
 
 import Distribution.Types.Version (mkVersion)
 import Stack.Prelude
 import System.Win32 (isMinTTYHandle, withHandleToHANDLE)
-import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP, 
+        getCurrentConsoleScreenBufferInfo, CONSOLE_SCREEN_BUFFER_INFO(..), SMALL_RECT(..))
 
 -- | Get the width, in columns, of the terminal if we can.
 getTerminalWidth :: IO (Maybe Int)
-getTerminalWidth = return Nothing
+getTerminalWidth = do
+    csbi <- getCurrentConsoleScreenBufferInfo 
+    return $ Just . rectWidth . srWindow $ csbi
+    where
+        rectWidth :: SMALL_RECT -> Int
+        rectWidth SMALL_RECT{left=l, right=r} = fromIntegral $ r - l + 1
+
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738

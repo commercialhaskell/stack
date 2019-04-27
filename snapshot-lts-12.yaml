@@ -10,6 +10,12 @@ packages:
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
+-  Win32-2.6.2.0@sha256:515518df0728294c99822c65b04be10a242933f40240b125c23469f45c8b11da,4227
+-  directory-1.3.2.2@sha256:435b95a1951a0268563e4e2411152fe8b172f886a925257da8ecfd2e167db7e1,2934
+-  hpc-0.6.0.3@sha256:83a7959a0ae2c828d342bd5b827d7d523368de4122868dfea8a0d1497888937b,1210
+-  process-1.6.4.0@sha256:0accc18e7a80d34fc70a47fb3b35ac4c37fde9832b52cc57d36de1f902bc32ea,2577
+-  time-1.5.0.1@sha256:49a05dd0624dadeb114cbf0d6696864657885e78521ff935361ca20ef65c615f,4068
+-  lens-4.17@sha256:534febcd710980b3c30efe12813e865b09fc6086a4ed6b7a6a8885f27caee3a6,14811
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

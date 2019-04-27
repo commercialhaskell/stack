@@ -55,7 +55,7 @@ dependencies:
 - cryptonite
 - cryptonite-conduit
 - deepseq
-- directory
+- directory >= 1.3.2.2
 - echo
 - exceptions
 - extra
@@ -67,12 +67,13 @@ dependencies:
 - hackage-security
 - hashable
 - hpack
-- hpc
+- hpc >= 0.6.0.3
 - http-client
 - http-client-tls
 - http-conduit
 - http-download
 - http-types
+- lens >= 4.17
 - memory
 - microlens
 - mintty
@@ -93,7 +94,7 @@ dependencies:
 - persistent-template
 - pretty
 - primitive
-- process
+- process >= 1.6.4.0
 - project-template
 - regex-applicative-text
 - resource-pool
@@ -111,7 +112,7 @@ dependencies:
 - text
 - text-metrics
 - th-reify-many
-- time
+- time >= 1.5.0.1
 - tls
 - transformers
 - typed-process
@@ -128,7 +129,7 @@ when:
   then:
     cpp-options: -DWINDOWS
     dependencies:
-    - Win32
+    - Win32 >= 2.6.2.0
   else:
     build-tools:
     - hsc2hs
