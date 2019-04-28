@@ -611,7 +611,8 @@ try_install_pkgs() {
 apt_get_install_pkgs() {
   # Grepping the output of dpkg-query and checking the overall status of the pipeline
   # causes differing behaviors across various shell versions. So it is more portable to
-  # just check the staus of dpkg-query
+  # just check the staus of dpkg-query.
+  # See https://github.com/commercialhaskell/stack/pull/4770#pullrequestreview-229732166
   if dpkg-query -W "$@" > /dev/null 2>&1; then
     info "Already installed!"
   elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq} "$@"; then
