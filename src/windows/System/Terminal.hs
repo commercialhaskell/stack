@@ -9,7 +9,6 @@ module System.Terminal
 
 import Distribution.Types.Version (mkVersion)
 import Stack.Prelude
-import System.IO (putStrLn)
 import System.Win32 (isMinTTYHandle, withHandleToHANDLE)
 import System.Win32.Console
     ( CONSOLE_SCREEN_BUFFER_INFO(..)
