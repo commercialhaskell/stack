@@ -2233,7 +2233,7 @@ data SnapshotLayer = SnapshotLayer
 instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
-    , ["compiler" .= slCompiler snap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (slCompiler snap)
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
