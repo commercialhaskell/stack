@@ -1,0 +1,16 @@
+name: foo
+version: 0
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+
+tests:
+  doctest:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+    - doctest
+    - acme-dont
