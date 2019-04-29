@@ -86,6 +86,9 @@ dependencies:
 - directory
 - filepath
 
+ghc-options:
+  - -Wall
+
 library:
   source-dirs: src/
   when:
@@ -104,6 +107,8 @@ library:
   # For testing
   - Pantry.Internal
   - Pantry.Internal.StaticBytes
+  # For stackage-server
+  - Pantry.Internal.Stackage
 
   # FIXME must be removed from pantry!
   - Data.Aeson.Extended

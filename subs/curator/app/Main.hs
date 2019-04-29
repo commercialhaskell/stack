@@ -11,13 +11,11 @@ import Network.HTTP.Download (download)
 import Options.Applicative.Simple hiding (action)
 import qualified Pantry
 import Path (toFilePath)
-import Path.IO (doesFileExist, resolveFile', resolveDir')
+import Path.IO (doesFileExist, removeFile, resolveFile', resolveDir')
 import Paths_curator (version)
 import qualified RIO.ByteString.Lazy as BL
 import RIO.List (stripPrefix)
 import qualified RIO.Map as Map
-import RIO.PrettyPrint
-import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
 import qualified RIO.Text as T
 import RIO.Time
@@ -106,18 +104,22 @@ update = do
 
 constraints :: Target -> RIO PantryApp ()
 constraints target =
-  withFixedColorTerm $ case target of
+  case target of
     TargetLts x y | y > 0 -> do
       let prev = y - 1
-          url = concat [ "https://raw.githubusercontent.com/commercialhaskell/stackage-constraints/master/lts-"
+          url = concat [ "https://raw.githubusercontent.com/" ++ constraintsRepo ++ "/master/lts/"
                         , show x
-                        , "."
+                        , "/"
                         , show prev
                         , ".yaml"
                         ]
-      logInfo $ "Reusing constraints.yaml from lts-" <> display x <> "." <> display prev
+      logInfo $ "Will reuse constraints.yaml from lts-" <> display x <> "." <> display prev
       req <- parseUrlThrow url
       constraintsPath <- resolveFile' constraintsFilename
+      exists <- doesFileExist constraintsPath
+      when exists $ do
+        logWarn "Local constraints file will be deleted before downloading reused constraints"
+        removeFile constraintsPath
       downloaded <- download req constraintsPath
       unless downloaded $
         error $ "Could not download constraints.yaml from " <> url
@@ -151,50 +153,19 @@ snapshot = do
   complete <- completeSnapshotLayer incomplete
   liftIO $ encodeFile snapshotFilename complete
 
-loadSnapshotYaml :: RIO PantryApp Pantry.RawSnapshot
+loadSnapshotYaml :: RIO PantryApp Pantry.Snapshot
 loadSnapshotYaml = do
   abs' <- resolveFile' snapshotFilename
-  loadSnapshot $ SLFilePath $
-    ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
+  let sloc = SLFilePath $
+        ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
+  fmap fst $ loadAndCompleteSnapshot sloc Map.empty
 
 checkSnapshot :: RIO PantryApp ()
 checkSnapshot = do
   logInfo "Checking dependencies in snapshot.yaml"
   decodeFileThrow constraintsFilename >>= \constraints' -> do
     snapshot' <- loadSnapshotYaml
-    withFixedColorTerm $ checkDependencyGraph constraints' snapshot'
-
-data FixedColorTermApp = FixedColorTermApp
-    { fctApp :: PantryApp
-    , fctWidth :: Int
-    }
-
-pantryAppL :: Lens' FixedColorTermApp PantryApp
-pantryAppL = lens fctApp (\s a -> s{ fctApp = a})
-
-instance HasLogFunc FixedColorTermApp where
-  logFuncL = pantryAppL.logFuncL
-
-instance HasStylesUpdate FixedColorTermApp where
-  stylesUpdateL = lens (const $ StylesUpdate []) (\s _ -> s)
-
-instance HasTerm FixedColorTermApp where
-  useColorL = lens (const True) (\s _ -> s)
-  termWidthL = lens fctWidth (\s w -> s{ fctWidth = w })
-
-instance HasPantryConfig FixedColorTermApp where
-  pantryConfigL = pantryAppL.pantryConfigL
-
-instance HasProcessContext FixedColorTermApp where
-  processContextL = pantryAppL.processContextL
-
-withFixedColorTerm :: RIO FixedColorTermApp a -> RIO PantryApp a
-withFixedColorTerm action = do
-  app <- ask
-  runRIO (FixedColorTermApp app defaultTerminalWidth) action
-
-defaultTerminalWidth :: Int
-defaultTerminalWidth = 100
+    checkDependencyGraph constraints' snapshot'
 
 unpackDir :: FilePath
 unpackDir = "unpack-dir"
@@ -202,9 +173,7 @@ unpackDir = "unpack-dir"
 unpackFiles :: RIO PantryApp ()
 unpackFiles = do
   logInfo "Unpacking files"
-  abs' <- resolveFile' snapshotFilename
-  snapshot' <- loadSnapshot $ SLFilePath $
-               ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
+  snapshot' <- loadSnapshotYaml
   constraints' <- decodeFileThrow constraintsFilename
   dest <- resolveDir' unpackDir
   unpackSnapshot constraints' snapshot' dest
@@ -222,7 +191,7 @@ hackageDistro target = do
   logInfo "Uploading Hackage distro for snapshot.yaml"
   snapshot' <- loadSnapshotYaml
   let packageVersions =
-        Map.mapMaybe (snapshotVersion . rspLocation) (rsPackages snapshot')
+        Map.mapMaybe (snapshotVersion . spLocation) (snapshotPackages snapshot')
   uploadHackageDistro target packageVersions
 
 uploadDocs' :: Target -> RIO PantryApp ()

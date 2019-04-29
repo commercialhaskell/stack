@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
 -- | Content addressable Haskell package management, providing for
 -- secure, reproducible acquisition of Haskell package contents and
 -- metadata.
@@ -182,7 +181,7 @@ import qualified RIO.FilePath as FilePath
 import Pantry.Archive
 import Pantry.Repo
 import qualified Pantry.SHA256 as SHA256
-import Pantry.Storage
+import Pantry.Storage hiding (TreeEntry, PackageName, Version)
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
@@ -195,6 +194,7 @@ import qualified Hpack
 import qualified Hpack.Config as Hpack
 import Network.HTTP.Download
 import RIO.PrettyPrint
+import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
@@ -302,8 +302,8 @@ getLatestHackageLocation req name preferred = do
 
   forM mVerCfKey $ \(version, cfKey@(BlobKey sha size)) -> do
     let pir = PackageIdentifierRevision name version (CFIHash sha (Just size))
-    treeKey <- getHackageTarballKey pir
-    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+    treeKey' <- getHackageTarballKey pir
+    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 
 -- | Returns the latest revision of the given package version available from
 -- Hackage.
@@ -321,8 +321,8 @@ getLatestHackageRevision req name version = do
     Nothing -> pure Nothing
     Just (revision, cfKey@(BlobKey sha size)) -> do
       let cfi = CFIHash sha (Just size)
-      treeKey <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
-      return $ Just (revision, cfKey, treeKey)
+      treeKey' <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
+      return $ Just (revision, cfKey, treeKey')
 
 fetchTreeKeys
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
@@ -705,7 +705,8 @@ loadPackage
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env Package
-loadPackage (PLIHackage ident cfHash tree) = getHackageTarball (pirForHash ident cfHash) (Just tree)
+loadPackage (PLIHackage ident cfHash tree) =
+  htrPackage <$> getHackageTarball (pirForHash ident cfHash) (Just tree)
 loadPackage pli@(PLIArchive archive pm) = getArchivePackage (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
 loadPackage (PLIRepo repo pm) = getRepo repo (toRawPM pm)
 
@@ -716,7 +717,7 @@ loadPackageRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RIO env Package
-loadPackageRaw (RPLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackageRaw (RPLIHackage pir mtree) = htrPackage <$> getHackageTarball pir mtree
 loadPackageRaw rpli@(RPLIArchive archive pm) = getArchivePackage rpli archive pm
 loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 
@@ -742,8 +743,8 @@ completePackageLocation (RPLIHackage pir0@(PackageIdentifierRevision name versio
             pir = PackageIdentifierRevision name version cfi
         logDebug $ "Added in cabal file hash: " <> display pir
         pure (pir, BlobKey sha size)
-  treeKey <- getHackageTarballKey pir
-  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+  treeKey' <- getHackageTarballKey pir
+  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 completePackageLocation pl@(RPLIArchive archive rpm) = do
   -- getArchive checks archive and package metadata
   (sha, size, package) <- getArchive pl archive rpm
@@ -1366,7 +1367,7 @@ getRawPackageLocationTreeKey
   -> RIO env TreeKey
 getRawPackageLocationTreeKey pl =
   case getRawTreeKey pl of
-    Just treeKey -> pure treeKey
+    Just treeKey' -> pure treeKey'
     Nothing ->
       case pl of
         RPLIHackage pir _ -> getHackageTarballKey pir
@@ -1402,6 +1403,9 @@ getTreeKey (PLIRepo _ pm) = pmTreeKey pm
 data PantryApp = PantryApp
   { paSimpleApp :: !SimpleApp
   , paPantryConfig :: !PantryConfig
+  , paUseColor :: !Bool
+  , paTermWidth :: !Int
+  , paStylesUpdate :: !StylesUpdate
   }
 
 simpleAppL :: Lens' PantryApp SimpleApp
@@ -1416,6 +1420,11 @@ instance HasPantryConfig PantryApp where
   pantryConfigL = lens paPantryConfig (\x y -> x { paPantryConfig = y })
 instance HasProcessContext PantryApp where
   processContextL = simpleAppL.processContextL
+instance HasStylesUpdate PantryApp where
+  stylesUpdateL = lens paStylesUpdate (\x y -> x { paStylesUpdate = y })
+instance HasTerm PantryApp where
+  useColorL = lens paUseColor (\x y -> x { paUseColor = y })
+  termWidthL = lens paTermWidth  (\x y -> x { paTermWidth = y })
 
 -- | Run some code against pantry using basic sane settings.
 --
@@ -1437,6 +1446,9 @@ runPantryApp f = runSimpleApp $ do
         PantryApp
           { paSimpleApp = sa
           , paPantryConfig = pc
+          , paTermWidth = 100
+          , paUseColor = True
+          , paStylesUpdate = mempty
           }
         f
 
@@ -1458,6 +1470,9 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
         PantryApp
           { paSimpleApp = sa
           , paPantryConfig = pc
+          , paTermWidth = 100
+          , paUseColor = True
+          , paStylesUpdate = mempty
           }
         f
 
@@ -1465,17 +1480,17 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
 --
 -- @since 0.1.0.0
 loadGlobalHints
-  :: HasTerm env
-  => Path Abs File -- ^ local cached file location
-  -> WantedCompiler
+  :: (HasTerm env, HasPantryConfig env)
+  => WantedCompiler
   -> RIO env (Maybe (Map PackageName Version))
-loadGlobalHints dest wc =
+loadGlobalHints wc =
     inner False
   where
     inner alreadyDownloaded = do
+      dest <- getGlobalHintsFile
       req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
       downloaded <- download req dest
-      eres <- tryAny inner2
+      eres <- tryAny (inner2 dest)
       mres <-
         case eres of
           Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
@@ -1494,7 +1509,8 @@ loadGlobalHints dest wc =
               pure Nothing
         _ -> pure mres
 
-    inner2 = liftIO
+    inner2 dest
+           = liftIO
            $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
          <$> Yaml.decodeFileThrow (toFilePath dest)
 

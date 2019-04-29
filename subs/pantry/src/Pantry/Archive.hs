@@ -13,7 +13,7 @@ module Pantry.Archive
 
 import RIO
 import qualified Pantry.SHA256 as SHA256
-import Pantry.Storage
+import Pantry.Storage hiding (Tree, TreeEntry)
 import Pantry.Tree
 import Pantry.Types
 import RIO.Process
@@ -447,7 +447,7 @@ parseArchive rpli archive fp = do
             BFCabal _ _ -> when (buildFilePath /= cabalFileName name) $ throwIO $ WrongCabalFileName rpli buildFilePath name
             _ -> return ()
           -- It's good! Store the tree, let's bounce
-          (tid, treeKey) <- withStorage $ storeTree rpli ident tree buildFile
+          (tid, treeKey') <- withStorage $ storeTree rpli ident tree buildFile
           packageCabal <- case buildFile of
                             BFCabal _ _ -> pure $ PCCabalFile buildFileEntry
                             BFHpack _ -> do
@@ -458,7 +458,7 @@ parseArchive rpli archive fp = do
                               let cabalTreeEntry = TreeEntry cabalKey (teType buildFileEntry)
                               pure $ PCHpack $ PHpack { phOriginal = buildFileEntry, phGenerated = cabalTreeEntry, phVersion = hpackSoftwareVersion}
           pure Package
-            { packageTreeKey = treeKey
+            { packageTreeKey = treeKey'
             , packageTree = tree
             , packageCabalEntry = packageCabal
             , packageIdent = ident

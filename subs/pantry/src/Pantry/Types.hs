@@ -10,7 +10,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 module Pantry.Types
   ( PantryConfig (..)
@@ -106,6 +105,7 @@ module Pantry.Types
   , toRawPM
   , cabalFileName
   , SnapshotCacheHash (..)
+  , getGlobalHintsFile
   , bsToBlobKey
   ) where
 
@@ -124,6 +124,7 @@ import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
 import Data.Aeson.Extended
+import Data.Aeson.Encoding.Internal (unsafeToEncoding)
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
 import Database.Persist.Sql
@@ -132,7 +133,7 @@ import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
-import Distribution.Types.PackageName (PackageName, unPackageName)
+import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
 import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
@@ -207,8 +208,8 @@ newtype Revision = Revision Word
 -- whether a pool is used, and the default implementation in
 -- "Pantry.Storage" does not use a pool.
 data Storage = Storage
-  { withStorage_ :: (forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a)
-  , withWriteLock_ :: (forall env a. HasLogFunc env => RIO env a -> RIO env a)
+  { withStorage_ :: forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a
+  , withWriteLock_ :: forall env a. HasLogFunc env => RIO env a -> RIO env a
   }
 
 -- | Configuration value used by the entire pantry package. Create one
@@ -485,9 +486,9 @@ data Repo = Repo
     --
     -- @since 0.1.0.0
   , repoSubdir :: !Text
-  -- ^ Subdirectory within the archive to get the package from.
-  --
-  -- @since 0.1.0.0
+    -- ^ Subdirectory within the archive to get the package from.
+    --
+    -- @since 0.1.0.0
   }
     deriving (Generic, Eq, Ord, Typeable)
 instance NFData Repo
@@ -552,6 +553,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
     pure HackageSecurityConfig {..}
 
+
 -- | An environment which contains a 'PantryConfig'.
 --
 -- @since 0.1.0.0
@@ -560,6 +562,7 @@ class HasPantryConfig env where
   --
   -- @since 0.1.0.0
   pantryConfigL :: Lens' env PantryConfig
+
 
 -- | File size in bytes
 --
@@ -599,7 +602,9 @@ instance FromJSON BlobKey where
     <*> o .: "size"
 
 newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
-  deriving (Show)
+  deriving (Eq, Ord, Show, Read, NFData)
+instance Display PackageNameP where
+  display = fromString . packageNameString . unPackageNameP
 instance PersistField PackageNameP where
   toPersistValue (PackageNameP pn) = PersistText $ T.pack $ packageNameString pn
   fromPersistValue v = do
@@ -609,9 +614,20 @@ instance PersistField PackageNameP where
       Just pn -> Right $ PackageNameP pn
 instance PersistFieldSql PackageNameP where
   sqlType _ = SqlString
+instance ToJSON PackageNameP where
+  toJSON (PackageNameP pn) = String $ T.pack $ packageNameString pn
+instance FromJSON PackageNameP where
+  parseJSON = withText "PackageNameP" $ pure . PackageNameP . mkPackageName . T.unpack
+instance ToJSONKey PackageNameP where
+  toJSONKey =
+    ToJSONKeyText
+      (T.pack . packageNameString . unPackageNameP)
+      (unsafeToEncoding . getUtf8Builder . display)
+instance FromJSONKey PackageNameP where
+  fromJSONKey = FromJSONKeyText $ PackageNameP . mkPackageName . T.unpack
 
-newtype VersionP = VersionP Version
-  deriving (Show)
+newtype VersionP = VersionP { unVersionP :: Version }
+  deriving (Eq, Ord, Show, Read, NFData)
 instance PersistField VersionP where
   toPersistValue (VersionP v) = PersistText $ T.pack $ versionString v
   fromPersistValue v = do
@@ -621,9 +637,20 @@ instance PersistField VersionP where
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
   sqlType _ = SqlString
+instance Display VersionP where
+  display (VersionP v) = fromString $ versionString v
+instance ToJSON VersionP where
+  toJSON (VersionP v) = String $ T.pack $ versionString v
+instance FromJSON VersionP where
+  parseJSON =
+    withText "VersionP" $
+    either (fail . displayException) (pure . VersionP) . parseVersionThrowing . T.unpack
 
-newtype ModuleNameP = ModuleNameP ModuleName
-  deriving (Show)
+newtype ModuleNameP = ModuleNameP
+  { unModuleNameP :: ModuleName
+  } deriving (Eq, Ord, Show, NFData)
+instance Display ModuleNameP where
+  display = fromString . moduleNameString . unModuleNameP
 instance PersistField ModuleNameP where
   toPersistValue (ModuleNameP mn) = PersistText $ T.pack $ moduleNameString mn
   fromPersistValue v = do
@@ -1718,6 +1745,7 @@ data HpackExecutable
     -- ^ Executable at the provided path
     deriving (Show, Read, Eq, Ord)
 
+
 -- | Which compiler a snapshot wants to use. The build tool may elect
 -- to do some fuzzy matching of versions (e.g., allowing different
 -- patch versions).
@@ -1731,6 +1759,7 @@ data WantedCompiler
       !Version
     -- ^ GHCJS version followed by GHC version
  deriving (Show, Eq, Ord, Generic)
+
 instance NFData WantedCompiler
 instance Display WantedCompiler where
   display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
@@ -2209,6 +2238,13 @@ toRawSnapshotLayer sl = RawSnapshotLayer
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
+
+-- | Get the path to the global hints cache file
+getGlobalHintsFile :: HasPantryConfig env => RIO env (Path Abs File)
+getGlobalHintsFile = do
+  root <- view $ pantryConfigL.to pcRootDir
+  globalHintsRelFile <- parseRelFile "global-hints-cache.yaml"
+  pure $ root </> globalHintsRelFile
 
 -- | Creates BlobKey for an input ByteString
 --

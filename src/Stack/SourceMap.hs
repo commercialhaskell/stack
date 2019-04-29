@@ -141,8 +141,7 @@ globalsFromHints ::
     => WantedCompiler
     -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
-    ghfp <- globalHintsFile
-    mglobalHints <- loadGlobalHints ghfp compiler
+    mglobalHints <- loadGlobalHints compiler
     case mglobalHints of
         Just hints -> pure hints
         Nothing -> do

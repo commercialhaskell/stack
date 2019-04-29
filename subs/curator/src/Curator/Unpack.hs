@@ -19,25 +19,29 @@ import qualified RIO.Set as Set
 unpackSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Constraints
-  -> RawSnapshot
+  -> Snapshot
   -> Path Abs Dir
   -> RIO env ()
 unpackSnapshot cons snap root = do
   unpacked <- parseRelDir "unpacked"
   (suffixes, flags, (skipTest, expectTestFailure), (skipBench, expectBenchmarkFailure),
-   (skipHaddock, expectHaddockFailure)) <- fmap fold $ for (rsPackages snap) $ \sp -> do
-    let pl = rspLocation sp
-    TreeKey (BlobKey sha _size) <- getRawPackageLocationTreeKey pl
-    PackageIdentifier name version <- getRawPackageLocationIdent pl
+   (skipHaddock, expectHaddockFailure)) <- fmap fold $ for (snapshotPackages snap) $ \sp -> do
+    let pl = spLocation sp
+    TreeKey (BlobKey sha _size) <- getPackageLocationTreeKey pl
+    let (PackageIdentifier name version) =
+          case pl of
+            PLIHackage ident _ _ -> ident
+            PLIArchive _ pm -> pmIdent pm
+            PLIRepo _ pm -> pmIdent pm
     let (flags, skipBuild, test, bench, haddock) =
           case Map.lookup name $ consPackages cons of
             Nothing ->
               (mempty, False, CAExpectSuccess, CAExpectSuccess, CAExpectSuccess)
             Just pc ->
               (pcFlags pc, pcSkipBuild pc, pcTests pc, pcBenchmarks pc, pcHaddock pc)
-    unless (flags == rspFlags sp) $ error $ unlines
+    unless (flags == spFlags sp) $ error $ unlines
       [ "mismatched flags for " ++ show pl
-      , " snapshot: " ++ show (rspFlags sp)
+      , " snapshot: " ++ show (spFlags sp)
       , " constraints: " ++ show flags
       ]
     if skipBuild
@@ -58,7 +62,7 @@ unpackSnapshot cons snap root = do
           ignoringAbsence $ removeDirRecur destTmp
           ensureDir destTmp
           logInfo $ "Unpacking " <> display pl
-          unpackPackageLocationRaw destTmp pl
+          unpackPackageLocation destTmp pl
           renameDir destTmp dest
         pure
           ( Set.singleton suffix
