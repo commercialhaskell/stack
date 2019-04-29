@@ -2004,6 +2004,27 @@ instance NFData SnapshotLocation
 instance ToJSON SnapshotLocation where
   toJSON sl = toJSON (toRawSL sl)
 
+instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
+    parseJSON v = file v <|> url v <|> compiler v
+      where
+        file = withObjectWarnings "SLFilepath" $ \o -> do
+           ufp <- o ..: "filepath"
+           pure $ Unresolved $ \mdir ->
+             case mdir of
+               Nothing -> throwIO $ InvalidFilePathSnapshot ufp
+               Just dir -> do
+                 absolute <- resolveFile dir (T.unpack ufp)
+                 let fp = ResolvedPath (RelFilePath ufp) absolute
+                 pure $ SLFilePath fp
+        url = withObjectWarnings "SLUrl" $ \o -> do
+          url' <- o ..: "url"
+          sha <- o ..: "sha256"
+          size <- o ..: "size"
+          pure $ Unresolved $ \_ -> pure $ SLUrl url' (BlobKey sha size)
+        compiler = withObjectWarnings "SLCompiler" $ \o -> do
+          c <- o ..: "compiler"
+          pure $ Unresolved $ \_ -> pure $ SLCompiler c
+
 -- | Convert snapshot location to its "raw" equivalent.
 --
 -- @since 0.1.0.0

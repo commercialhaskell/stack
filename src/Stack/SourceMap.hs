@@ -262,7 +262,7 @@ loadProjectSnapshotCandidate ::
     -> Bool
     -> RIO env (SnapshotCandidate env)
 loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
-    (snapshot, _) <- loadAndCompleteSnapshotRaw loc Map.empty
+    (snapshot, _, _) <- loadAndCompleteSnapshotRaw loc Map.empty Map.empty
     deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
     let wc = snapshotCompiler snapshot
     globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc

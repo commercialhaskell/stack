@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Stack.Lock
     ( lockCachedWanted
@@ -23,21 +24,24 @@ import Stack.SourceMap
 import Stack.Types.Config
 import Stack.Types.SourceMap
 
-data LockedLocation =
-    LockedLocation RawPackageLocationImmutable
-                   PackageLocationImmutable
-    deriving (Show, Eq)
+data LockedLocation a b = LockedLocation
+    { llOriginal :: a
+    , llCompleted :: b
+    } deriving (Eq, Show)
 
-instance ToJSON LockedLocation where
-    toJSON (LockedLocation o c) =
-        object [ "original" .= o, "completed" .= c ]
+instance (ToJSON a, ToJSON b) => ToJSON (LockedLocation a b) where
+    toJSON ll =
+        object [ "original" .= llOriginal ll, "completed" .= llCompleted ll ]
 
-instance FromJSON (WithJSONWarnings (Unresolved LockedLocation)) where
+instance ( FromJSON (WithJSONWarnings (Unresolved a))
+         , FromJSON (WithJSONWarnings (Unresolved b))
+         ) =>
+         FromJSON (WithJSONWarnings (Unresolved (LockedLocation a b))) where
     parseJSON =
         withObjectWarnings "LockedLocation" $ \o -> do
             original <- jsonSubWarnings $ o ..: "original"
             completed <- jsonSubWarnings $ o ..: "completed"
-            pure $ (\single c -> LockedLocation (unSingleRPLI single) c) <$> original <*> completed
+            pure $ LockedLocation <$> original <*> completed
 
 -- Special wrapper extracting only 1 RawPackageLocationImmutable
 -- serialization should not produce locations with multiple subdirs
@@ -51,21 +55,35 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
        let withWarnings x = WithJSONWarnings x ws
        pure $ withWarnings $ SingleRPLI . NE.head <$> unresolvedRPLIs
 
-newtype Locked = Locked [LockedLocation]
+data Locked = Locked
+    { lckSnapshotLocaitons :: [LockedLocation RawSnapshotLocation SnapshotLocation]
+    , lckPkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
+    } deriving (Eq, Show)
 
-instance FromJSON (Unresolved Locked) where
-    parseJSON v = do
-      locs <- unWarningParser $ jsonSubWarningsT (lift $  parseJSON v)
-      pure $ Locked <$> sequenceA locs
+instance ToJSON Locked where
+    toJSON Locked {..} =
+        object
+            [ "snapshots" .= lckSnapshotLocaitons
+            , "packages" .= lckPkgImmutableLocations
+            ]
+
+instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
+    parseJSON = withObjectWarnings "Locked" $ \o -> do
+      snapshots <- jsonSubWarningsT $ o ..: "snapshots"
+      packages <- jsonSubWarningsT $ o ..: "packages"
+      let unwrap ll = ll { llOriginal = unSingleRPLI (llOriginal ll) }
+      pure $ Locked <$> sequenceA snapshots <*> (map unwrap <$> sequenceA packages)
 
 loadYamlThrow
     :: HasLogFunc env
-    => (Value -> Yaml.Parser a) -> Path Abs File -> RIO env a
+    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
 loadYamlThrow parser path = do
     val <- liftIO $ Yaml.decodeFileThrow (toFilePath path)
     case Yaml.parseEither parser val of
         Left err -> throwIO $ Yaml.AesonException err
-        Right res -> return res
+        Right (WithJSONWarnings res warnings) -> do
+            logJSONWarnings (toFilePath path) warnings
+            return res
 
 lockCachedWanted ::
        (HasPantryConfig env, HasProcessContext env, HasLogFunc env)
@@ -79,22 +97,29 @@ lockCachedWanted ::
 lockCachedWanted stackFile resolver fillWanted = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
     lockExists <- doesFileExist lockFile
-    pkgLocCache <- if not lockExists
-                   then do
-                       logDebug "Lock file doesn't exist"
-                       pure Map.empty
-                   else do
-                       logDebug "Using package location completions from a lock file"
-                       unresolvedLocked <- loadYamlThrow parseJSON lockFile
-                       Locked locked0 <- resolvePaths (Just $ parent stackFile) unresolvedLocked
-                       pure $ Map.fromList [(orig, compl) | LockedLocation orig compl <- locked0]
-     
-    (snap, completed) <-
-        loadAndCompleteSnapshotRaw resolver pkgLocCache
+    locked <-
+        if not lockExists
+        then do
+            logDebug "Lock file doesn't exist"
+            pure $ Locked [] []
+        else do
+            logDebug "Using package location completions from a lock file"
+            unresolvedLocked <- loadYamlThrow parseJSON lockFile
+            resolvePaths (Just $ parent stackFile) unresolvedLocked
+    let toMap :: Ord a => [LockedLocation a b] -> Map a b
+        toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
+        slocCache = toMap $ lckSnapshotLocaitons locked
+        pkgLocCache = toMap $ lckPkgImmutableLocations locked
+    (snap, slocCompleted, pliCompleted) <-
+        loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
     let compiler = snapshotCompiler snap
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
-    liftIO $ Yaml.encodeFile (toFilePath lockFile) $
-        map (uncurry LockedLocation) $
-        prjCompleted <> completed
+    let lockLocations = map (uncurry LockedLocation)
+        newLocked = Locked { lckSnapshotLocaitons = lockLocations slocCompleted
+                           , lckPkgImmutableLocations =
+                             lockLocations $ pliCompleted <> prjCompleted
+                           }
+    when (newLocked /= locked) $
+      liftIO $ Yaml.encodeFile (toFilePath lockFile) newLocked
     pure wanted

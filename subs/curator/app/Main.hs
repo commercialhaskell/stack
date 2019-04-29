@@ -158,7 +158,8 @@ loadSnapshotYaml = do
   abs' <- resolveFile' snapshotFilename
   let sloc = SLFilePath $
         ResolvedPath (RelFilePath (fromString snapshotFilename)) abs'
-  fmap fst $ loadAndCompleteSnapshot sloc Map.empty
+  (snap, _, _) <- loadAndCompleteSnapshot sloc Map.empty Map.empty
+  pure snap
 
 checkSnapshot :: RIO PantryApp ()
 checkSnapshot = do
@@ -220,4 +221,4 @@ loadPantrySnapshotLayerFile fp = do
   eres <- loadSnapshotLayer $ SLFilePath (ResolvedPath (RelFilePath (fromString fp)) abs')
   case eres of
     Left x -> error $ "should not happen: " ++ show (fp, x)
-    Right (x, _) -> pure x
+    Right x -> pure x

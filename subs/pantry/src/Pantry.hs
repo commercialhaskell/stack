@@ -171,6 +171,7 @@ module Pantry
 
 import RIO
 import Conduit
+import Control.Arrow (right)
 import Control.Monad.State.Strict (State, execState, get, modify')
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -908,7 +909,7 @@ loadSnapshotRaw loc = do
         , rsPackages = mempty
         , rsDrop = mempty
         }
-    Right rsl -> do
+    Right (rsl, _) -> do
       snap0 <- loadSnapshotRaw $ rslParent rsl
       (packages, unused) <-
         addPackagesToSnapshot
@@ -944,7 +945,7 @@ loadSnapshot loc = do
         , rsPackages = mempty
         , rsDrop = mempty
         }
-    Right (rsl, _sha) -> do
+    Right rsl -> do
       snap0 <- loadSnapshotRaw $ rslParent rsl
       (packages, unused) <-
         addPackagesToSnapshot
@@ -965,6 +966,7 @@ loadSnapshot loc = do
         }
 
 type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
+type CompletedSL = (RawSnapshotLocation, SnapshotLocation)
 
 -- | Parse a 'Snapshot' (all layers) from a 'SnapshotLocation' noting
 -- any incomplete package locations
@@ -973,10 +975,11 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
-  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshot loc cachedPL =
-  loadAndCompleteSnapshotRaw (toRawSL loc) cachedPL
+  -> Map RawSnapshotLocation SnapshotLocation -- ^ Cached snapshot locations from lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached locations from lock file
+  -> RIO env (Snapshot, [CompletedSL], [CompletedPLI])
+loadAndCompleteSnapshot loc cachedSL cachedPL =
+  loadAndCompleteSnapshotRaw (toRawSL loc) cachedSL cachedPL
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations
@@ -985,10 +988,13 @@ loadAndCompleteSnapshot loc cachedPL =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
-  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
-  -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshotRaw loc cachePL = do
-  eres <- loadRawSnapshotLayer loc
+  -> Map RawSnapshotLocation SnapshotLocation -- ^ Cached snapshot locations from lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached locations from lock file
+  -> RIO env (Snapshot, [CompletedSL], [CompletedPLI])
+loadAndCompleteSnapshotRaw rawLoc cacheSL cachePL = do
+  eres <- case Map.lookup rawLoc cacheSL of
+    Just loc -> right (\rsl -> (rsl, (rawLoc, loc))) <$> loadSnapshotLayer loc
+    Nothing -> loadRawSnapshotLayer rawLoc
   case eres of
     Left wc ->
       let snapshot = Snapshot
@@ -996,12 +1002,12 @@ loadAndCompleteSnapshotRaw loc cachePL = do
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
-      in pure (snapshot, [])
-    Right rsl -> do
-      (snap0, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cachePL
+      in pure (snapshot, [(RSLCompiler wc, SLCompiler wc)], [])
+    Right (rsl, sloc) -> do
+      (snap0, slocs, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cacheSL cachePL
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
-          loc
+          rawLoc
           cachePL
           (rslLocations rsl)
           AddPackagesConfig
@@ -1011,13 +1017,13 @@ loadAndCompleteSnapshotRaw loc cachePL = do
             , apcGhcOptions = rslGhcOptions rsl
             }
           (snapshotPackages snap0)
-      warnUnusedAddPackagesConfig (display loc) unused
+      warnUnusedAddPackagesConfig (display rawLoc) unused
       let snapshot = Snapshot
             { snapshotCompiler = fromMaybe (snapshotCompiler snap0) (rslCompiler rsl)
             , snapshotPackages = packages
             , snapshotDrop = apcDrop unused
             }
-      return (snapshot, completed0 ++ completed)
+      return (snapshot, sloc : slocs,completed0 ++ completed)
 
 data SingleOrNot a
   = Single !a
@@ -1217,19 +1223,19 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
 loadRawSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => RawSnapshotLocation
-  -> RIO env (Either WantedCompiler RawSnapshotLayer)
+  -> RIO env (Either WantedCompiler (RawSnapshotLayer, CompletedSL))
 loadRawSnapshotLayer (RSLCompiler compiler) = pure $ Left compiler
-loadRawSnapshotLayer sl@(RSLUrl url blob) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
+loadRawSnapshotLayer rsl@(RSLUrl url blob) =
+  handleAny (throwIO . InvalidSnapshot rsl) $ do
     bs <- loadFromURL url blob
     value <- Yaml.decodeThrow bs
-    snapshot <- warningsParserHelperRaw sl value Nothing
-    pure $ Right snapshot
-loadRawSnapshotLayer sl@(RSLFilePath fp) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
+    snapshot <- warningsParserHelperRaw rsl value Nothing
+    pure $ Right (snapshot, (rsl, SLUrl url (bsToBlobKey bs)))
+loadRawSnapshotLayer rsl@(RSLFilePath fp) =
+  handleAny (throwIO . InvalidSnapshot rsl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    snapshot <- warningsParserHelperRaw sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right snapshot
+    snapshot <- warningsParserHelperRaw rsl value $ Just $ parent $ resolvedAbsolute fp
+    pure $ Right (snapshot, (rsl, SLFilePath fp))
 
 -- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --
@@ -1241,20 +1247,19 @@ loadRawSnapshotLayer sl@(RSLFilePath fp) =
 loadSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (RawSnapshotLayer, SHA256)) -- FIXME remove SHA? Be smart?
+  -> RIO env (Either WantedCompiler RawSnapshotLayer)
 loadSnapshotLayer (SLCompiler compiler) = pure $ Left compiler
 loadSnapshotLayer sl@(SLUrl url blob) =
   handleAny (throwIO . InvalidSnapshot (toRawSL sl)) $ do
     bs <- loadFromURL url (Just blob)
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelper sl value Nothing
-    pure $ Right (snapshot, SHA256.hashBytes bs)
+    pure $ Right snapshot
 loadSnapshotLayer sl@(SLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot (toRawSL sl)) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
     snapshot <- warningsParserHelper sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, sha)
+    pure $ Right snapshot
 
 loadFromURL
   :: (HasPantryConfig env, HasLogFunc env)
