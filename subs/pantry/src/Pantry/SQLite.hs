@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
 module Pantry.SQLite
   ( Storage (..)
   , initStorage
@@ -14,6 +13,7 @@ import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Pantry.Types (PantryException (MigrationFailure), Storage (..))
 import System.FileLock (withFileLock, withTryFileLock, SharedExclusive (..))
+import Pantry.Internal.Companion
 
 initStorage
   :: HasLogFunc env
@@ -82,7 +82,7 @@ withWriteLock desc dbFile inner = do
     case mres of
       Just res -> pure res
       Nothing -> do
-        let complainer :: Talker IO
+        let complainer :: Companion IO
             complainer delay = run $ do
               -- Wait five seconds before giving the first message to
               -- avoid spamming the user for uninteresting file locks
@@ -92,73 +92,9 @@ withWriteLock desc dbFile inner = do
               -- Now loop printing a message every 1 minute
               forever $ do
                 delay (60 * 1000 * 1000) -- 1 minute
-                  `onDoneTalking` logInfo ("Acquired the " <> desc <> " database write lock")
+                  `onCompanionDone` logInfo ("Acquired the " <> desc <> " database write lock")
                 logWarn ("Still waiting on the " <> desc <> " database write lock...")
-        talkUntil complainer $ \stopComplaining ->
+        withCompanion complainer $ \stopComplaining ->
           withFileLock lockFile Exclusive $ const $ do
             stopComplaining
             run inner
-
--- | A thread which can send some information to the user and delay.
-type Talker m = Delay -> m ()
-
--- | Delay the given number of microseconds. If 'StopTalking' is
--- triggered before the timer completes, a 'DoneTalking' exception
--- will be thrown (which is caught internally by 'talkUntil').
-type Delay = forall mio. MonadIO mio => Int -> mio ()
-
--- | Tell the 'Talker' to stop talking. The next time 'Delay' is
--- called, or if a 'Delay' is currently blocking, the 'Talker' thread
--- will exit with an exception.
-type StopTalking m = m ()
-
--- | When a delay was interrupted because we're done talking, perform
--- this action.
-onDoneTalking
-  :: MonadUnliftIO m
-  => m () -- ^ the delay
-  -> m () -- ^ action to perform
-  -> m ()
-onDoneTalking theDelay theAction =
-  theDelay `withException` \DoneTalking -> theAction
-
--- | Internal exception used by 'talkUntil' to allow short-circuiting
--- of the 'Talker'. Should not be used outside of the 'talkUntil'
--- function.
-data DoneTalking = DoneTalking
-  deriving (Show, Typeable)
-instance Exception DoneTalking
-
--- | Keep running the 'Talker' action until either the inner action
--- completes or calls the 'StopTalking' action. This can be used to
--- give the user status information while running a long running
--- operations.
-talkUntil
-  :: forall m a. MonadUnliftIO m
-  => Talker m
-  -> (StopTalking m -> m a)
-  -> m a
-talkUntil talker inner = do
-  -- Variable to indicate 'Delay'ing should result in a 'DoneTalking'
-  -- exception.
-  shouldStopVar <- newTVarIO False
-  let -- Relatively simple: set shouldStopVar to True
-      stopTalking = atomically $ writeTVar shouldStopVar True
-
-      delay :: Delay
-      delay usec = do
-        -- Register a delay with the runtime system
-        delayDoneVar <- registerDelay usec
-        join $ atomically $
-          -- Delay has triggered, keep going
-          (pure () <$ (readTVar delayDoneVar >>= checkSTM)) <|>
-          -- Time to stop talking, throw a 'DoneTalking' exception immediately
-          (throwIO DoneTalking <$ (readTVar shouldStopVar >>= checkSTM))
-
-  -- Run the 'Talker' and inner action together
-  runConcurrently $
-    -- Ignore a 'DoneTalking' exception from the talker, that's expected behavior
-    Concurrently (talker delay `catch` \DoneTalking -> pure ()) *>
-    -- Run the inner action, giving it the 'StopTalking' action, and
-    -- ensuring it is called regardless of exceptions.
-    Concurrently (inner stopTalking `finally` stopTalking)

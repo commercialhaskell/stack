@@ -24,6 +24,8 @@ packages:
 -  hpc-0.6.0.3@sha256:83a7959a0ae2c828d342bd5b827d7d523368de4122868dfea8a0d1497888937b,1210
 -  time-1.5.0.1@sha256:49a05dd0624dadeb114cbf0d6696864657885e78521ff935361ca20ef65c615f,4068
 -  lens-4.17@sha256:534febcd710980b3c30efe12813e865b09fc6086a4ed6b7a6a8885f27caee3a6,14811
+- github: nh2/filelock
+  commit: 7008cde39887131c7ca91ad1bad19e2c528c5ced
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

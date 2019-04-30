@@ -120,6 +120,7 @@ module Stack.Constants
     ,hadrianCmdPosix
     ,usrLibDirs
     ,testGhcEnvRelFile
+    ,relFileBuildLock
     )
     where
 
@@ -599,3 +600,7 @@ usrLibDirs = [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
 -- | Relative file path for a temporary GHC environment file for tests
 testGhcEnvRelFile :: Path Rel File
 testGhcEnvRelFile = $(mkRelFile "test-ghc-env")
+
+-- | File inside a dist directory to use for locking
+relFileBuildLock :: Path Rel File
+relFileBuildLock = $(mkRelFile "build-lock")

@@ -9,6 +9,8 @@ packages:
 -  directory-1.3.2.2@sha256:435b95a1951a0268563e4e2411152fe8b172f886a925257da8ecfd2e167db7e1,2934
 -  hpc-0.6.0.3@sha256:83a7959a0ae2c828d342bd5b827d7d523368de4122868dfea8a0d1497888937b,1210
 -  time-1.5.0.1@sha256:49a05dd0624dadeb114cbf0d6696864657885e78521ff935361ca20ef65c615f,4068
+- github: nh2/filelock
+  commit: 7008cde39887131c7ca91ad1bad19e2c528c5ced
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

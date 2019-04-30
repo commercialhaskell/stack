@@ -9,9 +9,9 @@ main = do
   stackCheckStdout ["freeze"] $ \stdOut -> do
     let contents = fromList [
                     "resolver:",
-                    "size: 527165",
+                    "size: 527200",
                     "url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/19.yaml",
-                    "sha256: 0116ad1779b20ad2c9d6620f172531f13b12bb69867e78f4277157e28865dfd4",
+                    "sha256: 16758b43c10c731bc142fdc5c005795db8338d7b4a28cd0af6730d739af2b306",
                     "extra-deps:",
                     "pantry-tree:",
                     "hackage: a50-0.5@sha256:b8dfcc13dcbb12e444128bb0e17527a2a7a9bd74ca9450d6f6862c4b394ac054,1491",

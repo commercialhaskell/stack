@@ -66,6 +66,7 @@ Major changes:
 
 * Remove support for building GHCJS itself. Future releases of Stack
   may remove GHCJS support entirely.
+* Support for lock files for pinning exact project dependency versions
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
@@ -118,6 +119,11 @@ Behavior changes:
 * For GHC 8.4 and later, disable the "shadowed dependencies" workaround. This
   means that Stack will no longer have to force reconfigures as often. See
   [#3554](https://github.com/commercialhaskell/stack/issues/3554).
+
+* When building a package, Stack takes a lock on the dist directory in
+  use to avoid multiple runs of Stack from trampling each others'
+  files. See
+  [#2730](https://github.com/commercialhaskell/stack/issues/2730).
 
 * Stack will check occassionally if there is a new version available and prompt
   the user to upgrade. This will not incur any additional network traffic, as
