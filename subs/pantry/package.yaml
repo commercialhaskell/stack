@@ -126,3 +126,4 @@ tests:
     - exceptions
     - hedgehog
     - QuickCheck
+    - raw-strings-qq

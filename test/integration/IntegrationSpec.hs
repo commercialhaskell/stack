@@ -238,8 +238,15 @@ copyTree src dst =
         Just suffix <- return $ stripPrefix src srcfp
         let dstfp = dst </> stripHeadSeparator suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
-        createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
-            copyFile srcfp dstfp -- for Windows
+        -- copying yaml files so lock files won't get created in
+        -- the source directory
+        if takeFileName srcfp /= "package.yaml" &&
+           (takeExtensions srcfp == ".yaml" || takeExtensions srcfp == ".yml")
+          then
+            copyFile srcfp dstfp
+          else
+            createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
+                copyFile srcfp dstfp -- for Windows
 
     stripHeadSeparator :: FilePath -> FilePath
     stripHeadSeparator [] = []

@@ -66,6 +66,7 @@ Major changes:
 
 * Remove support for building GHCJS itself. Future releases of Stack
   may remove GHCJS support entirely.
+* Support for lock files for pinning exact project dependency versions
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)

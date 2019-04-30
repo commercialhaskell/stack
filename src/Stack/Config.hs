@@ -62,6 +62,7 @@ import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
+import           Stack.Lock (lockCachedWanted)
 import           Stack.Storage (initStorage)
 import           Stack.SourceMap
 import           Stack.Types.Build
@@ -76,6 +77,7 @@ import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
+import           RIO.List (unzip)
 import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 
@@ -503,69 +505,10 @@ loadBuildConfig = do
             { projectCompiler = mcompiler <|> projectCompiler project'
             , projectResolver = fromMaybe (projectResolver project') mresolver
             }
-
-    resolver <- completeSnapshotLocation $ projectResolver project
-    (snapshot, _completed) <- loadAndCompleteSnapshot resolver
-
     extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
-    let bopts = configBuild config
-
-    packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
-      abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
-      let resolved = ResolvedPath fp abs'
-      pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
-      pure (cpName $ ppCommon pp, pp)
-
-    let completeLocation (RPLMutable m) = pure $ PLMutable m
-        completeLocation (RPLImmutable im) = PLImmutable <$> completePackageLocation im
-
-    deps0 <- forM (projectDependencies project) $ \rpl -> do
-      pl <- completeLocation rpl
-      dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
-      pure (cpName $ dpCommon dp, dp)
-
-    checkDuplicateNames $
-      map (second (PLMutable . ppResolvedDir)) packages0 ++
-      map (second dpLocation) deps0
-
-    let packages1 = Map.fromList packages0
-        snPackages = snapshotPackages snapshot
-          `Map.difference` packages1
-          `Map.difference` Map.fromList deps0
-          `Map.withoutKeys` projectDropPackages project
-
-    snDeps <- Map.traverseWithKey (snapToDepPackage (shouldHaddockDeps bopts)) snPackages
-
-    let deps1 = Map.fromList deps0 `Map.union` snDeps
-
-    let mergeApply m1 m2 f =
-          MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
-        pFlags = projectFlags project
-        packages2 = mergeApply packages1 pFlags $
-          \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
-        deps2 = mergeApply deps1 pFlags $
-          \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
-
-    checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
-
-    let pkgGhcOptions = configGhcOptionsByName config
-        deps = mergeApply deps2 pkgGhcOptions $
-          \_ d options -> d{dpCommon=(dpCommon d){cpGhcOptions=options}}
-        packages = mergeApply packages2 pkgGhcOptions $
-          \_ p options -> p{ppCommon=(ppCommon p){cpGhcOptions=options}}
-        unusedPkgGhcOptions = pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
-          `Map.restrictKeys` Map.keysSet deps2
-
-    unless (Map.null unusedPkgGhcOptions) $
-      throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
-
-    let wanted = SMWanted
-          { smwCompiler = fromMaybe (snapshotCompiler snapshot) (projectCompiler project)
-          , smwProject = packages
-          , smwDeps = deps
-          , smwSnapshotLocation = projectResolver project
-          }
+    wanted <- lockCachedWanted stackYamlFP (projectResolver project) $
+        fillProjectWanted stackYamlFP config project
 
     return BuildConfig
         { bcConfig = config
@@ -596,6 +539,79 @@ loadBuildConfig = do
         , projectCurator = Nothing
         , projectDropPackages = mempty
         }
+
+fillProjectWanted ::
+       (HasProcessContext env, HasLogFunc env, HasPantryConfig env)
+    => Path Abs t
+    -> Config
+    -> Project
+    -> Map RawPackageLocationImmutable PackageLocationImmutable
+    -> WantedCompiler
+    -> Map PackageName (Bool -> RIO env DepPackage)
+    -> RIO env (SMWanted, [CompletedPLI])
+fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages = do
+    let bopts = configBuild config
+
+    packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
+      abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
+      let resolved = ResolvedPath fp abs'
+      pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
+      pure (cpName $ ppCommon pp, pp)
+
+    (deps0, mcompleted) <- fmap unzip . forM (projectDependencies project) $ \rpl -> do
+      (pl, mCompleted) <- case rpl of
+         RPLImmutable rpli -> do
+           compl <- maybe (completePackageLocation rpli) pure (Map.lookup rpli locCache)
+           pure (PLImmutable compl, Just (rpli, compl))
+         RPLMutable p ->
+           pure (PLMutable p, Nothing)
+      dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
+      pure ((cpName $ dpCommon dp, dp), mCompleted)
+
+    checkDuplicateNames $
+      map (second (PLMutable . ppResolvedDir)) packages0 ++
+      map (second dpLocation) deps0
+
+    let packages1 = Map.fromList packages0
+        snPackages = snapPackages
+          `Map.difference` packages1
+          `Map.difference` Map.fromList deps0
+          `Map.withoutKeys` projectDropPackages project
+
+    snDeps <- for snPackages $ \getDep -> getDep (shouldHaddockDeps bopts)
+
+    let deps1 = Map.fromList deps0 `Map.union` snDeps
+
+    let mergeApply m1 m2 f =
+          MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
+        pFlags = projectFlags project
+        packages2 = mergeApply packages1 pFlags $
+          \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
+        deps2 = mergeApply deps1 pFlags $
+          \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
+
+    checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
+
+    let pkgGhcOptions = configGhcOptionsByName config
+        deps = mergeApply deps2 pkgGhcOptions $
+          \_ d options -> d{dpCommon=(dpCommon d){cpGhcOptions=options}}
+        packages = mergeApply packages2 pkgGhcOptions $
+          \_ p options -> p{ppCommon=(ppCommon p){cpGhcOptions=options}}
+        unusedPkgGhcOptions = pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
+          `Map.restrictKeys` Map.keysSet deps2
+
+    unless (Map.null unusedPkgGhcOptions) $
+      throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
+
+    let wanted = SMWanted
+          { smwCompiler = fromMaybe snapCompiler (projectCompiler project)
+          , smwProject = packages
+          , smwDeps = deps
+          , smwSnapshotLocation = projectResolver project
+          }
+
+    pure (wanted, catMaybes mcompleted)
+
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.

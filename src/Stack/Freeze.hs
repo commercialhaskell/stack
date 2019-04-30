@@ -69,7 +69,7 @@ doFreeze p FreezeSnapshot = do
   case result of
     Left _wc ->
       logInfo "No freezing is required for compiler resolver"
-    Right (snap, _) -> do
+    Right snap -> do
       snap' <- completeSnapshotLayer snap
       let rawCompleted = toRawSnapshotLayer snap'
       if rawCompleted == snap
