@@ -91,6 +91,7 @@ import           System.PosixCompat.Files (createLink, modificationTime, getFile
 import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
 import           RIO.Process
+import           Pantry.Internal.Companion
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -951,26 +952,19 @@ withLockedDistDir announce root inner = do
   case mres of
     Just res -> pure res
     Nothing -> do
-      announce $ "blocking for directory lock on " <> fromString (toFilePath lockFP)
-      stopYellingVar <- newTVarIO False
-      let yell = do
-            doneDelayingVar <- registerDelay 30000000 -- 30 seconds
-            join $ atomically $
-              (do stopYelling' <- readTVar stopYellingVar
-                  checkSTM stopYelling'
-                  pure $ pure ()) <|>
-              (do doneDelaying <- readTVar doneDelayingVar
-                  checkSTM doneDelaying
-                  pure $ do
-                    announce $ "still blocking for directory lock on " <>
-                               fromString (toFilePath lockFP) <>
-                               "; maybe another Stack process is running?"
-                    yell)
-          stopYelling = atomically $ writeTVar stopYellingVar True
-          block = withRunInIO $ \run ->
-            withFileLock (toFilePath lockFP) Exclusive (\_ -> stopYelling *> run inner)
-            `finally` stopYelling
-      runConcurrently $ Concurrently yell *> Concurrently block
+      let complainer delay = do
+            delay 5000000 -- 5 seconds
+            announce $ "blocking for directory lock on " <> fromString (toFilePath lockFP)
+            forever $ do
+              delay 30000000 -- 30 seconds
+              announce $ "still blocking for directory lock on " <>
+                         fromString (toFilePath lockFP) <>
+                         "; maybe another Stack process is running?"
+      withCompanion complainer $
+        \stopComplaining ->
+        withRunInIO $ \run ->
+        withFileLock (toFilePath lockFP) Exclusive $ \_ ->
+        run $ stopComplaining *> inner
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
