@@ -181,4 +181,5 @@ If the lock file does not exist, it will be created by:
 
 When loading a Stack project all completed package or snapshot locations
 (even when they were completed using information from a lock file) get
-collected to form a new lock file.
+collected to form a new lock file in memory and compare against the one
+on disk, writing if there are any differences.
