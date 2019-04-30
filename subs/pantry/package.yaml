@@ -110,6 +110,9 @@ library:
   # For stackage-server
   - Pantry.Internal.Stackage
 
+  # For stack
+  - Pantry.Internal.Companion
+
   # FIXME must be removed from pantry!
   - Data.Aeson.Extended
 
