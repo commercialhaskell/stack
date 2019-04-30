@@ -12,11 +12,6 @@ module Pantry.TypesSpec
 
 import Data.Aeson.Extended
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
-import Data.List.NonEmpty hiding (map)
-import Data.Semigroup
-import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Types.Version (mkVersion)
@@ -32,9 +27,7 @@ import Pantry.Internal
     , renderTree
     )
 import qualified Pantry.SHA256 as SHA256
-import qualified Path as Path
 import RIO
-import qualified RIO.HashMap as HM
 import qualified RIO.Text as T
 import Test.Hspec
 import Text.RawString.QQ
