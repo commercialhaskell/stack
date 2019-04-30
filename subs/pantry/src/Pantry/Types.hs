@@ -506,15 +506,6 @@ instance Display Repo where
     (if T.null subdir
       then mempty
       else " in subdirectory " <> display subdir)
-instance FromJSON Repo where
-    parseJSON =
-        withObject "Repo" $ \o -> do
-            repoSubdir <- o .: "subdir"
-            repoCommit <- o .: "commit"
-            (repoType, repoUrl) <-
-                (o .: "git" >>= \url -> pure (RepoGit, url)) <|>
-                (o .: "hg" >>= \url -> pure (RepoHg, url))
-            pure Repo {..}
 
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
@@ -1411,16 +1402,15 @@ instance Display PackageMetadata where
     , "cabal file == " <> display (pmCabal pm)
     ]
 
-instance FromJSON PackageMetadata where
-    parseJSON =
-        withObject "PackageMetadata" $ \o -> do
-            pmCabal :: BlobKey  <- o .: "cabal-file"
-            pantryTree :: BlobKey <- o .: "pantry-tree"
-            CabalString pkgName  <- o .: "name"
-            CabalString pkgVersion <- o .: "version"
-            let pmTreeKey = TreeKey pantryTree
-                pmIdent = PackageIdentifier {..}
-            pure PackageMetadata {..}
+parsePackageMetadata :: Object -> WarningParser PackageMetadata
+parsePackageMetadata o = do
+  pmCabal :: BlobKey <- o ..: "cabal-file"
+  pantryTree :: BlobKey <- o ..: "pantry-tree"
+  CabalString pkgName <- o ..: "name"
+  CabalString pkgVersion <- o ..: "version"
+  let pmTreeKey = TreeKey pantryTree
+      pmIdent = PackageIdentifier {..}
+  pure PackageMetadata {..}
 
 
 -- | Conver package metadata to its "raw" equivalent.
@@ -1540,14 +1530,18 @@ instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
                   <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
         where
           repoObject :: Value -> Parser (WithJSONWarnings (Unresolved PackageLocationImmutable))
-          repoObject value = do
-            pm <- parseJSON value
-            repo <- parseJSON value
-            pure $ noJSONWarnings $ pure $ PLIRepo repo pm
+          repoObject = withObjectWarnings "UnresolvedPackageLocationImmutable.PLIRepo" $ \o -> do
+            pm <- parsePackageMetadata o
+            repoSubdir <- o ..: "subdir"
+            repoCommit <- o ..: "commit"
+            (repoType, repoUrl) <-
+                (o ..: "git" >>= \url -> pure (RepoGit, url)) <|>
+                (o ..: "hg" >>= \url -> pure (RepoHg, url))
+            pure $ pure $ PLIRepo Repo {..} pm
 
-          archiveObject value = do
-            pm <- parseJSON value
-            withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" (\o -> do
+          archiveObject =
+            withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" $ \o -> do
+              pm <- parsePackageMetadata o
               Unresolved mkArchiveLocation <- parseArchiveLocationObject o
               archiveHash <- o ..: "sha256"
               archiveSize <- o ..: "size"
@@ -1555,20 +1549,19 @@ instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
               pure $ Unresolved $ \mdir -> do
                 archiveLocation <- mkArchiveLocation mdir
                 pure $ PLIArchive Archive {..} pm
-              ) value
 
-          hackageObject value =
-             withObjectWarnings "UnresolvedPackagelocationimmutable.PLIHackage (Object)" (\o -> do
+          hackageObject =
+             withObjectWarnings "UnresolvedPackagelocationimmutable.PLIHackage (Object)" $ \o -> do
                       treeKey <- o ..: "pantry-tree"
                       htxt <- o ..: "hackage"
                       case parseHackageText htxt of
                         Left e -> fail $ show e
                         Right (pkgIdentifier, blobKey) ->
-                          pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)) value
+                          pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)
 
-          github value = do
-            pm <- parseJSON value
+          github value =
             withObjectWarnings "UnresolvedPackagelocationimmutable.PLIArchive:github" (\o -> do
+              pm <- parsePackageMetadata o
               GitHubRepo ghRepo <- o ..: "github"
               commit <- o ..: "commit"
               let archiveLocation = ALUrl $ T.concat
@@ -1594,7 +1587,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
     <|> fail ("Could not parse a UnresolvedRawPackageLocationImmutable from: " ++ show v)
     where
       http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
-      http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
+      http = withText "UnresolvedPackageLocationImmutable.RPLIArchive (Text)" $ \t ->
         case parseArchiveLocationText t of
           Nothing -> fail $ "Invalid archive location: " ++ T.unpack t
           Just (Unresolved mkArchiveLocation) ->
@@ -1640,7 +1633,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
         os <- optionalSubdirs o
         pure $ pure $ NE.map (\(repoSubdir, pm) -> RPLIRepo Repo {..} pm) (osToRpms os)
 
-      archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
+      archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.RPLIArchive" $ \o -> do
         Unresolved mkArchiveLocation <- parseArchiveLocationObject o
         raHash <- o ..:? "sha256"
         raSize <- o ..:? "size"

@@ -140,11 +140,10 @@ spec = do
       liftIO $
         Yaml.toJSON (nightlySnapshotLocation day) `shouldBe`
         Yaml.String (T.pack $ "nightly-" ++ show day)
-    it "FromJSON instance for Repo" $ do
-      repValue <-
-        case Yaml.decodeThrow samplePLIRepo of
-          Just x -> pure x
-          Nothing -> fail "Can't parse Repo"
+    it "FromJSON instance for PLIRepo" $ do
+      WithJSONWarnings unresolvedPli warnings <- Yaml.decodeThrow samplePLIRepo
+      warnings `shouldBe` []
+      pli <- resolvePaths Nothing unresolvedPli
       let repoValue =
               Repo
                   { repoSubdir = "wai"
@@ -153,13 +152,7 @@ spec = do
                         "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
                   , repoUrl = "https://github.com/yesodweb/wai.git"
                   }
-      repValue `shouldBe` repoValue
-    it "FromJSON instance for PackageMetadata" $ do
-      pkgMeta <-
-        case Yaml.decodeThrow samplePLIRepo of
-          Just x -> pure x
-          Nothing -> fail "Can't parse Repo"
-      let cabalSha =
+          cabalSha =
               SHA256.fromHexBytes
                   "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
           pantrySha =
@@ -177,7 +170,7 @@ spec = do
                   , pmTreeKey = TreeKey (BlobKey psha (FileSize 714))
                   , pmCabal = BlobKey csha (FileSize 1765)
                   }
-      pkgMeta `shouldBe` pkgValue
+      pli `shouldBe` PLIRepo repoValue pkgValue
     it "parseHackageText parses" $ do
       let txt =
               "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
