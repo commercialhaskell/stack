@@ -4,8 +4,8 @@ name: snapshot-for-building-stack-with-ghc-8.6.2
 packages:
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
-- github: nh2/filelock
-  commit: 7008cde39887131c7ca91ad1bad19e2c528c5ced
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
