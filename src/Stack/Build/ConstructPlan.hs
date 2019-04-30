@@ -118,7 +118,7 @@ type M = RWST -- TODO replace with more efficient WS stack on top of StackT
 
 data Ctx = Ctx
     { baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> M Package)
+    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> M Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -171,7 +171,7 @@ instance HasEnvConfig Ctx where
 constructPlan :: forall env. HasEnvConfig env
               => BaseConfigOpts
               -> [DumpPackage] -- ^ locally registered
-              -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
+              -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> Bool
@@ -231,8 +231,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     mkCtx econfig globalCabalVersion sources mcur pathEnvVar' = Ctx
         { baseConfigOpts = baseConfigOpts0
-        , loadPackage = \x y z -> runRIO econfig $
-            applyForceCustomBuild globalCabalVersion <$> loadPackage0 x y z
+        , loadPackage = \w x y z -> runRIO econfig $
+            applyForceCustomBuild globalCabalVersion <$> loadPackage0 w x y z
         , combinedMap = combineMap sources installedMap
         , ctxEnvConfig = econfig
         , callStack = []
@@ -426,7 +426,7 @@ addDep name = do
                             -- names. This code does not feel right.
                             let version = installedVersion installed
                                 askPkgLoc = liftRIO $ do
-                                  mrev <- getLatestHackageRevision name version
+                                  mrev <- getLatestHackageRevision YesRequireHackageIndex name version
                                   case mrev of
                                     Nothing -> do
                                       -- this could happen for GHC boot libraries missing from Hackage
@@ -469,7 +469,7 @@ tellExecutablesUpstream name retrievePkgLoc loc flags = do
     when (name `Set.member` wanted ctx) $ do
         mPkgLoc <- retrievePkgLoc
         forM_ mPkgLoc $ \pkgLoc -> do
-            p <- loadPackage ctx pkgLoc flags []
+            p <- loadPackage ctx pkgLoc flags [] []
             tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
@@ -505,7 +505,7 @@ installPackage name ps minstalled = do
     case ps of
         PSRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
-            package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp)
+            package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
             resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
         PSFilePath lp -> do
             case lpTestBench lp of
@@ -662,7 +662,7 @@ addPackageDeps package = do
         eres <- addDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev = do
-              vsAndRevs <- runRIO ctx $ getHackagePackageVersions UsePreferredVersions depname
+              vsAndRevs <- runRIO ctx $ getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions depname
               pure $ do
                 lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
                 revs <- Map.lookup lappVer vsAndRevs
@@ -1057,7 +1057,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
       let cfInfo = CFIHash cabalHash (Just cabalSize)
           packageIdRev = PackageIdentifierRevision name version cfInfo
-       in "- " <+> fromString (T.unpack (utf8BuilderToText (RIO.display packageIdRev)))
+       in fromString ("- " ++ T.unpack (utf8BuilderToText (RIO.display packageIdRev)))
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =

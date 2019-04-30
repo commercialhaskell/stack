@@ -60,6 +60,12 @@ Major changes:
       is uniquely identified by a commit id and an Hadrian "flavour" (Hadrian is
       the newer GHC build system), hence `compiler` can be set to use a GHC
       built from source with `ghc-git-COMMIT-FLAVOUR`
+* `stack.yaml` now supports a `configure-options`, which are passed directly to
+  the `configure` step in the Cabal build process. See
+  [#1438](https://github.com/commercialhaskell/stack/issues/1438)
+
+* Remove support for building GHCJS itself. Future releases of Stack
+  may remove GHCJS support entirely.
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
@@ -117,6 +123,12 @@ Behavior changes:
   use to avoid multiple runs of Stack from trampling each others'
   files. See
   [#2730](https://github.com/commercialhaskell/stack/issues/2730).
+
+* Stack will check occassionally if there is a new version available and prompt
+  the user to upgrade. This will not incur any additional network traffic, as
+  it will piggy-back on the existing Hackage index updates. You can set
+  `recommend-stack-upgrade: false` to bypass this. See
+  [#1681](https://github.com/commercialhaskell/stack/issues/1681).
 
 Other enhancements:
 
@@ -220,6 +232,8 @@ Other enhancements:
   new-build`. See
   [#4706](https://github.com/commercialhaskell/stack/issues/4706).
 * Use a database cache table to speed up discovery of installed GHCs
+* You can specify multiple `--test-arguments` options. See
+  [#2226](https://github.com/commercialhaskell/stack/issues/2226)
 
 Bug fixes:
 
@@ -275,6 +289,8 @@ Bug fixes:
 - Docker: fix detection of expected subprocess failures.  This fixes
   downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
+* The `stack ghci` command's `--ghc-options` flag now parses multiple options.
+  See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
 
 ## v1.9.3
 

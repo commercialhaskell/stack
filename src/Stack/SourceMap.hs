@@ -56,6 +56,7 @@ mkProjectPackage printWarnings dir buildHaddocks = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpCabalConfigOpts = mempty
                   , cpHaddocks = buildHaddocks
                   }
      }
@@ -86,6 +87,7 @@ additionalDepPackage buildHaddocks pl = do
                   , cpName = name
                   , cpFlags = mempty
                   , cpGhcOptions = mempty
+                  , cpCabalConfigOpts = mempty
                   , cpHaddocks = buildHaddocks
                   }
     }
@@ -107,6 +109,7 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
                   , cpName = name
                   , cpFlags = spFlags
                   , cpGhcOptions = spGhcOptions
+                  , cpCabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
                   , cpHaddocks = buildHaddocks
                   }
     }
@@ -138,8 +141,7 @@ globalsFromHints ::
     => WantedCompiler
     -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
-    ghfp <- globalHintsFile
-    mglobalHints <- loadGlobalHints ghfp compiler
+    mglobalHints <- loadGlobalHints compiler
     case mglobalHints of
         Just hints -> pure hints
         Nothing -> do

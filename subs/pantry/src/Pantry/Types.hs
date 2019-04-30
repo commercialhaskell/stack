@@ -10,7 +10,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 module Pantry.Types
   ( PantryConfig (..)
@@ -105,6 +104,7 @@ module Pantry.Types
   , toRawPM
   , cabalFileName
   , SnapshotCacheHash (..)
+  , getGlobalHintsFile
   ) where
 
 import RIO
@@ -114,7 +114,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
-import RIO.Time (toGregorian, Day, fromGregorianValid)
+import RIO.Time (toGregorian, Day, fromGregorianValid, UTCTime)
 import qualified RIO.Map as Map
 import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -122,6 +122,7 @@ import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
 import Data.Aeson.Extended
+import Data.Aeson.Encoding.Internal (unsafeToEncoding)
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
 import Database.Persist.Sql
@@ -130,7 +131,7 @@ import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
-import Distribution.Types.PackageName (PackageName, unPackageName)
+import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
 import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
@@ -205,8 +206,8 @@ newtype Revision = Revision Word
 -- whether a pool is used, and the default implementation in
 -- "Pantry.Storage" does not use a pool.
 data Storage = Storage
-  { withStorage_ :: (forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a)
-  , withWriteLock_ :: (forall env a. HasLogFunc env => RIO env a -> RIO env a)
+  { withStorage_ :: forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a
+  , withWriteLock_ :: forall env a. HasLogFunc env => RIO env a -> RIO env a
   }
 
 -- | Configuration value used by the entire pantry package. Create one
@@ -483,9 +484,9 @@ data Repo = Repo
     --
     -- @since 0.1.0.0
   , repoSubdir :: !Text
-  -- ^ Subdirectory within the archive to get the package from.
-  --
-  -- @since 0.1.0.0
+    -- ^ Subdirectory within the archive to get the package from.
+    --
+    -- @since 0.1.0.0
   }
     deriving (Generic, Eq, Ord, Typeable)
 instance NFData Repo
@@ -540,6 +541,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
     pure HackageSecurityConfig {..}
 
+
 -- | An environment which contains a 'PantryConfig'.
 --
 -- @since 0.1.0.0
@@ -548,6 +550,7 @@ class HasPantryConfig env where
   --
   -- @since 0.1.0.0
   pantryConfigL :: Lens' env PantryConfig
+
 
 -- | File size in bytes
 --
@@ -587,7 +590,9 @@ instance FromJSON BlobKey where
     <*> o .: "size"
 
 newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
-  deriving (Show)
+  deriving (Eq, Ord, Show, Read, NFData)
+instance Display PackageNameP where
+  display = fromString . packageNameString . unPackageNameP
 instance PersistField PackageNameP where
   toPersistValue (PackageNameP pn) = PersistText $ T.pack $ packageNameString pn
   fromPersistValue v = do
@@ -597,9 +602,20 @@ instance PersistField PackageNameP where
       Just pn -> Right $ PackageNameP pn
 instance PersistFieldSql PackageNameP where
   sqlType _ = SqlString
+instance ToJSON PackageNameP where
+  toJSON (PackageNameP pn) = String $ T.pack $ packageNameString pn
+instance FromJSON PackageNameP where
+  parseJSON = withText "PackageNameP" $ pure . PackageNameP . mkPackageName . T.unpack
+instance ToJSONKey PackageNameP where
+  toJSONKey =
+    ToJSONKeyText
+      (T.pack . packageNameString . unPackageNameP)
+      (unsafeToEncoding . getUtf8Builder . display)
+instance FromJSONKey PackageNameP where
+  fromJSONKey = FromJSONKeyText $ PackageNameP . mkPackageName . T.unpack
 
-newtype VersionP = VersionP Version
-  deriving (Show)
+newtype VersionP = VersionP { unVersionP :: Version }
+  deriving (Eq, Ord, Show, Read, NFData)
 instance PersistField VersionP where
   toPersistValue (VersionP v) = PersistText $ T.pack $ versionString v
   fromPersistValue v = do
@@ -609,9 +625,20 @@ instance PersistField VersionP where
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
   sqlType _ = SqlString
+instance Display VersionP where
+  display (VersionP v) = fromString $ versionString v
+instance ToJSON VersionP where
+  toJSON (VersionP v) = String $ T.pack $ versionString v
+instance FromJSON VersionP where
+  parseJSON =
+    withText "VersionP" $
+    either (fail . displayException) (pure . VersionP) . parseVersionThrowing . T.unpack
 
-newtype ModuleNameP = ModuleNameP ModuleName
-  deriving (Show)
+newtype ModuleNameP = ModuleNameP
+  { unModuleNameP :: ModuleName
+  } deriving (Eq, Ord, Show, NFData)
+instance Display ModuleNameP where
+  display = fromString . moduleNameString . unModuleNameP
 instance PersistField ModuleNameP where
   toPersistValue (ModuleNameP mn) = PersistText $ T.pack $ moduleNameString mn
   fromPersistValue v = do
@@ -1624,6 +1651,7 @@ data HpackExecutable
     -- ^ Executable at the provided path
     deriving (Show, Read, Eq, Ord)
 
+
 -- | Which compiler a snapshot wants to use. The build tool may elect
 -- to do some fuzzy matching of versions (e.g., allowing different
 -- patch versions).
@@ -1637,6 +1665,7 @@ data WantedCompiler
       !Version
     -- ^ GHCJS version followed by GHC version
  deriving (Show, Eq, Ord, Generic)
+
 instance NFData WantedCompiler
 instance Display WantedCompiler where
   display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
@@ -1984,6 +2013,10 @@ data RawSnapshotLayer = RawSnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , rslPublishTime :: !(Maybe UTCTime)
+  -- ^ See 'slPublishTime'
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
@@ -2006,6 +2039,7 @@ instance ToJSON RawSnapshotLayer where
     , if Map.null (rslGhcOptions rsnap)
         then []
         else ["ghc-options" .= toCabalStringMap (rslGhcOptions rsnap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (rslPublishTime rsnap)
     ]
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
@@ -2028,6 +2062,7 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
     rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
     rslHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
     rslGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    rslPublishTime <- o ..:? "publish-time"
     pure $ (\rslLocations (rslParent, rslCompiler) -> RawSnapshotLayer {..})
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
@@ -2072,18 +2107,24 @@ data SnapshotLayer = SnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , slPublishTime :: !(Maybe UTCTime)
+  -- ^ Publication timestamp for this snapshot. This field is optional, and
+  -- is for informational purposes only.
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
 instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
-    , ["compiler" .= slCompiler snap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (slCompiler snap)
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
     , if Map.null (slHidden snap) then [] else ["hidden" .= toCabalStringMap (slHidden snap)]
     , if Map.null (slGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (slGhcOptions snap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (slPublishTime snap)
     ]
 
 -- | Convert snapshot layer into its "raw" equivalent.
@@ -2098,7 +2139,15 @@ toRawSnapshotLayer sl = RawSnapshotLayer
   , rslFlags = slFlags sl
   , rslHidden = slHidden sl
   , rslGhcOptions = slGhcOptions sl
+  , rslPublishTime = slPublishTime sl
   }
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
+
+-- | Get the path to the global hints cache file
+getGlobalHintsFile :: HasPantryConfig env => RIO env (Path Abs File)
+getGlobalHintsFile = do
+  root <- view $ pantryConfigL.to pcRootDir
+  globalHintsRelFile <- parseRelFile "global-hints-cache.yaml"
+  pure $ root </> globalHintsRelFile

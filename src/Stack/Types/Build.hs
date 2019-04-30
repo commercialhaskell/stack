@@ -631,6 +631,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList flags)
+    , map T.unpack $ packageCabalConfigOpts package
     , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
     , map ("--extra-include-dirs=" ++) (configExtraIncludeDirs config)
     , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)

@@ -127,12 +127,12 @@ createDependencyGraph dotOpts = do
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
       globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
   let depLoader = createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps
-      loadPackageDeps name version loc flags ghcOptions
+      loadPackageDeps name version loc flags ghcOptions cabalConfigOpts
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
           | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
               return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
-          | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions)
+          | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
 
@@ -265,7 +265,7 @@ createDepLoader :: SourceMap
                 -> Map PackageName DumpPackage
                 -> Map GhcPkgId PackageIdentifier
                 -> (PackageName -> Version -> PackageLocationImmutable ->
-                    Map FlagName Bool -> [Text] -> RIO DotConfig (Set PackageName, DotPayload))
+                    Map FlagName Bool -> [Text] -> [Text] -> RIO DotConfig (Set PackageName, DotPayload))
                 -> PackageName
                 -> RIO DotConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
@@ -293,7 +293,8 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
           let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
               flags = cpFlags common
               ghcOptions = cpGhcOptions common
-          assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions)
+              cabalConfigOpts = cpCabalConfigOpts common
+          assert (pkgName == name) (loadPackageDeps pkgName version loc flags ghcOptions cabalConfigOpts)
 
     -- If package is a global package, use info from ghc-pkg (#4324, #3084)
     globalDeps =

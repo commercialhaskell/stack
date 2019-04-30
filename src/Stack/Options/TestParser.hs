@@ -18,8 +18,8 @@ testOptsParser hide0 =
                 "running already successful tests"
                 hide
         <*> fmap
-                (fromMaybe [])
-                (optional
+                concat
+                (many
                     (argsOption
                         (long "test-arguments" <>
                          long "ta" <>
