@@ -1532,7 +1532,7 @@ instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
           repoObject :: Value -> Parser (WithJSONWarnings (Unresolved PackageLocationImmutable))
           repoObject = withObjectWarnings "UnresolvedPackageLocationImmutable.PLIRepo" $ \o -> do
             pm <- parsePackageMetadata o
-            repoSubdir <- o ..: "subdir"
+            repoSubdir <- o ..:? "subdir" ..!= ""
             repoCommit <- o ..: "commit"
             (repoType, repoUrl) <-
                 (o ..: "git" >>= \url -> pure (RepoGit, url)) <|>
@@ -1573,7 +1573,7 @@ instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
                     ]
               archiveHash <- o ..: "sha256"
               archiveSize <- o ..: "size"
-              archiveSubdir <- o ..: "subdir"
+              archiveSubdir <- o ..:? "subdir" ..!= ""
               pure $ pure $ PLIArchive Archive {..} pm) value
 
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where

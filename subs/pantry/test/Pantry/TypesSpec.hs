@@ -60,6 +60,21 @@ pantry-tree:
 commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
 |]
 
+samplePLIRepo2 :: ByteString
+samplePLIRepo2 =
+    [r|
+cabal-file:
+  size: 1863
+  sha256: 5ebffc39e75ea1016adcc8426dc31d2040d2cc8a5f4bbce228592ef35e233da2
+name: merkle-log
+version: 0.1.0.0
+git: https://github.com/kadena-io/merkle-log.git
+pantry-tree:
+  size: 615
+  sha256: 5a99e5e41ccd675a7721a733714ba2096f4204d9010f867c5fb7095b78e2959d
+commit: a7ae61d7082afe3aa1a0fd0546fc1351a2f7c376
+|]
+
 spec :: Spec
 spec = do
   describe "WantedCompiler" $ do
@@ -171,6 +186,11 @@ spec = do
                   , pmCabal = BlobKey csha (FileSize 1765)
                   }
       pli `shouldBe` PLIRepo repoValue pkgValue
+
+      WithJSONWarnings reparsed warnings2 <- Yaml.decodeThrow $ Yaml.encode pli
+      warnings2 `shouldBe` []
+      reparsed' <- resolvePaths Nothing reparsed
+      reparsed' `shouldBe` pli
     it "parseHackageText parses" $ do
       let txt =
               "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
@@ -186,3 +206,11 @@ spec = do
           PackageIdentifier
               (mkPackageName "persistent")
               (mkVersion [2, 8, 2])
+    it "roundtripping a PLIRepo" $ do
+      WithJSONWarnings unresolvedPli warnings <- Yaml.decodeThrow samplePLIRepo2
+      warnings `shouldBe` []
+      pli <- resolvePaths Nothing unresolvedPli
+      WithJSONWarnings unresolvedPli2 warnings2 <- Yaml.decodeThrow $ Yaml.encode pli
+      warnings2 `shouldBe` []
+      pli2 <- resolvePaths Nothing unresolvedPli2
+      pli2 `shouldBe` (pli :: PackageLocationImmutable)
