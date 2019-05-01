@@ -17,15 +17,17 @@ spec = do
     "file/\\test" ! Just "file/\\test"
     "/file/////\\test" ! Nothing
     "file/////\\test" ! Just "file/\\test"
+    "file/test/" ! Just "file/test"
     "/file/\\test////" ! Nothing
     "/file/./test" ! Nothing
     "file/./test" ! Just "file/test"
     "/test/file/../bob/fred/" ! Nothing
     "/test/file/../bob/fred" ! Nothing
-    "test/file/../bob/fred/" ! Nothing
+    "test/file/../bob/fred/" ! Just "test/bob/fred"
     "test/file/../bob/fred" ! Just "test/bob/fred"
+    "../bob/fred" ! Nothing
     "../bob/fred/" ! Nothing
-    "./bob/fred/" ! Nothing
+    "./bob/fred/" ! Just "bob/fred"
     "./bob/fred" ! Just "bob/fred"
     "./" ! Nothing
     "./." ! Nothing
