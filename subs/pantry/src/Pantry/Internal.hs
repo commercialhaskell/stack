@@ -15,16 +15,19 @@ module Pantry.Internal
 import Control.Exception (assert)
 import Pantry.Types
 import qualified Data.Text as T
+import Data.Maybe (fromMaybe)
 
 -- | Like @System.FilePath.normalise@, however:
 --
 -- * Only works on relative paths, absolute paths fail
 --
--- * May not point to directories
+-- * Strips trailing slashes
 --
 -- * Only works on forward slashes, even on Windows
 --
 -- * Normalizes parent dirs @foo/../@ get stripped
+--
+-- * Cannot begin with a parent directory (@../@)
 --
 -- * Spelled like an American, sorry
 normalizeParents
@@ -32,10 +35,13 @@ normalizeParents
   -> Either String FilePath
 normalizeParents "" = Left "empty file path"
 normalizeParents ('/':_) = Left "absolute path"
+normalizeParents ('.':'.':'/':_) = Left "absolute path"
 normalizeParents fp = do
-  let t = T.pack fp
+  -- Strip a single trailing, but not multiple
+  let t0 = T.pack fp
+      t = fromMaybe t0 $ T.stripSuffix "/" t0
   case T.unsnoc t of
-    Just (_, '/') -> Left "trailing slash"
+    Just (_, '/') -> Left "multiple trailing slashes"
     _ -> Right ()
 
   let c1 = T.split (== '/') t
