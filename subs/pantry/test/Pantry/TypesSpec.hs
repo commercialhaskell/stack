@@ -60,6 +60,21 @@ pantry-tree:
 commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
 |]
 
+samplePLIRepo2 :: ByteString
+samplePLIRepo2 =
+    [r|
+cabal-file:
+  size: 1863
+  sha256: 5ebffc39e75ea1016adcc8426dc31d2040d2cc8a5f4bbce228592ef35e233da2
+name: merkle-log
+version: 0.1.0.0
+git: https://github.com/kadena-io/merkle-log.git
+pantry-tree:
+  size: 615
+  sha256: 5a99e5e41ccd675a7721a733714ba2096f4204d9010f867c5fb7095b78e2959d
+commit: a7ae61d7082afe3aa1a0fd0546fc1351a2f7c376
+|]
+
 spec :: Spec
 spec = do
   describe "WantedCompiler" $ do
@@ -140,11 +155,10 @@ spec = do
       liftIO $
         Yaml.toJSON (nightlySnapshotLocation day) `shouldBe`
         Yaml.String (T.pack $ "nightly-" ++ show day)
-    it "FromJSON instance for Repo" $ do
-      repValue <-
-        case Yaml.decodeThrow samplePLIRepo of
-          Just x -> pure x
-          Nothing -> fail "Can't parse Repo"
+    it "FromJSON instance for PLIRepo" $ do
+      WithJSONWarnings unresolvedPli warnings <- Yaml.decodeThrow samplePLIRepo
+      warnings `shouldBe` []
+      pli <- resolvePaths Nothing unresolvedPli
       let repoValue =
               Repo
                   { repoSubdir = "wai"
@@ -153,13 +167,7 @@ spec = do
                         "d11d63f1a6a92db8c637a8d33e7953ce6194a3e0"
                   , repoUrl = "https://github.com/yesodweb/wai.git"
                   }
-      repValue `shouldBe` repoValue
-    it "FromJSON instance for PackageMetadata" $ do
-      pkgMeta <-
-        case Yaml.decodeThrow samplePLIRepo of
-          Just x -> pure x
-          Nothing -> fail "Can't parse Repo"
-      let cabalSha =
+          cabalSha =
               SHA256.fromHexBytes
                   "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
           pantrySha =
@@ -177,7 +185,12 @@ spec = do
                   , pmTreeKey = TreeKey (BlobKey psha (FileSize 714))
                   , pmCabal = BlobKey csha (FileSize 1765)
                   }
-      pkgMeta `shouldBe` pkgValue
+      pli `shouldBe` PLIRepo repoValue pkgValue
+
+      WithJSONWarnings reparsed warnings2 <- Yaml.decodeThrow $ Yaml.encode pli
+      warnings2 `shouldBe` []
+      reparsed' <- resolvePaths Nothing reparsed
+      reparsed' `shouldBe` pli
     it "parseHackageText parses" $ do
       let txt =
               "persistent-2.8.2@sha256:df118e99f0c46715e932fe82d787fc09689d87898f3a8b13f5954d25af6b46a1,5058"
@@ -193,3 +206,11 @@ spec = do
           PackageIdentifier
               (mkPackageName "persistent")
               (mkVersion [2, 8, 2])
+    it "roundtripping a PLIRepo" $ do
+      WithJSONWarnings unresolvedPli warnings <- Yaml.decodeThrow samplePLIRepo2
+      warnings `shouldBe` []
+      pli <- resolvePaths Nothing unresolvedPli
+      WithJSONWarnings unresolvedPli2 warnings2 <- Yaml.decodeThrow $ Yaml.encode pli
+      warnings2 `shouldBe` []
+      pli2 <- resolvePaths Nothing unresolvedPli2
+      pli2 `shouldBe` (pli :: PackageLocationImmutable)
