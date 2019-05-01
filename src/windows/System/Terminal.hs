@@ -1,19 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module System.Terminal
-( getTerminalWidth
-, fixCodePage
-,hIsTerminalDeviceOrMinTTY
+( fixCodePage
+, hIsTerminalDeviceOrMinTTY
 ) where
 
 import Distribution.Types.Version (mkVersion)
 import Stack.Prelude
 import System.Win32 (isMinTTYHandle, withHandleToHANDLE)
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-
--- | Get the width, in columns, of the terminal if we can.
-getTerminalWidth :: IO (Maybe Int)
-getTerminalWidth = return Nothing
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
