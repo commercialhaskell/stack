@@ -107,6 +107,7 @@ module Pantry.Types
   , SnapshotCacheHash (..)
   , getGlobalHintsFile
   , bsToBlobKey
+  , pliIdent
   ) where
 
 import RIO
@@ -2269,7 +2270,13 @@ getGlobalHintsFile = do
 
 -- | Creates BlobKey for an input ByteString
 --
--- @sinc 0.1.0.0
+-- @since 0.1.0.0
 bsToBlobKey :: ByteString -> BlobKey
 bsToBlobKey bs =
     BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
+
+-- | Identifier from a 'PackageLocationImmutable'
+pliIdent :: PackageLocationImmutable -> PackageIdentifier
+pliIdent (PLIHackage ident _ _) = ident
+pliIdent (PLIArchive _ pm) = pmIdent pm
+pliIdent (PLIRepo _ pm) = pmIdent pm
