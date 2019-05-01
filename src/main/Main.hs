@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -7,17 +6,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
-#ifdef USE_GIT_INFO
-{-# LANGUAGE TemplateHaskell #-}
-#endif
-
 -- | Main stack tool entry point.
 
 module Main (main) where
 
-#ifndef HIDE_DEP_VERSIONS
-import qualified Build_stack
-#endif
+import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
@@ -31,20 +24,12 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           RIO.Process
-#ifdef USE_GIT_INFO
-import           GitHash (giCommitCount, giHash, tGitInfoCwdTry)
-#endif
-import           Distribution.System (buildArch)
-import qualified Distribution.Text as Cabal (display)
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
-#ifdef USE_GIT_INFO
-import           Options.Applicative.Simple (simpleVersion)
-#endif
 import           Options.Applicative.Types (ParserHelp(..))
 import           Pantry (loadSnapshot)
 import           Path
@@ -120,44 +105,6 @@ hSetTranslit h = do
               hSetEncoding h enc'
         _ -> return ()
 
-versionString' :: String
-#ifdef USE_GIT_INFO
-versionString' = concat $ concat
-    [ [$(simpleVersion Meta.version)]
-      -- Leave out number of commits for --depth=1 clone
-      -- See https://github.com/commercialhaskell/stack/issues/792
-    , case giCommitCount <$> $$tGitInfoCwdTry of
-        Left _ -> []
-        Right 1 -> []
-        Right count -> [" (", show count, " commits)"]
-    , [" ", Cabal.display buildArch]
-    , [depsString, warningString]
-    ]
-#else
-versionString' =
-    showVersion Meta.version
-    ++ ' ' : Cabal.display buildArch
-    ++ depsString
-    ++ warningString
-#endif
-  where
-#ifdef HIDE_DEP_VERSIONS
-    depsString = " hpack-" ++ VERSION_hpack
-#else
-    depsString = "\nCompiled with:\n" ++ unlines (map ("- " ++) Build_stack.deps)
-#endif
-#ifdef SUPPORTED_BUILD
-    warningString = ""
-#else
-    warningString = unlines
-      [ ""
-      , "Warning: this is an unsupported build that may use different versions of"
-      , "dependencies and GHC than the officially released binaries, and therefore may"
-      , "not behave identically.  If you encounter problems, please try the latest"
-      , "official build by running 'stack upgrade --force-download'."
-      ]
-#endif
-
 main :: IO ()
 main = do
   -- Line buffer the output by default, particularly for non-terminal runs.
@@ -218,7 +165,7 @@ commandLineHandler
 commandLineHandler currentDir progName isInterpreter = complicatedOptions
   (mkVersion' Meta.version)
   (Just versionString')
-  VERSION_hpack
+  hpackVersion
   "stack - The Haskell Tool Stack"
   ""
   "stack's documentation is available at https://docs.haskellstack.org/"
@@ -675,11 +622,7 @@ upgradeCmd upgradeOpts' = do
     Nothing ->
       withGlobalProject $
       upgrade
-#ifdef USE_GIT_INFO
-        (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
-#else
-        Nothing
-#endif
+        maybeGitHash
         upgradeOpts'
 
 -- | Upload to Hackage
