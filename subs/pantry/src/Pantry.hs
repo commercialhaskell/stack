@@ -1175,9 +1175,9 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
                  -> RawPackageLocationImmutable
                  -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
       addPackage (ps, completed) rawLoc = do
-        name <- getPackageLocationName rawLoc
         complLoc <- cachedSnapshotCompletePackageLocation cachedPL rawLoc
-        let p = (name, SnapshotPackage
+        let PackageIdentifier name _ = pliIdent complLoc
+            p = (name, SnapshotPackage
               { spLocation = complLoc
               , spFlags = Map.findWithDefault mempty name flags
               , spHidden = Map.findWithDefault False name hiddens
