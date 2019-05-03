@@ -123,6 +123,7 @@ dependencies:
 - yaml
 - zip-archive
 - zlib
+- binary
 when:
 - condition: os(windows)
   then:
@@ -184,6 +185,7 @@ library:
   - Stack.Init
   - Stack.Ls
   - Stack.Lock
+  - Stack.ModuleInterface
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser

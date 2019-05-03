@@ -1,13 +1,13 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections       #-}
 
 -- | Dealing with Cabal.
 
@@ -27,56 +27,62 @@ module Stack.Package
   ,applyForceCustomBuild
   ) where
 
-import qualified Data.ByteString.Lazy.Char8 as CL8
-import           Data.List (isPrefixOf, unzip)
-import           Data.Maybe (maybe)
-import qualified Data.Map.Strict as M
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.ByteString.Char8                  as B8
+import           Data.List                              (find, isPrefixOf,
+                                                         unzip)
+import qualified Data.Map.Strict                        as M
+import           Data.Maybe                             (fromMaybe, maybe)
+import qualified Data.Set                               as S
+import qualified Data.Text                              as T
 import           Distribution.Compiler
-import           Distribution.ModuleName (ModuleName)
-import qualified Distribution.ModuleName as Cabal
-import qualified Distribution.Package as D
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
-import qualified Distribution.PackageDescription as D
-import           Distribution.PackageDescription hiding (FlagName)
+import           Distribution.ModuleName                (ModuleName)
+import qualified Distribution.ModuleName                as Cabal
+import           Distribution.Package                   hiding (Package,
+                                                         PackageIdentifier,
+                                                         PackageName,
+                                                         packageName,
+                                                         packageVersion)
+import qualified Distribution.Package                   as D
+import           Distribution.PackageDescription        hiding (FlagName)
+import qualified Distribution.PackageDescription        as D
 import           Distribution.PackageDescription.Parsec
-import           Distribution.Simple.Glob (matchDirFileGlob)
-import           Distribution.System (OS (..), Arch, Platform (..))
-import qualified Distribution.Text as D
-import qualified Distribution.Types.CondTree as Cabal
-import qualified Distribution.Types.ExeDependency as Cabal
+import           Distribution.Simple.Glob               (matchDirFileGlob)
+import           Distribution.System                    (Arch, OS (..),
+                                                         Platform (..))
+import qualified Distribution.Text                      as D
+import qualified Distribution.Types.CondTree            as Cabal
+import qualified Distribution.Types.ExeDependency       as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import qualified Distribution.Verbosity as D
-import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
-import           Path as FL
+import qualified Distribution.Verbosity                 as D
+import           Distribution.Version                   (anyVersion, mkVersion,
+                                                         orLaterVersion)
+import           Path                                   as FL
 import           Path.Extra
-import           Path.IO hiding (findFiles)
+import           Path.IO                                hiding (findFiles)
+import           RIO.PrettyPrint
+import qualified RIO.PrettyPrint                        as PP (Style (Module))
+import           RIO.Process
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Prelude hiding (Display (..))
+import qualified Stack.ModuleInterface                  as Iface
+import           Stack.Prelude                          hiding (Display (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
-import qualified System.Directory as D
-import           System.FilePath (replaceExtension)
-import qualified System.FilePath as FilePath
+import qualified System.Directory                       as D
+import           System.FilePath                        (replaceExtension)
+import qualified System.FilePath                        as FilePath
 import           System.IO.Error
-import           RIO.Process
-import           RIO.PrettyPrint
-import qualified RIO.PrettyPrint as PP (Style (Module))
 
-data Ctx = Ctx { ctxFile :: !(Path Abs File)
-               , ctxDistDir :: !(Path Abs Dir)
+data Ctx = Ctx { ctxFile        :: !(Path Abs File)
+               , ctxDistDir     :: !(Path Abs Dir)
                , ctxBuildConfig :: !BuildConfig
                }
 
@@ -148,7 +154,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
          in
           case mlib of
             Nothing -> NoLibraries
-            Just _ -> HasLibraries foreignLibNames
+            Just _  -> HasLibraries foreignLibNames
     , packageInternalLibraries = subLibNames
     , packageTests = M.fromList
       [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
@@ -332,18 +338,18 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
 
 -- | Input to 'generateBuildInfoOpts'
 data BioInput = BioInput
-    { biInstallMap :: !InstallMap
-    , biInstalledMap :: !InstalledMap
-    , biCabalDir :: !(Path Abs Dir)
-    , biDistDir :: !(Path Abs Dir)
-    , biOmitPackages :: ![PackageName]
-    , biAddPackages :: ![PackageName]
-    , biBuildInfo :: !BuildInfo
-    , biDotCabalPaths :: ![DotCabalPath]
-    , biConfigLibDirs :: ![FilePath]
+    { biInstallMap        :: !InstallMap
+    , biInstalledMap      :: !InstalledMap
+    , biCabalDir          :: !(Path Abs Dir)
+    , biDistDir           :: !(Path Abs Dir)
+    , biOmitPackages      :: ![PackageName]
+    , biAddPackages       :: ![PackageName]
+    , biBuildInfo         :: !BuildInfo
+    , biDotCabalPaths     :: ![DotCabalPath]
+    , biConfigLibDirs     :: ![FilePath]
     , biConfigIncludeDirs :: ![FilePath]
-    , biComponentName :: !NamedComponent
-    , biCabalVersion :: !Version
+    , biComponentName     :: !NamedComponent
+    , biCabalVersion      :: !Version
     }
 
 -- | Generate GHC options for the target. Since Cabal also figures out
@@ -390,7 +396,7 @@ generateBuildInfoOpts BioInput {..} =
     ghcOpts = concatMap snd . filter (isGhc . fst) $ options biBuildInfo
       where
         isGhc GHC = True
-        isGhc _ = False
+        isGhc _   = False
     extOpts = map (("-X" ++) . D.display) (usedExtensions biBuildInfo)
     srcOpts =
         map (("-i" <>) . toFilePathNoTrailingSep)
@@ -406,7 +412,7 @@ generateBuildInfoOpts BioInput {..} =
               ]) ++
         [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir) ]
     componentAutogen = componentAutogenDir biCabalVersion biComponentName biDistDir
-    toIncludeDir "." = Just biCabalDir
+    toIncludeDir "."    = Just biCabalDir
     toIncludeDir relDir = concatAndColapseAbsDir biCabalDir relDir
     includeOpts =
         map ("-I" <>) (biConfigIncludeDirs <> pkgIncludeOpts)
@@ -485,21 +491,21 @@ componentBuildDir cabalVer component distDir
     | cabalVer < mkVersion [2, 0] = buildDir distDir
     | otherwise =
         case component of
-            CLib -> buildDir distDir
+            CLib              -> buildDir distDir
             CInternalLib name -> buildDir distDir </> componentNameToDir name
-            CExe name -> buildDir distDir </> componentNameToDir name
-            CTest name -> buildDir distDir </> componentNameToDir name
-            CBench name -> buildDir distDir </> componentNameToDir name
+            CExe name         -> buildDir distDir </> componentNameToDir name
+            CTest name        -> buildDir distDir </> componentNameToDir name
+            CBench name       -> buildDir distDir </> componentNameToDir name
 
 -- | The directory where generated files are put like .o or .hs (from .x files).
 componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentOutputDir namedComponent distDir =
     case namedComponent of
-        CLib -> buildDir distDir
+        CLib              -> buildDir distDir
         CInternalLib name -> makeTmp name
-        CExe name -> makeTmp name
-        CTest name -> makeTmp name
-        CBench name -> makeTmp name
+        CExe name         -> makeTmp name
+        CTest name        -> makeTmp name
+        CBench name       -> makeTmp name
   where
     makeTmp name =
       buildDir distDir </> componentNameToDir (name <> "/" <> name <> "-tmp")
@@ -737,7 +743,7 @@ benchmarkFiles component bench = do
     names = bnames <> exposed
     exposed =
         case benchmarkInterface bench of
-            BenchmarkExeV10 _ fp -> [DotCabalMain fp]
+            BenchmarkExeV10 _ fp   -> [DotCabalMain fp]
             BenchmarkUnsupported _ -> []
     bnames = map DotCabalModule (otherModules build)
     build = benchmarkBuildInfo bench
@@ -753,8 +759,8 @@ testFiles component test = do
     names = bnames <> exposed
     exposed =
         case testInterface test of
-            TestSuiteExeV10 _ fp -> [DotCabalMain fp]
-            TestSuiteLibV09 _ mn -> [DotCabalModule mn]
+            TestSuiteExeV10 _ fp   -> [DotCabalMain fp]
+            TestSuiteLibV09 _ mn   -> [DotCabalModule mn]
             TestSuiteUnsupported _ -> []
     bnames = map DotCabalModule (otherModules build)
     build = testBuildInfo test
@@ -842,7 +848,7 @@ targetJsSources = jsSources
 -- moment. Odds are, you're reading this in the year 2024 and thinking
 -- "wtf?"
 data PackageDescriptionPair = PackageDescriptionPair
-  { pdpOrigBuildable :: PackageDescription
+  { pdpOrigBuildable     :: PackageDescription
   , pdpModifiedBuildable :: PackageDescription
   }
 
@@ -930,10 +936,10 @@ flagMap = M.fromList . map pair
         pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
-    { rcFlags :: Map FlagName Bool
+    { rcFlags           :: Map FlagName Bool
     , rcCompilerVersion :: ActualCompiler
-    , rcOS :: OS
-    , rcArch :: Arch
+    , rcOS              :: OS
+    , rcArch            :: Arch
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
@@ -1016,7 +1022,7 @@ resolveFilesAndDeps component dirs names0 = do
         let foundFiles = mapMaybe snd resolved
             foundModules = mapMaybe toResolvedModule resolved
             missingModules = mapMaybe toMissingModule resolved
-        pairs <- mapM (getDependencies component) foundFiles
+        pairs <- mapM (getDependencies component dirs) foundFiles
         let doneModules =
                 S.union
                     doneModules0
@@ -1077,81 +1083,61 @@ resolveFilesAndDeps component dirs names0 = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies
-    :: NamedComponent -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
-getDependencies component dotCabalPath =
+    :: NamedComponent -> [Path Abs Dir] -> DotCabalPath -> RIO Ctx (Set ModuleName, [Path Abs File])
+getDependencies component dirs dotCabalPath =
     case dotCabalPath of
         DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
-        DotCabalMainPath resolvedFile -> readResolvedHi resolvedFile
-        DotCabalFilePath{} -> return (S.empty, [])
-        DotCabalCFilePath{} -> return (S.empty, [])
+        DotCabalMainPath resolvedFile   -> readResolvedHi resolvedFile
+        DotCabalFilePath{}              -> return (S.empty, [])
+        DotCabalCFilePath{}             -> return (S.empty, [])
   where
     readResolvedHi resolvedFile = do
         dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
         dir <- asks (parent . ctxFile)
-        case stripProperPrefix dir resolvedFile of
+        let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
+            stripSourceDir d = stripProperPrefix d resolvedFile
+        case stripSourceDir sourceDir of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
-                let dumpHIPath =
+                let hiPath =
                         FilePath.replaceExtension
                             (toFilePath (dumpHIDir </> fileRel))
-                            ".dump-hi"
-                dumpHIExists <- liftIO $ D.doesFileExist dumpHIPath
+                            ".hi"
+                dumpHIExists <- liftIO $ D.doesFileExist hiPath
                 if dumpHIExists
-                    then parseDumpHI dumpHIPath
+                    then parseHI hiPath
                     else return (S.empty, [])
 
--- | Parse a .dump-hi file into a set of modules and files.
-parseDumpHI
+-- | Parse a .hi file into a set of modules and files.
+parseHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
-parseDumpHI dumpHIPath = do
-    dir <- asks (parent . ctxFile)
-    dumpHI <- liftIO $ filterDumpHi <$> fmap CL8.lines (CL8.readFile dumpHIPath)
-    let startModuleDeps =
-            dropWhile (not . ("module dependencies:" `CL8.isPrefixOf`)) dumpHI
-        moduleDeps =
-            S.fromList $
-            mapMaybe (D.simpleParse . TL.unpack . TLE.decodeUtf8) $
-            CL8.words $
-            CL8.concat $
-            CL8.dropWhile (/= ' ') (fromMaybe "" $ listToMaybe startModuleDeps) :
-            takeWhile (" " `CL8.isPrefixOf`) (drop 1 startModuleDeps)
-        thDeps =
-            -- The dependent file path is surrounded by quotes but is not escaped.
-            -- It can be an absolute or relative path.
-                  TL.unpack .
-                  -- Starting with GHC 8.4.3, there's a hash following
-                  -- the path. See
-                  -- https://github.com/yesodweb/yesod/issues/1551
-                  TLE.decodeUtf8 .
-                  CL8.takeWhile (/= '\"') <$>
-            mapMaybe (CL8.stripPrefix "addDependentFile \"") dumpHI
-    thDepsResolved <- liftM catMaybes $ forM thDeps $ \x -> do
-        mresolved <- liftIO (forgivingAbsence (resolveFile dir x)) >>= rejectMissingFile
-        when (isNothing mresolved) $
-            prettyWarnL
-                [ flow "addDependentFile path (Template Haskell) listed in"
-                , style File $ fromString dumpHIPath
-                , flow "does not exist:"
-                , style File $ fromString x
-                ]
-        return mresolved
-    return (moduleDeps, thDepsResolved)
-  where
-    -- | Filtering step fixing RAM usage upon a big dump-hi file. See
-    --   https://github.com/commercialhaskell/stack/issues/4027 It is
-    --   an optional step from a functionality stand-point.
-    filterDumpHi dumpHI =
-        let dl x xs = x ++ xs
-            isLineInteresting (acc, moduleDepsStarted) l
-                | moduleDepsStarted && " " `CL8.isPrefixOf` l =
-                    (acc . dl [l], True)
-                | "module dependencies:" `CL8.isPrefixOf` l =
-                    (acc . dl [l], True)
-                | "addDependentFile \"" `CL8.isPrefixOf` l =
-                    (acc . dl [l], False)
-                | otherwise = (acc, False)
-         in fst (foldl' isLineInteresting (dl [], False) dumpHI) []
-
+parseHI hiPath = do
+  dir <- asks (parent . ctxFile)
+  result <- liftIO $ Iface.fromFile hiPath
+  case result of
+    Left msg -> do
+      prettyWarnL
+        [ flow "Failed to decode module interface:"
+        , style File $ fromString hiPath
+        , flow "Decoding failure:"
+        , style Error $ fromString msg
+        ]
+      pure (S.empty, [])
+    Right iface -> do
+      let moduleNames = fmap (fromString . B8.unpack . fst) . Iface.unList . Iface.dmods . Iface.deps
+          resolveFileDependency file = do
+            resolved <- liftIO (forgivingAbsence (resolveFile dir file)) >>= rejectMissingFile
+            when (isNothing resolved) $
+              prettyWarnL
+              [ flow "Dependent file listed in:"
+              , style File $ fromString hiPath
+              , flow "does not exist:"
+              , style File $ fromString file
+              ]
+            pure resolved
+          resolveUsages = traverse (resolveFileDependency . Iface.unUsage) . Iface.unList . Iface.usage
+      resolvedUsages <- catMaybes <$> resolveUsages iface
+      pure (S.fromList $ moduleNames iface, resolvedUsages)
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
@@ -1179,7 +1165,7 @@ parsePackageNameFromFilePath fp = do
     base <- clean $ toFilePath $ filename fp
     case parsePackageName base of
         Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
-        Just x -> return x
+        Just x  -> return x
   where clean = liftM reverse . strip . reverse
         strip ('l':'a':'b':'a':'c':'.':xs) = return xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
@@ -1208,9 +1194,9 @@ findCandidate dirs name = do
     cons =
         case name of
             DotCabalModule{} -> DotCabalModulePath
-            DotCabalMain{} -> DotCabalMainPath
-            DotCabalFile{} -> DotCabalFilePath
-            DotCabalCFile{} -> DotCabalCFilePath
+            DotCabalMain{}   -> DotCabalMainPath
+            DotCabalFile{}   -> DotCabalFilePath
+            DotCabalCFile{}  -> DotCabalCFilePath
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
         liftM (nubOrd . concat) (mapM makeDirCandidates dirs)
@@ -1236,7 +1222,7 @@ findCandidate dirs name = do
                   ([_], [y]) -> [y]
 
                   -- Otherwise, return everything
-                  (xs, ys) -> xs ++ ys
+                  (xs, ys)   -> xs ++ ys
     resolveCandidate dir = fmap maybeToList . resolveDirFile dir
 
 -- | Resolve file as a child of a specified directory, symlinks
@@ -1264,9 +1250,9 @@ warnMultiple name candidate rest =
         , dispOne candidate
         ]
   where showName (DotCabalModule name') = D.display name'
-        showName (DotCabalMain fp) = fp
-        showName (DotCabalFile fp) = fp
-        showName (DotCabalCFile fp) = fp
+        showName (DotCabalMain fp)      = fp
+        showName (DotCabalFile fp)      = fp
+        showName (DotCabalCFile fp)     = fp
         dispOne = fromString . toFilePath
           -- TODO: figure out why dispOne can't be just `display`
           --       (remove the .hlint.yaml exception if it can be)
