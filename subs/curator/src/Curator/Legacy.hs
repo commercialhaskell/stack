@@ -5,11 +5,20 @@
 module Curator.Legacy
   ( LegacySnapshot
   , toLegacySnapshot
+  , LegacyBulkArgs (..)
+  , legacyBulk
   ) where
 
+import Conduit
 import RIO
+import RIO.Directory (doesFileExist)
+import RIO.FilePath (splitDirectories, splitExtension, (</>))
+import RIO.List (stripPrefix)
 import RIO.PrettyPrint (HasTerm)
+import RIO.Time (fromGregorian)
 import Pantry
+import Path.IO (resolveFile')
+import Curator.Types
 import Data.Yaml
 
 data LegacySnapshot = LegacySnapshot
@@ -79,3 +88,54 @@ instance ToJSON PackageInfo where
         , "hidden" .= piHidden
         ]
     ]
+
+data LegacyBulkArgs = LegacyBulkArgs
+  { lbaSnapshots :: !FilePath
+  -- ^ Pantry snapshots dir
+  , lbaLts :: !FilePath
+  -- ^ Legacy LTS
+  , lbaNightly :: !FilePath
+  -- ^ Legacy nightly
+  }
+  deriving Show
+
+convert :: Convert -> RIO PantryApp ()
+convert Convert {..} = do
+  logInfo $ "Convert from " <> fromString convertFrom <> " to " <> fromString convertTo
+  abs' <- resolveFile' convertFrom
+  let sloc = SLFilePath $ ResolvedPath (RelFilePath (fromString convertFrom)) abs'
+  (snapshot, _, _) <- loadAndCompleteSnapshot sloc mempty mempty
+  legacy <- toLegacySnapshot snapshot
+  liftIO $ encodeFile convertTo legacy
+
+data Convert = Convert
+  { convertFrom :: !FilePath
+  , convertTo :: !FilePath
+  }
+  deriving Show
+
+legacyBulk :: LegacyBulkArgs -> RIO PantryApp ()
+legacyBulk LegacyBulkArgs {..} = do
+  logInfo "Bulk converting Pantry-based snapshots to legacy snapshots"
+  let toDest (TargetLts major minor) = lbaLts </> concat ["lts-", show major, ".", show minor, ".yaml"]
+      toDest (TargetNightly day) = lbaNightly </> concat ["nightly-", show day, ".yaml"]
+  runConduitRes $
+    sourceDirectoryDeep True lbaSnapshots .|
+    concatMapC (\fp -> Convert fp <$> (toDest <$> (stripDirPrefix lbaSnapshots fp >>= parseTarget))) .|
+    filterMC (fmap not . doesFileExist . convertTo) .|
+    mapM_C (lift . convert)
+
+stripDirPrefix :: FilePath -> FilePath -> Maybe [FilePath]
+stripDirPrefix prefix fp = stripPrefix (splitDirectories prefix) (splitDirectories fp)
+
+parseTarget :: [FilePath] -> Maybe Target
+parseTarget ["lts", major, minorYaml] = do
+  (minor, ".yaml") <- Just $ splitExtension minorYaml
+  TargetLts <$> readMaybe major <*> readMaybe minor
+parseTarget ["nightly", year, month, dayYaml] = do
+  (day, ".yaml") <- Just $ splitExtension dayYaml
+  TargetNightly <$> (fromGregorian
+    <$> readMaybe year
+    <*> readMaybe month
+    <*> readMaybe day)
+parseTarget _ = Nothing

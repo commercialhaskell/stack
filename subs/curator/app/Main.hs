@@ -77,6 +77,10 @@ options =
                  "Upload list of snapshot packages on Hackage as a distro"
                  hackageDistro
                  parseTarget
+      addCommand "legacy-bulk"
+                 "Bulk convert all new snapshots to the legacy LTS/Nightly directories"
+                 legacyBulk
+                 parseLegacyBulkArgs
     parseTarget =
       option (nightly <|> lts) ( long "target"
                               <> metavar "TARGET"
@@ -96,6 +100,10 @@ options =
                            <> value 1
                            <> help "Number of jobs to run Stackage build with"
                               )
+    parseLegacyBulkArgs = LegacyBulkArgs
+      <$> strOption (long "stackage-snapshots" <> metavar "DIR")
+      <*> strOption (long "lts-haskell" <> metavar "DIR")
+      <*> strOption (long "stackage-nightly" <> metavar "DIR")
 
 main :: IO ()
 main = runPantryApp $ do
