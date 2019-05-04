@@ -75,6 +75,7 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Environment
+import           System.Info.ShortPathName (getShortPathName)
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.List (unzip)
@@ -270,6 +271,20 @@ configFromConfigMonoid
      configLocalProgramsBase <- case getFirst configMonoidLocalProgramsBase of
        Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
        Just path -> return path
+     let localProgramsFilePath = toFilePath configLocalProgramsBase
+     when (osIsWindows && ' ' `elem` localProgramsFilePath) $ do
+       ensureDir configLocalProgramsBase
+       -- getShortPathName returns the long path name when a short name does not
+       -- exist.
+       shortLocalProgramsFilePath <-
+         liftIO $ getShortPathName localProgramsFilePath
+       when (' ' `elem` shortLocalProgramsFilePath) $ do
+         logWarn $ "Stack's 'programs' path contains a space character and " <>
+           "has no alternative short ('8 dot 3') name. This will cause " <>
+           "problems with packages that use the GNU project's 'configure' " <>
+           "shell script. Use the 'local-programs-path' configuation option " <>
+           "to specify an alternative path. The current 'shortest' path is: " <>
+           display (T.pack shortLocalProgramsFilePath)
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
