@@ -37,10 +37,11 @@ __resolver__, to the snapshot which your package will be built against.
 
 Finally, stack is __isolated__: it will not make changes outside of specific
 stack directories. stack-built files generally go in either the stack root
-directory (default `~/.stack`) or `./.stack-work` directories local to each
-project. The stack root directory holds packages belonging to snapshots and any
-stack-installed versions of GHC. Stack will not tamper with any system version
-of GHC or interfere with packages installed by `cabal` or any other build tools.
+directory (default `~/.stack` or, on Windows, `%LOCALAPPDATA%\Programs\stack`)
+or `./.stack-work` directories local to each project. The stack root directory
+holds packages belonging to snapshots and any stack-installed versions of GHC.
+Stack will not tamper with any system version of GHC or interfere with packages
+installed by `cabal` or any other build tools.
 
 _NOTE_ In this guide, we'll use commands as run on a GNU/Linux system
 (specifically Ubuntu 14.04, 64-bit) and share output from that. Output on other
@@ -558,8 +559,8 @@ Haskell packages, this will often be enough to build most packages. However,
 at times, you may find that not all dependencies required may be available in
 the Stackage snapshots.
 
-Let's simulate an unsatisfied dependency by adding acme-missiles to the list of dependencies 
-the build requires. This is done by including it in the `Build-depends` section in the .cabal file 
+Let's simulate an unsatisfied dependency by adding acme-missiles to the list of dependencies
+the build requires. This is done by including it in the `Build-depends` section in the .cabal file
 and then re-initing:
 
 ```
@@ -1198,7 +1199,8 @@ While we're talking about paths, to wipe our stack install completely, here's
 what needs to be removed:
 
 1. The stack executable itself
-2. The stack root, e.g. `$HOME/.stack` on non-Windows systems.
+2. The stack root, e.g. `$HOME/.stack` on non-Windows systems or, on Windows,
+   `%LOCALAPPDATA%\Programs\stack`.
     * See `stack path --stack-root`
     * On Windows, you will also need to delete `stack path --programs`
 3. Any local `.stack-work` directories inside a project
