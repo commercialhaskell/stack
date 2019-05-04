@@ -237,6 +237,8 @@ Other enhancements:
 * Use a database cache table to speed up discovery of installed GHCs
 * You can specify multiple `--test-arguments` options. See
   [#2226](https://github.com/commercialhaskell/stack/issues/2226)
+* Windows terminal width detection is now done. See
+  [#3588](https://github.com/commercialhaskell/stack/issues/3588)
 
 Bug fixes:
 
