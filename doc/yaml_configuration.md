@@ -346,7 +346,7 @@ snapshots failing to work.
 
 ### system-ghc
 
-Enables or disables using the GHC available on the PATH.
+Enables or disables using the GHC available on the PATH. (Make sure PATH is explicit, i.e., don't use ~.)
 Useful to enable if you want to save the time, bandwidth or storage space needed to setup an isolated GHC.
 Default is `false` unless the [Docker](docker_integration.md) or [Nix](nix_integration.md) integration is enabled.
 In a Nix-enabled configuration, stack is incompatible with `system-ghc: false`.
@@ -396,10 +396,10 @@ extra-lib-dirs:
 ```
 
 Since these are system-dependent absolute paths, it is recommended that you
-specify these in your `config.yaml` within the stack root (usually, `~/.stack`).
-If you control the build environment in your project's ``stack.yaml``, perhaps
-through docker or other means, then it may well make sense to include these
-there as well.
+specify these in your `config.yaml` within the stack root (usually, `~/.stack`
+or, on Windows, `%LOCALAPPDATA%\Programs\stack`). If you control the build
+environment in your project's ``stack.yaml``, perhaps through docker or other
+means, then it may well make sense to include these there as well.
 
 
 ### with-gcc
@@ -1003,9 +1003,21 @@ This overrides the location of the programs directory, where tools like ghc and
 msys get installed.
 
 On most systems, this defaults to a folder called `programs`
-within the stack root directory. On windows, if the `LOCALAPPDATA` environment
-variable exists, then it defaults to `$LOCALAPPDATA/Programs/stack/`, which
-follows windows conventions.
+within the stack root directory. On Windows, if the `LOCALAPPDATA` environment
+variable exists, then it defaults to `%LOCALAPPDATA%\Programs\stack`, which
+follows Windows' conventions.
+
+__NOTE__: On Windows, if there is a space character in the `%LOCALAPPDATA%` path
+(which may be the case if the relevant user account name and its corresponding
+user profie path have a space) this may cause problems with building packages
+that make use of the GNU project's `autoconf` package and `configure` shell
+script files. That may be the case particularly if there is no corresponding
+short name ('8 dot 3' name) for the folder in the path with the space (which may
+be the case if '8 dot 3' names have been stripped or their creation not enabled
+by default). If there are problems building, it will be necessary to override
+the default location of stack's programs directory to specify an alternative
+path that does not contain space characters. Examples of packages on Hackage
+that make use of `configure` are `network` and `process`.
 
 Since 1.3.0
 

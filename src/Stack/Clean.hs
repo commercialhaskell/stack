@@ -29,7 +29,7 @@ clean cleanOpts = do
     toDelete <- dirsToDelete cleanOpts
     logDebug $ "Need to delete: " <> fromString (show (map toFilePath toDelete))
     failures <- mapM cleanDir toDelete
-    when (or failures) $ liftIO exitFailure
+    when (or failures) $ liftIO System.Exit.exitFailure
   where
     cleanDir dir = do
       logDebug $ "Deleting directory: " <> fromString (toFilePath dir)

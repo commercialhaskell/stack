@@ -147,10 +147,10 @@ main = do
           -- This special handler stops "stack: " from being printed before the
           -- exception
           case fromException e of
-              Just ec -> liftIO $ exitWith ec
+              Just ec -> liftIO $ System.Exit.exitWith ec
               Nothing -> do
                   logError $ fromString $ displayException e
-                  liftIO exitFailure
+                  liftIO System.Exit.exitFailure
 
 -- Vertically combine only the error component of the first argument with the
 -- error component of the second.
@@ -564,7 +564,7 @@ buildCmd opts = do
     logError "Error: When building with stack, you should not use the -prof GHC option"
     logError "Instead, please use --library-profiling and --executable-profiling"
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
-    liftIO exitFailure
+    liftIO System.Exit.exitFailure
   local (over globalOptsL modifyGO) $
     withConfig YesReexec $
     case boptsCLIFileWatch opts of
@@ -651,13 +651,13 @@ uploadCmd sdistOpts = do
                 , flow "Can't find:"
                 , line <> invalidList
                 ]
-            liftIO exitFailure
+            liftIO System.Exit.exitFailure
         when (null files && null dirs) $ do
             prettyErrorL
                 [ PP.style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
-            liftIO exitFailure
+            liftIO System.Exit.exitFailure
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
         getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
@@ -695,7 +695,7 @@ sdistCmd sdistOpts =
                         , pretty stackYaml
                         , flow "contains no packages, so no sdist tarballs will be generated."
                         ]
-                    liftIO exitFailure
+                    liftIO System.Exit.exitFailure
                 return dirs
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
@@ -752,7 +752,7 @@ execCmd ExecOpts {..} =
               -- should never happen as we have already installed the packages
               _      -> liftIO $ do
                   hPutStrLn stderr ("Could not find package id of package " ++ name)
-                  exitFailure
+                  System.Exit.exitFailure
 
       getPkgOpts pkgs =
           map ("-package-id=" ++) <$> mapM getPkgId pkgs
@@ -774,7 +774,7 @@ execCmd ExecOpts {..} =
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
-                  liftIO exitFailure
+                  liftIO System.Exit.exitFailure
 
       getGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs

@@ -1381,7 +1381,7 @@ installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir 
                     <> line <> line <>
                     "For more information consider rerunning with --verbose flag"
                     <> line
-                  liftIO exitFailure
+                  liftIO System.Exit.exitFailure
 
     logSticky $
       "Unpacking GHC into " <>

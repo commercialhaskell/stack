@@ -308,8 +308,8 @@ runContainerAndExit = do
 #endif
          )
      case e of
-       Left ExitCodeException{eceExitCode} -> liftIO (exitWith eceExitCode)
-       Right () -> liftIO exitSuccess
+       Left ExitCodeException{eceExitCode} -> liftIO (System.Exit.exitWith eceExitCode)
+       Right () -> liftIO System.Exit.exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
