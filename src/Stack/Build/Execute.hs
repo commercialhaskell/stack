@@ -71,6 +71,7 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
+import           Stack.DefaultColorWhen (defaultColorWhen)
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
@@ -913,8 +914,41 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
       exists <- doesFileExist fp
       unless exists $ do
         logInfo $ "Trying to generate configure with autoreconf in " <> fromString (toFilePath pkgDir)
-        withWorkingDir (toFilePath pkgDir) $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
+        let autoreconf = if osIsWindows
+                           then readProcessNull "sh" ["autoreconf", "-i"]
+                           else readProcessNull "autoreconf" ["-i"]
+            -- On Windows 10, an upstream issue with the `sh autoreconf -i`
+            -- command means that command clears, but does not then restore, the
+            -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+            -- folowing hack re-enables the lost ANSI-capability.
+            fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
+        withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
+          fixupOnWindows
           logWarn $ "Unable to run autoreconf: " <> displayShow ex
+          when osIsWindows $ do
+            logInfo $ "Check that executable perl is on the path in stack's " <>
+              "MSYS2 \\usr\\bin folder, and working, and that script file " <>
+              "autoreconf is on the path in that location. To check that " <>
+              "perl or autoreconf are on the path in the required location, " <>
+              "run commands:"
+            logInfo ""
+            logInfo "  stack exec where -- perl"
+            logInfo "  stack exec where -- autoreconf"
+            logInfo ""
+            logInfo $ "If perl or autoreconf is not on the path in the " <>
+              "required location, add them with command (note that the " <>
+              "relevant package name is 'autoconf' not 'autoreconf'):"
+            logInfo ""
+            logInfo "  stack exec pacman -- --sync --refresh autoconf"
+            logInfo ""
+            logInfo $ "Some versions of perl from MYSY2 are broken. See " <>
+              "https://github.com/msys2/MSYS2-packages/issues/1611 and " <>
+              "https://github.com/commercialhaskell/stack/pull/4781. To " <>
+              "test if perl in the required location is working, try command:"
+            logInfo ""
+            logInfo "  stack exec perl -- --version"
+            logInfo ""
+        fixupOnWindows
 
 -- | Make a padded prefix for log messages
 packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
