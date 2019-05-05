@@ -20,7 +20,6 @@ import qualified Stack.Build
 import           Stack.Build.Target (NeedTargets(NeedTargets))
 import           Stack.Runners
 import           Stack.Types.Config
-import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
@@ -132,7 +131,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
           (hoogleArgs ++ databaseArg)
           runProcess_
     bail :: RIO EnvConfig a
-    bail = liftIO (System.Exit.exitWith (ExitFailure (-1)))
+    bail = exitWith (ExitFailure (-1))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)

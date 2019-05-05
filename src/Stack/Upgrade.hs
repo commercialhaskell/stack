@@ -23,7 +23,6 @@ import           Stack.Runners
 import           Stack.Setup
 import           Stack.Types.Config
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           RIO.PrettyPrint
 import           RIO.Process

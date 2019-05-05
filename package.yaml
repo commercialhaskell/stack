@@ -99,7 +99,7 @@ dependencies:
 - resource-pool
 - resourcet
 - retry >= 0.7
-- rio
+- rio >= 0.1.9.2
 - rio-prettyprint
 - semigroups
 - split

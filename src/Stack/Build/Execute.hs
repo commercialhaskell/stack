@@ -83,7 +83,6 @@ import           Stack.Types.Package
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
-import           System.Exit (ExitCode (..))
 import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)

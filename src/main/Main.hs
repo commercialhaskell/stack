@@ -87,7 +87,6 @@ import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
-import           System.Exit
 import           System.FilePath (isValid, pathSeparator, takeDirectory)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
@@ -147,10 +146,10 @@ main = do
           -- This special handler stops "stack: " from being printed before the
           -- exception
           case fromException e of
-              Just ec -> liftIO $ System.Exit.exitWith ec
+              Just ec -> exitWith ec
               Nothing -> do
                   logError $ fromString $ displayException e
-                  liftIO System.Exit.exitFailure
+                  exitFailure
 
 -- Vertically combine only the error component of the first argument with the
 -- error component of the second.
@@ -564,7 +563,7 @@ buildCmd opts = do
     logError "Error: When building with stack, you should not use the -prof GHC option"
     logError "Instead, please use --library-profiling and --executable-profiling"
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
-    liftIO System.Exit.exitFailure
+    exitFailure
   local (over globalOptsL modifyGO) $
     withConfig YesReexec $
     case boptsCLIFileWatch opts of
@@ -651,13 +650,13 @@ uploadCmd sdistOpts = do
                 , flow "Can't find:"
                 , line <> invalidList
                 ]
-            liftIO System.Exit.exitFailure
+            exitFailure
         when (null files && null dirs) $ do
             prettyErrorL
                 [ PP.style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
-            liftIO System.Exit.exitFailure
+            exitFailure
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
         getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
@@ -695,7 +694,7 @@ sdistCmd sdistOpts =
                         , pretty stackYaml
                         , flow "contains no packages, so no sdist tarballs will be generated."
                         ]
-                    liftIO System.Exit.exitFailure
+                    exitFailure
                 return dirs
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
@@ -750,9 +749,9 @@ execCmd ExecOpts {..} =
           case mId of
               Just i -> return (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
-              _      -> liftIO $ do
-                  hPutStrLn stderr ("Could not find package id of package " ++ name)
-                  System.Exit.exitFailure
+              _      -> do
+                  logError ("Could not find package id of package " <> fromString name)
+                  exitFailure
 
       getPkgOpts pkgs =
           map ("-package-id=" ++) <$> mapM getPkgId pkgs
@@ -774,7 +773,7 @@ execCmd ExecOpts {..} =
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
-                  liftIO System.Exit.exitFailure
+                  exitFailure
 
       getGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs
