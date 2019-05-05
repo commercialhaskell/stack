@@ -133,6 +133,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Support MX Linux in get-stack.sh. Fixes
+  [#4769](https://github.com/commercialhaskell/stack/issues/4769).
 * Defer loading up of files for local packages. This allows us to get
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
@@ -235,6 +237,8 @@ Other enhancements:
 * Use a database cache table to speed up discovery of installed GHCs
 * You can specify multiple `--test-arguments` options. See
   [#2226](https://github.com/commercialhaskell/stack/issues/2226)
+* Windows terminal width detection is now done. See
+  [#3588](https://github.com/commercialhaskell/stack/issues/3588)
 
 Bug fixes:
 
