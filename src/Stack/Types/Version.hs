@@ -24,7 +24,6 @@ module Stack.Types.Version
 
 import           Stack.Prelude hiding (Vector)
 import           Data.Aeson.Extended
-import           Data.List
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Text (disp)

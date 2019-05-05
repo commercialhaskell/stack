@@ -91,7 +91,6 @@ import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
 import              System.Environment (getExecutablePath, lookupEnv)
-import              System.Exit (ExitCode (..), exitFailure)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -1381,7 +1380,7 @@ installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir 
                     <> line <> line <>
                     "For more information consider rerunning with --verbose flag"
                     <> line
-                  liftIO exitFailure
+                  exitFailure
 
     logSticky $
       "Unpacking GHC into " <>

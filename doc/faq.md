@@ -360,6 +360,17 @@ copying the files somewhere Windows finds them (cf. https://msdn.microsoft.com/d
 
 Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
 
+Another issue that may arise with building on Windows is as follows. The default
+location of stack's programs folder is `%LOCALAPPDATA\Programs\stack`. If there
+is a space character in the `%LOCALAPPDATA%` path this may, in some
+circumstances, cause problems with building packages that make use of the GNU
+project's `autoconf` package and `configure` shell script files. It may be
+necessary to override the default location of stack's programs folder. See
+[Non-project-specific config option, local-programs-path](yaml_configuration.md)
+for more informaton.
+
+Cf. issue [#4726](https://github.com/commercialhaskell/stack/issues/4726)
+
 ## Can I change stack's default temporary directory?
 
 Stack downloads and extracts files to `$STACK_ROOT/programs` on most platforms,

@@ -148,9 +148,9 @@ stack ghci
 λ: :main --stack-root /path/to/root/ --stack-yaml /path/to/stack.yaml COMMAND
 ```
 
-This allows you to set a special stack root (instead of `~/.stack/`) and to
-target your commands at a particular `stack.yaml` instead of the one found in
-the current directory.
+This allows you to set a special stack root (instead of `~/.stack/` or, on
+Windows, `%LOCALAPPDATA%\Programs\stack`) and to target your commands at a
+particular `stack.yaml` instead of the one found in the current directory.
 
 #### Complete guide to stack
 
@@ -203,4 +203,3 @@ label on the Github issue tracker.
 
 #### How to uninstall
 Removing ``~/.stack`` and ``/usr/local/bin/stack`` should be sufficient. You may want to delete ``.stack-work`` folders in any Haskell projects that you have built.
-
