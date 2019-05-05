@@ -66,6 +66,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
+- hi-file-parser
 - hpack
 - hpc
 - http-client
