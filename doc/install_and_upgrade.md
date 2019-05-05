@@ -89,6 +89,11 @@ After installation, running `stack setup` might fail with `configure: error: can
 
     xcode-select --install
 
+Starting with macOs 10.14 (Mojave) running `xcode-select --install` [might not be enough](https://forums.developer.apple.com/thread/104296). You will need to install additional headers by running:
+
+    cd /Library/Developer/CommandLineTools/Packages/
+    open macOS_SDK_headers_for_macOS_10.14.pkg
+
 If you are on OS X 10.11 ("El Capitan") and encounter either of these
 problems, see the linked FAQ entries:
 
