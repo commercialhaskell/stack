@@ -146,7 +146,7 @@ main = do
           -- This special handler stops "stack: " from being printed before the
           -- exception
           case fromException e of
-              Just ec -> System.Exit.exitWith ec
+              Just ec -> exitWith ec
               Nothing -> do
                   logError $ fromString $ displayException e
                   exitFailure
