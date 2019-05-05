@@ -1,7 +1,7 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Stack.ModuleInterface
+module HiFileParser
     ( Interface(..)
     , List(..)
     , Dictionary(..)
