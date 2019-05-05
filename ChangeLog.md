@@ -304,6 +304,13 @@ Hackage-only release with no user facing changes (added compatibility
 with `rio-0.1.9.2`).
 
 
+
+## v1.9.3.1
+
+Hackage-only release with no user facing changes (added compatibility
+with `rio-0.1.9.2`).
+
+
 ## v1.9.3
 
 Bug fixes:
