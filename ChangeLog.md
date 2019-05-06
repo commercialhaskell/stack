@@ -239,6 +239,10 @@ Other enhancements:
   [#2226](https://github.com/commercialhaskell/stack/issues/2226)
 * Windows terminal width detection is now done. See
   [#3588](https://github.com/commercialhaskell/stack/issues/3588)
+* On Windows, informs users if the 'programs' path contains a space character
+  and further warns users if that path does not have an alternative short
+  ('8 dot 3') name, referencing the `local-programs-path` configuration option.
+  See [#4726](https://github.com/commercialhaskell/stack/issues/4726)
 
 Bug fixes:
 
