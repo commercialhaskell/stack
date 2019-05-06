@@ -61,12 +61,11 @@ share [ mkPersist sqlSettings
     ]
     [persistLowerCase|
 ConfigCacheParent sql="config_cache"
-  key Text SafeToRemove
   directory FilePath "default=(hex(randomblob(16)))"
-  type ConfigCacheType default=''
-  pkgSrc CachePkgSrc default=''
-  active Bool default=0
-  pathEnvVar Text default=''
+  type ConfigCacheType
+  pkgSrc CachePkgSrc
+  active Bool
+  pathEnvVar Text
   UniqueConfigCacheParent directory type sql="unique_config_cache"
   deriving Show
 
@@ -97,12 +96,11 @@ ConfigCacheComponent
   deriving Show
 
 PrecompiledCacheParent sql="precompiled_cache"
-  key Text SafeToRemove
   platformGhcDir FilePath "default=(hex(randomblob(16)))"
-  compiler Text default=''
-  cabalVersion Text default=''
-  packageKey Text default=''
-  optionsHash ByteString default=''
+  compiler Text
+  cabalVersion Text
+  packageKey Text
+  optionsHash ByteString
   library FilePath Maybe
   UniquePrecompiledCacheParent platformGhcDir compiler cabalVersion packageKey optionsHash sql="unique_precompiled_cache"
   deriving Show
