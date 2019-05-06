@@ -116,7 +116,8 @@ lockCachedWanted stackFile resolver fillWanted = do
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
     let lockLocations = map (uncurry LockedLocation)
-        newLocked = Locked { lckSnapshotLocations = lockLocations slocCompleted
+        differentSnapLocs (raw, complete) = raw /= toRawSL complete
+        newLocked = Locked { lckSnapshotLocations = lockLocations $ filter differentSnapLocs slocCompleted
                            , lckPkgImmutableLocations =
                              lockLocations $ pliCompleted <> prjCompleted
                            }
