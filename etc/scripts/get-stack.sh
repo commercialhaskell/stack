@@ -291,8 +291,9 @@ do_osx_install() {
   info "Using generic bindist..."
   info ""
   install_64bit_osx_binary
-  info "NOTE: You may need to run 'xcode-select --install' to set"
-  info "      up the Xcode command-line tools, which Stack uses."
+  info "NOTE: You may need to run 'xcode-select --install' and/or"
+  info "      'open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg'"
+  info "      to set up the Xcode command-line tools, which Stack uses."
   info ""
 }
 
