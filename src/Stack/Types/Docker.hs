@@ -10,7 +10,7 @@
 module Stack.Types.Docker where
 
 import Stack.Prelude hiding (Display (..))
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.List (intercalate)
 import qualified Data.Text as T
 import Distribution.System (Platform(..), OS(..), Arch(..))

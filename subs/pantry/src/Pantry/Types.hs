@@ -123,7 +123,7 @@ import qualified Data.Map.Strict as Map (mapKeysMonotonic)
 import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.Aeson.Encoding.Internal (unsafeToEncoding)
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
@@ -714,6 +714,8 @@ instance FromJSON PackageIdentifierRevision where
       Right pir -> pure pir
 
 -- | Parse a hackage text.
+--
+-- @since 0.1.0.0
 parseHackageText :: Text -> Either PantryException (PackageIdentifier, BlobKey)
 parseHackageText t = maybe (Left $ PackageIdentifierRevisionParseFail t) Right $ do
   let (identT, cfiT) = T.break (== '@') t
@@ -2250,6 +2252,10 @@ toRawSnapshotLayer sl = RawSnapshotLayer
   , rslPublishTime = slPublishTime sl
   }
 
+-- | An arbitrary hash for a snapshot, used for finding module names
+-- in a snapshot. Mostly intended for Stack's usage.
+--
+-- @since 0.1.0.0
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
 

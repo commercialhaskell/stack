@@ -41,7 +41,7 @@ import Database.Persist.Sqlite
 import Database.Persist.TH
 import Distribution.Text (simpleParse, display)
 import Foreign.C.Types (CTime (..))
-import qualified Pantry.SQLite as SQLite
+import qualified Pantry.Internal as SQLite
 import Path
 import Path.IO (resolveFile', resolveDir')
 import qualified RIO.FilePath as FP

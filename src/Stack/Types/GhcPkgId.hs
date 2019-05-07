@@ -14,7 +14,7 @@ module Stack.Types.GhcPkgId
   where
 
 import           Stack.Prelude
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
 import           Data.Attoparsec.Text
 import qualified Data.Text as T
 import           Database.Persist.Sql (PersistField, PersistFieldSql)

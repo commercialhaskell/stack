@@ -8,7 +8,7 @@
 
 module Stack.Types.Nix where
 
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Stack.Prelude
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 

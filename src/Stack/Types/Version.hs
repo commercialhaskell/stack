@@ -23,7 +23,7 @@ module Stack.Types.Version
   where
 
 import           Stack.Prelude hiding (Vector)
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Text (disp)

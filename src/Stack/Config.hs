@@ -34,7 +34,7 @@ module Stack.Config
 
 import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
 import qualified Data.ByteString as S
 import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
@@ -577,7 +577,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
       (pl, mCompleted) <- case rpl of
          RPLImmutable rpli -> do
            compl <- maybe (completePackageLocation rpli) pure (Map.lookup rpli locCache)
-           pure (PLImmutable compl, Just (rpli, compl))
+           pure (PLImmutable compl, Just (CompletedPLI rpli compl))
          RPLMutable p ->
            pure (PLMutable p, Nothing)
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl

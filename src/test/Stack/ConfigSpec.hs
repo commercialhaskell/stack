@@ -5,7 +5,7 @@
 module Stack.ConfigSpec where
 
 import Control.Arrow
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.Yaml
 import Pantry.Internal (pcHpackExecutable)
 import Path

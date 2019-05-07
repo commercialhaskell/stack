@@ -1,7 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 -- | Companion threads, such as for printing messages saying we're
--- still busy. Ultimately this could be put into its own package.
+-- still busy. Ultimately this could be put into its own package. This
+-- is a non-standard API for use by Pantry and Stack, please /DO NOT
+-- DEPEND ON IT/.
 module Pantry.Internal.Companion
   ( withCompanion
   , onCompanionDone

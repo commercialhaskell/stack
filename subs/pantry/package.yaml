@@ -101,20 +101,29 @@ library:
   exposed-modules:
   - Pantry
   - Pantry.SHA256
-  - Pantry.HPack
-  - Pantry.SQLite
 
   # For testing
   - Pantry.Internal
   - Pantry.Internal.StaticBytes
+
   # For stackage-server
   - Pantry.Internal.Stackage
 
   # For stack
   - Pantry.Internal.Companion
+  - Pantry.Internal.AesonExtended
 
-  # FIXME must be removed from pantry!
-  - Data.Aeson.Extended
+  other-modules:
+  - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  - Pantry.Archive
+  - Pantry.HTTP
+  - Pantry.HPack
+  - Pantry.Hackage
+  - Pantry.Repo
+  - Pantry.SQLite
+  - Pantry.Storage
+  - Pantry.Tree
+  - Pantry.Types
 
 tests:
   spec:
