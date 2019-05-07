@@ -60,7 +60,11 @@ globalOptsParser currentDir kind defLogLevel =
              completer (fileExtCompleter [".yaml"]) <>
              help ("Override project stack.yaml file " <>
                    "(overrides any STACK_YAML environment variable)") <>
-             hide))
+             hide)) <*>
+    optionalFirst (option readLockFileBehavior
+        (long "lock-file" <>
+         help "Specify how to interact with lock files. Default: read/write. If resolver or compiler is overridden: read-only" <>
+         hide))
   where
     hide = hideMods hide0
     hide0 = kind /= OuterGlobalOpts
@@ -90,6 +94,12 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalStylesUpdate = globalMonoidStyles
     , globalTermWidth = getFirst globalMonoidTermWidth
     , globalStackYaml = stackYaml
+    , globalLockFileBehavior =
+        let defLFB =
+              case (getFirst globalMonoidResolver, getFirst globalMonoidCompiler) of
+                (Nothing, Nothing) -> LFBReadWrite
+                _ -> LFBReadOnly
+         in fromFirst defLFB globalMonoidLockFileBehavior
     }
 
 initOptsParser :: Parser InitOpts
