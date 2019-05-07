@@ -131,6 +131,8 @@ Behavior changes:
   `recommend-stack-upgrade: false` to bypass this. See
   [#1681](https://github.com/commercialhaskell/stack/issues/1681).
 
+* `stack list-dependencies` has been removed in favour of `stack ls dependencies`.
+
 Other enhancements:
 
 * Support MX Linux in get-stack.sh. Fixes
