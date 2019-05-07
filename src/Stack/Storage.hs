@@ -294,10 +294,10 @@ deactiveConfigCache (UniqueConfigCacheParent dir type_) =
         [ConfigCacheParentDirectory ==. dir, ConfigCacheParentType ==. type_]
         [ConfigCacheParentActive =. False]
 
--- | Key used to retrieve to retrieve the precompiled cache
+-- | Key used to retrieve the precompiled cache
 type PrecompiledCacheKey = Unique PrecompiledCacheParent
 
--- | Build key used to retrieve to retrieve the precompiled cache
+-- | Build key used to retrieve the precompiled cache
 precompiledCacheKey ::
        Path Rel Dir
     -> ActualCompiler
