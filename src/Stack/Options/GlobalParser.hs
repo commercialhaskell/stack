@@ -63,7 +63,7 @@ globalOptsParser currentDir kind defLogLevel =
              hide)) <*>
     optionalFirst (option readLockFileBehavior
         (long "lock-file" <>
-         help "Specify how to interact with lock files. Default: read/write. If resolver or compiler is overridden: read-only" <>
+         help "Specify how to interact with lock files. Default: read/write. If resolver is overridden: read-only" <>
          hide))
   where
     hide = hideMods hide0
@@ -96,8 +96,8 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalStackYaml = stackYaml
     , globalLockFileBehavior =
         let defLFB =
-              case (getFirst globalMonoidResolver, getFirst globalMonoidCompiler) of
-                (Nothing, Nothing) -> LFBReadWrite
+              case getFirst globalMonoidResolver of
+                Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
          in fromFirst defLFB globalMonoidLockFileBehavior
     }
