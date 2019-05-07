@@ -56,14 +56,14 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
        pure $ withWarnings $ SingleRPLI . NE.head <$> unresolvedRPLIs
 
 data Locked = Locked
-    { lckSnapshotLocaitons :: [LockedLocation RawSnapshotLocation SnapshotLocation]
+    { lckSnapshotLocations :: [LockedLocation RawSnapshotLocation SnapshotLocation]
     , lckPkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
     } deriving (Eq, Show)
 
 instance ToJSON Locked where
     toJSON Locked {..} =
         object
-            [ "snapshots" .= lckSnapshotLocaitons
+            [ "snapshots" .= lckSnapshotLocations
             , "packages" .= lckPkgImmutableLocations
             ]
 
@@ -108,7 +108,7 @@ lockCachedWanted stackFile resolver fillWanted = do
             resolvePaths (Just $ parent stackFile) unresolvedLocked
     let toMap :: Ord a => [LockedLocation a b] -> Map a b
         toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
-        slocCache = toMap $ lckSnapshotLocaitons locked
+        slocCache = toMap $ lckSnapshotLocations locked
         pkgLocCache = toMap $ lckPkgImmutableLocations locked
     (snap, slocCompleted, pliCompleted) <-
         loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
@@ -116,7 +116,8 @@ lockCachedWanted stackFile resolver fillWanted = do
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
     let lockLocations = map (uncurry LockedLocation)
-        newLocked = Locked { lckSnapshotLocaitons = lockLocations slocCompleted
+        differentSnapLocs (raw, complete) = raw /= toRawSL complete
+        newLocked = Locked { lckSnapshotLocations = lockLocations $ filter differentSnapLocs slocCompleted
                            , lckPkgImmutableLocations =
                              lockLocations $ pliCompleted <> prjCompleted
                            }
