@@ -168,13 +168,13 @@ strategy:
     stack-lts-13:
       BUILD: stack
       STACK_YAML: stack-lts-13.yaml
-    cabal-8.4.3:
+    cabal-8.4.4:
       BUILD: cabal
-      GHCVER: 8.4.3
+      GHCVER: 8.4.4
       CABALVER: 2.4
-    cabal-8.6.3:
+    cabal-8.6.5:
       BUILD: cabal
-      GHCVER: 8.6.3
+      GHCVER: 8.6.5
       CABALVER: 2.4
     nightly:
       BUILD: stack

@@ -19,7 +19,7 @@ extra-source-files:
 
 dependencies:
 - base
-- ansi-terminal >= 0.8.1
+- ansi-terminal
 - digest
 - rio
 - aeson
@@ -45,16 +45,16 @@ dependencies:
 - cryptonite
 - cryptonite-conduit
 - persistent
-- persistent-sqlite >= 2.9.3
+- persistent-sqlite
 - persistent-template
-- Cabal >= 2.4
+- Cabal
 - path-io
 - rio-orphans
 - conduit-extra
-- tar-conduit >= 0.3.0
+- tar-conduit
 - time
 - unix-compat
-- hpack >= 0.29.6
+- hpack
 - yaml
 - zip-archive
 - text-metrics
