@@ -66,6 +66,7 @@ Major changes:
 
 * Remove support for building GHCJS itself. Future releases of Stack
   may remove GHCJS support entirely.
+* Support for lock files for pinning exact project dependency versions
 
 Behavior changes:
 * `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
@@ -119,8 +120,21 @@ Behavior changes:
   means that Stack will no longer have to force reconfigures as often. See
   [#3554](https://github.com/commercialhaskell/stack/issues/3554).
 
+* When building a package, Stack takes a lock on the dist directory in
+  use to avoid multiple runs of Stack from trampling each others'
+  files. See
+  [#2730](https://github.com/commercialhaskell/stack/issues/2730).
+
+* Stack will check occassionally if there is a new version available and prompt
+  the user to upgrade. This will not incur any additional network traffic, as
+  it will piggy-back on the existing Hackage index updates. You can set
+  `recommend-stack-upgrade: false` to bypass this. See
+  [#1681](https://github.com/commercialhaskell/stack/issues/1681).
+
 Other enhancements:
 
+* Support MX Linux in get-stack.sh. Fixes
+  [#4769](https://github.com/commercialhaskell/stack/issues/4769).
 * Defer loading up of files for local packages. This allows us to get
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
@@ -223,6 +237,12 @@ Other enhancements:
 * Use a database cache table to speed up discovery of installed GHCs
 * You can specify multiple `--test-arguments` options. See
   [#2226](https://github.com/commercialhaskell/stack/issues/2226)
+* Windows terminal width detection is now done. See
+  [#3588](https://github.com/commercialhaskell/stack/issues/3588)
+* On Windows, informs users if the 'programs' path contains a space character
+  and further warns users if that path does not have an alternative short
+  ('8 dot 3') name, referencing the `local-programs-path` configuration option.
+  See [#4726](https://github.com/commercialhaskell/stack/issues/4726)
 
 Bug fixes:
 
@@ -280,6 +300,20 @@ Bug fixes:
   extra error when the in-container re-exec'ed `stack` exits with failure.
 * The `stack ghci` command's `--ghc-options` flag now parses multiple options.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
+
+
+## v1.9.3.1
+
+Hackage-only release with no user facing changes (added compatibility
+with `rio-0.1.9.2`).
+
+
+
+## v1.9.3.1
+
+Hackage-only release with no user facing changes (added compatibility
+with `rio-0.1.9.2`).
+
 
 ## v1.9.3
 

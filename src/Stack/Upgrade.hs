@@ -23,7 +23,6 @@ import           Stack.Runners
 import           Stack.Setup
 import           Stack.Types.Config
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process              (rawSystem, readProcess)
 import           RIO.PrettyPrint
 import           RIO.Process
@@ -210,7 +209,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
       Nothing -> withConfig NoReexec $ do
         void $ updateHackageIndex
              $ Just "Updating index to make sure we find the latest Stack version"
-        mversion <- getLatestHackageVersion "stack" UsePreferredVersions
+        mversion <- getLatestHackageVersion YesRequireHackageIndex "stack" UsePreferredVersions
         (PackageIdentifierRevision _ version _) <-
           case mversion of
             Nothing -> throwString "No stack found in package indices"
@@ -223,7 +222,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             else do
                 suffix <- parseRelDir $ "stack-" ++ versionString version
                 let dir = tmp </> suffix
-                mrev <- getLatestHackageRevision "stack" version
+                mrev <- getLatestHackageRevision YesRequireHackageIndex "stack" version
                 case mrev of
                   Nothing -> throwString "Latest version with no revision"
                   Just (_rev, cfKey, treeKey) -> do

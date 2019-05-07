@@ -10,7 +10,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
 module Pantry.Types
   ( PantryConfig (..)
@@ -91,6 +90,7 @@ module Pantry.Types
   , RawSnapshotLocation (..)
   , SnapshotLocation (..)
   , toRawSL
+  , parseHackageText
   , parseRawSnapshotLocation
   , RawSnapshotLayer (..)
   , SnapshotLayer (..)
@@ -105,6 +105,8 @@ module Pantry.Types
   , toRawPM
   , cabalFileName
   , SnapshotCacheHash (..)
+  , getGlobalHintsFile
+  , bsToBlobKey
   ) where
 
 import RIO
@@ -114,7 +116,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (isSpace)
 import RIO.List (intersperse)
-import RIO.Time (toGregorian, Day, fromGregorianValid)
+import RIO.Time (toGregorian, Day, fromGregorianValid, UTCTime)
 import qualified RIO.Map as Map
 import qualified RIO.HashMap as HM
 import qualified Data.Map.Strict as Map (mapKeysMonotonic)
@@ -122,6 +124,7 @@ import qualified RIO.Set as Set
 import Data.Aeson (ToJSON (..), FromJSON (..), withText, FromJSONKey (..))
 import Data.Aeson.Types (ToJSONKey (..) ,toJSONKeyText, Parser)
 import Data.Aeson.Extended
+import Data.Aeson.Encoding.Internal (unsafeToEncoding)
 import Data.ByteString.Builder (toLazyByteString, byteString, wordDec)
 import Database.Persist
 import Database.Persist.Sql
@@ -130,7 +133,7 @@ import qualified Pantry.SHA256 as SHA256
 import qualified Distribution.Compat.ReadP as Parse
 import Distribution.CabalSpecVersion (CabalSpecVersion (..), cabalSpecLatest)
 import Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
-import Distribution.Types.PackageName (PackageName, unPackageName)
+import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
 import Distribution.Types.VersionRange (VersionRange)
 import Distribution.PackageDescription (FlagName, unFlagName, GenericPackageDescription)
 import Distribution.Types.PackageId (PackageIdentifier (..))
@@ -205,8 +208,8 @@ newtype Revision = Revision Word
 -- whether a pool is used, and the default implementation in
 -- "Pantry.Storage" does not use a pool.
 data Storage = Storage
-  { withStorage_ :: (forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a)
-  , withWriteLock_ :: (forall env a. HasLogFunc env => RIO env a -> RIO env a)
+  { withStorage_ :: forall env a. HasLogFunc env => ReaderT SqlBackend (RIO env) a -> RIO env a
+  , withWriteLock_ :: forall env a. HasLogFunc env => RIO env a -> RIO env a
   }
 
 -- | Configuration value used by the entire pantry package. Create one
@@ -483,9 +486,9 @@ data Repo = Repo
     --
     -- @since 0.1.0.0
   , repoSubdir :: !Text
-  -- ^ Subdirectory within the archive to get the package from.
-  --
-  -- @since 0.1.0.0
+    -- ^ Subdirectory within the archive to get the package from.
+    --
+    -- @since 0.1.0.0
   }
     deriving (Generic, Eq, Ord, Typeable)
 instance NFData Repo
@@ -503,6 +506,7 @@ instance Display Repo where
     (if T.null subdir
       then mempty
       else " in subdirectory " <> display subdir)
+
 
 -- An unexported newtype wrapper to hang a 'FromJSON' instance off of. Contains
 -- a GitHub user and repo name separated by a forward slash, e.g. "foo/bar".
@@ -540,6 +544,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
     pure HackageSecurityConfig {..}
 
+
 -- | An environment which contains a 'PantryConfig'.
 --
 -- @since 0.1.0.0
@@ -548,6 +553,7 @@ class HasPantryConfig env where
   --
   -- @since 0.1.0.0
   pantryConfigL :: Lens' env PantryConfig
+
 
 -- | File size in bytes
 --
@@ -587,7 +593,9 @@ instance FromJSON BlobKey where
     <*> o .: "size"
 
 newtype PackageNameP = PackageNameP { unPackageNameP :: PackageName }
-  deriving (Show)
+  deriving (Eq, Ord, Show, Read, NFData)
+instance Display PackageNameP where
+  display = fromString . packageNameString . unPackageNameP
 instance PersistField PackageNameP where
   toPersistValue (PackageNameP pn) = PersistText $ T.pack $ packageNameString pn
   fromPersistValue v = do
@@ -597,9 +605,20 @@ instance PersistField PackageNameP where
       Just pn -> Right $ PackageNameP pn
 instance PersistFieldSql PackageNameP where
   sqlType _ = SqlString
+instance ToJSON PackageNameP where
+  toJSON (PackageNameP pn) = String $ T.pack $ packageNameString pn
+instance FromJSON PackageNameP where
+  parseJSON = withText "PackageNameP" $ pure . PackageNameP . mkPackageName . T.unpack
+instance ToJSONKey PackageNameP where
+  toJSONKey =
+    ToJSONKeyText
+      (T.pack . packageNameString . unPackageNameP)
+      (unsafeToEncoding . getUtf8Builder . display)
+instance FromJSONKey PackageNameP where
+  fromJSONKey = FromJSONKeyText $ PackageNameP . mkPackageName . T.unpack
 
-newtype VersionP = VersionP Version
-  deriving (Show)
+newtype VersionP = VersionP { unVersionP :: Version }
+  deriving (Eq, Ord, Show, Read, NFData)
 instance PersistField VersionP where
   toPersistValue (VersionP v) = PersistText $ T.pack $ versionString v
   fromPersistValue v = do
@@ -609,9 +628,20 @@ instance PersistField VersionP where
       Just ver -> Right $ VersionP ver
 instance PersistFieldSql VersionP where
   sqlType _ = SqlString
+instance Display VersionP where
+  display (VersionP v) = fromString $ versionString v
+instance ToJSON VersionP where
+  toJSON (VersionP v) = String $ T.pack $ versionString v
+instance FromJSON VersionP where
+  parseJSON =
+    withText "VersionP" $
+    either (fail . displayException) (pure . VersionP) . parseVersionThrowing . T.unpack
 
-newtype ModuleNameP = ModuleNameP ModuleName
-  deriving (Show)
+newtype ModuleNameP = ModuleNameP
+  { unModuleNameP :: ModuleName
+  } deriving (Eq, Ord, Show, NFData)
+instance Display ModuleNameP where
+  display = fromString . moduleNameString . unModuleNameP
 instance PersistField ModuleNameP where
   toPersistValue (ModuleNameP mn) = PersistText $ T.pack $ moduleNameString mn
   fromPersistValue v = do
@@ -683,6 +713,32 @@ instance FromJSON PackageIdentifierRevision where
       Left e -> fail $ show e
       Right pir -> pure pir
 
+-- | Parse a hackage text.
+parseHackageText :: Text -> Either PantryException (PackageIdentifier, BlobKey)
+parseHackageText t = maybe (Left $ PackageIdentifierRevisionParseFail t) Right $ do
+  let (identT, cfiT) = T.break (== '@') t
+  PackageIdentifier name version <- parsePackageIdentifier $ T.unpack identT
+  (csha, csize) <-
+    case splitColon cfiT of
+      Just ("@sha256", shaSizeT) -> do
+        let (shaT, sizeT) = T.break (== ',') shaSizeT
+        sha <- either (const Nothing) Just $ SHA256.fromHexText shaT
+        msize <-
+          case T.stripPrefix "," sizeT of
+            Nothing -> Nothing
+            Just sizeT' ->
+              case decimal sizeT' of
+                Right (size', "") -> Just $ (sha, FileSize size')
+                _ -> Nothing
+        pure msize
+      _ -> Nothing
+  pure $ (PackageIdentifier name version, BlobKey csha csize)
+
+splitColon :: Text -> Maybe (Text, Text)
+splitColon t' =
+    let (x, y) = T.break (== ':') t'
+     in (x, ) <$> T.stripPrefix ":" y
+
 -- | Parse a 'PackageIdentifierRevision'
 --
 -- @since 0.1.0.0
@@ -710,10 +766,6 @@ parsePackageIdentifierRevision t = maybe (Left $ PackageIdentifierRevisionParseF
       Nothing -> pure CFILatest
       _ -> Nothing
   pure $ PackageIdentifierRevision name version cfi
-  where
-    splitColon t' =
-      let (x, y) = T.break (== ':') t'
-       in (x, ) <$> T.stripPrefix ":" y
 
 data Mismatch a = Mismatch
   { mismatchExpected :: !a
@@ -1350,6 +1402,17 @@ instance Display PackageMetadata where
     , "cabal file == " <> display (pmCabal pm)
     ]
 
+parsePackageMetadata :: Object -> WarningParser PackageMetadata
+parsePackageMetadata o = do
+  pmCabal :: BlobKey <- o ..: "cabal-file"
+  pantryTree :: BlobKey <- o ..: "pantry-tree"
+  CabalString pkgName <- o ..: "name"
+  CabalString pkgVersion <- o ..: "version"
+  let pmTreeKey = TreeKey pantryTree
+      pmIdent = PackageIdentifier {..}
+  pure PackageMetadata {..}
+
+
 -- | Conver package metadata to its "raw" equivalent.
 --
 -- @since 0.1.0.0
@@ -1462,6 +1525,57 @@ rpmToPairs (RawPackageMetadata mname mversion mtree mcabal) = concat
   , maybe [] (\cabal -> ["cabal-file" .= cabal]) mcabal
   ]
 
+instance FromJSON (WithJSONWarnings (Unresolved PackageLocationImmutable)) where
+    parseJSON v = repoObject v <|> archiveObject v <|> hackageObject v <|> github v
+                  <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
+        where
+          repoObject :: Value -> Parser (WithJSONWarnings (Unresolved PackageLocationImmutable))
+          repoObject = withObjectWarnings "UnresolvedPackageLocationImmutable.PLIRepo" $ \o -> do
+            pm <- parsePackageMetadata o
+            repoSubdir <- o ..:? "subdir" ..!= ""
+            repoCommit <- o ..: "commit"
+            (repoType, repoUrl) <-
+                (o ..: "git" >>= \url -> pure (RepoGit, url)) <|>
+                (o ..: "hg" >>= \url -> pure (RepoHg, url))
+            pure $ pure $ PLIRepo Repo {..} pm
+
+          archiveObject =
+            withObjectWarnings "UnresolvedPackageLocationImmutable.PLIArchive" $ \o -> do
+              pm <- parsePackageMetadata o
+              Unresolved mkArchiveLocation <- parseArchiveLocationObject o
+              archiveHash <- o ..: "sha256"
+              archiveSize <- o ..: "size"
+              archiveSubdir <- o ..:? "subdir" ..!= ""
+              pure $ Unresolved $ \mdir -> do
+                archiveLocation <- mkArchiveLocation mdir
+                pure $ PLIArchive Archive {..} pm
+
+          hackageObject =
+             withObjectWarnings "UnresolvedPackagelocationimmutable.PLIHackage (Object)" $ \o -> do
+                      treeKey <- o ..: "pantry-tree"
+                      htxt <- o ..: "hackage"
+                      case parseHackageText htxt of
+                        Left e -> fail $ show e
+                        Right (pkgIdentifier, blobKey) ->
+                          pure $ pure $ PLIHackage pkgIdentifier blobKey (TreeKey treeKey)
+
+          github value =
+            withObjectWarnings "UnresolvedPackagelocationimmutable.PLIArchive:github" (\o -> do
+              pm <- parsePackageMetadata o
+              GitHubRepo ghRepo <- o ..: "github"
+              commit <- o ..: "commit"
+              let archiveLocation = ALUrl $ T.concat
+                    [ "https://github.com/"
+                    , ghRepo
+                    , "/archive/"
+                    , commit
+                    , ".tar.gz"
+                    ]
+              archiveHash <- o ..: "sha256"
+              archiveSize <- o ..: "size"
+              archiveSubdir <- o ..:? "subdir" ..!= ""
+              pure $ pure $ PLIArchive Archive {..} pm) value
+
 instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable))) where
   parseJSON v
       = http v
@@ -1470,10 +1584,10 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
     <|> repo v
     <|> archiveObject v
     <|> github v
-    <|> fail ("Could not parse a UnresolvedPackageLocationImmutable from: " ++ show v)
+    <|> fail ("Could not parse a UnresolvedRawPackageLocationImmutable from: " ++ show v)
     where
       http :: Value -> Parser (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmutable)))
-      http = withText "UnresolvedPackageLocationImmutable.UPLIArchive (Text)" $ \t ->
+      http = withText "UnresolvedPackageLocationImmutable.RPLIArchive (Text)" $ \t ->
         case parseArchiveLocationText t of
           Nothing -> fail $ "Invalid archive location: " ++ T.unpack t
           Just (Unresolved mkArchiveLocation) ->
@@ -1519,7 +1633,7 @@ instance FromJSON (WithJSONWarnings (Unresolved (NonEmpty RawPackageLocationImmu
         os <- optionalSubdirs o
         pure $ pure $ NE.map (\(repoSubdir, pm) -> RPLIRepo Repo {..} pm) (osToRpms os)
 
-      archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.UPLIArchive" $ \o -> do
+      archiveObject = withObjectWarnings "UnresolvedPackageLocationImmutable.RPLIArchive" $ \o -> do
         Unresolved mkArchiveLocation <- parseArchiveLocationObject o
         raHash <- o ..:? "sha256"
         raSize <- o ..:? "size"
@@ -1624,6 +1738,7 @@ data HpackExecutable
     -- ^ Executable at the provided path
     deriving (Show, Read, Eq, Ord)
 
+
 -- | Which compiler a snapshot wants to use. The build tool may elect
 -- to do some fuzzy matching of versions (e.g., allowing different
 -- patch versions).
@@ -1637,6 +1752,7 @@ data WantedCompiler
       !Version
     -- ^ GHCJS version followed by GHC version
  deriving (Show, Eq, Ord, Generic)
+
 instance NFData WantedCompiler
 instance Display WantedCompiler where
   display (WCGhc vghc) = "ghc-" <> fromString (versionString vghc)
@@ -1881,6 +1997,27 @@ instance NFData SnapshotLocation
 instance ToJSON SnapshotLocation where
   toJSON sl = toJSON (toRawSL sl)
 
+instance FromJSON (WithJSONWarnings (Unresolved SnapshotLocation)) where
+    parseJSON v = file v <|> url v <|> compiler v
+      where
+        file = withObjectWarnings "SLFilepath" $ \o -> do
+           ufp <- o ..: "filepath"
+           pure $ Unresolved $ \mdir ->
+             case mdir of
+               Nothing -> throwIO $ InvalidFilePathSnapshot ufp
+               Just dir -> do
+                 absolute <- resolveFile dir (T.unpack ufp)
+                 let fp = ResolvedPath (RelFilePath ufp) absolute
+                 pure $ SLFilePath fp
+        url = withObjectWarnings "SLUrl" $ \o -> do
+          url' <- o ..: "url"
+          sha <- o ..: "sha256"
+          size <- o ..: "size"
+          pure $ Unresolved $ \_ -> pure $ SLUrl url' (BlobKey sha size)
+        compiler = withObjectWarnings "SLCompiler" $ \o -> do
+          c <- o ..: "compiler"
+          pure $ Unresolved $ \_ -> pure $ SLCompiler c
+
 -- | Convert snapshot location to its "raw" equivalent.
 --
 -- @since 0.1.0.0
@@ -1984,6 +2121,10 @@ data RawSnapshotLayer = RawSnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , rslPublishTime :: !(Maybe UTCTime)
+  -- ^ See 'slPublishTime'
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
@@ -2006,6 +2147,7 @@ instance ToJSON RawSnapshotLayer where
     , if Map.null (rslGhcOptions rsnap)
         then []
         else ["ghc-options" .= toCabalStringMap (rslGhcOptions rsnap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (rslPublishTime rsnap)
     ]
 
 instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
@@ -2028,6 +2170,7 @@ instance FromJSON (WithJSONWarnings (Unresolved RawSnapshotLayer)) where
     rslFlags <- (unCabalStringMap . fmap unCabalStringMap) <$> (o ..:? "flags" ..!= Map.empty)
     rslHidden <- unCabalStringMap <$> (o ..:? "hidden" ..!= Map.empty)
     rslGhcOptions <- unCabalStringMap <$> (o ..:? "ghc-options" ..!= Map.empty)
+    rslPublishTime <- o ..:? "publish-time"
     pure $ (\rslLocations (rslParent, rslCompiler) -> RawSnapshotLayer {..})
       <$> ((concat . map NE.toList) <$> sequenceA unresolvedLocs)
       <*> unresolvedSnapshotParent
@@ -2072,18 +2215,24 @@ data SnapshotLayer = SnapshotLayer
   -- ^ GHC options per package
   --
   -- @since 0.1.0.0
+  , slPublishTime :: !(Maybe UTCTime)
+  -- ^ Publication timestamp for this snapshot. This field is optional, and
+  -- is for informational purposes only.
+  --
+  -- @since 0.1.0.0
   }
   deriving (Show, Eq, Generic)
 
 instance ToJSON SnapshotLayer where
   toJSON snap = object $ concat
     [ ["resolver" .= slParent snap]
-    , ["compiler" .= slCompiler snap]
+    , maybe [] (\compiler -> ["compiler" .= compiler]) (slCompiler snap)
     , ["packages" .= slLocations snap]
     , if Set.null (slDropPackages snap) then [] else ["drop-packages" .= Set.map CabalString (slDropPackages snap)]
     , if Map.null (slFlags snap) then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap (slFlags snap))]
     , if Map.null (slHidden snap) then [] else ["hidden" .= toCabalStringMap (slHidden snap)]
     , if Map.null (slGhcOptions snap) then [] else ["ghc-options" .= toCabalStringMap (slGhcOptions snap)]
+    , maybe [] (\time -> ["publish-time" .= time]) (slPublishTime snap)
     ]
 
 -- | Convert snapshot layer into its "raw" equivalent.
@@ -2098,7 +2247,22 @@ toRawSnapshotLayer sl = RawSnapshotLayer
   , rslFlags = slFlags sl
   , rslHidden = slHidden sl
   , rslGhcOptions = slGhcOptions sl
+  , rslPublishTime = slPublishTime sl
   }
 
 newtype SnapshotCacheHash = SnapshotCacheHash { unSnapshotCacheHash :: SHA256}
   deriving (Show)
+
+-- | Get the path to the global hints cache file
+getGlobalHintsFile :: HasPantryConfig env => RIO env (Path Abs File)
+getGlobalHintsFile = do
+  root <- view $ pantryConfigL.to pcRootDir
+  globalHintsRelFile <- parseRelFile "global-hints-cache.yaml"
+  pure $ root </> globalHintsRelFile
+
+-- | Creates BlobKey for an input ByteString
+--
+-- @since 0.1.0.0
+bsToBlobKey :: ByteString -> BlobKey
+bsToBlobKey bs =
+    BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))

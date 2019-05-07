@@ -71,6 +71,7 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
+import           Stack.DefaultColorWhen (defaultColorWhen)
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
@@ -83,13 +84,14 @@ import           Stack.Types.Package
 import           Stack.Types.Version
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
-import           System.Exit (ExitCode (..))
+import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
 import           RIO.Process
+import           Pantry.Internal.Companion
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -912,8 +914,41 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
       exists <- doesFileExist fp
       unless exists $ do
         logInfo $ "Trying to generate configure with autoreconf in " <> fromString (toFilePath pkgDir)
-        withWorkingDir (toFilePath pkgDir) $ readProcessNull "autoreconf" ["-i"] `catchAny` \ex ->
+        let autoreconf = if osIsWindows
+                           then readProcessNull "sh" ["autoreconf", "-i"]
+                           else readProcessNull "autoreconf" ["-i"]
+            -- On Windows 10, an upstream issue with the `sh autoreconf -i`
+            -- command means that command clears, but does not then restore, the
+            -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+            -- folowing hack re-enables the lost ANSI-capability.
+            fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
+        withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
+          fixupOnWindows
           logWarn $ "Unable to run autoreconf: " <> displayShow ex
+          when osIsWindows $ do
+            logInfo $ "Check that executable perl is on the path in stack's " <>
+              "MSYS2 \\usr\\bin folder, and working, and that script file " <>
+              "autoreconf is on the path in that location. To check that " <>
+              "perl or autoreconf are on the path in the required location, " <>
+              "run commands:"
+            logInfo ""
+            logInfo "  stack exec where -- perl"
+            logInfo "  stack exec where -- autoreconf"
+            logInfo ""
+            logInfo $ "If perl or autoreconf is not on the path in the " <>
+              "required location, add them with command (note that the " <>
+              "relevant package name is 'autoconf' not 'autoreconf'):"
+            logInfo ""
+            logInfo "  stack exec pacman -- --sync --refresh autoconf"
+            logInfo ""
+            logInfo $ "Some versions of perl from MYSY2 are broken. See " <>
+              "https://github.com/msys2/MSYS2-packages/issues/1611 and " <>
+              "https://github.com/commercialhaskell/stack/pull/4781. To " <>
+              "test if perl in the required location is working, try command:"
+            logInfo ""
+            logInfo "  stack exec perl -- --version"
+            logInfo ""
+        fixupOnWindows
 
 -- | Make a padded prefix for log messages
 packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
@@ -925,10 +960,45 @@ packageNamePrefix ee name' =
           Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
    in fromString paddedName <> "> "
 
-announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Text -> RIO env ()
+announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Utf8Builder -> RIO env ()
 announceTask ee task action = logInfo $
     packageNamePrefix ee (pkgName (taskProvides task)) <>
-    RIO.display action
+    action
+
+-- | Ensure we're the only action using the directory.  See
+-- <https://github.com/commercialhaskell/stack/issues/2730>
+withLockedDistDir
+  :: HasEnvConfig env
+  => (Utf8Builder -> RIO env ()) -- ^ announce
+  -> Path Abs Dir -- ^ root directory for package
+  -> RIO env a
+  -> RIO env a
+withLockedDistDir announce root inner = do
+  distDir <- distRelativeDir
+  let lockFP = root </> distDir </> relFileBuildLock
+  ensureDir $ parent lockFP
+
+  mres <-
+    withRunInIO $ \run ->
+    withTryFileLock (toFilePath lockFP) Exclusive $ \_lock ->
+    run inner
+
+  case mres of
+    Just res -> pure res
+    Nothing -> do
+      let complainer delay = do
+            delay 5000000 -- 5 seconds
+            announce $ "blocking for directory lock on " <> fromString (toFilePath lockFP)
+            forever $ do
+              delay 30000000 -- 30 seconds
+              announce $ "still blocking for directory lock on " <>
+                         fromString (toFilePath lockFP) <>
+                         "; maybe another Stack process is running?"
+      withCompanion complainer $
+        \stopComplaining ->
+        withRunInIO $ \run ->
+        withFileLock (toFilePath lockFP) Exclusive $ \_ ->
+        run $ stopComplaining *> inner
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
@@ -963,7 +1033,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -- argument, but we provide both to avoid recalculating `parent` of the `File`.
                      -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
                                                                -- Function to run Cabal with args
-                     -> (Text -> RIO env ())             -- An 'announce' function, for different build phases
+                     -> (Utf8Builder -> RIO env ())      -- An 'announce' function, for different build phases
                      -> OutputType
                      -> RIO env a)
                   -> RIO env a
@@ -996,7 +1066,10 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
 
     withPackage inner =
         case taskType of
-            TTLocalMutable lp -> inner (lpPackage lp) (lpCabalFile lp) (parent $ lpCabalFile lp)
+            TTLocalMutable lp -> do
+              let root = parent $ lpCabalFile lp
+              withLockedDistDir announce root $
+                inner (lpPackage lp) (lpCabalFile lp) root
             TTRemotePackage _ package pkgloc -> do
                 suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
                 let dir = eeTempDir </> suffix
@@ -1480,7 +1553,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix executableBuildStatuses)) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
 
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
@@ -1503,7 +1576,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
-        () <- announce ("initial-build-steps" <> annSuffix executableBuildStatuses)
+        announce ("initial-build-steps" <> RIO.display (annSuffix executableBuildStatuses))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
@@ -1511,7 +1584,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -> Package
         -> Path Abs Dir
         -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
-        -> (Text -> RIO env ())
+        -> (Utf8Builder -> RIO env ())
         -> Map Text ExecutableBuildStatus
         -> RIO env Installed
     realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
@@ -1554,7 +1627,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        () <- announce ("build" <> annSuffix executableBuildStatuses)
+        () <- announce ("build" <> RIO.display (annSuffix executableBuildStatuses))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         let stripTHLoading
@@ -1896,7 +1969,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                             argsDisplay = case args of
                                             [] -> ""
                                             _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
-                        announce $ "test (suite: " <> testName <> argsDisplay <> ")"
+                        announce $ "test (suite: " <> RIO.display testName <> RIO.display argsDisplay <> ")"
 
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
@@ -1954,7 +2027,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         -- tidiness.
                         when needHpc $
                             updateTixFile (packageName package) tixPath testName'
-                        let announceResult result = announce $ "Test suite " <> testName <> " " <> result
+                        let announceResult result = announce $ "Test suite " <> RIO.display testName <> " " <> result
                         case mec of
                             Just ExitSuccess -> do
                                 announceResult "passed"
@@ -2128,9 +2201,8 @@ extraBuildOptions :: (HasEnvConfig env, HasRunner env)
                   => WhichCompiler -> BuildOpts -> RIO env [String]
 extraBuildOptions wc bopts = do
     colorOpt <- appropriateGhcColorFlag
-    let ddumpOpts = " -ddump-hi -ddump-to-file"
-        optsFlag = compilerOptionsCabalFlag wc
-        baseOpts = ddumpOpts ++ maybe "" (" " ++) colorOpt
+    let optsFlag = compilerOptionsCabalFlag wc
+        baseOpts = maybe "" (" " ++) colorOpt
     if toCoverage (boptsTestOpts bopts)
       then do
         hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir

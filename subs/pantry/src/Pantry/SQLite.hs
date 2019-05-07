@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Pantry.SQLite
   ( Storage (..)
   , initStorage
@@ -12,6 +13,7 @@ import Path (Path, Abs, File, toFilePath, parent)
 import Path.IO (ensureDir)
 import Pantry.Types (PantryException (MigrationFailure), Storage (..))
 import System.FileLock (withFileLock, withTryFileLock, SharedExclusive (..))
+import Pantry.Internal.Companion
 
 initStorage
   :: HasLogFunc env
@@ -23,10 +25,20 @@ initStorage
 initStorage description migration fp inner = do
   ensureDir $ parent fp
 
-  migrates <- withWriteLock fp $ wrapMigrationFailure $
+  migrates <- withWriteLock (display description) fp $ wrapMigrationFailure $
     withSqliteConnInfo (sqinfo True) $ runReaderT $
     runMigrationSilent migration
   forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
+
+  -- This addresses a weird race condition that can result in a
+  -- deadlock. If multiple threads in the same process try to access
+  -- the database, it's possible that they will end up deadlocking on
+  -- the file lock, due to delays which can occur in the freeing of
+  -- previous locks. I don't fully grok the situation yet, but
+  -- introducing an MVar to ensure that, within a process, only one
+  -- thread is attempting to lock the file is both a valid workaround
+  -- and good practice.
+  baton <- newMVar ()
 
   withSqlitePoolInfo (sqinfo False) 1 $ \pool -> inner $ Storage
     -- NOTE: Currently, we take a write lock on every action. This is
@@ -36,7 +48,7 @@ initStorage description migration fp inner = do
     -- completely. We can investigate more elegant solutions in the
     -- future, such as separate read and write actions or introducing
     -- smarter retry logic.
-    { withStorage_ = withWriteLock fp . flip runSqlPool pool
+    { withStorage_ = withMVar baton . const . withWriteLock (display description) fp . flip runSqlPool pool
     , withWriteLock_ = id
     }
   where
@@ -59,33 +71,30 @@ initStorage description migration fp inner = do
 -- above.
 withWriteLock
   :: HasLogFunc env
-  => Path Abs File -- ^ SQLite database file
+  => Utf8Builder -- ^ database description, for lock messages
+  -> Path Abs File -- ^ SQLite database file
   -> RIO env a
   -> RIO env a
-withWriteLock dbFile inner = do
+withWriteLock desc dbFile inner = do
   let lockFile = toFilePath dbFile ++ ".pantry-write-lock"
   withRunInIO $ \run -> do
     mres <- withTryFileLock lockFile Exclusive $ const $ run inner
     case mres of
       Just res -> pure res
       Nothing -> do
-        run $ logInfo "Unable to get a write lock on the Pantry database, waiting..."
-        shouldStopComplainingVar <- newTVarIO False
-        let complainer = fix $ \loop -> do
-              delay <- registerDelay $ 60 * 1000 * 1000 -- 1 minute
-              shouldComplain <-
-                atomically $
-                  -- Delay has triggered, time to complain again
-                  (readTVar delay >>= checkSTM >> pure True) <|>
-                  -- Time to stop complaining, ignore that delay immediately
-                  (readTVar shouldStopComplainingVar >>= checkSTM >> pure False)
-              when shouldComplain $ do
-                run $ logWarn "Still waiting on the Pantry database write lock..."
-                loop
-            stopComplaining = atomically $ writeTVar shouldStopComplainingVar True
-            worker = withFileLock lockFile Exclusive $ const $ do
-              run $ logInfo "Acquired the Pantry database write lock"
-              stopComplaining
-              run inner
-        runConcurrently $ Concurrently complainer
-                       *> Concurrently (worker `finally` stopComplaining)
+        let complainer :: Companion IO
+            complainer delay = run $ do
+              -- Wait five seconds before giving the first message to
+              -- avoid spamming the user for uninteresting file locks
+              delay $ 5 * 1000 * 1000 -- 5 seconds
+              logInfo $ "Unable to get a write lock on the " <> desc <> " database, waiting..."
+
+              -- Now loop printing a message every 1 minute
+              forever $ do
+                delay (60 * 1000 * 1000) -- 1 minute
+                  `onCompanionDone` logInfo ("Acquired the " <> desc <> " database write lock")
+                logWarn ("Still waiting on the " <> desc <> " database write lock...")
+        withCompanion complainer $ \stopComplaining ->
+          withFileLock lockFile Exclusive $ const $ do
+            stopComplaining
+            run inner

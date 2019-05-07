@@ -28,6 +28,8 @@ module Stack.Storage
     , saveDockerImageExeCache
     , loadCompilerPaths
     , saveCompilerPaths
+    , upgradeChecksSince
+    , logUpgradeCheck
     ) where
 
 import qualified Data.ByteString as S
@@ -59,12 +61,11 @@ share [ mkPersist sqlSettings
     ]
     [persistLowerCase|
 ConfigCacheParent sql="config_cache"
-  key Text SafeToRemove
   directory FilePath "default=(hex(randomblob(16)))"
-  type ConfigCacheType default=''
-  pkgSrc CachePkgSrc default=''
-  active Bool default=0
-  pathEnvVar Text default=''
+  type ConfigCacheType
+  pkgSrc CachePkgSrc
+  active Bool
+  pathEnvVar Text
   haddock Bool default=0
   UniqueConfigCacheParent directory type sql="unique_config_cache"
   deriving Show
@@ -96,12 +97,11 @@ ConfigCacheComponent
   deriving Show
 
 PrecompiledCacheParent sql="precompiled_cache"
-  key Text SafeToRemove
   platformGhcDir FilePath "default=(hex(randomblob(16)))"
-  compiler Text default=''
-  cabalVersion Text default=''
-  packageKey Text default=''
-  optionsHash ByteString default=''
+  compiler Text
+  cabalVersion Text
+  packageKey Text
+  optionsHash ByteString
   haddock Bool default=0
   library FilePath Maybe
   UniquePrecompiledCacheParent platformGhcDir compiler cabalVersion packageKey optionsHash haddock sql="unique_precompiled_cache"
@@ -153,6 +153,12 @@ CompilerCache
   globalDump Text
 
   UniqueCompilerInfo ghcPath
+
+-- Last time certain actions were performed
+LastPerformed
+  action Action
+  timestamp UTCTime
+  UniqueAction action
 |]
 
 -- | Initialize the database.
@@ -292,10 +298,10 @@ deactiveConfigCache (UniqueConfigCacheParent dir type_) =
         [ConfigCacheParentDirectory ==. dir, ConfigCacheParentType ==. type_]
         [ConfigCacheParentActive =. False]
 
--- | Key used to retrieve to retrieve the precompiled cache
+-- | Key used to retrieve the precompiled cache
 type PrecompiledCacheKey = Unique PrecompiledCacheParent
 
--- | Build key used to retrieve to retrieve the precompiled cache
+-- | Build key used to retrieve the precompiled cache
 precompiledCacheKey ::
        Path Rel Dir
     -> ActualCompiler
@@ -549,3 +555,16 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
     , compilerCacheGlobalDump = tshow cpGlobalDump
     , compilerCacheArch = T.pack $ Distribution.Text.display cpArch
     }
+
+-- | How many upgrade checks have occurred since the given timestamp?
+upgradeChecksSince :: HasConfig env => UTCTime -> RIO env Int
+upgradeChecksSince since = withStorage $ count
+  [ LastPerformedAction ==. UpgradeCheck
+  , LastPerformedTimestamp >=. since
+  ]
+
+-- | Log in the database that an upgrade check occurred at the given time.
+logUpgradeCheck :: HasConfig env => UTCTime -> RIO env ()
+logUpgradeCheck time = withStorage $ void $ upsert
+  (LastPerformed UpgradeCheck time)
+  [LastPerformedTimestamp =. time]

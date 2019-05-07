@@ -426,7 +426,7 @@ addDep name = do
                             -- names. This code does not feel right.
                             let version = installedVersion installed
                                 askPkgLoc = liftRIO $ do
-                                  mrev <- getLatestHackageRevision name version
+                                  mrev <- getLatestHackageRevision YesRequireHackageIndex name version
                                   case mrev of
                                     Nothing -> do
                                       -- this could happen for GHC boot libraries missing from Hackage
@@ -662,7 +662,7 @@ addPackageDeps package = do
         eres <- addDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev = do
-              vsAndRevs <- runRIO ctx $ getHackagePackageVersions UsePreferredVersions depname
+              vsAndRevs <- runRIO ctx $ getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions depname
               pure $ do
                 lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
                 revs <- Map.lookup lappVer vsAndRevs
@@ -1060,7 +1060,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
       let cfInfo = CFIHash cabalHash (Just cabalSize)
           packageIdRev = PackageIdentifierRevision name version cfInfo
-       in "- " <+> fromString (T.unpack (utf8BuilderToText (RIO.display packageIdRev)))
+       in fromString ("- " ++ T.unpack (utf8BuilderToText (RIO.display packageIdRev)))
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =

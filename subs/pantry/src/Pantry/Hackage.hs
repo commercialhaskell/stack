@@ -4,7 +4,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Pantry.Hackage
   ( updateHackageIndex
+  , forceUpdateHackageIndex
   , DidUpdateOccur (..)
+  , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackageTarball
   , getHackageTarballKey
@@ -13,6 +15,7 @@ module Pantry.Hackage
   , getHackagePackageVersionRevisions
   , getHackageTypoCorrections
   , UsePreferredVersions (..)
+  , HackageTarballResult(..)
   ) where
 
 import RIO
@@ -27,7 +30,7 @@ import qualified RIO.ByteString as B
 import qualified RIO.ByteString.Lazy as BL
 import Pantry.Archive
 import Pantry.Types hiding (FileType (..))
-import Pantry.Storage
+import Pantry.Storage hiding (TreeEntry, PackageName, Version)
 import Pantry.Tree
 import qualified Pantry.SHA256 as SHA256
 import Network.URI (parseURI)
@@ -38,6 +41,7 @@ import qualified Distribution.PackageDescription as Cabal
 import System.IO (SeekMode (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text.Metrics (damerauLevenshtein)
+import Distribution.PackageDescription (GenericPackageDescription)
 import Distribution.Types.Version (versionNumbers)
 import Distribution.Types.VersionRange (withinRange)
 
@@ -68,6 +72,17 @@ hackageIndexTarballL = hackageDirL.to (</> indexRelFile)
 -- @since 0.1.0.0
 data DidUpdateOccur = UpdateOccurred | NoUpdateOccurred
 
+
+-- | Information returned by `getHackageTarball`
+--
+-- @since 0.1.0.0
+data HackageTarballResult = HackageTarballResult
+  { htrPackage :: !Package
+  -- ^ Package that was loaded from Hackage tarball
+  , htrFreshPackageInfo :: !(Maybe (GenericPackageDescription, TreeId))
+  -- ^ This information is only available whenever package was just loaded into pantry.
+  }
+
 -- | Download the most recent 01-index.tar file from Hackage and
 -- update the database tables.
 --
@@ -79,7 +94,26 @@ updateHackageIndex
   :: (HasPantryConfig env, HasLogFunc env)
   => Maybe Utf8Builder -- ^ reason for updating, if any
   -> RIO env DidUpdateOccur
-updateHackageIndex mreason = do
+updateHackageIndex = updateHackageIndexInternal False
+
+-- | Same as `updateHackageIndex`, but force the database update even if hackage
+-- security tells that there is no change.  This can be useful in order to make
+-- sure the database is in sync with the locally downloaded tarball
+--
+-- @since 0.1.0.0
+forceUpdateHackageIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Maybe Utf8Builder
+  -> RIO env DidUpdateOccur
+forceUpdateHackageIndex = updateHackageIndexInternal True
+
+
+updateHackageIndexInternal
+  :: (HasPantryConfig env, HasLogFunc env)
+  => Bool -- ^ Force the database update.
+  -> Maybe Utf8Builder -- ^ reason for updating, if any
+  -> RIO env DidUpdateOccur
+updateHackageIndexInternal forceUpdate mreason = do
   storage <- view $ pantryConfigL.to pcStorage
   gateUpdate $ withWriteLock_ storage $ do
     for_ mreason logInfo
@@ -117,6 +151,9 @@ updateHackageIndex mreason = do
         HS.checkForUpdates repo maybeNow
 
     case didUpdate of
+      _ | forceUpdate -> do
+            logInfo "Forced package update is initialized"
+            updateCache tarball
       HS.NoUpdates -> do
         x <- needsCacheUpdate tarball
         if x
@@ -199,11 +236,13 @@ updateHackageIndex mreason = do
               if oldHash == oldHashCheck
                 then oldSize <$ logInfo "Updating preexisting cache, should be quick"
                 else 0 <$ do
-                  logInfo "Package index change detected, that's pretty unusual"
-                  logInfo $ "Old size: " <> display oldSize
-                  logInfo $ "Old hash (orig) : " <> display oldHash
-                  logInfo $ "New hash (check): " <> display oldHashCheck
-                  logInfo "Forcing a recache"
+                  logWarn $ mconcat [
+                    "Package index change detected, that's pretty unusual: "
+                    , "\n    Old size: " <> display oldSize
+                    , "\n    Old hash (orig) : " <> display oldHash
+                    , "\n    New hash (check): " <> display oldHashCheck
+                    , "\n    Forcing a recache"
+                    ]
             pure (offset, newHash, newSize)
 
       lift $ logInfo $ "Populating cache from file size " <> display newSize <> ", hash " <> display newHash
@@ -356,7 +395,7 @@ fuzzyLookupCandidates
   -> Version
   -> RIO env FuzzyResults
 fuzzyLookupCandidates name ver0 = do
-  m <- getHackagePackageVersions UsePreferredVersions name
+  m <- getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions name
   if Map.null m
     then FRNameNotFound <$> getHackageTypoCorrections name
     else
@@ -411,18 +450,37 @@ getHackageTypoCorrections name1 =
 data UsePreferredVersions = UsePreferredVersions | IgnorePreferredVersions
   deriving Show
 
+-- | Require that the Hackage index is populated.
+--
+-- @since 0.1.0.0
+data RequireHackageIndex
+  = YesRequireHackageIndex
+    -- ^ If there is nothing in the Hackage index, then perform an update
+  | NoRequireHackageIndex
+    -- ^ Do not perform an update
+  deriving Show
+
+initializeIndex
+  :: (HasPantryConfig env, HasLogFunc env)
+  => RequireHackageIndex
+  -> RIO env ()
+initializeIndex NoRequireHackageIndex = pure ()
+initializeIndex YesRequireHackageIndex = do
+  cabalCount <- withStorage countHackageCabals
+  when (cabalCount == 0) $ void $
+    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+
 -- | Returns the versions of the package available on Hackage.
 --
 -- @since 0.1.0.0
 getHackagePackageVersions
   :: (HasPantryConfig env, HasLogFunc env)
-  => UsePreferredVersions
+  => RequireHackageIndex
+  -> UsePreferredVersions
   -> PackageName -- ^ package name
   -> RIO env (Map Version (Map Revision BlobKey))
-getHackagePackageVersions usePreferred name = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersions req usePreferred name = do
+  initializeIndex req
   withStorage $ do
     mpreferred <-
       case usePreferred of
@@ -441,13 +499,12 @@ getHackagePackageVersions usePreferred name = do
 -- @since 0.1.0.0
 getHackagePackageVersionRevisions
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> Version -- ^ package version
   -> RIO env (Map Revision BlobKey)
-getHackagePackageVersionRevisions name version = do
-  cabalCount <- withStorage countHackageCabals
-  when (cabalCount == 0) $ void $
-    updateHackageIndex $ Just $ "No information from Hackage index, updating"
+getHackagePackageVersionRevisions req name version = do
+  initializeIndex req
   withStorage $
     Map.map snd <$> loadHackagePackageVersion name version
 
@@ -457,16 +514,17 @@ withCachedTree
   -> PackageName
   -> Version
   -> BlobId -- ^ cabal file contents
-  -> RIO env Package
-  -> RIO env Package
+  -> RIO env HackageTarballResult
+  -> RIO env HackageTarballResult
 withCachedTree rpli name ver bid inner = do
   mres <- withStorage $ loadHackageTree rpli name ver bid
   case mres of
-    Just package -> pure package
+    Just package -> pure $ HackageTarballResult package Nothing
     Nothing -> do
-      package <- inner
-      withStorage $ storeHackageTree name ver bid $ packageTreeKey package
-      pure package
+      htr <- inner
+      withStorage $
+        storeHackageTree name ver bid $ packageTreeKey $ htrPackage htr
+      pure htr
 
 getHackageTarballKey
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -475,20 +533,21 @@ getHackageTarballKey
 getHackageTarballKey pir@(PackageIdentifierRevision name ver (CFIHash sha _msize)) = do
   mres <- withStorage $ loadHackageTreeKey name ver sha
   case mres of
-    Nothing -> packageTreeKey <$> getHackageTarball pir Nothing
+    Nothing -> packageTreeKey . htrPackage <$> getHackageTarball pir Nothing
     Just key -> pure key
-getHackageTarballKey pir = packageTreeKey <$> getHackageTarball pir Nothing
+getHackageTarballKey pir = packageTreeKey . htrPackage <$> getHackageTarball pir Nothing
 
 getHackageTarball
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageIdentifierRevision
   -> Maybe TreeKey
-  -> RIO env Package
-getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
+  -> RIO env HackageTarballResult
+getHackageTarball pir mtreeKey = do
+  let PackageIdentifierRevision name ver _cfi = pir
   cabalFile <- resolveCabalFileInfo pir
-  cabalFileKey <- withStorage $ getBlobKey cabalFile
   let rpli = RPLIHackage pir mtreeKey
   withCachedTree rpli name ver cabalFile $ do
+    cabalFileKey <- withStorage $ getBlobKey cabalFile
     mpair <- withStorage $ loadHackageTarballInfo name ver
     (sha, size) <-
       case mpair of
@@ -505,55 +564,66 @@ getHackageTarball pir@(PackageIdentifierRevision name ver _cfi) mtreeKey = do
             Just pair2 -> pure pair2
     pc <- view pantryConfigL
     let urlPrefix = hscDownloadPrefix $ pcHackageSecurity pc
-        url = mconcat
-          [ urlPrefix
-          , "package/"
-          , T.pack $ Distribution.Text.display name
-          , "-"
-          , T.pack $ Distribution.Text.display ver
-          , ".tar.gz"
-          ]
-    package <- getArchivePackage
-      rpli
-      RawArchive
-        { raLocation = ALUrl url
-        , raHash = Just sha
-        , raSize = Just size
-        , raSubdir = T.empty -- no subdirs on Hackage
-        }
-      RawPackageMetadata
-        { rpmName = Just name
-        , rpmVersion = Just ver
-        , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
-        , rpmCabal = Nothing -- cabal file in the tarball may be different!
-        }
-
+        url =
+          mconcat
+            [ urlPrefix
+            , "package/"
+            , T.pack $ Distribution.Text.display name
+            , "-"
+            , T.pack $ Distribution.Text.display ver
+            , ".tar.gz"
+            ]
+    package <-
+      getArchivePackage
+        rpli
+        RawArchive
+          { raLocation = ALUrl url
+          , raHash = Just sha
+          , raSize = Just size
+          , raSubdir = T.empty -- no subdirs on Hackage
+          }
+        RawPackageMetadata
+          { rpmName = Just name
+          , rpmVersion = Just ver
+          , rpmTreeKey = Nothing -- with a revision cabal file will differ giving a different tree
+          , rpmCabal = Nothing -- cabal file in the tarball may be different!
+          }
     case packageTree package of
       TreeMap m -> do
-        let (PCCabalFile (TreeEntry _ ft)) = packageCabalEntry package
+        let ft =
+              case packageCabalEntry package of
+                PCCabalFile (TreeEntry _ ft') -> ft'
+                _ -> error "Impossible: Hackage does not support hpack"
             cabalEntry = TreeEntry cabalFileKey ft
             tree' = TreeMap $ Map.insert (cabalFileName name) cabalEntry m
             ident = PackageIdentifier name ver
-
-        cabalBS <- withStorage $ do
-          let BlobKey sha' _ = cabalFileKey
-          mcabalBS <- loadBlobBySHA sha'
-          case mcabalBS of
-            Nothing -> error $ "Invariant violated, cabal file key: " ++ show cabalFileKey
-            Just bid -> loadBlobById bid
-
+        cabalBS <-
+          withStorage $ do
+            let BlobKey sha' _ = cabalFileKey
+            mcabalBS <- loadBlobBySHA sha'
+            case mcabalBS of
+              Nothing ->
+                error $
+                "Invariant violated, cabal file key: " ++ show cabalFileKey
+              Just bid -> loadBlobById bid
         (_warnings, gpd) <- rawParseGPD (Left rpli) cabalBS
         let gpdIdent = Cabal.package $ Cabal.packageDescription gpd
-        when (ident /= gpdIdent) $ throwIO $
-          MismatchedCabalFileForHackage pir Mismatch
-            { mismatchExpected = ident
-            , mismatchActual = gpdIdent
+        when (ident /= gpdIdent) $
+          throwIO $
+          MismatchedCabalFileForHackage
+            pir
+            Mismatch {mismatchExpected = ident, mismatchActual = gpdIdent}
+        (tid, treeKey') <-
+          withStorage $
+          storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
+        pure
+          HackageTarballResult
+            { htrPackage =
+                Package
+                  { packageTreeKey = treeKey'
+                  , packageTree = tree'
+                  , packageIdent = ident
+                  , packageCabalEntry = PCCabalFile cabalEntry
+                  }
+            , htrFreshPackageInfo = Just (gpd, tid)
             }
-
-        (_tid, treeKey') <- withStorage $ storeTree rpli ident tree' (BFCabal (cabalFileName name) cabalEntry)
-        pure Package
-          { packageTreeKey = treeKey'
-          , packageTree = tree'
-          , packageIdent = ident
-          , packageCabalEntry = PCCabalFile cabalEntry
-          }

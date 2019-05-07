@@ -11,7 +11,6 @@ module System.Process.Pager
 import Stack.Prelude
 import System.Directory (findExecutable)
 import System.Environment (lookupEnv)
-import System.Exit (ExitCode(..))
 import System.Process (createProcess,shell,waitForProcess,StdStream (CreatePipe)
                       ,CreateProcess(std_in, close_fds, delegate_ctlc))
 import System.IO (stdout)

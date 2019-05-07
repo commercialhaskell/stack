@@ -19,6 +19,9 @@ packages:
 - process-1.6.3.0@sha256:fc77cfe75a9653b8c54ae455ead8c06cb8adc4d7a340984d84d8ca880b579919,2370 #because of https://github.com/haskell/process/pull/101
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
+- rio-0.1.9.2@rev:0
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

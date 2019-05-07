@@ -1,0 +1,60 @@
+name:                hi-file-parser
+version:             0.1.0.0
+github:              commercialhaskell/stack
+license:             MIT
+author:              Hussein Ait-Lahcen
+maintainer:          michael@snoyman.com
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+- test-files/iface/x64/ghc844/Main.hi
+- test-files/iface/x64/ghc844/X.hi
+- test-files/iface/x64/ghc822/Main.hi
+- test-files/iface/x64/ghc822/X.hi
+- test-files/iface/x64/ghc864/Main.hi
+- test-files/iface/x64/ghc864/X.hi
+- test-files/iface/x32/ghc844/Main.hi
+- test-files/iface/x32/ghc802/Main.hi
+- test-files/iface/x32/ghc7103/Main.hi
+- test-files/iface/x32/ghc822/Main.hi
+
+# Metadata used when publishing your package
+synopsis:            Parser for GHC's hi files
+category:            Development
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/commercialhaskell/stack/blob/master/subs/hi-file-parser/README.md>
+
+dependencies:
+- base >= 4.10 && < 5
+- binary
+- bytestring
+- rio
+- vector
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+tests:
+  hi-file-parser-test:
+    main:                Spec.hs
+    source-dirs:         test
+    dependencies:
+    - hi-file-parser
+    - hspec
+
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N

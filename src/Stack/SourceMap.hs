@@ -141,8 +141,7 @@ globalsFromHints ::
     => WantedCompiler
     -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
-    ghfp <- globalHintsFile
-    mglobalHints <- loadGlobalHints ghfp compiler
+    mglobalHints <- loadGlobalHints compiler
     case mglobalHints of
         Just hints -> pure hints
         Nothing -> do
@@ -263,7 +262,7 @@ loadProjectSnapshotCandidate ::
     -> Bool
     -> RIO env (SnapshotCandidate env)
 loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
-    snapshot <- fmap fst . loadAndCompleteSnapshot =<< completeSnapshotLocation loc
+    (snapshot, _, _) <- loadAndCompleteSnapshotRaw loc Map.empty Map.empty
     deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
     let wc = snapshotCompiler snapshot
     globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc

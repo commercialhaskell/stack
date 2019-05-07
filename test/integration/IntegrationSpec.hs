@@ -18,7 +18,6 @@ import           RIO.Process
 import qualified RIO.Set                  as Set
 import qualified RIO.Text                 as T
 import           System.Environment       (lookupEnv, getExecutablePath)
-import           System.Exit
 import           System.Info (os)
 import           System.PosixCompat.Files
 
@@ -63,7 +62,7 @@ main = runSimpleApp $ do
     else do
       logInfo "Failed tests:"
       for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
-      liftIO exitFailure
+      exitFailure
 
 data Options = Options
   { optSpeed :: Maybe Speed
@@ -238,8 +237,15 @@ copyTree src dst =
         Just suffix <- return $ stripPrefix src srcfp
         let dstfp = dst </> stripHeadSeparator suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
-        createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
-            copyFile srcfp dstfp -- for Windows
+        -- copying yaml files so lock files won't get created in
+        -- the source directory
+        if takeFileName srcfp /= "package.yaml" &&
+           (takeExtensions srcfp == ".yaml" || takeExtensions srcfp == ".yml")
+          then
+            copyFile srcfp dstfp
+          else
+            createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
+                copyFile srcfp dstfp -- for Windows
 
     stripHeadSeparator :: FilePath -> FilePath
     stripHeadSeparator [] = []

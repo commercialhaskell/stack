@@ -96,3 +96,9 @@ spec = do
       , testSubdir = "subs/pant"
       }
     `shouldThrow` treeWithoutCabalFile
+  it "follows symlinks to directories" $ do
+    ident <- getRawPackageLocationIdent' TestArchive
+      { testLocation = TLFilePath "attic/symlink-to-dir.tar.gz"
+      , testSubdir = "symlink"
+      }
+    ident `shouldBe` parsePackageIdentifier' "foo-1.2.3"

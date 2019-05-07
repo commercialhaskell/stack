@@ -1,5 +1,5 @@
 name: stack
-version: '1.10.0'
+version: '2.0.0'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -66,6 +66,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
+- hi-file-parser
 - hpack
 - hpc
 - http-client
@@ -99,7 +100,7 @@ dependencies:
 - resource-pool
 - resourcet
 - retry >= 0.7
-- rio
+- rio >= 0.1.9.2
 - rio-prettyprint
 - semigroups
 - split
@@ -108,6 +109,7 @@ dependencies:
 - tar
 - template-haskell
 - temporary
+- terminal-size
 - text
 - text-metrics
 - th-reify-many
@@ -183,6 +185,7 @@ library:
   - Stack.IDE
   - Stack.Init
   - Stack.Ls
+  - Stack.Lock
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
@@ -241,6 +244,7 @@ library:
   - Stack.Unpack
   - Stack.Upgrade
   - Stack.Upload
+  - System.Info.ShortPathName
   - System.Permissions
   - System.Process.Pager
   - System.Terminal
@@ -302,6 +306,7 @@ tests:
     dependencies:
     - QuickCheck
     - hspec
+    - raw-strings-qq
     - stack
     - smallcheck
 flags:

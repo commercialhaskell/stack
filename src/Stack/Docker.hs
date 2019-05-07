@@ -54,7 +54,6 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
-import           System.Exit (exitSuccess, exitWith, ExitCode(..))
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin)
 import           System.IO.Error (isDoesNotExistError)
@@ -308,8 +307,8 @@ runContainerAndExit = do
 #endif
          )
      case e of
-       Left ExitCodeException{eceExitCode} -> liftIO (exitWith eceExitCode)
-       Right () -> liftIO exitSuccess
+       Left ExitCodeException{eceExitCode} -> exitWith eceExitCode
+       Right () -> exitSuccess
   where
     -- This is using a hash of the Docker repository (without tag or digest) to ensure
     -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)

@@ -20,7 +20,6 @@ import qualified Stack.Build
 import           Stack.Build.Target (NeedTargets(NeedTargets))
 import           Stack.Runners
 import           Stack.Types.Config
-import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
@@ -78,7 +77,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
         hooglePackageIdentifier <- do
-          mversion <- getLatestHackageVersion hooglePackageName UsePreferredVersions
+          mversion <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
 
           -- FIXME For a while, we've been following the logic of
           -- taking the latest Hoogle version available. However, we
@@ -132,7 +131,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
           (hoogleArgs ++ databaseArg)
           runProcess_
     bail :: RIO EnvConfig a
-    bail = liftIO (exitWith (ExitFailure (-1)))
+    bail = exitWith (ExitFailure (-1))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)

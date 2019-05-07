@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
 -- | Content addressable Haskell package management, providing for
 -- secure, reproducible acquisition of Haskell package contents and
 -- metadata.
@@ -93,6 +92,8 @@ module Pantry
   , loadSnapshotLayer
   , loadSnapshot
   , loadAndCompleteSnapshot
+  , loadAndCompleteSnapshotRaw
+  , CompletedPLI
   , addPackagesToSnapshot
   , AddPackagesConfig (..)
 
@@ -105,6 +106,7 @@ module Pantry
   , parseWantedCompiler
   , parseRawSnapshotLocation
   , parsePackageIdentifierRevision
+  , parseHackageText
 
     -- ** Cabal values
   , parsePackageIdentifier
@@ -154,6 +156,7 @@ module Pantry
     -- * Hackage index
   , updateHackageIndex
   , DidUpdateOccur (..)
+  , RequireHackageIndex (..)
   , hackageIndexTarballL
   , getHackagePackageVersions
   , getLatestHackageVersion
@@ -168,6 +171,7 @@ module Pantry
 
 import RIO
 import Conduit
+import Control.Arrow (right)
 import Control.Monad.State.Strict (State, execState, get, modify')
 import qualified RIO.Map as Map
 import qualified RIO.Set as Set
@@ -178,7 +182,7 @@ import qualified RIO.FilePath as FilePath
 import Pantry.Archive
 import Pantry.Repo
 import qualified Pantry.SHA256 as SHA256
-import Pantry.Storage
+import Pantry.Storage hiding (TreeEntry, PackageName, Version)
 import Pantry.Tree
 import Pantry.Types
 import Pantry.Hackage
@@ -191,6 +195,7 @@ import qualified Hpack
 import qualified Hpack.Config as Hpack
 import Network.HTTP.Download
 import RIO.PrettyPrint
+import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
@@ -267,11 +272,12 @@ defaultHackageSecurityConfig = HackageSecurityConfig
 -- @since 0.1.0.0
 getLatestHackageVersion
   :: (HasPantryConfig env, HasLogFunc env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageIdentifierRevision)
-getLatestHackageVersion name preferred =
-  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getHackagePackageVersions preferred name
+getLatestHackageVersion req name preferred =
+  ((fmap fst . Map.maxViewWithKey) >=> go) <$> getHackagePackageVersions req preferred name
   where
     go (version, m) = do
       (_rev, BlobKey sha size) <- fst <$> Map.maxViewWithKey m
@@ -283,12 +289,13 @@ getLatestHackageVersion name preferred =
 -- @since 0.1.0.0
 getLatestHackageLocation
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> UsePreferredVersions
   -> RIO env (Maybe PackageLocationImmutable)
-getLatestHackageLocation name preferred = do
+getLatestHackageLocation req name preferred = do
   mversion <-
-    fmap fst . Map.maxViewWithKey <$> getHackagePackageVersions preferred name
+    fmap fst . Map.maxViewWithKey <$> getHackagePackageVersions req preferred name
   let mVerCfKey = do
         (version, revisions) <- mversion
         (_rev, cfKey) <- fst <$> Map.maxViewWithKey revisions
@@ -296,8 +303,8 @@ getLatestHackageLocation name preferred = do
 
   forM mVerCfKey $ \(version, cfKey@(BlobKey sha size)) -> do
     let pir = PackageIdentifierRevision name version (CFIHash sha (Just size))
-    treeKey <- getHackageTarballKey pir
-    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+    treeKey' <- getHackageTarballKey pir
+    pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 
 -- | Returns the latest revision of the given package version available from
 -- Hackage.
@@ -305,17 +312,18 @@ getLatestHackageLocation name preferred = do
 -- @since 0.1.0.0
 getLatestHackageRevision
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => PackageName -- ^ package name
+  => RequireHackageIndex
+  -> PackageName -- ^ package name
   -> Version
   -> RIO env (Maybe (Revision, BlobKey, TreeKey))
-getLatestHackageRevision name version = do
-  revisions <- getHackagePackageVersionRevisions name version
+getLatestHackageRevision req name version = do
+  revisions <- getHackagePackageVersionRevisions req name version
   case fmap fst $ Map.maxViewWithKey revisions of
     Nothing -> pure Nothing
     Just (revision, cfKey@(BlobKey sha size)) -> do
       let cfi = CFIHash sha (Just size)
-      treeKey <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
-      return $ Just (revision, cfKey, treeKey)
+      treeKey' <- getHackageTarballKey (PackageIdentifierRevision name version cfi)
+      return $ Just (revision, cfKey, treeKey')
 
 fetchTreeKeys
   :: (HasPantryConfig env, HasLogFunc env, Foldable f)
@@ -392,7 +400,7 @@ loadCabalFileImmutable
 loadCabalFileImmutable loc = withCache $ do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadCabalFileBytes loc
-  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
+  let foundCabalKey = bsToBlobKey bs
   (_warnings, gpd) <- rawParseGPD (Left $ toRawPLI loc) bs
   let pm =
         case loc of
@@ -438,7 +446,7 @@ loadCabalFileRawImmutable
 loadCabalFileRawImmutable loc = withCache $ do
   logDebug $ "Parsing cabal file for " <> display loc
   bs <- loadRawCabalFileBytes loc
-  let foundCabalKey = BlobKey (SHA256.hashBytes bs) (FileSize (fromIntegral (B.length bs)))
+  let foundCabalKey = bsToBlobKey bs
   (_warnings, gpd) <- rawParseGPD (Left loc) bs
   let rpm =
         case loc of
@@ -698,7 +706,8 @@ loadPackage
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PackageLocationImmutable
   -> RIO env Package
-loadPackage (PLIHackage ident cfHash tree) = getHackageTarball (pirForHash ident cfHash) (Just tree)
+loadPackage (PLIHackage ident cfHash tree) =
+  htrPackage <$> getHackageTarball (pirForHash ident cfHash) (Just tree)
 loadPackage pli@(PLIArchive archive pm) = getArchivePackage (toRawPLI pli) (toRawArchive archive) (toRawPM pm)
 loadPackage (PLIRepo repo pm) = getRepo repo (toRawPM pm)
 
@@ -709,7 +718,7 @@ loadPackageRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawPackageLocationImmutable
   -> RIO env Package
-loadPackageRaw (RPLIHackage pir mtree) = getHackageTarball pir mtree
+loadPackageRaw (RPLIHackage pir mtree) = htrPackage <$> getHackageTarball pir mtree
 loadPackageRaw rpli@(RPLIArchive archive pm) = getArchivePackage rpli archive pm
 loadPackageRaw (RPLIRepo repo rpm) = getRepo repo rpm
 
@@ -735,8 +744,8 @@ completePackageLocation (RPLIHackage pir0@(PackageIdentifierRevision name versio
             pir = PackageIdentifierRevision name version cfi
         logDebug $ "Added in cabal file hash: " <> display pir
         pure (pir, BlobKey sha size)
-  treeKey <- getHackageTarballKey pir
-  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+  treeKey' <- getHackageTarballKey pir
+  pure $ PLIHackage (PackageIdentifier name version) cfKey treeKey'
 completePackageLocation pl@(RPLIArchive archive rpm) = do
   -- getArchive checks archive and package metadata
   (sha, size, package) <- getArchive pl archive rpm
@@ -791,8 +800,7 @@ completeSnapshotLocation (RSLFilePath f) = pure $ SLFilePath f
 completeSnapshotLocation (RSLUrl url (Just blobKey)) = pure $ SLUrl url blobKey
 completeSnapshotLocation (RSLUrl url Nothing) = do
   bs <- loadFromURL url Nothing
-  let blobKey = BlobKey (SHA256.hashBytes bs) (FileSize $ fromIntegral $ B.length bs)
-  pure $ SLUrl url blobKey
+  pure $ SLUrl url (bsToBlobKey bs)
 
 -- | Fill in optional fields in a 'SnapshotLayer' for more reproducible builds.
 --
@@ -812,6 +820,7 @@ completeSnapshotLayer rsnapshot = do
     , slFlags = rslFlags rsnapshot
     , slHidden = rslHidden rsnapshot
     , slGhcOptions = rslGhcOptions rsnapshot
+    , slPublishTime = rslPublishTime rsnapshot
     }
 
 traverseConcurrently_
@@ -900,7 +909,7 @@ loadSnapshotRaw loc = do
         , rsPackages = mempty
         , rsDrop = mempty
         }
-    Right (rsl, _sha) -> do
+    Right (rsl, _) -> do
       snap0 <- loadSnapshotRaw $ rslParent rsl
       (packages, unused) <-
         addPackagesToSnapshot
@@ -936,7 +945,7 @@ loadSnapshot loc = do
         , rsPackages = mempty
         , rsDrop = mempty
         }
-    Right (rsl, _sha) -> do
+    Right rsl -> do
       snap0 <- loadSnapshotRaw $ rslParent rsl
       (packages, unused) <-
         addPackagesToSnapshot
@@ -957,6 +966,7 @@ loadSnapshot loc = do
         }
 
 type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
+type CompletedSL = (RawSnapshotLocation, SnapshotLocation)
 
 -- | Parse a 'Snapshot' (all layers) from a 'SnapshotLocation' noting
 -- any incomplete package locations
@@ -965,9 +975,11 @@ type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
 loadAndCompleteSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => SnapshotLocation
-  -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshot loc =
-  loadAndCompleteSnapshotRaw (toRawSL loc)
+  -> Map RawSnapshotLocation SnapshotLocation -- ^ Cached snapshot locations from lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached locations from lock file
+  -> RIO env (Snapshot, [CompletedSL], [CompletedPLI])
+loadAndCompleteSnapshot loc cachedSL cachedPL =
+  loadAndCompleteSnapshotRaw (toRawSL loc) cachedSL cachedPL
 
 -- | Parse a 'Snapshot' (all layers) from a 'RawSnapshotLocation' completing
 -- any incomplete package locations
@@ -976,9 +988,13 @@ loadAndCompleteSnapshot loc =
 loadAndCompleteSnapshotRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => RawSnapshotLocation
-  -> RIO env (Snapshot, [CompletedPLI])
-loadAndCompleteSnapshotRaw loc = do
-  eres <- loadRawSnapshotLayer loc
+  -> Map RawSnapshotLocation SnapshotLocation -- ^ Cached snapshot locations from lock file
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached locations from lock file
+  -> RIO env (Snapshot, [CompletedSL], [CompletedPLI])
+loadAndCompleteSnapshotRaw rawLoc cacheSL cachePL = do
+  eres <- case Map.lookup rawLoc cacheSL of
+    Just loc -> right (\rsl -> (rsl, (rawLoc, loc))) <$> loadSnapshotLayer loc
+    Nothing -> loadRawSnapshotLayer rawLoc
   case eres of
     Left wc ->
       let snapshot = Snapshot
@@ -986,12 +1002,13 @@ loadAndCompleteSnapshotRaw loc = do
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
-      in pure (snapshot, [])
-    Right (rsl, _sha) -> do
-      (snap0, completed0) <- loadAndCompleteSnapshotRaw $ rslParent rsl
+      in pure (snapshot, [(RSLCompiler wc, SLCompiler wc)], [])
+    Right (rsl, sloc) -> do
+      (snap0, slocs, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cacheSL cachePL
       (packages, completed, unused) <-
         addAndCompletePackagesToSnapshot
-          (display loc)
+          rawLoc
+          cachePL
           (rslLocations rsl)
           AddPackagesConfig
             { apcDrop = rslDropPackages rsl
@@ -1000,13 +1017,13 @@ loadAndCompleteSnapshotRaw loc = do
             , apcGhcOptions = rslGhcOptions rsl
             }
           (snapshotPackages snap0)
-      warnUnusedAddPackagesConfig (display loc) unused
+      warnUnusedAddPackagesConfig (display rawLoc) unused
       let snapshot = Snapshot
             { snapshotCompiler = fromMaybe (snapshotCompiler snap0) (rslCompiler rsl)
             , snapshotPackages = packages
             , snapshotDrop = apcDrop unused
             }
-      return (snapshot, completed ++ completed0)
+      return (snapshot, sloc : slocs,completed0 ++ completed)
 
 data SingleOrNot a
   = Single !a
@@ -1120,6 +1137,16 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
 
   pure (allPackages, unused)
 
+cachedSnapshotCompletePackageLocation :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+  => Map RawPackageLocationImmutable PackageLocationImmutable
+  -> RawPackageLocationImmutable
+  -> RIO env PackageLocationImmutable
+cachedSnapshotCompletePackageLocation cachePackages rpli = do
+  let xs = Map.lookup rpli cachePackages
+  case xs of
+    Nothing -> completePackageLocation rpli
+    Just x -> pure x
+
 -- | Add more packages to a snapshot completing their locations if needed
 --
 -- Note that any settings on a parent flag which is being replaced will be
@@ -1127,31 +1154,39 @@ addPackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens 
 -- set, and @foo@ also appears in new packages, then @bar@ will no longer be
 -- set.
 --
--- Returns any of the 'AddPackagesConfig' values not used.
+-- Returns any of the 'AddPackagesConfig' values not used and also all
+-- non-trivial package location completions.
 --
 -- @since 0.1.0.0
 addAndCompletePackagesToSnapshot
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
-  => Utf8Builder
+  => RawSnapshotLocation
   -- ^ Text description of where these new packages are coming from, for error
   -- messages only
+  -> Map RawPackageLocationImmutable PackageLocationImmutable -- ^ Cached data from snapshot lock file
   -> [RawPackageLocationImmutable] -- ^ new packages
   -> AddPackagesConfig
   -> Map PackageName SnapshotPackage -- ^ packages from parent
   -> RIO env (Map PackageName SnapshotPackage, [CompletedPLI], AddPackagesConfig)
-addAndCompletePackagesToSnapshot source newPackages (AddPackagesConfig drops flags hiddens options) old = do
-  let addPackage (ps, completed) loc = do
-        name <- getPackageLocationName loc
-        loc' <- completePackageLocation loc
-        let p = (name, SnapshotPackage
-              { spLocation = loc'
+addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig drops flags hiddens options) old = do
+  let source = display loc
+      addPackage :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+                 => ([(PackageName, SnapshotPackage)],[CompletedPLI])
+                 -> RawPackageLocationImmutable
+                 -> RIO env ([(PackageName, SnapshotPackage)], [CompletedPLI])
+      addPackage (ps, completed) rawLoc = do
+        complLoc <- cachedSnapshotCompletePackageLocation cachedPL rawLoc
+        let PackageIdentifier name _ = packageLocationIdent complLoc
+            p = (name, SnapshotPackage
+              { spLocation = complLoc
               , spFlags = Map.findWithDefault mempty name flags
               , spHidden = Map.findWithDefault False name hiddens
               , spGhcOptions = Map.findWithDefault [] name options
               })
-        if toRawPLI loc' == loc
-          then pure (p:ps, completed)
-          else pure (p:ps, (loc, loc'):completed)
+            completed' = if toRawPLI complLoc == rawLoc
+                         then completed
+                         else (rawLoc, complLoc):completed
+        pure (p:ps, completed')
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
         = partitionEithers
@@ -1188,20 +1223,19 @@ addAndCompletePackagesToSnapshot source newPackages (AddPackagesConfig drops fla
 loadRawSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => RawSnapshotLocation
-  -> RIO env (Either WantedCompiler (RawSnapshotLayer, SHA256)) -- FIXME remove SHA? Be smart?
+  -> RIO env (Either WantedCompiler (RawSnapshotLayer, CompletedSL))
 loadRawSnapshotLayer (RSLCompiler compiler) = pure $ Left compiler
-loadRawSnapshotLayer sl@(RSLUrl url blob) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
+loadRawSnapshotLayer rsl@(RSLUrl url blob) =
+  handleAny (throwIO . InvalidSnapshot rsl) $ do
     bs <- loadFromURL url blob
     value <- Yaml.decodeThrow bs
-    snapshot <- warningsParserHelperRaw sl value Nothing
-    pure $ Right (snapshot, SHA256.hashBytes bs)
-loadRawSnapshotLayer sl@(RSLFilePath fp) =
-  handleAny (throwIO . InvalidSnapshot sl) $ do
+    snapshot <- warningsParserHelperRaw rsl value Nothing
+    pure $ Right (snapshot, (rsl, SLUrl url (bsToBlobKey bs)))
+loadRawSnapshotLayer rsl@(RSLFilePath fp) =
+  handleAny (throwIO . InvalidSnapshot rsl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
-    snapshot <- warningsParserHelperRaw sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, sha)
+    snapshot <- warningsParserHelperRaw rsl value $ Just $ parent $ resolvedAbsolute fp
+    pure $ Right (snapshot, (rsl, SLFilePath fp))
 
 -- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --
@@ -1213,20 +1247,19 @@ loadRawSnapshotLayer sl@(RSLFilePath fp) =
 loadSnapshotLayer
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotLocation
-  -> RIO env (Either WantedCompiler (RawSnapshotLayer, SHA256)) -- FIXME remove SHA? Be smart?
+  -> RIO env (Either WantedCompiler RawSnapshotLayer)
 loadSnapshotLayer (SLCompiler compiler) = pure $ Left compiler
 loadSnapshotLayer sl@(SLUrl url blob) =
   handleAny (throwIO . InvalidSnapshot (toRawSL sl)) $ do
     bs <- loadFromURL url (Just blob)
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelper sl value Nothing
-    pure $ Right (snapshot, SHA256.hashBytes bs)
+    pure $ Right snapshot
 loadSnapshotLayer sl@(SLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot (toRawSL sl)) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
-    sha <- SHA256.hashFile $ toFilePath $ resolvedAbsolute fp
     snapshot <- warningsParserHelper sl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, sha)
+    pure $ Right snapshot
 
 loadFromURL
   :: (HasPantryConfig env, HasLogFunc env)
@@ -1339,7 +1372,7 @@ getRawPackageLocationTreeKey
   -> RIO env TreeKey
 getRawPackageLocationTreeKey pl =
   case getRawTreeKey pl of
-    Just treeKey -> pure treeKey
+    Just treeKey' -> pure treeKey'
     Nothing ->
       case pl of
         RPLIHackage pir _ -> getHackageTarballKey pir
@@ -1375,6 +1408,9 @@ getTreeKey (PLIRepo _ pm) = pmTreeKey pm
 data PantryApp = PantryApp
   { paSimpleApp :: !SimpleApp
   , paPantryConfig :: !PantryConfig
+  , paUseColor :: !Bool
+  , paTermWidth :: !Int
+  , paStylesUpdate :: !StylesUpdate
   }
 
 simpleAppL :: Lens' PantryApp SimpleApp
@@ -1389,6 +1425,11 @@ instance HasPantryConfig PantryApp where
   pantryConfigL = lens paPantryConfig (\x y -> x { paPantryConfig = y })
 instance HasProcessContext PantryApp where
   processContextL = simpleAppL.processContextL
+instance HasStylesUpdate PantryApp where
+  stylesUpdateL = lens paStylesUpdate (\x y -> x { paStylesUpdate = y })
+instance HasTerm PantryApp where
+  useColorL = lens paUseColor (\x y -> x { paUseColor = y })
+  termWidthL = lens paTermWidth  (\x y -> x { paTermWidth = y })
 
 -- | Run some code against pantry using basic sane settings.
 --
@@ -1410,6 +1451,9 @@ runPantryApp f = runSimpleApp $ do
         PantryApp
           { paSimpleApp = sa
           , paPantryConfig = pc
+          , paTermWidth = 100
+          , paUseColor = True
+          , paStylesUpdate = mempty
           }
         f
 
@@ -1431,6 +1475,9 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
         PantryApp
           { paSimpleApp = sa
           , paPantryConfig = pc
+          , paTermWidth = 100
+          , paUseColor = True
+          , paStylesUpdate = mempty
           }
         f
 
@@ -1438,17 +1485,17 @@ runPantryAppClean f = liftIO $ withSystemTempDirectory "pantry-clean" $ \dir -> 
 --
 -- @since 0.1.0.0
 loadGlobalHints
-  :: HasTerm env
-  => Path Abs File -- ^ local cached file location
-  -> WantedCompiler
+  :: (HasTerm env, HasPantryConfig env)
+  => WantedCompiler
   -> RIO env (Maybe (Map PackageName Version))
-loadGlobalHints dest wc =
+loadGlobalHints wc =
     inner False
   where
     inner alreadyDownloaded = do
+      dest <- getGlobalHintsFile
       req <- parseRequest "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/global-hints.yaml"
       downloaded <- download req dest
-      eres <- tryAny inner2
+      eres <- tryAny (inner2 dest)
       mres <-
         case eres of
           Left e -> Nothing <$ logError ("Error when parsing global hints: " <> displayShow e)
@@ -1467,7 +1514,8 @@ loadGlobalHints dest wc =
               pure Nothing
         _ -> pure mres
 
-    inner2 = liftIO
+    inner2 dest
+           = liftIO
            $ Map.lookup wc . fmap (fmap unCabalString . unCabalStringMap)
          <$> Yaml.decodeFileThrow (toFilePath dest)
 

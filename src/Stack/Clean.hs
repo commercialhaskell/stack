@@ -19,7 +19,6 @@ import           Path.IO (ignoringAbsence, removeDirRecur)
 import           Stack.Constants.Config (rootDistDirFromDir, workDirFromDir)
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
-import           System.Exit (exitFailure)
 
 -- | Deletes build artifacts in the current project.
 --
@@ -29,7 +28,7 @@ clean cleanOpts = do
     toDelete <- dirsToDelete cleanOpts
     logDebug $ "Need to delete: " <> fromString (show (map toFilePath toDelete))
     failures <- mapM cleanDir toDelete
-    when (or failures) $ liftIO exitFailure
+    when (or failures) exitFailure
   where
     cleanDir dir = do
       logDebug $ "Deleting directory: " <> fromString (toFilePath dir)
