@@ -53,6 +53,10 @@ options =
                  "Check snapshot consistency"
                  (const checkSnapshot)
                  (pure ())
+      addCommand "legacy-snapshot"
+                 "Generate a legacy-format snapshot file"
+                 (const legacySnapshot)
+                 (pure ())
       addCommand "unpack"
                  "Unpack snapshot packages and create a Stack project for it"
                  (const unpackFiles)
@@ -73,6 +77,10 @@ options =
                  "Upload list of snapshot packages on Hackage as a distro"
                  hackageDistro
                  parseTarget
+      addCommand "legacy-bulk"
+                 "Bulk convert all new snapshots to the legacy LTS/Nightly directories"
+                 legacyBulk
+                 parseLegacyBulkArgs
     parseTarget =
       option (nightly <|> lts) ( long "target"
                               <> metavar "TARGET"
@@ -92,6 +100,10 @@ options =
                            <> value 1
                            <> help "Number of jobs to run Stackage build with"
                               )
+    parseLegacyBulkArgs = LegacyBulkArgs
+      <$> strOption (long "stackage-snapshots" <> metavar "DIR")
+      <*> strOption (long "lts-haskell" <> metavar "DIR")
+      <*> strOption (long "stackage-nightly" <> metavar "DIR")
 
 main :: IO ()
 main = runPantryApp $ do
@@ -167,6 +179,13 @@ checkSnapshot = do
   decodeFileThrow constraintsFilename >>= \constraints' -> do
     snapshot' <- loadSnapshotYaml
     checkDependencyGraph constraints' snapshot'
+
+legacySnapshot :: RIO PantryApp ()
+legacySnapshot = do
+  logInfo "Generating legacy-style snapshot file in legacy-snapshot.yaml"
+  snapshot' <- loadSnapshotYaml
+  legacy <- toLegacySnapshot snapshot'
+  liftIO $ encodeFile "legacy-snapshot.yaml" legacy
 
 unpackDir :: FilePath
 unpackDir = "unpack-dir"

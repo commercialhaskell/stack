@@ -5,6 +5,7 @@ module Curator
 
 import Curator.Constants as Export
 import Curator.HackageDistro as Export
+import Curator.Legacy as Export
 import Curator.Repo as Export
 import Curator.StackageConstraints as Export
 import Curator.Snapshot as Export
