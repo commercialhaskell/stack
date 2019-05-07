@@ -65,6 +65,7 @@ ConfigCacheParent sql="config_cache"
   pkgSrc CachePkgSrc default=''
   active Bool default=0
   pathEnvVar Text default=''
+  haddock Bool default=0
   UniqueConfigCacheParent directory type sql="unique_config_cache"
   deriving Show
 
@@ -101,8 +102,9 @@ PrecompiledCacheParent sql="precompiled_cache"
   cabalVersion Text default=''
   packageKey Text default=''
   optionsHash ByteString default=''
+  haddock Bool default=0
   library FilePath Maybe
-  UniquePrecompiledCacheParent platformGhcDir compiler cabalVersion packageKey optionsHash sql="unique_precompiled_cache"
+  UniquePrecompiledCacheParent platformGhcDir compiler cabalVersion packageKey optionsHash haddock sql="unique_precompiled_cache"
   deriving Show
 
 PrecompiledCacheSubLib
@@ -201,6 +203,7 @@ readConfigCache (Entity parentId ConfigCacheParent {..}) = do
         Set.fromList . map (configCacheComponentValue . entityVal) <$>
         selectList [ConfigCacheComponentParent ==. parentId] []
     let configCachePathEnvVar = configCacheParentPathEnvVar
+    let configCacheHaddock = configCacheParentHaddock
     return ConfigCache {..}
 
 -- | Load 'ConfigCache' from the database.
@@ -238,6 +241,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
                             , configCacheParentPkgSrc = configCachePkgSrc new
                             , configCacheParentActive = True
                             , configCacheParentPathEnvVar = configCachePathEnvVar new
+                            , configCacheParentHaddock = configCacheHaddock new
                             }
                 Just parentEntity@(Entity parentId _) -> do
                     old <- readConfigCache parentEntity
@@ -298,6 +302,7 @@ precompiledCacheKey ::
     -> Version
     -> Text
     -> ByteString
+    -> Bool
     -> PrecompiledCacheKey
 precompiledCacheKey platformGhcDir compiler cabalVersion =
     UniquePrecompiledCacheParent
@@ -336,7 +341,7 @@ savePrecompiledCache ::
     => PrecompiledCacheKey
     -> PrecompiledCache Rel
     -> RIO env ()
-savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPlatformGhcDir precompiledCacheParentCompiler precompiledCacheParentCabalVersion precompiledCacheParentPackageKey precompiledCacheParentOptionsHash) new =
+savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPlatformGhcDir precompiledCacheParentCompiler precompiledCacheParentCabalVersion precompiledCacheParentPackageKey precompiledCacheParentOptionsHash precompiledCacheParentHaddock) new =
     withStorage $ do
         let precompiledCacheParentLibrary = fmap toFilePath (pcLibrary new)
         mIdOld <- readPrecompiledCache key

@@ -827,6 +827,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                 case taskType of
                     TTLocalMutable lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTRemotePackage{} -> Set.empty
+            , configCacheHaddock = taskBuildHaddock
             , configCachePkgSrc = taskCachePkgSrc
             , configCachePathEnvVar = eePathEnvVar
             }
@@ -1381,6 +1382,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 mpc <- readPrecompiledCache
                        loc
                        (configCacheOpts cache)
+                       (configCacheHaddock cache)
                        (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
@@ -1685,6 +1687,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 eeBaseConfigOpts
                 loc
                 (configCacheOpts cache)
+                (configCacheHaddock cache)
                 (configCacheDeps cache)
                 mpkgid sublibsPkgIds (packageExes package)
             _ -> return ()
