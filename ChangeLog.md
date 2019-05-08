@@ -1,7 +1,20 @@
 # Changelog
 
 
-## v2.1.x (unreleased changes)
+## v2.3.x (unreleased changes)
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+## v2.1.x (unrelease changes)
 
 Release notes:
 
