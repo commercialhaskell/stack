@@ -133,6 +133,9 @@ Behavior changes:
 
 * `stack list-dependencies` has been removed in favour of `stack ls dependencies`.
 
+* The new default for `--docker-auto-pull` is enabled. See
+  [#3332](https://github.com/commercialhaskell/stack/issues/3332).
+
 Other enhancements:
 
 * Support MX Linux in get-stack.sh. Fixes
@@ -211,7 +214,7 @@ Other enhancements:
 * Set the `GHC_ENVIRONMENT` environment variable to specify dependency
   packages explicitly when running test. This is done to prevent
   ambiguous module name errors in `doctest` tests.
-- Document the way stack interacts with the Cabal library.
+* Document the way stack interacts with the Cabal library.
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)
@@ -282,11 +285,11 @@ Bug fixes:
   [#4527](https://github.com/commercialhaskell/stack/issues/4527).
 * Apply GHC options when building a `Setup.hs` file. See
   [#4526](https://github.com/commercialhaskell/stack/issues/4526).
-- Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
-- Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
+* Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
+* Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
   downloads and shows a help file, rather than listing available templates.
-- Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
-- Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
+* Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
+* Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 * Hackage credentials are not world-readable. See
   [#2159](https://github.com/commercialhaskell/stack/issues/2159).
@@ -297,7 +300,7 @@ Bug fixes:
 * When the Cabal spec version is newer than the global Cabal version, build
   against the snapshot's Cabal library. See
   [#4488](https://github.com/commercialhaskell/stack/issues/4488)
-- Docker: fix detection of expected subprocess failures.  This fixes
+* Docker: fix detection of expected subprocess failures.  This fixes
   downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
 * The `stack ghci` command's `--ghc-options` flag now parses multiple options.
@@ -393,8 +396,6 @@ Behavior changes:
   download a template, stack will check whether that template had
   been downloaded before. In that case, the cached version will be
   used. See [#3850](https://github.com/commercialhaskell/stack/issues/3850).
-* The new default for `--docker-auto-pull` is enabled. See
-  [#3332](https://github.com/commercialhaskell/stack/issues/3332).
 
 Other enhancements:
 
