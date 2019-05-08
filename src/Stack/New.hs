@@ -18,6 +18,7 @@ module Stack.New
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
 import           Control.Monad (void)
+import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.List
@@ -266,11 +267,12 @@ writeTemplateFiles
     :: MonadIO m
     => Map (Path Abs File) LB.ByteString -> m ()
 writeTemplateFiles files =
+    liftIO $
     forM_
         (M.toList files)
         (\(fp,bytes) ->
               do ensureDir (parent fp)
-                 liftIO (LB.writeFile (toFilePath fp) bytes))
+                 writeBinaryFileAtomic fp $ lazyByteString bytes)
 
 -- | Run any initialization functions, such as Git.
 runTemplateInits

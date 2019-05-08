@@ -83,6 +83,9 @@ module Stack.Types.Config
   ,GlobalOptsMonoid(..)
   ,StackYamlLoc(..)
   ,stackYamlLocL
+  ,LockFileBehavior(..)
+  ,readLockFileBehavior
+  ,lockFileBehaviorL
   ,defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
@@ -210,6 +213,7 @@ import qualified Options.Applicative.Types as OA
 import           Pantry.Internal (Storage)
 import           Path
 import qualified Paths_stack as Meta
+import qualified RIO.List as List
 import           RIO.PrettyPrint (HasTerm (..))
 import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString, HasStylesUpdate (..))
@@ -487,6 +491,7 @@ data GlobalOpts = GlobalOpts
     , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
+    , globalLockFileBehavior :: !LockFileBehavior
     } deriving (Show)
 
 -- | Location for the project's stack.yaml file.
@@ -504,6 +509,38 @@ data StackYamlLoc
 
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL = globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = y })
+
+-- | How to interact with lock files
+data LockFileBehavior
+  = LFBReadWrite
+  -- ^ Read and write lock files
+  | LFBReadOnly
+  -- ^ Read lock files, but do not write them
+  | LFBIgnore
+  -- ^ Entirely ignore lock files
+  | LFBErrorOnWrite
+  -- ^ Error out on trying to write a lock file. This can be used to
+  -- ensure that lock files in a repository already ensure
+  -- reproducible builds.
+  deriving (Show, Enum, Bounded)
+
+lockFileBehaviorL :: HasRunner env => SimpleGetter env LockFileBehavior
+lockFileBehaviorL = globalOptsL.to globalLockFileBehavior
+
+-- | Parser for 'LockFileBehavior'
+readLockFileBehavior :: ReadM LockFileBehavior
+readLockFileBehavior = do
+  s <- OA.readerAsk
+  case Map.lookup s m of
+    Just x -> pure x
+    Nothing -> OA.readerError $ "Invalid lock file behavior, valid options: " ++
+                                List.intercalate ", " (Map.keys m)
+  where
+    m = Map.fromList $ map (\x -> (render x, x)) [minBound..maxBound]
+    render LFBReadWrite = "read-write"
+    render LFBReadOnly = "read-only"
+    render LFBIgnore = "ignore"
+    render LFBErrorOnWrite = "error-on-write"
 
 -- | Project configuration information. Not every run of Stack has a
 -- true local project; see constructors below.
@@ -532,6 +569,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
+    , globalMonoidLockFileBehavior :: !(First LockFileBehavior) -- ^ See 'globalLockFileBehavior'
     } deriving Generic
 
 instance Semigroup GlobalOptsMonoid where
@@ -1964,7 +2002,7 @@ data CompilerPaths = CompilerPaths
   --
   -- Note that this is not necessarily the same version as the one that stack
   -- depends on as a library and which is displayed when running
-  -- @stack list-dependencies | grep Cabal@ in the stack project.
+  -- @stack ls dependencies | grep Cabal@ in the stack project.
   , cpGlobalDB :: !(Path Abs Dir)
   -- ^ Global package database
   , cpGhcInfo :: !ByteString

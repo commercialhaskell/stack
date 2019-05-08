@@ -589,7 +589,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
-            shouldInstall <- checkDirtiness ps installed package present
+            shouldInstall <- checkDirtiness ps installed package present buildHaddocks
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
@@ -773,8 +773,9 @@ checkDirtiness :: PackageSource
                -> Installed
                -> Package
                -> Map PackageIdentifier GhcPkgId
+               -> Bool
                -> M Bool
-checkDirtiness ps installed package present = do
+checkDirtiness ps installed package present buildHaddocks = do
     ctx <- ask
     moldOpts <- runRIO ctx $ tryGetFlagCache installed
     let configOpts = configureOpts
@@ -791,6 +792,7 @@ checkDirtiness ps installed package present = do
                 case ps of
                     PSFilePath lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     PSRemote{} -> Set.empty
+            , configCacheHaddock = buildHaddocks
             , configCachePkgSrc = toCachePkgSrc ps
             , configCachePathEnvVar = pathEnvVar ctx
             }
@@ -823,6 +825,7 @@ describeConfigDiff config old new
     | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
             (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
+    | not (configCacheHaddock old) && configCacheHaddock new = Just "rebuilding with haddocks"
     | oldOpts /= newOpts = Just $ T.pack $ concat
         [ "flags changed from "
         , show oldOpts

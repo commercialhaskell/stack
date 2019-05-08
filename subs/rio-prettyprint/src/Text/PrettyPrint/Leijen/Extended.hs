@@ -343,6 +343,7 @@ data SGRTag
     | TagColorForeground
     | TagColorBackground
     | TagRGBColor
+    | TagPaletteColor
     deriving (Eq, Ord)
 
 getSGRTag :: SGR -> SGRTag
@@ -356,6 +357,7 @@ getSGRTag SetSwapForegroundBackground{} = TagSwapForegroundBackground
 getSGRTag (SetColor Foreground _ _)     = TagColorForeground
 getSGRTag (SetColor Background _ _)     = TagColorBackground
 getSGRTag SetRGBColor{}                 = TagRGBColor
+getSGRTag SetPaletteColor{}             = TagPaletteColor
 
 (<+>) :: StyleDoc -> StyleDoc -> StyleDoc
 StyleDoc x <+> StyleDoc y = StyleDoc (x P.<+> y)

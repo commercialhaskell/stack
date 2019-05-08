@@ -36,6 +36,7 @@ import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
 import qualified Data.ByteString as S
+import           Data.ByteString.Builder (byteString)
 import           Data.Coerce (coerce)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
@@ -501,7 +502,7 @@ loadBuildConfig = do
                    logInfo "Note: You can change the snapshot via the resolver field there."
                    p <- getEmptyProject mresolver []
                    liftIO $ do
-                       S.writeFile dest' $ S.concat
+                       writeBinaryFileAtomic dest $ byteString $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
                            , "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n"
                            , "# defaults for all projects.  To change stack's default settings, edit\n"
@@ -511,9 +512,9 @@ loadBuildConfig = do
                            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
                            , "#\n"
                            , Yaml.encode p]
-                       S.writeFile (toFilePath $ parent dest </> relFileReadmeTxt) $ S.concat
-                           [ "This is the implicit global project, which is used only when 'stack' is run\n"
-                           , "outside of a real project.\n" ]
+                       writeBinaryFileAtomic (parent dest </> relFileReadmeTxt)
+                           "This is the implicit global project, which is used only when 'stack' is run\n\
+                           \outside of a real project.\n"
                    return (p, dest)
     mcompiler <- view $ globalOptsL.to globalCompiler
     let project = project'
@@ -855,34 +856,32 @@ getDefaultUserConfigPath stackRoot = do
         (defaultUserConfigPathDeprecated stackRoot)
     unless exists $ do
         ensureDir (parent path)
-        liftIO $ S.writeFile (toFilePath path) defaultConfigYaml
+        liftIO $ writeBinaryFileAtomic path defaultConfigYaml
     return path
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
-defaultConfigYaml :: S.ByteString
-defaultConfigYaml = S.intercalate "\n"
-     [ "# This file contains default non-project-specific settings for 'stack', used"
-     , "# in all projects.  For more information about stack's configuration, see"
-     , "# http://docs.haskellstack.org/en/stable/yaml_configuration/"
-     , ""
-     , "# The following parameters are used by \"stack new\" to automatically fill fields"
-     , "# in the cabal config. We recommend uncommenting them and filling them out if"
-     , "# you intend to use 'stack new'."
-     , "# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates"
-     , "templates:"
-     , "  params:"
-     , "#    author-name:"
-     , "#    author-email:"
-     , "#    copyright:"
-     , "#    github-username:"
-     , ""
-     , "# The following parameter specifies stack's output styles; STYLES is a"
-     , "# colon-delimited sequence of key=value, where 'key' is a style name and"
-     , "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic"
-     , "# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\""
-     , "# to see the current sequence."
-     , "# stack-colors: STYLES"
-     , ""
-     ]
+defaultConfigYaml :: IsString s => s
+defaultConfigYaml =
+  "# This file contains default non-project-specific settings for 'stack', used\n\
+  \# in all projects.  For more information about stack's configuration, see\n\
+  \# http://docs.haskellstack.org/en/stable/yaml_configuration/\n\
+  \\n\
+  \# The following parameters are used by \"stack new\" to automatically fill fields\n\
+  \# in the cabal config. We recommend uncommenting them and filling them out if\n\
+  \# you intend to use 'stack new'.\n\
+  \# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates\n\
+  \templates:\n\
+  \  params:\n\
+  \#    author-name:\n\
+  \#    author-email:\n\
+  \#    copyright:\n\
+  \#    github-username:\n\
+  \\n\
+  \# The following parameter specifies stack's output styles; STYLES is a\n\
+  \# colon-delimited sequence of key=value, where 'key' is a style name and\n\
+  \# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n\
+  \# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\"\n\
+  \# to see the current sequence.\n\
+  \# stack-colors: STYLES\n"

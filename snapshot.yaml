@@ -2,7 +2,7 @@ resolver: lts-11.22
 name: snapshot-for-building-stack-with-ghc-8.2.2
 
 packages:
-- ansi-terminal-0.8.1@sha256:4cebbd2034dcd9029369c0a49c72666be8dacd11a2827d33bcfa539f2933614a,3116
+- ansi-terminal-0.9@rev:0
 - Cabal-2.4.0.1@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
 - hpack-0.31.1@rev:0
@@ -20,6 +20,8 @@ packages:
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
 - rio-0.1.9.2@rev:0
+- ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
+- hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 

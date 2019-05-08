@@ -395,6 +395,8 @@ data ConfigCache = ConfigCache
       -- ^ The components to be built. It's a bit of a hack to include this in
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
+    , configCacheHaddock :: !Bool
+      -- ^ Are haddocks to be built?
     , configCachePkgSrc :: !CachePkgSrc
     , configCachePathEnvVar :: !Text
     -- ^ Value of the PATH env var, see <https://github.com/commercialhaskell/stack/issues/3138>

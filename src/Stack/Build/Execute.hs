@@ -29,6 +29,7 @@ import           Crypto.Hash
 import           Data.Attoparsec.Text hiding (try)
 import qualified Data.ByteArray as Mem (convert)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64.URL as B64URL
 import           Data.Char (isSpace)
@@ -228,13 +229,15 @@ buildSetupArgs =
      , "StackSetupShim.mainOverride"
      ]
 
-simpleSetupCode :: S.ByteString
+simpleSetupCode :: Builder
 simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
 
 simpleSetupHash :: String
 simpleSetupHash =
     T.unpack $ decodeUtf8 $ S.take 8 $ B64URL.encode $ Mem.convert $ hashWith SHA256 $
-    encodeUtf8 (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
+    toStrictBytes $
+    Data.ByteString.Builder.toLazyByteString $
+    encodeUtf8Builder (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
 -- | Get a compiled Setup exe
 getSetupExe :: HasEnvConfig env
@@ -332,11 +335,11 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         setupFileName <- parseRelFile ("setup-" ++ simpleSetupHash ++ ".hs")
         let setupHs = setupSrcDir </> setupFileName
         setupHsExists <- doesFileExist setupHs
-        unless setupHsExists $ liftIO $ S.writeFile (toFilePath setupHs) simpleSetupCode
+        unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
         setupShimFileName <- parseRelFile ("setup-shim-" ++ simpleSetupHash ++ ".hs")
         let setupShimHs = setupSrcDir </> setupShimFileName
         setupShimHsExists <- doesFileExist setupShimHs
-        unless setupShimHsExists $ liftIO $ S.writeFile (toFilePath setupShimHs) setupGhciShimCode
+        unless setupShimHsExists $ writeBinaryFileAtomic setupShimHs setupGhciShimCode
         setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
         cabalPkgVer <- view cabalVersionL
@@ -829,6 +832,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                 case taskType of
                     TTLocalMutable lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
                     TTRemotePackage{} -> Set.empty
+            , configCacheHaddock = taskBuildHaddock
             , configCachePkgSrc = taskCachePkgSrc
             , configCachePathEnvVar = eePathEnvVar
             }
@@ -1209,9 +1213,9 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
-                                cppMacrosFile = toFilePath $ setupDir </> relFileSetupMacrosH
-                                cppArgs = ["-optP-include", "-optP" ++ cppMacrosFile]
-                            liftIO $ S.writeFile cppMacrosFile (encodeUtf8 (T.pack (C.generatePackageVersionMacros macroDeps)))
+                                cppMacrosFile = setupDir </> relFileSetupMacrosH
+                                cppArgs = ["-optP-include", "-optP" ++ toFilePath cppMacrosFile]
+                            writeBinaryFileAtomic cppMacrosFile (encodeUtf8Builder (T.pack (C.generatePackageVersionMacros macroDeps)))
                             return (packageDBArgs ++ depsArgs ++ cppArgs)
 
                         -- This branch is taken when
@@ -1454,6 +1458,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 mpc <- readPrecompiledCache
                        loc
                        (configCacheOpts cache)
+                       (configCacheHaddock cache)
                        (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
@@ -1758,6 +1763,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 eeBaseConfigOpts
                 loc
                 (configCacheOpts cache)
+                (configCacheHaddock cache)
                 (configCacheDeps cache)
                 mpkgid sublibsPkgIds (packageExes package)
             _ -> return ()
