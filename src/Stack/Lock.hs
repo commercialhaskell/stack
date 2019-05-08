@@ -11,6 +11,7 @@ module Stack.Lock
     ) where
 
 import Data.Aeson.Extended
+import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -130,9 +131,9 @@ lockCachedWanted stackFile resolver fillWanted = do
     when (newLocked /= locked) $ do
       case lfb of
         LFBReadWrite ->
-          writeFileBinary (toFilePath lockFile) $
+          writeBinaryFileAtomic lockFile $
             header <>
-            Yaml.encode newLocked
+            byteString (Yaml.encode newLocked)
         LFBErrorOnWrite -> do
           logError "You indicated that Stack should error out on writing a lock file"
           logError $

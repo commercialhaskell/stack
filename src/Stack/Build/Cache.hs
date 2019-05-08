@@ -32,7 +32,6 @@ module Stack.Build.Cache
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
-import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -80,7 +79,7 @@ markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     ensureDir dir
     ident' <- parseRelFile $ packageIdentifierString ident
-    let fp = toFilePath $ dir </> ident'
+    let fp = dir </> ident'
     -- Remove old install records for this package.
     -- TODO: This is a bit in-efficient. Put all this metadata into one file?
     installed <- getInstalledExes loc
@@ -89,7 +88,7 @@ markExeInstalled loc ident = do
     -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
     -- longer exist
-    liftIO $ B.writeFile fp "Installed"
+    writeBinaryFileAtomic fp "Installed"
 
 -- | Mark the given executable as not installed
 markExeNotInstalled :: (HasEnvConfig env)
@@ -166,9 +165,9 @@ writeCabalMod :: HasEnvConfig env
               -> CTime
               -> RIO env ()
 writeCabalMod dir x = do
-    fp <- toFilePath <$> configCabalMod dir
-    writeFileBinary fp "Just used for its modification time"
-    liftIO $ setFileTimes fp x x
+    fp <- configCabalMod dir
+    writeBinaryFileAtomic fp "Just used for its modification time"
+    liftIO $ setFileTimes (toFilePath fp) x x
 
 -- | Delete the caches for the project.
 deleteCaches :: HasEnvConfig env => Path Abs Dir -> RIO env ()
@@ -208,7 +207,7 @@ writeFlagCache gid cache = do
     key <- flagCacheKey gid
     saveConfigCache key cache
 
-successBS, failureBS :: ByteString
+successBS, failureBS :: IsString s => s
 successBS = "success"
 failureBS = "failure"
 
@@ -218,7 +217,7 @@ setTestSuccess :: HasEnvConfig env
                -> RIO env ()
 setTestSuccess dir = do
     fp <- testSuccessFile dir
-    writeFileBinary (toFilePath fp) successBS
+    writeBinaryFileAtomic fp successBS
 
 -- | Mark a test suite as not having succeeded
 unsetTestSuccess :: HasEnvConfig env
@@ -226,7 +225,7 @@ unsetTestSuccess :: HasEnvConfig env
                  -> RIO env ()
 unsetTestSuccess dir = do
     fp <- testSuccessFile dir
-    writeFileBinary (toFilePath fp) failureBS
+    writeBinaryFileAtomic fp failureBS
 
 -- | Check if the test suite already passed
 checkTestSuccess :: HasEnvConfig env

@@ -17,6 +17,7 @@ module Stack.Ghci
 
 import           Stack.Prelude hiding (Display (..))
 import           Control.Monad.State.Strict (State, execState, get, modify)
+import           Data.ByteString.Builder (byteString)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.List
@@ -481,7 +482,7 @@ writeHashedFile outputDirectory relFile contents = do
     alreadyExists <- doesFileExist outFile
     unless alreadyExists $ do
         ensureDir outDir
-        S8.writeFile (toFilePath outFile) contents
+        writeBinaryFileAtomic outFile $ byteString contents
     return outFile
 
 renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript

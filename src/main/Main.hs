@@ -12,12 +12,12 @@ module Main (main) where
 
 import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
+import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
-import qualified Data.ByteString.Lazy as L
 import           Data.List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -698,7 +698,9 @@ sdistCmd sdistOpts =
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
             ensureDir (parent tarPath)
-            liftIO $ L.writeFile (toFilePath tarPath) tarBytes
+            runConduitRes $
+              sourceLazy tarBytes .|
+              sinkFileCautious (toFilePath tarPath)
             prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
             checkSDistTarball sdistOpts tarPath
             forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName

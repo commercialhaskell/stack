@@ -21,7 +21,6 @@ module Stack.Setup.Installed
     ) where
 
 import           Stack.Prelude
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List hiding (concat, elem, maximumBy)
@@ -61,7 +60,7 @@ markInstalled :: (MonadIO m, MonadThrow m)
               -> m ()
 markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ B.writeFile (toFilePath $ programsPath </> fpRel) "installed"
+    writeBinaryFileAtomic (programsPath </> fpRel) "installed"
 
 unmarkInstalled :: MonadIO m
                 => Path Abs Dir

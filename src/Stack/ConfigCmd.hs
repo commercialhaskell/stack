@@ -17,7 +17,7 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Stack.Prelude
-import qualified Data.ByteString as S
+import           Data.ByteString.Builder (byteString)
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.HashMap.Strict as HMap
 import qualified Data.Text as T
@@ -80,7 +80,7 @@ cfgCmdSet cmd = do
                  (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
-            liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
+            writeBinaryFileAtomic configFilePath (byteString (Yaml.encode config'))
             logInfo (fromString (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
