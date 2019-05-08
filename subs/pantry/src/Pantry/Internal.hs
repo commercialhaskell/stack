@@ -10,10 +10,16 @@ module Pantry.Internal
   , normalizeParents
   , makeTarRelative
   , getGlobalHintsFile
+  , hpackVersion
+  , Storage
+  , initStorage
+  , withStorage_
   ) where
 
 import Control.Exception (assert)
 import Pantry.Types
+import Pantry.SQLite (initStorage)
+import Pantry.HPack (hpackVersion)
 import qualified Data.Text as T
 import Data.Maybe (fromMaybe)
 

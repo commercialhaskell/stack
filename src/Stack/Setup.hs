@@ -33,7 +33,7 @@ import              Conduit
 import              Control.Applicative (empty)
 import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
-import              Data.Aeson.Extended
+import              Pantry.Internal.AesonExtended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.Conduit.Binary as CB

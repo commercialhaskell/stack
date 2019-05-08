@@ -93,7 +93,8 @@ module Pantry
   , loadSnapshot
   , loadAndCompleteSnapshot
   , loadAndCompleteSnapshotRaw
-  , CompletedPLI
+  , CompletedSL (..)
+  , CompletedPLI (..)
   , addPackagesToSnapshot
   , AddPackagesConfig (..)
 
@@ -165,6 +166,7 @@ module Pantry
   , getHackageTypoCorrections
   , loadGlobalHints
   , partitionReplacedDependencies
+    -- * Snapshot cache
   , SnapshotCacheHash (..)
   , withSnapshotCache
   ) where
@@ -199,7 +201,7 @@ import RIO.PrettyPrint.StylesUpdate
 import RIO.Process
 import RIO.Directory (getAppUserDataDirectory)
 import qualified Data.Yaml as Yaml
-import Data.Aeson.Extended (WithJSONWarnings (..), Value)
+import Pantry.Internal.AesonExtended (WithJSONWarnings (..), Value)
 import Data.Aeson.Types (parseEither)
 import Data.Monoid (Endo (..))
 import Pantry.HTTP
@@ -572,6 +574,8 @@ loadCabalFilePath dir = do
 --
 -- If the directory contains a file named package.yaml, hpack is used to
 -- generate a .cabal file from it.
+--
+-- @since 0.1.0.0
 findOrGenerateCabalFile
     :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
     => Path Abs Dir -- ^ package directory
@@ -965,8 +969,15 @@ loadSnapshot loc = do
         , rsDrop = apcDrop unused
         }
 
-type CompletedPLI = (RawPackageLocationImmutable, PackageLocationImmutable)
-type CompletedSL = (RawSnapshotLocation, SnapshotLocation)
+-- | A completed package location, including the original raw and completed information.
+--
+-- @since 0.1.0.0
+data CompletedPLI = CompletedPLI !RawPackageLocationImmutable !PackageLocationImmutable
+
+-- | A completed snapshot location, including the original raw and completed information.
+--
+-- @since 0.1.0.0
+data CompletedSL = CompletedSL !RawSnapshotLocation !SnapshotLocation
 
 -- | Parse a 'Snapshot' (all layers) from a 'SnapshotLocation' noting
 -- any incomplete package locations
@@ -993,7 +1004,7 @@ loadAndCompleteSnapshotRaw
   -> RIO env (Snapshot, [CompletedSL], [CompletedPLI])
 loadAndCompleteSnapshotRaw rawLoc cacheSL cachePL = do
   eres <- case Map.lookup rawLoc cacheSL of
-    Just loc -> right (\rsl -> (rsl, (rawLoc, loc))) <$> loadSnapshotLayer loc
+    Just loc -> right (\rsl -> (rsl, (CompletedSL rawLoc loc))) <$> loadSnapshotLayer loc
     Nothing -> loadRawSnapshotLayer rawLoc
   case eres of
     Left wc ->
@@ -1002,7 +1013,7 @@ loadAndCompleteSnapshotRaw rawLoc cacheSL cachePL = do
             , snapshotPackages = mempty
             , snapshotDrop = mempty
             }
-      in pure (snapshot, [(RSLCompiler wc, SLCompiler wc)], [])
+      in pure (snapshot, [CompletedSL (RSLCompiler wc) (SLCompiler wc)], [])
     Right (rsl, sloc) -> do
       (snap0, slocs, completed0) <- loadAndCompleteSnapshotRaw (rslParent rsl) cacheSL cachePL
       (packages, completed, unused) <-
@@ -1185,7 +1196,7 @@ addAndCompletePackagesToSnapshot loc cachedPL newPackages (AddPackagesConfig dro
               })
             completed' = if toRawPLI complLoc == rawLoc
                          then completed
-                         else (rawLoc, complLoc):completed
+                         else CompletedPLI rawLoc complLoc:completed
         pure (p:ps, completed')
   (revNew, revCompleted) <- foldM addPackage ([], []) newPackages
   let (newSingles, newMultiples)
@@ -1230,12 +1241,12 @@ loadRawSnapshotLayer rsl@(RSLUrl url blob) =
     bs <- loadFromURL url blob
     value <- Yaml.decodeThrow bs
     snapshot <- warningsParserHelperRaw rsl value Nothing
-    pure $ Right (snapshot, (rsl, SLUrl url (bsToBlobKey bs)))
+    pure $ Right (snapshot, (CompletedSL rsl (SLUrl url (bsToBlobKey bs))))
 loadRawSnapshotLayer rsl@(RSLFilePath fp) =
   handleAny (throwIO . InvalidSnapshot rsl) $ do
     value <- Yaml.decodeFileThrow $ toFilePath $ resolvedAbsolute fp
     snapshot <- warningsParserHelperRaw rsl value $ Just $ parent $ resolvedAbsolute fp
-    pure $ Right (snapshot, (rsl, SLFilePath fp))
+    pure $ Right (snapshot, CompletedSL rsl (SLFilePath fp))
 
 -- | Parse a 'SnapshotLayer' value from a 'SnapshotLocation'.
 --
@@ -1416,6 +1427,9 @@ data PantryApp = PantryApp
 simpleAppL :: Lens' PantryApp SimpleApp
 simpleAppL = lens paSimpleApp (\x y -> x { paSimpleApp = y })
 
+-- | Lens to view or modify the 'HpackExecutable' of a 'PantryConfig'
+--
+-- @since 0.1.0.0
 hpackExecutableL :: Lens' PantryConfig HpackExecutable
 hpackExecutableL k pconfig = fmap (\hpExe -> pconfig { pcHpackExecutable = hpExe }) (k (pcHpackExecutable pconfig))
 
@@ -1564,6 +1578,11 @@ prunePackageWithDeps pkgs getName getDeps (pname, a)  = do
         modify' $ first (Map.insert pname prunedDeps)
       return $ not (null prunedDeps)
 
+-- | Use a snapshot cache, which caches which modules are in which
+-- packages in a given snapshot. This is mostly intended for usage by
+-- Stack.
+--
+-- @since 0.1.0.0
 withSnapshotCache
   :: (HasPantryConfig env, HasLogFunc env)
   => SnapshotCacheHash

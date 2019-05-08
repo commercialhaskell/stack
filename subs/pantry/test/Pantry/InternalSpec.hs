@@ -1,7 +1,8 @@
 module Pantry.InternalSpec (spec) where
 
 import Test.Hspec
-import Pantry.Internal (normalizeParents, makeTarRelative)
+import Pantry (runPantryApp)
+import Pantry.Internal (normalizeParents, makeTarRelative, hpackVersion)
 
 spec :: Spec
 spec = do
@@ -55,3 +56,18 @@ spec = do
     -- you refactor in the future, and this turns into Nothing, that's
     -- fine.
     test "/foo" "bar" $ Just "/bar"
+
+  describe "Parse HPack version" $ do
+    {-
+    let isVersion :: Version -> Bool
+        isVersion _ = True
+    -}
+
+    it "Shipped hpack version" $ example $ do
+      _version <- runPantryApp hpackVersion
+      -- version `shouldSatisfy` isVersion
+      pure ()
+
+    -- it "External hpack version" $ do
+    --   version <- runPantryApp $ customHpack "/home/sibi/.local/bin/hpack" hpackVersion
+    --   version `shouldSatisfy` isVersion

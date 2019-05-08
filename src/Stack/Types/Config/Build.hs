@@ -30,7 +30,7 @@ module Stack.Types.Config.Build
     )
     where
 
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
 import qualified Data.Map.Strict as Map
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Stack.Prelude

@@ -175,7 +175,7 @@ module Stack.Types.Config
 import           Control.Monad.Writer (tell)
 import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
@@ -210,7 +210,7 @@ import           Lens.Micro (Lens', lens, _1, _2, to)
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
-import           Pantry.SQLite (Storage)
+import           Pantry.Internal (Storage)
 import           Path
 import qualified Paths_stack as Meta
 import qualified RIO.List as List

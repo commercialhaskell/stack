@@ -26,7 +26,7 @@ module Stack.Docker
 
 import           Stack.Prelude
 import qualified Crypto.Hash as Hash (Digest, MD5, hash)
-import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
+import           Pantry.Internal.AesonExtended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS

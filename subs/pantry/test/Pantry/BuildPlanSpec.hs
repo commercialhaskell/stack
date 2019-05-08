@@ -3,7 +3,7 @@
 
 module Pantry.BuildPlanSpec where
 
-import           Data.Aeson.Extended (WithJSONWarnings(..))
+import           Pantry.Internal.AesonExtended (WithJSONWarnings(..))
 import           RIO
 import qualified Data.ByteString.Char8 as S8
 import           Data.Yaml (decodeThrow)

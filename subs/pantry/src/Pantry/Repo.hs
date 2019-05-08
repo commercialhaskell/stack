@@ -151,6 +151,8 @@ createRepoArchive repo tarball = do
 
 -- | Clone the repository and execute the action with the working
 -- directory set to the repository root.
+--
+-- @since 0.1.0.0
 withRepo
   :: forall env a. (HasLogFunc env, HasProcessContext env)
   => Repo

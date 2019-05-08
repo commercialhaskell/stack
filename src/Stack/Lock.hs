@@ -10,7 +10,7 @@ module Stack.Lock
     , Locked(..)
     ) where
 
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
@@ -122,9 +122,11 @@ lockCachedWanted stackFile resolver fillWanted = do
     let compiler = snapshotCompiler snap
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted Map.empty compiler snPkgs
-    let lockLocations = map (uncurry LockedLocation)
-        differentSnapLocs (raw, complete) = raw /= toRawSL complete
-        newLocked = Locked { lckSnapshotLocations = lockLocations $ filter differentSnapLocs slocCompleted
+    let lockLocations = map (\(CompletedPLI r c) -> LockedLocation r c)
+        differentSnapLocs (CompletedSL raw complete)
+          | raw == toRawSL complete = Nothing
+          | otherwise = Just $ LockedLocation raw complete
+        newLocked = Locked { lckSnapshotLocations = mapMaybe differentSnapLocs slocCompleted
                            , lckPkgImmutableLocations =
                              lockLocations $ pliCompleted <> prjCompleted
                            }

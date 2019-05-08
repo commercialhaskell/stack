@@ -21,7 +21,7 @@ module Stack.Types.Resolver
   ,parseSnapName
   ) where
 
-import           Data.Aeson.Extended
+import           Pantry.Internal.AesonExtended
                  (FromJSON, parseJSON,
                   withObject, (.:), withText)
 import qualified Data.HashMap.Strict as HashMap

@@ -4,8 +4,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
--- | Extensions to Aeson parsing of objects.
-module Data.Aeson.Extended (
+-- | Extensions to Aeson parsing of objects. This module is intended
+-- for internal use by Pantry and Stack only. The intention is to
+-- fully remove this module in the future. /DO NOT RELY ON IT/.
+module Pantry.Internal.AesonExtended (
     module Export
   -- * Extended failure messages
   , (.:)

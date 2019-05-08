@@ -10,7 +10,7 @@ module Pantry.TypesSpec
     ( spec
     ) where
 
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Yaml as Yaml
 import Distribution.Types.PackageName (mkPackageName)
