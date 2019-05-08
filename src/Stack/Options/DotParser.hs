@@ -56,7 +56,7 @@ dotOptsParser externalDefault =
         globalHints = switch (long "global-hints" <>
                               help "Do not require an install GHC; instead, use a hints file for global packages")
 
--- | Parser for arguments to `stack list-dependencies`.
+-- | Parser for arguments to `stack ls dependencies`.
 listDepsOptsParser :: Parser ListDepsOpts
 listDepsOptsParser = ListDepsOpts
                  <$> dotOptsParser True -- Default for --external is True.

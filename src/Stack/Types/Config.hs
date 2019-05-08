@@ -2002,7 +2002,7 @@ data CompilerPaths = CompilerPaths
   --
   -- Note that this is not necessarily the same version as the one that stack
   -- depends on as a library and which is displayed when running
-  -- @stack list-dependencies | grep Cabal@ in the stack project.
+  -- @stack ls dependencies | grep Cabal@ in the stack project.
   , cpGlobalDB :: !(Path Abs Dir)
   -- ^ Global package database
   , cpGhcInfo :: !ByteString
