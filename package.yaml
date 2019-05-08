@@ -15,7 +15,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >=4.10 && < 5
-  - Cabal >= 2.4
+  - Cabal
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
@@ -38,10 +38,10 @@ ghc-options:
 - -fwarn-incomplete-record-updates
 - -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
-- Cabal >= 2.4
+- Cabal
 - aeson
 - annotated-wl-pprint
-- ansi-terminal >= 0.8.1
+- ansi-terminal
 - array
 - async
 - attoparsec
@@ -77,8 +77,6 @@ dependencies:
 - memory
 - microlens
 - mintty
-# TODO remove dep when persistent drops monad-logger
-- monad-logger
 - mono-traversable
 - mtl
 - mustache
@@ -99,8 +97,8 @@ dependencies:
 - regex-applicative-text
 - resource-pool
 - resourcet
-- retry >= 0.7
-- rio >= 0.1.9.2
+- retry
+- rio
 - rio-prettyprint
 - semigroups
 - split
@@ -119,7 +117,7 @@ dependencies:
 - typed-process
 - unicode-transforms
 - unix-compat
-- unliftio >= 0.2.8.0
+- unliftio
 - unordered-containers
 - vector
 - yaml

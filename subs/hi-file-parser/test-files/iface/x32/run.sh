@@ -3,7 +3,7 @@
 set -eux
 
 go() {
-  for ver in 7.10.3 8.0.2 8.2.2 8.4.4 8.6.4
+  for ver in 7.10.3 8.0.2 8.2.2 8.4.4 8.6.5
   do
       stack --resolver ghc-$ver --arch i386 ghc -- -fforce-recomp Main.hs
       local DIR

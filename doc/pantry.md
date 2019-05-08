@@ -36,7 +36,7 @@ There are essentially four different ways of specifying a snapshot
 location:
 
 * Via a compiler version, which is a "compiler only" snapshot. This
-  could be, e.g., `resolver: ghc-8.4.3`.
+  could be, e.g., `resolver: ghc-8.6.5`.
 * Via a URL pointing to a snapshot configuration file, e.g. `resolver: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2018/8/21.yaml`
 * Via a local file path pointing to a snapshot configuration file, e.g. `resolver: my-local-snapshot.yaml`
 * Via a _convenience synonym_, which provides a short form for some

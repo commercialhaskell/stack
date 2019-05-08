@@ -76,7 +76,7 @@ specific package) and _general_ (general option `*` for flags is only available 
     * A map from package name to package location, flags, GHC options,
       and if a package should be hidden. All package locations here
       are immutable.
-    * A wanted compiler version, e.g. `ghc-8.4.3`
+    * A wanted compiler version, e.g. `ghc-8.6.5`
 * If the `--compiler` CLI arg is set, or the `compiler` config value
   is set (and `--resolver` CLI arg is not set), ignore the wanted
   compiler from the snapshot and use the specified wanted compiler
