@@ -352,10 +352,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Delete the project stack working directories (.stack-work by default). Shortcut for 'stack clean --full'"
                     cleanCmd
                     (cleanOptsParser Purge)
-        addCommand' "list-dependencies"
-                    "List the dependencies"
-                    (listDependenciesCmd True)
-                    listDepsOptsParser
         addCommand' "query"
                     "Query general build information (experimental)"
                     queryCmd

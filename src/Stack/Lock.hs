@@ -19,7 +19,6 @@ import qualified Data.Yaml as Yaml
 import Pantry
 import Path (addFileExtension, parent)
 import Path.IO (doesFileExist)
-import RIO.Process
 import Stack.Prelude
 import Stack.SourceMap
 import Stack.Types.Config
@@ -87,7 +86,7 @@ loadYamlThrow parser path = do
             return res
 
 lockCachedWanted ::
-       (HasPantryConfig env, HasProcessContext env, HasLogFunc env)
+       (HasPantryConfig env, HasRunner env)
     => Path Abs File
     -> RawSnapshotLocation
     -> (Map RawPackageLocationImmutable PackageLocationImmutable
@@ -97,16 +96,23 @@ lockCachedWanted ::
     -> RIO env SMWanted
 lockCachedWanted stackFile resolver fillWanted = do
     lockFile <- liftIO $ addFileExtension "lock" stackFile
-    lockExists <- doesFileExist lockFile
+    let getLockExists = doesFileExist lockFile
+    lfb <- view lockFileBehaviorL
+    readLockFile <-
+      case lfb of
+        LFBIgnore -> pure False
+        LFBReadWrite -> getLockExists
+        LFBReadOnly -> getLockExists
+        LFBErrorOnWrite -> getLockExists
     locked <-
-        if not lockExists
+        if readLockFile
         then do
-            logDebug "Lock file doesn't exist"
-            pure $ Locked [] []
-        else do
             logDebug "Using package location completions from a lock file"
             unresolvedLocked <- loadYamlThrow parseJSON lockFile
             resolvePaths (Just $ parent stackFile) unresolvedLocked
+        else do
+            logDebug "Not reading lock file"
+            pure $ Locked [] []
     let toMap :: Ord a => [LockedLocation a b] -> Map a b
         toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
         slocCache = toMap $ lckSnapshotLocations locked
@@ -122,10 +128,21 @@ lockCachedWanted stackFile resolver fillWanted = do
                            , lckPkgImmutableLocations =
                              lockLocations $ pliCompleted <> prjCompleted
                            }
-    when (newLocked /= locked) $
-      writeBinaryFileAtomic lockFile $
-        header <>
-        byteString (Yaml.encode newLocked)
+    when (newLocked /= locked) $ do
+      case lfb of
+        LFBReadWrite ->
+          writeBinaryFileAtomic lockFile $
+            header <>
+            byteString (Yaml.encode newLocked)
+        LFBErrorOnWrite -> do
+          logError "You indicated that Stack should error out on writing a lock file"
+          logError $
+            "I just tried to write the following lock file contents to " <>
+            fromString (toFilePath lockFile)
+          logError $ display $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
+          exitFailure
+        LFBIgnore -> pure ()
+        LFBReadOnly -> pure ()
     pure wanted
   where
     header =
