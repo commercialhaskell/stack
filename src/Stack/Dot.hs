@@ -155,9 +155,9 @@ listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
   liftIO $ case listDepsFormat opts of
-      treeOpts@(ListDepsTree{}) -> Text.putStrLn "Packages" >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
+      treeOpts@ListDepsTree{} -> Text.putStrLn "Packages" >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
       ListDepsJSON -> printJSON pkgs resultGraph
-      textOpts@(ListDepsText{}) -> void (Map.traverseWithKey go (snd <$> resultGraph))
+      textOpts@ListDepsText{} -> void (Map.traverseWithKey go (snd <$> resultGraph))
         where go name payload = Text.putStrLn $ listDepsLine textOpts name payload
 
 data DependencyTree = DependencyTree (Set PackageName) (Map PackageName (Set PackageName, DotPayload))
