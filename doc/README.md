@@ -77,18 +77,21 @@ The `stack new` command should have created the following files:
 
 ```
 .
-├── LICENSE
-├── Setup.hs
 ├── app
 │   └── Main.hs
+├── ChangeLog.md
+├── LICENSE
 ├── my-project.cabal
+├── package.yaml
+├── README.md
+├── Setup.hs
 ├── src
 │   └── Lib.hs
 ├── stack.yaml
 └── test
     └── Spec.hs
 
-    3 directories, 7 files
+    3 directories, 10 files
 ```
 
 So to manage your library:
