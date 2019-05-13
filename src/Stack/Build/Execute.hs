@@ -56,7 +56,7 @@ import           Distribution.System            (OS (Windows),
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
-import           Distribution.Version (mkVersion, nullVersion)
+import           Distribution.Version (mkVersion)
 import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
@@ -1925,16 +1925,6 @@ singleTest topts testsToRun ac ee task installedMap = do
                                 (Map.toList $ eeGlobalDumpPkgs ee) of
                   Just (ghcId, _) -> return ghcId
                   Nothing -> error "template-haskell is a wired-in GHC boot library but it wasn't found"
-                packageIds <- forMaybeM (M.toList $ packageDeps package) $ \(name, dv) -> do
-                    let pkgId = PackageIdentifier name nullVersion
-                    case Map.lookupGT pkgId allDepsMap of
-                        Just (PackageIdentifier name' version, ghcPkgId)
-                            | name' == name && dvType dv == AsLibrary &&
-                              version `withinRange` dvVersionRange dv ->
-                            return $ Just ghcPkgId
-                        _ -> do
-                            logWarn $ "Could not find GHC package id for dependency " <> fromString (packageNameString name)
-                            return Nothing
                 -- env variable GHC_ENVIRONMENT is set for doctest so module names for
                 -- packages with proper dependencies should no longer get ambiguous
                 -- see e.g. https://github.com/doctest/issues/119
@@ -1949,7 +1939,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         "package-db " <> fromString snapDBPath <> "\n" <>
                         "package-db " <> fromString localDBPath <> "\n" <>
                         foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
-                            (thGhcId:packageIds)
+                            (thGhcId:M.elems allDepsMap)
                 writeFileUtf8Builder fp ghcEnv
                 menv <- liftIO $ setEnv fp =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
