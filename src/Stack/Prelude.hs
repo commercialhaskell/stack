@@ -46,6 +46,7 @@ import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
+import System.Permissions (osIsWindows)
 
 import Conduit
 
@@ -218,9 +219,18 @@ defaultFirstFalse _ = False
 --
 -- In the future: replace with a function in rio
 writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
-writeBinaryFileAtomic fp builder =
-  liftIO $
-  runConduitRes $
-  yield builder .|
-  unsafeBuilderToByteString .|
-  sinkFileCautious (toFilePath fp)
+writeBinaryFileAtomic fp builder
+  -- Atomic file writing is not supported on Windows yet, unfortunately.
+  -- withSinkFileCautious needs to be implemented properly for Windows to make
+  -- this work.
+  | osIsWindows =
+      liftIO $
+      withBinaryFile (toFilePath fp) WriteMode $ \h ->
+      hPutBuilder h builder
+  | otherwise =
+      liftIO $
+      withSinkFileCautious (toFilePath fp) $ \sink ->
+      runConduit $
+      yield builder .|
+      unsafeBuilderToByteString .|
+      sink
