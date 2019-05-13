@@ -561,16 +561,15 @@ buildCmd opts = do
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
     exitFailure
   local (over globalOptsL modifyGO) $
-    withConfig YesReexec $
     case boptsCLIFileWatch opts of
-      FileWatchPoll -> fileWatchPoll stderr (inner . Just)
-      FileWatch -> fileWatch stderr (inner . Just)
+      FileWatchPoll -> fileWatchPoll (inner . Just)
+      FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
   where
     inner
       :: Maybe (Set (Path Abs File) -> IO ())
-      -> RIO Config ()
-    inner setLocalFiles = withEnvConfig NeedTargets opts $
+      -> RIO Runner ()
+    inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
         Stack.Build.build setLocalFiles
     -- Read the build command from the CLI and enable it to run
     modifyGO =
