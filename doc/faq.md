@@ -3,7 +3,7 @@
 # FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [Build overview](build-overview.md) page. The goal of the answers
+below, see the [Build overview](build_overview.md) page. The goal of the answers
 here is to be as helpful and concise as possible.
 
 ## What version of GHC is used when I run something like `stack ghci`?
