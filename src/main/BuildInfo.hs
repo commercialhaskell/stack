@@ -18,6 +18,7 @@ import Stack.Prelude
 import qualified Paths_stack as Meta
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.System (buildArch)
+import           Data.Version (versionBranch)
 
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
@@ -31,6 +32,10 @@ import           GitHash (giCommitCount, giHash, tGitInfoCwdTry)
 import           Options.Applicative.Simple (simpleVersion)
 #endif
 
+#ifndef USE_GIT_INFO
+import           Data.Version (showVersion)
+#endif
+
 versionString' :: String
 #ifdef USE_GIT_INFO
 versionString' = concat $ concat
@@ -41,17 +46,23 @@ versionString' = concat $ concat
         Left _ -> []
         Right 1 -> []
         Right count -> [" (", show count, " commits)"]
-    , [" ", Cabal.display buildArch]
-    , [depsString, warningString]
+    , [afterVersion]
     ]
 #else
-versionString' =
-    showVersion Meta.version
-    ++ ' ' : Cabal.display buildArch
-    ++ depsString
-    ++ warningString
+versionString' = showVersion Meta.version ++ afterVersion
 #endif
   where
+    afterVersion = concat
+      [ preReleaseString
+      , ' ' : Cabal.display buildArch
+      , depsString
+      , warningString
+      ]
+    preReleaseString =
+      case versionBranch Meta.version of
+        (_:y:_) | even y -> " PRE-RELEASE"
+        (_:_:z:_) | even z -> " RELEASE-CANDIDATE"
+        _ -> ""
 #ifdef HIDE_DEP_VERSIONS
     depsString = " hpack-" ++ VERSION_hpack
 #else
