@@ -198,9 +198,8 @@ rules global@Global{..} args = do
             () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
                 ,[" --haddock" | gTestHaddocks]]
-            () <- cmd0  "install" "cabal-install"
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
-            () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests"
+            () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests --exec stack-integration-test stack"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
@@ -506,7 +505,7 @@ certificateNameOptName = "certificate-name"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
+stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch, "--interleaved-output"]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
