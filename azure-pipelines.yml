@@ -5,6 +5,7 @@ trigger:
     - ci/*
     - master
     - stable
+    - v2.1
 
 variables:
   BASE_BRANCH: "master"
