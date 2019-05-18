@@ -3,6 +3,7 @@ trigger:
   branches:
     include:
     - ci/*
+    - rc/*
     - master
     - stable
 

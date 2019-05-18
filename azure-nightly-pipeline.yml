@@ -1,5 +1,13 @@
-trigger: none
-pr: none
+trigger:
+  batch: true
+  branches:
+    include:
+    - rc/*
+pr:
+  autoCancel: true
+  branches:
+    include:
+    - rc/*
 
 variables:
   BASE_BRANCH: "master"
