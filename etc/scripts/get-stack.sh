@@ -612,7 +612,7 @@ try_install_pkgs() {
 apt_get_install_pkgs() {
   missing=
   for pkg in $*; do
-    if ! dpkg -s $pkg 2>/dev/null |grep Status >/dev/null; then
+    if ! dpkg -s $pkg 2>/dev/null |grep '^Status:.*installed' >/dev/null; then
       missing="$missing $pkg"
     fi
   done
