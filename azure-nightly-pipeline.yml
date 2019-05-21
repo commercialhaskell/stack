@@ -1,8 +1,4 @@
-trigger:
-  batch: true
-  branches:
-    include:
-    - rc/*
+trigger: none
 pr:
   autoCancel: true
   branches:
