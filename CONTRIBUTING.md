@@ -59,16 +59,21 @@ If you want to contribute to the source code, please take a look at the
 
 ## Contributing to Documentation
 
+[1]: https://github.com/commercialhaskell/stack/tree/stable
+
 If you would like to help with documentation, please note that for most cases
 the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
-subdirectory of the repository itself. Please submit a
-[pull request](https://help.github.com/articles/using-pull-requests/) with your
-changes/additions based off the [the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
+subdirectory of the repository itself. Please create a new branch off of the 
+project's [stable branch][1] and make your changes/additions on the new 
+branch. Once you are ready to submit your changes/additions, please submit a 
+pull request from your new branch to the project's [stable branch][1]. For 
+more information about pull requests, take a look at GitHub's overview of 
+[using pull requests](https://help.github.com/articles/using-pull-requests/).
 
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
-from GFM, please check the documentation there before submitting a PR to fix
-those.
+from GitHub Flavored Markdown, please check the documentation there before 
+submitting a pull request to fix those.
 
 If your changes move or rename files, or subsume Wiki content, please continue
 to leave a file/page in the old location temporarily, in addition to the new
