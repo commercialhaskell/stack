@@ -13,7 +13,51 @@ issue. If you are not a member of the project, you will be asked for
 confirmation and we will close it.
 
 
-## Documentation
+## Contributing Overview
+
+Contributions to The Haskell Tool Stack are most welcome. To get started, we 
+suggest that you get the source code of the project onto your local machine by 
+following these steps (this assumes that you have already installed a version 
+of stack and have `git` installed on your machine).
+
+1. Clone `stack` from git with
+   `git clone https://github.com/commercialhaskell/stack.git`.
+2. Enter into the stack folder with `cd stack`.
+3. Build `stack` using a pre-existing `stack` install with
+   `stack setup && stack build`.
+4. Once `stack` finishes building, check the stack version with
+   `stack exec stack -- --version`. Make sure the version is the latest.
+5. Look for issues tagged with
+   [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
+   and
+   [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
+   labels.
+
+Here is a one-line command that will execute steps 1 through 3 at once.
+```bash
+git clone https://github.com/commercialhaskell/stack.git && \
+cd stack && \
+stack setup && \
+stack build
+```
+
+If you need to check your changes quickly run:
+```bash
+stack ghci
+λ: :main --stack-root /path/to/root/ --stack-yaml /path/to/stack.yaml COMMAND
+```
+
+This allows you to set a special stack root (instead of `~/.stack/` or, on
+Windows, `%LOCALAPPDATA%\Programs\stack`) and to target your commands at a
+particular `stack.yaml` instead of the one found in the current directory.
+
+If you want to contribute to documentation, please take a look at the 
+[Contributing to Documentation](#contributing-to-documentation) section below. 
+If you want to contribute to the source code, please take a look at the 
+[Contributing to Code](#contributing-to-code) section below.
+
+
+## Contributing to Documentation
 
 If you would like to help with documentation, please note that for most cases
 the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
@@ -33,7 +77,7 @@ location. Please also update any links in other files, or on the Wiki, to point
 to the new file location.
 
 
-## Code
+## Contributing to Code
 
 If you would like to contribute code to fix a bug, add a new feature, or
 otherwise improve `stack`, pull requests are most welcome. It's a good idea to

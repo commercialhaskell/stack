@@ -116,41 +116,21 @@ If you want to go further, we highly recommend you to read the [`stack` guide](G
 
 #### How to contribute
 
-This assumes that you have already installed a version of stack, and have `git`
-installed.
+[1]: https://docs.haskellstack.org/en/stable/CONTRIBUTING/
+[2]: https://docs.haskellstack.org/en/stable/CONTRIBUTING/#contributing-overview
+[3]: https://docs.haskellstack.org/en/stable/CONTRIBUTING/#contributing-to-documentation
+[4]: https://docs.haskellstack.org/en/stable/CONTRIBUTING/#contributing-to-code
+[5]: https://github.com/commercialhaskell/stack/blob/master/CONTRIBUTING.md
+[6]: https://github.com/commercialhaskell/stack/blob/master/CONTRIBUTING.md#contributing-overview
+[7]: https://github.com/commercialhaskell/stack/blob/master/CONTRIBUTING.md#contributing-to-documentation
+[8]: https://github.com/commercialhaskell/stack/blob/master/CONTRIBUTING.md#contributing-to-code
 
-1. Clone `stack` from git with
-   `git clone https://github.com/commercialhaskell/stack.git`.
-2. Enter into the stack folder with `cd stack`.
-3. Build `stack` using a pre-existing `stack` install with
-   `stack setup && stack build`.
-4. Once `stack` finishes building, check the stack version with
-   `stack exec stack -- --version`. Make sure the version is the latest.
-5. Look for issues tagged with
-   [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
-   and
-   [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
-   labels.
-
-Build from source as a one-liner:
-
-```bash
-git clone https://github.com/commercialhaskell/stack.git && \
-cd stack && \
-stack setup && \
-stack build
-```
-
-If you need to check your changes quickly run:
-
-```bash
-stack ghci
-λ: :main --stack-root /path/to/root/ --stack-yaml /path/to/stack.yaml COMMAND
-```
-
-This allows you to set a special stack root (instead of `~/.stack/` or, on
-Windows, `%LOCALAPPDATA%\Programs\stack`) and to target your commands at a
-particular `stack.yaml` instead of the one found in the current directory.
+To begin your contribution, we suggest that you clone this repository to your 
+local machine and build the Haskell Tool Stack program - you can find the 
+specific steps for this in the [contributing overview section][2] 
+of the [contributors guide][1]. Also, please refer to the [contributing to documentation section][3]
+if you want to make changes to documentation, and the [contributing to code section][4]
+if you want to make changes to the source code.
 
 #### Complete guide to stack
 
