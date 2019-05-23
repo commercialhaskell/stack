@@ -14,7 +14,7 @@ packages:
 - ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
 - hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
 - optparse-simple-0.1.1.2
-- github: snoyberg/filelock
+- git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
 drop-packages:
