@@ -77,7 +77,7 @@ main =
             _ <- readProcess "stack" ["build", "--dry-run"] ""
             gStackPackageDescription <-
                 packageDescription <$> readGenericPackageDescription silent "stack.cabal"
-            gGpgKey <- fromMaybe defaultGpgKey <$> lookupEnv gpgKeyEnvVar
+            gGpgKey <- maybe defaultGpgKey Just <$> lookupEnv gpgKeyEnvVar
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
@@ -109,7 +109,7 @@ main =
 options :: [OptDescr (Either String (Global -> Global))]
 options =
     [ Option "" [gpgKeyOptName]
-        (ReqArg (\v -> Right $ \g -> g{gGpgKey = v}) "USER-ID")
+        (ReqArg (\v -> Right $ \g -> g{gGpgKey = Just v}) "USER-ID")
         ("GPG user ID to sign distribution package with (defaults to " ++
          gpgKeyEnvVar ++
          " environment variable).")
@@ -198,9 +198,8 @@ rules global@Global{..} args = do
             () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
                 ,[" --haddock" | gTestHaddocks]]
-            () <- cmd0  "install" "cabal-install"
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
-            () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests"
+            () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests --exec stack-integration-test stack"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
@@ -267,9 +266,12 @@ rules global@Global{..} args = do
     releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
-        cmd ("gpg " ++ gpgOptions ++ " --detach-sig --armor")
-            [ "-u", gGpgKey
-            , dropExtension out ]
+        case gGpgKey of
+            Nothing -> error "No GPG key specified"
+            Just gpgKey ->
+                cmd ("gpg " ++ gpgOptions ++ " --detach-sig --armor")
+                    [ "-u", gpgKey
+                    , dropExtension out ]
 
     releaseDir </> "*" <.> sha256Ext %> \out -> do
         need [out -<.> ""]
@@ -315,7 +317,11 @@ rules global@Global{..} args = do
     releaseBinDir = releaseDir </> "bin"
 
     binaryPkgFileNames =
-        concatMap (\x -> [x, x <.> ascExt, x <.> sha256Ext]) binaryPkgArchiveFileNames
+        concatMap sigHashFileNames binaryPkgArchiveFileNames
+    sigHashFileNames x =
+        case gGpgKey of
+            Nothing -> [x, x <.> sha256Ext]
+            Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
     binaryPkgArchiveFileNames =
         case platformOS of
             Windows -> [binaryPkgZipFileName, binaryPkgTarGzFileName]
@@ -454,8 +460,8 @@ githubReleaseTagOptName :: String
 githubReleaseTagOptName = "github-release-tag"
 
 -- | Default GPG key ID for signing bindists
-defaultGpgKey :: String
-defaultGpgKey = "0x575159689BEFB442"
+defaultGpgKey :: Maybe String
+defaultGpgKey = Nothing
 
 -- | @STACK_RELEASE_GPG_KEY@ environment variable name.
 gpgKeyEnvVar :: String
@@ -499,7 +505,7 @@ certificateNameOptName = "certificate-name"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
+stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch, "--interleaved-output"]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
@@ -538,7 +544,7 @@ instance FromJSON GithubReleaseAsset where
 -- | Global values and options.
 data Global = Global
     { gStackPackageDescription :: !PackageDescription
-    , gGpgKey :: !String
+    , gGpgKey :: !(Maybe String)
     , gAllowDirty :: !Bool
     , gGithubAuthToken :: !(Maybe String)
     , gGithubReleaseTag :: !(Maybe String)

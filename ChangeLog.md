@@ -14,9 +14,7 @@ Other enhancements:
 Bug fixes:
 
 
-## v2.1.x (unrelease changes)
-
-Release notes:
+## v2.1.0.1 (release candidate)
 
 Major changes:
 

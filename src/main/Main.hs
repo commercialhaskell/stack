@@ -335,7 +335,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                  (globalOpts OtherCmdGlobalOpts)
                  scriptOptsParser
       addCommand' "freeze"
-                  "Show project or snapshot with pinned dependencies if there are any such"
+                  "Show project or snapshot with pinned dependencies if there are any such (experimental, may be removed)"
                   freezeCmd
                   freezeOptsParser
 

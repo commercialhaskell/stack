@@ -6,7 +6,7 @@ module System.Permissions
   ) where
 
 import qualified System.Posix.Files as Posix
-import Stack.Prelude
+import RIO
 
 -- | True if using Windows OS.
 osIsWindows :: Bool

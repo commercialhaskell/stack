@@ -1,12 +1,13 @@
-resolver: nightly-2019-05-05
+resolver: nightly-2019-05-23
 name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:
 - amazonka-1.6.1@rev:0
 - amazonka-s3-1.6.1@rev:0
 - amazonka-core-1.6.1@rev:0
+  # For amazonka-1.6.1 (check for amazonka update allowing http-client-0.6)
 - http-client-0.5.14@rev:0
-- github: snoyberg/filelock
+- git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
 drop-packages:

@@ -34,8 +34,9 @@ pages:
   - Code coverage: coverage.md
   - GHCi: ghci.md
   - Pantry: pantry.md
+  - Lock files: lock_files.md
 - Advanced documentation:
-  - Build overview: build-overview.md
+  - Build overview: build_overview.md
 - Project documentation:
   - Contributors guide: CONTRIBUTING.md
   - Maintainer guide:
