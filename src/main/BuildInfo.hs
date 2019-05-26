@@ -18,7 +18,6 @@ import Stack.Prelude
 import qualified Paths_stack as Meta
 import qualified Distribution.Text as Cabal (display)
 import           Distribution.System (buildArch)
-import           Data.Version (versionBranch)
 
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
@@ -32,8 +31,10 @@ import           GitHash (giCommitCount, giHash, tGitInfoCwdTry)
 import           Options.Applicative.Simple (simpleVersion)
 #endif
 
-#ifndef USE_GIT_INFO
-import           Data.Version (showVersion)
+#ifdef USE_GIT_INFO
+import           Data.Version (versionBranch)
+#else
+import           Data.Version (showVersion, versionBranch)
 #endif
 
 versionString' :: String
