@@ -610,9 +610,15 @@ try_install_pkgs() {
 
 # Install packages using apt-get
 apt_get_install_pkgs() {
-  if ! dpkg-query -W "$@"|grep -v '^\S\+\s\+.\+$' > /dev/null; then
+  missing=
+  for pkg in $*; do
+    if ! dpkg -s $pkg 2>/dev/null |grep '^Status:.*installed' >/dev/null; then
+      missing="$missing $pkg"
+    fi
+  done
+  if [ "$missing" = "" ]; then
     info "Already installed!"
-  elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq} "$@"; then
+  elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq}$missing; then
     die "Installing apt packages failed.  Please run 'apt-get update' and try again."
   fi
 }
