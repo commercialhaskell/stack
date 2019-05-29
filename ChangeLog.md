@@ -11,6 +11,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Add `--docker-mount-mode` option to set the Docker volume mount mode
+  for performance tuning on macOS.
+
 Bug fixes:
 
 

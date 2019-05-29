@@ -72,6 +72,7 @@ dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
         dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount
+        dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
         dockerEnv = dockerMonoidEnv
         dockerSetUser = getFirst dockerMonoidSetUser
         dockerRequireDockerVersion =

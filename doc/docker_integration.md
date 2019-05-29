@@ -43,6 +43,10 @@ Other Un*xen are not officially supported but there are ways to get them working
 See [#194](https://github.com/commercialhaskell/stack/issues/194) for details
 and workarounds.
 
+Note: you may want to use set the `mount-mode` option to `delegated`, since
+this can dramatically improve performance on macOS (see
+[configuration](#configuration) for more information).
+
 **Windows does not work at all** (see
 [#2421](https://github.com/commercialhaskell/stack/issues/2421)).
 
@@ -207,6 +211,14 @@ otherwise noted.
       mount:
         - "/foo/bar"
         - "/baz:/tmp/quux"
+
+      # Sets the volume mount mode, passed directly to `docker`.
+      # The default mode (consistent) is safest, but may suffer poor performance
+      # on non-Linux platforms such as macOS, where the `delegated` mode will
+      # be significantly faster.
+      # See https://docs.docker.com/docker-for-mac/osxfs-caching/
+      # for valid values and the implications of changing the default.
+      mount-mode: delegated
 
       # Environment variables to set in the container.  Environment variables
       # are not automatically inherited from the host, so if you need any specific
