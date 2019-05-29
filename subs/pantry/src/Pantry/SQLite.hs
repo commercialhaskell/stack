@@ -26,31 +26,32 @@ initStorage description migration fp inner = do
   ensureDir $ parent fp
 
   migrates <- withWriteLock (display description) fp $ wrapMigrationFailure $
-    withSqliteConnInfo (sqinfo True) $ runReaderT $
+    withSqliteConnInfo (sqinfo True) $ runSqlConn $
     runMigrationSilent migration
   forM_ migrates $ \mig -> logDebug $ "Migration executed: " <> display mig
 
-  -- This addresses a weird race condition that can result in a
-  -- deadlock. If multiple threads in the same process try to access
-  -- the database, it's possible that they will end up deadlocking on
-  -- the file lock, due to delays which can occur in the freeing of
-  -- previous locks. I don't fully grok the situation yet, but
-  -- introducing an MVar to ensure that, within a process, only one
-  -- thread is attempting to lock the file is both a valid workaround
-  -- and good practice.
-  baton <- newMVar ()
-
-  withSqlitePoolInfo (sqinfo False) 1 $ \pool -> inner $ Storage
-    -- NOTE: Currently, we take a write lock on every action. This is
-    -- a bit heavyweight, but it avoids the SQLITE_BUSY errors
-    -- reported in
-    -- <https://github.com/commercialhaskell/stack/issues/4471>
-    -- completely. We can investigate more elegant solutions in the
-    -- future, such as separate read and write actions or introducing
-    -- smarter retry logic.
-    { withStorage_ = withMVar baton . const . withWriteLock (display description) fp . flip runSqlPool pool
-    , withWriteLock_ = id
-    }
+  -- Make a single connection to the SQLite database and wrap it in an MVar for
+  -- the entire execution context. Previously we used a resource pool of size
+  -- 1, but (1) there's no advantage to that, and (2) it had a _very_ weird
+  -- interaction with Docker on OS X where when resource-pool's reaper would
+  -- trigger, it would somehow cause the Stack process inside the container to
+  -- die with a SIGBUS. Definitely an interesting thing worth following up
+  -- on...
+  withSqliteConnInfo (sqinfo False) $ \conn0 -> do
+    connVar <- newMVar conn0
+    inner $ Storage
+      -- NOTE: Currently, we take a write lock on every action. This is
+      -- a bit heavyweight, but it avoids the SQLITE_BUSY errors
+      -- reported in
+      -- <https://github.com/commercialhaskell/stack/issues/4471>
+      -- completely. We can investigate more elegant solutions in the
+      -- future, such as separate read and write actions or introducing
+      -- smarter retry logic.
+      { withStorage_ = \action -> withMVar connVar $ \conn ->
+                       withWriteLock (display description) fp $
+                       runSqlConn action conn
+      , withWriteLock_ = id
+      }
   where
     wrapMigrationFailure = handleAny (throwIO . MigrationFailure description fp)
 
