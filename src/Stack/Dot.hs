@@ -53,7 +53,7 @@ data DotOpts = DotOpts
     -- ^ Include dependencies on base
     , dotDependencyDepth :: !(Maybe Int)
     -- ^ Limit the depth of dependency resolution to (Just n) or continue until fixpoint
-    , dotPrune :: !(Set String)
+    , dotPrune :: !(Set PackageName)
     -- ^ Package names to prune from the graph
     , dotTargets :: [Text]
     -- ^ stack TARGETs to trace dependencies for
@@ -215,14 +215,14 @@ payloadText opts payload =
 -- unless they are in @dontPrune@
 pruneGraph :: (F.Foldable f, F.Foldable g, Eq a)
            => f PackageName
-           -> g String
+           -> g PackageName
            -> Map PackageName (Set PackageName, a)
            -> Map PackageName (Set PackageName, a)
 pruneGraph dontPrune names =
   pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps,x) ->
-    if packageNameString pkg `F.elem` names
+    if pkg `F.elem` names
       then Nothing
-      else let filtered = Set.filter (\n -> packageNameString n `F.notElem` names) pkgDeps
+      else let filtered = Set.filter (\n -> n `F.notElem` names) pkgDeps
            in if Set.null filtered && not (Set.null pkgDeps)
                 then Nothing
                 else Just (filtered,x))
@@ -342,7 +342,7 @@ printGraph dotOpts locals graph = do
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
   where filteredLocals = Set.filter (\local' ->
-          packageNameString local' `Set.notMember` dotPrune dotOpts) locals
+          local' `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadIO m)

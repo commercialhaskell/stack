@@ -53,14 +53,14 @@ spec = do
 
     prop "requested packages are pruned" $ do
       let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
-          allPackages g = Set.map packageNameString (Map.keysSet g `Set.union`  fold (fmap fst g))
+          allPackages g = Map.keysSet g `Set.union`  fold (fmap fst g)
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
         in Set.null (allPackages pruned `Set.intersection` Set.fromList toPrune)
 
     prop "pruning removes orhpans" $ do
       let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
-          allPackages g = Set.map packageNameString (Map.keysSet g `Set.union` fold (fmap fst g))
+          allPackages g = Map.keysSet g `Set.union` fold (fmap fst g)
           orphans g = Map.filterWithKey (\k _ -> not (graphElem k g)) g
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
