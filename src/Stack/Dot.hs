@@ -220,9 +220,9 @@ pruneGraph :: (F.Foldable f, F.Foldable g, Eq a)
            -> Map PackageName (Set PackageName, a)
 pruneGraph dontPrune names =
   pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps,x) ->
-    if show pkg `F.elem` names
+    if packageNameString pkg `F.elem` names
       then Nothing
-      else let filtered = Set.filter (\n -> show n `F.notElem` names) pkgDeps
+      else let filtered = Set.filter (\n -> packageNameString n `F.notElem` names) pkgDeps
            in if Set.null filtered && not (Set.null pkgDeps)
                 then Nothing
                 else Just (filtered,x))
