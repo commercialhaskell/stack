@@ -1,13 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
-
-Major changes:
-
-Behavior changes:
+## v2.1.0.3 (release candidate)
 
 Other enhancements:
 
@@ -15,6 +9,9 @@ Other enhancements:
   for performance tuning on macOS.
 
 Bug fixes:
+
+* Fix regression where `stack --docker` would quite after 20 seconds on
+  macOS.
 
 
 ## v2.1.0.1 (release candidate)
