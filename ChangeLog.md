@@ -1,7 +1,24 @@
 # Changelog
 
 
+## Unreleased changes
+
+**Changes since v2.1.0.3**
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
 ## v2.1.0.3 (release candidate)
+
+**Changes since v2.1.0.1**
 
 Other enhancements:
 
@@ -15,6 +32,8 @@ Bug fixes:
 
 
 ## v2.1.0.1 (release candidate)
+
+**Changes since v1.9.3**
 
 Major changes:
 
