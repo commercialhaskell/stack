@@ -175,12 +175,12 @@ rules global@Global{..} args = do
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
-            mUploadLabel =
-                case takeExtension srcFile of
-                    e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
-                      | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
-                      | otherwise -> gUploadLabel
-        uploadToGithubRelease global srcFile mUploadLabel
+            -- mUploadLabel =
+            --     case takeExtension srcFile of
+            --         e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
+            --           | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
+            --           | otherwise -> gUploadLabel
+        uploadToGithubRelease global srcFile Nothing
         copyFileChanged srcFile out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
@@ -197,7 +197,8 @@ rules global@Global{..} args = do
             _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile "stack.cabal")
             () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
-                ,[" --haddock" | gTestHaddocks]]
+                ,[" --haddock" | gTestHaddocks]
+                ,["stack"]]
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
             () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests --exec stack-integration-test stack"
             return ()
@@ -296,7 +297,8 @@ rules global@Global{..} args = do
                 "install"
                 gBuildArgs
                 "--pedantic"
-                "--flag stack:integration-tests")
+                "--flag stack:integration-tests"
+                "stack")
             (tryJust (guard . isDoesNotExistError) (removeFile out))
 
   where
