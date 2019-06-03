@@ -27,7 +27,7 @@ Other enhancements:
 
 Bug fixes:
 
-* Fix regression where `stack --docker` would quite after 20 seconds on
+* Fix regression where `stack --docker` would quit after 20 seconds on
   macOS.
 
 
