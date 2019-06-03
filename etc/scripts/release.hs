@@ -278,7 +278,12 @@ rules global@Global{..} args = do
         bs <- liftIO $ do
             _ <- tryJust (guard . isDoesNotExistError) (removeFile out)
             S8.readFile (dropExtension out)
-        writeFileChanged out (S8.unpack (digestToHexByteString (hash bs :: Digest SHA256)) ++ "\n")
+        writeFileChanged
+          out
+          ( S8.unpack (digestToHexByteString (hash bs :: Digest SHA256)) ++
+            "  " ++
+            takeFileName (dropExtension out) ++
+            "\n" )
 
     releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
         alwaysRerun
