@@ -331,8 +331,8 @@ rules global@Global{..} args = do
             Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
     binaryPkgArchiveFileNames =
         case platformOS of
-            Windows -> [binaryPkgZipFileName, binaryPkgTarGzFileName]
-            _ -> [binaryPkgTarGzFileName]
+            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName]
+            _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     binaryExeFileName = binaryName <.> exe
