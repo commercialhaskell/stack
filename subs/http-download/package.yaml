@@ -5,11 +5,11 @@ category:    Development
 author:      Michael Snoyman
 maintainer:  michael@snoyman.com
 copyright:   2018-2019 FP Complete
-license:     MIT
+license:     BSD3
 github:      commercialhaskell/stack # TODO move to commercialhaskell/http-download!
 
 dependencies:
-- base
+- base >=4.10 && < 5
 - cryptonite
 - http-client
 - path

@@ -5,7 +5,7 @@ ghc-options:
 - -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 
 dependencies:
-- base
+- base >=4.10 && < 5
 - http-client
 - http-client-tls
 - pantry

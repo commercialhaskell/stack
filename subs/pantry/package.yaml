@@ -6,7 +6,7 @@ category:    Development
 author:      Michael Snoyman
 maintainer:  michael@snoyman.com
 copyright:   2018-2019 FP Complete
-license:     MIT
+license:     BSD3
 github:      commercialhaskell/stack # TODO move to commercialhaskell/pantry!
 
 default-extensions:
@@ -18,7 +18,7 @@ extra-source-files:
 - attic/package-0.1.2.3.tar.gz
 
 dependencies:
-- base
+- base >=4.10 && < 5
 - ansi-terminal
 - digest
 - rio
