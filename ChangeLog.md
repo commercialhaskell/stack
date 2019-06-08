@@ -1,37 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-**Changes since v2.1.0.3**
-
-Release notes:
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-
-## v2.1.0.3 (release candidate)
-
-**Changes since v2.1.0.1**
-
-Other enhancements:
-
-* Add `--docker-mount-mode` option to set the Docker volume mount mode
-  for performance tuning on macOS.
-
-Bug fixes:
-
-* Fix regression where `stack --docker` would quit after 20 seconds on
-  macOS.
-
-
-## v2.1.0.1 (release candidate)
+## v2.1.1
 
 **Changes since v1.9.3**
 
@@ -93,76 +63,60 @@ Major changes:
 * `stack.yaml` now supports a `configure-options`, which are passed directly to
   the `configure` step in the Cabal build process. See
   [#1438](https://github.com/commercialhaskell/stack/issues/1438)
-
 * Remove support for building GHCJS itself. Future releases of Stack
   may remove GHCJS support entirely.
 * Support for lock files for pinning exact project dependency versions
 
 Behavior changes:
-* `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 
+* `stack.yaml` now supports `snapshot`: a synonym for `resolver`. See
+  [#4256](https://github.com/commercialhaskell/stack/issues/4256)
 * `stack script` now passes `-i -idir` in to the `ghc`
   invocation. This makes it so that the script can import local
   modules, and fixes an issue where `.hs` files in the current
   directory could affect interpretation of the script. See
   [#4538](https://github.com/commercialhaskell/stack/pull/4538)
-
 * When using `stack script`, custom snapshot files will be resolved
   relative to the directory containing the script.
-
 * Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
-
 * Support the `drop-packages` field in `stack.yaml`
-
 * Remove the GPG signing code during uploads. The GPG signatures have
   never been used yet, and there are no plans to implement signature
   verification.
-
 * Remove the `--plain` option for the `exec` family of commands
-
 * Always use the `--exact-configuration` Cabal configuration option when
   building (should mostly be a non-user-visible enhancement).
-
 * No longer supports Cabal versions older than `1.19.2`.  This means
   projects using snapshots earlier than `lts-3.0` or
   `nightly-2015-05-05` will no longer build.
-
 * Remove the `stack docker cleanup` command.  Docker itself now has
   [`docker image prune`](https://docs.docker.com/engine/reference/commandline/image_prune/)
   and
   [`docker container prune`](https://docs.docker.com/engine/reference/commandline/container_prune/),
   which you can use instead.
-
 * Interleaved output is now turned on by default, see
   [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
   addition, the `packagename> ` prefix is no longer included in
   interelaved mode when only building a single target.
-
 * The `-fhide-source-paths` GHC option is now enabled by default and
   can be disabled via the `hide-source-paths` configuration option in
   `stack.yaml`. See [#3784](https://github.com/commercialhaskell/stack/issues/3784)
-
 * Stack will reconfigure a package if you modify your `PATH` environment
   variable. See
   [#3138](https://github.com/commercialhaskell/stack/issues/3138).
-
 * For GHC 8.4 and later, disable the "shadowed dependencies" workaround. This
   means that Stack will no longer have to force reconfigures as often. See
   [#3554](https://github.com/commercialhaskell/stack/issues/3554).
-
 * When building a package, Stack takes a lock on the dist directory in
   use to avoid multiple runs of Stack from trampling each others'
   files. See
   [#2730](https://github.com/commercialhaskell/stack/issues/2730).
-
 * Stack will check occassionally if there is a new version available and prompt
   the user to upgrade. This will not incur any additional network traffic, as
   it will piggy-back on the existing Hackage index updates. You can set
   `recommend-stack-upgrade: false` to bypass this. See
   [#1681](https://github.com/commercialhaskell/stack/issues/1681).
-
 * `stack list-dependencies` has been removed in favour of `stack ls dependencies`.
-
 * The new default for `--docker-auto-pull` is enabled. See
   [#3332](https://github.com/commercialhaskell/stack/issues/3332).
 
@@ -188,7 +142,8 @@ Other enhancements:
 * British English spelling of 'color' (colour) accepted as an alias for
   `--color`, `--stack-colors`, `stack ls stack-colors` at the command line and
   for `color:` and `stack-colors:` in yaml configuration files.
-* New build option `--ddump-dir`. (See [#4225](https://github.com/commercialhaskell/stack/issues/4225))
+* New build option `--ddump-dir`. (See 
+  [#4225](https://github.com/commercialhaskell/stack/issues/4225))
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,
   e.g. `stack unpack packagename`.
@@ -210,7 +165,8 @@ Other enhancements:
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)/
-* Show snapshot being used when `stack ghci` is invoked outside of a project directory. See
+* Show snapshot being used when `stack ghci` is invoked outside of a project
+  directory. See
   [#3651](https://github.com/commercialhaskell/stack/issues/3651)
 * The script interpreter now accepts a `--extra-dep` flag for adding
   packages not present in the snapshot. Currently, this only works
@@ -244,7 +200,6 @@ Other enhancements:
 * Set the `GHC_ENVIRONMENT` environment variable to specify dependency
   packages explicitly when running test. This is done to prevent
   ambiguous module name errors in `doctest` tests.
-* Document the way stack interacts with the Cabal library.
 * `get-stack` script now works on Windows CI machines of Appveyor,
   Travis and Azure Pipelines. See
   [#4535](https://github.com/commercialhaskell/stack/issues/4535)
@@ -278,6 +233,8 @@ Other enhancements:
   and further warns users if that path does not have an alternative short
   ('8 dot 3') name, referencing the `local-programs-path` configuration option.
   See [#4726](https://github.com/commercialhaskell/stack/issues/4726)
+* Add `--docker-mount-mode` option to set the Docker volume mount mode
+  for performance tuning on macOS.
 
 Bug fixes:
 
@@ -315,10 +272,13 @@ Bug fixes:
   [#4527](https://github.com/commercialhaskell/stack/issues/4527).
 * Apply GHC options when building a `Setup.hs` file. See
   [#4526](https://github.com/commercialhaskell/stack/issues/4526).
-* Stack handles ABI changes in FreeBSD 12 by differentiating that version from previous.
-* Help text for the `templates` subcommand now reflects behaviour in stack 1.9 — that it
-  downloads and shows a help file, rather than listing available templates.
-* Fix detection of aarch64 platform (this broke when we upgraded to a newer Cabal version).
+* Stack handles ABI changes in FreeBSD 12 by differentiating that version from
+  previous.
+* Help text for the `templates` subcommand now reflects behaviour in stack 1.9
+  — that it downloads and shows a help file, rather than listing available
+  templates.
+* Fix detection of aarch64 platform (this broke when we upgraded to a newer
+  Cabal version).
 * Docker: fix detecting and pulling missing images with `--docker-auto-pull`, see
   [#4598](https://github.com/commercialhaskell/stack/issues/4598)
 * Hackage credentials are not world-readable. See
@@ -331,17 +291,11 @@ Bug fixes:
   against the snapshot's Cabal library. See
   [#4488](https://github.com/commercialhaskell/stack/issues/4488)
 * Docker: fix detection of expected subprocess failures.  This fixes
-  downloading a compatible `stack` executable  when the host `stack` is not compatible with the Docker image (on Linux), and doesn't show an unnecessary
+  downloading a compatible `stack` executable  when the host `stack` is not
+  compatible with the Docker image (on Linux), and doesn't show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
 * The `stack ghci` command's `--ghc-options` flag now parses multiple options.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
-
-
-## v1.9.3.1
-
-Hackage-only release with no user facing changes (added compatibility
-with `rio-0.1.9.2`).
-
 
 
 ## v1.9.3.1
