@@ -6,7 +6,7 @@ author:      Michael Snoyman
 maintainer:  michael@snoyman.com
 copyright:   2018-2019 FP Complete
 license:     MIT
-github:      commercialhaskell/rio-prettyprint # TODO move to this repo!
+github:      commercialhaskell/stack # TODO move to commercialhaskell/rio-prettyprint!
 
 dependencies:
 - base
