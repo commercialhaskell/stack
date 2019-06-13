@@ -1,7 +1,31 @@
 # Changelog
 
 
+## Unreleased changes
+
+**Changes since v2.1.1**
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
 ## v2.1.1
+
+The Stack 2 release represents a series of significant changes to how Stack
+works internally. For the vast majority of cases, these changes are backwards
+compatible, in that existing projects will continue to build in the same way
+with Stack 2 as they did with Stack 1. The large version bump is due to the
+fundamental internal changes to cache handling, database storage (using SQLite
+in place of binary files), implicit snapshots (which greatly improve the
+precompiled cache), and moving to Pantry. We have also removed some less used
+features, as listed below.
 
 **Changes since v1.9.3**
 
