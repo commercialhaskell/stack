@@ -84,7 +84,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry
+- pantry-tmp
 - path
 - path-io
 - persistent

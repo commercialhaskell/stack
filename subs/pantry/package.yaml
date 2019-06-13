@@ -1,4 +1,4 @@
-name:        pantry
+name:        pantry-tmp
 version:     0.1.0.0
 synopsis:    Content addressable Haskell package management
 description: Please see the README on Github at <https://github.com/commercialhaskell/stack/blob/master/subs/pantry/README.md>
@@ -130,7 +130,7 @@ tests:
     source-dirs: test
     main: Spec.hs
     dependencies:
-    - pantry
+    - pantry-tmp
     - hspec
     - exceptions
     - hedgehog

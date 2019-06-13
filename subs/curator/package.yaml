@@ -8,7 +8,7 @@ dependencies:
 - base >=4.10 && < 5
 - http-client
 - http-client-tls
-- pantry
+- pantry-tmp
 - path
 - path-io
 - rio
