@@ -131,7 +131,9 @@ if [[ -s "$LTS_SLUG/Dockerfile" ]]; then
 
     # If there is an exact match, build and push that image
 
-    dry docker build -t "$DOCKER_REPO:$LTS_SLUG" --build-arg "LTS_SLUG=$LTS_SLUG" --build-arg "VARIANT=$VARIANT" $LTS_SLUG
+    sed "s/\\\$DOCKER_REPO/$(echo $DOCKER_REPO|sed 's/\//\\\//')/g" "$LTS_SLUG/Dockerfile" >"$LTS_SLUG/Dockerfile.sub"
+    dry docker build -t "$DOCKER_REPO:$LTS_SLUG" --build-arg "DOCKER_REPO=$DOCKER_REPO" --build-arg "LTS_SLUG=$LTS_SLUG" --build-arg "VARIANT=$VARIANT" -f "$LTS_SLUG/Dockerfile.sub" "$LTS_SLUG"
+    rm -f "$LTS_SLUG/Dockerfile.sub"
     push "$DOCKER_REPO:$LTS_SLUG"
 else
 
