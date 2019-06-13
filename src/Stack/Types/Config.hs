@@ -1146,8 +1146,7 @@ instance Show ConfigException where
         , T.unpack url
         , "':\n"
         , Yaml.prettyPrintParseException exception
-        -- FIXME: Link to docs about custom snapshots
-        -- , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
         ]
     show (NoProjectConfigFound dir mcmd) = concat
         [ "Unable to find a stack.yaml file in the current directory ("

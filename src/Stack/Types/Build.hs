@@ -182,9 +182,7 @@ instance Show StackBuildException where
             | otherwise = return $
                 "The following target packages were not found: " ++
                 intercalate ", " (map packageNameString $ Set.toList noKnown) ++
-                "\nSee https://docs.haskellstack.org/en/v"
-                <> versionString stackMinorVersion <>
-                "/build_command/#target-syntax for details."
+                "\nSee https://docs.haskellstack.org/en/stable/build_command/#target-syntax for details."
         notInSnapshot'
             | Map.null notInSnapshot = []
             | otherwise =

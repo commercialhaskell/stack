@@ -1,13 +1,13 @@
-name:        pantry
+name:        pantry-tmp
 version:     0.1.0.0
 synopsis:    Content addressable Haskell package management
-description: Please see the README and documentation at <https://www.stackage.org/package/pantry>
+description: Please see the README on Github at <https://github.com/commercialhaskell/stack/blob/master/subs/pantry/README.md>
 category:    Development
 author:      Michael Snoyman
 maintainer:  michael@snoyman.com
 copyright:   2018-2019 FP Complete
-license:     MIT
-github:      commercialhaskell/pantry # TODO move to this repo!
+license:     BSD3
+github:      commercialhaskell/stack # TODO move to commercialhaskell/pantry!
 
 default-extensions:
 - MonadFailDesugaring
@@ -18,7 +18,7 @@ extra-source-files:
 - attic/package-0.1.2.3.tar.gz
 
 dependencies:
-- base
+- base >=4.10 && < 5
 - ansi-terminal
 - digest
 - rio
@@ -130,7 +130,7 @@ tests:
     source-dirs: test
     main: Spec.hs
     dependencies:
-    - pantry
+    - pantry-tmp
     - hspec
     - exceptions
     - hedgehog

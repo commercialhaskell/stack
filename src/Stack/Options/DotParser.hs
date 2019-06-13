@@ -7,6 +7,7 @@ import           Data.Char (isSpace)
 import           Data.List.Split (splitOn)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.Types.PackageName(PackageName, mkPackageName)
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
@@ -50,8 +51,8 @@ dotOptsParser externalDefault =
         benchTargets = switch (long "bench" <>
                                help "Consider dependencies of benchmark components")
 
-        splitNames :: String -> [String]
-        splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
+        splitNames :: String -> [PackageName]
+        splitNames = map (mkPackageName . takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
 
         globalHints = switch (long "global-hints" <>
                               help "Do not require an install GHC; instead, use a hints file for global packages")

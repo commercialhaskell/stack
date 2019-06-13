@@ -43,6 +43,10 @@ Other Un*xen are not officially supported but there are ways to get them working
 See [#194](https://github.com/commercialhaskell/stack/issues/194) for details
 and workarounds.
 
+Note: you may want to use set the `mount-mode` option to `delegated`, since
+this can dramatically improve performance on macOS (see
+[configuration](#configuration) for more information).
+
 **Windows does not work at all** (see
 [#2421](https://github.com/commercialhaskell/stack/issues/2421)).
 
@@ -208,6 +212,14 @@ otherwise noted.
         - "/foo/bar"
         - "/baz:/tmp/quux"
 
+      # Sets the volume mount mode, passed directly to `docker`.
+      # The default mode (consistent) is safest, but may suffer poor performance
+      # on non-Linux platforms such as macOS, where the `delegated` mode will
+      # be significantly faster.
+      # See https://docs.docker.com/docker-for-mac/osxfs-caching/
+      # for valid values and the implications of changing the default.
+      mount-mode: delegated
+
       # Environment variables to set in the container.  Environment variables
       # are not automatically inherited from the host, so if you need any specific
       # variables, use the `--docker-env` command-line argument version of this to
@@ -217,8 +229,10 @@ otherwise noted.
         - "BAR=BAZ QUUX"
 
       # Location of a Docker container-compatible 'stack' executable with the
-      # matching version. This executable must be built on linux-x86_64 and
-      # statically linked.
+      # matching version. This executable must be compatible with the Docker
+      # image in terms of platform (linux-x86_64) and shared libraries
+      # (statically linked is best, otherwise the image needs to have the
+      # same shared libraries installed).
       # Valid values are:
       #   host: use the host's executable.  This is the default when the host's
       #     executable is known to work (e.g., from official linux-x86_64 bindist)

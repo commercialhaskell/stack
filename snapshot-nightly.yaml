@@ -1,4 +1,4 @@
-resolver: nightly-2019-05-23
+resolver: nightly-2019-06-06
 name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:

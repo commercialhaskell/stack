@@ -30,3 +30,4 @@ tags
 .hspec-failures
 better-cache/
 /subs/*/*.cabal
+stack*.yaml.lock

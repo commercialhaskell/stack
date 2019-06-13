@@ -71,6 +71,10 @@ dockerOptsParser hide0 =
                            completer dirCompleter <>
                            help ("Mount volumes from host in container " ++
                                  "(may specify multiple times)")))
+    <*> firstStrOption (long (dockerOptName dockerMountModeArgName) <>
+                        hide <>
+                        metavar "SUFFIX" <>
+                        help "Volume mount mode suffix")
     <*> many (option str (long (dockerOptName dockerEnvArgName) <>
                                 hide <>
                                 metavar "NAME=VALUE" <>

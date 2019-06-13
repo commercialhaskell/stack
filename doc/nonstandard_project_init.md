@@ -109,14 +109,15 @@ For further information see [YAML configuration](yaml_configuration.md)
   - https://github.com/commercialhaskell/stack/issues/565
 
 ## Custom Snapshots
-Currently WIP?
+See [Custom Snapshots](custom_snapshot.md).
+
 ### Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/111
   - https://github.com/commercialhaskell/stack/issues/253
   - https://github.com/commercialhaskell/stack/issues/137
 
 ## Intra-package Targets
-stack supports intra-package targets, similar to `cabal build COMPONENTS` for
+Stack supports intra-package targets, similar to `cabal build COMPONENTS` for
 situations when you don't want to build every target inside your package.
 
 Example:

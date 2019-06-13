@@ -47,6 +47,8 @@ data DockerOpts = DockerOpts
     -- ^ Arguments to pass directly to @docker run@.
   ,dockerMount :: ![Mount]
     -- ^ Volumes to mount in the container.
+  ,dockerMountMode :: !(Maybe String)
+    -- ^ Volume mount mode
   ,dockerEnv :: ![String]
     -- ^ Environment variables to set in the container.
   ,dockerStackExe :: !(Maybe DockerStackExe)
@@ -87,6 +89,8 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Arguments to pass directly to @docker run@
   ,dockerMonoidMount :: ![Mount]
     -- ^ Volumes to mount in the container
+  ,dockerMonoidMountMode :: !(First String)
+    -- ^ Volume mount mode
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
   ,dockerMonoidStackExe :: !(First DockerStackExe)
@@ -116,6 +120,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
+              dockerMonoidMountMode        <- First <$> o ..:? dockerMountModeArgName
               dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
               dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
               dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
@@ -374,6 +379,10 @@ dockerRunArgsArgName = "run-args"
 -- | Docker mount argument name.
 dockerMountArgName :: Text
 dockerMountArgName = "mount"
+
+-- | Docker mount mode argument name.
+dockerMountModeArgName :: Text
+dockerMountModeArgName = "mount-mode"
 
 -- | Docker environment variable argument name.
 dockerEnvArgName :: Text

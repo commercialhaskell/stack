@@ -175,12 +175,12 @@ rules global@Global{..} args = do
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
-            mUploadLabel =
-                case takeExtension srcFile of
-                    e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
-                      | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
-                      | otherwise -> gUploadLabel
-        uploadToGithubRelease global srcFile mUploadLabel
+            -- mUploadLabel =
+            --     case takeExtension srcFile of
+            --         e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
+            --           | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
+            --           | otherwise -> gUploadLabel
+        uploadToGithubRelease global srcFile Nothing
         copyFileChanged srcFile out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
@@ -197,7 +197,8 @@ rules global@Global{..} args = do
             _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile "stack.cabal")
             () <- cmd0 "install" gBuildArgs $ concat $ concat
                 [["--pedantic --no-haddock-deps --flag stack:integration-tests"]
-                ,[" --haddock" | gTestHaddocks]]
+                ,[" --haddock" | gTestHaddocks]
+                ,[" stack"]]
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
             () <- cmd' "test" gBuildArgs "--pedantic --flag stack:integration-tests --exec stack-integration-test stack"
             return ()
@@ -278,7 +279,12 @@ rules global@Global{..} args = do
         bs <- liftIO $ do
             _ <- tryJust (guard . isDoesNotExistError) (removeFile out)
             S8.readFile (dropExtension out)
-        writeFileChanged out (S8.unpack (digestToHexByteString (hash bs :: Digest SHA256)) ++ "\n")
+        writeFileChanged
+          out
+          ( S8.unpack (digestToHexByteString (hash bs :: Digest SHA256)) ++
+            "  " ++
+            takeFileName (dropExtension out) ++
+            "\n" )
 
     releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
         alwaysRerun
@@ -291,7 +297,8 @@ rules global@Global{..} args = do
                 "install"
                 gBuildArgs
                 "--pedantic"
-                "--flag stack:integration-tests")
+                "--flag stack:integration-tests"
+                "stack")
             (tryJust (guard . isDoesNotExistError) (removeFile out))
 
   where
@@ -324,8 +331,8 @@ rules global@Global{..} args = do
             Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
     binaryPkgArchiveFileNames =
         case platformOS of
-            Windows -> [binaryPkgZipFileName, binaryPkgTarGzFileName]
-            _ -> [binaryPkgTarGzFileName]
+            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName]
+            _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     binaryExeFileName = binaryName <.> exe

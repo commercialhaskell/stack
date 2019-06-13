@@ -238,6 +238,7 @@ runContainerAndExit = do
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
+     let mountSuffix = maybe "" (":" ++) (dockerMountMode docker)
      containerID <- withWorkingDir (toFilePath projectRoot) $ trim . decodeUtf8 <$> readDockerProcess
        (concat
          [["create"
@@ -248,10 +249,10 @@ runContainerAndExit = do
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ T.unpack newPathEnv
           ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
-          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toFilePathNoTrailingSep homeDir
-          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
-          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
-          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
+          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toFilePathNoTrailingSep homeDir ++ mountSuffix
+          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot ++ mountSuffix
+          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot ++ mountSuffix
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
           ,"-w",toFilePathNoTrailingSep pwd]
          ,case muserEnv of
             Nothing -> []
@@ -267,7 +268,7 @@ runContainerAndExit = do
                (icEntrypoint == ["/usr/local/sbin/docker-entrypoint"] ||
                  icEntrypoint == ["/root/entrypoint.sh"])]
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-         ,concatMap mountArg (extraMount ++ dockerMount docker)
+         ,concatMap (mountArg mountSuffix) (extraMount ++ dockerMount docker)
          ,concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
          ,case dockerContainerName docker of
             Just name -> ["--name=" ++ name]
@@ -318,7 +319,8 @@ runContainerAndExit = do
       case lookup name vars of
         Just ('=':val) -> Just val
         _ -> Nothing
-    mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
+    mountArg mountSuffix (Mount host container) =
+      ["-v",host ++ ":" ++ container ++ mountSuffix]
     sshRelDir = relDirDotSsh
 
 -- | Inspect Docker image or container.
