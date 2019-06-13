@@ -1,7 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -10,27 +11,22 @@
 module Stack.Types.Package where
 
 import           Stack.Prelude
-import qualified Data.ByteString as S
-import           Data.List
+import           Foreign.C.Types (CTime)
+import qualified RIO.Text as T
+import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import           Data.Store.Version (VersionConfig)
-import           Data.Store.VersionTagged (storeVersionConfig)
 import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
-import           Path as FL
-import           Stack.Types.BuildPlan (PackageLocation, PackageLocationIndex (..), ExeName)
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
+import           Stack.Types.SourceMap
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -40,9 +36,6 @@ data PackageException
       !(Maybe Version)
       ![PError]
       ![PWarning]
-  | PackageNoCabalFileFound (Path Abs Dir)
-  | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
-  | MismatchedCabalName (Path Abs File) PackageName
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   deriving Typeable
 instance Exception PackageException
@@ -50,7 +43,7 @@ instance Show PackageException where
     show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse cabal file "
         , case loc of
-            Left pir -> "for " ++ packageIdentifierRevisionString pir
+            Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
             Right fp -> toFilePath fp
         {-
 
@@ -80,33 +73,12 @@ instance Show PackageException where
                 ])
             warnings
         ]
-    show (PackageNoCabalFileFound dir) = concat
-        [ "Stack looks for packages in the directories configured in"
-        , " the 'packages' and 'extra-deps' fields defined in your stack.yaml\n"
-        , "The current entry points to "
-        , toFilePath dir
-        , " but no .cabal or package.yaml file could be found there."
-        ]
-    show (PackageMultipleCabalFilesFound dir files) =
-        "Multiple .cabal files found in directory " ++
-        toFilePath dir ++
-        ": " ++
-        intercalate ", " (map (toFilePath . filename) files)
-    show (MismatchedCabalName fp name) = concat
-        [ "cabal file path "
-        , toFilePath fp
-        , " does not match the package name it defines.\n"
-        , "Please rename the file to: "
-        , packageNameString name
-        , ".cabal\n"
-        , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
-        ]
     show (MismatchedCabalIdentifier pir ident) = concat
         [ "Mismatched package identifier."
         , "\nFound:    "
         , packageIdentifierString ident
         , "\nExpected: "
-        , packageIdentifierRevisionString pir
+        , T.unpack $ utf8BuilderToText $ display pir
         ]
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
@@ -115,6 +87,10 @@ data PackageLibraries
   = NoLibraries
   | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
  deriving (Show,Typeable)
+
+-- | Name of an executable.
+newtype ExeName = ExeName { unExeName :: Text }
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
 
 -- | Some package info.
 data Package =
@@ -126,6 +102,7 @@ data Package =
           ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
+          ,packageCabalConfigOpts :: ![Text]              -- ^ Additional options passed to ./Setup.hs configure
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
           ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
@@ -138,8 +115,12 @@ data Package =
           ,packageBuildType :: !BuildType                 -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
+          ,packageCabalSpec :: !VersionRange              -- ^ Cabal spec range
           }
  deriving (Show,Typeable)
+
+packageIdent :: Package -> PackageIdentifier
+packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
 
 -- | The value for a map from dependency name. This contains both the
 -- version range and the type of dependency, and provides a semigroup
@@ -169,18 +150,20 @@ packageIdentifier pkg =
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+type InstallMap = Map PackageName (InstallLocation, Version)
+
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env. HasEnvConfig env
-                     => SourceMap
+                     => InstallMap
                      -> InstalledMap
                      -> [PackageName]
                      -> [PackageName]
                      -> Path Abs File
                      -> RIO env
                           (Map NamedComponent (Map ModuleName (Path Abs File))
-                          ,Map NamedComponent (Set DotCabalPath)
+                          ,Map NamedComponent [DotCabalPath]
                           ,Map NamedComponent BuildInfoOpts)
     }
 instance Show GetPackageOpts where
@@ -209,7 +192,7 @@ newtype GetPackageFiles = GetPackageFiles
                       => Path Abs File
                       -> RIO env
                            (Map NamedComponent (Map ModuleName (Path Abs File))
-                           ,Map NamedComponent (Set DotCabalPath)
+                           ,Map NamedComponent [DotCabalPath]
                            ,Set (Path Abs File)
                            ,[PackageWarning])
     }
@@ -234,8 +217,8 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
                 ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCompilerVersion
-                                  :: !(CompilerVersion 'CVActual) -- ^ GHC version
+                ,packageConfigCabalConfigOpts :: ![Text]          -- ^ ./Setup.hs configure options
+                ,packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)
@@ -248,28 +231,28 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) packageName
 
-type SourceMap = Map PackageName PackageSource
-
 -- | Where the package's source is located: local directory or package index
 data PackageSource
-  = PSFiles LocalPackage InstallLocation
-  -- ^ Package which exist on the filesystem (as opposed to an index tarball)
-  | PSIndex InstallLocation (Map FlagName Bool) [Text] PackageIdentifierRevision
-  -- ^ Package which is in an index, and the files do not exist on the
-  -- filesystem yet.
-    deriving Show
+  = PSFilePath LocalPackage
+  -- ^ Package which exist on the filesystem
+  | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
+  -- ^ Package which is downloaded remotely.
 
-piiVersion :: PackageSource -> Version
-piiVersion (PSFiles lp _) = packageVersion $ lpPackage lp
-piiVersion (PSIndex _ _ _ (PackageIdentifierRevision (PackageIdentifier _ v) _)) = v
+instance Show PackageSource where
+    show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
+    show (PSRemote pli v fromSnapshot _) =
+        concat
+            [ "PSRemote"
+            , "(", show pli, ")"
+            , "(", show v, ")"
+            , show fromSnapshot
+            , "<CommonPackage>"
+            ]
 
-piiLocation :: PackageSource -> InstallLocation
-piiLocation (PSFiles _ loc) = loc
-piiLocation (PSIndex loc _ _ _) = loc
 
-piiPackageLocation :: PackageSource -> PackageLocationIndex FilePath
-piiPackageLocation (PSFiles lp _) = PLOther (lpLocation lp)
-piiPackageLocation (PSIndex _ _ _ pir) = PLIndex pir
+psVersion :: PackageSource -> Version
+psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
+psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -291,26 +274,51 @@ data LocalPackage = LocalPackage
     , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.
-    , lpDir           :: !(Path Abs Dir)
-    -- ^ Directory of the package.
     , lpCabalFile     :: !(Path Abs File)
     -- ^ The .cabal file
+    , lpBuildHaddocks :: !Bool
     , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(Maybe (Set FilePath))
+    , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(Map NamedComponent (Map FilePath FileCacheInfo))
+    , lpNewBuildCaches :: !(MemoizedWith EnvConfig (Map NamedComponent (Map FilePath FileCacheInfo)))
     -- ^ current state of the files
-    , lpComponentFiles :: !(Map NamedComponent (Set (Path Abs File)))
+    , lpComponentFiles :: !(MemoizedWith EnvConfig (Map NamedComponent (Set (Path Abs File))))
     -- ^ all files used by this package
-    , lpLocation      :: !(PackageLocation FilePath)
-    -- ^ Where this source code came from
     }
     deriving Show
 
-lpFiles :: LocalPackage -> Set.Set (Path Abs File)
-lpFiles = Set.unions . M.elems . lpComponentFiles
+newtype MemoizedWith env a = MemoizedWith { unMemoizedWith :: RIO env a }
+  deriving (Functor, Applicative, Monad)
+
+memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
+memoizeRefWith action = do
+  ref <- newIORef Nothing
+  pure $ MemoizedWith $ do
+    mres <- readIORef ref
+    res <-
+      case mres of
+        Just res -> pure res
+        Nothing -> do
+          res <- tryAny action
+          writeIORef ref $ Just res
+          pure res
+    either throwIO pure res
+
+runMemoizedWith
+  :: (HasEnvConfig env, MonadReader env m, MonadIO m)
+  => MemoizedWith EnvConfig a
+  -> m a
+runMemoizedWith (MemoizedWith action) = do
+  envConfig <- view envConfigL
+  runRIO envConfig action
+
+instance Show (MemoizedWith env a) where
+  show _ = "<<MemoizedWith>>"
+
+lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
+lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . lpComponentFiles
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
@@ -327,23 +335,26 @@ data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)
 
 data FileCacheInfo = FileCacheInfo
-    { fciModTime :: !ModTime
-    , fciSize :: !Word64
-    , fciHash :: !S.ByteString
+    { fciModTime :: !CTime
+    , fciSize :: !FileSize
+    , fciHash :: !SHA256
     }
-    deriving (Generic, Show, Eq, Data, Typeable)
-instance Store FileCacheInfo
+    deriving (Generic, Show, Eq, Typeable)
 instance NFData FileCacheInfo
 
--- | Used for storage and comparison.
-newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord, Show, Generic, Eq, NFData, Store, Data, Typeable)
-
-modTimeVC :: VersionConfig ModTime
-modTimeVC = storeVersionConfig "mod-time-v1" "UBECpUI0JvM_SBOnRNdaiF9_yOU="
-
-testSuccessVC :: VersionConfig Bool
-testSuccessVC = storeVersionConfig "test-v1" "jC_GB0SGtbpRQbDlm7oQJP7thu8="
+-- Provided for storing the BuildCache values in a file. But maybe
+-- JSON/YAML isn't the right choice here, worth considering.
+instance ToJSON FileCacheInfo where
+  toJSON (FileCacheInfo time size hash') = object
+    [ "modtime" .= time
+    , "size" .= size
+    , "hash" .= hash'
+    ]
+instance FromJSON FileCacheInfo where
+  parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
+    <$> o .: "modtime"
+    <*> o .: "size"
+    <*> o .: "hash"
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --
@@ -415,4 +426,6 @@ installedPackageIdentifier (Executable pid) = pid
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
-installedVersion = packageIdentifierVersion . installedPackageIdentifier
+installedVersion i =
+  let PackageIdentifier _ version = installedPackageIdentifier i
+   in version

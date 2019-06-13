@@ -10,7 +10,7 @@
 module Stack.Types.Docker where
 
 import Stack.Prelude hiding (Display (..))
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.List (intercalate)
 import qualified Data.Text as T
 import Distribution.System (Platform(..), OS(..), Arch(..))
@@ -18,7 +18,6 @@ import Distribution.Text (simpleParse, display)
 import Distribution.Version (anyVersion)
 import Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import Path
-import Stack.Constants
 import Stack.Types.Version
 import Text.Read (Read (..))
 
@@ -26,7 +25,7 @@ import Text.Read (Read (..))
 data DockerOpts = DockerOpts
   {dockerEnable :: !Bool
     -- ^ Is using Docker enabled?
-  ,dockerImage :: !String
+  ,dockerImage :: !(Either SomeException String)
     -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
   ,dockerRegistryLogin :: !Bool
     -- ^ Does registry require login for pulls?
@@ -48,10 +47,10 @@ data DockerOpts = DockerOpts
     -- ^ Arguments to pass directly to @docker run@.
   ,dockerMount :: ![Mount]
     -- ^ Volumes to mount in the container.
+  ,dockerMountMode :: !(Maybe String)
+    -- ^ Volume mount mode
   ,dockerEnv :: ![String]
     -- ^ Environment variables to set in the container.
-  ,dockerDatabasePath :: !(Path Abs File)
-    -- ^ Location of image usage database.
   ,dockerStackExe :: !(Maybe DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerSetUser :: !(Maybe Bool)
@@ -76,11 +75,11 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Optional username for Docker registry.
   ,dockerMonoidRegistryPassword :: !(First String)
     -- ^ Optional password for Docker registry.
-  ,dockerMonoidAutoPull :: !(First Bool)
+  ,dockerMonoidAutoPull :: !FirstTrue
     -- ^ Automatically pull new images.
-  ,dockerMonoidDetach :: !(First Bool)
+  ,dockerMonoidDetach :: !FirstFalse
     -- ^ Whether to run a detached container
-  ,dockerMonoidPersist :: !(First Bool)
+  ,dockerMonoidPersist :: !FirstFalse
     -- ^ Create a persistent container (don't remove it when finished).  Implied by
     -- `dockerDetach`.
   ,dockerMonoidContainerName :: !(First String)
@@ -90,10 +89,10 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Arguments to pass directly to @docker run@
   ,dockerMonoidMount :: ![Mount]
     -- ^ Volumes to mount in the container
+  ,dockerMonoidMountMode :: !(First String)
+    -- ^ Volume mount mode
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
-  ,dockerMonoidDatabasePath :: !(First (Path Abs File))
-    -- ^ Location of image usage database.
   ,dockerMonoidStackExe :: !(First DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerMonoidSetUser :: !(First Bool)
@@ -115,14 +114,14 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName
               dockerMonoidRegistryPassword <- First <$> o ..:? dockerRegistryPasswordArgName
-              dockerMonoidAutoPull         <- First <$> o ..:? dockerAutoPullArgName
-              dockerMonoidDetach           <- First <$> o ..:? dockerDetachArgName
-              dockerMonoidPersist          <- First <$> o ..:? dockerPersistArgName
+              dockerMonoidAutoPull         <- FirstTrue <$> o ..:? dockerAutoPullArgName
+              dockerMonoidDetach           <- FirstFalse <$> o ..:? dockerDetachArgName
+              dockerMonoidPersist          <- FirstFalse <$> o ..:? dockerPersistArgName
               dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
+              dockerMonoidMountMode        <- First <$> o ..:? dockerMountModeArgName
               dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
-              dockerMonoidDatabasePath     <- First <$> o ..:? dockerDatabasePathArgName
               dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
               dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
               dockerMonoidRequireDockerVersion
@@ -216,8 +215,6 @@ data StackDockerException
       -- ^ @docker inspect@ failed.
     | NotPulledException String
       -- ^ Image does not exist.
-    | InvalidCleanupCommandException String
-      -- ^ Input to @docker cleanup@ has invalid command.
     | InvalidImagesOutputException String
       -- ^ Invalid output from @docker images@.
     | InvalidPSOutputException String
@@ -263,8 +260,6 @@ instance Show StackDockerException where
                ,"\n\nRun '"
                ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
                ,"' to download it, then try again."]
-    show (InvalidCleanupCommandException line) =
-        concat ["Invalid line in cleanup commands: '",line,"'."]
     show (InvalidImagesOutputException line) =
         concat ["Invalid 'docker images' output line: '",line,"'."]
     show (InvalidPSOutputException line) =
@@ -385,6 +380,10 @@ dockerRunArgsArgName = "run-args"
 dockerMountArgName :: Text
 dockerMountArgName = "mount"
 
+-- | Docker mount mode argument name.
+dockerMountModeArgName :: Text
+dockerMountModeArgName = "mount-mode"
+
 -- | Docker environment variable argument name.
 dockerEnvArgName :: Text
 dockerEnvArgName = "env"
@@ -397,11 +396,7 @@ dockerContainerNameArgName = "container-name"
 dockerPersistArgName :: Text
 dockerPersistArgName = "persist"
 
--- | Docker database path argument name.
-dockerDatabasePathArgName :: Text
-dockerDatabasePathArgName = "database-path"
-
--- | Docker database path argument name.
+-- | Docker stack executable argument name.
 dockerStackExeArgName :: Text
 dockerStackExeArgName = "stack-exe"
 
@@ -439,10 +434,6 @@ dockerHelpOptName = dockerCmdName ++ "-help"
 -- | Command-line argument for @docker pull@.
 dockerPullCmdName :: String
 dockerPullCmdName = "pull"
-
--- | Command-line argument for @docker cleanup@.
-dockerCleanupCmdName :: String
-dockerCleanupCmdName = "cleanup"
 
 -- | Command-line option for @--internal-re-exec-version@.
 reExecArgName :: String

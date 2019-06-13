@@ -14,8 +14,9 @@ import           StackTest
 
 main :: IO ()
 main = do
-    stack [defaultResolverArg, "clean", "--full"]
-    stack [defaultResolverArg, "init", "--force"]
+    removeDirIgnore ".stack-work"
+    removeFileIgnore "stack.yaml"
+    stack [defaultResolverArg, "init"]
     stack ["build", ":alpha"]
     bracket
         (S.readFile alphaFile)

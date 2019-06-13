@@ -1,5 +1,5 @@
 name: stack
-version: '1.9.4'
+version: '2.1.1'
 synopsis: The Haskell Tool Stack
 description: ! 'Please see the README.md for usage information, and
   the wiki on Github for more details.  Also, note that
@@ -42,11 +42,13 @@ dependencies:
 - aeson
 - annotated-wl-pprint
 - ansi-terminal
+- array
 - async
 - attoparsec
 - base >=4.10 && < 5
 - base64-bytestring
 - bytestring
+- colour
 - conduit
 - conduit-extra
 - containers
@@ -64,17 +66,17 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
+- hi-file-parser
 - hpack
 - hpc
 - http-client
 - http-client-tls
 - http-conduit
+- http-download
 - http-types
 - memory
 - microlens
 - mintty
-# TODO remove dep when persistent drops monad-logger
-- monad-logger
 - mono-traversable
 - mtl
 - mustache
@@ -82,6 +84,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
+- pantry-tmp
 - path
 - path-io
 - persistent
@@ -92,18 +95,19 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
+- resource-pool
 - resourcet
 - retry
 - rio
+- rio-prettyprint
 - semigroups
 - split
 - stm
-- store
-- store-core
 - streaming-commons
 - tar
 - template-haskell
 - temporary
+- terminal-size
 - text
 - text-metrics
 - th-reify-many
@@ -129,28 +133,19 @@ when:
     build-tools:
     - hsc2hs
     dependencies:
-    - bindings-uname
     - unix
 library:
   source-dirs: src/
   ghc-options:
   - -fwarn-identities
-  verbatim:
-    # TODO: replace with 'generated-exposed-modules' after stack-1.7 is released.
-    # Using 'verbatim' to support older hpack version.
-    autogen-modules: |
-      Paths_stack
+  generated-exposed-modules:
+  - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
-  - Data.Aeson.Extended
   - Data.Attoparsec.Args
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
-  - Data.IORef.RunOnce
   - Data.Monoid.Map
-  - Data.Store.VersionTagged
-  - Network.HTTP.Download
-  - Network.HTTP.Download.Verified
   - Network.HTTP.StackClient
   - Options.Applicative.Args
   - Options.Applicative.Builder.Extra
@@ -158,7 +153,6 @@ library:
   - Path.CheckInstall
   - Path.Extra
   - Path.Find
-  - Paths_stack
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -171,7 +165,6 @@ library:
   - Stack.Clean
   - Stack.Config
   - Stack.Config.Build
-  - Stack.Config.Urls
   - Stack.Config.Docker
   - Stack.Config.Nix
   - Stack.ConfigCmd
@@ -180,18 +173,17 @@ library:
   - Stack.Coverage
   - Stack.DefaultColorWhen
   - Stack.Docker
-  - Stack.Docker.GlobalDB
   - Stack.Dot
-  - Stack.Fetch
   - Stack.FileWatch
+  - Stack.Freeze
   - Stack.GhcPkg
   - Stack.Ghci
   - Stack.Ghci.Script
   - Stack.Hoogle
   - Stack.IDE
-  - Stack.Image
   - Stack.Init
   - Stack.Ls
+  - Stack.Lock
   - Stack.New
   - Stack.Nix
   - Stack.Options.BenchParser
@@ -203,6 +195,7 @@ library:
   - Stack.Options.DockerParser
   - Stack.Options.DotParser
   - Stack.Options.ExecParser
+  - Stack.Options.FreezeParser
   - Stack.Options.GhcBuildParser
   - Stack.Options.GhciParser
   - Stack.Options.GhcVariantParser
@@ -216,76 +209,55 @@ library:
   - Stack.Options.ResolverParser
   - Stack.Options.ScriptParser
   - Stack.Options.SDistParser
-  - Stack.Options.SolverParser
   - Stack.Options.TestParser
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
-  - Stack.PackageIndex
-  - Stack.PackageLocation
   - Stack.Path
   - Stack.Prelude
-  - Stack.PrettyPrint
   - Stack.Runners
   - Stack.Script
   - Stack.SDist
   - Stack.Setup
   - Stack.Setup.Installed
   - Stack.SetupCmd
-  - Stack.Sig
-  - Stack.Sig.GPG
-  - Stack.Sig.Sign
-  - Stack.Snapshot
-  - Stack.Solver
-  - Stack.StaticBytes
+  - Stack.SourceMap
+  - Stack.Storage
   - Stack.Types.Build
-  - Stack.Types.BuildPlan
   - Stack.Types.CompilerBuild
-  - Stack.Types.Urls
   - Stack.Types.Compiler
   - Stack.Types.Config
   - Stack.Types.Config.Build
   - Stack.Types.Docker
-  - Stack.Types.FlagName
   - Stack.Types.GhcPkgId
-  - Stack.Types.Image
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
-  - Stack.Types.PackageDump
-  - Stack.Types.PackageIdentifier
-  - Stack.Types.PackageIndex
   - Stack.Types.PackageName
   - Stack.Types.Resolver
-  - Stack.Types.Runner
-  - Stack.Types.Sig
+  - Stack.Types.SourceMap
   - Stack.Types.TemplateName
   - Stack.Types.Version
   - Stack.Types.VersionIntervals
+  - Stack.Unpack
   - Stack.Upgrade
   - Stack.Upload
-  - Text.PrettyPrint.Leijen.Extended
-  - System.Process.PagerEditor
+  - System.Info.ShortPathName
+  - System.Permissions
+  - System.Process.Pager
   - System.Terminal
-  other-modules:
-  - Hackage.Security.Client.Repository.HttpLib.HttpClient
   when:
   - condition: 'os(windows)'
     then:
       source-dirs: src/windows/
     else:
       source-dirs: src/unix/
+      c-sources: src/unix/cbits/uname.c
 executables:
   stack:
     main: Main.hs
     source-dirs: src/main
-    verbatim:
-      # TODO: replace with 'generated-other-modules' after stack-1.7 is released.
-      # Using 'verbatim' to support older hpack version.
-      autogen-modules: |
-          Build_stack,
-          Paths_stack
-    other-modules:
+    generated-other-modules:
     - Build_stack
     - Paths_stack
     ghc-options:
@@ -307,17 +279,6 @@ executables:
       cpp-options: -DHIDE_DEP_VERSIONS
     - condition: flag(supported-build)
       cpp-options: -DSUPPORTED_BUILD
-tests:
-  stack-test:
-    main: Test.hs
-    source-dirs: src/test
-    ghc-options:
-    - -threaded
-    dependencies:
-    - QuickCheck
-    - hspec
-    - stack
-    - smallcheck
   stack-integration-test:
     main: IntegrationSpec.hs
     source-dirs:
@@ -328,10 +289,24 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - filepath
     - hspec
+    - optparse-generic
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false
+tests:
+  stack-test:
+    main: Spec.hs
+    source-dirs: src/test
+    ghc-options:
+    - -threaded
+    dependencies:
+    - QuickCheck
+    - hspec
+    - raw-strings-qq
+    - stack
+    - smallcheck
 flags:
   static:
     description: Pass -static/-pthread to ghc when linking the stack binary.

@@ -3,11 +3,7 @@
 Docker integration
 ===============================================================================
 
-**Note:** This page is mainly about building Haskell packages inside docker containers.
-If you want to deploy your built Haskell programs into a docker container,
-look [here](GUIDE.md#docker) instead.
-
-`stack` has support for automatically performing builds inside a Docker
+Stack has support for automatically performing builds inside a Docker
 container, using volume mounts and user ID switching to make it mostly seamless.
 FP Complete provides images for use with stack that include GHC, tools, and
 optionally have all of the Stackage LTS packages pre-installed in the global
@@ -21,6 +17,10 @@ See the
 [how stack can use Docker under the hood](https://www.fpcomplete.com/blog/2015/08/stack-docker)
 blog post for more information about the motivation and implementation of stack's
 Docker support.
+
+If you'd like to build Docker images that contain your Haskell
+executables, see [Building Haskell Apps with
+Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
 
 Prerequisites
 -------------------------------------------------------------------------------
@@ -42,6 +42,10 @@ most trivial projects).
 Other Un*xen are not officially supported but there are ways to get them working.
 See [#194](https://github.com/commercialhaskell/stack/issues/194) for details
 and workarounds.
+
+Note: you may want to use set the `mount-mode` option to `delegated`, since
+this can dramatically improve performance on macOS (see
+[configuration](#configuration) for more information).
 
 **Windows does not work at all** (see
 [#2421](https://github.com/commercialhaskell/stack/issues/2421)).
@@ -119,27 +123,6 @@ enabled.
 `stack docker pull` pulls an image from the Docker registry for the first time,
 or updates the image by pulling the latest version.
 
-### cleanup - Clean up old images and containers
-
-Docker images can take up quite a lot of disk space, and it's easy for them to
-build up if you switch between projects or your projects update their images.
-This sub-command will help to remove old images and containers.
-
-By default, `stack docker cleanup` will bring up an editor showing the images
-and containers on your system, with any stack images that haven't been used
-in the last seven days marked for removal.  You can add or remove the `R` in
-the left-most column to flag or unflag an image/container for removal.  When
-you save the file and quit the text editor, those images marked for removal
-will be deleted from your system.  If you wish to abort the cleanup, delete
-all the lines from your editor.
-
-If you use Docker for purposes other than stack, you may have other images on
-your system as well.  These will also appear in a separate section, but they
-will not be marked for removal by default.
-
-Run `stack docker cleanup --help` to see additional options to customize its
-behaviour.
-
 ### reset - Reset the Docker "sandbox"
 
 In order to preserve the contents of the in-container home directory between
@@ -199,7 +182,7 @@ otherwise noted.
       # If true, the image will be pulled from the registry automatically, without
       # needing to run `stack docker pull`.  See the "security" section of this
       # document for implications of enabling this.
-      auto-pull: false
+      auto-pull: true
 
       # If true, the container will be run "detached" (in the background).  Refer
       # to the Docker users guide for information about how to manage containers.
@@ -229,6 +212,14 @@ otherwise noted.
         - "/foo/bar"
         - "/baz:/tmp/quux"
 
+      # Sets the volume mount mode, passed directly to `docker`.
+      # The default mode (consistent) is safest, but may suffer poor performance
+      # on non-Linux platforms such as macOS, where the `delegated` mode will
+      # be significantly faster.
+      # See https://docs.docker.com/docker-for-mac/osxfs-caching/
+      # for valid values and the implications of changing the default.
+      mount-mode: delegated
+
       # Environment variables to set in the container.  Environment variables
       # are not automatically inherited from the host, so if you need any specific
       # variables, use the `--docker-env` command-line argument version of this to
@@ -236,12 +227,6 @@ otherwise noted.
       env:
         - "FOO=BAR"
         - "BAR=BAZ QUUX"
-
-      # Location of database used to track image usage, which `stack docker cleanup`
-      # uses to determine which images should be kept.  On shared systems, it may
-      # be useful to override this in the global configuration file so that
-      # all users share a single database.
-      database-path: "~/.stack/docker.db"
 
       # Location of a Docker container-compatible 'stack' executable with the
       # matching version. This executable must be compatible with the Docker
@@ -349,7 +334,7 @@ and publish port 3000.
 If you do want to do all your work, including editing, in the container, it
 might be better to use a persistent container in which you can install Ubuntu
 packages. You could get that by running something like
-`stack --docker-container-name=NAME --docker-persist exec --plain bash`. This
+`stack --docker-container-name=NAME --docker-persist exec bash`. This
 means when the container exits, it won't be deleted. You can then restart it
 using `docker start -a -i NAME`. It's also possible to detach from a container
 while it continues running in the background using by pressing Ctrl-P Ctrl-Q,

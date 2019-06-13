@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Stack.Options.Completion
@@ -20,18 +19,13 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Config (getLocalPackages)
-import           Stack.DefaultColorWhen (defaultColorWhen)
+import           Stack.Constants (ghcShowOptionsOutput)
 import           Stack.Options.GlobalParser (globalOptsFromMonoid)
-import           Stack.Runners (loadConfigWithOpts)
-import           Stack.Prelude hiding (lift)
-import           Stack.Setup
+import           Stack.Runners
+import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.FlagName
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageName
-import           System.Process (readProcess)
-import           Language.Haskell.TH.Syntax (runIO, lift)
+import           Stack.Types.SourceMap
 
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
@@ -41,10 +35,7 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> return $
         otherArgs = reverse otherArgsReversed
      in if null curArg then [] else
          map (otherArgs ++) $
-         filter (curArg `isPrefixOf`)
-                -- Technically, we should be consulting the user's current ghc,
-                -- but that would require loading up a BuildConfig.
-                $(runIO (readProcess "ghc" ["--show-options"] "") >>= lift . lines)
+         filter (curArg `isPrefixOf`) ghcShowOptionsOutput
 
 -- TODO: Ideally this would pay attention to --stack-yaml, may require
 -- changes to optparse-applicative.
@@ -58,46 +49,48 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
         -- If it looks like a flag, skip this more costly completion.
         ('-': _) -> return []
         _ -> do
-            defColorWhen <- liftIO defaultColorWhen
-            let go = (globalOptsFromMonoid False defColorWhen mempty)
-                    { globalLogLevel = LevelOther "silent" }
-            loadConfigWithOpts go $ \lc -> do
-              bconfig <- liftIO $ lcLoadBuildConfig lc (globalCompiler go)
-              envConfig <- runRIO bconfig (setupEnv Nothing)
-              runRIO envConfig (inner input)
+            go' <- globalOptsFromMonoid False mempty
+            let go = go' { globalLogLevel = LevelOther "silent" }
+            withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 
 targetCompleter :: Completer
-targetCompleter = buildConfigCompleter $ \input ->
-      filter (input `isPrefixOf`)
-    . concatMap allComponentNames
-    . Map.toList
-    . lpProject
-  <$> getLocalPackages
+targetCompleter = buildConfigCompleter $ \input -> do
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  comps <- for packages ppComponents
+  pure
+    $ filter (input `isPrefixOf`)
+    $ concatMap allComponentNames
+    $ Map.toList comps
   where
-    allComponentNames (name, lpv) =
-        map (T.unpack . renderPkgComponent . (name,)) (Set.toList (lpvComponents lpv))
+    allComponentNames (name, comps) =
+        map (T.unpack . renderPkgComponent . (name,)) (Set.toList comps)
 
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
-    lpvs <- fmap lpProject getLocalPackages
     bconfig <- view buildConfigL
+    gpds <- for (smwProject $ bcSMWanted bconfig) ppGPD
     let wildcardFlags
             = nubOrd
-            $ concatMap (\(name, lpv) ->
-                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags (lpvGPD lpv)))
-            $ Map.toList lpvs
+            $ concatMap (\(name, gpd) ->
+                map (\fl -> "*:" ++ flagString name fl) (C.genPackageFlags gpd))
+            $ Map.toList gpds
         normalFlags
-            = concatMap (\(name, lpv) ->
+            = concatMap (\(name, gpd) ->
                 map (\fl -> packageNameString name ++ ":" ++ flagString name fl)
-                    (C.genPackageFlags (lpvGPD lpv)))
-            $ Map.toList lpvs
+                    (C.genPackageFlags gpd))
+            $ Map.toList gpds
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
              in (if flagEnabled name fl then "-" else "") ++ flname
+        prjFlags =
+          case configProject (bcConfig bconfig) of
+            PCProject (p, _) -> projectFlags p
+            PCGlobalProject -> mempty
+            PCNoProject _ -> mempty
         flagEnabled name fl =
             fromMaybe (C.flagDefault fl) $
-            Map.lookup (fromCabalFlagName (C.flagName fl)) $
-            Map.findWithDefault Map.empty name (bcFlags bconfig)
+            Map.lookup (C.flagName fl) $
+            Map.findWithDefault Map.empty name prjFlags
     return $ filter (input `isPrefixOf`) $
         case input of
             ('*' : ':' : _) -> wildcardFlags
@@ -105,14 +98,15 @@ flagCompleter = buildConfigCompleter $ \input -> do
             _ -> normalFlags
 
 projectExeCompleter :: Completer
-projectExeCompleter = buildConfigCompleter $ \input ->
-      filter (input `isPrefixOf`)
-    . nubOrd
-    . concatMap
-        (\(_, lpv) -> map
+projectExeCompleter = buildConfigCompleter $ \input -> do
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  gpds <- Map.traverseWithKey (const ppGPD) packages
+  pure
+    $ filter (input `isPrefixOf`)
+    $ nubOrd
+    $ concatMap
+        (\gpd -> map
           (C.unUnqualComponentName . fst)
-          (C.condExecutables (lpvGPD lpv))
+          (C.condExecutables gpd)
         )
-    . Map.toList
-    . lpProject
-  <$> getLocalPackages
+        gpds

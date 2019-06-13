@@ -1,11 +1,12 @@
-resolver: nightly-2019-04-16
+resolver: snapshot-nightly.yaml
 
 packages:
 - .
-
-extra-deps:
-- resolv-0.1.1.2@rev:0
-- rio-0.1.9.2@rev:0
+- subs/pantry
+- subs/curator
+- subs/http-download
+- subs/rio-prettyprint
+- subs/hi-file-parser
 
 # docker:
 #   enable: true

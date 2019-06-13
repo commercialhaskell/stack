@@ -1,12 +1,8 @@
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 module Stack.Prelude
-  ( withSourceFile
-  , withSinkFile
-  , withSinkFileCautious
-  , withSystemTempDir
+  ( withSystemTempDir
   , withKeepSystemTempDir
   , sinkProcessStderrStdout
   , sinkProcessStdout
@@ -14,73 +10,45 @@ module Stack.Prelude
   , readProcessNull
   , withProcessContext
   , stripCR
-  , hIsTerminalDeviceOrMinTTY
   , prompt
   , promptPassword
   , promptBool
+  , stackProgName
+  , FirstTrue (..)
+  , fromFirstTrue
+  , defaultFirstTrue
+  , FirstFalse (..)
+  , fromFirstFalse
+  , defaultFirstFalse
+  , writeBinaryFileAtomic
   , module X
   ) where
 
 import           RIO                  as X
+import           RIO.File             as X
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
+import           Pantry               as X hiding (Package (..), loadSnapshot)
 
 import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo (..))
 
 import qualified Path.IO
 
-import qualified System.IO as IO
-import qualified System.Directory as Dir
-import qualified System.FilePath as FP
 import           System.IO.Echo (withoutInputEcho)
-import           System.IO.Error (isDoesNotExistError)
 
-#ifdef WINDOWS
-import           System.Win32 (isMinTTYHandle, withHandleToHANDLE)
-#endif
-
-import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource)
+import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
 import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL)
-import           Data.Store           as X (Store)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
+import System.Permissions (osIsWindows)
 
--- | Get a source for a file. Unlike @sourceFile@, doesn't require
--- @ResourceT@. Unlike explicit @withBinaryFile@ and @sourceHandle@
--- usage, you can't accidentally use @WriteMode@ instead of
--- @ReadMode@.
-withSourceFile :: MonadUnliftIO m => FilePath -> (ConduitM i ByteString m () -> m a) -> m a
-withSourceFile fp inner = withBinaryFile fp ReadMode $ inner . sourceHandle
-
--- | Same idea as 'withSourceFile', see comments there.
-withSinkFile :: MonadUnliftIO m => FilePath -> (ConduitM ByteString o m () -> m a) -> m a
-withSinkFile fp inner = withBinaryFile fp WriteMode $ inner . sinkHandle
-
--- | Like 'withSinkFile', but ensures that the file is atomically
--- moved after all contents are written.
-withSinkFileCautious
-  :: MonadUnliftIO m
-  => FilePath
-  -> (ConduitM ByteString o m () -> m a)
-  -> m a
-withSinkFileCautious fp inner =
-    withRunInIO $ \run -> bracket acquire cleanup $ \(tmpFP, h) ->
-      run (inner $ sinkHandle h) <* (IO.hClose h *> Dir.renameFile tmpFP fp)
-  where
-    acquire = IO.openBinaryTempFile (FP.takeDirectory fp) (FP.takeFileName fp FP.<.> "tmp")
-    cleanup (tmpFP, h) = do
-        IO.hClose h
-        Dir.removeFile tmpFP `catch` \e ->
-            if isDoesNotExistError e
-                then return ()
-                else throwIO e
+import Conduit
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
@@ -107,6 +75,9 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
   proc name args $ \pc0 -> do
     let pc = setStdout createSource
            $ setStderr createSource
+           -- Don't use closed, since that can break ./configure scripts
+           -- See https://github.com/commercialhaskell/stack/pull/4722
+           $ setStdin (byteStringInput "")
              pc0
     withProcess_ pc $ \p ->
       runConduit (getStderr p .| sinkStderr) `concurrently`
@@ -163,19 +134,6 @@ withProcessContext pcNew inner = do
 stripCR :: Text -> Text
 stripCR = T.dropSuffix "\r"
 
--- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
--- devices, but isMinTTYHandle does.
-hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
-#ifdef WINDOWS
-hIsTerminalDeviceOrMinTTY h = do
-  isTD <- hIsTerminalDevice h
-  if isTD
-    then return True
-    else liftIO $ withHandleToHANDLE h isMinTTYHandle
-#else
-hIsTerminalDeviceOrMinTTY = hIsTerminalDevice
-#endif
-
 -- | Prompt the user by sending text to stdout, and taking a line of
 -- input from stdin.
 prompt :: MonadIO m => Text -> m Text
@@ -213,3 +171,66 @@ promptBool txt = liftIO $ do
     _ -> do
       T.putStrLn "Please press either 'y' or 'n', and then enter."
       promptBool txt
+
+-- | Name of the 'stack' program.
+--
+-- NOTE: Should be defined in "Stack.Constants", but not doing so due to the
+-- GHC stage restrictions.
+stackProgName :: String
+stackProgName = "stack"
+
+-- | Like @First Bool@, but the default is @True@.
+newtype FirstTrue = FirstTrue { getFirstTrue :: Maybe Bool }
+  deriving (Show, Eq, Ord)
+instance Semigroup FirstTrue where
+  FirstTrue (Just x) <> _ = FirstTrue (Just x)
+  FirstTrue Nothing <> x = x
+instance Monoid FirstTrue where
+  mempty = FirstTrue Nothing
+  mappend = (<>)
+
+-- | Get the 'Bool', defaulting to 'True'
+fromFirstTrue :: FirstTrue -> Bool
+fromFirstTrue = fromMaybe True . getFirstTrue
+
+-- | Helper for filling in default values
+defaultFirstTrue :: (a -> FirstTrue) -> Bool
+defaultFirstTrue _ = True
+
+-- | Like @First Bool@, but the default is @False@.
+newtype FirstFalse = FirstFalse { getFirstFalse :: Maybe Bool }
+  deriving (Show, Eq, Ord)
+instance Semigroup FirstFalse where
+  FirstFalse (Just x) <> _ = FirstFalse (Just x)
+  FirstFalse Nothing <> x = x
+instance Monoid FirstFalse where
+  mempty = FirstFalse Nothing
+  mappend = (<>)
+
+-- | Get the 'Bool', defaulting to 'False'
+fromFirstFalse :: FirstFalse -> Bool
+fromFirstFalse = fromMaybe False . getFirstFalse
+
+-- | Helper for filling in default values
+defaultFirstFalse :: (a -> FirstFalse) -> Bool
+defaultFirstFalse _ = False
+
+-- | Write a @Builder@ to a file and atomically rename.
+--
+-- In the future: replace with a function in rio
+writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
+writeBinaryFileAtomic fp builder
+  -- Atomic file writing is not supported on Windows yet, unfortunately.
+  -- withSinkFileCautious needs to be implemented properly for Windows to make
+  -- this work.
+  | osIsWindows =
+      liftIO $
+      withBinaryFile (toFilePath fp) WriteMode $ \h ->
+      hPutBuilder h builder
+  | otherwise =
+      liftIO $
+      withSinkFileCautious (toFilePath fp) $ \sink ->
+      runConduit $
+      yield builder .|
+      unsafeBuilderToByteString .|
+      sink

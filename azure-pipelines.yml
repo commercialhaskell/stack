@@ -1,8 +1,17 @@
+trigger:
+  batch: true
+  branches:
+    include:
+    - ci/*
+    - rc/*
+    - master
+    - stable
+
 variables:
   BASE_BRANCH: "master"
   CACHE_S3_PREFIX: "stack"
   CACHE_S3_VERSION: "v0.1.4"
-  S3_BUCKET: "fpco-gitlab-runner-pipeline-cache"
+  S3_BUCKET: "fpco-public-cache"
   AWS_REGION: "us-east-1"
 
 jobs:

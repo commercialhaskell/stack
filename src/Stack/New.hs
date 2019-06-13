@@ -4,7 +4,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | Create new a new project directory populated with a basic working
 -- project.
@@ -19,6 +18,7 @@ module Stack.New
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
 import           Control.Monad (void)
+import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import           Data.List
@@ -30,14 +30,14 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.Download
-import           Network.HTTP.StackClient (Request, HttpException, getResponseStatusCode, getResponseBody)
+import           Network.HTTP.StackClient (DownloadException (..), Request, HttpException,
+                                           getResponseStatusCode, getResponseBody, httpLbs,
+                                           parseRequest, parseUrlThrow, redownload, setGithubHeaders)
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
-import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           RIO.Process
 import qualified Text.Mustache as Mustache
@@ -100,7 +100,7 @@ new opts forceOverwrite = do
         logInfo
             (loading <> " template \"" <> display (templateName template) <>
              "\" to create project \"" <>
-             display (packageNameText project) <>
+             fromString (packageNameString project) <>
              "\" in " <>
              if bare then "the current directory"
                      else fromString (toFilePath (dirname absDir)) <>
@@ -119,13 +119,13 @@ loadTemplate name logIt = do
     case templatePath name of
         AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> downloadFromUrl s templateDir
-        RelPath relFile ->
+        RelPath rawParam relFile ->
             catch
                 (do f <- loadLocalFile relFile
                     logIt LocalTemp
                     return f)
                 (\(e :: NewException) ->
-                      case relRequest relFile of
+                      case relRequest rawParam of
                         Just req -> downloadTemplate req
                                                      (templateDir </> relFile)
                         Nothing -> throwM e
@@ -143,9 +143,9 @@ loadTemplate name logIt = do
         if exists
             then readFileUtf8 (toFilePath path)
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: Path Rel File -> Maybe Request
-    relRequest rel = do
-        rtp <- parseRepoPathWithService defaultRepoService (T.pack (toFilePath rel))
+    relRequest :: String -> Maybe Request
+    relRequest req = do
+        rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
         let url = urlFromRepoTemplatePath rtp
         parseRequest (T.unpack url)
     downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
@@ -169,8 +169,6 @@ loadTemplate name logIt = do
         then do logWarn "Tried to download the template but an error was found."
                 logWarn "Using cached local version. It may not be the most recent version though."
         else throwM (FailedToDownloadTemplate name exception)
-
-    backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
 -- | Construct a URL for downloading from a repo.
 urlFromRepoTemplatePath :: RepoTemplatePath -> Text
@@ -198,9 +196,9 @@ applyTemplate project template nonceParams dir templateText = do
       return $ T.pack . show $ year
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
-            nameAsVarId = T.replace "-" "_" $ packageNameText project
-            nameAsModule = T.filter (/= '-') $ T.toTitle $ packageNameText project
-            nameParams = M.fromList [ ("name", packageNameText project)
+            nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
+            nameAsModule = T.filter (/= '-') $ T.toTitle $ T.pack $ packageNameString project
+            nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                     , ("name-as-varid", nameAsVarId)
                                     , ("name-as-module", nameAsModule) ]
             configParams = configTemplateParams config
@@ -269,11 +267,12 @@ writeTemplateFiles
     :: MonadIO m
     => Map (Path Abs File) LB.ByteString -> m ()
 writeTemplateFiles files =
+    liftIO $
     forM_
         (M.toList files)
         (\(fp,bytes) ->
               do ensureDir (parent fp)
-                 liftIO (LB.writeFile (toFilePath fp) bytes))
+                 writeBinaryFileAtomic fp $ lazyByteString bytes)
 
 -- | Run any initialization functions, such as Git.
 runTemplateInits
@@ -301,10 +300,6 @@ templatesHelp = do
 
 --------------------------------------------------------------------------------
 -- Defaults
-
--- | The default template name you can use if you don't have one.
-defaultTemplateName :: TemplateName
-defaultTemplateName = $(mkTemplateName "new-template")
 
 -- | The default service to use to download templates.
 defaultRepoService :: RepoService

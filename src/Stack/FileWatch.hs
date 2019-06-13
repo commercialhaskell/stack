@@ -14,27 +14,31 @@ import GHC.IO.Exception
 import Path
 import System.FSNotify
 import System.IO (hPutStrLn, getLine)
+import System.Terminal
 
-fileWatch :: Handle
-          -> ((Set (Path Abs File) -> IO ()) -> IO ())
-          -> IO ()
+fileWatch
+  :: Handle
+  -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
+  -> RIO env ()
 fileWatch = fileWatchConf defaultConfig
 
-fileWatchPoll :: Handle
-              -> ((Set (Path Abs File) -> IO ()) -> IO ())
-              -> IO ()
+fileWatchPoll
+  :: Handle
+  -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
+  -> RIO env ()
 fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 
 -- | Run an action, watching for file changes
 --
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
-fileWatchConf :: WatchConfig
-              -> Handle
-              -> ((Set (Path Abs File) -> IO ()) -> IO ())
-              -> IO ()
-fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
-    let putLn = hPutStrLn out
+fileWatchConf
+  :: WatchConfig
+  -> Handle
+  -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
+  -> RIO env ()
+fileWatchConf cfg out inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -> do
+    let putLn = hPutStrLn out -- FIXME
     outputIsTerminal <- hIsTerminalDeviceOrMinTTY out
     let withColor color str = putLn $ do
             if outputIsTerminal
@@ -113,7 +117,7 @@ fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
             dirty <- readTVar dirtyVar
             check dirty
 
-        eres <- tryAny $ inner setWatched
+        eres <- tryAny $ run $ inner setWatched
 
         -- Clear dirtiness flag after the build to avoid an infinite
         -- loop caused by the build itself triggering dirtiness. This

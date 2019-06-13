@@ -1,0 +1,6 @@
+name: foo
+version: 0
+dependencies:
+- base
+- process
+library: {}

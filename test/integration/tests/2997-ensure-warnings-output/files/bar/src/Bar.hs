@@ -1,0 +1,3 @@
+module Bar where
+
+bar = ()

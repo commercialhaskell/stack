@@ -7,9 +7,9 @@
 
 -- | Run commands in a nix-shell
 module Stack.Nix
-  (reexecWithOptionalShell
-  ,nixCmdName
+  (nixCmdName
   ,nixHelpOptName
+  ,runShellAndExit
   ) where
 
 import           Stack.Prelude
@@ -18,60 +18,44 @@ import           Data.Version (showVersion)
 import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.Config (getInNixShell, getInContainer)
+import           Stack.Config (getInContainer, loadBuildConfig)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
-import           Stack.Types.Runner
-import           Stack.Types.Compiler
+import           Stack.Docker (getProjectRoot)
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
 
--- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
--- Otherwise, runs the inner action.
-reexecWithOptionalShell
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
-    -> IO ()
-    -> RIO env ()
-reexecWithOptionalShell mprojectRoot getCompilerVersion inner =
-  do config <- view configL
-     inShell <- getInNixShell
-     inContainer <- getInContainer
-     isReExec <- view reExecL
-     let getCmdArgs = do
-           origArgs <- liftIO getArgs
-           let args | inContainer = origArgs  -- internal-re-exec version already passed
-                      -- first stack when restarting in the container
-                    | otherwise =
-                        ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
-           exePath <- liftIO getExecutablePath
-           return (exePath, args)
-     if nixEnable (configNix config) && not inShell && (not isReExec || inContainer)
-        then runShellAndExit mprojectRoot getCompilerVersion getCmdArgs
-        else liftIO inner
-
-
-runShellAndExit
-    :: HasConfig env
-    => Maybe (Path Abs Dir)
-    -> IO (CompilerVersion 'CVWanted)
-    -> RIO env (String, [String])
-    -> RIO env ()
-runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
+runShellAndExit :: RIO Config void
+runShellAndExit = do
+   inContainer <- getInContainer -- TODO we can probably assert that this is False based on Stack.Runners now
+   origArgs <- liftIO getArgs
+   let args | inContainer = origArgs  -- internal-re-exec version already passed
+              -- first stack when restarting in the container
+            | otherwise =
+                ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
+   exePath <- liftIO getExecutablePath
    config <- view configL
    envOverride <- view processContextL
    local (set processContextL envOverride) $ do
-     (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
+     let cmnd = escape exePath
+         args' = map escape args
+     projectRoot <- getProjectRoot
      mshellFile <-
-         traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
+         traverse (resolveFile projectRoot) $
          nixInitFile (configNix config)
-     compilerVersion <- liftIO getCompilerVersion
-     inContainer <- getInContainer
+
+     -- This will never result in double loading the build config, since:
+     --
+     -- 1. This function explicitly takes a Config, not a HasConfig
+     --
+     -- 2. This function ends up exiting before running other code
+     -- (thus the void return type)
+     compilerVersion <- view wantedCompilerVersionL <$> loadBuildConfig
+
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
@@ -101,6 +85,8 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                               ,"LD_LIBRARY_PATH = libPath;"  -- LD_LIBRARY_PATH is set because for now it's
                                -- needed by builds using Template Haskell
                               ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
+                               -- overriding default locale so Unicode output using base won't be broken
+                              ,"LANG=\"en_US.UTF-8\";"
                               ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else []
@@ -109,7 +95,7 @@ runShellAndExit mprojectRoot getCompilerVersion getCmdArgs = do
                                                 F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
+                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
@@ -127,10 +113,6 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
                                    ("'\"'\"'"++)
                                  else (c:)) "" str
                  ++ "'"
-
--- | Fail with friendly error if project root not set.
-fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (impureThrow CannotDetermineProjectRoot)
 
 -- | Command-line argument for "nix"
 nixCmdName :: String

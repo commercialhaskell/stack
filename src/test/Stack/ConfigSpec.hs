@@ -1,18 +1,20 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TemplateHaskell  #-}
 module Stack.ConfigSpec where
 
 import Control.Arrow
-import Data.Aeson.Extended
+import Pantry.Internal.AesonExtended
 import Data.Yaml
+import Pantry.Internal (pcHpackExecutable)
 import Path
 import Path.IO hiding (withSystemTempDir)
 import Stack.Config
 import Stack.Prelude
+import Stack.Runners
 import Stack.Types.Config
-import Stack.Types.Runner
+import Stack.Options.GlobalParser (globalOptsFromMonoid)
 import System.Directory
 import System.Environment
 import System.IO (writeFile)
@@ -56,8 +58,24 @@ hpackConfig =
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
+resolverConfig :: String
+resolverConfig =
+  "resolver: lts-2.10\n" ++
+  "packages: ['.']\n"
+
+snapshotConfig :: String
+snapshotConfig =
+  "snapshot: lts-2.10\n" ++
+  "packages: ['.']\n"
+
+resolverSnapshotConfig :: String
+resolverSnapshotConfig =
+  "resolver: lts-2.10\n" ++
+  "snapshot: lts-2.10\n" ++
+  "packages: ['.']\n"
+
 stackDotYaml :: Path Rel File
-stackDotYaml = $(mkRelFile "stack.yaml")
+stackDotYaml = either impureThrow id (parseRelFile "stack.yaml")
 
 setup :: IO ()
 setup = unsetEnv "STACK_YAML"
@@ -67,7 +85,7 @@ noException = const False
 
 spec :: Spec
 spec = beforeAll setup $ do
-  let logLevel = LevelDebug
+  let logLevel = LevelOther "silent"
   -- TODO(danburton): not use inTempDir
   let inTempDir action = do
         currentDirectory <- getCurrentDirectory
@@ -82,11 +100,42 @@ spec = beforeAll setup $ do
         let resetVar = setEnv name originalValue
         bracket_ setVar resetVar action
 
+  describe "parseProjectAndConfigMonoid" $ do
+    let loadProject' fp inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $ do
+              iopc <- loadConfigYaml (
+                parseProjectAndConfigMonoid (parent fp)
+                ) fp
+              ProjectAndConfigMonoid project _ <- liftIO iopc
+              liftIO $ inner project
+
+        toAbsPath path = do
+          parentDir <- getCurrentDirectory >>= parseAbsDir
+          return (parentDir </> path)
+
+        loadProject config inner = do
+          yamlAbs <- toAbsPath stackDotYaml
+          writeFile (toFilePath yamlAbs) config
+          loadProject' yamlAbs inner
+
+    it "parses snapshot using 'resolver'" $ inTempDir $ do
+      loadProject resolverConfig $ \Project{..} ->
+        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+
+    it "parses snapshot using 'snapshot'" $ inTempDir $ do
+      loadProject snapshotConfig $ \Project{..} ->
+        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+
+    it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
+      loadProject resolverSnapshotConfig (const (return ()))
+        `shouldThrow` anyException
+
   describe "loadConfig" $ do
-    let loadConfig' inner =
-          withRunner logLevel True False ColorAuto Nothing False $ \runner -> do
-            lc <- runRIO runner $ loadConfig mempty Nothing SYLDefault
-            inner lc
+    let loadConfig' inner = do
+          globalOpts <- globalOptsFromMonoid False mempty
+          withRunnerGlobal globalOpts { globalLogLevel = logLevel } $
+            loadConfig inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
       loadConfig' $ const $ return ()
@@ -96,22 +145,23 @@ spec = beforeAll setup $ do
       -- TODO(danburton): more specific test for exception
       loadConfig' (const (return ())) `shouldThrow` anyException
 
+    let configOverrideHpack = pcHpackExecutable . view pantryConfigL
+
     it "parses config option with-hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) hpackConfig
-      loadConfig' $ \lc -> do
-        let Config{..} = lcConfig lc
-        configOverrideHpack `shouldBe` HpackCommand "/usr/local/bin/hpack"
+      loadConfig' $ \config ->
+        liftIO $ configOverrideHpack config `shouldBe`
+        HpackCommand "/usr/local/bin/hpack"
 
     it "parses config bundled hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
-      loadConfig' $ \lc -> do
-        let Config{..} = lcConfig lc
-        configOverrideHpack `shouldBe` HpackBundled
+      loadConfig' $ \config ->
+        liftIO $ configOverrideHpack config `shouldBe` HpackBundled
 
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
-     loadConfig' $ \lc -> do
-      let BuildOpts{..} = configBuild $ lcConfig lc
+     loadConfig' $ \config -> liftIO $ do
+      let BuildOpts{..} = configBuild  config
       boptsLibProfile `shouldBe` True
       boptsExeProfile `shouldBe` True
       boptsHaddock `shouldBe` True
@@ -119,13 +169,14 @@ spec = beforeAll setup $ do
       boptsInstallExes `shouldBe` True
       boptsPreFetch `shouldBe` True
       boptsKeepGoing `shouldBe` Just True
-      boptsKeepTmpFiles `shouldBe` Just True
+      boptsKeepTmpFiles `shouldBe` True
       boptsForceDirty `shouldBe` True
       boptsTests `shouldBe` True
       boptsTestOpts `shouldBe` TestOpts {toRerunTests = True
                                          ,toAdditionalArgs = ["-fprof"]
                                          ,toCoverage = True
-                                         ,toDisableRun = True}
+                                         ,toDisableRun = True
+                                         ,toMaximumTimeSeconds = Nothing}
       boptsBenchmarks `shouldBe` True
       boptsBenchmarkOpts `shouldBe` BenchmarkOpts {beoAdditionalArgs = Just "-O2"
                                                    ,beoDisableRun = True}
@@ -133,33 +184,37 @@ spec = beforeAll setup $ do
       boptsCabalVerbose `shouldBe` True
 
     it "finds the config file in a parent directory" $ inTempDir $ do
+      writeFile "package.yaml" "name: foo"
       writeFile (toFilePath stackDotYaml) sampleConfig
       parentDir <- getCurrentDirectory >>= parseAbsDir
       let childDir = "child"
       createDirectory childDir
       setCurrentDirectory childDir
-      loadConfig' $ \LoadConfig{..} -> do
-        bc <- liftIO (lcLoadBuildConfig Nothing)
+      loadConfig' $ \config -> liftIO $ do
+        bc <- runRIO config loadBuildConfig
         view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
       withSystemTempDir "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
-        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \LoadConfig{..} -> do
-          BuildConfig{..} <- lcLoadBuildConfig Nothing
+        writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
+        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \config -> liftIO $ do
+          BuildConfig{..} <- runRIO config loadBuildConfig
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
     it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
-        let childRel = $(mkRelDir "child")
-            yamlRel = childRel </> $(mkRelFile "some-other-name.config")
+        let childRel = either impureThrow id (parseRelDir "child")
+            yamlRel = childRel </> either impureThrow id (parseRelFile "some-other-name.config")
             yamlAbs = parentDir </> yamlRel
+            packageYaml = childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
-        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \LoadConfig{..} -> do
-            BuildConfig{..} <- lcLoadBuildConfig Nothing
+        writeFile (toFilePath packageYaml) "name: foo"
+        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
+            BuildConfig{..} <- runRIO config loadBuildConfig
             bcStackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $

@@ -10,7 +10,7 @@ module Path.Find
   ,findInParents)
   where
 
-import Stack.Prelude
+import RIO
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path

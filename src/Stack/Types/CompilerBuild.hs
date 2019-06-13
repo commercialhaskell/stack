@@ -7,7 +7,7 @@ module Stack.Types.CompilerBuild
   ) where
 
 import           Stack.Prelude
-import           Data.Aeson.Extended (FromJSON, parseJSON, withText)
+import           Pantry.Internal.AesonExtended (FromJSON, parseJSON, withText)
 import           Data.Text as T
 
 data CompilerBuild

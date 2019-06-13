@@ -12,32 +12,54 @@ import System.IO.Error
 import System.Process
 import System.Exit
 import System.Info (arch, os)
+import GHC.Stack (HasCallStack)
 
-run' :: FilePath -> [String] -> IO ExitCode
+run' :: HasCallStack => FilePath -> [String] -> IO ExitCode
 run' cmd args = do
     logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Nothing, Nothing, Nothing, ph) <- createProcess (proc cmd args)
     waitForProcess ph
 
-run :: FilePath -> [String] -> IO ()
+run :: HasCallStack => FilePath -> [String] -> IO ()
 run cmd args = do
     ec <- run' cmd args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
+runShell :: HasCallStack => String -> IO ()
+runShell cmd = do
+    logInfo $ "Running: " ++ cmd
+    (Nothing, Nothing, Nothing, ph) <- createProcess (shell cmd)
+    ec <- waitForProcess ph
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+
+runWithCwd :: HasCallStack => FilePath -> String -> [String] -> IO String
+runWithCwd cwdPath cmd args = do
+    logInfo $ "Running: " ++ cmd
+    let cp = proc cmd args
+    (ec, stdoutStr, _) <- readCreateProcessWithExitCode (cp { cwd = Just cwdPath }) ""
+    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    return stdoutStr
+
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
 
-stack' :: [String] -> IO ExitCode
+stackSrc :: IO String
+stackSrc = getEnv "SRC_DIR"
+
+testDir :: IO String
+testDir = getEnv "TEST_DIR"
+
+stack' :: HasCallStack => [String] -> IO ExitCode
 stack' args = do
     stackEnv <- stackExe
     run' stackEnv args
 
-stack :: [String] -> IO ()
+stack :: HasCallStack => [String] -> IO ()
 stack args = do
     ec <- stack' args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
 
-stackErr :: [String] -> IO ()
+stackErr :: HasCallStack => [String] -> IO ()
 stackErr args = do
     ec <- stack' args
     when (ec == ExitSuccess) $ error "stack was supposed to fail, but didn't"
@@ -70,7 +92,7 @@ replGetLine = fmap replStdout ask >>= liftIO . hGetLine
 replGetChar :: Repl Char
 replGetChar = fmap replStdout ask >>= liftIO . hGetChar
 
-runRepl :: FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
+runRepl :: HasCallStack => FilePath -> [String] -> ReaderT ReplConnection IO () -> IO ExitCode
 runRepl cmd args actions = do
     logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
     (Just rStdin, Just rStdout, Just rStderr, ph) <-
@@ -84,13 +106,15 @@ runRepl cmd args actions = do
     hSetBuffering rStderr NoBuffering
 
     _ <- forkIO $ withFile "/tmp/stderr" WriteMode
-        $ \err -> forever $ catch (hGetChar rStderr >>= hPutChar err)
-                  $ \e -> unless (isEOFError e) $ throw e
+        $ \err -> do
+            hSetBuffering err NoBuffering
+            forever $ catch (hGetChar rStderr >>= hPutChar err)
+                    $ \e -> unless (isEOFError e) $ throw e
 
     runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
     waitForProcess ph
 
-repl :: [String] -> Repl () -> IO ()
+repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
     stackExe' <- stackExe
     ec <- runRepl stackExe' ("repl":args) action
@@ -99,7 +123,7 @@ repl args action = do
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
 
-stackStderr :: [String] -> IO (ExitCode, String)
+stackStderr :: HasCallStack => [String] -> IO (ExitCode, String)
 stackStderr args = do
     stackExe' <- stackExe
     logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
@@ -109,7 +133,7 @@ stackStderr args = do
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.
-stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
+stackCheckStderr :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
     (ec, err) <- stackStderr args
     if ec /= ExitSuccess
@@ -118,32 +142,38 @@ stackCheckStderr args check = do
 
 -- | Same as 'stackCheckStderr', but ensures that the Stack process
 -- fails.
-stackErrStderr :: [String] -> (String -> IO ()) -> IO ()
+stackErrStderr :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackErrStderr args check = do
     (ec, err) <- stackStderr args
     if ec == ExitSuccess
         then error "Stack process succeeded, but it shouldn't"
         else check err
 
-stackStdout :: [String] -> IO (ExitCode, String)
-stackStdout args = do
-    stackExe' <- stackExe
-    logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
-    (ec, out, err) <- readProcessWithExitCode stackExe' args ""
+runEx :: HasCallStack => FilePath -> String -> IO (ExitCode, String, String)
+runEx cmd args = runEx' cmd $ words args
+
+runEx' :: HasCallStack => FilePath -> [String] -> IO (ExitCode, String, String)
+runEx' cmd args = do
+    logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
+    (ec, out, err) <- readProcessWithExitCode cmd args ""
     putStr out
     hPutStr stderr err
-    return (ec, out)
+    return (ec, out, err)
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
-stackCheckStdout :: [String] -> (String -> IO ()) -> IO ()
+--
+-- Take care with newlines; if the output includes a newline character that
+-- should not be there, use 'Data.List.Extra.trimEnd' to remove it.
+stackCheckStdout :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackCheckStdout args check = do
-    (ec, out) <- stackStdout args
+    stackExe' <- stackExe
+    (ec, out, _) <- runEx' stackExe' args
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
         else check out
 
-doesNotExist :: FilePath -> IO ()
+doesNotExist :: HasCallStack => FilePath -> IO ()
 doesNotExist fp = do
     logInfo $ "doesNotExist " ++ fp
     exists <- doesFileOrDirExist fp
@@ -151,7 +181,7 @@ doesNotExist fp = do
       (Right msg) -> error msg
       (Left _) -> return ()
 
-doesExist :: FilePath -> IO ()
+doesExist :: HasCallStack => FilePath -> IO ()
 doesExist fp = do
     logInfo $ "doesExist " ++ fp
     exists <- doesFileOrDirExist fp
@@ -159,7 +189,7 @@ doesExist fp = do
       (Right _) -> return ()
       (Left _) -> error "No file or directory exists"
 
-doesFileOrDirExist :: FilePath -> IO (Either () String)
+doesFileOrDirExist :: HasCallStack => FilePath -> IO (Either () String)
 doesFileOrDirExist fp = do
     isFile <- doesFileExist fp
     if isFile
@@ -170,12 +200,12 @@ doesFileOrDirExist fp = do
                 then return (Right ("Directory exists: " ++ fp))
                 else return (Left ())
 
-copy :: FilePath -> FilePath -> IO ()
+copy :: HasCallStack => FilePath -> FilePath -> IO ()
 copy src dest = do
     logInfo ("Copy " ++ show src ++ " to " ++ show dest)
     System.Directory.copyFile src dest
 
-fileContentsMatch :: FilePath -> FilePath -> IO ()
+fileContentsMatch :: HasCallStack => FilePath -> FilePath -> IO ()
 fileContentsMatch f1 f2 = do
     doesExist f1
     doesExist f2
@@ -229,15 +259,38 @@ defaultResolverArg :: String
 defaultResolverArg = "--resolver=lts-11.22"
 
 -- | Remove a file and ignore any warnings about missing files.
-removeFileIgnore :: FilePath -> IO ()
+removeFileIgnore :: HasCallStack => FilePath -> IO ()
 removeFileIgnore fp = removeFile fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
 
--- | Remove a directory tree and ignore any warnings about missing files.
-removeDirectoryRecursiveIgnore :: FilePath -> IO ()
-removeDirectoryRecursiveIgnore fp = removeDirectoryRecursive fp `catch` \e ->
+-- | Remove a directory and ignore any warnings about missing files.
+removeDirIgnore :: HasCallStack => FilePath -> IO ()
+removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
     then return ()
     else throwIO e
+
+-- | Changes working directory to Stack source directory
+withSourceDirectory :: HasCallStack => IO () -> IO ()
+withSourceDirectory action = do
+  dir <- stackSrc
+  currentDirectory <- getCurrentDirectory
+  let enterDir = setCurrentDirectory dir
+      exitDir = setCurrentDirectory currentDirectory
+  bracket_ enterDir exitDir action
+
+-- | Mark a test as superslow, only to be run when explicitly requested.
+superslow :: HasCallStack => IO () -> IO ()
+superslow inner = do
+  mres <- lookupEnv "STACK_TEST_SPEED"
+  case mres of
+    Just "NORMAL" -> logInfo "Skipping superslow test"
+    Just "SUPERSLOW" -> do
+      logInfo "Running superslow test, hold on to your butts"
+      inner
+    Nothing -> do
+      logInfo "No STACK_TEST_SPEED specified. Executing superslow test, hold on to your butts"
+      inner
+    Just x -> error $ "Invalid value for STACK_TEST_SPEED env var: " ++ show x

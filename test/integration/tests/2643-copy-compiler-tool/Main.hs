@@ -4,13 +4,16 @@ import System.Directory
 main :: IO ()
 main = do
   -- init
+  removeFileIgnore "stack.yaml"
+  removeDirIgnore ".stack-work"
   stack ["init", defaultResolverArg]
 
   -- place to throw some exes
+  removeDirIgnore "binny"
   createDirectory "binny"
 
   -- check assumptions on exec and the build flags and clean
-  stack ["build", "--flag", "*:build-baz"]
+  stack ["build", "--flag", "copy-compiler-tool-test:build-baz"]
   stack ["exec", "--", "baz-exe" ++ exeExt]
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stack ["clean", "--full"]

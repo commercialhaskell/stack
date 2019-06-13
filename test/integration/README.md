@@ -23,9 +23,22 @@ One simple way to run a single test is:
 A more thorough way to run the tests is with
 
 ```shell
-$ stack test --flag stack:integration-tests stack:test:stack-integration-test
+$ stack build --flag stack:integration-tests stack --interleaved-output --exec stack-integration-test
 ```
 
 Note that this command can take a _long_ time. It's also more thorough
 than the quick command given above, as it will run each test with a
 clean `STACK_ROOT`.
+
+## Helper scripts
+
+There are two helper scripts in this directory. Note that these may
+not always work as anticipated, since some of the tests expect a clean
+`STACK_ROOT`, and these scripts do not set that up.
+
+* `run-sort-tests.sh` will run all of the tests in the `tests`
+  directory, and move the successful ones into `tests-success`, and
+  the failing ones into `tests-fail`. It will keep the logs of failing
+  tests in `logs`.
+* `run-single-test.sh` takes a single argument (the name of a test),
+  and runs just that test.

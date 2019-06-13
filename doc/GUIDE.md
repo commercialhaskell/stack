@@ -8,6 +8,10 @@ This guide takes a new stack user through the typical workflows. This guide
 will not teach Haskell or involve much code, and it requires no prior experience
 with the Haskell packaging system or other build tools.
 
+__NOTE__ This document is probably out of date in some places and
+deserves a refresh. If you find this document helpful, please drop a
+note on [issue #4252](https://github.com/commercialhaskell/stack/issues/4252).
+
 ## Stack's functions
 
 stack handles the management of your toolchain (including GHC — the Glasgow
@@ -276,6 +280,24 @@ michael@d30748af6d3d:~/helloworld$ stack exec -- which ghc
 As you can see from that path (and as emphasized earlier), the installation is
 placed to not interfere with any other GHC installation, whether system-wide or
 even different GHC versions installed by stack.
+
+## Cleaning your project
+
+You can clean up build artifacts for your project using the `stack clean` and `stack purge` commands.
+
+### `stack clean`
+
+`stack clean` deletes the local working directories containing compiler output.
+By default, that means the contents of directories in `.stack-work/dist`, for all the `.stack-work` directories within a project.
+
+Use `stack clean <specific-package>` to delete the output for the package _specific-package_ only.
+
+### `stack purge`
+
+`stack purge` deletes the local stack working directories, including extra-deps, git dependencies and the compiler output (including logs).
+It does not delete any snapshot packages, compilers or programs installed using `stack install`. This essentially
+reverts the project to a completely fresh state, as if it had never been built.
+`stack purge` is just a shortcut for `stack clean --full`
 
 ### The build command
 
@@ -1665,83 +1687,9 @@ page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 
-Stack provides two built-in Docker integrations. The first way is to
-build your code inside a Docker image, which means even more
-reproducibility to your builds, since you and the rest of your team
-will always have the same system libraries.
-
-The second way is to generate Docker images for you containing your
-built executables (the executable is built in your local machine and
-copied into the image) .  This feature is great for automating
-deployments from CI. This feature is not yet well-documented, but the
-basics are to add a section like the following to stack.yaml:
-
-```yaml
-image:
-
-  # You need a `containers` yaml section for `stack image container`.
-  # A `container` section that does not contain a list is also valid.
-  containers:
-
-    # This example just has one container.
-    -
-      # You need a base image name. Stack layers exes on top of
-      # the base image. Prepare your project image in advance by
-      # putting all your runtime dependencies in the image.
-      base: "fpco/ubuntu-with-libgmp:14.04"
-
-      # You can optionally name the image. Stack will use the project
-      # directory name if you leave out this option.
-      name: "fpco/hello-world"
-
-      # Optionally add a directory to a path inside the docker image.
-      add:
-        man/: /usr/local/share/man/
-
-      # Optionally specify a list of executables. Stack will create
-      # a tagged image for each in the list. these images will have
-      # their respective "ENTRYPOINT" set.
-      entrypoints:
-        - stack
-```
-
-and then run `stack image container` and then `docker images` to list
-the images.
-
-Note that the executable will be built in the development environment
-and copied to the container, so the dev OS must match that of the
-container OS. Note that you can use the `--docker` option to build
-your code inside the Docker container in case you have a different
-development environment or if you specifically want to build on the
-container.
-
-The executable will be stored under `/usr/local/bin/<your-project>-exe`
-in the running container.
-
-If you want the container to run the executable immediately on startup
-then set an entrypoint as follows:
-
-```yaml
-entrypoints:
-    - <your-project>-exe
-```
-
-The difference between the first and second integration methods is
-that in the first one your Haskell code is actually built in the
-container whereas in the second one the executable built in your host
-machine is copied to the container. The presence of the following
-configuration in `stack.yaml` informs stack to switch to the first
-integration method:
-
-```yaml
-docker:
-    enable: true
-```
-
-Alternatively, instead of the above configuration, you can use the
-`--docker` option to achieve the same.  You can find more details
-about the first integration method [in the Docker integration
-documentation](./docker_integration.md).
+Stack is able to build your code inside a Docker image, which means
+even more reproducibility to your builds, since you and the rest of
+your team will always have the same system libraries.
 
 ### Nix
 

@@ -40,11 +40,6 @@
   ]
 }
 
-# Pretty-printing
-- error: {lhs: "fromString . toFilePath", rhs: "display"}
-- ignore: {name: "Use display", within: "warnMultiple"}
-- ignore: {name: "Use display", within: "Stack.PrettyPrint"}
-
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.formDataBody", rhs: "Network.HTTP.StackClient.formDataBody"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partBS", rhs: "Network.HTTP.StackClient.partBS"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partFileRequestBody", rhs: "Network.HTTP.StackClient.partFileRequestBody"}
@@ -60,7 +55,6 @@
 - error: {lhs: "Network.HTTP.Client.parseUrlThrow", rhs: "Network.HTTP.StackClient.parseUrlThrow"}
 - error: {lhs: "Network.HTTP.Client.path", rhs: "Network.HTTP.StackClient.path"}
 - error: {lhs: "Network.HTTP.Client.responseHeaders", rhs: "Network.HTTP.StackClient.responseHeaders"}
-- error: {lhs: "Network.HTTP.Client.withResponse", rhs: "Network.HTTP.StackClient.withResponseByManager"}
 - error: {lhs: "Network.HTTP.Conduit.requestHeaders", rhs: "Network.HTTP.StackClient.requestHeaders"}
 - error: {lhs: "Network.HTTP.Simple.HttpException", rhs: "Network.HTTP.StackClient.HttpException"}
 - error: {lhs: "Network.HTTP.Simple.addRequestHeader", rhs: "Network.HTTP.StackClient.addRequestHeader"}
@@ -88,4 +82,3 @@
 - error: {lhs: "Network.HTTP.Types.hContentMD5", rhs: "Network.HTTP.StackClient.hContentMD5"}
 - error: {lhs: "Network.HTTP.Types.methodPut", rhs: "Network.HTTP.StackClient.methodPut"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
-- ignore: {name: "Use withResponseByManager", within: "Network.HTTP.StackClient"}

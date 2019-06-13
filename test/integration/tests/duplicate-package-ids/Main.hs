@@ -6,5 +6,6 @@ main = do
     stack ["setup"]
     stack ["build", "auto-update"]
     readFile "stack2.yaml" >>= writeFile "stack.yaml"
+    removeDirIgnore "auto-update-0.1.2.1"
     stack ["unpack", "auto-update-0.1.2.1"]
     stack ["build"]

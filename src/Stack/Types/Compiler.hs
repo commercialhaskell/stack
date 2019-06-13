@@ -6,13 +6,29 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Stack.Types.Compiler where
+module Stack.Types.Compiler
+  ( ActualCompiler (..)
+  , WhichCompiler (..)
+  , CompilerRepository (..)
+  , defaultCompilerRepository
+  , getGhcVersion
+  , whichCompiler
+  , compilerVersionText
+  , compilerVersionString
+  , isWantedCompiler
+  , wantedToActual
+  , actualToWanted
+  , parseActualCompiler
+  ) where
 
 import           Data.Aeson
-import           Data.Data
+import           Database.Persist
+import           Database.Persist.Sql
 import qualified Data.Text as T
+import           Data.Text (Text)
 import           Stack.Prelude
 import           Stack.Types.Version
+import           Distribution.Version (mkVersion)
 
 -- | Variety of compiler to use.
 data WhichCompiler
@@ -20,86 +36,88 @@ data WhichCompiler
     | Ghcjs
     deriving (Show, Eq, Ord)
 
--- | Whether the compiler version given is the wanted version (what
--- the stack.yaml file, snapshot file, or --resolver argument
--- request), or the actual installed GHC. Depending on the matching
--- requirements, these values could be different.
-data CVType = CVWanted | CVActual
-
 -- | Specifies a compiler and its version number(s).
 --
 -- Note that despite having this datatype, stack isn't in a hurry to
 -- support compilers other than GHC.
-data CompilerVersion (cvType :: CVType)
-    = GhcVersion {-# UNPACK #-} !Version
-    | GhcjsVersion
-        {-# UNPACK #-} !Version -- GHCJS version
-        {-# UNPACK #-} !Version -- GHC version
+data ActualCompiler
+    = ACGhc !Version
+    | ACGhcGit !Text !Text
+    | ACGhcjs
+        !Version -- GHCJS version
+        !Version -- GHC version
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
-instance Store (CompilerVersion a)
-instance NFData (CompilerVersion a)
-instance Display (CompilerVersion a) where
-    display = display . compilerVersionText
-instance ToJSON (CompilerVersion a) where
+instance NFData ActualCompiler
+instance Display ActualCompiler where
+    display (ACGhc x) = display (WCGhc x)
+    display (ACGhcjs x y) = display (WCGhcjs x y)
+    display (ACGhcGit x y) = display (WCGhcGit x y)
+instance ToJSON ActualCompiler where
     toJSON = toJSON . compilerVersionText
-instance FromJSON (CompilerVersion a) where
-    parseJSON (String t) = maybe (fail "Failed to parse compiler version") return (parseCompilerVersion t)
+instance FromJSON ActualCompiler where
+    parseJSON (String t) = either (const $ fail "Failed to parse compiler version") return (parseActualCompiler t)
     parseJSON _ = fail "Invalid CompilerVersion, must be String"
-instance FromJSONKey (CompilerVersion a) where
+instance FromJSONKey ActualCompiler where
     fromJSONKey = FromJSONKeyTextParser $ \k ->
-        case parseCompilerVersion k of
-            Nothing -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
-            Just parsed -> return parsed
+        case parseActualCompiler k of
+            Left _ -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
+            Right parsed -> return parsed
+instance PersistField ActualCompiler where
+  toPersistValue = toPersistValue . compilerVersionText
+  fromPersistValue = (mapLeft tshow . parseActualCompiler) <=< fromPersistValue
+instance PersistFieldSql ActualCompiler where
+  sqlType _ = SqlString
 
-actualToWanted :: CompilerVersion 'CVActual -> CompilerVersion 'CVWanted
-actualToWanted (GhcVersion x) = GhcVersion x
-actualToWanted (GhcjsVersion x y) = GhcjsVersion x y
+wantedToActual :: WantedCompiler -> ActualCompiler
+wantedToActual (WCGhc x) = ACGhc x
+wantedToActual (WCGhcjs x y) = ACGhcjs x y
+wantedToActual (WCGhcGit x y) = ACGhcGit x y
 
-wantedToActual :: CompilerVersion 'CVWanted -> CompilerVersion 'CVActual
-wantedToActual (GhcVersion x) = GhcVersion x
-wantedToActual (GhcjsVersion x y) = GhcjsVersion x y
+actualToWanted :: ActualCompiler -> WantedCompiler
+actualToWanted (ACGhc x) = WCGhc x
+actualToWanted (ACGhcjs x y) = WCGhcjs x y
+actualToWanted (ACGhcGit x y) = WCGhcGit x y
 
-parseCompilerVersion :: T.Text -> Maybe (CompilerVersion a)
-parseCompilerVersion t
-    | Just t' <- T.stripPrefix "ghc-" t
-    , Just v <- parseVersionFromString $ T.unpack t'
-        = Just (GhcVersion v)
-    | Just t' <- T.stripPrefix "ghcjs-" t
-    , [tghcjs, tghc] <- T.splitOn "_ghc-" t'
-    , Just vghcjs <- parseVersionFromString $ T.unpack tghcjs
-    , Just vghc <- parseVersionFromString $ T.unpack tghc
-        = Just (GhcjsVersion vghcjs vghc)
-    | otherwise
-        = Nothing
+parseActualCompiler :: T.Text -> Either PantryException ActualCompiler
+parseActualCompiler = fmap wantedToActual . parseWantedCompiler
 
-compilerVersionText :: CompilerVersion a -> T.Text
-compilerVersionText (GhcVersion vghc) =
-    "ghc-" <> versionText vghc
-compilerVersionText (GhcjsVersion vghcjs vghc) =
-    "ghcjs-" <> versionText vghcjs <> "_ghc-" <> versionText vghc
+compilerVersionText :: ActualCompiler -> T.Text
+compilerVersionText = utf8BuilderToText . display
 
-compilerVersionString :: CompilerVersion a -> String
+compilerVersionString :: ActualCompiler -> String
 compilerVersionString = T.unpack . compilerVersionText
 
-whichCompiler :: CompilerVersion a -> WhichCompiler
-whichCompiler GhcVersion {} = Ghc
-whichCompiler GhcjsVersion {} = Ghcjs
+whichCompiler :: ActualCompiler -> WhichCompiler
+whichCompiler ACGhc{} = Ghc
+whichCompiler ACGhcGit{} = Ghc
+whichCompiler ACGhcjs{} = Ghcjs
 
-isWantedCompiler :: VersionCheck -> CompilerVersion 'CVWanted -> CompilerVersion 'CVActual -> Bool
-isWantedCompiler check (GhcVersion wanted) (GhcVersion actual) =
+isWantedCompiler :: VersionCheck -> WantedCompiler -> ActualCompiler -> Bool
+isWantedCompiler check (WCGhc wanted) (ACGhc actual) =
     checkVersion check wanted actual
-isWantedCompiler check (GhcjsVersion wanted wantedGhc) (GhcjsVersion actual actualGhc) =
+isWantedCompiler check (WCGhcjs wanted wantedGhc) (ACGhcjs actual actualGhc) =
     checkVersion check wanted actual && checkVersion check wantedGhc actualGhc
+isWantedCompiler _check (WCGhcGit wCommit wFlavour) (ACGhcGit aCommit aFlavour) =
+    wCommit == aCommit && wFlavour == aFlavour
 isWantedCompiler _ _ _ = False
 
-getGhcVersion :: CompilerVersion a -> Version
-getGhcVersion (GhcVersion v) = v
-getGhcVersion (GhcjsVersion _ v) = v
+getGhcVersion :: ActualCompiler -> Version
+getGhcVersion (ACGhc v) = v
+getGhcVersion (ACGhcjs _ v) = v
+getGhcVersion (ACGhcGit _ _) =
+   -- We can't return the actual version without running the installed ghc.
+   -- For now we assume that users of ghc-git use it with a recent commit so we
+   -- return a version far in the future. This disables our hacks for older
+   -- versions and passes version checking when we use newer features.
+   mkVersion [999,0,0]
 
-compilerExeName :: WhichCompiler -> String
-compilerExeName Ghc = "ghc"
-compilerExeName Ghcjs = "ghcjs"
+-- | Repository containing the compiler sources
+newtype CompilerRepository
+  = CompilerRepository Text
+  deriving (Show)
 
-haddockExeName :: WhichCompiler -> String
-haddockExeName Ghc = "haddock"
-haddockExeName Ghcjs = "haddock-ghcjs"
+instance FromJSON CompilerRepository where
+  parseJSON = withText "CompilerRepository" (return . CompilerRepository)
+
+defaultCompilerRepository :: CompilerRepository
+defaultCompilerRepository = CompilerRepository "https://gitlab.haskell.org/ghc/ghc.git"

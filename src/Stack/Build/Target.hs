@@ -71,26 +71,18 @@ module Stack.Build.Target
     ) where
 
 import           Stack.Prelude
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
 import           Path
 import           Path.Extra (rejectMissingDir)
 import           Path.IO
-import           Stack.Config (getLocalPackages)
-import           Stack.PackageIndex
-import           Stack.PackageLocation
-import           Stack.Snapshot (calculatePackagePromotion)
+import           RIO.Process (HasProcessContext)
+import           Stack.SourceMap
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.Build
-import           Stack.Types.BuildPlan
-import           Stack.Types.GhcPkgId
+import           Stack.Types.SourceMap
 
 -- | Do we need any targets? For example, `stack build` will fail if
 -- no targets are provided.
@@ -103,13 +95,13 @@ data NeedTargets = NeedTargets | AllowNoTargets
 -- | Raw target information passed on the command line.
 newtype RawInput = RawInput { unRawInput :: Text }
 
-getRawInput :: BuildOptsCLI -> Map PackageName LocalPackageView -> ([Text], [RawInput])
+getRawInput :: BuildOptsCLI -> Map PackageName ProjectPackage -> ([Text], [RawInput])
 getRawInput boptscli locals =
     let textTargets' = boptsCLITargets boptscli
         textTargets =
             -- Handle the no targets case, which means we pass in the names of all project packages
             if null textTargets'
-                then map packageNameText (Map.keys locals)
+                then map (T.pack . packageNameString) (Map.keys locals)
                 else textTargets'
      in (textTargets', map RawInput textTargets)
 
@@ -144,7 +136,7 @@ data RawTarget
 -- | Same as @parseRawTarget@, but also takes directories into account.
 parseRawTargetDirs :: MonadIO m
                    => Path Abs Dir -- ^ current directory
-                   -> Map PackageName LocalPackageView
+                   -> Map PackageName ProjectPackage
                    -> RawInput -- ^ raw target information from the commandline
                    -> m (Either Text [(RawInput, RawTarget)])
 parseRawTargetDirs root locals ri =
@@ -162,8 +154,8 @@ parseRawTargetDirs root locals ri =
                             t
                         names -> return $ Right $ map ((ri, ) . RTPackage) names
   where
-    childOf dir (name, lpv) =
-        if dir == lpvRoot lpv || isProperPrefixOf dir (lpvRoot lpv)
+    childOf dir (name, pp) =
+        if dir == ppRoot pp || isProperPrefixOf dir (ppRoot pp)
             then Just name
             else Nothing
 
@@ -173,8 +165,8 @@ parseRawTargetDirs root locals ri =
 -- directory.
 parseRawTarget :: Text -> Maybe RawTarget
 parseRawTarget t =
-        (RTPackageIdentifier <$> parsePackageIdentifier t)
-    <|> (RTPackage <$> parsePackageNameFromString s)
+        (RTPackageIdentifier <$> parsePackageIdentifier s)
+    <|> (RTPackage <$> parsePackageName s)
     <|> (RTComponent <$> T.stripPrefix ":" t)
     <|> parsePackageComponent
   where
@@ -183,13 +175,13 @@ parseRawTarget t =
     parsePackageComponent =
         case T.splitOn ":" t of
             [pname, "lib"]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                | Just pname' <- parsePackageName (T.unpack pname) ->
                     Just $ RTPackageComponent pname' $ ResolvedComponent CLib
             [pname, cname]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname) ->
+                | Just pname' <- parsePackageName (T.unpack pname) ->
                     Just $ RTPackageComponent pname' $ UnresolvedComponent cname
             [pname, typ, cname]
-                | Just pname' <- parsePackageNameFromString (T.unpack pname)
+                | Just pname' <- parsePackageName (T.unpack pname)
                 , Just wrapper <- parseCompType typ ->
                     Just $ RTPackageComponent pname' $ ResolvedComponent $ wrapper cname
             _ -> Nothing
@@ -210,24 +202,25 @@ data ResolveResult = ResolveResult
   , rrRaw :: !RawInput
   , rrComponent :: !(Maybe NamedComponent)
   -- ^ Was a concrete component specified?
-  , rrAddedDep :: !(Maybe Version)
+  , rrAddedDep :: !(Maybe PackageLocationImmutable)
   -- ^ Only if we're adding this as a dependency
   , rrPackageType :: !PackageType
   }
 
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
 -- the module).
-resolveRawTarget
-  :: forall env. HasConfig env
-  => Map PackageName (LoadedPackageInfo GhcPkgId) -- ^ globals
-  -> Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- ^ snapshot
-  -> Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath) -- ^ local deps
-  -> Map PackageName LocalPackageView -- ^ project packages
-  -> (RawInput, RawTarget)
-  -> RIO env (Either Text ResolveResult)
-resolveRawTarget globals snap deps locals (ri, rt) =
-    go rt
+resolveRawTarget ::
+       (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
+    => SMActual GlobalPackage
+    -> Map PackageName PackageLocation
+    -> (RawInput, RawTarget)
+    -> RIO env (Either Text ResolveResult)
+resolveRawTarget sma allLocs (ri, rt) =
+  go rt
   where
+    locals = smaProject sma
+    deps = smaDeps sma
+    globals = smaGlobal sma
     -- Helper function: check if a 'NamedComponent' matches the given 'ComponentName'
     isCompNamed :: ComponentName -> NamedComponent -> Bool
     isCompNamed _ CLib = False
@@ -236,21 +229,22 @@ resolveRawTarget globals snap deps locals (ri, rt) =
     isCompNamed t1 (CTest t2) = t1 == t2
     isCompNamed t1 (CBench t2) = t1 == t2
 
-    go (RTComponent cname) = return $
+    go (RTComponent cname) = do
         -- Associated list from component name to package that defines
         -- it. We use an assoc list and not a Map so we can detect
         -- duplicates.
-        let allPairs = concatMap
-                (\(name, lpv) -> map (name,) $ Set.toList $ lpvComponents lpv)
-                (Map.toList locals)
-         in case filter (isCompNamed cname . snd) allPairs of
+        allPairs <- fmap concat $ flip Map.traverseWithKey locals
+          $ \name pp -> do
+              comps <- ppComponents pp
+              pure $ map (name, ) $ Set.toList comps
+        pure $ case filter (isCompNamed cname . snd) allPairs of
                 [] -> Left $ cname `T.append` " doesn't seem to be a local target. Run 'stack ide targets' for a list of available targets"
                 [(name, comp)] -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
                   , rrComponent = Just comp
                   , rrAddedDep = Nothing
-                  , rrPackageType = ProjectPackage
+                  , rrPackageType = PTProject
                   }
                 matches -> Left $ T.concat
                     [ "Ambiugous component name "
@@ -258,18 +252,19 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                     , ", matches: "
                     , T.pack $ show matches
                     ]
-    go (RTPackageComponent name ucomp) = return $
+    go (RTPackageComponent name ucomp) =
         case Map.lookup name locals of
-            Nothing -> Left $ T.pack $ "Unknown local package: " ++ packageNameString name
-            Just lpv ->
-                case ucomp of
+            Nothing -> pure $ Left $ T.pack $ "Unknown local package: " ++ packageNameString name
+            Just pp -> do
+                comps <- ppComponents pp
+                pure $ case ucomp of
                     ResolvedComponent comp
-                        | comp `Set.member` lpvComponents lpv -> Right ResolveResult
+                        | comp `Set.member` comps -> Right ResolveResult
                             { rrName = name
                             , rrRaw = ri
                             , rrComponent = Just comp
                             , rrAddedDep = Nothing
-                            , rrPackageType = ProjectPackage
+                            , rrPackageType = PTProject
                             }
                         | otherwise -> Left $ T.pack $ concat
                             [ "Component "
@@ -278,7 +273,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                             , packageNameString name
                             ]
                     UnresolvedComponent comp ->
-                        case filter (isCompNamed comp) $ Set.toList $ lpvComponents lpv of
+                        case filter (isCompNamed comp) $ Set.toList comps of
                             [] -> Left $ T.concat
                                 [ "Component "
                                 , comp
@@ -290,7 +285,7 @@ resolveRawTarget globals snap deps locals (ri, rt) =
                               , rrRaw = ri
                               , rrComponent = Just x
                               , rrAddedDep = Nothing
-                              , rrPackageType = ProjectPackage
+                              , rrPackageType = PTProject
                               }
                             matches -> Left $ T.concat
                                 [ "Ambiguous component name "
@@ -307,123 +302,110 @@ resolveRawTarget globals snap deps locals (ri, rt) =
           , rrRaw = ri
           , rrComponent = Nothing
           , rrAddedDep = Nothing
-          , rrPackageType = ProjectPackage
+          , rrPackageType = PTProject
           }
-      | Map.member name deps ||
-        Map.member name snap ||
-        Map.member name globals = return $ Right ResolveResult
-          { rrName = name
-          , rrRaw = ri
-          , rrComponent = Nothing
-          , rrAddedDep = Nothing
-          , rrPackageType = Dependency
-          }
-      | otherwise = do
-          mversion <- getLatestVersion name
-          return $ case mversion of
-            -- This is actually an error case. We _could_ return a
-            -- Left value here, but it turns out to be better to defer
-            -- this until the ConstructPlan phase, and let it complain
-            -- about the missing package so that we get more errors
-            -- together, plus the fancy colored output from that
-            -- module.
-            Nothing -> Right ResolveResult
-              { rrName = name
-              , rrRaw = ri
-              , rrComponent = Nothing
-              , rrAddedDep = Nothing
-              , rrPackageType = Dependency
-              }
-            Just version -> Right ResolveResult
-              { rrName = name
-              , rrRaw = ri
-              , rrComponent = Nothing
-              , rrAddedDep = Just version
-              , rrPackageType = Dependency
-              }
-      where
-        getLatestVersion pn =
-            fmap fst . Set.maxView . Set.fromList . HashMap.keys <$> getPackageVersions pn
+      | Map.member name deps =
+          pure $ deferToConstructPlan name
+      | Just gp <- Map.lookup name globals =
+          case gp of
+              GlobalPackage _ -> pure $ deferToConstructPlan name
+              ReplacedGlobalPackage _ -> hackageLatest name
+      | otherwise = hackageLatest name
+
+    -- Note that we use getLatestHackageRevision below, even though it's
+    -- non-reproducible, to avoid user confusion. In any event,
+    -- reproducible builds should be done by updating your config
+    -- files!
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
       | Map.member name locals = return $ Left $ T.concat
-            [ packageNameText name
+            [ tshow (packageNameString name)
             , " target has a specific version number, but it is a local package."
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
             , "\nTo build the local package, specify the target without an explicit version."
             ]
-      | otherwise = return $
+      | otherwise =
           case Map.lookup name allLocs of
             -- Installing it from the package index, so we're cool
             -- with overriding it if necessary
-            Just (PLIndex (PackageIdentifierRevision (PackageIdentifier _name versionLoc) _mcfi)) -> Right ResolveResult
-                  { rrName = name
-                  , rrRaw = ri
-                  , rrComponent = Nothing
-                  , rrAddedDep =
-                      if version == versionLoc
-                        -- But no need to override anyway, this is already the
-                        -- version we have
-                        then Nothing
-                        -- OK, we'll override it
-                        else Just version
-                  , rrPackageType = Dependency
-                  }
+            Just (PLImmutable (PLIHackage (PackageIdentifier _name versionLoc) _cfKey _treeKey)) ->
+              if version == versionLoc
+              then pure $ deferToConstructPlan name
+              else hackageLatestRevision name version
             -- The package was coming from something besides the
             -- index, so refuse to do the override
-            Just (PLOther loc') -> Left $ T.concat
+            Just loc' -> pure $ Left $ T.concat
               [ "Package with identifier was targeted on the command line: "
-              , packageIdentifierText ident
+              , T.pack $ packageIdentifierString ident
               , ", but it was specified from a non-index location: "
               , T.pack $ show loc'
               , ".\nRecommendation: add the correctly desired version to extra-deps."
               ]
-            -- Not present at all, so add it
-            Nothing -> Right ResolveResult
+            -- Not present at all, add it from Hackage
+            Nothing -> do
+              mrev <- getLatestHackageRevision YesRequireHackageIndex name version
+              pure $ case mrev of
+                Nothing -> deferToConstructPlan name
+                Just (_rev, cfKey, treeKey) -> Right ResolveResult
+                  { rrName = name
+                  , rrRaw = ri
+                  , rrComponent = Nothing
+                  , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+                  , rrPackageType = PTDependency
+                  }
+
+    hackageLatest name = do
+        mloc <- getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
+        pure $ case mloc of
+          Nothing -> deferToConstructPlan name
+          Just loc -> do
+            Right ResolveResult
+                  { rrName = name
+                  , rrRaw = ri
+                  , rrComponent = Nothing
+                  , rrAddedDep = Just loc
+                  , rrPackageType = PTDependency
+                  }
+
+    hackageLatestRevision name version = do
+        mrev <- getLatestHackageRevision YesRequireHackageIndex name version
+        pure $ case mrev of
+          Nothing -> deferToConstructPlan name
+          Just (_rev, cfKey, treeKey) -> Right ResolveResult
+            { rrName = name
+            , rrRaw = ri
+            , rrComponent = Nothing
+            , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
+            , rrPackageType = PTDependency
+            }
+
+    -- This is actually an error case. We _could_ return a
+    -- Left value here, but it turns out to be better to defer
+    -- this until the ConstructPlan phase, and let it complain
+    -- about the missing package so that we get more errors
+    -- together, plus the fancy colored output from that
+    -- module.
+    deferToConstructPlan name = Right ResolveResult
               { rrName = name
               , rrRaw = ri
               , rrComponent = Nothing
-              , rrAddedDep = Just version
-              , rrPackageType = Dependency
+              , rrAddedDep = Nothing
+              , rrPackageType = PTDependency
               }
-
-      where
-        allLocs :: Map PackageName (PackageLocationIndex FilePath)
-        allLocs = Map.unions
-          [ Map.mapWithKey
-              (\name' lpi -> PLIndex $ PackageIdentifierRevision
-                  (PackageIdentifier name' (lpiVersion lpi))
-                  CFILatest)
-              globals
-          , Map.map lpiLocation snap
-          , Map.map snd deps
-          ]
-
 ---------------------------------------------------------------------------------
 -- Combine the ResolveResults
 ---------------------------------------------------------------------------------
 
--- | How a package is intended to be built
-data Target
-  = TargetAll !PackageType
-  -- ^ Build all of the default components.
-  | TargetComps !(Set NamedComponent)
-  -- ^ Only build specific components
-
-data PackageType = ProjectPackage | Dependency
-  deriving (Eq, Show)
-
 combineResolveResults
   :: forall env. HasLogFunc env
   => [ResolveResult]
-  -> RIO env ([Text], Map PackageName Target, Map PackageName (PackageLocationIndex FilePath))
+  -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocationImmutable)
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
         Nothing -> return Map.empty
-        Just version -> do
-          let ident = PackageIdentifier (rrName result) version
-          return $ Map.singleton (rrName result) $ PLIndex $ PackageIdentifierRevision ident CFILatest
+        Just pl -> do
+          return $ Map.singleton (rrName result) pl
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -437,7 +419,7 @@ combineResolveResults results = do
                   | all isJust mcomps -> Right $ Map.singleton name $ TargetComps $ Set.fromList $ catMaybes mcomps
                   | otherwise -> Left $ T.concat
                       [ "The package "
-                      , packageNameText name
+                      , T.pack $ packageNameString name
                       , " was specified in multiple, incompatible ways: "
                       , T.unwords $ map (unRawInput . rrRaw) rrs
                       ]
@@ -448,32 +430,26 @@ combineResolveResults results = do
 -- OK, let's do it!
 ---------------------------------------------------------------------------------
 
-parseTargets
-    :: HasEnvConfig env
+parseTargets :: HasBuildConfig env
     => NeedTargets
+    -> Bool
     -> BuildOptsCLI
-    -> RIO env
-         ( LoadedSnapshot -- upgraded snapshot, with some packages possibly moved to local
-         , Map PackageName (LoadedPackageInfo (PackageLocationIndex FilePath)) -- all local deps
-         , Map PackageName Target
-         )
-parseTargets needTargets boptscli = do
+    -> SMActual GlobalPackage
+    -> RIO env SMTargets
+parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
-  ls0 <- view loadedSnapshotL
   workingDir <- getCurrentDir
-  lp <- getLocalPackages
-  let locals = lpProject lp
-      deps = lpDependencies lp
-      globals = lsGlobals ls0
-      snap = lsPackages ls0
-      (textTargets', rawInput) = getRawInput boptscli locals
+  locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  let (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
-    parseRawTargetDirs workingDir (lpProject lp)
+    parseRawTargetDirs workingDir locals
+
+  let depLocs = Map.map dpLocation $ smaDeps smActual
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
-    resolveRawTarget globals snap deps locals
+    resolveRawTarget smActual depLocs
 
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
@@ -492,67 +468,15 @@ parseTargets needTargets boptscli = do
       | otherwise -> throwIO $ TargetParseException
           ["The specified targets matched no packages"]
 
-  root <- view projectRootL
+  addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
-  let dropMaybeKey (Nothing, _) = Map.empty
-      dropMaybeKey (Just key, value) = Map.singleton key value
-      flags = Map.unionWith Map.union
-        (Map.unions (map dropMaybeKey (Map.toList (boptsCLIFlags boptscli))))
-        (bcFlags bconfig)
-      hides = Map.empty -- not supported to add hidden packages
-
-      -- We promote packages to the local database if the GHC options
-      -- are added to them by name. See:
-      -- https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095.
-      --
-      -- GHC options applied to all packages are handled by getGhcOptions.
-      options = configGhcOptionsByName (bcConfig bconfig)
-
-      drops = Set.empty -- not supported to add drops
-
-  (globals', snapshots, locals') <- do
-    addedDeps' <- fmap Map.fromList $ forM (Map.toList addedDeps) $ \(name, loc) -> do
-      gpd <- parseSingleCabalFileIndex root loc
-      return (name, (gpd, loc, Nothing))
-
-    -- Calculate a list of all of the locals, based on the project
-    -- packages, local dependencies, and added deps found from the
-    -- command line
-    let allLocals :: Map PackageName (GenericPackageDescription, PackageLocationIndex FilePath, Maybe LocalPackageView)
-        allLocals = Map.unions
-          [ -- project packages
-            Map.map
-              (\lpv -> (lpvGPD lpv, PLOther $ lpvLoc lpv, Just lpv))
-              (lpProject lp)
-          , -- added deps take precendence over local deps
-            addedDeps'
-          , -- added deps take precendence over local deps
-            Map.map
-              (\(gpd, loc) -> (gpd, loc, Nothing))
-              (lpDependencies lp)
-          ]
-
-    calculatePackagePromotion
-      root ls0 (Map.elems allLocals)
-      flags hides options drops
-
-  let ls = LoadedSnapshot
-        { lsCompilerVersion = lsCompilerVersion ls0
-        , lsGlobals = globals'
-        , lsPackages = snapshots
-        }
-
-      localDeps = Map.fromList $ flip mapMaybe (Map.toList locals') $ \(name, lpi) ->
-        -- We want to ignore any project packages, but grab the local
-        -- deps and upgraded snapshot deps
-        case lpiLocation lpi of
-          (_, Just (Just _localPackageView)) -> Nothing -- project package
-          (loc, _) -> Just (name, lpi { lpiLocation = loc }) -- upgraded or local dep
-
-  return (ls, localDeps, targets)
-
-gpdVersion :: GenericPackageDescription -> Version
-gpdVersion gpd =
-    version
+  return SMTargets
+    { smtTargets = targets
+    , smtDeps = addedDeps'
+    }
   where
-    PackageIdentifier _ version = fromCabalPackageIdentifier $ package $ packageDescription gpd
+    bcImplicitGlobal bconfig =
+      case configProject $ bcConfig bconfig of
+        PCProject _ -> False
+        PCGlobalProject -> True
+        PCNoProject _ -> False

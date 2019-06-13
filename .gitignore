@@ -25,7 +25,9 @@ tags
 /.dir-locals.el
 /.git/
 /stack.cabal
+/subs/*/*.cabal
 /etc/scripts/stack-scripts.cabal
 .hspec-failures
 better-cache/
-subs/
+/subs/*/*.cabal
+stack*.yaml.lock

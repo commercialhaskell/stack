@@ -1,0 +1,10 @@
+resolver: ghc-8.2.2
+
+extra-deps:
+- acme-dont-1.1@rev:0
+
+configure-options:
+  name:
+  - this is an invalid option
+  acme-dont:
+  - this is an invalid option

@@ -15,7 +15,6 @@ module Options.Applicative.Complicated
 
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
-import           Data.Version
 import           Options.Applicative
 import           Options.Applicative.Types
 import           Options.Applicative.Builder.Internal
@@ -45,7 +44,7 @@ complicatedOptions
   -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
+complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
@@ -56,8 +55,8 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd footerS
   where parser = info (helpOption <*> versionOptions <*> complicatedParser "COMMAND|FILE" commonParser commandParser) desc
         desc = fullDesc <> header h <> progDesc pd <> footer footerStr
         versionOptions =
-          case versionString of
-            Nothing -> versionOption (showVersion numericVersion)
+          case stringVersion of
+            Nothing -> versionOption (versionString numericVersion)
             Just s -> versionOption s <*> numericVersionOption <*> numericHpackVersionOption
         versionOption s =
           infoOption
@@ -66,7 +65,7 @@ complicatedOptions numericVersion versionString numericHpackVersion h pd footerS
              help "Show version")
         numericVersionOption =
           infoOption
-            (showVersion numericVersion)
+            (versionString numericVersion)
             (long "numeric-version" <>
              help "Show only version number")
         numericHpackVersionOption =
@@ -80,11 +79,12 @@ addCommand :: String   -- ^ command string
            -> String   -- ^ title of command
            -> String   -- ^ footer of command help
            -> (a -> b) -- ^ constructor to wrap up command in common data type
+           -> (a -> c -> c) -- ^ extend common settings from local settings
            -> Parser c -- ^ common parser
            -> Parser a -- ^ command parser
            -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
-addCommand cmd title footerStr constr =
-  addCommand' cmd title footerStr (\a c -> (constr a,c))
+addCommand cmd title footerStr constr extendCommon =
+  addCommand' cmd title footerStr (\a c -> (constr a,extendCommon a c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands

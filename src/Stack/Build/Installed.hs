@@ -7,14 +7,14 @@
 module Stack.Build.Installed
     ( InstalledMap
     , Installed (..)
-    , GetInstalledOpts (..)
     , getInstalled
+    , InstallMap
+    , toInstallMap
     ) where
 
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
-import qualified Data.Foldable as F
-import qualified Data.HashSet as HashSet
+import qualified Data.Set as Set
 import           Data.List
 import qualified Data.Map.Strict as Map
 import           Path
@@ -22,48 +22,45 @@ import           Stack.Build.Cache
 import           Stack.Constants
 import           Stack.PackageDump
 import           Stack.Prelude
+import           Stack.SourceMap (getPLIVersion, loadVersion)
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageDump
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
+import           Stack.Types.SourceMap
 
--- | Options for 'getInstalled'.
-data GetInstalledOpts = GetInstalledOpts
-    { getInstalledProfiling :: !Bool
-      -- ^ Require profiling libraries?
-    , getInstalledHaddock   :: !Bool
-      -- ^ Require haddocks?
-    , getInstalledSymbols   :: !Bool
-      -- ^ Require debugging symbols?
-    }
+toInstallMap :: MonadIO m => SourceMap -> m InstallMap
+toInstallMap sourceMap = do
+    projectInstalls <-
+        for (smProject sourceMap) $ \pp -> do
+            version <- loadVersion (ppCommon pp)
+            return (Local, version)
+    depInstalls <-
+        for (smDeps sourceMap) $ \dp ->
+            case dpLocation dp of
+                PLImmutable pli -> pure (Snap, getPLIVersion pli)
+                PLMutable _ -> do
+                    version <- loadVersion (dpCommon dp)
+                    return (Local, version)
+    return $ projectInstalls <> depInstalls
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: HasEnvConfig env
-             => GetInstalledOpts
-             -> Map PackageName PackageSource -- ^ does not contain any installed information
+             => InstallMap -- ^ does not contain any installed information
              -> RIO env
                   ( InstalledMap
-                  , [DumpPackage () () ()] -- globally installed
-                  , [DumpPackage () () ()] -- snapshot installed
-                  , [DumpPackage () () ()] -- locally installed
+                  , [DumpPackage] -- globally installed
+                  , [DumpPackage] -- snapshot installed
+                  , [DumpPackage] -- locally installed
                   )
-getInstalled opts sourceMap = do
+getInstalled {-opts-} installMap = do
     logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
     extraDBPaths <- packageDatabaseExtra
 
-    mcache <-
-        if getInstalledProfiling opts || getInstalledHaddock opts
-            then configInstalledCache >>= liftM Just . loadInstalledCache
-            else return Nothing
-
-    let loadDatabase' = loadDatabase opts mcache sourceMap
+    let loadDatabase' = loadDatabase {-opts mcache-} installMap
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
@@ -76,24 +73,24 @@ getInstalled opts sourceMap = do
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = Map.fromList $ map lhPair installedLibs3
 
-    F.forM_ mcache $ \cache -> do
-        icache <- configInstalledCache
-        saveInstalledCache icache cache
-
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
     let exesToSM loc = Map.unions . map (exeToSM loc)
         exeToSM loc (PackageIdentifier name version) =
-            case Map.lookup name sourceMap of
+            case Map.lookup name installMap of
                 -- Doesn't conflict with anything, so that's OK
                 Nothing -> m
-                Just pii
+                Just (iLoc, iVersion)
                     -- Not the version we want, ignore it
-                    | version /= piiVersion pii || loc /= piiLocation pii -> Map.empty
+                    | version /= iVersion || mismatchingLoc loc iLoc -> Map.empty
 
                     | otherwise -> m
           where
             m = Map.singleton name (loc, Executable $ PackageIdentifier name version)
+            mismatchingLoc installed target | target == installed = False
+                                            | installed == Local = False -- snapshot dependency could end up
+                                                                         -- in a local install as being mutable
+                                            | otherwise = True
     exesSnap <- getInstalledExes Snap
     exesLocal <- getInstalledExes Local
     let installedMap = Map.unions
@@ -114,15 +111,14 @@ getInstalled opts sourceMap = do
 -- that it has profiling if necessary, and that it matches the version and
 -- location needed by the SourceMap
 loadDatabase :: HasEnvConfig env
-             => GetInstalledOpts
-             -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
-             -> Map PackageName PackageSource -- ^ to determine which installed things we should include
+             => InstallMap -- ^ to determine which installed things we should include
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> RIO env ([LoadHelper], [DumpPackage () () ()])
-loadDatabase opts mcache sourceMap mdb lhs0 = do
+             -> RIO env ([LoadHelper], [DumpPackage])
+loadDatabase installMap mdb lhs0 = do
     wc <- view $ actualCompilerVersionL.to whichCompiler
-    (lhs1', dps) <- ghcPkgDump wc (fmap snd (maybeToList mdb))
+    pkgexe <- getGhcPkgExe
+    (lhs1', dps) <- ghcPkgDump pkgexe (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage .| sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
     lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
@@ -134,29 +130,8 @@ loadDatabase opts mcache sourceMap mdb lhs0 = do
             (lhs0 ++ lhs1)
     return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
   where
-    conduitProfilingCache =
-        case mcache of
-            Just cache | getInstalledProfiling opts -> addProfiling cache
-            -- Just an optimization to avoid calculating the profiling
-            -- values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpProfiling = False })
-    conduitHaddockCache =
-        case mcache of
-            Just cache | getInstalledHaddock opts -> addHaddock cache
-            -- Just an optimization to avoid calculating the haddock
-            -- values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpHaddock = False })
-    conduitSymbolsCache =
-        case mcache of
-            Just cache | getInstalledSymbols opts -> addSymbols cache
-            -- Just an optimization to avoid calculating the debugging
-            -- symbol values when they aren't necessary
-            _ -> CL.map (\dp -> dp { dpSymbols = False })
     mloc = fmap fst mdb
-    sinkDP = conduitProfilingCache
-           .| conduitHaddockCache
-           .| conduitSymbolsCache
-           .| CL.map (isAllowed opts mcache sourceMap mloc &&& toLoadHelper mloc)
+    sinkDP =  CL.map (isAllowed installMap mloc &&& toLoadHelper mloc)
            .| CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
@@ -171,40 +146,34 @@ processLoadResult _ _ (Allowed, lh) = return (Just lh)
 processLoadResult _ True (WrongVersion actual wanted, lh)
     -- Allow some packages in the ghcjs global DB to have the wrong
     -- versions.  Treat them as wired-ins by setting deps to [].
-    | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
+    | fst (lhPair lh) `Set.member` ghcjsBootPackages = do
         logWarn $
             "Ignoring that the GHCJS boot package \"" <>
-            display (packageNameText (fst (lhPair lh))) <>
+            fromString (packageNameString (fst (lhPair lh))) <>
             "\" has a different version, " <>
-            display (versionText actual) <>
+            fromString (versionString actual) <>
             ", than the resolver's wanted version, " <>
-            display (versionText wanted)
+            fromString (versionString wanted)
         return (Just lh)
 processLoadResult mdb _ (reason, lh) = do
     logDebug $
         "Ignoring package " <>
-        display (packageNameText (fst (lhPair lh))) <>
+        fromString (packageNameString (fst (lhPair lh))) <>
         maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
         " due to" <>
         case reason of
             Allowed -> " the impossible?!?!"
-            NeedsProfiling -> " it needing profiling."
-            NeedsHaddock -> " it needing haddocks."
-            NeedsSymbols -> " it needing debugging symbols."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
             WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
             WrongVersion actual wanted ->
                 " wanting version " <>
-                display (versionText wanted) <>
+                fromString (versionString wanted) <>
                 " instead of " <>
-                display (versionText actual)
+                fromString (versionString actual)
     return Nothing
 
 data Allowed
     = Allowed
-    | NeedsProfiling
-    | NeedsHaddock
-    | NeedsSymbols
     | UnknownPkg
     | WrongLocation (Maybe InstalledPackageLocation) InstallLocation
     | WrongVersion Version Version
@@ -213,31 +182,22 @@ data Allowed
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any
 -- dirtiness or flag change checks.
-isAllowed :: GetInstalledOpts
-          -> Maybe InstalledCache
-          -> Map PackageName PackageSource
+isAllowed :: InstallMap
           -> Maybe InstalledPackageLocation
-          -> DumpPackage Bool Bool Bool
+          -> DumpPackage
           -> Allowed
-isAllowed opts mcache sourceMap mloc dp
-    -- Check that it can do profiling if necessary
-    | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = NeedsProfiling
-    -- Check that it has haddocks if necessary
-    | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = NeedsHaddock
-    -- Check that it has haddocks if necessary
-    | getInstalledSymbols opts && isJust mcache && not (dpSymbols dp) = NeedsSymbols
-    | otherwise =
-        case Map.lookup name sourceMap of
+isAllowed installMap mloc dp =
+        case Map.lookup name installMap of
             Nothing ->
                 -- If the sourceMap has nothing to say about this package,
                 -- check if it represents a sublibrary first
                 -- See: https://github.com/commercialhaskell/stack/issues/3899
                 case dpParentLibIdent dp of
                   Just (PackageIdentifier parentLibName version') ->
-                    case Map.lookup parentLibName sourceMap of
+                    case Map.lookup parentLibName installMap of
                       Nothing -> checkNotFound
-                      Just pii
-                        | version' == version -> checkFound pii
+                      Just instInfo
+                        | version' == version -> checkFound instInfo
                         | otherwise -> checkNotFound -- different versions
                   Nothing -> checkNotFound
             Just pii -> checkFound pii
@@ -245,12 +205,12 @@ isAllowed opts mcache sourceMap mloc dp
     PackageIdentifier name version = dpPackageIdent dp
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
-    checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
+    checkLocation Snap = True -- snapshot deps could become mutable after getting any mutable dependency
     checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
     -- Check if a package is allowed if it is found in the sourceMap
-    checkFound pii
-      | not (checkLocation (piiLocation pii)) = WrongLocation mloc (piiLocation pii)
-      | version /= piiVersion pii = WrongVersion version (piiVersion pii)
+    checkFound (installLoc, installVer)
+      | not (checkLocation installLoc) = WrongLocation mloc installLoc
+      | version /= installVer = WrongVersion version installVer
       | otherwise = Allowed
     -- check if a package is allowed if it is not found in the sourceMap
     checkNotFound = case mloc of
@@ -268,7 +228,7 @@ data LoadHelper = LoadHelper
     }
     deriving Show
 
-toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage Bool Bool Bool -> LoadHelper
+toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage -> LoadHelper
 toLoadHelper mloc dp = LoadHelper
     { lhId = gid
     , lhDeps =
@@ -278,7 +238,7 @@ toLoadHelper mloc dp = LoadHelper
         -- minor versions of GHC, where the dependencies of wired-in
         -- packages may change slightly and therefore not match the
         -- snapshot.
-        if name `HashSet.member` wiredInPackages
+        if name `Set.member` wiredInPackages
             then []
             else dpDepends dp
     , lhPair = (name, (toPackageLocation mloc, Library ident gid (Right <$> dpLicense dp)))

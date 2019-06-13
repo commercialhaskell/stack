@@ -7,6 +7,7 @@ import           Data.Char (isSpace)
 import           Data.List.Split (splitOn)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.Types.PackageName(PackageName, mkPackageName)
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
@@ -24,6 +25,7 @@ dotOptsParser externalDefault =
           <*> flagsParser
           <*> testTargets
           <*> benchTargets
+          <*> globalHints
   where includeExternal = boolFlags externalDefault
                                     "external"
                                     "inclusion of external dependencies"
@@ -49,10 +51,13 @@ dotOptsParser externalDefault =
         benchTargets = switch (long "bench" <>
                                help "Consider dependencies of benchmark components")
 
-        splitNames :: String -> [String]
-        splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
+        splitNames :: String -> [PackageName]
+        splitNames = map (mkPackageName . takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
 
--- | Parser for arguments to `stack list-dependencies`.
+        globalHints = switch (long "global-hints" <>
+                              help "Do not require an install GHC; instead, use a hints file for global packages")
+
+-- | Parser for arguments to `stack ls dependencies`.
 listDepsOptsParser :: Parser ListDepsOpts
 listDepsOptsParser = ListDepsOpts
                  <$> dotOptsParser True -- Default for --external is True.
@@ -66,5 +71,9 @@ listDepsOptsParser = ListDepsOpts
                  <*> boolFlags False
                                 "license"
                                 "printing of dependency licenses instead of versions"
+                                idm
+                 <*> boolFlags False
+                                "tree"
+                                "printing of dependencies as a tree"
                                 idm
   where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)

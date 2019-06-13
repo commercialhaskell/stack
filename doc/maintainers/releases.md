@@ -368,10 +368,12 @@ Now continue to the **General Windows setup** subsection below.
      * Change **Choose how updates are installed** to **Notify to schedule restart**
      * Check **Defer upgrades** (this avoids rebooting in the middle of the stack build)
 
-6. In **Settings**->**System**->**Power & sleep**
-	- Disable turning off the screen or going to sleep when plugged in
+ 6. In **Settings**->**System**->**Power & sleep**
+	  - Disable turning off the screen or going to sleep when plugged in
 
- 8. Install msysgit: https://msysgit.github.io/
+ 7. Install msysgit: https://msysgit.github.io/
+
+ 8. Install TortoiseHG: https://tortoisehg.bitbucket.io/download/index.html
 
  9. Install nsis-2.46.5-Unicode-setup.exe from http://www.scratchpaper.com/
 
@@ -404,8 +406,8 @@ Now continue to the **General Windows setup** subsection below.
         git config --global user.name "Emanuel Borsboom"
         git config --global push.default simple
         git config --global core.autocrlf true
-        git clone https://github.com/commercialhaskell/stack.git stack-release
         git clone https://github.com/borsboom/stack-installer.git
+        git clone -b stable --reference C:\p\stack-release https://github.com/commercialhaskell/stack.git stack-release
         cd stack-release
         stack install cabal-install
 

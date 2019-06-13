@@ -2,6 +2,8 @@ import StackTest
 
 main :: IO ()
 main = do
+    removeDirIgnore ".stack-work"
+
     -- Fails to work because BAR is defined here and FOO in stack file
     stackErr ["haddock", "--haddock-arguments", "--optghc=-DBAR"]
     stack ["clean"]

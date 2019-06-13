@@ -7,8 +7,9 @@
 module Options.Applicative.Builder.Extra
   (boolFlags
   ,boolFlagsNoDefault
-  ,maybeBoolFlags
-  ,firstBoolFlags
+  ,firstBoolFlagsNoDefault
+  ,firstBoolFlagsTrue
+  ,firstBoolFlagsFalse
   ,enableDisableFlags
   ,enableDisableFlagsNoDefault
   ,extraHelpOption
@@ -16,6 +17,8 @@ module Options.Applicative.Builder.Extra
   ,textOption
   ,textArgument
   ,optionalFirst
+  ,optionalFirstTrue
+  ,optionalFirstFalse
   ,absFileOption
   ,relFileOption
   ,absDirOption
@@ -48,7 +51,13 @@ boolFlags :: Bool                 -- ^ Default value
           -> String               -- ^ Help suffix
           -> Mod FlagFields Bool
           -> Parser Bool
-boolFlags defaultValue = enableDisableFlags defaultValue True False
+boolFlags defaultValue name helpSuffix =
+  enableDisableFlags defaultValue True False name $ concat
+    [ helpSuffix
+    , " (default: "
+    , if defaultValue then "enabled" else "disabled"
+    , ")"
+    ]
 
 -- | Enable/disable flags for a 'Bool', without a default case (to allow chaining with '<|>').
 boolFlagsNoDefault :: String               -- ^ Flag name
@@ -57,16 +66,24 @@ boolFlagsNoDefault :: String               -- ^ Flag name
                    -> Parser Bool
 boolFlagsNoDefault = enableDisableFlagsNoDefault True False
 
--- | Enable/disable flags for a @('Maybe' 'Bool')@.
-maybeBoolFlags :: String                       -- ^ Flag name
-               -> String                       -- ^ Help suffix
-               -> Mod FlagFields (Maybe Bool)
-               -> Parser (Maybe Bool)
-maybeBoolFlags = enableDisableFlags Nothing (Just True) (Just False)
+-- | Flag with no default of True or False
+firstBoolFlagsNoDefault :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (First Bool)
+firstBoolFlagsNoDefault name helpSuffix mod' =
+  First <$>
+  enableDisableFlags Nothing (Just True) (Just False)
+  name helpSuffix mod'
 
--- | Like 'maybeBoolFlags', but parsing a 'First'.
-firstBoolFlags :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (First Bool)
-firstBoolFlags long0 help0 mod0 = First <$> maybeBoolFlags long0 help0 mod0
+-- | Flag with a Semigroup instance and a default of True
+firstBoolFlagsTrue :: String -> String -> Mod FlagFields FirstTrue -> Parser FirstTrue
+firstBoolFlagsTrue name helpSuffix =
+  enableDisableFlags mempty (FirstTrue (Just True)) (FirstTrue (Just False))
+  name $ helpSuffix ++ " (default: enabled)"
+
+-- | Flag with a Semigroup instance and a default of False
+firstBoolFlagsFalse :: String -> String -> Mod FlagFields FirstFalse -> Parser FirstFalse
+firstBoolFlagsFalse name helpSuffix =
+  enableDisableFlags mempty (FirstFalse (Just True)) (FirstFalse (Just False))
+  name $ helpSuffix ++ " (default: disabled)"
 
 -- | Enable/disable flags for any type.
 enableDisableFlags :: a                 -- ^ Default value
@@ -160,6 +177,14 @@ textArgument = argument (T.pack <$> readerAsk)
 -- | Like 'optional', but returning a 'First'.
 optionalFirst :: Alternative f => f a -> f (First a)
 optionalFirst = fmap First . optional
+
+-- | Like 'optional', but returning a 'FirstTrue'.
+optionalFirstTrue :: Alternative f => f Bool -> f FirstTrue
+optionalFirstTrue = fmap FirstTrue . optional
+
+-- | Like 'optional', but returning a 'FirstFalse'.
+optionalFirstFalse :: Alternative f => f Bool -> f FirstFalse
+optionalFirstFalse = fmap FirstFalse . optional
 
 absFileOption :: Mod OptionFields (Path Abs File) -> Parser (Path Abs File)
 absFileOption mods = option (eitherReader' parseAbsFile) $

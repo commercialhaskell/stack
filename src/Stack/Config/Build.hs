@@ -10,71 +10,42 @@ import           Stack.Types.Config
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
 buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
-    { boptsLibProfile = fromFirst
-          (boptsLibProfile defaultBuildOpts)
+    { boptsLibProfile = fromFirstFalse
           (buildMonoidLibProfile <>
-           First (if tracing || profiling then Just True else Nothing))
-    , boptsExeProfile = fromFirst
-          (boptsExeProfile defaultBuildOpts)
+           FirstFalse (if tracing || profiling then Just True else Nothing))
+    , boptsExeProfile = fromFirstFalse
           (buildMonoidExeProfile <>
-           First (if tracing || profiling then Just True else Nothing))
-    , boptsLibStrip = fromFirst
-          (boptsLibStrip defaultBuildOpts)
+           FirstFalse (if tracing || profiling then Just True else Nothing))
+    , boptsLibStrip = fromFirstTrue
           (buildMonoidLibStrip <>
-           First (if noStripping then Just False else Nothing))
-    , boptsExeStrip = fromFirst
-          (boptsExeStrip defaultBuildOpts)
+           FirstTrue (if noStripping then Just False else Nothing))
+    , boptsExeStrip = fromFirstTrue
           (buildMonoidExeStrip <>
-           First (if noStripping then Just False else Nothing))
-    , boptsHaddock = fromFirst
-          (boptsHaddock defaultBuildOpts)
-          buildMonoidHaddock
+           FirstTrue (if noStripping then Just False else Nothing))
+    , boptsHaddock = fromFirstFalse buildMonoidHaddock
     , boptsHaddockOpts = haddockOptsFromMonoid buildMonoidHaddockOpts
-    , boptsOpenHaddocks = fromFirst
-          (boptsOpenHaddocks defaultBuildOpts)
-          buildMonoidOpenHaddocks
+    , boptsOpenHaddocks = fromFirstFalse buildMonoidOpenHaddocks
     , boptsHaddockDeps = getFirst buildMonoidHaddockDeps
-    , boptsHaddockInternal = fromFirst
-          (boptsHaddockInternal defaultBuildOpts)
-          buildMonoidHaddockInternal
-    , boptsHaddockHyperlinkSource = fromFirst
-          (boptsHaddockHyperlinkSource defaultBuildOpts)
-          buildMonoidHaddockHyperlinkSource
-    , boptsInstallExes = fromFirst
-          (boptsInstallExes defaultBuildOpts)
-          buildMonoidInstallExes
-    , boptsInstallCompilerTool = fromFirst
-          (boptsInstallCompilerTool defaultBuildOpts)
-          buildMonoidInstallCompilerTool
-    , boptsPreFetch = fromFirst
-          (boptsPreFetch defaultBuildOpts)
-          buildMonoidPreFetch
+    , boptsHaddockInternal = fromFirstFalse buildMonoidHaddockInternal
+    , boptsHaddockHyperlinkSource = fromFirstTrue buildMonoidHaddockHyperlinkSource
+    , boptsInstallExes = fromFirstFalse buildMonoidInstallExes
+    , boptsInstallCompilerTool = fromFirstFalse buildMonoidInstallCompilerTool
+    , boptsPreFetch = fromFirstFalse buildMonoidPreFetch
     , boptsKeepGoing = getFirst buildMonoidKeepGoing
-    , boptsKeepTmpFiles = getFirst buildMonoidKeepTmpFiles
-    , boptsForceDirty = fromFirst
-          (boptsForceDirty defaultBuildOpts)
-          buildMonoidForceDirty
-    , boptsTests = fromFirst (boptsTests defaultBuildOpts) buildMonoidTests
+    , boptsKeepTmpFiles = fromFirstFalse buildMonoidKeepTmpFiles
+    , boptsForceDirty = fromFirstFalse buildMonoidForceDirty
+    , boptsTests = fromFirstFalse buildMonoidTests
     , boptsTestOpts =
           testOptsFromMonoid buildMonoidTestOpts additionalArgs
-    , boptsBenchmarks = fromFirst
-          (boptsBenchmarks defaultBuildOpts)
-          buildMonoidBenchmarks
+    , boptsBenchmarks = fromFirstFalse buildMonoidBenchmarks
     , boptsBenchmarkOpts =
           benchmarkOptsFromMonoid buildMonoidBenchmarkOpts additionalArgs
-    , boptsReconfigure = fromFirst
-          (boptsReconfigure defaultBuildOpts)
-          buildMonoidReconfigure
-    , boptsCabalVerbose = fromFirst
-          (boptsCabalVerbose defaultBuildOpts)
-          buildMonoidCabalVerbose
-    , boptsSplitObjs = fromFirst
-          (boptsSplitObjs defaultBuildOpts)
-          buildMonoidSplitObjs
+    , boptsReconfigure = fromFirstFalse buildMonoidReconfigure
+    , boptsCabalVerbose = fromFirstFalse buildMonoidCabalVerbose
+    , boptsSplitObjs = fromFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = buildMonoidSkipComponents
-    , boptsInterleavedOutput = fromFirst
-          (boptsInterleavedOutput defaultBuildOpts)
-          buildMonoidInterleavedOutput
+    , boptsInterleavedOutput = fromFirstTrue buildMonoidInterleavedOutput
+    , boptsDdumpDir = getFirst buildMonoidDdumpDir
     }
   where
     -- These options are not directly used in bopts, instead they
@@ -104,10 +75,11 @@ haddockOptsFromMonoid HaddockOptsMonoid{..} =
 testOptsFromMonoid :: TestOptsMonoid -> Maybe [String] -> TestOpts
 testOptsFromMonoid TestOptsMonoid{..} madditional =
     defaultTestOpts
-    { toRerunTests = fromFirst (toRerunTests defaultTestOpts) toMonoidRerunTests
+    { toRerunTests = fromFirstTrue toMonoidRerunTests
     , toAdditionalArgs = fromMaybe [] madditional <> toMonoidAdditionalArgs
-    , toCoverage = fromFirst (toCoverage defaultTestOpts) toMonoidCoverage
-    , toDisableRun = fromFirst (toDisableRun defaultTestOpts) toMonoidDisableRun
+    , toCoverage = fromFirstFalse toMonoidCoverage
+    , toDisableRun = fromFirstFalse toMonoidDisableRun
+    , toMaximumTimeSeconds = fromFirst (toMaximumTimeSeconds defaultTestOpts) toMonoidMaximumTimeSeconds
     }
 
 benchmarkOptsFromMonoid :: BenchmarkOptsMonoid -> Maybe [String] -> BenchmarkOpts

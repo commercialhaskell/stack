@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 
 -- | Generate haddocks
 module Stack.Build.Haddock
@@ -26,22 +25,20 @@ import           Data.Time (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
+import           RIO.List (intercalate)
+import           RIO.PrettyPrint
+import           Stack.Constants
 import           Stack.PackageDump
-import           Stack.PrettyPrint
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Runner
 import qualified System.FilePath as FP
 import           RIO.Process
 import           Web.Browser (openBrowser)
 
 openHaddocksInBrowser
-    :: HasRunner env
+    :: HasTerm env
     => BaseConfigOpts
     -> Map PackageName (PackageIdentifier, InstallLocation)
     -- ^ Available packages and their locations for the current project
@@ -80,7 +77,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                             ", but that file is missing.  Opening doc index instead."
                         getDocIndex
             _ -> getDocIndex
-    prettyInfo $ "Opening" <+> Stack.PrettyPrint.display docFile <+> "in the browser."
+    prettyInfo $ "Opening" <+> pretty docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
     return ()
 
@@ -102,13 +99,12 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local package dump
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
+    -> Map GhcPkgId DumpPackage  -- ^ Local package dump
     -> [LocalPackage]
     -> RIO env ()
-generateLocalHaddockIndex wc bco localDumpPkgs locals = do
+generateLocalHaddockIndex bco localDumpPkgs locals = do
     let dumpPackages =
             mapMaybe
                 (\LocalPackage{lpPackage = Package{..}} ->
@@ -118,7 +114,6 @@ generateLocalHaddockIndex wc bco localDumpPkgs locals = do
                 locals
     generateHaddockIndex
         "local packages"
-        wc
         bco
         dumpPackages
         "."
@@ -126,20 +121,18 @@ generateLocalHaddockIndex wc bco localDumpPkgs locals = do
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot dump information
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Local dump information
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
+    -> Map GhcPkgId DumpPackage  -- ^ Global dump information
+    -> Map GhcPkgId DumpPackage  -- ^ Snapshot dump information
+    -> Map GhcPkgId DumpPackage  -- ^ Local dump information
     -> [LocalPackage]
     -> RIO env ()
-generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
+generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
     let deps = (mapMaybe (`lookupDumpPackage` allDumpPkgs) . nubOrd . findTransitiveDepends . mapMaybe getGhcPkgId) locals
         depDocDir = localDepsDocDir bco
     generateHaddockIndex
         "local packages and dependencies"
-        wc
         bco
         deps
         ".."
@@ -169,16 +162,14 @@ generateDepsHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs lo
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
-    => WhichCompiler
-    -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Global package dump
-    -> Map GhcPkgId (DumpPackage () () ())  -- ^ Snapshot package dump
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
+    => BaseConfigOpts
+    -> Map GhcPkgId DumpPackage  -- ^ Global package dump
+    -> Map GhcPkgId DumpPackage  -- ^ Snapshot package dump
     -> RIO env ()
-generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
+generateSnapHaddockIndex bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
         "snapshot packages"
-        wc
         bco
         (Map.elems snapshotDumpPkgs ++ Map.elems globalDumpPkgs)
         "."
@@ -186,15 +177,14 @@ generateSnapHaddockIndex wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: (HasProcessContext env, HasLogFunc env)
+    :: (HasProcessContext env, HasLogFunc env, HasCompiler env)
     => Text
-    -> WhichCompiler
     -> BaseConfigOpts
-    -> [DumpPackage () () ()]
+    -> [DumpPackage]
     -> FilePath
     -> Path Abs Dir
     -> RIO env ()
-generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
+generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
     ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
@@ -213,8 +203,9 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                   " in\n" <>
                   fromString (toFilePath destIndexFile)
                 liftIO (mapM_ copyPkgDocs interfaceOpts)
+                haddockExeName <- view $ compilerPathsL.to (toFilePath . cpHaddock)
                 withWorkingDir (toFilePath destDir) $ readProcessNull
-                    (haddockExeName wc)
+                    haddockExeName
                     (map (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                         [bcoSnapDB bco, bcoLocalDB bco] ++
                      hoAdditionalArgs (boptsHaddockOpts (bcoBuildOpts bco)) ++
@@ -227,7 +218,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                 " already up to date at:\n" <>
                 fromString (toFilePath destIndexFile)
   where
-    toInterfaceOpt :: DumpPackage a b c -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
+    toInterfaceOpt :: DumpPackage -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =
         case dpHaddockInterfaces of
             [] -> return Nothing
@@ -238,6 +229,9 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                         docRelFP FP.</>
                         packageIdentifierString dpPackageIdent FP.</>
                         (packageNameString name FP.<.> "haddock")
+                    interfaces = intercalate "," $
+                      maybeToList dpHaddockHtml ++ [srcInterfaceFP]
+
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
                 return $
@@ -245,11 +239,7 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
                         Left _ -> Nothing
                         Right srcInterfaceModTime ->
                             Just
-                                ( [ "-i"
-                                  , concat
-                                        [ docRelFP FP.</> packageIdentifierString dpPackageIdent
-                                        , ","
-                                        , destInterfaceRelFP ]]
+                                ( [ "-i", interfaces ]
                                 , srcInterfaceModTime
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
@@ -278,14 +268,14 @@ generateHaddockIndex descr wc bco dumpPackages docRelFP destDir = do
 
 -- | Find first DumpPackage matching the GhcPkgId
 lookupDumpPackage :: GhcPkgId
-                  -> [Map GhcPkgId (DumpPackage () () ())]
-                  -> Maybe (DumpPackage () () ())
+                  -> [Map GhcPkgId DumpPackage]
+                  -> Maybe DumpPackage
 lookupDumpPackage ghcPkgId dumpPkgs =
     listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 
 -- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File
-haddockIndexFile destDir = destDir </> $(mkRelFile "index.html")
+haddockIndexFile destDir = destDir </> relFileIndexHtml
 
 -- | Path of local packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
@@ -293,7 +283,7 @@ localDocDir bco = bcoLocalInstallRoot bco </> docDirSuffix
 
 -- | Path of documentation directory for the dependencies of local packages
 localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
-localDepsDocDir bco = localDocDir bco </> $(mkRelDir "all")
+localDepsDocDir bco = localDocDir bco </> relDirAll
 
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir

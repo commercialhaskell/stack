@@ -8,6 +8,7 @@
 module Stack.Clean
     (clean
     ,CleanOpts(..)
+    ,CleanCommand(..)
     ,StackCleanException(..)
     ) where
 
@@ -15,53 +16,58 @@ import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Config (getLocalPackages)
-import           Stack.Constants.Config (distDirFromDir, workDirFromDir)
-import           Stack.Types.PackageName
+import           Stack.Constants.Config (rootDistDirFromDir, workDirFromDir)
 import           Stack.Types.Config
-import           System.Exit (exitFailure)
+import           Stack.Types.SourceMap
 
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
-clean :: HasEnvConfig env => CleanOpts -> RIO env ()
+clean :: HasBuildConfig env => CleanOpts -> RIO env ()
 clean cleanOpts = do
-    failures <- mapM cleanDir =<< dirsToDelete cleanOpts
-    when (or failures) $ liftIO System.Exit.exitFailure
+    toDelete <- dirsToDelete cleanOpts
+    logDebug $ "Need to delete: " <> fromString (show (map toFilePath toDelete))
+    failures <- mapM cleanDir toDelete
+    when (or failures) exitFailure
   where
-    cleanDir dir =
+    cleanDir dir = do
+      logDebug $ "Deleting directory: " <> fromString (toFilePath dir)
       liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
         logError $ "Exception while recursively deleting " <> fromString (toFilePath dir) <> "\n" <> displayShow ex
         logError "Perhaps you do not have permission to delete these files or they are in use?"
         return True
 
-dirsToDelete :: HasEnvConfig env => CleanOpts -> RIO env [Path Abs Dir]
+dirsToDelete :: HasBuildConfig env => CleanOpts -> RIO env [Path Abs Dir]
 dirsToDelete cleanOpts = do
-    packages <- getLocalPackages
+    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     case cleanOpts of
         CleanShallow [] ->
             -- Filter out packages listed as extra-deps
-            mapM (distDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
+            mapM (rootDistDirFromDir . ppRoot) $ Map.elems packages
         CleanShallow targets -> do
-            let localPkgViews = lpProject packages
-                localPkgNames = Map.keys localPkgViews
-                getPkgDir pkgName = fmap lpvRoot (Map.lookup pkgName localPkgViews)
+            let localPkgNames = Map.keys packages
+                getPkgDir pkgName' = fmap ppRoot (Map.lookup pkgName' packages)
             case targets \\ localPkgNames of
-                [] -> mapM distDirFromDir (mapMaybe getPkgDir targets)
+                [] -> mapM rootDistDirFromDir (mapMaybe getPkgDir targets)
                 xs -> throwM (NonLocalPackages xs)
         CleanFull -> do
-            pkgWorkDirs <- mapM (workDirFromDir . lpvRoot) $ Map.elems $ lpProject packages
+            pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
             projectWorkDir <- getProjectWorkDir
             return (projectWorkDir : pkgWorkDirs)
 
 -- | Options for @stack clean@.
 data CleanOpts
     = CleanShallow [PackageName]
-    -- ^ Delete the "dist directories" as defined in 'Stack.Constants.distRelativeDir'
+    -- ^ Delete the "dist directories" as defined in 'Stack.Constants.Config.distRelativeDir'
     -- for the given local packages. If no packages are given, all project packages
     -- should be cleaned.
     | CleanFull
     -- ^ Delete all work directories in the project.
+
+-- | Clean commands
+data CleanCommand
+    = Clean
+    | Purge
 
 -- | Exceptions during cleanup.
 newtype StackCleanException

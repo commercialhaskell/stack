@@ -1,22 +1,21 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 module Stack.PackageDumpSpec where
 
-import           Data.Conduit
+import           Conduit
 import qualified Data.Conduit.List             as CL
 import           Data.Conduit.Text             (decodeUtf8)
 import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Distribution.License          (License(..))
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version          (mkVersion)
+import           Path                          (parseAbsFile)
 import           Stack.PackageDump
 import           Stack.Prelude
-import           Stack.Types.Compiler
+import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
@@ -72,13 +71,14 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "haskell2010-1.1.2.0-05c8dd51009e08c6371c82972d40f55a"
-            packageIdent <- parsePackageIdentifier "haskell2010-1.1.2.0"
+            packageIdent <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "haskell2010-1.1.2.0"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
                 , "ghc-prim-0.3.1.0-a24f9c14c632d75b683d0f93283aea37"
                 ]
-            haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
+            haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = packageIdent
                 , dpParentLibIdent = Nothing
@@ -89,11 +89,8 @@ spec = do
                 , dpHasExposedModules = True
                 , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpHaddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
-                , dpExposedModules = []
+                , dpExposedModules = mempty
                 }
 
         it "ghc 7.10" $ do
@@ -105,7 +102,8 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "ghc-7.10.1-325809317787a897b7a97d646ceaa3a3"
-            pkgIdent <- parsePackageIdentifier "ghc-7.10.1"
+            pkgIdent <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "ghc-7.10.1"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.1.0-e29cdbe82692341ebb7ce6e2798294f9"
                 , "base-4.8.0.0-1b689eb8d72c4d4cc88f445839c1f01a"
@@ -122,7 +120,7 @@ spec = do
                 , "transformers-0.4.2.0-c1a7bb855a176fe475d7b665301cd48f"
                 , "unix-2.7.1.0-e5915eb989e568b732bc7286b0d0817f"
                 ]
-            haskell2010 { dpExposedModules = [] } `shouldBe` DumpPackage
+            haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgIdent
                 , dpParentLibIdent = Nothing
@@ -133,11 +131,8 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHasExposedModules = True
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = False
-                , dpExposedModules = []
+                , dpExposedModules = mempty
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <-
@@ -148,7 +143,8 @@ spec = do
                .| conduitDumpPackage
                .| CL.consume
             ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
-            pkgId <- parsePackageIdentifier "hmatrix-0.16.1.5"
+            pkgId <- maybe (fail "Not parsable package id") return $
+              parsePackageIdentifier "hmatrix-0.16.1.5"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-918c7ac27f65a87103264a9f51652d63"
@@ -174,11 +170,8 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HShmatrix-0.16.1.5"]
                 , dpHasExposedModules = True
-                , dpProfiling = ()
-                , dpHaddock = ()
-                , dpSymbols = ()
                 , dpIsExposed = True
-                , dpExposedModules = ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
+                , dpExposedModules = Set.fromList ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
                 }
         it "ghc HEAD" $ do
           ghcBoot:_ <-
@@ -189,7 +182,8 @@ spec = do
              .| conduitDumpPackage
              .| CL.consume
           ghcPkgId <- parseGhcPkgId "ghc-boot-0.0.0.0"
-          pkgId <- parsePackageIdentifier "ghc-boot-0.0.0.0"
+          pkgId <- maybe (fail "Not parsable package id") return $
+            parsePackageIdentifier "ghc-boot-0.0.0.0"
           depends <- mapM parseGhcPkgId
             [ "base-4.9.0.0"
             , "binary-0.7.5.0"
@@ -209,37 +203,21 @@ spec = do
             , dpDepends = depends
             , dpLibraries = ["HSghc-boot-0.0.0.0"]
             , dpHasExposedModules = True
-            , dpProfiling = ()
-            , dpHaddock = ()
-            , dpSymbols = ()
             , dpIsExposed = True
-            , dpExposedModules = ["GHC.Lexeme", "GHC.PackageDb"]
+            , dpExposedModules = Set.fromList ["GHC.Lexeme", "GHC.PackageDb"]
             }
 
 
-    it "ghcPkgDump + addProfiling + addHaddock" $ runEnvNoLogging $ do
-        icache <- newInstalledCache
-        ghcPkgDump Ghc []
+    it "sinkMatching" $ runEnvNoLogging $ \pkgexe -> do
+        m <- ghcPkgDump pkgexe []
             $  conduitDumpPackage
-            .| addProfiling icache
-            .| addHaddock icache
-            .| fakeAddSymbols
-            .| CL.sinkNull
-
-    it "sinkMatching" $ runEnvNoLogging $ do
-        icache <- newInstalledCache
-        m <- ghcPkgDump Ghc []
-            $  conduitDumpPackage
-            .| addProfiling icache
-            .| addHaddock icache
-            .| fakeAddSymbols
-            .| sinkMatching False False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
-        case Map.lookup $(mkPackageName "base") m of
+            .| sinkMatching (Map.singleton (mkPackageName "transformers") (mkVersion [0, 0, 0, 0, 0, 0, 1]))
+        case Map.lookup (mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()
         liftIO $ do
-          Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
-          Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
+          Map.lookup (mkPackageName "transformers") m `shouldBe` Nothing
+          Map.lookup (mkPackageName "ghc") m `shouldBe` Nothing
 
     describe "pruneDeps" $ do
         it "sanity check" $ do
@@ -282,12 +260,10 @@ checkDepsPresent prunes selected =
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
--- addSymbols can't be reasonably tested like this
-fakeAddSymbols :: Monad m => ConduitM (DumpPackage a b c) (DumpPackage a b Bool) m ()
-fakeAddSymbols = CL.map (\dp -> dp { dpSymbols = False })
-
-runEnvNoLogging :: RIO LoggedProcessContext a -> IO a
+runEnvNoLogging :: (GhcPkgExe -> RIO LoggedProcessContext a) -> IO a
 runEnvNoLogging inner = do
   envVars <- view envVarsL <$> mkDefaultProcessContext
   menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
-  runRIO (LoggedProcessContext menv mempty) inner
+  let find name = runRIO menv (findExecutable name) >>= either throwIO parseAbsFile
+  pkg <- GhcPkgExe <$> find "ghc-pkg"
+  runRIO (LoggedProcessContext menv mempty) (inner pkg)

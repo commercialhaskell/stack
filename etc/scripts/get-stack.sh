@@ -25,7 +25,7 @@
 # https://docs.haskellstack.org/en/stable/install_and_upgrade/
 #
 
-STACK_VERSION="1.9.3"
+STACK_VERSION="2.1.1"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 # Windows doesn't have a good place for DEST, but all CI systems (Appveyor, Travis, Azure) support /bin
@@ -448,7 +448,7 @@ GETDISTRO
     ubuntu|linuxmint|elementary|neon)
       do_ubuntu_install "$VERSION"
       ;;
-    debian|kali|raspbian)
+    debian|kali|raspbian|mx)
       do_debian_install "$VERSION"
       ;;
     fedora)

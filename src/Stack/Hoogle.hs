@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 -- | A wrapper around hoogle.
 module Stack.Hoogle
@@ -11,28 +10,31 @@ module Stack.Hoogle
 import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
-import           Data.List (find)
-import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Version (mkVersion)
+import           Lens.Micro ((?~))
 import           Path (parseAbsFile)
 import           Path.IO hiding (findExecutable)
 import qualified Stack.Build
-import           Stack.Fetch
+import           Stack.Build.Target (NeedTargets(NeedTargets))
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
-import           System.Exit
 import           RIO.Process
 
 -- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool,Bool) -> GlobalOpts -> IO ()
-hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
+hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
+hoogleCmd (args,setup,rebuild,startServer) =
+  local (over globalOptsL modifyGO) $
+  withConfig YesReexec $
+  withDefaultEnvConfig $ do
     hooglePath <- ensureHoogleInPath
     generateDbIfNeeded hooglePath
     runHoogle hooglePath args'
   where
+    modifyGO :: GlobalOpts -> GlobalOpts
+    modifyGO = globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
+
     args' :: [String]
     args' = if startServer
                  then ["server", "--local", "--port", "8080"]
@@ -63,82 +65,61 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
            createDirIfMissing True dir
            runHoogle hooglePath ["generate", "--local"]
     buildHaddocks :: RIO EnvConfig ()
-    buildHaddocks =
-        liftIO
-            (catch
-                 (withBuildConfigAndLock
-                      (set
-                           (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
-                           (Just True)
-                           go)
-                      (\lk ->
-                            Stack.Build.build
-                                (const (return ()))
-                                lk
-                                defaultBuildOptsCLI))
-                 (\(_ :: ExitCode) ->
-                       return ()))
-    hooglePackageName = $(mkPackageName "hoogle")
-    hoogleMinVersion = $(mkVersion "5.0")
+    buildHaddocks = do
+      config <- view configL
+      runRIO config $ -- a bit weird that we have to drop down like this
+        catch (withDefaultEnvConfig $ Stack.Build.build Nothing)
+              (\(_ :: ExitCode) -> return ())
+    hooglePackageName = mkPackageName "hoogle"
+    hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
         PackageIdentifier hooglePackageName hoogleMinVersion
     installHoogle :: RIO EnvConfig ()
     installHoogle = do
-        hooglePackageIdentifier <-
-            do (_,_,resolved) <-
-                   resolvePackagesAllowMissing
+        hooglePackageIdentifier <- do
+          mversion <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
 
-                       -- FIXME this Nothing means "do not follow any
-                       -- specific snapshot", which matches old
-                       -- behavior. However, since introducing the
-                       -- logic to pin a name to a package in a
-                       -- snapshot, we may arguably want to ensure
-                       -- that we're grabbing the version of Hoogle
-                       -- present in the snapshot currently being
-                       -- used.
-                       Nothing
+          -- FIXME For a while, we've been following the logic of
+          -- taking the latest Hoogle version available. However, we
+          -- may want to instead grab the version of Hoogle present in
+          -- the snapshot current being used instead.
+          pure $ fromMaybe (Left hoogleMinIdent) $ do
+            pir@(PackageIdentifierRevision _ ver _) <- mversion
+            guard $ ver >= hoogleMinVersion
+            Just $ Right pir
 
-                       mempty
-                       (Set.fromList [hooglePackageName])
-               return
-                   (case find
-                             ((== hooglePackageName) . packageIdentifierName)
-                             (map rpIdent resolved) of
-                        Just ident@(PackageIdentifier _ ver)
-                          | ver >= hoogleMinVersion -> Right ident
-                        _ -> Left hoogleMinIdent)
         case hooglePackageIdentifier of
             Left{} -> logInfo $
               "Minimum " <>
-              display hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               " is not in your index. Installing the minimum version."
             Right ident -> logInfo $
               "Minimum version is " <>
-              display hoogleMinIdent <>
+              fromString (packageIdentifierString hoogleMinIdent) <>
               ". Found acceptable " <>
               display ident <>
               " in your index, installing it."
         config <- view configL
         menv <- liftIO $ configProcessContextSettings config envSettings
-        liftIO
-            (catch
-                 (withBuildConfigAndLock
-                      go
-                      (\lk ->
-                            Stack.Build.build
-                                (const (return ()))
-                                lk
-                                defaultBuildOptsCLI
-                                { boptsCLITargets = [ packageIdentifierText
-                                                          (either
-                                                               id
-                                                               id
-                                                               hooglePackageIdentifier)]
-                                }))
+        let boptsCLI = defaultBuildOptsCLI
+                { boptsCLITargets =
+                    pure $
+                    T.pack . packageIdentifierString $
+                    either
+                    id
+                    (\(PackageIdentifierRevision n v _) -> PackageIdentifier n v)
+                    hooglePackageIdentifier
+                }
+        runRIO config $ catch -- Also a bit weird
+                 (withEnvConfig
+                      NeedTargets
+                      boptsCLI $
+                      Stack.Build.build Nothing
+                 )
                  (\(e :: ExitCode) ->
                        case e of
                            ExitSuccess -> runRIO menv resetExeCache
-                           _ -> throwIO e))
+                           _ -> throwIO e)
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
@@ -150,7 +131,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
           (hoogleArgs ++ databaseArg)
           runProcess_
     bail :: RIO EnvConfig a
-    bail = liftIO (System.Exit.exitWith (ExitFailure (-1)))
+    bail = exitWith (ExitFailure (-1))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)
@@ -173,7 +154,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                         ]
                 return $ case result of
                     Left err -> unexpectedResult $ T.pack (show err)
-                    Right bs -> case parseVersionFromString (takeWhile (not . isSpace) (BL8.unpack bs)) of
+                    Right bs -> case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
                         Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
                         Just ver
                             | ver >= hoogleMinVersion -> Right hooglePath
@@ -181,7 +162,7 @@ hoogleCmd (args,setup,rebuild,startServer) go = withBuildConfig go $ do
                                 [ "Installed Hoogle is too old, "
                                 , T.pack hooglePath
                                 , " is version "
-                                , versionText ver
+                                , T.pack $ versionString ver
                                 , " but >= 5.0 is required."
                                 ]
         case eres of

@@ -8,7 +8,6 @@ import Data.Attoparsec.Args (EscapingMode(..), parseArgsFromString)
 import Data.Attoparsec.Interpreter (interpreterArgsParser)
 import qualified Data.Attoparsec.Text as P
 import Data.Text (pack)
-import Stack.Constants (stackProgName)
 import Stack.Prelude
 import Test.Hspec
 import Prelude (head)
@@ -87,8 +86,7 @@ interpreterArgsSpec =
                            Left _ -> True
                            Right _ -> False
 
-      showInput i = "BEGIN =>" ++ i ++ "<= END"
-      testAndCheck checker out inp = it (showInput inp) $ checker out inp
+      testAndCheck checker out inp = it (show inp) $ checker out inp
 
       checkLines args = forM_
         (interpreterGenValid lineComment args)

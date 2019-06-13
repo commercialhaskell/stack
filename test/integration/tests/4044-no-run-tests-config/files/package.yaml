@@ -1,0 +1,10 @@
+name: foo
+version: 0
+dependencies:
+- base
+
+library: {}
+
+tests:
+  foo:
+    main: Test.hs

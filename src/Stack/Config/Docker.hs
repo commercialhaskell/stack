@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable, RecordWildCards #-}
 
 -- | Docker configuration
 module Stack.Config.Docker where
@@ -7,72 +8,75 @@ module Stack.Config.Docker where
 import           Stack.Prelude
 import           Data.List (find)
 import qualified Data.Text as T
+import           Data.Text.Read (decimal)
 import           Distribution.Version (simplifyVersionRange)
-import           Path
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Resolver
 
+-- | Add a default Docker tag name to a given base image.
+addDefaultTag
+  :: MonadThrow m
+  => String -- ^ base
+  -> Maybe Project
+  -> Maybe AbstractResolver
+  -> m String
+addDefaultTag base mproject maresolver = do
+  let exc = throwM $ ResolverNotSupportedException mproject maresolver
+      onUrl url = maybe exc pure $ do
+        (x, y) <- parseLtsName url
+        Just $ concat
+          [ base
+          , ":lts-"
+          , show x
+          , "."
+          , show y
+          ]
+  case maresolver of
+    Just (ARResolver (RSLUrl url _)) -> onUrl url
+    Just _aresolver -> exc
+    Nothing ->
+      case projectResolver <$> mproject of
+        Just (RSLUrl url _) -> onUrl url
+        _ -> exc
+
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid
     :: MonadThrow m
     => Maybe Project
-    -> Path Abs Dir
     -> Maybe AbstractResolver
     -> DockerOptsMonoid
     -> m DockerOpts
-dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
+dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
+    let dockerImage =
+          case getFirst dockerMonoidRepoOrImage of
+            Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
+            Just (DockerMonoidImage image) -> pure image
+            Just (DockerMonoidRepo repo) ->
+              case find (`elem` (":@" :: String)) repo of
+                Nothing -> addDefaultTag repo mproject maresolver
+                -- Repo already specified a tag or digest, so don't append default
+                Just _ -> pure repo
     let dockerEnable =
             fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
-        dockerImage =
-            let mresolver =
-                    case maresolver of
-                        Just (ARResolver resolver) ->
-                            Just (void resolver)
-                        Just aresolver ->
-                            impureThrow
-                                (ResolverNotSupportedException $
-                                 show aresolver)
-                        Nothing ->
-                            fmap (void . projectResolver) mproject
-                defaultTag =
-                    case mresolver of
-                        Nothing -> ""
-                        Just resolver ->
-                            case resolver of
-                                ResolverStackage n@(LTS _ _) ->
-                                    ":" ++ T.unpack (renderSnapName n)
-                                _ ->
-                                    impureThrow
-                                        (ResolverNotSupportedException $
-                                         show resolver)
-            in case getFirst dockerMonoidRepoOrImage of
-                   Nothing -> "fpco/stack-build" ++ defaultTag
-                   Just (DockerMonoidImage image) -> image
-                   Just (DockerMonoidRepo repo) ->
-                       case find (`elem` (":@" :: String)) repo of
-                           Just _    -- Repo already specified a tag or digest, so don't append default
-                            ->
-                               repo
-                           Nothing -> repo ++ defaultTag
         dockerRegistryLogin =
             fromFirst
                 (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
                 dockerMonoidRegistryLogin
         dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
         dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
-        dockerAutoPull = fromFirst False dockerMonoidAutoPull
-        dockerDetach = fromFirst False dockerMonoidDetach
-        dockerPersist = fromFirst False dockerMonoidPersist
+        dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
+        dockerDetach = fromFirstFalse dockerMonoidDetach
+        dockerPersist = fromFirstFalse dockerMonoidPersist
         dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount
+        dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
         dockerEnv = dockerMonoidEnv
         dockerSetUser = getFirst dockerMonoidSetUser
         dockerRequireDockerVersion =
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-        dockerDatabasePath = fromFirst (stackRoot </> $(mkRelFile "docker.db")) dockerMonoidDatabasePath
         dockerStackExe = getFirst dockerMonoidStackExe
 
     return DockerOpts{..}
@@ -82,10 +86,8 @@ dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
 
 -- | Exceptions thrown by Stack.Docker.Config.
 data StackDockerConfigException
-    = ResolverNotSupportedException String
+    = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
     -- ^ Only LTS resolvers are supported for default image tag.
-    | InvalidDatabasePathException SomeException
-    -- ^ Invalid global database path.
     deriving (Typeable)
 
 -- | Exception instance for StackDockerConfigException.
@@ -93,11 +95,24 @@ instance Exception StackDockerConfigException
 
 -- | Show instance for StackDockerConfigException.
 instance Show StackDockerConfigException where
-    show (ResolverNotSupportedException resolver) =
+    show (ResolverNotSupportedException mproject maresolver) =
         concat
             [ "Resolver not supported for Docker images:\n    "
-            , resolver
+            , case (mproject, maresolver) of
+                (Nothing, Nothing) -> "no resolver specified"
+                (_, Just aresolver) -> T.unpack $ utf8BuilderToText $ display aresolver
+                (Just project, Nothing) -> T.unpack $ utf8BuilderToText $ display $ projectResolver project
             , "\nUse an LTS resolver, or set the '"
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
-    show (InvalidDatabasePathException ex) = "Invalid database path: " ++ show ex
+
+-- | Parse an LTS major and minor number from a snapshot URL.
+--
+-- This might make more sense in pantry instead.
+parseLtsName :: Text -> Maybe (Int, Int)
+parseLtsName t0 = do
+  t1 <- T.stripPrefix "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/" t0
+  Right (x, t2) <- Just $ decimal t1
+  t3 <- T.stripPrefix "/" t2
+  Right (y, ".yaml") <- Just $ decimal t3
+  Just (x, y)

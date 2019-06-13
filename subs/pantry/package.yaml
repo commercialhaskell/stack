@@ -1,0 +1,138 @@
+name:        pantry-tmp
+version:     0.1.0.0
+synopsis:    Content addressable Haskell package management
+description: Please see the README on Github at <https://github.com/commercialhaskell/stack/blob/master/subs/pantry/README.md>
+category:    Development
+author:      Michael Snoyman
+maintainer:  michael@snoyman.com
+copyright:   2018-2019 FP Complete
+license:     BSD3
+github:      commercialhaskell/stack # TODO move to commercialhaskell/pantry!
+
+default-extensions:
+- MonadFailDesugaring
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+- attic/package-0.1.2.3.tar.gz
+
+dependencies:
+- base >=4.10 && < 5
+- ansi-terminal
+- digest
+- rio
+- aeson
+- text
+- unordered-containers
+- containers
+- path
+- transformers
+- generic-deriving
+- unliftio
+- http-conduit
+- http-client-tls
+- http-download
+- http-types
+- http-client
+- conduit
+- bytestring
+- network-uri
+- hackage-security
+- primitive
+- vector
+- memory
+- cryptonite
+- cryptonite-conduit
+- persistent
+- persistent-sqlite
+- persistent-template
+- Cabal
+- path-io
+- rio-orphans
+- conduit-extra
+- tar-conduit
+- time
+- unix-compat
+- hpack
+- yaml
+- zip-archive
+- text-metrics
+- resourcet
+- rio-prettyprint
+- mtl
+- filelock
+
+# FIXME remove when we drop store
+- integer-gmp
+- ghc-prim
+- template-haskell
+- network
+- th-utilities
+- th-reify-many
+- th-lift
+- th-lift-instances
+- mono-traversable
+- safe
+- contravariant
+- syb
+- deepseq
+- array
+- hashable
+- base-orphans
+- th-orphans
+- cryptonite
+- base64-bytestring
+- directory
+- filepath
+
+ghc-options:
+  - -Wall
+
+library:
+  source-dirs: src/
+  when:
+  - condition: 'os(windows)'
+    then:
+      source-dirs: src/windows/
+    else:
+      source-dirs: src/unix/
+
+  exposed-modules:
+  - Pantry
+  - Pantry.SHA256
+
+  # For testing
+  - Pantry.Internal
+  - Pantry.Internal.StaticBytes
+
+  # For stackage-server
+  - Pantry.Internal.Stackage
+
+  # For stack
+  - Pantry.Internal.Companion
+  - Pantry.Internal.AesonExtended
+
+  other-modules:
+  - Hackage.Security.Client.Repository.HttpLib.HttpClient
+  - Pantry.Archive
+  - Pantry.HTTP
+  - Pantry.HPack
+  - Pantry.Hackage
+  - Pantry.Repo
+  - Pantry.SQLite
+  - Pantry.Storage
+  - Pantry.Tree
+  - Pantry.Types
+
+tests:
+  spec:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - pantry-tmp
+    - hspec
+    - exceptions
+    - hedgehog
+    - QuickCheck
+    - raw-strings-qq

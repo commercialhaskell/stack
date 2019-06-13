@@ -1,0 +1,7 @@
+name: foo
+
+dependencies:
+- base
+- process
+
+library: {}

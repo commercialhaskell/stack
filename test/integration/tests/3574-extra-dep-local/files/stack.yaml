@@ -1,8 +1,9 @@
 resolver: ghc-8.2.2
 
-packages:
-- location: foo
-  extra-dep: true
+packages: []
+
+extra-deps:
+- foo
 
 ghc-options:
   $locals: -bob

@@ -7,7 +7,7 @@ module Path.CheckInstall where
 import           Control.Monad.Extra (anyM, (&&^))
 import qualified Data.Text as T
 import           Stack.Prelude
-import           Stack.PrettyPrint
+import           RIO.PrettyPrint
 import           Stack.Types.Config
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -29,25 +29,25 @@ warnInstallSearchPathIssues destDir installed = do
                     unless (exeDir `FP.equalFilePath` destDir) $ do
                         prettyWarnL
                           [ flow "The"
-                          , styleFile . fromString . T.unpack $ exe
+                          , style File . fromString . T.unpack $ exe
                           , flow "executable found on the PATH environment variable is"
-                          , styleFile . fromString $ exePath
+                          , style File . fromString $ exePath
                           , flow "and not the version that was just installed."
                           , flow "This means that"
-                          , styleFile . fromString . T.unpack $ exe
+                          , style File . fromString . T.unpack $ exe
                           , "calls on the command line will not use this version."
                           ]
                 Nothing -> do
                     prettyWarnL
                       [ flow "Installation path"
-                      , styleDir . fromString $ destDir
+                      , style Dir . fromString $ destDir
                       , flow "is on the PATH but the"
-                      , styleFile . fromString . T.unpack $ exe
+                      , style File . fromString . T.unpack $ exe
                       , flow "executable that was just installed could not be found on the PATH."
                       ]
         else do
             prettyWarnL
               [ flow "Installation path "
-              , styleDir . fromString $ destDir
+              , style Dir . fromString $ destDir
               , "not found on the PATH environment variable."
               ]

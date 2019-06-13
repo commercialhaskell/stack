@@ -1,11 +1,6 @@
 resolver: lts-11.22
 
-packages:
-- location: ./one-deps
-  extra-dep: true
+packages: []
 
-extra-deps: []
-
-flags: {}
-
-extra-package-dbs: []
+extra-deps:
+- ./one-deps

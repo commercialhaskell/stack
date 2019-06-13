@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Stack.Options.GhciParser where
 
 import           Options.Applicative
@@ -9,7 +10,6 @@ import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Options.BuildParser         (flagsParser)
 import           Stack.Options.Completion
 import           Stack.Prelude
-import           Stack.Types.Version
 
 -- | Parser for GHCI options
 ghciOptsParser :: Parser GhciOpts
@@ -19,20 +19,24 @@ ghciOptsParser = GhciOpts
                         (metavar "TARGET/FILE" <>
                          completer (targetCompleter <> fileExtCompleter [".hs", ".lhs"]) <>
                          help ("If none specified, use all local packages. " <>
-                               "See https://docs.haskellstack.org/en/v" <>
-                               versionString stackMinorVersion <>
-                               "/build_command/#target-syntax for details. " <>
+                               "See https://docs.haskellstack.org/en/stable/build_command/#target-syntax for details. " <>
                                "If a path to a .hs or .lhs file is specified, it will be loaded.")))
-             <*> fmap concat (many (argsOption (long "ghci-options" <>
+             <*> ((\x y -> x ++ concat y)
+                 <$> flag
+                     []
+                     ["-Wall", "-Werror"]
+                     (long "pedantic" <> help "Turn on -Wall and -Werror")
+                 <*> many (argsOption (long "ghci-options" <>
                                     metavar "OPTIONS" <>
                                     completer ghcOptsCompleter <>
-                                    help "Additional options passed to GHCi")))
-             <*> many
-                     (textOption
+                                    help "Additional options passed to GHCi"))
+             )
+             <*> (concat <$> many
+                     (argsOption
                           (long "ghc-options" <>
                            metavar "OPTIONS" <>
                            completer ghcOptsCompleter <>
-                           help "Additional options passed to both GHC and GHCi"))
+                           help "Additional options passed to both GHC and GHCi")))
              <*> flagsParser
              <*> optional
                      (strOption (long "with-ghc" <>

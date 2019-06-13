@@ -11,25 +11,32 @@ module Stack.ConfigCmd
        ,configCmdSetParser
        ,cfgCmdSet
        ,cfgCmdSetName
+       ,configCmdEnvParser
+       ,cfgCmdEnv
+       ,cfgCmdEnvName
        ,cfgCmdName) where
 
 import           Stack.Prelude
-import qualified Data.ByteString as S
+import           Data.ByteString.Builder (byteString)
+import qualified Data.Map.Merge.Strict as Map
 import qualified Data.HashMap.Strict as HMap
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
+import           Options.Applicative.Builder.Extra
+import           Pantry (completeSnapshotLocation, loadSnapshot)
 import           Path
-import           Path.IO
-import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir, LocalConfigStatus(..))
+import qualified RIO.Map as Map
+import           RIO.Process (envVarsL)
+import           Stack.Config (makeConcreteResolver, getProjectConfig, getImplicitGlobalProjectDir)
 import           Stack.Constants
-import           Stack.Snapshot (loadResolver)
 import           Stack.Types.Config
 import           Stack.Types.Resolver
+import           System.Environment (getEnvironment)
 
 data ConfigCmdSet
-    = ConfigCmdSetResolver AbstractResolver
+    = ConfigCmdSetResolver (Unresolved AbstractResolver)
     | ConfigCmdSetSystemGhc CommandScope
                             Bool
     | ConfigCmdSetInstallGhc CommandScope
@@ -49,18 +56,18 @@ configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 cfgCmdSet
     :: (HasConfig env, HasGHCVariant env)
-    => GlobalOpts -> ConfigCmdSet -> RIO env ()
-cfgCmdSet go cmd = do
+    => ConfigCmdSet -> RIO env ()
+cfgCmdSet cmd = do
     conf <- view configL
     configFilePath <-
              case configCmdSetScope cmd of
                  CommandScopeProject -> do
-                     mstackYamlOption <- forM (globalStackYaml go) resolveFile'
+                     mstackYamlOption <- view $ globalOptsL.to globalStackYaml
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
-                         LCSProject stackYaml -> return stackYaml
-                         LCSNoProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         LCSNoConfig _ -> throwString "config command used when no local configuration available"
+                         PCProject stackYaml -> return stackYaml
+                         PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                         PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
     (config :: Yaml.Object) <-
@@ -73,7 +80,7 @@ cfgCmdSet go cmd = do
                  (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
-            liftIO (S.writeFile (toFilePath configFilePath) (Yaml.encode config'))
+            writeBinaryFileAtomic configFilePath (byteString (Yaml.encode config'))
             logInfo (fromString (toFilePath configFilePath) <> " has been updated.")
 
 cfgCmdSetValue
@@ -81,9 +88,10 @@ cfgCmdSetValue
     => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
-    concreteResolver <- makeConcreteResolver (Just root) newResolver
+    newResolver' <- resolvePaths (Just root) newResolver
+    concreteResolver <- makeConcreteResolver newResolver'
     -- Check that the snapshot actually exists
-    void $ loadResolver concreteResolver
+    void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
     return (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
     return (Yaml.Bool bool')
@@ -100,6 +108,9 @@ cfgCmdName = "config"
 
 cfgCmdSetName :: String
 cfgCmdSetName = "set"
+
+cfgCmdEnvName :: String
+cfgCmdEnvName = "env"
 
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
@@ -148,3 +159,39 @@ readBool = do
 
 boolArgument :: OA.Parser Bool
 boolArgument = OA.argument readBool (OA.metavar "true|false" <> OA.completeWith ["true", "false"])
+
+configCmdEnvParser :: OA.Parser EnvSettings
+configCmdEnvParser = EnvSettings
+  <$> boolFlags True "locals" "include local package information" mempty
+  <*> boolFlags True "ghc-package-path" "set GHC_PACKAGE_PATH variable" mempty
+  <*> boolFlags True "stack-exe" "set STACK_EXE environment variable" mempty
+  <*> boolFlags False "locale-utf8" "set the GHC_CHARENC environment variable to UTF8" mempty
+  <*> boolFlags False "keep-ghc-rts" "keep any GHC_RTS environment variables" mempty
+
+data EnvVarAction = EVASet !Text | EVAUnset
+  deriving Show
+
+cfgCmdEnv :: EnvSettings -> RIO EnvConfig ()
+cfgCmdEnv es = do
+  origEnv <- liftIO $ Map.fromList . map (first fromString) <$> getEnvironment
+  mkPC <- view $ configL.to configProcessContextSettings
+  pc <- liftIO $ mkPC es
+  let newEnv = pc ^. envVarsL
+      actions = Map.merge
+        (pure EVAUnset)
+        (Map.traverseMissing $ \_k new -> pure (EVASet new))
+        (Map.zipWithMaybeAMatched $ \_k old new -> pure $
+            if fromString old == new
+              then Nothing
+              else Just (EVASet new))
+        origEnv
+        newEnv
+      toLine key EVAUnset = "unset " <> encodeUtf8Builder key <> ";\n"
+      toLine key (EVASet value) =
+        encodeUtf8Builder key <> "='" <>
+        encodeUtf8Builder (T.concatMap escape value) <> -- TODO more efficient to use encodeUtf8BuilderEscaped
+        "'; export " <>
+        encodeUtf8Builder key <> ";\n"
+      escape '\'' = "'\"'\"'"
+      escape c = T.singleton c
+  hPutBuilder stdout $ Map.foldMapWithKey toLine actions

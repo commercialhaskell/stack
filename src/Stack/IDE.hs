@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Functions for IDEs.
 module Stack.IDE
@@ -15,12 +16,10 @@ module Stack.IDE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Stack.Config (getLocalPackages)
-import           Stack.Package (readPackageUnresolvedDir, gpdPackageName)
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
-import           Stack.Types.PackageName (packageNameString)
+import           Stack.Types.SourceMap
 import           System.IO (putStrLn)
 
 data OutputStream = OutputLogInfo
@@ -34,35 +33,27 @@ outputFunc OutputLogInfo = logInfo . fromString
 outputFunc OutputStdout  = liftIO . putStrLn
 
 -- | List the packages inside the current project.
-listPackages :: HasEnvConfig env => OutputStream -> ListPackagesCmd -> RIO env ()
+listPackages :: HasBuildConfig env => OutputStream -> ListPackagesCmd -> RIO env ()
 listPackages stream flag = do
-    -- TODO: Instead of setting up an entire EnvConfig only to look up the package directories,
-    -- make do with a Config (and the Project inside) and use resolvePackageEntry to get
-    -- the directory.
-    packages <- liftM (Map.elems . lpProject) getLocalPackages
-    forM_ packages $ \pkg -> do
-        let dir = lpvRoot pkg
-            cabal_file = toFilePath $ lpvCabalFP pkg
-            cabal_file :: FilePath
-        case flag of
-          ListPackageNames -> do
-            (gpd, _) <- readPackageUnresolvedDir dir False
-            outputFunc stream $ packageNameString $ gpdPackageName gpd
-          ListPackageCabalFiles ->
-            outputFunc stream cabal_file
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  let strs = case flag of
+        ListPackageNames ->
+          map packageNameString (Map.keys packages)
+        ListPackageCabalFiles ->
+          map (toFilePath . ppCabalFP) (Map.elems packages)
+  mapM_ (outputFunc stream) strs
 
 -- | List the targets in the current project.
-listTargets :: HasEnvConfig env => OutputStream -> RIO env ()
-listTargets stream =
-    do rawLocals <- lpProject <$> getLocalPackages
-       outputFunc stream $ T.unpack
-           (T.intercalate
-                "\n"
-                (map
-                     renderPkgComponent
-                     (concatMap
-                          toNameAndComponent
-                          (Map.toList rawLocals))))
+listTargets :: forall env. HasBuildConfig env => OutputStream -> RIO env ()
+listTargets stream = do
+  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
+  outputFunc stream $ T.unpack $ T.intercalate "\n" $
+    map renderPkgComponent pairs
   where
-    toNameAndComponent (pkgName,view') =
-        map (pkgName, ) (Set.toList (lpvComponents view'))
+    toNameAndComponent
+      :: PackageName
+      -> ProjectPackage
+      -> RIO env [(PackageName, NamedComponent)]
+    toNameAndComponent pkgName' =
+        fmap (map (pkgName', ) . Set.toList) . ppComponents

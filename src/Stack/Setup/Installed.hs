@@ -1,10 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -17,14 +15,12 @@ module Stack.Setup.Installed
     , toolString
     , toolNameString
     , parseToolText
-    , ExtraDirs (..)
     , extraDirs
     , installDir
     , tempInstallDir
     ) where
 
 import           Stack.Prelude
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List hiding (concat, elem, maximumBy)
@@ -32,31 +28,30 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
-import           Generics.Deriving.Monoid (mappenddefault, memptydefault)
 import           Path
 import           Path.IO
+import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           RIO.Process
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs (CompilerVersion 'CVActual) -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
+    | ToolGhcGit !Text !Text   -- ^ e.g. ghc-git-COMMIT_ID-FLAVOUR
+    deriving (Eq)
 
 toolString :: Tool -> String
 toolString (Tool ident) = packageIdentifierString ident
-toolString (ToolGhcjs cv) = compilerVersionString cv
+toolString (ToolGhcGit commit flavour) = "ghc-git-" ++ T.unpack commit ++ "-" ++ T.unpack flavour
 
 toolNameString :: Tool -> String
-toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
-toolNameString ToolGhcjs{} = "ghcjs"
+toolNameString (Tool ident) = packageNameString $ pkgName ident
+toolNameString ToolGhcGit{} = "ghc-git"
 
 parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just cv@GhcjsVersion{}) = Just (ToolGhcjs cv)
-parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
+parseToolText (parseWantedCompiler -> Right WCGhcjs{}) = Nothing
+parseToolText (parseWantedCompiler -> Right (WCGhcGit c f)) = Just (ToolGhcGit c f)
+parseToolText (parsePackageIdentifier . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
 markInstalled :: (MonadIO m, MonadThrow m)
@@ -65,7 +60,7 @@ markInstalled :: (MonadIO m, MonadThrow m)
               -> m ()
 markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ B.writeFile (toFilePath $ programsPath </> fpRel) "installed"
+    writeBinaryFileAtomic (programsPath </> fpRel) "installed"
 
 unmarkInstalled :: MonadIO m
                 => Path Abs Dir
@@ -101,14 +96,15 @@ ghcjsWarning = unwords
 getCompilerVersion
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
-  -> RIO env (CompilerVersion 'CVActual)
-getCompilerVersion wc =
+  -> Path Abs File -- ^ executable
+  -> RIO env ActualCompiler
+getCompilerVersion wc exe = do
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"
-            bs <- fst <$> proc "ghc" ["--numeric-version"] readProcess_
+            bs <- fst <$> proc (toFilePath exe) ["--numeric-version"] readProcess_
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
-            x <- GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
+            x <- ACGhc <$> parseVersionThrowing (T.unpack $ T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
             return x
         Ghcjs -> do
@@ -117,10 +113,10 @@ getCompilerVersion wc =
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- fst <$> proc "ghcjs" ["--version"] readProcess_
-            let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
-                (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
-            GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
+            bs <- fst <$> proc (toFilePath exe) ["--version"] readProcess_
+            let (rest, ghcVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
+                (_, ghcjsVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd rest
+            ACGhcjs <$> parseVersionThrowing ghcjsVersion <*> parseVersionThrowing ghcVersion
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
     isValid c = c == '.' || ('0' <= c && c <= '9')
@@ -133,46 +129,41 @@ extraDirs tool = do
     case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+                [ dir </> relDirBin
+                , dir </> relDirMingw </> relDirBin
                 ]
             }
         (Platform Cabal.I386 Cabal.Windows, "msys2") -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw32 </> relDirBin
+                , dir </> relDirUsr </> relDirBin
+                , dir </> relDirUsr </> relDirLocal </> relDirBin
                 ]
             , edInclude =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                [ dir </> relDirMingw32 </> relDirInclude
                 ]
             , edLib =
-                [ dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw32 </> relDirLib
+                , dir </> relDirMingw32 </> relDirBin
                 ]
             }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "usr") </> $(mkRelDir "local") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw64 </> relDirBin
+                , dir </> relDirUsr </> relDirBin
+                , dir </> relDirUsr </> relDirLocal </> relDirBin
                 ]
             , edInclude =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
+                [ dir </> relDirMingw64 </> relDirInclude
                 ]
             , edLib =
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw64") </> $(mkRelDir "bin")
+                [ dir </> relDirMingw64 </> relDirLib
+                , dir </> relDirMingw64 </> relDirBin
                 ]
             }
         (_, isGHC -> True) -> return mempty
             { edBins =
-                [ dir </> $(mkRelDir "bin")
-                ]
-            }
-        (_, isGHCJS -> True) -> return mempty
-            { edBins =
-                [ dir </> $(mkRelDir "bin")
+                [ dir </> relDirBin
                 ]
             }
         (Platform _ x, toolName) -> do
@@ -180,18 +171,6 @@ extraDirs tool = do
             return mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
-    isGHCJS n = "ghcjs" == n
-
-data ExtraDirs = ExtraDirs
-    { edBins :: ![Path Abs Dir]
-    , edInclude :: ![Path Abs Dir]
-    , edLib :: ![Path Abs Dir]
-    } deriving (Show, Generic)
-instance Semigroup ExtraDirs where
-    (<>) = mappenddefault
-instance Monoid ExtraDirs where
-    mempty = memptydefault
-    mappend = (<>)
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir

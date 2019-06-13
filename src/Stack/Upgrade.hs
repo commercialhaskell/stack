@@ -1,11 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade
     ( upgrade
     , UpgradeOpts
@@ -13,9 +10,6 @@ module Stack.Upgrade
     ) where
 
 import           Stack.Prelude               hiding (force, Display (..))
-import qualified Data.HashMap.Strict         as HashMap
-import qualified Data.List
-import qualified Data.Map                    as Map
 import qualified Data.Text as T
 import           Distribution.Version        (mkVersion')
 import           Lens.Micro                  (set)
@@ -23,23 +17,14 @@ import           Options.Applicative
 import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
-import           Stack.Config
--- Following import is redundant on non-Windows operating systems
-#ifdef WINDOWS
-import           Stack.DefaultColorWhen (defaultColorWhen)
-#endif
-import           Stack.Fetch
-import           Stack.PackageIndex
-import           Stack.PrettyPrint
+import           Stack.Build.Target (NeedTargets(..))
+import           Stack.Constants
+import           Stack.Runners
 import           Stack.Setup
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIndex
-import           Stack.Types.PackageName
-import           Stack.Types.Version
 import           Stack.Types.Config
-import           Stack.Types.Resolver
-import           System.Exit                 (ExitCode (ExitSuccess))
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Process              (rawSystem, readProcess)
+import           RIO.PrettyPrint
 import           RIO.Process
 
 upgradeOpts :: Parser UpgradeOpts
@@ -104,13 +89,10 @@ data UpgradeOpts = UpgradeOpts
     }
     deriving Show
 
-upgrade :: HasConfig env
-        => ConfigMonoid
-        -> Maybe AbstractResolver
-        -> Maybe String -- ^ git hash at time of building, if known
+upgrade :: Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts
-        -> RIO env ()
-upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
+        -> RIO Runner ()
+upgrade builtHash (UpgradeOpts mbo mso) =
     case (mbo, mso) of
         -- FIXME It would be far nicer to capture this case in the
         -- options parser itself so we get better error messages, but
@@ -130,10 +112,10 @@ upgrade gConfigMonoid mresolver builtHash (UpgradeOpts mbo mso) =
             source so
   where
     binary bo = binaryUpgrade bo
-    source so = sourceUpgrade gConfigMonoid mresolver builtHash so
+    source so = sourceUpgrade builtHash so
 
-binaryUpgrade :: HasConfig env => BinaryOpts -> RIO env ()
-binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
+binaryUpgrade :: BinaryOpts -> RIO Runner ()
+binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexec $ do
     platforms0 <-
       case mplatform of
         Nothing -> preferredPlatforms
@@ -157,9 +139,9 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
             Just downloadVersion -> do
                 prettyInfoL
                     [ flow "Current Stack version:"
-                    , display stackVersion <> ","
+                    , fromString (versionString stackVersion) <> ","
                     , flow "available download version:"
-                    , display downloadVersion
+                    , fromString (versionString downloadVersion)
                     ]
                 return $ downloadVersion > stackVersion
 
@@ -183,13 +165,10 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = do
                     $ throwString "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
-  :: HasConfig env
-  => ConfigMonoid
-  -> Maybe AbstractResolver
-  -> Maybe String
+  :: Maybe String
   -> SourceOpts
-  -> RIO env ()
-sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
+  -> RIO Runner ()
+sourceUpgrade builtHash (SourceOpts gitRepo) =
   withSystemTempDir "stack-upgrade" $ \tmp -> do
     mdir <- case gitRepo of
       Just (repo, branch) -> do
@@ -216,48 +195,50 @@ sourceUpgrade gConfigMonoid mresolver builtHash (SourceOpts gitRepo) =
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
-#ifdef WINDOWS
                 -- On Windows 10, an upstream issue with the `git clone` command
                 -- means that command clears, but does not then restore, the
                 -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
                 -- The folowing hack re-enables the lost ANSI-capability.
-                _ <- liftIO defaultColorWhen
-#endif
-                return $ Just $ tmp </> $(mkRelDir "stack")
-      Nothing -> do
-        updateAllIndices
-        PackageCache caches <- getPackageCaches
-        let versions
-                = filter (/= $(mkVersion "9.9.9")) -- Mistaken upload to Hackage, just ignore it
-                $ maybe [] HashMap.keys
-                $ HashMap.lookup $(mkPackageName "stack") caches
+                when osIsWindows $
+                  void $ liftIO $ hSupportsANSIWithoutEmulation stdout
+                return $ Just $ tmp </> relDirStackProgName
+      -- We need to access the Pantry database to find out about the
+      -- latest Stack available on Hackage. We first use a standard
+      -- Config to do this, and once we have the source load up the
+      -- stack.yaml from inside that source.
+      Nothing -> withConfig NoReexec $ do
+        void $ updateHackageIndex
+             $ Just "Updating index to make sure we find the latest Stack version"
+        mversion <- getLatestHackageVersion YesRequireHackageIndex "stack" UsePreferredVersions
+        (PackageIdentifierRevision _ version _) <-
+          case mversion of
+            Nothing -> throwString "No stack found in package indices"
+            Just version -> pure version
 
-        when (null versions) (throwString "No stack found in package indices")
-
-        let version = Data.List.maximum versions
-        if version <= fromCabalVersion (mkVersion' Paths.version)
+        if version <= mkVersion' Paths.version
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
                 return Nothing
             else do
-                let ident = PackageIdentifier $(mkPackageName "stack") version
-                paths <- unpackPackageIdents tmp Nothing
-                    -- accept latest cabal revision
-                    [PackageIdentifierRevision ident CFILatest]
-                case Map.lookup ident paths of
-                    Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
-                    Just path -> return $ Just path
+                suffix <- parseRelDir $ "stack-" ++ versionString version
+                let dir = tmp </> suffix
+                mrev <- getLatestHackageRevision YesRequireHackageIndex "stack" version
+                case mrev of
+                  Nothing -> throwString "Latest version with no revision"
+                  Just (_rev, cfKey, treeKey) -> do
+                    let ident = PackageIdentifier "stack" version
+                    unpackPackageLocation dir $ PLIHackage ident cfKey treeKey
+                    pure $ Just dir
 
-    forM_ mdir $ \dir -> do
-        lc <- loadConfig
-            gConfigMonoid
-            mresolver
-            (SYLOverride $ dir </> $(mkRelFile "stack.yaml"))
-        bconfig <- liftIO $ lcLoadBuildConfig lc Nothing
-        envConfig1 <- runRIO bconfig $ setupEnv $ Just $
-            "Try rerunning with --install-ghc to install the correct GHC into " <>
-            T.pack (toFilePath (configLocalPrograms (view configL bconfig)))
-        runRIO (set (buildOptsL.buildOptsInstallExesL) True envConfig1) $
-            build (const $ return ()) Nothing defaultBuildOptsCLI
-                { boptsCLITargets = ["stack"]
-                }
+    let modifyGO dir go = go
+          { globalResolver = Nothing -- always use the resolver settings in the stack.yaml file
+          , globalStackYaml = SYLOverride $ dir </> stackDotYaml
+          }
+        boptsCLI = defaultBuildOptsCLI
+          { boptsCLITargets = ["stack"]
+          }
+    forM_ mdir $ \dir ->
+      local (over globalOptsL (modifyGO dir)) $
+      withConfig NoReexec $ withEnvConfig AllowNoTargets boptsCLI $
+      local (set (buildOptsL.buildOptsInstallExesL) True) $
+      build Nothing
