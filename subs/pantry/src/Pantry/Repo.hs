@@ -159,12 +159,13 @@ withRepo
   -> RIO env a
   -> RIO env a
 withRepo repo@(Repo url commit repoType' _subdir) action =
-  withSystemTempDirectory "with-repo" $
-  \tmpdir -> withWorkingDir tmpdir $ do
-    let suffix = "cloned"
-        dir = tmpdir </> suffix
-
-    let (runCommand, resetArgs, submoduleArgs) =
+  withSystemTempDirectory "with-repo" $ \tmpDir -> do
+    -- Note we do not immediately change directories into the new temporary directory,
+    -- but instead wait until we have finished cloning the repo. This is because the
+    -- repo URL may be a relative path on the local filesystem, and we should interpret
+    -- it as relative to the current directory, not the temporary directory.
+    let dir = tmpDir </> "cloned"
+        (runCommand, resetArgs, submoduleArgs) =
           case repoType' of
             RepoGit ->
               ( runGitCommand
@@ -176,23 +177,21 @@ withRepo repo@(Repo url commit repoType' _subdir) action =
               , ["update", "-C", T.unpack commit]
               , Nothing
               )
+        fixANSIForWindows =
+          -- On Windows 10, an upstream issue with the `git clone` command means that
+          -- command clears, but does not then restore, the
+          -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
+          -- folowing hack re-enables the lost ANSI-capability.
+          when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
 
     logInfo $ "Cloning " <> display commit <> " from " <> display url
-    runCommand ("clone" : [T.unpack url, suffix])
-    -- On Windows 10, an upstream issue with the `git clone` command means that
-    -- command clears, but does not then restore, the
-    -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
-    -- folowing hack re-enables the lost ANSI-capability.
-    when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
+    runCommand ["clone", T.unpack url, dir]
+    fixANSIForWindows
     created <- doesDirectoryExist dir
     unless created $ throwIO $ FailedToCloneRepo repo
 
     withWorkingDir dir $ do
       runCommand resetArgs
       traverse_ runCommand submoduleArgs
-      -- On Windows 10, an upstream issue with the `git submodule` command means
-      -- that command clears, but does not then restore, the
-      -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
-      -- folowing hack re-enables the lost ANSI-capability.
-      when osIsWindows $ void $ liftIO $ hSupportsANSIWithoutEmulation stdout
+      fixANSIForWindows
       action
