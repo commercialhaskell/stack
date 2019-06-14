@@ -1,11 +1,19 @@
 name: stack
-version: '2.1.1'
+version: '2.1.1.1'
 synopsis: The Haskell Tool Stack
-description: ! 'Please see the README.md for usage information, and
-  the wiki on Github for more details.  Also, note that
-  the API for the library is not currently stable, and may
+description: |
+  Please see the documentation at <https://docs.haskellstack.org>
+  for usage information.
+  .
+  If building a 'stack' executable for distribution, please download the
+  source code from <https://github.com/commercialhaskell/stack/releases>
+  and build it using Stack itself in order to ensure identical behaviour
+  to official binaries.  This package on Hackage is provided for convenience
+  and bootstrapping purposes.
+  .
+  Note that the API for the library is not currently stable, and may
   change significantly, even between minor releases. It is
-  currently only intended for use by the executable.'
+  currently only intended for use by the executable.
 category: Development
 author: Commercial Haskell SIG
 maintainer: manny@fpcomplete.com
@@ -24,7 +32,6 @@ extra-source-files:
 - README.md
 - doc/*.md
 - src/setup-shim/StackSetupShim.hs
-- stack.yaml
 - test/package-dump/ghc-7.10.txt
 - test/package-dump/ghc-7.8.4-osx.txt
 - test/package-dump/ghc-7.8.txt

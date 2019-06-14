@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v2.1.1.1
+
+Hackage-only release that removes `stack.yaml` from the sdist.  This is because
+`stack.yaml` now defines a multi-package project, whereas Hackage works on the
+basis on individual packages (see
+[#4860](https://github.com/commercialhaskell/stack/issues/4860))
+
+If building a `stack` executable for distribution, please download the
+source code from https://github.com/commercialhaskell/stack/releases/tag/v2.1.1
+and build it using Stack itself in order to ensure identical behaviour
+to official binaries.  This package on Hackage is provided for convenience
+and bootstrapping purposes.
+
+
 ## v2.1.1
 
 **Changes since v1.9.3**
