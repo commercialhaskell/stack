@@ -147,7 +147,7 @@ createDependencyGraph dotOpts = do
           | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
               return (Set.empty, DotPayload (Just version) (Just $ Right BSD3) Nothing)
           | otherwise =
-              fmap (packageAllDeps &&& (makePayload loc)) (loadPackage loc flags ghcOptions cabalConfigOpts)
+              fmap (packageAllDeps &&& makePayload loc) (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
   where makePayload loc pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) (Just $ PLImmutable loc)
 
@@ -177,7 +177,7 @@ dependencyToJSON pkg (_, payload) =  let fieldsAlwaysPresent = [ "name" .= packa
                                                                , "license" .= licenseText payload
                                                                , "version" .= versionText payload
                                                                ]
-                                         loc = catMaybes [("location" .=) <$> pkgLocToJSON <$> payloadLocation payload]
+                                         loc = catMaybes [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
                                      in object $ fieldsAlwaysPresent ++ loc
 
 pkgLocToJSON :: PackageLocation -> Value
