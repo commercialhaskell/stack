@@ -30,6 +30,7 @@ import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
+import qualified Path
 import           RIO.PrettyPrint (HasTerm (..), HasStylesUpdate (..))
 import           RIO.Process (HasProcessContext (..))
 import           Stack.Build (loadPackage)
@@ -102,6 +103,8 @@ data DotPayload = DotPayload
   -- ^ The package version.
   , payloadLicense :: Maybe (Either SPDX.License License)
   -- ^ The license the package was released under.
+  , payloadLocation :: Maybe PackageLocation
+  -- ^ The location of the package.
   } deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
@@ -143,10 +146,11 @@ createDependencyGraph dotOpts = do
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
           | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
-              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
-          | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions cabalConfigOpts)
+              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3) Nothing)
+          | otherwise =
+              fmap (packageAllDeps &&& (makePayload loc)) (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
-  where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+  where makePayload loc pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) (Just $ PLImmutable loc)
 
 listDependencies
   :: ListDepsOpts
@@ -170,9 +174,30 @@ foldToList :: (k -> a -> b) -> Map k a -> [b]
 foldToList f = Map.foldrWithKey (\k a bs -> bs ++ [f k a]) []
 
 dependencyToJSON :: PackageName -> (Set PackageName, DotPayload) -> Value
-dependencyToJSON pkg (_, payload) =  object [ "name" .= packageNameString pkg
-                                            , "version" .= versionText payload
-                                            , "license" .= licenseText payload]
+dependencyToJSON pkg (_, payload) =  let fieldsAlwaysPresent = [ "name" .= packageNameString pkg
+                                                               , "license" .= licenseText payload
+                                                               , "version" .= versionText payload
+                                                               ]
+                                         loc = catMaybes [("location" .=) <$> pkgLocToJSON <$> payloadLocation payload]
+                                     in object $ fieldsAlwaysPresent ++ loc
+
+pkgLocToJSON :: PackageLocation -> Value
+pkgLocToJSON (PLMutable (ResolvedPath _ dir)) = object [ "type" .= ("project package" :: Text)
+                                              , "url" .= ("file://" ++ Path.toFilePath dir)]
+pkgLocToJSON (PLImmutable (PLIHackage pkgid _ _)) = object [ "type" .= ("hackage" :: Text)
+                                                  , "url" .= ("https://hackage.haskell.org/package/" ++ display pkgid)]
+pkgLocToJSON (PLImmutable (PLIArchive archive _)) = let url = case archiveLocation archive of
+                                                                ALUrl u -> u
+                                                                ALFilePath (ResolvedPath _ path) -> Text.pack $ "file://" ++ Path.toFilePath path
+                                                    in object [ "type" .= ("archive" :: Text)
+                                                              , "url" .= url ]
+pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object [ "type" .= case repoType repo of
+                                                                   RepoGit -> "git" :: Text
+                                                                   RepoHg -> "hg" :: Text
+                                                     , "url" .= repoUrl repo
+                                                     , "commit" .= repoCommit repo
+                                                     , "subdir" .= repoSubdir repo
+                                                     ]
 
 printJSON :: Set PackageName
           -> Map PackageName (Set PackageName, DotPayload)
@@ -314,7 +339,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
       where
         loadDeps pp = do
           pkg <- loadCommonPackage (ppCommon pp)
-          pure (packageAllDeps pkg, payloadFromLocal pkg)
+          pure (packageAllDeps pkg, payloadFromLocal pkg Nothing)
 
     dependencyDeps =
       loadDeps <$> Map.lookup pkgName (smDeps sourceMap)
@@ -322,7 +347,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
         loadDeps DepPackage{dpLocation=PLMutable dir} = do
               pp <- mkProjectPackage YesPrintWarnings dir False
               pkg <- loadCommonPackage (ppCommon pp)
-              pure (packageAllDeps pkg, payloadFromLocal pkg)
+              pure (packageAllDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
         loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
           let common = dpCommon dp
@@ -350,21 +375,23 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
     noDepsErr = error ("Invariant violated: The '" ++ packageNameString pkgName
                 ++ "' package was not found in any of the dependency sources")
 
-    payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
+    payloadFromLocal pkg loc = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) loc
+    payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp) Nothing
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
 projectPackageDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
     map (\lp -> let pkg = localPackageToPackage lp
-                 in (packageName pkg, (deps pkg, lpPayload pkg)))
+                    pkgDir = Path.parent $ lpCabalFile lp
+                    loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
+                 in (packageName pkg, (deps pkg, lpPayload pkg loc)))
         locals
   where deps pkg =
           if dotIncludeExternal dotOpts
             then Set.delete (packageName pkg) (packageAllDeps pkg)
             else Set.intersection localNames (packageAllDeps pkg)
         localNames = Set.fromList $ map (packageName . lpPackage) locals
-        lpPayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+        lpPayload pkg loc = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) (Just loc)
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
 printGraph :: (Applicative m, MonadIO m)
