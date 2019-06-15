@@ -16,7 +16,6 @@ module Stack.Dot (dot
                  ) where
 
 import           Data.Aeson
-import           Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
 import qualified Data.Sequence as Seq
@@ -202,7 +201,7 @@ pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object [ "type" .= case repoType r
 printJSON :: Set PackageName
           -> Map PackageName (Set PackageName, DotPayload)
           -> IO ()
-printJSON pkgs dependencyMap = LBC8.putStrLn $ encodePretty $ DependencyTree pkgs dependencyMap
+printJSON pkgs dependencyMap = LBC8.putStrLn $ encode $ DependencyTree pkgs dependencyMap
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
