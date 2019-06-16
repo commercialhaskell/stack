@@ -1750,14 +1750,10 @@ explicitSetupDeps :: (MonadReader env m, HasConfig env) => PackageName -> m Bool
 explicitSetupDeps name = do
     m <- view $ configL.to configExplicitSetupDeps
     return $
-        -- Yes there are far cleverer ways to write this. I honestly consider
-        -- the explicit pattern matching much easier to parse at a glance.
-        case Map.lookup (Just name) m of
-            Just b -> b
-            Nothing ->
-                case Map.lookup Nothing m of
-                    Just b -> b
-                    Nothing -> False -- default value
+      Map.findWithDefault
+        (Map.findWithDefault False Nothing m)
+        (Just name)
+        m
 
 -- | Data passed into Docker container for the Docker entrypoint's use
 newtype DockerEntrypoint = DockerEntrypoint
