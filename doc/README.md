@@ -38,6 +38,14 @@ platform's package manager to install dependencies and to install to
 installation instructions in the
 [install and upgrade guide](install_and_upgrade.md).
 
+#### How to upgrade
+
+If you already have `stack` installed, upgrade it to the latest version
+by running:
+
+    stack upgrade
+
+
 #### Quick Start Guide
 
 First you need to [install it (see previous section)](#how-to-install).
