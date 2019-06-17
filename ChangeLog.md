@@ -15,6 +15,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Removes dependency on gnu-tar for OSX and Linux environment. The
+  `--force-local` option was required only for windows environment.
+
 
 ## v2.1.1.1
 
