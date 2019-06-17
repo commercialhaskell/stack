@@ -102,8 +102,6 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
-- resource-pool
-- resourcet
 - retry
 - rio
 - rio-prettyprint
