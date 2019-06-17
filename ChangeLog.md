@@ -14,6 +14,8 @@ Behavior changes:
 Other enhancements:
 
 Bug fixes:
+* Fix to allow dependencies on specific versions of local git repositories. See
+  [#4862](https://github.com/commercialhaskell/stack/pull/4862)
 
 
 ## v2.1.1.1
