@@ -18,3 +18,5 @@ removing support for building GHCJS itself; links will be added to
 this README for information on separate tools. Issues on GHCJS may be
 closed as not supported, and the next major Stack release may remove
 GHCJS support entirely.
+
+Test commit
