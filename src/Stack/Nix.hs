@@ -24,7 +24,6 @@ import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inConta
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
-import           Stack.Docker (getProjectRoot)
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
@@ -43,10 +42,11 @@ runShellAndExit = do
    local (set processContextL envOverride) $ do
      let cmnd = escape exePath
          args' = map escape args
-     projectRoot <- getProjectRoot
-     mshellFile <-
-         traverse (resolveFile projectRoot) $
-         nixInitFile (configNix config)
+
+     mshellFile <- case configProjectRoot config of
+         Just projectRoot ->
+             traverse (resolveFile projectRoot) $ nixInitFile (configNix config)
+         Nothing -> pure Nothing
 
      -- This will never result in double loading the build config, since:
      --

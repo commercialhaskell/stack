@@ -15,6 +15,10 @@ Other enhancements:
 
 Bug fixes:
 
+* Allow Stack commands to be run in Nix mode without having a project file
+  available. See
+  [#4854](https://github.com/commercialhaskell/stack/issues/4864).
+
 
 ## v2.1.1.1
 
