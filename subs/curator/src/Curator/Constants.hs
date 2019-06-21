@@ -12,7 +12,7 @@ constraintsFilename :: FilePath
 constraintsFilename = "constraints.yaml"
 
 snapshotsRepo :: String
-snapshotsRepo = "commercialhaskell/stackage-next"
+snapshotsRepo = "commercialhaskell/stackage-snapshots"
 
 constraintsRepo :: String
-constraintsRepo = "commercialhaskell/stackage-constraints-next"
+constraintsRepo = "commercialhaskell/stackage-constraints"
