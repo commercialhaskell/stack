@@ -21,6 +21,9 @@ Bug fixes:
   available. See
   [#4854](https://github.com/commercialhaskell/stack/issues/4864).
 
+* Removes dependency on gnu-tar for OSX and Linux environment. The
+  `--force-local` option was required only for windows environment.
+
 
 ## v2.1.1.1
 

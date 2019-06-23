@@ -138,13 +138,16 @@ createRepoArchive repo tarball = do
   withRepo repo $ case repoType repo of
     RepoGit -> do
        runGitCommand ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
+       let forceLocal = if osIsWindows
+                        then " --force-local "
+                        else mempty
        -- also include submodules files: use `git submodule foreach` to
        -- execute `git archive` in each submodule and to append the
        -- generated archive to the main one with `tar -A`
        runGitCommand
          [ "submodule", "foreach", "--recursive"
          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD"
-           <> " && if [ -f bar.tar ]; then tar --force-local -Af " <> tarball <> " bar.tar ; fi"
+           <> " && if [ -f bar.tar ]; then tar" <> forceLocal <> " -Af " <> tarball <> " bar.tar ; fi"
          ]
     RepoHg  -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
