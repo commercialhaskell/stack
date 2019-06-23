@@ -14,6 +14,15 @@ Behavior changes:
 Other enhancements:
 
 Bug fixes:
+* Fix to allow dependencies on specific versions of local git repositories. See
+  [#4862](https://github.com/commercialhaskell/stack/pull/4862)
+
+* Allow Stack commands to be run in Nix mode without having a project file
+  available. See
+  [#4854](https://github.com/commercialhaskell/stack/issues/4864).
+
+* Removes dependency on gnu-tar for OSX and Linux environment. The
+  `--force-local` option was required only for windows environment.
 
 
 ## v2.1.1.1
