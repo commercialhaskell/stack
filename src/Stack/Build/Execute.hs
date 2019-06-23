@@ -1597,7 +1597,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
             TTLocalMutable lp -> do
-                when enableTests $ unsetTestSuccess pkgDir
+                when enableTests $ setTestStatus pkgDir TSUnknown
                 caches <- runMemoizedWith $ lpNewBuildCaches lp
                 mapM_ (uncurry (writeBuildCache pkgDir))
                       (Map.toList caches)
@@ -1886,12 +1886,19 @@ singleTest topts testsToRun ac ee task installedMap = do
               else if toRerunTests topts
                   then return True
                   else do
-                      success <- checkTestSuccess pkgDir
-                      if success
-                          then do
-                              unless (null testsToRun) $ announce "skipping already passed test"
-                              return False
-                          else return True
+                    status <- getTestStatus pkgDir
+                    case status of
+                      TSSuccess -> do
+                        unless (null testsToRun) $ announce "skipping already passed test"
+                        return False
+                      TSFailure
+                        | expectFailure -> do
+                            announce "skipping already failed test that's expected to fail"
+                            return False
+                        | otherwise -> do
+                            announce "rerunning previously failed test"
+                            return True
+                      TSUnknown -> return True
 
         when toRun $ do
             buildDir <- distDirFromDir pkgDir
@@ -2058,7 +2065,8 @@ singleTest topts testsToRun ac ee task installedMap = do
                         hClose h
                         S.readFile $ toFilePath logFile
 
-            unless (Map.null errs || expectFailure) $ throwM $ TestSuiteFailure
+            let succeeded = Map.null errs
+            unless (succeeded || expectFailure) $ throwM $ TestSuiteFailure
                 (taskProvides task)
                 errs
                 (case outputType of
@@ -2066,7 +2074,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                    OTConsole _ -> Nothing)
                 bs
 
-            setTestSuccess pkgDir
+            setTestStatus pkgDir $ if succeeded then TSSuccess else TSFailure
 
 -- | Implements running a package's benchmarks.
 singleBench :: HasEnvConfig env

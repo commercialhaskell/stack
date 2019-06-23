@@ -20,9 +20,9 @@ module Stack.Build.Cache
     , writeBuildCache
     , writeConfigCache
     , writeCabalMod
-    , setTestSuccess
-    , unsetTestSuccess
-    , checkTestSuccess
+    , TestStatus (..)
+    , setTestStatus
+    , getTestStatus
     , writePrecompiledCache
     , readPrecompiledCache
     -- Exported for testing
@@ -207,36 +207,42 @@ writeFlagCache gid cache = do
     key <- flagCacheKey gid
     saveConfigCache key cache
 
-successBS, failureBS :: IsString s => s
+successBS, failureBS, unknownBS :: IsString s => s
 successBS = "success"
 failureBS = "failure"
+unknownBS = "unknown"
 
--- | Mark a test suite as having succeeded
-setTestSuccess :: HasEnvConfig env
-               => Path Abs Dir
-               -> RIO env ()
-setTestSuccess dir = do
-    fp <- testSuccessFile dir
-    writeBinaryFileAtomic fp successBS
+-- | Status of a test suite
+data TestStatus = TSSuccess | TSFailure | TSUnknown
 
--- | Mark a test suite as not having succeeded
-unsetTestSuccess :: HasEnvConfig env
-                 => Path Abs Dir
-                 -> RIO env ()
-unsetTestSuccess dir = do
+-- | Mark test suite status
+setTestStatus :: HasEnvConfig env
+              => Path Abs Dir
+              -> TestStatus
+              -> RIO env ()
+setTestStatus dir status = do
     fp <- testSuccessFile dir
-    writeBinaryFileAtomic fp failureBS
+    writeBinaryFileAtomic fp $
+      case status of
+        TSSuccess -> successBS
+        TSFailure -> failureBS
+        TSUnknown -> unknownBS
 
 -- | Check if the test suite already passed
-checkTestSuccess :: HasEnvConfig env
-                 => Path Abs Dir
-                 -> RIO env Bool
-checkTestSuccess dir = do
+getTestStatus :: HasEnvConfig env
+              => Path Abs Dir
+              -> RIO env TestStatus
+getTestStatus dir = do
   fp <- testSuccessFile dir
   -- we could ensure the file is the right size first,
   -- but we're not expected an attack from the user's filesystem
-  either (const False) (== successBS)
-    <$> tryIO (readFileBinary $ toFilePath fp)
+  eres <- tryIO (readFileBinary $ toFilePath fp)
+  pure $
+    case eres of
+      Right bs
+        | bs == successBS -> TSSuccess
+        | bs == failureBS -> TSFailure
+      _ -> TSUnknown
 
 --------------------------------------
 -- Precompiled Cache
