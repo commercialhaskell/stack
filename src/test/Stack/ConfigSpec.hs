@@ -191,7 +191,7 @@ spec = beforeAll setup $ do
       createDirectory childDir
       setCurrentDirectory childDir
       loadConfig' $ \config -> liftIO $ do
-        bc <- runRIO config loadBuildConfig
+        bc <- runRIO config $ withBuildConfig ask
         view projectRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
@@ -200,7 +200,7 @@ spec = beforeAll setup $ do
         writeFile stackYamlFp sampleConfig
         writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
         withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \config -> liftIO $ do
-          BuildConfig{..} <- runRIO config loadBuildConfig
+          BuildConfig{..} <- runRIO config $ withBuildConfig ask
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
@@ -214,7 +214,7 @@ spec = beforeAll setup $ do
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
-            BuildConfig{..} <- runRIO config loadBuildConfig
+            BuildConfig{..} <- runRIO config $ withBuildConfig ask
             bcStackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $

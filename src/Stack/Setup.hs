@@ -81,7 +81,7 @@ import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath,
 import              Stack.Prelude hiding (Display (..))
 import              Stack.SourceMap
 import              Stack.Setup.Installed
-import              Stack.Storage (loadCompilerPaths, saveCompilerPaths)
+import              Stack.Storage.User (loadCompilerPaths, saveCompilerPaths)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
 import              Stack.Types.CompilerBuild

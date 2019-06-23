@@ -41,7 +41,8 @@ import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Storage
+import           Stack.Storage.Project
+import           Stack.Storage.User
 import           Stack.Types.Build
 import           Stack.Types.Cache
 import           Stack.Types.Config

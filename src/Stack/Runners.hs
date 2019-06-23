@@ -29,7 +29,7 @@ import           Stack.DefaultColorWhen (defaultColorWhen)
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Setup
-import           Stack.Storage (upgradeChecksSince, logUpgradeCheck)
+import           Stack.Storage.User (upgradeChecksSince, logUpgradeCheck)
 import           Stack.Types.Config
 import           Stack.Types.Docker (dockerEnable)
 import           Stack.Types.Nix (nixEnable)
@@ -54,14 +54,6 @@ withDefaultEnvConfig
     :: RIO EnvConfig a
     -> RIO Config a
 withDefaultEnvConfig = withEnvConfig AllowNoTargets defaultBuildOptsCLI
-
--- | Upgrade a 'Config' environment to a 'BuildConfig' environment by
--- performing further parsing of project-specific configuration. This
--- is intended to be run inside a call to 'withConfig'.
-withBuildConfig :: RIO BuildConfig a -> RIO Config a
-withBuildConfig inner = do
-  bconfig <- loadBuildConfig
-  runRIO bconfig inner
 
 -- | Upgrade a 'Config' environment to an 'EnvConfig' environment by
 -- performing further parsing of project-specific configuration (like

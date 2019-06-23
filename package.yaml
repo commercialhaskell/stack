@@ -229,7 +229,9 @@ library:
   - Stack.Setup.Installed
   - Stack.SetupCmd
   - Stack.SourceMap
-  - Stack.Storage
+  - Stack.Storage.Project
+  - Stack.Storage.User
+  - Stack.Storage.Util
   - Stack.Types.Build
   - Stack.Types.CompilerBuild
   - Stack.Types.Compiler

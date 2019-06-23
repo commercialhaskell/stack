@@ -11,15 +11,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
--- | Work with SQLite database used for caches.
-module Stack.Storage
-    ( initStorage
-    , withStorage
-    , ConfigCacheKey
-    , configCacheKey
-    , loadConfigCache
-    , saveConfigCache
-    , deactiveConfigCache
+-- | Work with SQLite database used for caches across an entire user account.
+module Stack.Storage.User
+    ( initUserStorage
     , PrecompiledCacheKey
     , precompiledCacheKey
     , loadPrecompiledCache
@@ -32,7 +26,6 @@ module Stack.Storage
     , logUpgradeCheck
     ) where
 
-import qualified Data.ByteString as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
@@ -46,12 +39,12 @@ import Path
 import Path.IO (resolveFile', resolveDir')
 import qualified RIO.FilePath as FP
 import Stack.Prelude hiding (MigrationFailure)
+import Stack.Storage.Util
 import Stack.Types.Build
 import Stack.Types.Cache
 import Stack.Types.Compiler
 import Stack.Types.CompilerBuild (CompilerBuild)
-import Stack.Types.Config (HasConfig, configL, configStorage, CompilerPaths (..), GhcPkgExe (..))
-import Stack.Types.GhcPkgId
+import Stack.Types.Config (HasConfig, configL, configUserStorage, CompilerPaths (..), GhcPkgExe (..), UserStorage (..))
 import System.Posix.Types (COff (..))
 import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
 
@@ -60,42 +53,6 @@ share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
-ConfigCacheParent sql="config_cache"
-  directory FilePath "default=(hex(randomblob(16)))"
-  type ConfigCacheType
-  pkgSrc CachePkgSrc
-  active Bool
-  pathEnvVar Text
-  haddock Bool default=0
-  UniqueConfigCacheParent directory type sql="unique_config_cache"
-  deriving Show
-
-ConfigCacheDirOption
-  parent ConfigCacheParentId sql="config_cache_id"
-  index Int
-  value String sql="option"
-  UniqueConfigCacheDirOption parent index
-  deriving Show
-
-ConfigCacheNoDirOption
-  parent ConfigCacheParentId sql="config_cache_id"
-  index Int
-  value String sql="option"
-  UniqueConfigCacheNoDirOption parent index
-  deriving Show
-
-ConfigCacheDep
-  parent ConfigCacheParentId sql="config_cache_id"
-  value GhcPkgId sql="ghc_pkg_id"
-  UniqueConfigCacheDep parent value
-  deriving Show
-
-ConfigCacheComponent
-  parent ConfigCacheParentId sql="config_cache_id"
-  value S.ByteString sql="component"
-  UniqueConfigCacheComponent parent value
-  deriving Show
-
 PrecompiledCacheParent sql="precompiled_cache"
   platformGhcDir FilePath "default=(hex(randomblob(16)))"
   compiler Text
@@ -162,141 +119,20 @@ LastPerformed
 |]
 
 -- | Initialize the database.
-initStorage ::
+initUserStorage ::
        HasLogFunc env
     => Path Abs File -- ^ storage file
-    -> (SQLite.Storage -> RIO env a)
+    -> (UserStorage -> RIO env a)
     -> RIO env a
-initStorage = SQLite.initStorage "Stack" migrateAll
+initUserStorage fp f = SQLite.initStorage "Stack" migrateAll fp $ f . UserStorage
 
 -- | Run an action in a database transaction
-withStorage ::
+withUserStorage ::
        (HasConfig env, HasLogFunc env)
     => ReaderT SqlBackend (RIO env) a
     -> RIO env a
-withStorage inner =
-    flip SQLite.withStorage_ inner =<< view (configL . to configStorage)
-
--- | Key used to retrieve configuration or flag cache
-type ConfigCacheKey = Unique ConfigCacheParent
-
--- | Build key used to retrieve configuration or flag cache
-configCacheKey :: Path Abs Dir -> ConfigCacheType -> ConfigCacheKey
-configCacheKey dir = UniqueConfigCacheParent (toFilePath dir)
-
--- | Internal helper to read the 'ConfigCache'
-readConfigCache ::
-       (HasConfig env, HasLogFunc env)
-    => Entity ConfigCacheParent
-    -> ReaderT SqlBackend (RIO env) ConfigCache
-readConfigCache (Entity parentId ConfigCacheParent {..}) = do
-    let configCachePkgSrc = configCacheParentPkgSrc
-    coDirs <-
-        map (configCacheDirOptionValue . entityVal) <$>
-        selectList
-            [ConfigCacheDirOptionParent ==. parentId]
-            [Asc ConfigCacheDirOptionIndex]
-    coNoDirs <-
-        map (configCacheNoDirOptionValue . entityVal) <$>
-        selectList
-            [ConfigCacheNoDirOptionParent ==. parentId]
-            [Asc ConfigCacheNoDirOptionIndex]
-    let configCacheOpts = ConfigureOpts {..}
-    configCacheDeps <-
-        Set.fromList . map (configCacheDepValue . entityVal) <$>
-        selectList [ConfigCacheDepParent ==. parentId] []
-    configCacheComponents <-
-        Set.fromList . map (configCacheComponentValue . entityVal) <$>
-        selectList [ConfigCacheComponentParent ==. parentId] []
-    let configCachePathEnvVar = configCacheParentPathEnvVar
-    let configCacheHaddock = configCacheParentHaddock
-    return ConfigCache {..}
-
--- | Load 'ConfigCache' from the database.
-loadConfigCache ::
-       (HasConfig env, HasLogFunc env)
-    => ConfigCacheKey
-    -> RIO env (Maybe ConfigCache)
-loadConfigCache key =
-    withStorage $ do
-        mparent <- getBy key
-        case mparent of
-            Nothing -> return Nothing
-            Just parentEntity@(Entity _ ConfigCacheParent {..})
-                | configCacheParentActive ->
-                    Just <$> readConfigCache parentEntity
-                | otherwise -> return Nothing
-
--- | Insert or update 'ConfigCache' to the database.
-saveConfigCache ::
-       (HasConfig env, HasLogFunc env)
-    => ConfigCacheKey
-    -> ConfigCache
-    -> RIO env ()
-saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
-    withStorage $ do
-        mparent <- getBy key
-        (parentId, mold) <-
-            case mparent of
-                Nothing ->
-                    (, Nothing) <$>
-                    insert
-                        ConfigCacheParent
-                            { configCacheParentDirectory = dir
-                            , configCacheParentType = type_
-                            , configCacheParentPkgSrc = configCachePkgSrc new
-                            , configCacheParentActive = True
-                            , configCacheParentPathEnvVar = configCachePathEnvVar new
-                            , configCacheParentHaddock = configCacheHaddock new
-                            }
-                Just parentEntity@(Entity parentId _) -> do
-                    old <- readConfigCache parentEntity
-                    update
-                        parentId
-                        [ ConfigCacheParentPkgSrc =. configCachePkgSrc new
-                        , ConfigCacheParentActive =. True
-                        , ConfigCacheParentPathEnvVar =. configCachePathEnvVar new
-                        ]
-                    return (parentId, Just old)
-        updateList
-            ConfigCacheDirOption
-            ConfigCacheDirOptionParent
-            parentId
-            ConfigCacheDirOptionIndex
-            (maybe [] (coDirs . configCacheOpts) mold)
-            (coDirs $ configCacheOpts new)
-        updateList
-            ConfigCacheNoDirOption
-            ConfigCacheNoDirOptionParent
-            parentId
-            ConfigCacheNoDirOptionIndex
-            (maybe [] (coNoDirs . configCacheOpts) mold)
-            (coNoDirs $ configCacheOpts new)
-        updateSet
-            ConfigCacheDep
-            ConfigCacheDepParent
-            parentId
-            ConfigCacheDepValue
-            (maybe Set.empty configCacheDeps mold)
-            (configCacheDeps new)
-        updateSet
-            ConfigCacheComponent
-            ConfigCacheComponentParent
-            parentId
-            ConfigCacheComponentValue
-            (maybe Set.empty configCacheComponents mold)
-            (configCacheComponents new)
-
--- | Mark 'ConfigCache' as inactive in the database.
--- We use a flag instead of deleting the records since, in most cases, the same
--- cache will be written again within in a few seconds (after
--- `cabal configure`), so this avoids unnecessary database churn.
-deactiveConfigCache :: HasConfig env => ConfigCacheKey -> RIO env ()
-deactiveConfigCache (UniqueConfigCacheParent dir type_) =
-    withStorage $
-    updateWhere
-        [ConfigCacheParentDirectory ==. dir, ConfigCacheParentType ==. type_]
-        [ConfigCacheParentActive =. False]
+withUserStorage inner =
+    flip SQLite.withStorage_ inner =<< view (configL . to configUserStorage . to unUserStorage)
 
 -- | Key used to retrieve the precompiled cache
 type PrecompiledCacheKey = Unique PrecompiledCacheParent
@@ -339,7 +175,7 @@ loadPrecompiledCache ::
        (HasConfig env, HasLogFunc env)
     => PrecompiledCacheKey
     -> RIO env (Maybe (PrecompiledCache Rel))
-loadPrecompiledCache key = withStorage $ fmap snd <$> readPrecompiledCache key
+loadPrecompiledCache key = withUserStorage $ fmap snd <$> readPrecompiledCache key
 
 -- | Insert or update 'PrecompiledCache' to the database.
 savePrecompiledCache ::
@@ -348,7 +184,7 @@ savePrecompiledCache ::
     -> PrecompiledCache Rel
     -> RIO env ()
 savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPlatformGhcDir precompiledCacheParentCompiler precompiledCacheParentCabalVersion precompiledCacheParentPackageKey precompiledCacheParentOptionsHash precompiledCacheParentHaddock) new =
-    withStorage $ do
+    withUserStorage $ do
         let precompiledCacheParentLibrary = fmap toFilePath (pcLibrary new)
         mIdOld <- readPrecompiledCache key
         (parentId, mold) <-
@@ -386,7 +222,7 @@ loadDockerImageExeCache ::
     -> UTCTime
     -> RIO env (Maybe Bool)
 loadDockerImageExeCache imageId exePath exeTimestamp =
-    withStorage $
+    withUserStorage $
     fmap (dockerImageExeCacheCompatible . entityVal) <$>
     getBy (DockerImageExeCacheUnique imageId (toFilePath exePath) exeTimestamp)
 
@@ -400,7 +236,7 @@ saveDockerImageExeCache ::
     -> RIO env ()
 saveDockerImageExeCache imageId exePath exeTimestamp compatible =
     void $
-    withStorage $
+    withUserStorage $
     upsert
         (DockerImageExeCache
              imageId
@@ -408,61 +244,6 @@ saveDockerImageExeCache imageId exePath exeTimestamp compatible =
              exeTimestamp
              compatible)
         []
-
--- | Efficiently update a set of values stored in a database table
-updateSet ::
-       ( PersistEntityBackend record ~ BaseBackend backend
-       , PersistField parentid
-       , PersistField value
-       , Ord value
-       , PersistEntity record
-       , MonadIO m
-       , PersistQueryWrite backend
-       )
-    => (parentid -> value -> record)
-    -> EntityField record parentid
-    -> parentid
-    -> EntityField record value
-    -> Set value
-    -> Set value
-    -> ReaderT backend m ()
-updateSet recordCons parentFieldCons parentId valueFieldCons old new =
-    when (old /= new) $ do
-        deleteWhere
-            [ parentFieldCons ==. parentId
-            , valueFieldCons <-. Set.toList (Set.difference old new)
-            ]
-        insertMany_ $
-            map (recordCons parentId) $ Set.toList (Set.difference new old)
-
--- | Efficiently update a list of values stored in a database table.
-updateList ::
-       ( PersistEntityBackend record ~ BaseBackend backend
-       , PersistField parentid
-       , Ord value
-       , PersistEntity record
-       , MonadIO m
-       , PersistQueryWrite backend
-       )
-    => (parentid -> Int -> value -> record)
-    -> EntityField record parentid
-    -> parentid
-    -> EntityField record Int
-    -> [value]
-    -> [value]
-    -> ReaderT backend m ()
-updateList recordCons parentFieldCons parentId indexFieldCons old new =
-    when (old /= new) $ do
-        let oldSet = Set.fromList (zip [0 ..] old)
-            newSet = Set.fromList (zip [0 ..] new)
-        deleteWhere
-            [ parentFieldCons ==. parentId
-            , indexFieldCons <-.
-              map fst (Set.toList $ Set.difference oldSet newSet)
-            ]
-        insertMany_ $
-            map (uncurry $ recordCons parentId) $
-            Set.toList (Set.difference newSet oldSet)
 
 -- | Type-restricted version of 'fromIntegral' to ensure we're making
 -- the value bigger, not smaller.
@@ -483,7 +264,7 @@ loadCompilerPaths
   -> Bool -- ^ sandboxed?
   -> RIO env (Maybe CompilerPaths)
 loadCompilerPaths compiler build sandboxed = do
-  mres <- withStorage $ getBy $ UniqueCompilerInfo $ toFilePath compiler
+  mres <- withUserStorage $ getBy $ UniqueCompilerInfo $ toFilePath compiler
   for mres $ \(Entity _ CompilerCache {..}) -> do
     compilerStatus <- liftIO $ getFileStatus $ toFilePath compiler
     when
@@ -534,7 +315,7 @@ saveCompilerPaths
   :: HasConfig env
   => CompilerPaths
   -> RIO env ()
-saveCompilerPaths CompilerPaths {..} = withStorage $ do
+saveCompilerPaths CompilerPaths {..} = withUserStorage $ do
   deleteBy $ UniqueCompilerInfo $ toFilePath cpCompiler
   compilerStatus <- liftIO $ getFileStatus $ toFilePath cpCompiler
   globalDbStatus <- liftIO $ getFileStatus $ toFilePath $ cpGlobalDB </> $(mkRelFile "package.cache")
@@ -558,13 +339,13 @@ saveCompilerPaths CompilerPaths {..} = withStorage $ do
 
 -- | How many upgrade checks have occurred since the given timestamp?
 upgradeChecksSince :: HasConfig env => UTCTime -> RIO env Int
-upgradeChecksSince since = withStorage $ count
+upgradeChecksSince since = withUserStorage $ count
   [ LastPerformedAction ==. UpgradeCheck
   , LastPerformedTimestamp >=. since
   ]
 
 -- | Log in the database that an upgrade check occurred at the given time.
 logUpgradeCheck :: HasConfig env => UTCTime -> RIO env ()
-logUpgradeCheck time = withStorage $ void $ upsert
+logUpgradeCheck time = withUserStorage $ void $ upsert
   (LastPerformed UpgradeCheck time)
   [LastPerformedTimestamp =. time]

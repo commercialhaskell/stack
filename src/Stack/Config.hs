@@ -29,7 +29,7 @@ module Stack.Config
   ,getInNixShell
   ,defaultConfigYaml
   ,getProjectConfig
-  ,loadBuildConfig
+  ,withBuildConfig
   ) where
 
 import           Control.Monad.Extra (firstJustM)
@@ -64,7 +64,8 @@ import           Stack.Config.Nix
 import           Stack.Constants
 import           Stack.Build.Haddock (shouldHaddockDeps)
 import           Stack.Lock (lockCachedWanted)
-import           Stack.Storage (initStorage)
+import           Stack.Storage.Project (initProjectStorage)
+import           Stack.Storage.User (initUserStorage)
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Compiler
@@ -373,9 +374,9 @@ configFromConfigMonoid
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
-       (\configPantryConfig -> initStorage
+       (\configPantryConfig -> initUserStorage
          (configStackRoot </> relFileStorage)
-         (\configStorage -> inner Config {..}))
+         (\configUserStorage -> inner Config {..}))
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
@@ -448,8 +449,10 @@ loadConfig inner = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: RIO Config BuildConfig
-loadBuildConfig = do
+withBuildConfig
+  :: RIO BuildConfig a
+  -> RIO Config a
+withBuildConfig inner = do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
@@ -526,13 +529,20 @@ loadBuildConfig = do
     wanted <- lockCachedWanted stackYamlFP (projectResolver project) $
         fillProjectWanted stackYamlFP config project
 
-    return BuildConfig
-        { bcConfig = config
-        , bcSMWanted = wanted
-        , bcExtraPackageDBs = extraPackageDBs
-        , bcStackYaml = stackYamlFP
-        , bcCurator = projectCurator project
-        }
+    -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig yet
+    workDir <- view workDirL
+    let projectStorageFile = parent stackYamlFP </> workDir </> relFileStorage
+
+    initProjectStorage projectStorageFile $ \projectStorage -> do
+      let bc = BuildConfig
+            { bcConfig = config
+            , bcSMWanted = wanted
+            , bcExtraPackageDBs = extraPackageDBs
+            , bcStackYaml = stackYamlFP
+            , bcCurator = projectCurator project
+            , bcProjectStorage = projectStorage
+            }
+      runRIO bc inner
   where
     getEmptyProject :: Maybe RawSnapshotLocation -> [PackageIdentifierRevision] -> RIO Config Project
     getEmptyProject mresolver extraDeps = do
