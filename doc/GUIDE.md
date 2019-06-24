@@ -410,7 +410,7 @@ Again, we add this new dependency to the `package.yaml` file like this:
 
 ```
 dependencies:
-- base >= 4.7 && 5
+- base >= 4.7 && < 5
 - text
 - filepath
 - containers
