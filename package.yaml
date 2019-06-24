@@ -324,8 +324,11 @@ flags:
     manual: true
     default: false
   hide-dependency-versions:
-    description: Hides dependency versions from "stack --version", used only by building
-      with stack.yaml
+    description: "Hides dependency versions from 'stack --version', used only by building
+      Stack and the default 'stack.yaml'.  Note to packagers/distributors:
+      DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY
+      (e.g. using cabal or from Hackage), as it makes debugging support
+      requests more difficult."
     manual: true
     default: false
   integration-tests:
@@ -333,6 +336,11 @@ flags:
     manual: true
     default: false
   supported-build:
-    description: If false, causes "stack --version" to issue a warning about the build being unsupported.  True only if building with stack.yaml
+    description: "If false, causes 'stack --version' to issue a warning about
+      the build being unsupported.  Should be True only if building with
+      Stack and the default 'stack.yaml'.  Note to packagers/distributors:
+      DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY
+      (e.g. using cabal or from Hackage), as it makes debugging support
+      requests more difficult."
     manual: true
     default: false
