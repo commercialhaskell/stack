@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -31,7 +32,9 @@ import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 -- support others later).
 path :: [Text] -> RIO Runner ()
 path keys =
-    do let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
+    do let haddockEnabledL :: Lens' Runner (Maybe Bool)
+           haddockEnabledL = globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL
+           deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
        forM_ deprecated $ \(oldOption, newOption) -> logWarn $
            "\n" <>
            "'--" <> display oldOption <> "' will be removed in a future release.\n" <>
@@ -52,16 +55,17 @@ path keys =
              liftIO $ forM_ extractors $ \(key, extractPath) -> do
                let prefix = if single then "" else key <> ": "
                T.putStrLn $ prefix <> extractPath pathInfo
-           runHaddock x = local
-             (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
+           runHaddock =
              withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
              withDefaultEnvConfig
+           runSetHaddock x = local (set haddockEnabledL (Just x)) . runHaddock
        -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
        -- withDefaultEnvConfig each time, need to figure out what
        -- purpose is served and whether we can achieve it without two
        -- completely separate Config setups
-       runHaddock True $ printKeys with singlePath
-       runHaddock False $ printKeys without singlePath
+       view haddockEnabledL >>= \ case
+         Just True -> runHaddock (printKeys with singlePath) >> runSetHaddock False (printKeys without singlePath)
+         _ -> runSetHaddock False (printKeys without singlePath)
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
