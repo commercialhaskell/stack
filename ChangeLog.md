@@ -10,6 +10,10 @@ Release notes:
 Major changes:
 
 Behavior changes:
+* `stack path` no longer outputs haddock-dependent paths unless `--haddock` is
+  specified. [#4892](https://github.com/commercialhaskell/stack/issues/4892).
+  Current list of affected paths: `local-doc-root`, `local-hoogle-root`,
+  `dist-dir`.
 
 Other enhancements:
 
