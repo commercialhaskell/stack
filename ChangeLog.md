@@ -29,6 +29,9 @@ Bug fixes:
 * Removes dependency on gnu-tar for OSX and Linux environment. The
   `--force-local` option was required only for windows environment.
 
+* Properly wait for the `tar` subprocess to complete before returning, thereby
+  avoiding a SIGTERM screwing up GHC installation. See
+  [#4888](https://github.com/commercialhaskell/stack/issues/4888).
 
 ## v2.1.1.1
 
