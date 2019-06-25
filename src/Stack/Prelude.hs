@@ -40,7 +40,7 @@ import           System.IO.Echo (withoutInputEcho)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
-import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL)
+import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL, waitExitCode)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 
@@ -80,8 +80,8 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
            $ setStdin (byteStringInput "")
              pc0
     withProcess_ pc $ \p ->
-      runConduit (getStderr p .| sinkStderr) `concurrently`
-      runConduit (getStdout p .| sinkStdout)
+      (runConduit (getStderr p .| sinkStderr) `concurrently`
+      runConduit (getStdout p .| sinkStdout)) <* waitExitCode p
 
 -- | Consume the stdout of a process feeding strict 'ByteString's to a consumer.
 -- If the process fails, spits out stdout and stderr as error log
