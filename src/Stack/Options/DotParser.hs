@@ -74,11 +74,14 @@ licenseParser = boolFlags False
                 "printing of dependency licenses instead of versions"
                 idm
 
+listDepsFormatOptsParser :: Parser ListDepsFormatOpts
+listDepsFormatOptsParser = ListDepsFormatOpts <$> separatorParser <*> licenseParser
+
 listDepsTreeParser :: Parser ListDepsFormat
-listDepsTreeParser =  ListDepsTree <$> separatorParser <*> licenseParser
+listDepsTreeParser =  ListDepsTree <$> listDepsFormatOptsParser
 
 listDepsTextParser :: Parser ListDepsFormat
-listDepsTextParser = ListDepsText <$> separatorParser <*> licenseParser
+listDepsTextParser = ListDepsText <$> listDepsFormatOptsParser
 
 listDepsJsonParser :: Parser ListDepsFormat
 listDepsJsonParser = pure ListDepsJSON
