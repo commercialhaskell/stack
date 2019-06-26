@@ -94,4 +94,5 @@ unpackSnapshot cons snap root = do
         , "skip-haddock" .= Set.map CabalString skipHaddock
         , "expect-haddock-failure" .= Set.map CabalString expectHaddockFailure
         ]
+    , "system-ghc" .= True
     ]
