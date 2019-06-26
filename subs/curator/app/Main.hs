@@ -219,7 +219,7 @@ uploadDocs' target = do
   docsDir <- fmap (T.unpack . T.dropSuffix "\n" . decodeUtf8Lenient . BL.toStrict) $
     withWorkingDir unpackDir $ proc "stack" (words "path --local-doc-root") readProcessStdout_
   logInfo "Uploading docs to S3"
-  let bucket = "next.haddock.stackage.org"
+  let bucket = "haddock.stackage.org"
       prefix = utf8BuilderToText $
         case target of
           TargetNightly day ->
