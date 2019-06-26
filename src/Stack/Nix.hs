@@ -18,7 +18,7 @@ import           Data.Version (showVersion)
 import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Stack.Config (getInContainer, loadBuildConfig)
+import           Stack.Config (getInContainer, withBuildConfig)
 import           Stack.Config.Nix (nixCompiler)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
@@ -54,7 +54,7 @@ runShellAndExit = do
      --
      -- 2. This function ends up exiting before running other code
      -- (thus the void return type)
-     compilerVersion <- view wantedCompilerVersionL <$> loadBuildConfig
+     compilerVersion <- withBuildConfig $ view wantedCompilerVersionL
 
      ghc <- either throwIO return $ nixCompiler compilerVersion
      let pkgsInConfig = nixPackages (configNix config)

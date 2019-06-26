@@ -46,6 +46,9 @@ module Stack.Types.Config
   ,stackYamlL
   ,projectRootL
   ,HasBuildConfig(..)
+  -- ** Storage databases
+  ,UserStorage(..)
+  ,ProjectStorage(..)
   -- ** GHCVariant & HasGHCVariant
   ,GHCVariant(..)
   ,ghcVariantName
@@ -365,13 +368,23 @@ data Config =
          ,configStackRoot           :: !(Path Abs Dir)
          ,configResolver            :: !(Maybe AbstractResolver)
          -- ^ Any resolver override from the command line
-         ,configStorage             :: !Storage
-         -- ^ Database connection pool for Stack database
+         ,configUserStorage         :: !UserStorage
+         -- ^ Database connection pool for user Stack database
          ,configHideSourcePaths     :: !Bool
          -- ^ Enable GHC hiding source paths?
          ,configRecommendUpgrade    :: !Bool
          -- ^ Recommend a Stack upgrade?
          }
+
+-- | A bit of type safety to ensure we're talking to the right database.
+newtype UserStorage = UserStorage
+  { unUserStorage :: Storage
+  }
+
+-- | A bit of type safety to ensure we're talking to the right database.
+newtype ProjectStorage = ProjectStorage
+  { unProjectStorage :: Storage
+  }
 
 -- | The project root directory, if in a project.
 configProjectRoot :: Config -> Maybe (Path Abs Dir)
@@ -611,6 +624,8 @@ data BuildConfig = BuildConfig
       -- Note: if the STACK_YAML environment variable is used, this may be
       -- different from projectRootL </> "stack.yaml" if a different file
       -- name is used.
+    , bcProjectStorage :: !ProjectStorage
+    -- ^ Database connection pool for project Stack database
     , bcCurator :: !(Maybe Curator)
     }
 

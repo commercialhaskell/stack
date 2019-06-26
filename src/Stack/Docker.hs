@@ -49,7 +49,7 @@ import           Stack.Config (getInContainer)
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Setup (ensureDockerStackExe)
-import           Stack.Storage (loadDockerImageExeCache,saveDockerImageExeCache)
+import           Stack.Storage.User (loadDockerImageExeCache,saveDockerImageExeCache)
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker

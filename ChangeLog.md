@@ -18,6 +18,10 @@ Other enhancements:
   additional message letting the user know when a previously-failed
   test case is being rerun.
 
+* Move configure information for local packages back to .stack-work to
+  improve caching. See
+  [#4893](https://github.com/commercialhaskell/stack/issues/4893).
+
 Bug fixes:
 * Fix to allow dependencies on specific versions of local git repositories. See
   [#4862](https://github.com/commercialhaskell/stack/pull/4862)
