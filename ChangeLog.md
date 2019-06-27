@@ -37,6 +37,10 @@ Bug fixes:
   avoiding a SIGTERM screwing up GHC installation. See
   [#4888](https://github.com/commercialhaskell/stack/issues/4888).
 
+* Use package complete locations from lock files when resolving dependencies
+  in `extra-deps`. See
+  [#4887](https://github.com/commercialhaskell/stack/issues/4887).
+
 ## v2.1.1.1
 
 Hackage-only release that removes `stack.yaml` from the sdist.  This is because
