@@ -57,6 +57,7 @@ initStorage description migration fp inner = do
 
     sqinfo isMigration
            = set extraPragmas ["PRAGMA busy_timeout=2000;"]
+           $ set walEnabled False
 
            -- When doing a migration, we want to disable foreign key
            -- checking, since the order in which tables are created by

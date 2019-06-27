@@ -11,6 +11,10 @@ Major changes:
 
 Behavior changes:
 
+* Disable WAL mode for SQLite3 databases, to improve compatibility with
+  some platforms and filesystems.  See
+  [#4876](https://github.com/commercialhaskell/stack/issues/4876).
+
 Other enhancements:
 
 * Do not rerun expected test failures. This is mostly a change that
