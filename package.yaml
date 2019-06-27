@@ -91,7 +91,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry-tmp
+- pantry
 - path
 - path-io
 - persistent

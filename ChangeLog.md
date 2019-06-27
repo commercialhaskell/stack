@@ -37,6 +37,11 @@ Bug fixes:
   avoiding a SIGTERM screwing up GHC installation. See
   [#4888](https://github.com/commercialhaskell/stack/issues/4888).
 
+* Rename `pantry-tmp` package back to `pantry`, now that we have gained
+  maintainership (which had been used by someone else for a candidate-only test
+  that made it look like the name was free but prevented uploading a real
+  package).
+
 ## v2.1.1.1
 
 Hackage-only release that removes `stack.yaml` from the sdist.  This is because
