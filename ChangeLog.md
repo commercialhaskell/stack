@@ -24,6 +24,9 @@ Bug fixes:
 * Removes dependency on gnu-tar for OSX and Linux environment. The
   `--force-local` option was required only for windows environment.
 
+* Add `ls dependencies json` which will print dependencies as JSON. `ls 
+  dependencies --tree`  is now `ls dependencies tree`. See
+  [#4424](https://github.com/commercialhaskell/stack/pull/4424)
 
 ## v2.1.1.1
 
