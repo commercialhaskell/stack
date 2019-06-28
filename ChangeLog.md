@@ -46,6 +46,10 @@ Bug fixes:
   that made it look like the name was free but prevented uploading a real
   package).
 
+* Use package complete locations from lock files when resolving dependencies
+  in `extra-deps`. See
+  [#4887](https://github.com/commercialhaskell/stack/issues/4887).
+
 ## v2.1.1.1
 
 Hackage-only release that removes `stack.yaml` from the sdist.  This is because
