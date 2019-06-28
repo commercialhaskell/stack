@@ -20,7 +20,7 @@ dotOptsParser externalDefault =
   DotOpts <$> includeExternal
           <*> includeBase
           <*> depthLimit
-          <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
+          <*> fmap (maybe Set.empty $ Set.fromList . splitNames) prunedPkgs
           <*> targetsParser
           <*> flagsParser
           <*> testTargets
