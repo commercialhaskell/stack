@@ -11,8 +11,8 @@ spec = describe "loadCabalFilePath" $ do
   it "sanity" $ do
     abs' <- resolveDir' "."
     (f, name, cabalfp) <- runPantryApp $ loadCabalFilePath abs'
-    suffix <- parseRelFile "pantry-tmp.cabal"
+    suffix <- parseRelFile "pantry.cabal"
     cabalfp `shouldBe` abs' </> suffix
-    name' <- parsePackageNameThrowing "pantry-tmp"
+    name' <- parsePackageNameThrowing "pantry"
     name `shouldBe` name'
     void $ f NoPrintWarnings
