@@ -1927,6 +1927,18 @@ singleTest topts testsToRun ac ee task installedMap = do
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
+                -- in Stack.Package.packageFromPackageDescription we filter out
+                -- package itself of any dependencies so any tests requiring loading
+                -- of their own package library will fail
+                -- so to prevent this we return it back here but unfortunately unconditionally
+                installed <- case Map.lookup pname installedMap of
+                  Just (_, installed) -> pure $ Just installed
+                  Nothing -> do
+                    idMap <- liftIO $ readTVarIO (eeGhcPkgIds ee)
+                    pure $ Map.lookup (taskProvides task) idMap
+                let pkgGhcIdList = case installed of
+                                       Just (Library _ ghcPkgId _) -> [ghcPkgId]
+                                       _ -> []
                 -- doctest relies on template-haskell in QuickCheck-based tests
                 thGhcId <- case find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
                                 (Map.toList $ eeGlobalDumpPkgs ee) of
@@ -1949,7 +1961,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         "package-db " <> fromString snapDBPath <> "\n" <>
                         "package-db " <> fromString localDBPath <> "\n" <>
                         foldMap (\ghcId -> "package-id " <> RIO.display (unGhcPkgId ghcId) <> "\n")
-                            (thGhcId:M.elems allDepsMap)
+                            (pkgGhcIdList ++ thGhcId:M.elems allDepsMap)
                 writeFileUtf8Builder fp ghcEnv
                 menv <- liftIO $ setEnv fp =<< configProcessContextSettings config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
