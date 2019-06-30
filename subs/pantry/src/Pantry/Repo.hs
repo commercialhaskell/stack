@@ -101,6 +101,8 @@ withRepoArchive
 withRepoArchive repo action =
   withSystemTempDirectory "with-repo-archive" $ \tmpdir -> do
     let tarball = tmpdir </> "foo.tar"
+    -- Create an emtpy tarball so that files can be appended
+    void $ proc "tar" ["-cf", tarball, "-T" , "/dev/null"] readProcess_
     createRepoArchive repo tarball
     action tarball
 
@@ -129,27 +131,40 @@ runHgCommand
 runHgCommand args = void $ proc "hg" args readProcess_
 
 -- | Create a tarball containing files from a repository
-createRepoArchive
-  :: forall env. (HasLogFunc env, HasProcessContext env)
+createRepoArchive ::
+     forall env. (HasLogFunc env, HasProcessContext env)
   => Repo
   -> FilePath -- ^ Output tar archive filename
   -> RIO env ()
 createRepoArchive repo tarball = do
-  withRepo repo $ case repoType repo of
-    RepoGit -> do
-       runGitCommand ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
-       let forceLocal = if osIsWindows
-                        then " --force-local "
-                        else mempty
-       -- also include submodules files: use `git submodule foreach` to
-       -- execute `git archive` in each submodule and to append the
-       -- generated archive to the main one with `tar -A`
-       runGitCommand
-         [ "submodule", "foreach", "--recursive"
-         , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD"
-           <> " && if [ -f bar.tar ]; then tar" <> forceLocal <> " -Af " <> tarball <> " bar.tar ; fi"
-         ]
-    RepoHg  -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
+  withRepo repo $
+    case repoType repo of
+      RepoGit -> do
+        logInfo $ displayShow tarball
+        runGitCommand
+          ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
+        let forceLocal =
+              if osIsWindows
+                then " --force-local "
+                else mempty
+       -- also include submodules files: use `git submodule foreach`
+       -- to execute `git archive` in each submodule and generate tar
+       -- archive. This generated archive is extracted to a temporary
+       -- folder and the files in them are added to the tarball
+       -- referenced by the variable tarball in the haskell code. You
+       -- could do this with GNU -A option, but that doesn't work with
+       -- bsdtar which is present in MacOS. So we do this now using a
+       -- temporary folder which is works for both GNU tar and bsdtar.
+        runGitCommand
+          [ "submodule"
+          , "foreach"
+          , "--recursive"
+          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD" <>
+            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar " <> forceLocal <> " -xf temp/bar.tar -C temp/; " <>
+            "rm temp/bar.tar; tar -C temp -rf " <>
+            tarball <> " . ; fi"
+          ]
+      RepoHg -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
 
 -- | Clone the repository and execute the action with the working
