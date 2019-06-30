@@ -1109,7 +1109,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             let prunedDeps = map (style Current . fromString . packageNameString) pruned
             in Just $ flow "Can't use GHC boot package" <+>
                       (style Current . fromString . packageNameString $ name) <+>
-                      flow "when it has an overriden dependency, " <+>
+                      flow "when it has an overridden dependency (issue #4510);" <+>
                       flow "you need to add the following as explicit dependencies to the project:" <+>
                       line <+> encloseSep "" "" ", " prunedDeps
         | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
@@ -1121,13 +1121,22 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintFlag (name, False) = "-" <> fromString (flagNameString name)
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
-        NotInBuildPlan -> Just $
-            style Error (fromString $ packageNameString name) <+>
-            align ((if range == Cabal.anyVersion
-                      then flow "needed"
-                      else flow "must match" <+> goodRange) <> "," <> softline <>
-                   flow "but the stack configuration has no specified version" <+>
-                   latestApplicable Nothing)
+        NotInBuildPlan
+          | name `elem` fold prunedGlobalDeps -> Just $
+              style Error (fromString $ packageNameString name) <+>
+              align ((if range == Cabal.anyVersion
+                        then flow "needed"
+                        else flow "must match" <+> goodRange) <> "," <> softline <>
+                     flow "but this GHC boot package has been pruned (issue #4510);" <+>
+                     flow "you need to add the package explicitly to extra-deps" <+>
+                     latestApplicable Nothing)
+          | otherwise -> Just $
+              style Error (fromString $ packageNameString name) <+>
+              align ((if range == Cabal.anyVersion
+                        then flow "needed"
+                        else flow "must match" <+> goodRange) <> "," <> softline <>
+                     flow "but the stack configuration has no specified version" <+>
+                     latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
             (style Error . fromString . packageIdentifierString) (PackageIdentifier name version) <+>
