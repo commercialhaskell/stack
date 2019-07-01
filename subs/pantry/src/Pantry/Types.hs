@@ -541,7 +541,7 @@ instance FromJSON (WithJSONWarnings HackageSecurityConfig) where
     Object o <- o' ..: "hackage-security"
     hscKeyIds <- o ..: "keyids"
     hscKeyThreshold <- o ..: "key-threshold"
-    hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= False
+    hscIgnoreExpiry <- o ..:? "ignore-expiry" ..!= True
     pure HackageSecurityConfig {..}
 
 

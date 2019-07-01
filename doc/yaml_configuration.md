@@ -337,12 +337,16 @@ package-indices:
     key-threshold: 3 # number of keys required
 
     # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
-    ignore-expiry: no
+    ignore-expiry: true
 ```
 
 If you provide a replacement index which does not mirror Hackage, it
 is likely that you'll end up with significant breakage, such as most
 snapshots failing to work.
+
+Note: since Stack v2.1.3, `ignore-expiry` was changed to `true` by
+default. For more information on this change, see [issue
+#4928](https://github.com/commercialhaskell/stack/issues/4928).
 
 ### system-ghc
 
