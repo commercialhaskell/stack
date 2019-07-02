@@ -101,12 +101,6 @@ withRepoArchive
 withRepoArchive repo action =
   withSystemTempDirectory "with-repo-archive" $ \tmpdir -> do
     let tarball = tmpdir </> "foo.tar"
-        forceLocal = 
-            if osIsWindows
-            then "--force-local"
-            else mempty
-    -- Create an emtpy tarball so that files can be appended
-    void $ proc "tar" [forceLocal, "-cf", tarball, "-T" , "/dev/null"] readProcess_
     createRepoArchive repo tarball
     action tarball
 
@@ -163,9 +157,14 @@ createRepoArchive repo tarball = do
           , "foreach"
           , "--recursive"
           , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD" <>
-            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar " <> forceLocal <> " -xf temp/bar.tar -C temp/; " <>
-            "rm temp/bar.tar; tar -C temp -rf " <>
-            tarball <> " . ; fi"
+            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar " <>
+            forceLocal <>
+            " -xf temp/bar.tar -C temp/; " <>
+            "rm temp/bar.tar; tar " <>
+            forceLocal <>
+            " -C temp -rf " <>
+            tarball <>
+            " . ; fi"
           ]
       RepoHg -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
