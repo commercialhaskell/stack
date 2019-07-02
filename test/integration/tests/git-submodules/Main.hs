@@ -7,7 +7,7 @@ import System.IO (hPutStrLn, withFile, IOMode(..))
 import Control.Monad (unless)
 
 main :: IO ()
-main = unless isWindows $ do
+main = do
     let
       gitInit = do
          runShell "git init ."

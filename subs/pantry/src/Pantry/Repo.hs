@@ -140,7 +140,6 @@ createRepoArchive repo tarball = do
   withRepo repo $
     case repoType repo of
       RepoGit -> do
-        logInfo $ displayShow tarball
         runGitCommand
           ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
         let forceLocal =
