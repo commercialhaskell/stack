@@ -157,15 +157,16 @@ createRepoArchive repo tarball = do
           , "foreach"
           , "--recursive"
           , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD" <>
-            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar " <>
+            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar -C temp " <>
             forceLocal <>
-            " -xf temp/bar.tar -C temp/; " <>
-            "rm temp/bar.tar; tar " <>
+            " -xf temp/bar.tar; " <>
+            "rm temp/bar.tar; tar -C temp " <>
             forceLocal <>
-            " -C temp -rf " <>
+            " -rf " <>
             tarball <>
             " . ; fi"
           ]
+        void $ proc "tar" ["-tvf", tarball] readProcess_
       RepoHg -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
 

@@ -49,12 +49,14 @@ main = do
       writeToStackFile (tmpRepoDir, gitHeadCommit)
       -- Setup the package
       stack ["setup"]
+      -- Intentional error for testing out
+      error "Intentional crash"
 
     -- cleanup
-    removeDirIgnore "tmpRepo"
-    removeDirIgnore "tmpSubRepo"
-    removeDirIgnore "tmpSubSubRepo"
-    removeDirIgnore "tmpPackage"
+    -- removeDirIgnore "tmpRepo"
+    -- removeDirIgnore "tmpSubRepo"
+    -- removeDirIgnore "tmpSubSubRepo"
+    -- removeDirIgnore "tmpPackage"
 
 writeToStackFile :: (String, String) -> IO ()
 writeToStackFile (tmpRepoDir, gitCommit) = do
