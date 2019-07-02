@@ -219,15 +219,14 @@ uploadDocs' target = do
   docsDir <- fmap (T.unpack . T.dropSuffix "\n" . decodeUtf8Lenient . BL.toStrict) $
     withWorkingDir unpackDir $ proc "stack" (words "path --local-doc-root") readProcessStdout_
   logInfo "Uploading docs to S3"
-  let bucket = "haddock.stackage.org"
-      prefix = utf8BuilderToText $
+  let prefix = utf8BuilderToText $
         case target of
           TargetNightly day ->
             let date = formatTime defaultTimeLocale (iso8601DateFormat Nothing) day
             in "nightly-" <> fromString date
           TargetLts x y ->
             "lts-" <> display x <> "." <> display y
-  uploadDocs docsDir prefix bucket
+  uploadDocs docsDir prefix haddockBucket
 
 uploadGithub' :: Target -> RIO PantryApp ()
 uploadGithub' target = do
