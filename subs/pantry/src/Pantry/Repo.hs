@@ -101,8 +101,12 @@ withRepoArchive
 withRepoArchive repo action =
   withSystemTempDirectory "with-repo-archive" $ \tmpdir -> do
     let tarball = tmpdir </> "foo.tar"
+        forceLocal = 
+            if osIsWindows
+            then "--force-local"
+            else mempty
     -- Create an emtpy tarball so that files can be appended
-    void $ proc "tar" ["-cf", tarball, "-T" , "/dev/null"] readProcess_
+    void $ proc "tar" [forceLocal, "-cf", tarball, "-T" , "/dev/null"] readProcess_
     createRepoArchive repo tarball
     action tarball
 
