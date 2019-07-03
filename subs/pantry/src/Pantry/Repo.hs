@@ -164,7 +164,7 @@ createRepoArchive repo tarball = do
             forceLocal <>
             " -rf " <>
             tarball <>
-            " . ; fi"
+            " . ;"
           ]
         if osIsWindows
         then do
