@@ -166,8 +166,13 @@ createRepoArchive repo tarball = do
             tarball <>
             " . ; fi"
           ]
-        (outputStdout, _) <- proc "tar" [forceLocal <> "-tvf", tarball] readProcess_
-        logError $ displayShow outputStdout
+        if osIsWindows
+        then do
+          (outputStdout, _) <- proc "tar" ["--force-local", "-tvf", tarball] readProcess_
+          logError $ displayShow outputStdout
+        else do
+          (outputStdout, _) <- proc "tar" ["-tvf", tarball] readProcess_
+          logError $ displayShow outputStdout
       RepoHg -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
 
