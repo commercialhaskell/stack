@@ -10,7 +10,7 @@
         git fetch upstream
         git push origin ghc-X.Y.Z-release
 
-  * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
+  * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases)
     with tag `ghc-X.Y.Z-release` and same name.
 
   * Download all the relevant GHC bindists from https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload them to the just-created Github release (see
@@ -35,7 +35,7 @@ TODO: look into using https://github.com/bgamari/ghc-utils/blob/master/rel-eng/b
 On systems with a small `/tmp`, you should set TMP and TEMP to an alternate
 location.
 
-Setup the system based on [these instructions](https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Linux).  On Ubuntu (`docker run -ti --rm ubuntu:16.04`):
+Setup the system based on [these instructions](https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/linux).  On Ubuntu (`docker run -ti --rm ubuntu:16.04`):
 
     apt-get update && apt-get install -y ghc alex happy make autoconf g++ git vim xz-utils automake libtool gcc libgmp-dev ncurses-dev libtinfo-dev python3
 
@@ -54,7 +54,7 @@ For GHC >= 7.10.2, set the `GHC_VERSION` environment variable to the version to 
   * `export GHC_VERSION=7.10.3a`
   * `export GHC_VERSION=7.10.2`
 
-then, run (from [here](https://ghc.haskell.org/trac/ghc/wiki/Newcomers)):
+then, run (from [here](https://gitlab.haskell.org/ghc/ghc/wikis/building/quick-start)):
 
     git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/ && \
     git clone -b ghc-${GHC_VERSION}-release --recursive https://gitlab.haskell.org/ghc/ghc.git ghc-${GHC_VERSION} && \
