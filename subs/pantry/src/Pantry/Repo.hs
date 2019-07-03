@@ -156,8 +156,8 @@ createRepoArchive repo tarball = do
           [ "submodule"
           , "foreach"
           , "--recursive"
-          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD" <>
-            " && if [ -f bar.tar ]; then rm -rf temp; mkdir temp; mv bar.tar temp/; tar -C temp " <>
+          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD;" <>
+            " rm -rf temp; mkdir temp; mv bar.tar temp/; tar -C temp " <>
             forceLocal <>
             " -xf temp/bar.tar; " <>
             "rm temp/bar.tar; tar -C temp " <>
