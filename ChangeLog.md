@@ -55,6 +55,9 @@ Bug fixes:
 
 * Expose package library when running tests.
 
+* Fix support for non-ASCII module names. See
+  [4938](https://github.com/commercialhaskell/stack/issues/4938)
+
 ## v2.1.1.1
 
 Hackage-only release that removes `stack.yaml` from the sdist.  This is because

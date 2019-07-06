@@ -1,0 +1,10 @@
+name: umlaut
+dependencies: [base]
+library:
+  source-dirs: .
+executables:
+  exe:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - umlaut
