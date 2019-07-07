@@ -7,7 +7,7 @@ import System.IO (hPutStrLn, withFile, IOMode(..))
 import Control.Monad (unless)
 
 main :: IO ()
-main = do
+main = unless isWindows $ do
     let
       gitInit = do
          runShell "git init ."
@@ -53,10 +53,10 @@ main = do
       error "Intentional crash"
 
     -- cleanup
-    -- removeDirIgnore "tmpRepo"
-    -- removeDirIgnore "tmpSubRepo"
-    -- removeDirIgnore "tmpSubSubRepo"
-    -- removeDirIgnore "tmpPackage"
+    removeDirIgnore "tmpRepo"
+    removeDirIgnore "tmpSubRepo"
+    removeDirIgnore "tmpSubSubRepo"
+    removeDirIgnore "tmpPackage"
 
 writeToStackFile :: (String, String) -> IO ()
 writeToStackFile (tmpRepoDir, gitCommit) = do

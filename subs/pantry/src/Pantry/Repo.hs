@@ -18,12 +18,28 @@ import RIO
 import Path.IO (resolveFile')
 import RIO.FilePath ((</>))
 import RIO.Directory (doesDirectoryExist)
+import RIO.ByteString (isInfixOf)
+import RIO.ByteString.Lazy (toStrict)
 import qualified RIO.Map as Map
 import RIO.Process
 import Database.Persist (Entity (..))
 import qualified RIO.Text as T
 import System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import System.IsWindows (osIsWindows)
+
+data TarType = Gnu | Bsd
+
+getTarType :: (HasProcessContext env, HasLogFunc env) => RIO env TarType
+getTarType = do
+  (stdoutBS, _) <- proc "tar" ["--version"] readProcess_
+  let bs = toStrict stdoutBS
+  if "GNU" `isInfixOf` bs
+  then pure Gnu
+  else if "bsdtar" `isInfixOf` bs
+       then pure Bsd
+       else do
+         logError $ "Either GNU Tar or BSD tar is required on the PATH."
+         throwString "Proper tar executable not found in the environment"
 
 fetchReposRaw
   :: (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
@@ -121,6 +137,39 @@ runGitCommand args =
        . Map.delete "GIT_OBJECT_DIRECTORY" -- possible optimization: set this to something Pantry controls
        . Map.delete "GIT_ALTERNATE_OBJECT_DIRECTORIES"
 
+-- Include submodules files into the archive: use `git submodule
+-- foreach` to execute `git archive` in each submodule and generate
+-- tar archive. With bsd tar, the generated archive is extracted to a
+-- temporary folder and the files in them are added to the tarball
+-- referenced by the variable tarball in the haskell code. This is
+-- done in GNU tar with -A option.
+archiveSubmodules :: (HasLogFunc env, HasProcessContext env) => FilePath -> RIO env ()
+archiveSubmodules tarball = do
+  tarType <- getTarType
+  let forceLocal =
+          if osIsWindows
+          then " --force-local "
+          else mempty
+  case tarType of
+    Gnu -> runGitCommand
+         [ "submodule", "foreach", "--recursive"
+         , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD; "
+           <> "tar" <> forceLocal <> " -Af " <> tarball <> " bar.tar"
+         ]
+    Bsd ->
+       runGitCommand
+          [ "submodule"
+          , "foreach"
+          , "--recursive"
+          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD;" <>
+            " rm -rf temp; mkdir temp; mv bar.tar temp/; tar " <>
+            " -C temp -xf temp/bar.tar; " <>
+            "rm temp/bar.tar; tar " <>
+            " -C temp -rf " <>
+            tarball <>
+            " . ;"
+          ]
+
 -- | Run an hg command
 runHgCommand
   :: (HasLogFunc env, HasProcessContext env)
@@ -140,39 +189,7 @@ createRepoArchive repo tarball = do
       RepoGit -> do
         runGitCommand
           ["-c", "core.autocrlf=false", "archive", "-o", tarball, "HEAD"]
-        let forceLocal =
-              if osIsWindows
-                then " --force-local "
-                else mempty
-       -- also include submodules files: use `git submodule foreach`
-       -- to execute `git archive` in each submodule and generate tar
-       -- archive. This generated archive is extracted to a temporary
-       -- folder and the files in them are added to the tarball
-       -- referenced by the variable tarball in the haskell code. You
-       -- could do this with GNU -A option, but that doesn't work with
-       -- bsdtar which is present in MacOS. So we do this now using a
-       -- temporary folder which is works for both GNU tar and bsdtar.
-        runGitCommand
-          [ "submodule"
-          , "foreach"
-          , "--recursive"
-          , "git -c core.autocrlf=false archive --prefix=$displaypath/ -o bar.tar HEAD;" <>
-            " rm -rf temp; mkdir temp; mv bar.tar temp/; tar -C temp " <>
-            forceLocal <>
-            " -xf temp/bar.tar; " <>
-            "rm temp/bar.tar; tar -C temp " <>
-            forceLocal <>
-            " -rf " <>
-            tarball <>
-            " . ;"
-          ]
-        if osIsWindows
-        then do
-          (outputStdout, _) <- proc "tar" ["--force-local", "-tvf", tarball] readProcess_
-          logError $ displayShow outputStdout
-        else do
-          (outputStdout, _) <- proc "tar" ["-tvf", tarball] readProcess_
-          logError $ displayShow outputStdout
+        archiveSubmodules tarball
       RepoHg -> runHgCommand ["archive", tarball, "-X", ".hg_archival.txt"]
 
 
