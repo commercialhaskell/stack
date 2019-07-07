@@ -70,7 +70,7 @@ stackCleanFull = stackIgnoreException ["clean", "--full"]
 -- of Windows when we do stack clean. More info here: https://github.com/commercialhaskell/stack/issues/4936
 stackIgnoreException :: HasCallStack => [String] -> IO ()
 stackIgnoreException args = if isWindows
-                            then (void $ stack' args) `catch` (\(_e :: IOException) -> return ())
+                            then void (stack' args) `catch` (\(_e :: IOException) -> return ())
                             else stack args
 
 stackErr :: HasCallStack => [String] -> IO ()
