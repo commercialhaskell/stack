@@ -13,6 +13,7 @@ main = unless isWindows $ do
          runShell "git init ."
          runShell "git config user.name Test"
          runShell "git config user.email test@test.com"
+         runShell "git config commit.gpgsign false"
 
     let withEmptyDir name inner = do
           removeDirIgnore name
