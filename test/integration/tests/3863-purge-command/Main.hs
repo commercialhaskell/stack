@@ -4,6 +4,7 @@ import StackTest
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
 import Data.Maybe (listToMaybe, fromMaybe)
+import Control.Monad (when)
 import System.Directory
 import System.FilePath
 

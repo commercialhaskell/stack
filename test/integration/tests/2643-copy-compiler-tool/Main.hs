@@ -1,5 +1,6 @@
 import StackTest
 import System.Directory
+import Control.Monad (when)
 
 main :: IO ()
 main = do
