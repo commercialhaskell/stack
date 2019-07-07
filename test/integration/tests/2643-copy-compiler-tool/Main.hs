@@ -17,7 +17,8 @@ main = do
   stack ["exec", "--", "baz-exe" ++ exeExt]
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stackCleanFull
-  stackErr ["exec", "--", "baz-exe" ++ exeExt]
+  -- See #4936 for details regarding the windows condition
+  when (not isWindows) $ stackErr ["exec", "--", "baz-exe" ++ exeExt]
 
   -- install one exe normally
   stack ["install",

@@ -22,7 +22,7 @@ main =
 
       -- First, clean the .stack-work directory.
       -- This is only necessary when running individual tests.
-      stack [defaultResolverArg, "purge"]
+      stackIgnoreException [defaultResolverArg, "purge"]
       doesNotExist stackWork
 
       -- The dist directory should exist after a build
@@ -34,10 +34,13 @@ main =
       -- The dist directory should not exist after a clean, whereas the
       -- .stack-work directory should
       stackIgnoreException [defaultResolverArg, "clean"]
-      doesNotExist distDir
-      doesExist localInstallRoot
-      doesExist stackWork
+      -- See #4936 for details regarding the windows condition
+      when (not isWindows) $ do
+        doesNotExist distDir
+        doesExist localInstallRoot
+        doesExist stackWork
 
       -- The .stack-work directory should not exist after a purge
-      stack [defaultResolverArg, "purge"]
-      doesNotExist stackWork
+      stackIgnoreException [defaultResolverArg, "purge"]
+      -- See #4936 for details regarding the windows condition 
+      when (not isWindows) $ doesNotExist stackWork
