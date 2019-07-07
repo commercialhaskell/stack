@@ -15,6 +15,9 @@ Behavior changes:
   some platforms and filesystems.  See
   [#4876](https://github.com/commercialhaskell/stack/issues/4876).
 
+* By default, do not perform expiry checks in Hackage Security. See
+  [#4928](https://github.com/commercialhaskell/stack/issues/4928).
+
 Other enhancements:
 
 * Do not rerun expected test failures. This is mostly a change that
