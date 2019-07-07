@@ -33,7 +33,7 @@ main =
 
       -- The dist directory should not exist after a clean, whereas the
       -- .stack-work directory should
-      stack [defaultResolverArg, "clean"]
+      stackIgnoreException [defaultResolverArg, "clean"]
       doesNotExist distDir
       doesExist localInstallRoot
       doesExist stackWork

@@ -16,7 +16,7 @@ main = do
   stack ["build", "--flag", "copy-compiler-tool-test:build-baz"]
   stack ["exec", "--", "baz-exe" ++ exeExt]
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
-  stack ["clean", "--full"]
+  stackCleanFull
   stackErr ["exec", "--", "baz-exe" ++ exeExt]
 
   -- install one exe normally
@@ -40,7 +40,7 @@ main = do
 
   -- nuke the built things that go in .stack-work/, so we can test if
   -- the installed ones exist for sure
-  stack ["clean", "--full"]
+  stackCleanFull
 
   -- bar and baz were installed as compiler tools, should work fine
   stack ["exec", "--", "bar-exe" ++ exeExt]

@@ -3,7 +3,7 @@ import Data.List (isInfixOf)
 
 main :: IO ()
 main = do
-  stack ["clean", "--full"]
+  stackCleanFull
   stackCheckStderr ["build", "--terminal", "--color=always"] $ \str ->
     if "no type signature" `isInfixOf` str
       then pure ()

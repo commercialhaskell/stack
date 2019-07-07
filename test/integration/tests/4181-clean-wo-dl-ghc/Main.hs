@@ -8,5 +8,5 @@ main :: IO ()
 main = do
   -- `stack clean` should succeed even though there is no ghc available.
   -- See the stack.yaml file for how this works.
-  stack ["clean"]
-  stack ["clean", "--full"]
+  stackIgnoreException ["clean"]
+  stackCleanFull

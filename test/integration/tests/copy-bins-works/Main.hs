@@ -6,7 +6,7 @@ main :: IO ()
 main = do
   let test args = do
         removeDirIgnore "bin"
-        stack ["clean", "--full"]
+        stackCleanFull
         stack args
         exists <- doesDirectoryExist "bin"
         unless exists $ error $ "Failed with: " ++ show args

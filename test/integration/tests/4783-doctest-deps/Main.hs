@@ -2,6 +2,6 @@ import StackTest
 
 main :: IO ()
 main = do
-  stack ["clean", "--full"]
+  stackCleanFull
   stack ["build", "acme-dont-copy"]
   stack ["test"]
