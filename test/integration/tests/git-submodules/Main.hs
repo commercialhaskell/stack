@@ -49,8 +49,6 @@ main = unless isWindows $ do
       writeToStackFile (tmpRepoDir, gitHeadCommit)
       -- Setup the package
       stack ["setup"]
-      -- Intentional error for testing out
-      error "Intentional crash"
 
     -- cleanup
     removeDirIgnore "tmpRepo"
