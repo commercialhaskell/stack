@@ -27,7 +27,6 @@ module Stack.Package
   ,applyForceCustomBuild
   ) where
 
-import qualified Data.ByteString.Char8 as B8
 import           Data.List (find, isPrefixOf, unzip)
 import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
@@ -1117,7 +1116,8 @@ parseHI hiPath = do
         ]
       pure (S.empty, [])
     Right iface -> do
-      let moduleNames = fmap (fromString . B8.unpack . fst) . Iface.unList . Iface.dmods . Iface.deps
+      let moduleNames = fmap (fromString . T.unpack . decodeUtf8Lenient . fst) .
+                        Iface.unList . Iface.dmods . Iface.deps
           resolveFileDependency file = do
             resolved <- liftIO (forgivingAbsence (resolveFile dir file)) >>= rejectMissingFile
             when (isNothing resolved) $
