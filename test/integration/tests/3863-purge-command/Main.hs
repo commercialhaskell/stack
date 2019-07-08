@@ -24,7 +24,8 @@ main =
       -- First, clean the .stack-work directory.
       -- This is only necessary when running individual tests.
       stackIgnoreException [defaultResolverArg, "purge"]
-      doesNotExist stackWork
+      -- See #4936 for details regarding the windows condition
+      when (not isWindows) $ doesNotExist stackWork
 
       -- The dist directory should exist after a build
       stack [defaultResolverArg, "build"]
