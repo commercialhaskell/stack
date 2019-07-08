@@ -1,6 +1,6 @@
 import StackTest
 import System.Directory
-import Control.Monad (when)
+import Control.Monad (unless)
 
 main :: IO ()
 main = do
@@ -19,7 +19,7 @@ main = do
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stackCleanFull
   -- See #4936 for details regarding the windows condition
-  when (not isWindows) $ stackErr ["exec", "--", "baz-exe" ++ exeExt]
+  unless isWindows $ stackErr ["exec", "--", "baz-exe" ++ exeExt]
 
   -- install one exe normally
   stack ["install",

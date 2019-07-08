@@ -4,7 +4,7 @@ import StackTest
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
 import Data.Maybe (listToMaybe, fromMaybe)
-import Control.Monad (when)
+import Control.Monad (unless)
 import System.Directory
 import System.FilePath
 
@@ -25,7 +25,7 @@ main =
       -- This is only necessary when running individual tests.
       stackIgnoreException [defaultResolverArg, "purge"]
       -- See #4936 for details regarding the windows condition
-      when (not isWindows) $ doesNotExist stackWork
+      unless isWindows $ doesNotExist stackWork
 
       -- The dist directory should exist after a build
       stack [defaultResolverArg, "build"]
@@ -37,7 +37,7 @@ main =
       -- .stack-work directory should
       stackIgnoreException [defaultResolverArg, "clean"]
       -- See #4936 for details regarding the windows condition
-      when (not isWindows) $ do
+      unless isWindows $ do
         doesNotExist distDir
         doesExist localInstallRoot
         doesExist stackWork
@@ -45,4 +45,4 @@ main =
       -- The .stack-work directory should not exist after a purge
       stackIgnoreException [defaultResolverArg, "purge"]
       -- See #4936 for details regarding the windows condition 
-      when (not isWindows) $ doesNotExist stackWork
+      unless isWindows $ doesNotExist stackWork
