@@ -4,6 +4,7 @@ import StackTest
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
 import Data.Maybe (listToMaybe, fromMaybe)
+import Control.Monad (unless)
 import System.Directory
 import System.FilePath
 
@@ -22,8 +23,9 @@ main =
 
       -- First, clean the .stack-work directory.
       -- This is only necessary when running individual tests.
-      stack [defaultResolverArg, "purge"]
-      doesNotExist stackWork
+      stackIgnoreException [defaultResolverArg, "purge"]
+      -- See #4936 for details regarding the windows condition
+      unless isWindows $ doesNotExist stackWork
 
       -- The dist directory should exist after a build
       stack [defaultResolverArg, "build"]
@@ -33,11 +35,14 @@ main =
 
       -- The dist directory should not exist after a clean, whereas the
       -- .stack-work directory should
-      stack [defaultResolverArg, "clean"]
-      doesNotExist distDir
-      doesExist localInstallRoot
-      doesExist stackWork
+      stackIgnoreException [defaultResolverArg, "clean"]
+      -- See #4936 for details regarding the windows condition
+      unless isWindows $ do
+        doesNotExist distDir
+        doesExist localInstallRoot
+        doesExist stackWork
 
       -- The .stack-work directory should not exist after a purge
-      stack [defaultResolverArg, "purge"]
-      doesNotExist stackWork
+      stackIgnoreException [defaultResolverArg, "purge"]
+      -- See #4936 for details regarding the windows condition 
+      unless isWindows $ doesNotExist stackWork

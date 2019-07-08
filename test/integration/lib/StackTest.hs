@@ -1,3 +1,5 @@
+{-#LANGUAGE ScopedTypeVariables#-}
+
 module StackTest where
 
 import Control.Monad
@@ -58,6 +60,18 @@ stack :: HasCallStack => [String] -> IO ()
 stack args = do
     ec <- stack' args
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+
+-- Temporary workaround for Windows to ignore exceptions arising out
+-- of Windows when we do stack clean. More info here: https://github.com/commercialhaskell/stack/issues/4936
+stackCleanFull :: HasCallStack => IO ()
+stackCleanFull = stackIgnoreException ["clean", "--full"]
+
+-- Temporary workaround for Windows to ignore exceptions arising out
+-- of Windows when we do stack clean. More info here: https://github.com/commercialhaskell/stack/issues/4936
+stackIgnoreException :: HasCallStack => [String] -> IO ()
+stackIgnoreException args = if isWindows
+                            then void (stack' args) `catch` (\(_e :: IOException) -> return ())
+                            else stack args
 
 stackErr :: HasCallStack => [String] -> IO ()
 stackErr args = do

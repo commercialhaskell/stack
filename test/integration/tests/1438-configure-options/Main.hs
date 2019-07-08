@@ -5,7 +5,7 @@ import Data.List (isInfixOf)
 
 main :: IO ()
 main = do
-  stack ["clean", "--full"]
+  stackCleanFull
   let stackYamlFiles = words "stack-locals.yaml stack-everything.yaml stack-targets.yaml stack-name.yaml"
   for_ stackYamlFiles $ \stackYaml ->
     stackErrStderr ["build", "--stack-yaml", stackYaml] $ \str ->

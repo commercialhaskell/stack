@@ -2,9 +2,9 @@ import StackTest
 
 main :: IO ()
 main = do
-  stack ["clean", "--full"]
+  stackCleanFull
   stackErr ["haddock"]
-  stack ["clean", "--full"]
+  stackCleanFull
   stackErr ["haddock", "--no-haddock-deps"]
   stack ["build"]
   stackErr ["haddock", "--no-haddock-deps"]
