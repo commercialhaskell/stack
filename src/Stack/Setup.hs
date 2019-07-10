@@ -504,10 +504,10 @@ warnUnsupportedCompilerCabal cp didWarn = do
 
   if
     | cabalVersion < mkVersion [1, 19, 2] -> do
-        logWarn $ "Stack no longer supported Cabal versions below 1.19.2,"
-        logWarn $ "but version " <> fromString (versionString cabalVersion) <> "was found."
+        logWarn $ "Stack no longer supports Cabal versions below 1.19.2,"
+        logWarn $ "but version " <> fromString (versionString cabalVersion) <> " was found."
         logWarn "This invocation will most likely fail."
-        logWarn "To fix this, either use a newer version of Stack or a newer resolver"
+        logWarn "To fix this, either use an older version of Stack or a newer resolver"
         logWarn "Acceptable resolvers: lts-3.0/nightly-2015-05-05 or later"
     | cabalVersion >= mkVersion [2, 5] ->
         logWarn $
