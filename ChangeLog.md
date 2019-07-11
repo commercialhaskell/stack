@@ -68,6 +68,9 @@ Bug fixes:
 * Fix support for non-ASCII module names. See
   [4938](https://github.com/commercialhaskell/stack/issues/4938)
 
+* Fix GHC version for batched package unregistration. See
+  [4951](https://github.com/commercialhaskell/stack/issues/4951)
+
 Other changes:
 
 * Rename `pantry-tmp` package back to `pantry`, now that we have gained

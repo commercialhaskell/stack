@@ -131,7 +131,8 @@ findGhcPkgField pkgexe pkgDbs name field = do
             Right bs ->
                 fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
--- | unregister list of package ghcids, batching available from GHC 8.0.1,
+-- | unregister list of package ghcids, batching available from GHC 8.2.1,
+-- see https://github.com/commercialhaskell/stack/issues/2662#issuecomment-460342402
 -- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds
   :: (HasProcessContext env, HasLogFunc env)
