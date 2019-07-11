@@ -1,13 +1,9 @@
 # Changelog
 
 
-## Unreleased changes
+## v2.1.3
 
 **Changes since v2.1.1**
-
-Release notes:
-
-Major changes:
 
 Behavior changes:
 
@@ -30,6 +26,7 @@ Other enhancements:
   [#4893](https://github.com/commercialhaskell/stack/issues/4893).
 
 Bug fixes:
+
 * Fix to allow dependencies on specific versions of local git repositories. See
   [#4862](https://github.com/commercialhaskell/stack/pull/4862)
 
@@ -44,11 +41,6 @@ Bug fixes:
   avoiding a SIGTERM screwing up GHC installation. See
   [#4888](https://github.com/commercialhaskell/stack/issues/4888).
 
-* Rename `pantry-tmp` package back to `pantry`, now that we have gained
-  maintainership (which had been used by someone else for a candidate-only test
-  that made it look like the name was free but prevented uploading a real
-  package).
-
 * Use package complete locations from lock files when resolving dependencies
   in `extra-deps`. See
   [#4887](https://github.com/commercialhaskell/stack/issues/4887).
@@ -60,6 +52,14 @@ Bug fixes:
 
 * Fix support for non-ASCII module names. See
   [4938](https://github.com/commercialhaskell/stack/issues/4938)
+
+Other changes:
+
+* Rename `pantry-tmp` package back to `pantry`, now that we have gained
+  maintainership (which had been used by someone else for a candidate-only test
+  that made it look like the name was free but prevented uploading a real
+  package).
+
 
 ## v2.1.1.1
 
