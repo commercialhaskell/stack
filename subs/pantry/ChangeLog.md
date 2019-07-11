@@ -1,6 +1,21 @@
 # Changelog for pantry
 
 
+## Unreleased changes
+
+**Changes since v0.1.1.0**
+
+Release notes:
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
 ## v0.1.1.0
 
 **Changes since 0.1.0.0**
