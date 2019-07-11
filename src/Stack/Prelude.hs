@@ -40,7 +40,7 @@ import           System.IO.Echo (withoutInputEcho)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
-import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcess_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL, waitExitCode)
+import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcessWait_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL, waitExitCode)
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 
@@ -79,7 +79,7 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
            -- See https://github.com/commercialhaskell/stack/pull/4722
            $ setStdin (byteStringInput "")
              pc0
-    withProcess_ pc $ \p ->
+    withProcessWait_ pc $ \p ->
       (runConduit (getStderr p .| sinkStderr) `concurrently`
       runConduit (getStdout p .| sinkStdout)) <* waitExitCode p
 

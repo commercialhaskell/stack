@@ -1656,7 +1656,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 ec
                   <- withWorkingDir (toFilePath eeTempDir)
                    $ proc "haddock" ["--hyperlinked-source"]
-                   $ \pc -> withProcess
+                   $ \pc -> withProcessWait
                      (setStdout createSource $ setStderr createSource pc) $ \p ->
                        runConcurrently
                          $ Concurrently (runConduit $ getStdout p .| CL.sinkNull)
@@ -2026,7 +2026,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                    $ setStdout output
                                    $ setStderr output
                                      pc0
-                            withProcess pc $ \p -> do
+                            withProcessWait pc $ \p -> do
                               case (getStdout p, getStderr p) of
                                 (Nothing, Nothing) -> pure ()
                                 (Just x, Just y) -> concurrently_ x y

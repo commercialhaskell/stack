@@ -1561,7 +1561,7 @@ setup7z si = do
                 ec <-
                   proc cmd args $ \pc ->
                   if isExtract
-                    then withProcess (setStdout createSource pc) $ \p -> do
+                    then withProcessWait (setStdout createSource pc) $ \p -> do
                         total <- runConduit
                             $ getStdout p
                            .| filterCE (== 10) -- newline characters

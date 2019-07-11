@@ -19,9 +19,10 @@ packages:
 - process-1.6.3.0@sha256:fc77cfe75a9653b8c54ae455ead8c06cb8adc4d7a340984d84d8ca880b579919,2370 #because of https://github.com/haskell/process/pull/101
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
-- rio-0.1.9.2@rev:0
+- rio-0.1.10.0@rev:0
 - ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
 - hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
+- typed-process-0.2.6.0@rev:0 # for rio-0.1.10.0
 - git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
