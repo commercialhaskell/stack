@@ -12,7 +12,7 @@ jobs:
 - template: ./.azure/azure-nightly-template-osx.yml
   parameters:
     name: macOS
-    vmImage: macOS-10.13
+    vmImage: macOS-10.14
     os: osx
 
 - template: ./.azure/azure-nightly-template-linux.yml
