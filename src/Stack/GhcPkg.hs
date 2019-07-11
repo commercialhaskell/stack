@@ -146,11 +146,10 @@ unregisterGhcPkgIds pkgexe pkgDb epgids = do
         Left e -> logWarn $ displayShow e
         Right _ -> return ()
   where
+    (idents, gids) = partitionEithers $ toList epgids
     args = "unregister" : "--user" : "--force" :
-        concatMap (either
-            (\ident -> [packageIdentifierString ident])
-            (\gid -> ["--ipid", ghcPkgIdString gid]))
-            epgids
+        map packageIdentifierString idents ++
+        if null gids then [] else "--ipid" : map ghcPkgIdString gids
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
