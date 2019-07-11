@@ -64,7 +64,10 @@ runShellAndExit = do
          addGCRoots = nixAddGCRoots (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp, "--arg", "ghc"
-                      ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
+                      ,"with (import <nixpkgs> {config={" ++
+                        platformVariantEnvVar <>
+                        "=''nix'';};}); "
+                        ++T.unpack ghc]
            Nothing -> ["-E", T.unpack $ T.concat
                               ["with (import <nixpkgs> {}); "
                               ,"let inputs = ",pkgsStr,"; "
