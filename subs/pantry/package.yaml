@@ -15,7 +15,9 @@ default-extensions:
 extra-source-files:
 - README.md
 - ChangeLog.md
+- attic/hpack-0.1.2.3.tar.gz
 - attic/package-0.1.2.3.tar.gz
+- attic/symlink-to-dir.tar.gz
 
 dependencies:
 - base >=4.10 && < 5
