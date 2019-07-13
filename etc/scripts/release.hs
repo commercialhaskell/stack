@@ -339,7 +339,7 @@ rules global@Global{..} args = do
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
-    binaryExeFileName = binaryName <.> exe
+    binaryExeFileName = binaryName <.> binaryExt
     binaryName =
         concat
             [ stackProgName
@@ -359,12 +359,15 @@ rules global@Global{..} args = do
     ascExt = ".asc"
     sha256Ext = ".sha256"
     uploadExt = ".upload"
+    binaryExt =
+        case platformOS of
+            Windows -> ".exe"
+            _ -> ".bin"
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
 uploadToGithubRelease global@Global{..} file mUploadLabel = do
     -- TODO: consider using https://github.com/tfausak/github-release
-    need [file]
     putNormal $ "Uploading to Github: " ++ file
     GithubRelease{..} <- getGithubRelease
     resp <- liftIO $ callGithubApi global
