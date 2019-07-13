@@ -93,6 +93,7 @@ main =
                 gProjectRoot = "" -- Set to real value velow.
                 gBuildArgs = []
                 gCertificateName = Nothing
+                gUploadOnly = False
                 global0 = foldl (flip id) Global{..} flags
 
             -- Need to get paths after options since the '--arch' argument can effect them.
@@ -148,6 +149,8 @@ options =
     , Option "" [certificateNameOptName]
         (ReqArg (\v -> Right $ \g -> g{gCertificateName = Just v}) "NAME")
         "Certificate name for code signing on Windows"
+    , Option "" [uploadOnlyOptName] (NoArg $ Right $ \g -> g{gUploadOnly = True})
+        "Just upload an existing file, but don't try to build it."
     ]
 
 -- | Shake rules.
@@ -180,6 +183,7 @@ rules global@Global{..} args = do
             --         e | e == ascExt -> fmap (++ " (GPG signature)") gUploadLabel
             --           | e == sha256Ext -> fmap (++ " (SHA256 checksum)") gUploadLabel
             --           | otherwise -> gUploadLabel
+        need [srcFile]
         uploadToGithubRelease global srcFile Nothing
         copyFileChanged srcFile out
 
@@ -204,7 +208,7 @@ rules global@Global{..} args = do
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
-    releaseDir </> binaryPkgZipFileName %> \out -> do
+    unless gUploadOnly $ releaseDir </> binaryPkgZipFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
         putNormal $ "zip " ++ out
         liftIO $ do
@@ -221,7 +225,7 @@ rules global@Global{..} args = do
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
             L8.writeFile out (Zip.fromArchive archive)
 
-    releaseDir </> binaryPkgTarGzFileName %> \out -> do
+    unless gUploadOnly $ releaseDir </> binaryPkgTarGzFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
         writeTarGz out releaseStageDir stageFiles
 
@@ -233,7 +237,7 @@ rules global@Global{..} args = do
             (dropDirectoryPrefix (releaseStageDir </> binaryName) out)
             out
 
-    releaseDir </> binaryExeFileName %> \out -> do
+    unless gUploadOnly $ releaseDir </> binaryExeFileName %> \out -> do
         need [releaseBinDir </> binaryName </> stackExeFileName]
         (Stdout versionOut) <- cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
         when (not gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
@@ -510,6 +514,10 @@ staticOptName = "static"
 certificateNameOptName :: String
 certificateNameOptName = "certificate-name"
 
+-- | @--upload-only@ command-line option name.
+uploadOnlyOptName :: String
+uploadOnlyOptName = "upload-only"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch, "--interleaved-output"]
@@ -565,5 +573,6 @@ data Global = Global
     , gTestHaddocks :: !Bool
     , gBuildArgs :: [String]
     , gCertificateName :: !(Maybe String)
+    , gUploadOnly :: !Bool
     }
     deriving (Show)
