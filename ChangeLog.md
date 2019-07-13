@@ -1,7 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
+## v2.3.x (unreleased changes)
 
 **Changes since v2.1.3**
 
@@ -12,6 +12,10 @@ Major changes:
 Behavior changes:
 
 Other enhancements:
+
+* Add `ls dependencies json` which will print dependencies as JSON.
+  `ls dependencies --tree`  is now `ls dependencies tree`. See
+  [#4424](https://github.com/commercialhaskell/stack/pull/4424)
 
 Bug fixes:
 
