@@ -339,7 +339,8 @@ rules global@Global{..} args = do
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
-    binaryExeFileName = binaryName <.> exe
+    -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
+    binaryExeFileName = binaryName ++ "-bin" <.> exe
     binaryName =
         concat
             [ stackProgName
