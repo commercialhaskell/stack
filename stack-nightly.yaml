@@ -4,7 +4,6 @@ packages:
 - .
 - subs/pantry
 - subs/http-download
-- subs/hi-file-parser
 
 docker:
   enable: false
