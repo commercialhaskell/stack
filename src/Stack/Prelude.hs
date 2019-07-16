@@ -216,4 +216,4 @@ defaultFirstFalse _ = False
 writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
     liftIO $
-    withBinaryFileAtomic (toFilePath fp) WriteMode (\h -> hPutBuilder h builder)
+    withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
