@@ -1,5 +1,8 @@
 resolver: snapshot.yaml
 
+packages:
+- .
+
 docker:
   enable: false
   repo: fpco/stack-build:lts-11.22

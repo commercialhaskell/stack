@@ -9,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches across an entire user account.
