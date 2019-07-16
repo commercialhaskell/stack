@@ -3,7 +3,7 @@
 
 ## v2.3.x (unreleased changes)
 
-**Changes since v2.1.3**
+**Changes since v2.1.3.1**
 
 Release notes:
 
@@ -18,6 +18,15 @@ Other enhancements:
   [#4424](https://github.com/commercialhaskell/stack/pull/4424)
 
 Bug fixes:
+
+
+## v2.1.3.1
+
+Hackage-only release:
+
+* Support persistent-template-2.7.x
+* Support rio-0.1.11.0
+* Add `stack.yaml` back to hackage sdist, and add `snapshot.yaml`
 
 
 ## v2.1.3

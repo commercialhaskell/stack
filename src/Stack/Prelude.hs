@@ -25,7 +25,7 @@ module Stack.Prelude
   ) where
 
 import           RIO                  as X
-import           RIO.File             as X
+import           RIO.File             as X hiding (writeBinaryFileAtomic)
 import           Data.Conduit         as X (ConduitM, runConduit, (.|))
 import           Path                 as X (Abs, Dir, File, Path, Rel,
                                             toFilePath)
@@ -46,9 +46,6 @@ import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
-import System.Permissions (osIsWindows)
-
-import Conduit
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
@@ -216,21 +213,7 @@ defaultFirstFalse :: (a -> FirstFalse) -> Bool
 defaultFirstFalse _ = False
 
 -- | Write a @Builder@ to a file and atomically rename.
---
--- In the future: replace with a function in rio
 writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
-writeBinaryFileAtomic fp builder
-  -- Atomic file writing is not supported on Windows yet, unfortunately.
-  -- withSinkFileCautious needs to be implemented properly for Windows to make
-  -- this work.
-  | osIsWindows =
-      liftIO $
-      withBinaryFile (toFilePath fp) WriteMode $ \h ->
-      hPutBuilder h builder
-  | otherwise =
-      liftIO $
-      withSinkFileCautious (toFilePath fp) $ \sink ->
-      runConduit $
-      yield builder .|
-      unsafeBuilderToByteString .|
-      sink
+writeBinaryFileAtomic fp builder =
+    liftIO $
+    withBinaryFileAtomic (toFilePath fp) WriteMode (\h -> hPutBuilder h builder)

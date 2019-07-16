@@ -1,16 +1,14 @@
-resolver: nightly-2019-07-11
+resolver: nightly-2019-07-15
 name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:
-- amazonka-1.6.1@rev:0
-- amazonka-s3-1.6.1@rev:0
-- amazonka-core-1.6.1@rev:0
-  # For amazonka-1.6.1 (check for amazonka update allowing http-client-0.6)
-  # Once fixed, remove bounds from `package.yaml` (also under `subs`)
-- http-client-0.5.14@rev:0
-- cryptonite-0.26@rev:0
 - git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- rio-0.1.11.0@rev:0
+- persistent-template-2.7.1@rev:0
+- persistent-2.10.0@rev:0
+- persistent-sqlite-2.10.1@rev:0
+- pantry-0.1.1.1@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
