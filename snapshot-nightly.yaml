@@ -11,6 +11,9 @@ packages:
 - cryptonite-0.26@rev:0
 - git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- persistent-template-2.7.1@rev:0
+- persistent-2.10.0@rev:0
+- persistent-sqlite-2.10.1@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
