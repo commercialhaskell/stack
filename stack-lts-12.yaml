@@ -3,7 +3,6 @@ resolver: snapshot-lts-12.yaml
 packages:
 - .
 - subs/pantry
-- subs/curator
 - subs/http-download
 - subs/rio-prettyprint
 - subs/hi-file-parser
