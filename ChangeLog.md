@@ -1,6 +1,14 @@
 # Changelog
 
 
+## v2.1.3.1
+
+Hackage-only release:
+
+* Support persistent-template-2.7.x
+* Support rio-0.1.11.0
+* Add `stack.yaml` back to hackage sdist, and add `snapshot.yaml`
+
 ## v2.1.3
 
 **Changes since v2.1.1**
