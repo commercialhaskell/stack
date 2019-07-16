@@ -1,13 +1,5 @@
 resolver: snapshot-nightly.yaml
 
-packages:
-- .
-- subs/pantry
-- subs/curator
-- subs/http-download
-- subs/rio-prettyprint
-- subs/hi-file-parser
-
 docker:
   enable: false
   repo: fpco/stack-build-small:lts-13.26
