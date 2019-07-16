@@ -1,6 +1,13 @@
 # Changelog for pantry
 
 
+## v0.1.1.1
+
+Other changes:
+
+* Support building with persistent-template-2.7
+
+
 ## v0.1.1.0
 
 **Changes since 0.1.0.0**
