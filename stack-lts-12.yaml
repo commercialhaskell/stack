@@ -1,9 +1,5 @@
 resolver: snapshot-lts-12.yaml
 
-packages:
-- .
-- subs/pantry
-
 docker:
   enable: false
   repo: fpco/stack-build-small:lts-12.26
