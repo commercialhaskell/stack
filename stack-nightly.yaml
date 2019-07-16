@@ -3,7 +3,6 @@ resolver: snapshot-nightly.yaml
 packages:
 - .
 - subs/pantry
-- subs/http-download
 
 docker:
   enable: false
