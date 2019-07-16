@@ -9,7 +9,8 @@ packages:
 - yaml-0.10.4.0@rev:0 #for hpack-0.31
 - persistent-2.9.2@rev:0
 - persistent-sqlite-2.9.3@rev:0
-- rio-0.1.10.0@rev:0
+- rio-0.1.11.0@rev:0
+- unliftio-0.2.12@rev:0 #for rio-0.1.11.0
 - ansi-terminal-0.9@rev:0
 - ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
 - hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
