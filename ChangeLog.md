@@ -19,6 +19,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Errors from the `terminal-size` package are now silenced. See
+  [#4901](https://github.com/commercialhaskell/stack/issues/4901)
+
 
 ## v2.1.3.1
 

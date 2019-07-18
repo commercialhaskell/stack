@@ -36,6 +36,8 @@ import           Stack.Types.Nix (nixEnable)
 import           Stack.Types.Version (stackMinorVersion, stackVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Console.Terminal.Size (size, width)
+import           System.IO.Silently (hSilence)
+import           System.IO (stderr)
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a
@@ -145,8 +147,10 @@ withRunnerGlobal go inner = do
     ColorAlways -> return True
     ColorAuto -> fromMaybe True <$>
                           hSupportsANSIWithoutEmulation stderr
+  -- In certain situations the call to 'size' prints error messages on stderr even when the operation
+  -- succeeds, so we silence stderr to avoid these errors
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
-                                    <$> fmap (fmap width) size)
+                                    <$> fmap (fmap width) (hSilence [stderr] size))
                                    pure (globalTermWidth go)
   menv <- mkDefaultProcessContext
   logOptions0 <- logOptionsHandle stderr False

@@ -108,6 +108,7 @@ dependencies:
 - rio
 - rio-prettyprint
 - semigroups
+- silently
 - split
 - stm
 - streaming-commons
