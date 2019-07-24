@@ -652,8 +652,8 @@ pkg_install_pkgs() {
 }
 
 # Get installed Stack version, if any
-stack_version() {
-  stack --version | grep -o 'Version \([[:digit:]]\|\.\)\+'
+installed_stack_version() {
+  stack --version | grep -o 'Version \([[:digit:]]\|\.\)\+' | tr A-Z a-z
 }
 
 # Get installed Stack's path
@@ -765,11 +765,15 @@ check_stack_installed() {
         get="wget -qO-"
       fi
       [ "$DEST" != "" ] && location=$(realpath "$DEST") || location=$(stack_location)
-      die "Stack $(stack_version) already appears to be installed at:
+      die "Stack $(installed_stack_version) already appears to be installed at:
   $location
+
 Use 'stack upgrade' or your OS's package manager to upgrade,
 or pass '-f' to this script to over-write the existing binary, e.g.:
-  $get https://get.haskellstack.org/ | sh -s - -f"
+  $get https://get.haskellstack.org/ | sh -s - -f
+
+To install to a different location, pass '-d DESTDIR', e.g.:
+  $get https://get.haskellstack.org/ | sh -s - -d /opt/stack-$STACK_VERSION/bin"
     fi
   fi
 }
