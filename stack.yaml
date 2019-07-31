@@ -19,3 +19,15 @@ flags:
 
 ghc-options:
    "$locals": -fhide-source-paths
+
+extra-deps:
+- github: fpco/casa
+  commit: 2bae0df3998cc046f384b54de735e1fad2dcabdd
+  size: 9523
+  sha256: cdd1a6f426469280c8b93293d23c20c0443bfa52c18e73d8ba7626467860aa52
+  subdirs:
+     - casa-client
+     - casa-types
+
+- github: commercialhaskell/pantry
+  commit: ab606acc38d196d1be9afab569a10c4a9d0939b2
