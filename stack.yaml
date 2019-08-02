@@ -21,13 +21,30 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
-- github: fpco/casa
+
+- subdir: casa-client
+  github: fpco/casa
   commit: 2bae0df3998cc046f384b54de735e1fad2dcabdd
   size: 9523
   sha256: cdd1a6f426469280c8b93293d23c20c0443bfa52c18e73d8ba7626467860aa52
-  subdirs:
-     - casa-client
-     - casa-types
+  cabal-file:
+    size: 542
+    sha256: 5def9cffe09cc0f117a335611cdf930af6a117c34527944bac48581e72a46369
+  pantry-tree:
+    size: 120
+    sha256: bf3a66b82d479a60af67f21ec0053daca42dfdc2eca37018d57cff3216e297f4
+
+- subdir: casa-types
+  github: fpco/casa
+  commit: 2bae0df3998cc046f384b54de735e1fad2dcabdd
+  size: 9523
+  sha256: cdd1a6f426469280c8b93293d23c20c0443bfa52c18e73d8ba7626467860aa52
+  cabal-file:
+    size: 404
+    sha256: 9a9bc4febca2c369a93c8180f966483359cc9a8a6590021d542a73f9c6e7bcb4
+  pantry-tree:
+    size: 177
+    sha256: ec8e13b7099781ba2629036baa5cf1bab6423eeb7aff17796a5d22a92db83b6c
 
 - github: commercialhaskell/pantry
   commit: 9c0275396eb741c1ac90f115435d9c010f754669
