@@ -172,12 +172,13 @@ foldToList :: (k -> a -> b) -> Map k a -> [b]
 foldToList f = Map.foldrWithKey (\k a bs -> bs ++ [f k a]) []
 
 dependencyToJSON :: PackageName -> (Set PackageName, DotPayload) -> Value
-dependencyToJSON pkg (_, payload) =  let fieldsAlwaysPresent = [ "name" .= packageNameString pkg
-                                                               , "license" .= licenseText payload
-                                                               , "version" .= versionText payload
-                                                               ]
-                                         loc = catMaybes [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
-                                     in object $ fieldsAlwaysPresent ++ loc
+dependencyToJSON pkg (deps, payload) =  let fieldsAlwaysPresent = [ "name" .= packageNameString pkg
+                                                                  , "license" .= licenseText payload
+                                                                  , "version" .= versionText payload
+                                                                  , "dependencies" .= Set.map packageNameString deps
+                                                                  ]
+                                            loc = catMaybes [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
+                                        in object $ fieldsAlwaysPresent ++ loc
 
 pkgLocToJSON :: PackageLocation -> Value
 pkgLocToJSON (PLMutable (ResolvedPath _ dir)) = object [ "type" .= ("project package" :: Text)
