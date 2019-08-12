@@ -22,37 +22,15 @@ ghc-options:
 
 extra-deps:
 
-- subdir: casa-client
-  github: fpco/casa
-  commit: 2bae0df3998cc046f384b54de735e1fad2dcabdd
-  size: 9523
-  sha256: cdd1a6f426469280c8b93293d23c20c0443bfa52c18e73d8ba7626467860aa52
-  cabal-file:
-    size: 542
-    sha256: 5def9cffe09cc0f117a335611cdf930af6a117c34527944bac48581e72a46369
-  pantry-tree:
-    size: 120
-    sha256: bf3a66b82d479a60af67f21ec0053daca42dfdc2eca37018d57cff3216e297f4
-
-- subdir: casa-types
-  github: fpco/casa
-  commit: 2bae0df3998cc046f384b54de735e1fad2dcabdd
-  size: 9523
-  sha256: cdd1a6f426469280c8b93293d23c20c0443bfa52c18e73d8ba7626467860aa52
-  cabal-file:
-    size: 404
-    sha256: 9a9bc4febca2c369a93c8180f966483359cc9a8a6590021d542a73f9c6e7bcb4
-  pantry-tree:
-    size: 177
-    sha256: ec8e13b7099781ba2629036baa5cf1bab6423eeb7aff17796a5d22a92db83b6c
+- github: fpco/casa
+  commit: a0cd05c1a9ce33acbb1bdfb9324370f884916e88
+  sha256: e21e5fa2b9fa03f37761d5b95559a09af578a9b10e9cad0baca4ccdb5cde1b78
+  size: 10520
+  subdirs:
+     - casa-client
+     - casa-types
 
 - github: commercialhaskell/pantry
-  commit: 7a1903d7bd167498816d282871cd706fa79a4163
-  size: 94821
-  cabal-file:
-    size: 4761
-    sha256: ed7ca552edd51565b735119702f144ba3bec864875577a3e921ca4f7d2426ee6
-  sha256: df3c770709e6460256de0fcf8a0fc6f217952b7fcb9071ff9621967f53eabacb
-  pantry-tree:
-    size: 3545
-    sha256: 12ba5d8935d3321b28e39af90a814f14c994de19367d533e95de787254785aee
+  commit: a67d0818de52de239d9e051a25cca6d29785e06d
+  size: 95018
+  sha256: 299dabb14beb81c39457be69eb80be3038868850dd0c28b02ebf98566757bbc8
