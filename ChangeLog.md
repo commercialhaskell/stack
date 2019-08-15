@@ -16,6 +16,9 @@ Other enhancements:
 * Add `ls dependencies json` which will print dependencies as JSON.
   `ls dependencies --tree`  is now `ls dependencies tree`. See
   [#4424](https://github.com/commercialhaskell/stack/pull/4424)
+* Add ability to set which version of stack to be downloaded by
+  `get-stack.sh` with `--version` argument.
+
 
 Bug fixes:
 

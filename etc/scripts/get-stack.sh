@@ -25,7 +25,8 @@
 # https://docs.haskellstack.org/en/stable/install_and_upgrade/
 #
 
-STACK_VERSION="2.1.3"
+DEFAULT_STACK_VERSION="2.1.3"
+STACK_VERSION=""
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 # Windows doesn't have a good place for DEST, but all CI systems (Appveyor, Travis, Azure) support /bin
@@ -469,6 +470,10 @@ set_default_dest() {
   [ "$DEST" != "" ] || DEST="$DEFAULT_DEST"
 }
 
+set_default_stack_version() {
+  [ "$STACK_VERSION" != "" ] || STACK_VERSION="$DEFAULT_STACK_VERSION"
+}
+
 # Determine operating system and attempt to install.
 do_os() {
   case "$(uname)" in
@@ -792,6 +797,10 @@ while [ $# -gt 0 ]; do
       DEST="$2/stack"
       shift 2
       ;;
+    -v|--version)
+      STACK_VERSION="$2"
+      shift 2
+      ;;
     *)
       echo "Invalid argument: $1" >&2
       exit 1
@@ -799,6 +808,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+set_default_stack_version
 check_stack_installed
 do_os
 check_home_local_bin_on_path
