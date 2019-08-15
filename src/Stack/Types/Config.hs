@@ -283,6 +283,8 @@ data Config =
          ,configHideTHLoading       :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
+         ,configPrefixTimestamps    :: !Bool
+         -- ^ Prefix build output with timestamps for each line.
          ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
          ,configPlatformVariant     :: !PlatformVariant
@@ -762,6 +764,8 @@ data ConfigMonoid =
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading      :: !FirstTrue
     -- ^ See: 'configHideTHLoading'
+    , configMonoidPrefixTimestamps   :: !(First Bool)
+    -- ^ See: 'configPrefixTimestamps'
     , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
     , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
@@ -877,6 +881,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- First <$> obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
+    configMonoidPrefixTimestamps <- First <$> obj ..:? configMonoidPrefixTimestampsName
 
     murls :: Maybe Value <- obj ..:? configMonoidUrlsName
     configMonoidLatestSnapshot <-
@@ -1001,6 +1006,9 @@ configMonoidConnectionCountName = "connection-count"
 
 configMonoidHideTHLoadingName :: Text
 configMonoidHideTHLoadingName = "hide-th-loading"
+
+configMonoidPrefixTimestampsName :: Text
+configMonoidPrefixTimestampsName = "build-output-timestamps"
 
 configMonoidUrlsName :: Text
 configMonoidUrlsName = "urls"

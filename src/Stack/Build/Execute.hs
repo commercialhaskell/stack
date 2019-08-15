@@ -49,6 +49,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Tuple
+import           Data.Time (ZonedTime, getZonedTime, formatTime, defaultTimeLocale)
+import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
@@ -1292,15 +1294,14 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                   where
                     runAndOutput :: ActualCompiler -> RIO env ()
                     runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case outputType of
-                        OTLogFile _ h ->
-                            proc (toFilePath exeName) fullArgs
-                          $ runProcess_
-                            -- Don't use closed, since that can break
-                            -- ./configure scripts. See:
-                            -- https://github.com/commercialhaskell/stack/pull/4722
-                          . setStdin (byteStringInput "")
-                          . setStdout (useHandleOpen h)
-                          . setStderr (useHandleOpen h)
+                        OTLogFile _ h -> do
+                          let prefixWithTimestamps =
+                                if configPrefixTimestamps config
+                                   then PrefixWithTimestamps
+                                   else WithoutTimestamps
+                          void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
+                              (sinkWithTimestamps prefixWithTimestamps h)
+                              (sinkWithTimestamps prefixWithTimestamps h)
                         OTConsole mprefix ->
                             let prefix = fold mprefix in
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
@@ -2192,6 +2193,28 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
            >> char ':'
            >> return ()
         where num = some digit
+
+-- | Whether to prefix log lines with timestamps.
+data PrefixWithTimestamps = PrefixWithTimestamps | WithoutTimestamps
+
+-- | Write stream of lines to handle, but adding timestamps.
+sinkWithTimestamps :: MonadIO m => PrefixWithTimestamps -> Handle -> ConduitT ByteString Void m ()
+sinkWithTimestamps prefixWithTimestamps h =
+    case prefixWithTimestamps of
+        PrefixWithTimestamps ->
+            CB.lines .| CL.mapM addTimestamp .| CL.map (<> "\n") .| sinkHandle h
+        WithoutTimestamps -> sinkHandle h
+  where
+    addTimestamp theLine = do
+        now <- liftIO getZonedTime
+        pure (formatZonedTimeForLog now <> " " <> theLine)
+
+-- | Format a time in ISO8601 format. We choose ZonedTime over UTCTime
+-- because a user expects to see logs in their local time, and would
+-- be confused to see UTC time. Stack's debug logs also use the local
+-- time zone.
+formatZonedTimeForLog :: ZonedTime -> ByteString
+formatZonedTimeForLog = S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
 
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.
