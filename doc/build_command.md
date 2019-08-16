@@ -184,19 +184,22 @@ This command will:
 
 ## Build output
 
-When building a single target package (e.g., `stack build` in a project with
-only one package, or `stack build package-name` in a multi-package project),
-the build output from GHC will be hidden for building all dependencies, and
-will be displayed for the one target package.
+Starting with Stack 2.1, output of all packages being built scrolls by in a
+streaming fashion. The output from each package built will be prefixed by the
+package name, e.g. `mtl> Building ...`. This will include the output from
+dependencies being built, not just targets.
 
-By default, when building multiple target packages, the output from these will
-end up in a log file instead of on the console unless it contains errors or
-warnings, to avoid problems of interleaved output and decrease console noise.
-If you would like to see this content instead, you can use the `--dump-logs`
-command line option, or add `dump-logs: all` to your `stack.yaml` file.
+To disable this behaviour, you can pass `--no-interleaved-output`, or add
+`interleaved-output: false` to your `stack.yaml` file.  When disabled:
 
-Alternatively, starting with Stack 1.8, you can pass `--interleaved-output` to
-see output of all packages being built scroll by in a streaming fashion. The
-output from each package built will be prefixed by the package name, e.g. `mtl>
-Building ...`. Note that, unlike the default output, this will include the
-output from dependencies being built, not just targets.
+  * When building a single target package (e.g., `stack build` in a project
+    with only one package, or `stack build package-name` in a multi-package
+    project), the build output from GHC will be hidden for building all
+    dependencies, and will be displayed for the one target package.
+
+  * By default, when building multiple target packages, the output from these
+    will end up in a log file instead of on the console unless it contains
+    errors or warnings, to avoid problems of interleaved output and decrease
+    console noise. If you would like to see this content instead, you can use
+    the `--dump-logs` command line option, or add `dump-logs: all` to your
+    `stack.yaml` file.

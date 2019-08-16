@@ -135,13 +135,13 @@ Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
 Running the integration tests is a little involved, you'll need to:
 
 ```bash
-$ stack build --flag stack:integration-tests stack --interleaved-output --exec stack-integration-test
+$ stack build --flag stack:integration-tests stack --exec stack-integration-test
 ```
 
 Running an individual module works like this:
 
 ```bash
-$ stack build --flag stack:integration-tests stack --interleaved-output --exec "stack-integration-test -m <PATTERN>"
+$ stack build --flag stack:integration-tests stack --exec "stack-integration-test -m <PATTERN>"
 ```
 
 Where `<PATTERN>` is the name of the folder listed in the
