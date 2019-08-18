@@ -10,7 +10,7 @@
         git fetch upstream
         git push origin ghc-X.Y.Z-release
 
-  * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases)
+  * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
     with tag `ghc-X.Y.Z-release` and same name.
 
   * Download all the relevant GHC bindists from https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload them to the just-created Github release (see
