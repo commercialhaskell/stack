@@ -13,6 +13,10 @@ Behavior changes:
 
 Other enhancements:
 
+* Show warning about `local-programs-path` with spaces on windows
+  when running scripts. See 
+  [#5013](https://github.com/commercialhaskell/stack/pull/5013)
+
 * Add `ls dependencies json` which will print dependencies as JSON.
   `ls dependencies --tree`  is now `ls dependencies tree`. See
   [#4424](https://github.com/commercialhaskell/stack/pull/4424)
