@@ -281,7 +281,7 @@ configFromConfigMonoid
        shortLocalProgramsFilePath <-
          liftIO $ getShortPathName localProgramsFilePath
        when (' ' `elem` shortLocalProgramsFilePath) $ do
-         logWarn $ "Stack's 'programs' path contains a space character and " <>
+         logError $ "Stack's 'programs' path contains a space character and " <>
            "has no alternative short ('8 dot 3') name. This will cause " <>
            "problems with packages that use the GNU project's 'configure' " <>
            "shell script. Use the 'local-programs-path' configuation option " <>
