@@ -284,7 +284,7 @@ configFromConfigMonoid
          logError $ "Stack's 'programs' path contains a space character and " <>
            "has no alternative short ('8 dot 3') name. This will cause " <>
            "problems with packages that use the GNU project's 'configure' " <>
-           "shell script. Use the 'local-programs-path' configuation option " <>
+           "shell script. Use the 'local-programs-path' configuration option " <>
            "to specify an alternative path. The current 'shortest' path is: " <>
            display (T.pack shortLocalProgramsFilePath)
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
