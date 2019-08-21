@@ -285,8 +285,8 @@ configFromConfigMonoid
            "has no alternative short ('8 dot 3') name. This will cause " <>
            "problems with packages that use the GNU project's 'configure' " <>
            "shell script. Use the 'local-programs-path' configuration option " <>
-           "to specify an alternative path. The current 'shortest' path is: " <>
-           display (T.pack shortLocalProgramsFilePath)
+           "to specify an alternative path. The current path is: " <>
+           display (T.pack localProgramsFilePath)
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
