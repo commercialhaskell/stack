@@ -53,16 +53,16 @@ import           System.Terminal (fixCodePage)
 --   protect the snapshot, and it must be safe to unlock it if there are no further
 --   modifications to the snapshot to be performed by this build.
 build :: HasEnvConfig env
-      => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
+      => PackageCaches -> Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
-build msetLocalFiles = do
+build packageCaches msetLocalFiles = do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
     sourceMap <- view $ envConfigL.to envConfigSourceMap
-    locals <- projectLocalPackages
-    depsLocals <- localDependencies
+    locals <- projectLocalPackages packageCaches
+    depsLocals <- localDependencies packageCaches
     let allLocals = locals <> depsLocals
 
     -- Set local files, necessary for file watching
@@ -80,7 +80,7 @@ build msetLocalFiles = do
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli) packageCaches
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -263,10 +263,10 @@ loadPackage loc flags ghcOptions cabalConfigOpts = do
 
 -- | Query information about the build and print the result to stdout in YAML format.
 queryBuildInfo :: HasEnvConfig env
-               => [Text] -- ^ selectors
+               => PackageCaches -> [Text] -- ^ selectors
                -> RIO env ()
-queryBuildInfo selectors0 =
-        rawBuildInfo
+queryBuildInfo packageCaches selectors0 =
+        rawBuildInfo packageCaches
     >>= select id selectors0
     >>= liftIO . TIO.putStrLn . addGlobalHintsComment . decodeUtf8 . Yaml.encode
   where
@@ -303,9 +303,9 @@ queryBuildInfo selectors0 =
       , "# See https://github.com/commercialhaskell/stack/issues/3796"
       ]
 -- | Get the raw build information object
-rawBuildInfo :: HasEnvConfig env => RIO env Value
-rawBuildInfo = do
-    locals <- projectLocalPackages
+rawBuildInfo :: HasEnvConfig env => PackageCaches -> RIO env Value
+rawBuildInfo packageCaches = do
+    locals <- projectLocalPackages packageCaches
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
     return $ object

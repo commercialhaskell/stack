@@ -132,7 +132,7 @@ createDependencyGraph
   -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
-  locals <- for (toList $ smProject sourceMap) loadLocalPackage
+  locals <- for (toList $ smProject sourceMap) (flip loadLocalPackage undefined)
   let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
   globalDump <- view $ to dcGlobalDump
   -- TODO: Can there be multiple entries for wired-in-packages? If so,

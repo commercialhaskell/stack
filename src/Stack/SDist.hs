@@ -314,7 +314,7 @@ getSDistFileList lp =
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
         baseConfigOpts <- mkBaseConfigOpts boptsCli
-        locals <- projectLocalPackages
+        locals <- projectLocalPackages undefined
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] Nothing -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
@@ -453,7 +453,7 @@ buildExtractedTarball pkgDir = do
         in set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
         sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
-  local adjustEnvForBuild $ build Nothing
+  local adjustEnvForBuild $ build undefined Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.

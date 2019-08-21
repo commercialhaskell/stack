@@ -292,19 +292,73 @@ data LocalPackage = LocalPackage
 newtype MemoizedWith env a = MemoizedWith { unMemoizedWith :: RIO env a }
   deriving (Functor, Applicative, Monad)
 
-memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
-memoizeRefWith action = do
-  ref <- newIORef Nothing
-  pure $ MemoizedWith $ do
-    mres <- readIORef ref
-    res <-
-      case mres of
-        Just res -> pure res
-        Nothing -> do
-          res <- tryAny action
-          writeIORef ref $ Just res
-          pure res
-    either throwIO pure res
+data PackageCaches =
+    PackageCaches
+        { packageCachesComponentFiles :: PackagesCache (Map NamedComponent (Set (Path Abs File)))
+        , packageCachesCheckResults :: PackagesCache [( NamedComponent
+                                                      , ( Set FilePath
+                                                        , Map FilePath FileCacheInfo))]
+        }
+newPackageCaches :: MonadIO m => m PackageCaches
+newPackageCaches = PackageCaches <$> newPackagesCache <*> newPackagesCache
+newtype PackagesCache a =
+    PackagesCache
+        { packagesCacheRef :: IORef (Map PackageName (IORef (Maybe (Either SomeException a))))
+        }
+newPackagesCache :: MonadIO m => m (PackagesCache a)
+newPackagesCache = fmap PackagesCache (newIORef mempty)
+
+memoizeRefWith ::
+       (HasLogFunc env', MonadReader env' m, MonadIO m, HasLogFunc env)
+    => PackagesCache a
+    -> PackageName
+    -> Utf8Builder
+    -> RIO env a
+    -> m (MemoizedWith env a)
+memoizeRefWith packagesCache pname label action = do
+    packagesMap <- liftIO (readIORef (packagesCacheRef packagesCache))
+    ref <-
+        case M.lookup pname packagesMap of
+            Nothing -> do
+                logDebug
+                    ("memoizeRefWith: Package cache MISS: " <>
+                     fromString (show pname) <>
+                     ": " <>
+                     label)
+                ref <- newIORef Nothing
+                modifyIORef'
+                    (packagesCacheRef packagesCache)
+                    (M.insert pname ref)
+                pure ref
+            Just ref -> do
+                logDebug
+                    ("memoizeRefWith: Package cache HIT: " <>
+                     fromString (show pname) <>
+                     ": " <>
+                     label)
+                pure ref
+    pure $
+        MemoizedWith $ do
+            mres <- readIORef ref
+            res <-
+                case mres of
+                    Just res -> do
+                        logDebug
+                            ("memoizeRefWith: Key cache HIT: " <>
+                             fromString (show pname) <>
+                             ": " <>
+                             label)
+                        pure res
+                    Nothing -> do
+                        logDebug
+                            ("memoizeRefWith: Key cache MISS: " <>
+                             fromString (show pname) <>
+                             ": " <>
+                             label)
+                        res <- (tryAny action)
+                        writeIORef ref $ Just res
+                        pure res
+            either throwIO pure res
 
 runMemoizedWith
   :: (HasEnvConfig env, MonadReader env m, MonadIO m)

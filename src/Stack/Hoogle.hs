@@ -68,7 +68,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
     buildHaddocks = do
       config <- view configL
       runRIO config $ -- a bit weird that we have to drop down like this
-        catch (withDefaultEnvConfig $ Stack.Build.build Nothing)
+        catch (withDefaultEnvConfig $ Stack.Build.build undefined Nothing)
               (\(_ :: ExitCode) -> return ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
@@ -114,7 +114,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                  (withEnvConfig
                       NeedTargets
                       boptsCLI $
-                      Stack.Build.build Nothing
+                      Stack.Build.build undefined Nothing
                  )
                  (\(e :: ExitCode) ->
                        case e of

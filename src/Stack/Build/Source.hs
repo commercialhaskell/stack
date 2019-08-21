@@ -45,21 +45,21 @@ import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
-              => RIO env [LocalPackage]
-projectLocalPackages = do
+              => PackageCaches -> RIO env [LocalPackage]
+projectLocalPackages packageCaches = do
     sm <- view $ envConfigL.to envConfigSourceMap
-    for (toList $ smProject sm) loadLocalPackage
+    for (toList $ smProject sm) (flip loadLocalPackage packageCaches)
 
 -- | loads all local dependencies - project packages and local extra-deps
-localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
-localDependencies = do
+localDependencies :: HasEnvConfig env => PackageCaches -> RIO env [LocalPackage]
+localDependencies packageCaches = do
     bopts <- view $ configL.to configBuild
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
         case dpLocation dp of
             PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
-                Just <$> loadLocalPackage pp
+                Just <$> loadLocalPackage pp packageCaches
             _ -> return Nothing
 
 -- | Given the parsed targets and build command line options constructs
@@ -260,8 +260,9 @@ loadCommonPackage common = do
 loadLocalPackage ::
        forall env. (HasBuildConfig env, HasSourceMap env)
     => ProjectPackage
+    -> PackageCaches
     -> RIO env LocalPackage
-loadLocalPackage pp = do
+loadLocalPackage pp packageCaches = do
     sm <- view sourceMapL
     let common = ppCommon pp
     bopts <- view buildOptsL
@@ -349,9 +350,9 @@ loadLocalPackage pp = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
 
-    componentFiles <- memoizeRefWith $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
+    componentFiles <- memoizeRefWith (packageCachesComponentFiles packageCaches) name "componentFiles" $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
-    checkCacheResults <- memoizeRefWith $ do
+    checkCacheResults <- memoizeRefWith (packageCachesCheckResults packageCaches) name "checkCacheResults" $ do
       componentFiles' <- runMemoizedWith componentFiles
       forM (Map.toList componentFiles') $ \(component, files) -> do
         mbuildCache <- tryGetBuildCache (ppRoot pp) component

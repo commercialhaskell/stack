@@ -10,6 +10,7 @@
 
 module Main (main) where
 
+import Stack.Types.Package (PackageCaches, newPackageCaches)
 import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
@@ -560,17 +561,18 @@ buildCmd opts = do
     logError "Instead, please use --library-profiling and --executable-profiling"
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
     exitFailure
+  packageCaches <- newPackageCaches
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
-      FileWatchPoll -> fileWatchPoll (inner . Just)
-      FileWatch -> fileWatch (inner . Just)
-      NoFileWatch -> inner Nothing
+      FileWatchPoll -> fileWatchPoll (inner packageCaches . Just)
+      FileWatch -> fileWatch (inner packageCaches . Just)
+      NoFileWatch -> inner packageCaches Nothing
   where
     inner
-      :: Maybe (Set (Path Abs File) -> IO ())
+      :: PackageCaches -> Maybe (Set (Path Abs File) -> IO ())
       -> RIO Runner ()
-    inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
-        Stack.Build.build setLocalFiles
+    inner packageCaches setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
+        Stack.Build.build packageCaches setLocalFiles
     -- Read the build command from the CLI and enable it to run
     modifyGO =
       case boptsCLICommand opts of
@@ -713,7 +715,7 @@ sdistCmd sdistOpts =
 execCmd :: ExecOpts -> RIO Runner ()
 execCmd ExecOpts {..} =
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
-    unless (null targets) $ Stack.Build.build Nothing
+    unless (null targets) $ Stack.Build.build undefined Nothing
 
     config <- view configL
     menv <- liftIO $ configProcessContextSettings config eoEnvSettings
@@ -766,7 +768,7 @@ execCmd ExecOpts {..} =
                                 firstExe = listToMaybe executables
           case exe of
               Just (CExe exe') -> do
-                withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
+                withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build undefined Nothing
                 return (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
@@ -857,7 +859,7 @@ templatesCmd () = withConfig NoReexec templatesHelp
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()
-queryCmd selectors = withConfig YesReexec $ withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors = withConfig YesReexec $ withDefaultEnvConfig $ queryBuildInfo undefined $ map T.pack selectors
 
 -- | Generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()

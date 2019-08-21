@@ -131,7 +131,7 @@ scriptCmd opts = do
                 else do
                     logDebug "Missing packages, performing installation"
                     let targets = map (T.pack . packageNameString) $ Set.toList targetsSet
-                    withNewLocalBuildTargets targets $ Stack.Build.build Nothing
+                    withNewLocalBuildTargets targets $ Stack.Build.build undefined Nothing
 
         let ghcArgs = concat
                 [ ["-i", "-i" ++ toFilePath scriptDir]

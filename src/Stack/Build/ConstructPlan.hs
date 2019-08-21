@@ -175,8 +175,9 @@ constructPlan :: forall env. HasEnvConfig env
               -> SourceMap
               -> InstalledMap
               -> Bool
+              -> PackageCaches
               -> RIO env Plan
-constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps packageCaches = do
     logDebug "Constructing the build plan"
 
     when hasBaseInDeps $
@@ -254,7 +255,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
     getSources globalCabalVersion = do
       let loadLocalPackage' pp = do
-            lp <- loadLocalPackage pp
+            lp <- loadLocalPackage pp packageCaches
             pure lp { lpPackage = applyForceCustomBuild globalCabalVersion $ lpPackage lp }
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage' pp

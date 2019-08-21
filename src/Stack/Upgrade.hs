@@ -241,4 +241,4 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
       local (over globalOptsL (modifyGO dir)) $
       withConfig NoReexec $ withEnvConfig AllowNoTargets boptsCLI $
       local (set (buildOptsL.buildOptsInstallExesL) True) $
-      build Nothing
+      build undefined Nothing

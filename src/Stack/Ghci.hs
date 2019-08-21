@@ -138,8 +138,8 @@ ghci opts@GhciOpts{..} = do
             }
     sourceMap <- view $ envConfigL.to envConfigSourceMap
     installMap <- toInstallMap sourceMap
-    locals <- projectLocalPackages
-    depLocals <- localDependencies
+    locals <- projectLocalPackages undefined
+    depLocals <- localDependencies undefined
     let localMap =
           M.fromList [(packageName $ lpPackage lp, lp) | lp <- locals ++ depLocals]
         -- FIXME:qrilka this looks wrong to go back to SMActual
@@ -343,7 +343,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
     -- 'initialBuildSteps'.
     when (not ghciNoBuild && not (null targets)) $ do
         -- only new local targets could appear here
-        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing
+        eres <- tryAny $ withNewLocalBuildTargets targets $ build undefined Nothing
         case eres of
             Right () -> return ()
             Left err -> do
