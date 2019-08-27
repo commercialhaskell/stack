@@ -19,6 +19,10 @@ Other enhancements:
 
 Bug fixes:
 
+* Upgrade `pantry`: module mapping insertions into the database are now atomic.
+  Previously, if you SIGTERMed at the wrong time while running a script, you
+  could end up with an inconsistent database state.
+
 
 ## v2.1.3.1
 
