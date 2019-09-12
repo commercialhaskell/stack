@@ -1694,15 +1694,15 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         return SetupInfo {..}
 
 -- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
--- For all fields the values from the last @SetupInfo@ win.
+-- For all fields the values from the first @SetupInfo@ win.
 instance Semigroup SetupInfo where
     l <> r =
         SetupInfo
-        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
-        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
-        , siMsys2 = siMsys2 r <> siMsys2 l
-        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
+        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
+        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
+        , siMsys2 = siMsys2 l <> siMsys2 r
+        , siGHCs = Map.unionWith (<>) (siGHCs l) (siGHCs r)
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs l) (siGHCJSs r)
         , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
 
 instance Monoid SetupInfo where
