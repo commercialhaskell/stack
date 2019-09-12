@@ -21,8 +21,8 @@ configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
     (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
         ghcVariant ghcBuild jobs includes libs overrideGccPath overrideHpack
-        skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser
-        dumpLogs colorWhen -> mempty
+        skipGHCCheck skipMsys localBin setupInfoLocations modifyCodePage
+        allowDifferentUser dumpLogs colorWhen -> mempty
             { configMonoidStackRoot = stackRoot
             , configMonoidWorkDir = workDir
             , configMonoidBuildOpts = buildOpts
@@ -41,6 +41,7 @@ configOptsParser currentDir hide0 =
             , configMonoidOverrideHpack = overrideHpack
             , configMonoidSkipMsys = skipMsys
             , configMonoidLocalBinPath = localBin
+            , configMonoidSetupInfoLocations = setupInfoLocations
             , configMonoidModifyCodePage = modifyCodePage
             , configMonoidAllowDifferentUser = allowDifferentUser
             , configMonoidDumpLogs = dumpLogs
@@ -128,6 +129,18 @@ configOptsParser currentDir hide0 =
             <> help "Install binaries to DIR"
             <> hide
              ))
+    <*> many (SetupInfoFileOrURL <$> (
+        ( strOption
+            ( long "stack-setup-yaml"
+           <> help "DEPRECATED: Use 'setup-info-yaml' instead"
+           <> metavar "URL"
+           <> hidden )
+        ) <|>
+        ( strOption
+            ( long "setup-info-yaml"
+           <> help "Alternate URL or absolute path for stack dependencies"
+           <> metavar "URL" )
+        )))
     <*> firstBoolFlagsTrue
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"

@@ -27,24 +27,10 @@ import           Stack.Types.Version
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe WantedCompiler)
     , scoForceReinstall  :: !Bool
-    , scoSetupInfoYaml   :: !String
     , scoGHCBindistURL   :: !(Maybe String)
     , scoGHCJSBootOpts   :: ![String]
     , scoGHCJSBootClean  :: !Bool
     }
-
-setupYamlCompatParser :: OA.Parser String
-setupYamlCompatParser = stackSetupYaml <|> setupInfoYaml
-    where stackSetupYaml = OA.strOption (
-               OA.long "stack-setup-yaml"
-            <> OA.help "DEPRECATED: Use 'setup-info-yaml' instead"
-            <> OA.metavar "URL"
-            <> OA.hidden )
-          setupInfoYaml  = OA.strOption (
-               OA.long "setup-info-yaml"
-            <> OA.help "Alternate URL or absolute path for stack dependencies"
-            <> OA.metavar "URL"
-            <> OA.value defaultSetupInfoYaml )
 
 setupParser :: OA.Parser SetupCmdOpts
 setupParser = SetupCmdOpts
@@ -56,7 +42,6 @@ setupParser = SetupCmdOpts
             "reinstall"
             "reinstalling GHC, even if available (incompatible with --system-ghc)"
             OA.idm
-    <*> setupYamlCompatParser
     <*> OA.optional (OA.strOption
             (OA.long "ghc-bindist"
            <> OA.metavar "URL"
@@ -99,7 +84,6 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsSkipGhcCheck = False
         , soptsSkipMsys = configSkipMsys
         , soptsResolveMissingGHC = Nothing
-        , soptsSetupInfoYaml = scoSetupInfoYaml
         , soptsGHCBindistURL = scoGHCBindistURL
         , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }

@@ -121,8 +121,6 @@ data SetupOpts = SetupOpts
     -- ^ Do not use a custom msys installation on Windows
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
-    , soptsSetupInfoYaml :: !FilePath
-    -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
     , soptsGHCJSBootOpts :: [String]
@@ -225,7 +223,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsSkipGhcCheck = configSkipGHCCheck config
             , soptsSkipMsys = configSkipMsys config
             , soptsResolveMissingGHC = mResolveMissingGHC
-            , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
             , soptsGHCJSBootOpts = ["--clean"]
             }
@@ -456,7 +453,7 @@ ensureCompilerAndMsys
 ensureCompilerAndMsys sopts = do
   didWarn <- warnUnsupportedCompiler $ getGhcVersion $ wantedToActual $ soptsWantedCompiler sopts
 
-  getSetupInfo' <- memoizeRef (getSetupInfo (soptsSetupInfoYaml sopts))
+  getSetupInfo' <- memoizeRef getSetupInfo
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
 
   warnUnsupportedCompilerCabal cp didWarn
@@ -1070,14 +1067,14 @@ sourceSystemCompilers wanted = do
       | otherwise = id
 
 -- | Download the most recent SetupInfo
-getSetupInfo :: HasConfig env => String -> RIO env SetupInfo
-getSetupInfo stackSetupYaml = do
+getSetupInfo :: HasConfig env => RIO env SetupInfo
+getSetupInfo = do
     config <- view configL
     setupInfos <-
         mapM
             loadSetupInfo
-            (SetupInfoFileOrURL stackSetupYaml :
-             configSetupInfoLocations config)
+            (configSetupInfoLocations config ++
+             [SetupInfoFileOrURL defaultSetupInfoYaml])
     return (mconcat setupInfos)
   where
     loadSetupInfo (SetupInfoInline si) = return si
