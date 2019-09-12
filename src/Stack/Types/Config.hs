@@ -333,7 +333,7 @@ data Config =
          ,configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
          -- ^ Additional options to be passed to ./Setup.hs configure
          ,configSetupInfoLocations  :: ![String]
-         -- ^ URLs or paths to setup-info.yaml files, for finding tools.
+         -- ^ URLs or paths to stack-setup.yaml files, for finding tools.
          -- If none present, the default setup-info is used.
          ,configSetupInfoInline     :: !SetupInfo
          -- ^ Additional SetupInfo to use to find tools.
@@ -823,10 +823,9 @@ data ConfigMonoid =
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![String]
-    -- ^ URLs or paths to setup-info.yaml files, for finding tools.
-    -- If none present, the default setup-info is used.
+    -- ^ See 'configSetupInfoLocations'
     ,configMonoidSetupInfoInline     :: !SetupInfo
-    -- ^ Additional SetupInfo to use to find tools.
+    -- ^ See 'configSetupInfoInline'
     ,configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
     ,configMonoidPvpBounds           :: !(First PvpBounds)
