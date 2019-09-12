@@ -1070,23 +1070,22 @@ sourceSystemCompilers wanted = do
 getSetupInfo :: HasConfig env => RIO env SetupInfo
 getSetupInfo = do
     config <- view configL
-    setupInfos <-
-        mapM
-            loadSetupInfo
-            (configSetupInfoLocations config ++
-             [SetupInfoFileOrURL defaultSetupInfoYaml])
-    return (mconcat setupInfos)
+    let inlineSetupInfo = configSetupInfoInline config
+        locations' = configSetupInfoLocations config
+        locations = if null locations' then [defaultSetupInfoYaml] else locations'
+
+    resolvedSetupInfos <- mapM loadSetupInfo locations
+    return (inlineSetupInfo <> mconcat resolvedSetupInfos)
   where
-    loadSetupInfo (SetupInfoInline si) = return si
-    loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
-        bs <-
-            case parseUrlThrow urlOrFile of
-                Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
-                Nothing -> liftIO $ S.readFile urlOrFile
-        WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
-        when (urlOrFile /= defaultSetupInfoYaml) $
-            logJSONWarnings urlOrFile warnings
-        return si
+    loadSetupInfo urlOrFile = do
+      bs <-
+          case parseUrlThrow urlOrFile of
+              Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
+              Nothing -> liftIO $ S.readFile urlOrFile
+      WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
+      when (urlOrFile /= defaultSetupInfoYaml) $
+          logJSONWarnings urlOrFile warnings
+      return si
 
 getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find

@@ -320,6 +320,7 @@ configFromConfigMonoid
          configGhcOptionsByName = coerce configMonoidGhcOptionsByName
          configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
+         configSetupInfoInline = configMonoidSetupInfoInline
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps

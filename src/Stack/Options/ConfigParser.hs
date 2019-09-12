@@ -129,7 +129,7 @@ configOptsParser currentDir hide0 =
             <> help "Install binaries to DIR"
             <> hide
              ))
-    <*> many (SetupInfoFileOrURL <$> (
+    <*> many (
         ( strOption
             ( long "stack-setup-yaml"
            <> help "DEPRECATED: Use 'setup-info-yaml' instead"
@@ -140,7 +140,7 @@ configOptsParser currentDir hide0 =
             ( long "setup-info-yaml"
            <> help "Alternate URL or absolute path for stack dependencies"
            <> metavar "URL" )
-        )))
+        ))
     <*> firstBoolFlagsTrue
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"
