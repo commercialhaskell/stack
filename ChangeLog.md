@@ -8,11 +8,21 @@
 Release notes:
 
 Major changes:
+* `setup-info-locations` yaml configuration now allows overwriting the default locations of `stack-setup-2.yaml`.
+  [#2983](https://github.com/commercialhaskell/stack/issues/2983)
+  [#2913](https://github.com/commercialhaskell/stack/issues/2913)
+
+* The `setup-info` configuration key now allows overwriting parts of the default `setup-info`
+
+* The `--setup-info-yaml` command line flag now may be used in all stack commands such as `stack build`, and not only in `stack setup`
+
+* The `--setup-info-yaml` may specify multiple locations for `stack-setup.yaml` files.
 
 Behavior changes:
+* Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
+  [#2647](https://github.com/commercialhaskell/stack/issues/2647)
 
 Other enhancements:
-
 * Add `build-output-timestamps` flag in yaml. Setting it to true
   prefixes each build log output line with a timestamp.
 
