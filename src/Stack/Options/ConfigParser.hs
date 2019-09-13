@@ -130,17 +130,10 @@ configOptsParser currentDir hide0 =
             <> hide
              ))
     <*> many (
-        ( strOption
-            ( long "stack-setup-yaml"
-           <> help "DEPRECATED: Use 'setup-info-yaml' instead"
-           <> metavar "URL"
-           <> hidden )
-        ) <|>
-        ( strOption
+        strOption
             ( long "setup-info-yaml"
            <> help "Alternate URL or absolute path for stack dependencies"
-           <> metavar "URL" )
-        ))
+           <> metavar "URL" ))
     <*> firstBoolFlagsTrue
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"
