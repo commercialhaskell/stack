@@ -319,11 +319,10 @@ If you're attempting to install stack from within China:
 
 ```
 ###ADD THIS IF YOU LIVE IN CHINA
-setup-info: "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
+setup-info-locations: 
+- "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
 urls:
   latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
-  lts-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/lts-haskell/
-  nightly-build-plans: http://mirrors.tuna.tsinghua.edu.cn/stackage/stackage-nightly/
 package-indices:
  - name: Tsinghua
    download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/package/

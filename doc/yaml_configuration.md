@@ -617,8 +617,9 @@ Specify a variant binary distribution of GHC to use.  Known values:
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
-  [setup-info](#setup-info) so `stack setup` knows where to download it, or
-  pass the `stack setup --ghc-bindist` argument on the command-line
+  [setup-info](#setup-info) or [setup-info-locations](#setup-info-locations) 
+  so `stack setup` knows where to download it,
+  or pass the `stack setup --ghc-bindist` argument on the command-line
 
 This option is incompatible with `system-ghc: true`.
 
@@ -630,13 +631,54 @@ Specify a specialized architecture bindist to use.  Normally this is
 determined automatically, but you can override the autodetected value here.
 Possible arguments include `standard`, `gmp4`, `tinfo6`, and `nopie`.
 
+### setup-info-locations
+
+(Since 2.3)
+
+Possible usages of this config are:
+1. Using `stack` offline or behind a firewall
+2. Extending the tools known to `stack` such as cutting-edge versions of `ghc` or builds for custom linux distributions.
+
+The `setup-info` dictionary specifies locations for installation of Haskell-related tooling - it maps `(Tool, Platform, Version)` to the location where it can be obtained, such as `(GHC, Windows64, 8.6.5)` to the url hosting the `*.tar.xz` for GHC's installation.
+
+By default, it's obtained from [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
+
+The `setup-info` dictionary is constructed in the following order:
+1. `setup-info` yaml configuration - inline config
+2. `--setup-info-yaml` command line arguments - urls or paths, multiple locations may be specified.
+3. `setup-info-locations` yaml configuration - urls or paths
+
+The first location which specifies the location of a tool `(Tool, Platform, Version)` takes precedence, so one can extend the default tools with a fallback to the default `setup-info` location:
+
+```yaml
+setup-info-locations:
+- C:/stack-offline/my-stack-setup.yaml
+- \\smbServer\stack\my-stack-setup.yaml
+- http://stack-mirror.com/stack-setup.yaml
+- https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml
+```
+
+The default `setup-info` location is included only if no locations in the `setup-info-locations` config or the  `--setup-info-yaml` command line argument were specified.
+
+Thus the following will cause `stack setup` not to consult github for the `setup-info`:
+```yaml
+setup-info-locations:
+- C:/stack-offline/my-stack-setup.yaml
+```
+
+```yaml
+setup-info-locations: []
+```
+
 ### setup-info
 
 (Since 0.1.5)
 
-Allows augmenting from where tools like GHC and msys2 (on Windows) are
+Allows specifying from where tools like GHC and msys2 (on Windows) are
 downloaded. Most useful for specifying locations of custom GHC binary
-distributions (for use with the [ghc-variant](#ghc-variant) option):
+distributions (for use with the [ghc-variant](#ghc-variant) option).
+
+The format of this field is the same as in the default [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml):
 
 ```yaml
 setup-info:
@@ -646,18 +688,7 @@ setup-info:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
 
-Or you can point to external setup-info:
-
-```yaml
-setup-info: "https://example.com/my-stack-setup-info.yaml"
-```
-
-This may be either URL or (since 1.2.0) absolute file path.
-
-Note that this **adds** the specified setup info metadata to the default.
-If you need to **replace** it, use the `stack --setup-info-yaml` command-line
-argument instead.  The default setup metadata is in
-[stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
+Note that specifying this config *does not* the default `stack-setup-2.yaml` from being consulted as a fallback.
 
 ### pvp-bounds
 
