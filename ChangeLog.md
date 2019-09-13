@@ -9,6 +9,7 @@ Release notes:
 
 Major changes:
 * `setup-info-locations` yaml configuration now allows overwriting the default locations of `stack-setup-2.yaml`.
+  [#5031](https://github.com/commercialhaskell/stack/pull/5031)
   [#2983](https://github.com/commercialhaskell/stack/issues/2983)
   [#2913](https://github.com/commercialhaskell/stack/issues/2913)
 
