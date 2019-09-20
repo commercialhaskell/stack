@@ -15,6 +15,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix using relative links in haddocks output.  See
+  [#4971](https://github.com/commercialhaskell/stack/issues/4971).
+
 
 ## v2.1.3.1
 

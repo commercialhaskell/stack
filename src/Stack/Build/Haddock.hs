@@ -229,8 +229,10 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
                         docRelFP FP.</>
                         packageIdentifierString dpPackageIdent FP.</>
                         (packageNameString name FP.<.> "haddock")
+                    docPathRelFP =
+                        fmap ((docRelFP FP.</>) . FP.takeFileName) dpHaddockHtml
                     interfaces = intercalate "," $
-                      maybeToList dpHaddockHtml ++ [srcInterfaceFP]
+                        maybeToList docPathRelFP ++ [srcInterfaceFP]
 
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
