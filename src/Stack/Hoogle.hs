@@ -74,8 +74,16 @@ hoogleCmd (args,setup,rebuild,startServer) =
     hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
         PackageIdentifier hooglePackageName hoogleMinVersion
-    installHoogle :: RIO EnvConfig ()
-    installHoogle = do
+    installHoogle :: RIO EnvConfig (Path Abs File)
+    installHoogle = requiringLatestHoogle $ do
+        Stack.Build.build Nothing
+        mhooglePath' <- findExecutable "hoogle"
+        case mhooglePath' of
+            Right hooglePath -> parseAbsFile hooglePath
+            Left _ -> do
+                logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
+                bail
+    requiringLatestHoogle f = do
         hooglePackageIdentifier <- do
           mversion <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
 
@@ -100,7 +108,6 @@ hoogleCmd (args,setup,rebuild,startServer) =
               display ident <>
               " in your index, installing it."
         config <- view configL
-        menv <- liftIO $ configProcessContextSettings config envSettings
         let boptsCLI = defaultBuildOptsCLI
                 { boptsCLITargets =
                     pure $
@@ -110,16 +117,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                     (\(PackageIdentifierRevision n v _) -> PackageIdentifier n v)
                     hooglePackageIdentifier
                 }
-        runRIO config $ catch -- Also a bit weird
-                 (withEnvConfig
-                      NeedTargets
-                      boptsCLI $
-                      Stack.Build.build Nothing
-                 )
-                 (\(e :: ExitCode) ->
-                       case e of
-                           ExitSuccess -> runRIO menv resetExeCache
-                           _ -> throwIO e)
+        runRIO config $ withEnvConfig NeedTargets boptsCLI f
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
@@ -139,7 +137,8 @@ hoogleCmd (args,setup,rebuild,startServer) =
     ensureHoogleInPath = do
         config <- view configL
         menv <- liftIO $ configProcessContextSettings config envSettings
-        mhooglePath <- runRIO menv $ findExecutable "hoogle"
+        mhooglePath <- runRIO menv (findExecutable "hoogle") <>
+          requiringLatestHoogle (findExecutable "hoogle")
         eres <- case mhooglePath of
             Left _ -> return $ Left "Hoogle isn't installed."
             Right hooglePath -> do
@@ -171,12 +170,6 @@ hoogleCmd (args,setup,rebuild,startServer) =
                 | setup -> do
                     logWarn $ display err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
-                    mhooglePath' <- runRIO menv $ findExecutable "hoogle"
-                    case mhooglePath' of
-                        Right hooglePath -> parseAbsFile hooglePath
-                        Left _ -> do
-                            logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
-                            bail
                 | otherwise -> do
                     logWarn $ display err <> " Not installing it due to --no-setup."
                     bail
