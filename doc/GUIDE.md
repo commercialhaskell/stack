@@ -1788,7 +1788,7 @@ The `my-tests.prof` file now contains time and allocation info for the test run.
 To create a profiling report for an executable, e.g. `my-exe`, you can
 run
 
-     stack exec -- my-exe +RTS -p
+     stack exec --profile -- my-exe +RTS -p
 
 For more fine-grained control of compilation options there are the
 `--library-profiling` and `--executable-profiling` flags which will turn on the
