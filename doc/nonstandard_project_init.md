@@ -41,13 +41,7 @@ flags:
 ```
 
 It is also possible to pass the same flag to multiple packages, i.e.
-`stack build --flag *:necessary`
-
-Currently one needs to list all of your modules that interpret flags in the
-`other-modules` section of a cabal file. `cabal-install` has a different
-behavior currently and doesn't require that the modules be listed. This may
-change in a future release.
-
+`stack build --flag '*:necessary'`
 
 ### Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/191
