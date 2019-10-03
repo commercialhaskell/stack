@@ -759,7 +759,7 @@ execCmd ExecOpts {..} =
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
                              []   -> (firstExe, args)
-                             x:xs -> case find (\y -> y == (CExe $ T.pack x)) executables of
+                             x:xs -> case find (\y -> y == CExe (T.pack x)) executables of
                                      Nothing -> (firstExe, args)
                                      argExe -> (argExe, xs)
                              where
