@@ -137,9 +137,8 @@ reexec inner = do
 withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do
   colorWhen <-
-    case getFirst $ configMonoidColorWhen $ globalConfigMonoid go of
-      Nothing -> defaultColorWhen
-      Just colorWhen -> pure colorWhen
+    maybe defaultColorWhen pure $
+    getFirst $ configMonoidColorWhen $ globalConfigMonoid go
   useColor <- case colorWhen of
     ColorNever -> return False
     ColorAlways -> return True
