@@ -26,8 +26,9 @@ packages:
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
 - http-download-0.1.0.0@rev:0
-- pantry-0.1.1.1@rev:0
-- git: https://github.com/snoyberg/filelock.git
+- github: commercialhaskell/pantry
+  commit: 1295ec4a2220bd29d488b406072fe78622414676
+- github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
 drop-packages:
