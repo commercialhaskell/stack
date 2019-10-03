@@ -21,11 +21,22 @@ Other enhancements:
   `ls dependencies --tree`  is now `ls dependencies tree`. See
   [#4424](https://github.com/commercialhaskell/stack/pull/4424)
 
+* Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
+
 Bug fixes:
 
 * Upgrade `pantry`: module mapping insertions into the database are now atomic.
   Previously, if you SIGTERMed at the wrong time while running a script, you
   could end up with an inconsistent database state.
+
+* Fix using relative links in haddocks output.  See
+  [#4971](https://github.com/commercialhaskell/stack/issues/4971).
+
+* Use proper Hoogle executable path when installed automatically. See
+  [#4905](https://github.com/commercialhaskell/stack/issues/4905)
+
+* Fix GHC version for batched package unregistration. See
+  [#4951](https://github.com/commercialhaskell/stack/issues/4951)
 
 
 ## v2.1.3.1

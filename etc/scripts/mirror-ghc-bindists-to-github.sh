@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.6.5
+GHCVER=8.8.1
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -34,14 +34,15 @@ if [[ -z "$UPLOAD_URL" ]]; then
 fi
 echo 'ghc:' >stack-setup-$GHCVER.yaml
 
-mirror () {
+mirror_ () {
+  base_url="$1"; shift
   suffix="$1"; shift
   srcext="$1"; shift
   destext="$1"; shift
   local srcfn=ghc-$GHCVER-${suffix}.tar.${srcext}
   if [[ ! -s "$srcfn.downloaded" ]]; then
     rm -f "$srcfn"
-    curl -LO --fail "http://downloads.haskell.org/~ghc/$GHCVER/$srcfn"
+    curl -LO --fail "$base_url/$srcfn"
     date >"$srcfn.downloaded"
   fi
   local destfn=ghc-$GHCVER-${suffix}.tar.${destext}
@@ -61,6 +62,7 @@ mirror () {
     alias="$1"
     echo "    $alias:" >>stack-setup-$GHCVER.yaml
     echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
+    echo "            # Mirrored from $base_url/$srcfn" >>stack-setup-$GHCVER.yaml
     echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
     echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
     echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
@@ -70,19 +72,25 @@ mirror () {
   done
 }
 
+mirror () {
+  mirror_ http://downloads.haskell.org/~ghc/$GHCVER "$@"
+}
 
 # NOTE: keep the 'mirror' commands in the same order as entries in
 # https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
 
-mirror i386-deb9-linux xz xz linux32 linux32-nopie
-mirror x86_64-deb8-linux xz xz linux64 linux64-nopie
-#mirror x86_64-centos67-linux xz xz linux64-gmp4 linux64-gmp4-nopie
-mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie
+mirror i386-deb9-linux xz xz linux32
+mirror x86_64-deb8-linux xz xz linux64
+#mirror x86_64-centos67-linux xz xz linux64-gmp4
+mirror x86_64-fedora27-linux xz xz linux64-tinfo6
 mirror x86_64-apple-darwin xz bz2 macosx
-mirror i386-unknown-mingw32 xz xz windows32
+#mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
 #mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
-#mirror aarch64-deb8-linux xz xz linux-aarch64
+mirror aarch64-deb9-linux xz xz linux-aarch64
+
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl xz xz linux32-musl
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl xz xz linux64-musl
 
 set +x
 echo

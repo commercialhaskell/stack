@@ -1427,6 +1427,16 @@ The `runghc` command is still very useful, especially when you're working on a
 project and want to access the package databases and configurations used by
 that project. See the next section for more information on configuration files.
 
+### Platform-specific script issues
+
+On Mac OSX:
+
+- Avoid `{-# LANGUAGE CPP #-}` in stack scripts; it breaks the hashbang line
+  ([GHC #6132](https://gitlab.haskell.org/ghc/ghc/issues/6132))
+
+- Use a compiled executable, not another script, in the hashbang line.
+  Eg `#!/usr/bin/env runhaskell` will work but `#!/usr/local/bin/runhaskell` would not.
+
 ### Loading scripts in ghci
 
 Sometimes you want to load your script in ghci REPL to play around with your

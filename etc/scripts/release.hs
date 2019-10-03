@@ -171,10 +171,10 @@ rules global@Global{..} args = do
         need [releaseCheckDir </> binaryExeFileName]
 
     phony uploadPhony $
-        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) binaryPkgFileNames
+        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) binaryPkgAndSigFileNames
 
     phony buildPhony $
-        mapM_ (\f -> need [releaseDir </> f]) binaryPkgFileNames
+        mapM_ (\f -> need [releaseDir </> f]) binaryPkgAndSigFileNames
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
@@ -335,13 +335,13 @@ rules global@Global{..} args = do
     releaseStageDir = releaseDir </> "stage"
     releaseBinDir = releaseDir </> "bin"
 
-    binaryPkgFileNames =
-        concatMap sigHashFileNames binaryPkgArchiveFileNames
+    binaryPkgAndSigFileNames =
+        concatMap sigHashFileNames binaryPkgFileNames
     sigHashFileNames x =
         case gGpgKey of
             Nothing -> [x, x <.> sha256Ext]
             Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
-    binaryPkgArchiveFileNames =
+    binaryPkgFileNames =
         case platformOS of
             Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]

@@ -2,7 +2,12 @@
 
 # Signing key
 
-Releases are signed with this key:
+Releases are signed with the GPG key of the individual who builds
+them.  Authorized keys will always be signed by key ID 0x575159689BEFB442,
+with the key and signature uploaded to the
+[SKS keyserver pool](https://sks-keyservers.net/).
+
+This is the public key block for 0x575159689BEFB442:
 
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----

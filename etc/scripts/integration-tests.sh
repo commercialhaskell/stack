@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec stack build --flag stack:integration-tests stack --interleaved-output --exec stack-integration-test
+exec stack build --flag stack:integration-tests stack --exec stack-integration-test

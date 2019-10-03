@@ -4,21 +4,15 @@
 
 ## Upcoming release tasks:
 
-* Check whether `persistent` still needs `monad-logger`; remove dependency if not
-* Check if workaround for https://github.com/commercialhaskell/stack/issues/3922 still needed in stack.yaml
-* Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 1.11.x.  Directories, and last Stack version uploaded:
+* Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 2.1.x.  Directories, and last Stack version uploaded:
 	- `s3://download.fpcomplete.com/archlinux` (1.0.0)
 	- `s3://download.fpcomplete.com/centos` (1.5.1)
 	- `s3://download.fpcomplete.com/debian` (1.4.0)
 	- `s3://download.fpcomplete.com/fedora` (1.3.0)
 	- `s3://download.fpcomplete.com/ubuntu` (1.5.1)
-* Eventually remove `-nopie` variants from [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml).  stack-1.6 was the last release to use them, so wait a few major releases after that, and be sure to announce.
-    * Also remove the `-nopie` variants from `etc/scripts/mirrog-ghc-bindists-to-github.sh`.
-* Remove workaround to [#4125](https://github.com/commercialhaskell/stack/issues/4125) from `stack.yaml` for next major version after 1.8.
-* Explicitly tag release candidates and prereleases in `stack --version` output.
 * Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
 * If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
-
+* Try using Alpine and https://github.com/redneb/ghc-alt-libc/releases to build linux 32-bit static binaries.  This will require upgrading GHC version used (e.g. to 8.6.5).  If this works out, switch over to the same for 64-bit static binaries (rather than static-haskell-nix).
 
 ## Iterating on release process
 
@@ -26,19 +20,20 @@
 
 Since the release process and scripts sometimes need to be iterated on during the process of building all the platforms' binaries, the scripts are all designed so that you can run them *from a different directory*.  This means you can have one source tree for the version of `stack` being released, and a separate one where you work on the release scripts and process.
 
-To use this way, set the current directory should be the version of `stack` to be released.  You can then call the scripts in another directory to use their version.  For example, `stack ../stack-release-scripts/etc/scripts/release.hs …` or `../stack-release-scripts/etc/scripts/vagrant-releases.hs`.
+To use this way, the current directory should be the version of `stack` to be released.  You can then call the scripts in another directory to use their version.  For example, `stack ../stack-release-scripts/etc/scripts/release.hs …` or `../stack-release-scripts/etc/scripts/vagrant-releases.hs`.
 
 
 ## Version scheme
 
 * Versions with an _even_ second component are development versions (the `master` branch)
-* Versions with an _odd_ second component are stable versions (the `stable` branch, or in a `vX.Y` release candidate branch for not-yet-released versions)
+* Versions with an _odd_ second component are stable versions (the `stable` branch, or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
 * Versions with an _even_ third component (e.g. 1.6.2 and 1.7.0) are unreleased versions
 * Versions with an _odd_ third component (e.g. 1.6.1 or 1.7.3) and released versions
 * Pre-release unstable binaries will be released with the date as the fourth component (e.g. 1.6.0.20171129)
 * Release candidate binaries will be released with an even third component and and odd number as the fourth component (e.g. 1.7.0.1)
+* Hackage-only dependency compatibility patch releases add a fourth patchlevel component (e.g. v1.7.3.1, in the `release` branch)
 * All branches _except_ `release` (which matches exactly the most recent release) must have an even third component (development)
-* Branches other than `stable`, `release`, and a `vX.Y` release candidate will always have a `0` third component (e.g. 1.7.0).
+* Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate will always have a `0` third component (e.g. 1.7.0).
 
 Examples:
 
@@ -50,18 +45,20 @@ Examples:
 * `1.7.2.0`: development for second release of 1.7.x series (`stable` branch)
 * `1.7.2.1`: release candidate for second release of 1.7.x series (`stable` branch)
 * `1.7.3`: second release of 1.7.x series (`release` branch)
+* `1.7.3.1`: first hackage-only patch of 1.7.3 (`release` branch)
+* `1.7.3.2`: second hackage-only patch of 1.7.3 (`release` branch)
 * `1.8.0`: unstable development code (`master` branch)
 * `1.8.0.20181004`: pre-release snapshot of unstable version (`master` branch)
 
 ## Pre-release checks
 
-* Check that the snapshot in `stack.yaml`'s' GHC version supports building on all required platforms (e.g. GHC 8.4 doesn't support FreeBSD, so it's not a candidate).  If not, will have to switch to a different snapshot (or decide that we won't support the platform for this iteration).
+* Check that the snapshot in `stack.yaml`'s GHC version supports building on all required platforms (e.g. GHC 8.4 doesn't support FreeBSD, so it's not a candidate).  If not, will have to switch to a different snapshot (or decide that we won't support the platform for this iteration).
 * Check for any P0 and P1 issues that should be dealt with before release
 * Check for un-merged pull requests that should be merged before release
 * Ensure `release` and `stable` branches merged to `master`
-* Ensure no bounds specified in package.yaml unless truly necessary (e.g. in most cases rely on stack.yaml's resolver to manage dependency versions), and ensure `base` minbound is correct for the supported GHC version(s) (e.g. use `stack exec ghc-pkg list base` to find out minimum base version)
+* Ensure no bounds specified in any package.yaml (including those in `subs/`) unless truly necessary (e.g. in most cases rely on stacksnap.yaml to manage dependency versions), and ensure `base` minbound is correct for the supported GHC version(s) (check version of `base` in oldest supported Stackage snapshot)
 * Check compatibility with latest LTS Stackage snapshots
-    * `stack*.yaml` (where `*` is not `nightly`), __including the ones in
+    * `snapshot*.yaml` and `stack*.yaml` (where `*` is not `nightly`), __including the ones in
       subdirectories__: bump to use latest LTS minor
       version (be sure any extra-deps that exist only for custom flags have
       versions matching the snapshot)
@@ -69,47 +66,48 @@ Examples:
     * Run `stack --stack-yaml=stack*.yaml test --pedantic` (replace `*` with
       the actual file)
 * Check compatibility with latest nightly stackage snapshot:
-    * Update `stack-nightly.yaml` with latest nightly and remove unnecessary extra-deps (be
+    * Update `snapshot-nightly.yaml` with latest nightly and remove unnecessary extra-deps (be
       sure any extra-deps that exist only for custom flags have versions
       matching the snapshot)
     * Run `stack --stack-yaml=stack-nightly.yaml test --pedantic`
-* Update `.travis.yml` for any GHC version changes made in above steps.
-* Ensure integration tests pass on a Windows, macOS, and Linux (Linux
-  integration tests are run
-  by
-  [Gitlab](http://gitlab.fpcomplete.com/fpco-mirrors/stack/pipelines)):
-  `stack install --pedantic && stack test --pedantic --flag
-  stack:integration-tests`. The actual release script will perform a more
-  thorough test for every platform/variant prior to uploading, so this is just a
-  pre-check
+* Update (increase lower bound) or remove (if redundant) any constraints in `package.yaml` (including under `subs/`)
+* Update `.azure-pipelines*.yml` and files in `.azure` for any GHC version changes made in above steps.
+* Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
+* Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
 
 ## Release preparation
 
 * In master branch:
-    * `package.yaml`: bump to next release candidate version (bump second component to next odd number, ensure third component is `0`, and add patchlevel `1`; e.g. from `1.8.0` to `1.9.0.1`)
+    * `package.yaml`: bump to next release candidate version (bump second component to next odd number, ensure third component is `0`, and add patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`)
+    * If any changes have been made to packages in `subs/` (use `git diff --stat origin/release HEAD |grep subs/` to check), also update package versions.
     * `ChangeLog.md`
-        * Rename the "Unreleased changes" section to the same version as package.yaml, and mark it clearly as a release candidate (e.g. `v1.9.0.1 (release candidate)`).  Remove any empty sections.
         * Check for any entries that snuck into the previous version's changes
           due to merges (`git diff origin/stable HEAD ChangeLog.md`)
+        * Do the same for any ChangeLogs for packages `subs/`.
 
-* Cut a release candidate branch `vX.Y` from master
+* Cut a release candidate branch `rc/vX.Y` from master
 
 * In master branch:
-    * package.yaml: bump version to next unstable version (bump to next even second component with `.0` third component (e.g. from 1.9.0 to 1.10.0)
-    * Changelog: add new "Unreleased changes" section:
-      ```
-      ## Unreleased changes
+    * `package.yaml`: bump version to next unstable version (next even second component with `.0` third component (e.g. from 1.9.0 to 1.10.0)
+    * `Changelog.md`:
+      * Change the title of the existing **Unreleased changes** section to what will be the next final (non-RC) release (e.g. `v2.1.1`).
+      * add new "Unreleased changes" section:
+        ```
+        ## Unreleased changes
 
-      Release notes:
+        **Changes since vX.Y.Z**
 
-      Major changes:
+        Release notes:
 
-      Behavior changes:
+        Major changes:
 
-      Other enhancements:
+        Behavior changes:
 
-      Bug fixes:
-      ```
+        Other enhancements:
+
+        Bug fixes:
+
+        ```
 
 * In RC branch:
     * Review documentation for any changes that need to be made
@@ -119,17 +117,25 @@ Examples:
           the released version of Stack" warning at the top.
         * Search for old Stack version, unstable stack version, and the next
           "obvious" possible versions in sequence, and
-          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd).
-          Note: do **not** update the Dockerfiles in `etc/dockerfiles/stack-build` yet; that will come later)
+          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd). 
+          * Do **NOT** update the Dockerfiles in `etc/dockerfiles/stack-build` yet; that will come later)
             * Do __NOT__ update templates in `.github` to point at the new release version yet!
-        * Look for any links to "latest" documentation, replace with version tag
+        * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
+        * Look for any links to "latest" (`latest/`) documentation, replace with version tag
     * Update `STACK_VERSION` in `etc/scripts/get-stack.sh` to the new release version (`X.Y.1`)
     * Check if GHC version we're using has bindists using upgraded versions of operating systems (e.g. FreeBSD, Debian) and upgrade relevant Vagrantfiles in `etc/vagrant` and release shell script (`etc/scripts/*-release.sh`) to match.
     * Check that for any platform entries that need to be added to (or removed from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md).
+    * `package.yaml`: bump to next release candidate version (bump patchlevel (fourth) component to next odd number; e.g. from `1.9.0.0` to `1.9.0.1`)
+    * `ChangeLog.md`
+        - Rename the “Unreleased changes” section to the same version as package.yaml, and mark it clearly as a release candidate (e.g. `v1.9.0.1 (release candidate)`).  Remove any empty sections.
 
-* Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
+* For first release candidate:
+
+    * Re-do the pre-release checks (above section)
+    * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`)
+    * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
 
 * For subsequent release candidates:
     * Re-do the pre-release checks (above section)
@@ -149,115 +155,112 @@ See
 [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
 for requirements to perform the release, and more details about the tool.
 
+* Manually trigger the nightly pipeline on Azure Devops for the branch you are releasing, which will build Linux, macOS, and Windows bindists. `[RC]`
+
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
-  with tag and name `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field.  check the *This is a pre-release* checkbox.  `[RC]`
+  with tag and title `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field and check the *This is a pre-release* checkbox.  `[RC]`
 
 * On each machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
 
-* [TODO (for below steps): All the `etc/scripts/*-releases.sh` should be integrated into `etc/scripts/release.hs`]
+* Upload the Azure bindists built by Azure Pipelines to the Gitlab release `[RC]` (TODO: integrate this into `release.hs`)
+  * Download the bindist artifacts from the Azure DevOps nightly pipeline build, and put the contents under `_release/`.
+  * For each file, run `stack "$(dirname "$0")/release.hs" --upload-only "_releases/<file>.upload" "_releases/<file>.sha256.upload" "_releases/<file>.asc.upload"` to sign, hash, and upload to Github
 
-* On a machine with Vagrant installed: `[RC]`
+* On a machine with Vagrant installed:
+
     * Run `etc/scripts/vagrant-releases.sh`
 
-* On macOS: `[RC]`
-    * Run `etc/scripts/osx-release.sh`
+* On Windows (TODO: add support for building/uploading installers to `release.hs` and the nightly CI jobs)
 
-* On Windows: `[RC]`
     * Use a short path for your working tree (e.g. `C:\p\stack-release`
     * Ensure that STACK_ROOT, TEMP, and TMP are set to short paths
-    * Run `etc\scripts\windows-releases.bat` (for release candidates, only 64-bit is necessary so feel free to comment out 32-bit)
-    * Release Windows installers. See
+    * Put the Azure Devops pipeline-built Windows binaries in `SOME-OTHER-DIRECTORY/_release`.
+    * Build Windows installers. See
       [stack-installer README](https://github.com/borsboom/stack-installer#readme).
-      For release candidates, the windows installers can be skipped.
-      [TODO: this should be integrated into `etc/scripts/release.hs`]
 
-* On Linux ARMv7: `[RC]`
+* On Linux ARMv7:
+
     * Run `etc/scripts/linux-armv7-release.sh`
 
-* On Linux ARM64 (aarch64): `[RC]`
+* On Linux ARM64 (aarch64):
+
     * Run `etc/scripts/linux-aarch64-release.sh`
 
 * Build a Linux static bindist `[RC]`
+
     * Follow directions in the **Build Linux static binary distribution with Nix** section below.
 
-* Build sdist using `stack sdist .`, and upload it to the
-  Github release with a name like `stack-X.Y.Z-sdist-0.tar.gz`.  Also upload GPG signature and checksums. `[RC]`
-
-  TODO: did this last time by copying to `_release` and then using `release.hs` to upload sigs and checksum -- should add all this logic to `release.hs` itself.  e.g.:
-
-  ```
-  mv /home/vagrant/stack-release/.stack-work/dist/x86_64-linux/Cabal-2.0.1.0/stack-1.9.0.1.tar.gz _release/stack-1.9.0.1-sdist-0.tar.gz
-  stack ../stack/etc/scripts/release.hs _release/stack-1.9.0.1-sdist-0.tar.gz.upload _release/stack-1.9.0.1-sdist-0.tar.gz.asc.upload _release/stack-1.9.0.1-sdist-0.tar.gz.sha256.upload
-  ```
-
-* Use `etc/scripts/sdist-with-bounds.sh` to generate a Cabal spec and sdist with dependency bounds.  `[RC]` [TODO: should add this logic to `release.hs` itself]
-
-* Upload `_release/stack-X.Y.Z-sdist-1.tar.gz` to the Github release similarly to the `sdist-0` above. `[RC]`
-
-* For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to keyserver:
+* For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to SKS keyserver pool:
 
   ```
   gpg --sign-key -u 0x575159689BEFB442 <OTHER-KEY-ID>
   gpg --send-keys <OTHER-KEY-ID>
   ```
 
-* Publish Github release. Include the changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|LC_ALL=C sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
+* Publish Github release. Include the Changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]` (For release candidates, you can skip the list of contributors).
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
 
-* Upload package to Hackage: `stack upload .` (note that this uploads revision 0 without bounds, which is best for stackage since we have told it to ignore revisions for stack)
+* For any packages in `subs/` that have changed, use `stack upload subs/<PACKAGE> --pvp-bounds=lower` to upload to Hackage.
 
-* [Edit Cabal file metadata on Hackage](http://hackage.haskell.org/package/stack/maintain) and paste in the contents of `_release/stack-X.Y.Z_bounds.cabal` to add bounds (this helps non-stackage users build stack).  You will have to add the `x-revision: 1` field.
+* Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
+
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
 
-* In the `stable` or, in the case of a release candidate, `vX.Y` branch: `[RC]`
-    * `package.yaml`: bump the version number even third component (e.g. from 1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_ component (e.g. from 1.7.0.1 to 1.7.0.2).
-    * `ChangeLog.md`: Add an "Unreleased changes" section:
-
-        ```
-        ## Unreleased changes
-
-        Release notes:
-
-        Major changes:
-
-        Behavior changes:
-
-        Other enhancements:
-
-        Bug fixes:
-        ```
-
-* Activate version for new release tag (or, in the case of release candidates, the `vX.Y` branch), on
+* Activate version for new release tag, on
   [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/), and
-  ensure that stable documentation has updated.  `[RC]`
+  ensure that stable documentation has updated.
 
-* Deactivate version for release candidate on [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/).
+* Update [get.haskellstack.org /stable rewrite rules](https://gitlab.fpcomplete.com/fpco/devops/blob/master/dockerfiles/nginx/prod-v2/etc/nginx/conf.d/haskellstack.conf) (be sure to change both places) to new released version, and update production cluster using the `deploy_nginx_prod_v2` job.
 
-* Update [get.haskellstack.org /stable rewrite rules](https://gitlab.fpcomplete.com/fpco/devops/blob/develop/dockerfiles/nginx/prod-v2/etc/nginx/conf.d/haskellstack.conf) (be sure to change both places) to new released version, and update production cluster.
+    * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz >/dev/null`, make sure it redirects to the new version
 
-* Delete the RC branch (locally and on origin).  E.g. `git branch -d vX.Y; git push origin :vX.Y`.
+* In the `stable` or, in the case of a release candidate, `rc/vX.Y` branch:
+    - `package.yaml`: bump the version number even third component (e.g. from 1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_ component (e.g. from 1.7.0.1 to 1.7.0.2). `[RC]`
 
-* Update fpco/stack-build Docker images with new version
-    * Add `etc/dockerfiles/stack-build/lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
+    - `ChangeLog.md`: Add an “Unreleased changes” section (update “changes since” version):`[RC]`
 
       ```
-      FROM fpco/stack-build:lts-X.Z
-      ARG STACK_VERSION=X.Y.Z
-      RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_        VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+      ## Unreleased changes
+
+      **Changes since vX.Y.Z**
+
+      Release notes:
+
+      Major changes:
+
+      Behavior changes:
+
+      Other enhancements:
+
+      Bug fixes:
+
       ```
 
-    * Run the appropriate job for the LTS major version in [Gitlab pipelines](https://gitlab.fpcomplete.com/fpco-mirrors/stack/pipelines).
+    - Update templates in `.github` to point at the new release version (`X.Y.1`).  **SKIP THIS IN RC BRANCHES.**
 
-    * Check that the newly build Docker image has the new Stack version
+    - Update fpco/stack-build Docker images with new version
 
-* Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).  `[RC]`
+      * Add `etc/dockerfiles/stack-build/lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
 
-* `master` branch: update templates in `.github` to point at the new release version (`X.Y.1`).
+        ```
+        FROM fpco/stack-build:lts-X.Z
+        ARG STACK_VERSION=X.Y.Z
+        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+        ```
+
+      * Run `./build.sh lts` and test that the new image has the new version of Stack.
+
+      * Run `./build.sh --push lts && ./build.sh --push --small lts` to push the new image to the registry.
+
+
+* Delete the RC branch (locally and on origin).  E.g. `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
+
+* Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).   It is best to do this by making a `ci/merge-stable-to-release` branch and waiting for CI to pass, then merging.  If anything is complicated to merge, consider making it a PR and getting it reviewed rather than merging immediately.
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the markdown for the release description from Github. `[RC]`
@@ -267,10 +270,8 @@ for requirements to perform the release, and more details about the tool.
 
 ## Build Linux static binary distribution with Nix
 
-TODO: script this process and/or integrate with `etc/scripts/release.hs`
-
-TODO: run integration tests against static binary
-
+TODO: script this process and/or integrate with `etc/scripts/release.hs`. 
+NOTE: With GHC 8.8.x, Alpine Linux GHC bindists are once again available and we may be able to switch back to use Alpine to build static binaries using out normal build/release process rather than this convoluted process.
 
 These instructions are tested on Ubuntu 16.04, but theoretically should work on any Linux distribution.
 
@@ -293,18 +294,23 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
 
 - Check out stack commit to be released to `~/stack-release` (or elsewhere, in which case adjust following instructions)
 
-- `rm -f ~/stack-release/stack.cabal`, to ensure it's regenerated
+- `rm -f ~/stack-release/*.cabal ~/stack-release/subs/*/*.cabal`, to ensure it's regenerated
 
-- clone https://github.com/nh2/static-haskell-nix (commit 6bd86c02ed11cc34f209430e23761cd14461c067)
+- clone https://github.com/nh2/static-haskell-nix recursively (last known to work with commit 725ceb2479637b3b3ab29298a1bc0e48c54984c9)
 
-- in `static-stack` directory, run (from https://github.com/nh2/static-haskell-nix/blob/upstream-nixpkgs-musl-1.1.19/static-stack/README.md#Building):
+- in `static-stack` directory, run (from `static-stack/README.md`):
 
   ```
-  $(nix-build --no-out-link -A stack2nix-script) ~/stack-release
-  nix-build --no-out-link default.nix -A static_stack --arg release true
+  $(nix-build --no-link -A run-stack2nix-and-static-build-script --argstr stackDir ~/stack-release)
   ```
 
-- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/.stack-release/_release/bin/stack-X.Y.Z-linux-x86_64-static/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
+- Run integration tests against the static binary [TODO: improve this process by adding full support in `release.hs` or the integration tests for testing a binary built elsewhere]
+
+    - In `~/stack-release`, run `stack build --flag stack:integration-tests stack:stack-integration-test`
+    - Copy binary built above to place where `stack build` normally puts the `stack binary` (e.g. `cp  /nix/store/7vl1xvlbbqjvf864inz5vw7z2z1k4nmw-stack-2.1.0.1/bin/stack /home/vagrant/stack-release/.stack-work/install/x86_64-linux/custom-snapshot-for-building-stack-with-ghc-8.2.2-PyNP5UoO8Ott/8.2.2/bin/stack`; figure it out using `stack exec which stack`)
+    - Run `stack exec stack-integration-test`
+
+- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/stack-release/_release/bin/stack-X.Y.Z-linux-x86_64-static/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
 
 - Package, sign, and upload to Github using stack's release script in the stack directory:
 
@@ -369,7 +375,8 @@ Now continue to the **General Windows setup** subsection below.
      * Check **Defer upgrades** (this avoids rebooting in the middle of the stack build)
 
  6. In **Settings**->**System**->**Power & sleep**
-	  - Disable turning off the screen or going to sleep when plugged in
+
+    * Disable turning off the screen or going to sleep when plugged in
 
  7. Install msysgit: https://msysgit.github.io/
 
