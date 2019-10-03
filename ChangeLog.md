@@ -13,6 +13,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
+
 Bug fixes:
 
 * Fix using relative links in haddocks output.  See
