@@ -85,6 +85,9 @@ Bug fixes:
 * Use proper Hoogle executable path when installed automatically. See
   [#4905](https://github.com/commercialhaskell/stack/issues/4905)
 
+* Fix GHC version for batched package unregistration. See
+  [4951](https://github.com/commercialhaskell/stack/issues/4951)
+
 Other changes:
 
 * Rename `pantry-tmp` package back to `pantry`, now that we have gained
