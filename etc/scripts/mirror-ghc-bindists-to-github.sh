@@ -74,10 +74,10 @@ mirror () {
 # NOTE: keep the 'mirror' commands in the same order as entries in
 # https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
 
-mirror i386-deb9-linux xz xz linux32 linux32-nopie
-mirror x86_64-deb8-linux xz xz linux64 linux64-nopie
-#mirror x86_64-centos67-linux xz xz linux64-gmp4 linux64-gmp4-nopie
-mirror x86_64-fedora27-linux xz xz linux64-tinfo6 linux64-tinfo6-nopie
+mirror i386-deb9-linux xz xz linux32
+mirror x86_64-deb8-linux xz xz linux64
+#mirror x86_64-centos67-linux xz xz linux64-gmp4
+mirror x86_64-fedora27-linux xz xz linux64-tinfo6
 mirror x86_64-apple-darwin xz bz2 macosx
 mirror i386-unknown-mingw32 xz xz windows32
 mirror x86_64-unknown-mingw32 xz xz windows64
