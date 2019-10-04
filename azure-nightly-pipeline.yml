@@ -1,6 +1,14 @@
 trigger: none
 pr: none
 
+schedules:
+- cron: "0 0 * * *"
+  displayName: Nightly build
+  branches:
+    include:
+    - master
+    - stable
+
 variables:
   BASE_BRANCH: "master"
   CACHE_S3_PREFIX: "stack-nightly"
