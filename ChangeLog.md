@@ -26,6 +26,8 @@ Bug fixes:
 * Fix GHC version for batched package unregistration. See
   [#4951](https://github.com/commercialhaskell/stack/issues/4951)
 
+* Use Hoogle from the snapshot used and not the latest version. See
+  [#4905](https://github.com/commercialhaskell/stack/issues/4905)
 
 ## v2.1.3.1
 
