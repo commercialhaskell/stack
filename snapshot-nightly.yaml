@@ -8,8 +8,7 @@ packages:
 - persistent-template-2.7.1@rev:0
 - persistent-2.10.0@rev:0
 - persistent-sqlite-2.10.1@rev:0
-- github: commercialhaskell/pantry
-  commit: 1295ec4a2220bd29d488b406072fe78622414676
+- pantry-0.2.0.0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
