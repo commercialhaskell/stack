@@ -90,9 +90,6 @@ packages:
     commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
   completed:
     subdir: wai
-    cabal-file:
-      size: 1765
-      sha256: eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410
     name: wai
     version: 3.2.1.2
     git: https://github.com/yesodweb/wai.git
@@ -106,9 +103,6 @@ packages:
     commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
   completed:
     subdir: warp
-    cabal-file:
-      size: 10725
-      sha256: cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758
     name: warp
     version: 3.2.25
     git: https://github.com/yesodweb/wai.git
@@ -128,7 +122,6 @@ packages:
             emptyRPM = RawPackageMetadata { rpmName = Nothing
                                           , rpmVersion = Nothing
                                           , rpmTreeKey = Nothing
-                                          , rpmCabal = Nothing
                                           }
         pkgImm `shouldBe`
             [ LockedLocation
@@ -145,10 +138,6 @@ packages:
                                            (decodeSHA
                                              "ecfd0b4b75f435a3f362394807b35e5ef0647b1a25005d44a3632c49db4833d2")
                                            (FileSize 714))
-                                     , pmCabal =
-                                         toBlobKey
-                                         "eea52c4967d8609c2f79213d6dffe6d6601034f1471776208404781de7051410"
-                                         1765
                                      }))
             , LockedLocation
               (RPLIRepo (waiSubdirRepo "warp") emptyRPM)
@@ -164,9 +153,5 @@ packages:
                                         (decodeSHA
                                           "f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a")
                                         (FileSize 5103))
-                                    , pmCabal =
-                                      toBlobKey
-                                      "cfec5336260bb4b1ecbd833f7d6948fd1ee373770471fe79796cf9c389c71758"
-                                      10725
                                     }))
             ]

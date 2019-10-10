@@ -19,6 +19,8 @@ Bug fixes:
 
 * Fix using relative links in haddocks output.  See
   [#4971](https://github.com/commercialhaskell/stack/issues/4971).
+* Do not include generated cabal file information in lock files. See
+  [#5045](https://github.com/commercialhaskell/stack/issues/5045).
 
 * Use proper Hoogle executable path when installed automatically. See
   [#4905](https://github.com/commercialhaskell/stack/issues/4905)

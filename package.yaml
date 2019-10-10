@@ -93,7 +93,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry
+- pantry >= 0.2
 - path
 - path-io
 - persistent
