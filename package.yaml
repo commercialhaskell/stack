@@ -1,5 +1,5 @@
 name: stack
-version: '2.1.4'
+version: '2.2.0'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
@@ -104,8 +104,6 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
-- resource-pool
-- resourcet
 - retry
 - rio
 - rio-prettyprint

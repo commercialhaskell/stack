@@ -36,16 +36,18 @@ echo 'ghc:' >stack-setup-$GHCVER.yaml
 
 mirror_ () {
   base_url="$1"; shift
+  destsuffix="$1"; shift
   suffix="$1"; shift
   srcext="$1"; shift
   destext="$1"; shift
-  local srcfn=ghc-$GHCVER-${suffix}.tar.${srcext}
+  local srcurl="$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
+  local srcfn=ghc-$GHCVER-${suffix}${destsuffix}.tar.${srcext}
   if [[ ! -s "$srcfn.downloaded" ]]; then
     rm -f "$srcfn"
-    curl -LO --fail "$base_url/$srcfn"
+    curl -Lo "$srcfn" --fail "$srcurl"
     date >"$srcfn.downloaded"
   fi
-  local destfn=ghc-$GHCVER-${suffix}.tar.${destext}
+  local destfn=ghc-$GHCVER-${suffix}${destsuffix}.tar.${destext}
   if [[ ! -s "$destfn.uploaded" ]]; then
     if [[ "${srcext}" == "xz" && "${destext}" == "bz2" ]]; then
       xzcat "$srcfn" | bzip2 -c > "$destfn"
@@ -62,7 +64,7 @@ mirror_ () {
     alias="$1"
     echo "    $alias:" >>stack-setup-$GHCVER.yaml
     echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
-    echo "            # Mirrored from $base_url/$srcfn" >>stack-setup-$GHCVER.yaml
+    echo "            # Mirrored from $srcurl" >>stack-setup-$GHCVER.yaml
     echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
     echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
     echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
@@ -73,7 +75,7 @@ mirror_ () {
 }
 
 mirror () {
-  mirror_ http://downloads.haskell.org/~ghc/$GHCVER "$@"
+  mirror_ http://downloads.haskell.org/~ghc/$GHCVER "" "$@"
 }
 
 # NOTE: keep the 'mirror' commands in the same order as entries in
@@ -89,8 +91,13 @@ mirror x86_64-unknown-mingw32 xz xz windows64
 #mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
 mirror aarch64-deb9-linux xz xz linux-aarch64
 
-mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl xz xz linux32-musl
-mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl xz xz linux64-musl
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl "" i386-unknown-linux-musl xz xz linux32-musl
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl "" x86_64-unknown-linux-musl xz xz linux64-musl
+
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists/11 "" i386-portbld-freebsd xz xz freebsd32
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists "-ino64" i386-portbld-freebsd xz xz freebsd32-ino64
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists/11 "" x86_64-portbld-freebsd xz xz freebsd64
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists "-ino64" x86_64-portbld-freebsd xz xz freebsd64-ino64
 
 set +x
 echo

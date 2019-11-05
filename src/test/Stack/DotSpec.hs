@@ -19,7 +19,7 @@ import           Test.QuickCheck (forAll,choose,Gen)
 import           Stack.Dot
 
 dummyPayload :: DotPayload
-dummyPayload = DotPayload (parseVersion "0.0.0.0") (Just (Right BSD3))
+dummyPayload = DotPayload (parseVersion "0.0.0.0") (Just (Right BSD3)) Nothing
 
 spec :: Spec
 spec = do

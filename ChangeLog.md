@@ -1,7 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
+## v2.3.x (unreleased changes)
 
 **Changes since v2.1.3.1**
 
@@ -13,9 +13,21 @@ Behavior changes:
 
 Other enhancements:
 
+* Show warning about `local-programs-path` with spaces on windows
+  when running scripts. See 
+  [#5013](https://github.com/commercialhaskell/stack/pull/5013)
+
+* Add `ls dependencies json` which will print dependencies as JSON.
+  `ls dependencies --tree`  is now `ls dependencies tree`. See
+  [#4424](https://github.com/commercialhaskell/stack/pull/4424)
+
 * Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
 
 Bug fixes:
+
+* Upgrade `pantry`: module mapping insertions into the database are now atomic.
+  Previously, if you SIGTERMed at the wrong time while running a script, you
+  could end up with an inconsistent database state.
 
 * Fix using relative links in haddocks output.  See
   [#4971](https://github.com/commercialhaskell/stack/issues/4971).
