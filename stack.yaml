@@ -31,6 +31,4 @@ extra-deps:
      - casa-types
 
 - github: commercialhaskell/pantry
-  commit: a67d0818de52de239d9e051a25cca6d29785e06d
-  size: 95018
-  sha256: 299dabb14beb81c39457be69eb80be3038868850dd0c28b02ebf98566757bbc8
+  commit: dbbce9198339194fdab0259b22052edce8a76fab
