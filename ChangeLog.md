@@ -31,6 +31,8 @@ Bug fixes:
 
 * Fix using relative links in haddocks output.  See
   [#4971](https://github.com/commercialhaskell/stack/issues/4971).
+* Do not include generated cabal file information in lock files. See
+  [#5045](https://github.com/commercialhaskell/stack/issues/5045).
 
 * Use proper Hoogle executable path when installed automatically. See
   [#4905](https://github.com/commercialhaskell/stack/issues/4905)
@@ -38,6 +40,8 @@ Bug fixes:
 * Fix GHC version for batched package unregistration. See
   [#4951](https://github.com/commercialhaskell/stack/issues/4951)
 
+* Use Hoogle from the snapshot used and not the latest version. See
+  [#4905](https://github.com/commercialhaskell/stack/issues/4905)
 
 ## v2.1.3.1
 

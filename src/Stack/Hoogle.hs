@@ -11,6 +11,7 @@ import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char (isSpace)
 import qualified Data.Text as T
+import           Distribution.PackageDescription (packageDescription, package)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
 import           Lens.Micro ((?~))
@@ -20,7 +21,12 @@ import qualified Stack.Build
 import           Stack.Build.Target (NeedTargets(NeedTargets))
 import           Stack.Runners
 import           Stack.Types.Config
+import           Stack.Types.SourceMap
+import qualified RIO.Map as Map
 import           RIO.Process
+
+-- | Helper type to duplicate log messages
+data Muted = Muted | NotMuted
 
 -- | Hoogle command.
 hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
@@ -75,7 +81,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
     hoogleMinIdent =
         PackageIdentifier hooglePackageName hoogleMinVersion
     installHoogle :: RIO EnvConfig (Path Abs File)
-    installHoogle = requiringLatestHoogle $ do
+    installHoogle = requiringHoogle Muted $ do
         Stack.Build.build Nothing
         mhooglePath' <- findExecutable "hoogle"
         case mhooglePath' of
@@ -83,41 +89,58 @@ hoogleCmd (args,setup,rebuild,startServer) =
             Left _ -> do
                 logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
                 bail
-    requiringLatestHoogle f = do
-        hooglePackageIdentifier <- do
-          mversion <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
-
-          -- FIXME For a while, we've been following the logic of
-          -- taking the latest Hoogle version available. However, we
-          -- may want to instead grab the version of Hoogle present in
-          -- the snapshot current being used instead.
-          pure $ fromMaybe (Left hoogleMinIdent) $ do
-            pir@(PackageIdentifierRevision _ ver _) <- mversion
-            guard $ ver >= hoogleMinVersion
-            Just $ Right pir
-
-        case hooglePackageIdentifier of
-            Left{} -> logInfo $
-              "Minimum " <>
-              fromString (packageIdentifierString hoogleMinIdent) <>
-              " is not in your index. Installing the minimum version."
-            Right ident -> logInfo $
+    requiringHoogle :: Muted -> RIO EnvConfig x -> RIO EnvConfig x
+    requiringHoogle muted f = do
+        hoogleTarget <- do
+          sourceMap <- view $ sourceMapL . to smDeps
+          case Map.lookup hooglePackageName sourceMap of
+            Just hoogleDep ->
+              case dpLocation hoogleDep of
+                PLImmutable pli ->
+                  T.pack . packageIdentifierString <$>
+                      restrictMinHoogleVersion muted (packageLocationIdent pli)
+                plm@(PLMutable _) -> do
+                  T.pack . packageIdentifierString . package . packageDescription
+                      <$> loadCabalFile plm
+            Nothing -> do
+              -- not muted because this should happen only once
+              logWarn "No hoogle version was found, trying to install the latest version"
+              mpir <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
+              let hoogleIdent = case mpir of
+                      Nothing -> hoogleMinIdent
+                      Just (PackageIdentifierRevision _ ver _) ->
+                          PackageIdentifier hooglePackageName ver
+              T.pack . packageIdentifierString <$>
+                  restrictMinHoogleVersion muted hoogleIdent
+        config <- view configL
+        let boptsCLI = defaultBuildOptsCLI
+                { boptsCLITargets =  [hoogleTarget]
+                }
+        runRIO config $ withEnvConfig NeedTargets boptsCLI f
+    restrictMinHoogleVersion
+      :: HasLogFunc env
+      => Muted -> PackageIdentifier -> RIO env PackageIdentifier
+    restrictMinHoogleVersion muted ident = do
+      if ident < hoogleMinIdent
+      then do
+          muteableLog LevelWarn muted $
+               "Minimum " <>
+               fromString (packageIdentifierString hoogleMinIdent) <>
+               " is not in your index. Installing the minimum version."
+          pure hoogleMinIdent
+      else do
+          muteableLog LevelInfo muted $
               "Minimum version is " <>
               fromString (packageIdentifierString hoogleMinIdent) <>
               ". Found acceptable " <>
-              display ident <>
-              " in your index, installing it."
-        config <- view configL
-        let boptsCLI = defaultBuildOptsCLI
-                { boptsCLITargets =
-                    pure $
-                    T.pack . packageIdentifierString $
-                    either
-                    id
-                    (\(PackageIdentifierRevision n v _) -> PackageIdentifier n v)
-                    hooglePackageIdentifier
-                }
-        runRIO config $ withEnvConfig NeedTargets boptsCLI f
+              fromString (packageIdentifierString ident) <>
+              " in your index, requiring its installation."
+          pure ident
+    muteableLog :: HasLogFunc env => LogLevel -> Muted -> Utf8Builder -> RIO env ()
+    muteableLog logLevel muted msg =
+        case muted of
+            Muted -> pure ()
+            NotMuted -> logGeneric "" logLevel msg
     runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
     runHoogle hooglePath hoogleArgs = do
         config <- view configL
@@ -138,7 +161,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
         config <- view configL
         menv <- liftIO $ configProcessContextSettings config envSettings
         mhooglePath <- runRIO menv (findExecutable "hoogle") <>
-          requiringLatestHoogle (findExecutable "hoogle")
+          requiringHoogle NotMuted (findExecutable "hoogle")
         eres <- case mhooglePath of
             Left _ -> return $ Left "Hoogle isn't installed."
             Right hooglePath -> do

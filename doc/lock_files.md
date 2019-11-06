@@ -67,9 +67,6 @@ the `stack.yaml` file to fully resolve that package. That looks like:
 extra-deps:
 - size: 1442
   url: https://hackage.haskell.org/package/acme-missiles-0.3.tar.gz
-  cabal-file:
-    size: 613
-    sha256: 2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
   name: acme-missiles
   version: '0.3'
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
@@ -150,9 +147,6 @@ packages:
   completed:
     size: 1442
     url: https://hackage.haskell.org/package/acme-missiles-0.3.tar.gz
-    cabal-file:
-      size: 613
-      sha256: 2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
     name: acme-missiles
     version: '0.3'
     sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b

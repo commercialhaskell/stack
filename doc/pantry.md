@@ -191,9 +191,6 @@ Would be converted into:
 ```yaml
 extra-deps:
 - subdir: auto-update
-  cabal-file:
-    size: 1219
-    sha256: c07b2b1a2df1199f83eef819ac9bb067567e100b60586a52f8b92fc733ae3a6d
   name: auto-update
   version: 0.1.2.1
   git: git@github.com:yesodweb/wai
@@ -202,9 +199,6 @@ extra-deps:
     sha256: 26377897f35ccd3890b4405d72523233717afb04d62f2d36031bf6b18dcef74f
   commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
 - subdir: wai
-  cabal-file:
-    size: 1717
-    sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
   name: wai
   version: 3.0.2.3
   git: git@github.com:yesodweb/wai
@@ -260,9 +254,6 @@ With the `stack freeze` command, this would be replaced with:
 extra-deps:
 - size: 1540
   url: https://hackage.haskell.org/package/acme-dont-1.1.tar.gz
-  cabal-file:
-    size: 602
-    sha256: 8264ad3e5113d3e0417b46e71d5a9c0914a1f03b5b81319cc329f1dc0f49b96c
   name: acme-dont
   version: '1.1'
   sha256: c32231ff8548bccd4f3bafcc9b1eb84947a2e5e0897c50c048e0e7609fc443ce
@@ -272,9 +263,6 @@ extra-deps:
 - size: 285152
   subdir: wai
   url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  cabal-file:
-    size: 1717
-    sha256: 7b46e7a8b121d668351fa8a684810afadf58c39276125098485203ef274fd056
   name: wai
   version: 3.0.2.3
   sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
@@ -284,9 +272,6 @@ extra-deps:
 - size: 285152
   subdir: warp
   url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  cabal-file:
-    size: 6648
-    sha256: e3f01fd7417af923fd30962e9e6a4fe4de41ebc5e02af9819067fed79c9c6575
   name: warp
   version: 3.0.13.1
   sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
@@ -295,9 +280,6 @@ extra-deps:
     sha256: d6b1def306a042b5fc500930302533a3ea828e916c99cbd82c0b7e2c4e3a8e09
 - size: 1442
   filepath: acme-missiles-0.3.tar.gz
-  cabal-file:
-    size: 613
-    sha256: 2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
   name: acme-missiles
   version: '0.3'
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
