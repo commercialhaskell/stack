@@ -689,9 +689,9 @@ unregisterPackages cv localDB ids = do
             unregisterGhcPkgIds pkg localDB $ select ident gid :| []
 
     case cv of
-        -- GHC versions >= 8.0.1 support batch unregistering of packages. See
-        -- https://github.com/commercialhaskell/stack/pull/4554
-        ACGhc v | v >= mkVersion [8, 0, 1] -> do
+        -- GHC versions >= 8.2.1 support batch unregistering of packages. See
+        -- https://gitlab.haskell.org/ghc/ghc/issues/12637
+        ACGhc v | v >= mkVersion [8, 2, 1] -> do
                 platform <- view platformL
                 -- According to https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
                 -- the maximum command line length on Windows since XP is 8191 characters.
