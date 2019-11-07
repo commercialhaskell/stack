@@ -13,18 +13,18 @@ import qualified Data.Set as Set
 import GHC.IO.Exception
 import Path
 import System.FSNotify
-import System.IO (getLine)
-import RIO.PrettyPrint hiding (line)
+import System.IO (hPutStrLn, getLine)
+import System.Terminal
 
 fileWatch
-  :: (HasLogFunc env, HasTerm env)
-  => ((Set (Path Abs File) -> IO ()) -> RIO env ())
+  :: Handle
+  -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
 fileWatch = fileWatchConf defaultConfig
 
 fileWatchPoll
-  :: (HasLogFunc env, HasTerm env)
-  => ((Set (Path Abs File) -> IO ()) -> RIO env ())
+  :: Handle
+  -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
 fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 
@@ -33,11 +33,18 @@ fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
 fileWatchConf
-  :: (HasLogFunc env, HasTerm env)
-  => WatchConfig
+  :: WatchConfig
+  -> Handle
   -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
-fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -> do
+fileWatchConf cfg out inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -> do
+    let putLn = hPutStrLn out -- FIXME
+    outputIsTerminal <- hIsTerminalDeviceOrMinTTY out
+    let withColor color str = putLn $ do
+            if outputIsTerminal
+            then concat [color, str, reset]
+            else str
+
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty
@@ -85,31 +92,32 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
     let watchInput = do
             line <- getLine
             unless (line == "quit") $ do
-                run $ case line of
+                case line of
                     "help" -> do
-                        logInfo ""
-                        logInfo "help: display this help"
-                        logInfo "quit: exit"
-                        logInfo "build: force a rebuild"
-                        logInfo "watched: display watched files"
+                        putLn ""
+                        putLn "help: display this help"
+                        putLn "quit: exit"
+                        putLn "build: force a rebuild"
+                        putLn "watched: display watched files"
                     "build" -> atomically $ writeTVar dirtyVar True
                     "watched" -> do
                         watch <- readTVarIO allFiles
-                        mapM_ (logInfo . fromString) (Set.toList watch)
+                        mapM_ putLn (Set.toList watch)
                     "" -> atomically $ writeTVar dirtyVar True
-                    _ -> logInfo $
-                        "Unknown command: " <>
-                        displayShow line <>
-                        ". Try 'help'"
+                    _ -> putLn $ concat
+                        [ "Unknown command: "
+                        , show line
+                        , ". Try 'help'"
+                        ]
 
                 watchInput
 
-    race_ watchInput $ run $ forever $ do
+    race_ watchInput $ forever $ do
         atomically $ do
             dirty <- readTVar dirtyVar
             check dirty
 
-        eres <- tryAny $ inner setWatched
+        eres <- tryAny $ run $ inner setWatched
 
         -- Clear dirtiness flag after the build to avoid an infinite
         -- loop caused by the build itself triggering dirtiness. This
@@ -119,13 +127,17 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
         -- https://github.com/commercialhaskell/stack/issues/822
         atomically $ writeTVar dirtyVar False
 
-        prettyInfo $
-          case eres of
-            Left e ->
-                let theStyle = case fromException e of
-                        Just ExitSuccess -> Good
-                        _ -> Error
-                 in style theStyle $ fromString $ show e
-            _ -> style Good "Success! Waiting for next file change."
+        case eres of
+            Left e -> do
+                let color = case fromException e of
+                        Just ExitSuccess -> green
+                        _ -> red
+                withColor color $ show e
+            _ -> withColor green "Success! Waiting for next file change."
 
-        logInfo "Type help for available commands. Press enter to force a rebuild."
+        putLn "Type help for available commands. Press enter to force a rebuild."
+
+green, red, reset :: String
+green = "\ESC[32m"
+red = "\ESC[31m"
+reset = "\ESC[0m"
