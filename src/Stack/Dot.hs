@@ -9,11 +9,15 @@ module Stack.Dot (dot
                  ,DotOpts(..)
                  ,DotPayload(..)
                  ,ListDepsOpts(..)
+                 ,ListDepsFormat(..)
+                 ,ListDepsFormatOpts(..)
                  ,resolveDependencies
                  ,printGraph
                  ,pruneGraph
                  ) where
 
+import           Data.Aeson
+import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -26,6 +30,7 @@ import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
+import qualified Path
 import           RIO.PrettyPrint (HasTerm (..), HasStylesUpdate (..))
 import           RIO.Process (HasProcessContext (..))
 import           Stack.Build (loadPackage)
@@ -67,15 +72,21 @@ data DotOpts = DotOpts
     -- ^ Use global hints instead of relying on an actual GHC installation.
     }
 
+data ListDepsFormatOpts = ListDepsFormatOpts { listDepsSep :: !Text
+                                             -- ^ Separator between the package name and details.
+                                             , listDepsLicense :: !Bool
+                                             -- ^ Print dependency licenses instead of versions.
+                                             }
+
+data ListDepsFormat = ListDepsText ListDepsFormatOpts
+                    | ListDepsTree ListDepsFormatOpts
+                    | ListDepsJSON
+
 data ListDepsOpts = ListDepsOpts
-    { listDepsDotOpts :: !DotOpts
+    { listDepsFormat :: !ListDepsFormat
+    -- ^ Format of printing dependencies
+    , listDepsDotOpts :: !DotOpts
     -- ^ The normal dot options.
-    , listDepsSep :: !Text
-    -- ^ Separator between the package name and details.
-    , listDepsLicense :: !Bool
-    -- ^ Print dependency licenses instead of versions.
-    , listDepsTree :: !Bool
-    -- ^ Print dependency tree.
     }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -90,6 +101,8 @@ data DotPayload = DotPayload
   -- ^ The package version.
   , payloadLicense :: Maybe (Either SPDX.License License)
   -- ^ The license the package was released under.
+  , payloadLocation :: Maybe PackageLocation
+  -- ^ The location of the package.
   } deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
@@ -131,10 +144,11 @@ createDependencyGraph dotOpts = do
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
           | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
-              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3))
-          | otherwise = fmap (packageAllDeps &&& makePayload) (loadPackage loc flags ghcOptions cabalConfigOpts)
+              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3) Nothing)
+          | otherwise =
+              fmap (packageAllDeps &&& makePayload loc) (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
-  where makePayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+  where makePayload loc pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) (Just $ PLImmutable loc)
 
 listDependencies
   :: ListDepsOpts
@@ -142,13 +156,52 @@ listDependencies
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
-  if listDepsTree opts then
-    do
-      liftIO $ Text.putStrLn "Packages"
-      liftIO $ printTree opts 0 [] (treeRoots opts pkgs) resultGraph
-    else
-      void (Map.traverseWithKey go (snd <$> resultGraph))
-      where go name payload = liftIO $ Text.putStrLn $ listDepsLine opts name payload
+  liftIO $ case listDepsFormat opts of
+      ListDepsTree treeOpts -> Text.putStrLn "Packages" >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
+      ListDepsJSON -> printJSON pkgs resultGraph
+      ListDepsText textOpts -> void (Map.traverseWithKey go (snd <$> resultGraph))
+        where go name payload = Text.putStrLn $ listDepsLine textOpts name payload
+
+data DependencyTree = DependencyTree (Set PackageName) (Map PackageName (Set PackageName, DotPayload))
+
+instance ToJSON DependencyTree where
+  toJSON (DependencyTree _ dependencyMap) =
+    toJSON $ foldToList dependencyToJSON dependencyMap
+
+foldToList :: (k -> a -> b) -> Map k a -> [b]
+foldToList f = Map.foldrWithKey (\k a bs -> bs ++ [f k a]) []
+
+dependencyToJSON :: PackageName -> (Set PackageName, DotPayload) -> Value
+dependencyToJSON pkg (deps, payload) =  let fieldsAlwaysPresent = [ "name" .= packageNameString pkg
+                                                                  , "license" .= licenseText payload
+                                                                  , "version" .= versionText payload
+                                                                  , "dependencies" .= Set.map packageNameString deps
+                                                                  ]
+                                            loc = catMaybes [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
+                                        in object $ fieldsAlwaysPresent ++ loc
+
+pkgLocToJSON :: PackageLocation -> Value
+pkgLocToJSON (PLMutable (ResolvedPath _ dir)) = object [ "type" .= ("project package" :: Text)
+                                              , "url" .= ("file://" ++ Path.toFilePath dir)]
+pkgLocToJSON (PLImmutable (PLIHackage pkgid _ _)) = object [ "type" .= ("hackage" :: Text)
+                                                  , "url" .= ("https://hackage.haskell.org/package/" ++ display pkgid)]
+pkgLocToJSON (PLImmutable (PLIArchive archive _)) = let url = case archiveLocation archive of
+                                                                ALUrl u -> u
+                                                                ALFilePath (ResolvedPath _ path) -> Text.pack $ "file://" ++ Path.toFilePath path
+                                                    in object [ "type" .= ("archive" :: Text)
+                                                              , "url" .= url ]
+pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object [ "type" .= case repoType repo of
+                                                                   RepoGit -> "git" :: Text
+                                                                   RepoHg -> "hg" :: Text
+                                                     , "url" .= repoUrl repo
+                                                     , "commit" .= repoCommit repo
+                                                     , "subdir" .= repoSubdir repo
+                                                     ]
+
+printJSON :: Set PackageName
+          -> Map PackageName (Set PackageName, DotPayload)
+          -> IO ()
+printJSON pkgs dependencyMap = LBC8.putStrLn $ encode $ DependencyTree pkgs dependencyMap
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
@@ -157,13 +210,14 @@ treeRoots opts projectPackages' =
         then projectPackages'
         else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
-printTree :: ListDepsOpts
+printTree :: ListDepsFormatOpts
+          -> DotOpts
           -> Int
           -> [Int]
           -> Set PackageName
           -> Map PackageName (Set PackageName, DotPayload)
           -> IO ()
-printTree opts depth remainingDepsCounts packages dependencyMap =
+printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
   F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
   where
     toSeq = Seq.fromList . Set.toList
@@ -171,22 +225,23 @@ printTree opts depth remainingDepsCounts packages dependencyMap =
                      in
                       case Map.lookup name dependencyMap of
                         Just (deps, payload) -> do
-                          printTreeNode opts depth newDepsCounts deps payload name
-                          if Just depth == dotDependencyDepth (listDepsDotOpts opts)
+                          printTreeNode opts dotOpts depth newDepsCounts deps payload name
+                          if Just depth == dotDependencyDepth dotOpts
                              then return ()
-                             else printTree opts (depth + 1) newDepsCounts deps dependencyMap
+                             else printTree opts dotOpts (depth + 1) newDepsCounts deps dependencyMap
                         -- TODO: Define this behaviour, maybe return an error?
                         Nothing -> return ()
 
-printTreeNode :: ListDepsOpts
+printTreeNode :: ListDepsFormatOpts
+              -> DotOpts
               -> Int
               -> [Int]
               -> Set PackageName
               -> DotPayload
               -> PackageName
               -> IO ()
-printTreeNode opts depth remainingDepsCounts deps payload name =
-  let remainingDepth = fromMaybe 999 (dotDependencyDepth (listDepsDotOpts opts)) - depth
+printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
+  let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
       hasDeps = not $ null deps
    in Text.putStrLn $ treeNodePrefix "" remainingDepsCounts hasDeps  remainingDepth  <> " " <> listDepsLine opts name payload
 
@@ -201,14 +256,20 @@ treeNodePrefix t [_] False _ = t <> "├──"
 treeNodePrefix t (0:ns) d remainingDepth = treeNodePrefix (t <> "  ") ns d remainingDepth
 treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d remainingDepth
 
-listDepsLine :: ListDepsOpts -> PackageName -> DotPayload -> Text
+listDepsLine :: ListDepsFormatOpts -> PackageName -> DotPayload -> Text
 listDepsLine opts name payload = Text.pack (packageNameString name) <> listDepsSep opts <> payloadText opts payload
 
-payloadText :: ListDepsOpts -> DotPayload -> Text
+payloadText :: ListDepsFormatOpts -> DotPayload -> Text
 payloadText opts payload =
   if listDepsLicense opts
-    then maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
-    else maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
+    then licenseText payload
+    else versionText payload
+
+licenseText :: DotPayload -> Text
+licenseText payload = maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id) (payloadLicense payload)
+
+versionText :: DotPayload -> Text
+versionText payload = maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans
@@ -277,7 +338,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
       where
         loadDeps pp = do
           pkg <- loadCommonPackage (ppCommon pp)
-          pure (packageAllDeps pkg, payloadFromLocal pkg)
+          pure (packageAllDeps pkg, payloadFromLocal pkg Nothing)
 
     dependencyDeps =
       loadDeps <$> Map.lookup pkgName (smDeps sourceMap)
@@ -285,7 +346,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
         loadDeps DepPackage{dpLocation=PLMutable dir} = do
               pp <- mkProjectPackage YesPrintWarnings dir False
               pkg <- loadCommonPackage (ppCommon pp)
-              pure (packageAllDeps pkg, payloadFromLocal pkg)
+              pure (packageAllDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
         loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
           let common = dpCommon dp
@@ -313,21 +374,23 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
     noDepsErr = error ("Invariant violated: The '" ++ packageNameString pkgName
                 ++ "' package was not found in any of the dependency sources")
 
-    payloadFromLocal pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
-    payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp)
+    payloadFromLocal pkg loc = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) loc
+    payloadFromDump dp = DotPayload (Just $ pkgVersion $ dpPackageIdent dp) (Right <$> dpLicense dp) Nothing
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages (assumed to come from project packages)
 projectPackageDependencies :: DotOpts -> [LocalPackage] -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
     map (\lp -> let pkg = localPackageToPackage lp
-                 in (packageName pkg, (deps pkg, lpPayload pkg)))
+                    pkgDir = Path.parent $ lpCabalFile lp
+                    loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
+                 in (packageName pkg, (deps pkg, lpPayload pkg loc)))
         locals
   where deps pkg =
           if dotIncludeExternal dotOpts
             then Set.delete (packageName pkg) (packageAllDeps pkg)
             else Set.intersection localNames (packageAllDeps pkg)
         localNames = Set.fromList $ map (packageName . lpPackage) locals
-        lpPayload pkg = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+        lpPayload pkg loc = DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg) (Just loc)
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
 printGraph :: (Applicative m, MonadIO m)

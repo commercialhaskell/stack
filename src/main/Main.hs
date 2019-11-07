@@ -562,8 +562,8 @@ buildCmd opts = do
     exitFailure
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
-      FileWatchPoll -> fileWatchPoll stderr (inner . Just)
-      FileWatch -> fileWatch stderr (inner . Just)
+      FileWatchPoll -> fileWatchPoll (inner . Just)
+      FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
   where
     inner

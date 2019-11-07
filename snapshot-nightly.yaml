@@ -2,14 +2,14 @@ resolver: nightly-2019-07-15
 name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:
-- github: snoyberg/filelock
-  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - rio-0.1.11.0@rev:0
 - persistent-template-2.7.1@rev:0
 - persistent-2.10.0@rev:0
 - persistent-sqlite-2.10.1@rev:0
 - pantry-0.2.0.0
-
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+  
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install
