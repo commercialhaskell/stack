@@ -211,6 +211,7 @@ configFromConfigMonoid
            configMonoidLatestSnapshot
          clConnectionCount = fromFirst 8 configMonoidConnectionCount
          configHideTHLoading = fromFirstTrue configMonoidHideTHLoading
+         configPrefixTimestamps = fromFirst False configMonoidPrefixTimestamps
 
          configGHCVariant = getFirst configMonoidGHCVariant
          configCompilerRepository = fromFirst
