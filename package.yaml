@@ -94,6 +94,7 @@ dependencies:
 - open-browser
 - optparse-applicative
 - pantry >= 0.2
+- casa-client
 - path
 - path-io
 - persistent

@@ -23,12 +23,10 @@ ghc-options:
 extra-deps:
 
 - github: fpco/casa
-  commit: a0cd05c1a9ce33acbb1bdfb9324370f884916e88
-  sha256: e21e5fa2b9fa03f37761d5b95559a09af578a9b10e9cad0baca4ccdb5cde1b78
-  size: 10520
+  commit: fe80c92fde5458d0b1521b2bc6853a5a08b0fa52
   subdirs:
      - casa-client
      - casa-types
 
 - github: commercialhaskell/pantry
-  commit: dbbce9198339194fdab0259b22052edce8a76fab
+  commit: 3950d5a08a358194f05c5cef4e5209715948ce65
