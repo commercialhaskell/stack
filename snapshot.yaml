@@ -26,9 +26,16 @@ packages:
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
 - http-download-0.1.0.0@rev:0
-- pantry-0.2.0.0
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+
+- github: commercialhaskell/pantry
+  commit: 3950d5a08a358194f05c5cef4e5209715948ce65
+- github: fpco/casa
+  commit: 76965495c3a6b85efa53728c6f1c2a8602399ddf
+  subdirs:
+     - casa-client
+     - casa-types
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

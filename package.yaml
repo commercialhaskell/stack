@@ -95,6 +95,7 @@ dependencies:
 - optparse-applicative
 - pantry >= 0.2
 - casa-client
+- casa-types
 - path
 - path-io
 - persistent
