@@ -49,8 +49,8 @@ pacman, so have a look to see what works for you. Both tools can be
 installed with the commands:
 
 ```
-stack exec -- pacman -R mingw-w64-x86_64-make
-stack exec -- pacman -R mingw-w64-x86_64-cmake
+stack exec -- pacman -S mingw-w64-x86_64-make
+stack exec -- pacman -S mingw-w64-x86_64-cmake
 ```
 
 Even though make and cmake are then both installed into the same
