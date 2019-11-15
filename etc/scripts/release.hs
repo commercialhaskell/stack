@@ -343,12 +343,13 @@ rules global@Global{..} args = do
             Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
     binaryPkgFileNames =
         case platformOS of
-            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName]
+            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName, binaryInstallerFileName]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
+    binaryInstallerFileName = binaryName ++ "-installer" <.> exe
     binaryName =
         concat
             [ stackProgName
