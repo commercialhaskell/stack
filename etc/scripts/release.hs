@@ -268,6 +268,19 @@ rules global@Global{..} args = do
                 cmd "strip -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
 
+    releaseDir </> binaryInstallerFileName %> \out -> do
+        need [releaseDir </> binaryExeFileName]
+        copyFile' (releaseDir </> binaryExeFileName) stackExeFileName
+        actionOnException
+            (command_ [] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
+                [ "-V3"
+                , "stack-install.nsi"])
+            (removeFile out)
+
+        _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
+
+        liftIO $ renameFile ("stack-install" <.> exe) out
+
     releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
