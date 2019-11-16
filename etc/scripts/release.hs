@@ -270,6 +270,7 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryInstallerFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
+        cmd "stack etc/scripts/build-stack-installer.hs" :: Action ()
         copyFile' (releaseDir </> binaryExeFileName) stackExeFileName
         actionOnException
             (command_ [] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
