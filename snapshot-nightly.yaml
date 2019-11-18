@@ -6,10 +6,16 @@ packages:
 - persistent-template-2.7.1@rev:0
 - persistent-2.10.0@rev:0
 - persistent-sqlite-2.10.1@rev:0
-- pantry-0.2.0.0
+- github: commercialhaskell/pantry
+  commit: de8a0b5f88e9974fafb4a6ed5835d1da8f821d80
+- github: fpco/casa
+  commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
+  subdirs:
+     - casa-client
+     - casa-types
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
-  
+
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install

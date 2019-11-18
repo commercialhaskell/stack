@@ -28,11 +28,10 @@ packages:
 - http-download-0.1.0.0@rev:0
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
-
 - github: commercialhaskell/pantry
-  commit: 3950d5a08a358194f05c5cef4e5209715948ce65
+  commit: de8a0b5f88e9974fafb4a6ed5835d1da8f821d80
 - github: fpco/casa
-  commit: 76965495c3a6b85efa53728c6f1c2a8602399ddf
+  commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
   subdirs:
      - casa-client
      - casa-types
