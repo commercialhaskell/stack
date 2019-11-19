@@ -270,7 +270,7 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryInstallerFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
-        cmd "stack etc/scripts/build-stack-installer.hs" :: Action ()
+        need ["stack-install" <.> nsiExt]
         copyFile' (releaseDir </> binaryExeFileName) stackExeFileName
         actionOnException
             (command_ [] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
@@ -281,6 +281,10 @@ rules global@Global{..} args = do
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
 
         liftIO $ renameFile ("stack-install" <.> exe) out
+
+    "stack-install" <.> nsiExt %> \out -> do
+        need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
+        cmd "stack etc/scripts/build-stack-installer.hs" :: Action ()
 
     releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
@@ -383,6 +387,7 @@ rules global@Global{..} args = do
     ascExt = ".asc"
     sha256Ext = ".sha256"
     uploadExt = ".upload"
+    nsiExt = ".nsi"
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
