@@ -86,12 +86,11 @@ You can list all known Haskell compilers in Nix with the following:
 $ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
 ```
 
-Alternatively, install `nix-repl`, a convenient tool to explore
+Alternatively, use `nix repl`, a convenient tool to explore
 nixpkgs:
 
 ```sh
-$ nix-env -i nix-repl
-$ nix-repl
+$ nix repl
 ```
 
 In the REPL, load nixpkgs and get the same information through
@@ -102,7 +101,7 @@ nix-repl> :l <nixpkgs>
 nix-repl> haskell.compiler.ghc<Tab>
 ```
 
-You can type and evaluate any nix expression in the nix-repl, such as
+You can type and evaluate any nix expression in the nix repl, such as
 the one we gave to `nix-instantiate` earlier.
 
 **Note:** currently, stack only discovers dynamic and static libraries
