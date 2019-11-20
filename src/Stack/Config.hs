@@ -375,6 +375,8 @@ configFromConfigMonoid
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
+       (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
+       defaultCasaMaxPerRequest
        (\configPantryConfig -> initUserStorage
          (configStackRoot </> relFileStorage)
          (\configUserStorage -> inner Config {..}))

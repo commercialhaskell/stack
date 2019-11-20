@@ -234,6 +234,7 @@ import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           RIO.Process (ProcessContext, HasProcessContext (..))
+import           Casa.Client (CasaRepoPrefix)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -855,6 +856,7 @@ data ConfigMonoid =
     -- ^ See 'configHideSourcePaths'
     , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
+    , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
     }
   deriving (Show, Generic)
 
@@ -976,6 +978,8 @@ parseConfigMonoidObject rootDir obj = do
 
     configMonoidHideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
     configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
+
+    configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
 
     return ConfigMonoid {..}
   where
@@ -1135,6 +1139,9 @@ configMonoidHideSourcePathsName = "hide-source-paths"
 
 configMonoidRecommendUpgradeName :: Text
 configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
+
+configMonoidCasaRepoPrefixName :: Text
+configMonoidCasaRepoPrefixName = "casa-repo-prefix"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
