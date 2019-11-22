@@ -674,7 +674,7 @@ setup-info-locations: []
 
 (Since 0.1.5)
 
-Allows specifying from where tools like GHC and msys2 (on Windows) are
+Allows augmenting from where tools like GHC and msys2 (on Windows) are
 downloaded. Most useful for specifying locations of custom GHC binary
 distributions (for use with the [ghc-variant](#ghc-variant) option).
 
@@ -688,7 +688,14 @@ setup-info:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
 
-Note that specifying this config *does not* the default `stack-setup-2.yaml` from being consulted as a fallback.
+This configuration **adds** the specified setup info metadata to the default;
+Specifying this config **does not** prevent the default `stack-setup-2.yaml` from being consulted as a fallback.
+
+If you need to **replace** the default setup-info, add the following:
+
+```yaml
+setup-info-locations: []
+```
 
 ### pvp-bounds
 
