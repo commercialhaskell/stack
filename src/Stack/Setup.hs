@@ -447,7 +447,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure both the compiler and the msys toolchain are installed and
 -- provide the PATHs to add if necessary
 ensureCompilerAndMsys
-  :: (HasConfig env, HasGHCVariant env)
+  :: (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
@@ -516,7 +516,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
 -- | Ensure that the msys toolchain is installed if necessary and
 -- provide the PATHs to add if necessary
 ensureMsys
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (Maybe Tool)
@@ -546,7 +546,7 @@ ensureMsys sopts getSetupInfo' = do
       _ -> return Nothing
 
 installGhcBindist
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> [Tool]
@@ -607,7 +607,7 @@ installGhcBindist sopts getSetupInfo' installed = do
 
 -- | Ensure compiler (ghc or ghcjs) is installed, without worrying about msys
 ensureCompiler
-  :: forall env. (HasConfig env, HasGHCVariant env)
+  :: forall env. (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
@@ -649,7 +649,7 @@ ensureCompiler sopts getSetupInfo' = do
         pure (cp, paths)
 
 ensureSandboxedCompiler
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
@@ -823,7 +823,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
 buildGhcFromSource :: forall env.
    ( HasTerm env
    , HasProcessContext env
-   , HasConfig env
+   , HasBuildConfig env
    ) => Memoized SetupInfo -> [Tool] -> CompilerRepository -> Text -> Text
    -> RIO env (Tool, CompilerBuild)
 buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId flavour = do
@@ -1104,7 +1104,7 @@ getInstalledTool installed name goodVersion =
             else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: HasTerm env
+downloadAndInstallTool :: (HasTerm env, HasBuildConfig env)
                        => Path Abs Dir
                        -> DownloadInfo
                        -> Tool
@@ -1123,7 +1123,7 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
     liftIO $ ignoringAbsence (removeDirRecur tempDir)
     return tool
 
-downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
+downloadAndInstallCompiler :: (HasBuildConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
                            -> WantedCompiler
@@ -1195,7 +1195,7 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
 
 -- | Download and install the first available compiler build.
 downloadAndInstallPossibleCompilers
-    :: (HasGHCVariant env, HasConfig env)
+    :: (HasGHCVariant env, HasBuildConfig env)
     => [CompilerBuild]
     -> SetupInfo
     -> WantedCompiler
@@ -1263,7 +1263,7 @@ getOSKey platform =
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadFromInfo
-    :: HasTerm env
+    :: (HasTerm env, HasBuildConfig env)
     => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     at <-
@@ -1281,21 +1281,14 @@ downloadFromInfo programsDir downloadInfo tool = do
             chattyDownload (T.pack (toolString tool)) downloadInfo path
             return path
         (parseAbsFile -> Just path) -> do
-            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
-                             downloadInfoSha256=sha256} =
-                    downloadInfo
-            when (isJust contentLength) $
-                logWarn ("`content-length` in not checked \n" <>
-                          "and should not be specified when `url` is a file path")
-            when (isJust sha1) $
-                logWarn ("`sha1` is not checked and \n" <>
-                          "should not be specified when `url` is a file path")
-            when (isJust sha256) $
-                logWarn ("`sha256` is not checked and \n" <>
-                          "should not be specified when `url` is a file path")
+            warnOnIgnoredChecks
             return path
+        (parseRelFile -> Just path) -> do
+            warnOnIgnoredChecks
+            root <- view projectRootL
+            return (root </> path)
         _ ->
-            throwString $ "Error: `url` must be either an HTTP URL or absolute file path: " ++ url
+            throwString $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
     return (path, at)
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
@@ -1306,6 +1299,16 @@ downloadFromInfo programsDir downloadInfo tool = do
             | otherwise = ""
           where
             (fp', ext) = FP.splitExtension fp
+    warnOnIgnoredChecks = do
+      let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
+                       downloadInfoSha256=sha256} = downloadInfo
+      when (isJust contentLength) $
+        logWarn "`content-length` is not checked and should not be specified when `url` is a file path"
+      when (isJust sha1) $
+        logWarn "`sha1` is not checked and should not be specified when `url` is a file path"
+      when (isJust sha256) $
+        logWarn "`sha256` is not checked and should not be specified when `url` is a file path"
+
 
 data ArchiveType
     = TarBz2
