@@ -37,6 +37,9 @@ Other enhancements:
 
 * Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
 
+* Allow relative paths in `--setup-info-yaml` and tool paths
+  [#3394](https://github.com/commercialhaskell/stack/issues/3394)
+
 Bug fixes:
 
 * Upgrade `pantry`: module mapping insertions into the database are now atomic.
