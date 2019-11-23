@@ -707,8 +707,6 @@ ghc:
             url: "installs/ghc-8.2.2.tar.xz"
 ```
 
-Executing `stack setup` outside of a project will use the global `stack.yaml` to determine the relevant `setup-info` information and locations.
-
 ### setup-info
 
 (Since 0.1.5)
