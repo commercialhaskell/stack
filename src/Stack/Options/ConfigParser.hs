@@ -132,7 +132,7 @@ configOptsParser currentDir hide0 =
     <*> many (
         strOption
             ( long "setup-info-yaml"
-           <> help "Alternate URL or absolute path for stack dependencies"
+           <> help "Alternate URL or relative / absolute path for stack dependencies"
            <> metavar "URL" ))
     <*> firstBoolFlagsTrue
             "modify-code-page"

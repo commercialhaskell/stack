@@ -653,7 +653,8 @@ The first location which specifies the location of a tool `(Tool, Platform, Vers
 ```yaml
 setup-info-locations:
 - C:/stack-offline/my-stack-setup.yaml
-- \\smbServer\stack\my-stack-setup.yaml
+- relative/inside/my/project/setup-info.yaml
+- \\smbShare\stack\my-stack-setup.yaml
 - http://stack-mirror.com/stack-setup.yaml
 - https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml
 ```
@@ -668,6 +669,42 @@ setup-info-locations:
 
 ```yaml
 setup-info-locations: []
+```
+
+Relative paths are resolved relative to the `stack.yaml` file - either in the local project or the global `stack.yaml` in the stack directory.
+
+Relative paths may also be used inside paths to tool installs - such as for ghc or 7z, which allows vendoring the tools inside a monorepo.
+For example:
+
+Directory structure:
+```
+- src/
+- installs/
+  - my-stack-setup.yaml
+  - 7z.exe
+  - 7z.dll
+  - ghc-8.2.2.tar.xz
+- stack.yaml
+```
+
+In the project's `stack.yaml`:
+```yaml
+setup-info-locations:
+- installs/my-stack-setup.yaml
+```
+
+In `installs/my-stack-setup.yaml`:
+```yaml
+sevenzexe-info:
+    url: "installs/7z.exe"
+
+sevenzdll-info:
+    url: "installs/7z.dll"
+
+ghc:
+    windows64:
+        8.2.2:
+            url: "installs/ghc-8.2.2.tar.xz"
 ```
 
 ### setup-info
