@@ -1262,43 +1262,26 @@ getOSKey platform =
         Platform AArch64               Cabal.Linux   -> return "linux-aarch64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
-downloadFromInfo
+downloadOrUseLocal
     :: (HasTerm env, HasBuildConfig env)
-    => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
-downloadFromInfo programsDir downloadInfo tool = do
-    at <-
-        case extension of
-            ".tar.xz" -> return TarXz
-            ".tar.bz2" -> return TarBz2
-            ".tar.gz" -> return TarGz
-            ".7z.exe" -> return SevenZ
-            _ -> throwString $ "Error: Unknown extension for url: " ++ url
-    relativeFile <- parseRelFile $ toolString tool ++ extension
-    path <- case url of
-        (parseUrlThrow -> Just _) -> do
-            let path = programsDir </> relativeFile
-            ensureDir programsDir
-            chattyDownload (T.pack (toolString tool)) downloadInfo path
-            return path
-        (parseAbsFile -> Just path) -> do
-            warnOnIgnoredChecks
-            return path
-        (parseRelFile -> Just path) -> do
-            warnOnIgnoredChecks
-            root <- view projectRootL
-            return (root </> path)
-        _ ->
-            throwString $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
-    return (path, at)
+    => Text -> DownloadInfo -> Path Abs File -> RIO env (Path Abs File)
+downloadOrUseLocal downloadLabel downloadInfo destination =
+  case url of
+    (parseUrlThrow -> Just _) -> do
+        ensureDir (parent destination)
+        chattyDownload downloadLabel downloadInfo destination
+        return destination
+    (parseAbsFile -> Just path) -> do
+        warnOnIgnoredChecks
+        return path
+    (parseRelFile -> Just path) -> do
+        warnOnIgnoredChecks
+        root <- view projectRootL
+        return (root </> path)
+    _ ->
+        throwString $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
-    extension = loop url
-      where
-        loop fp
-            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z", ".gz"] = loop fp' ++ ext
-            | otherwise = ""
-          where
-            (fp', ext) = FP.splitExtension fp
     warnOnIgnoredChecks = do
       let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
                        downloadInfoSha256=sha256} = downloadInfo
@@ -1308,6 +1291,33 @@ downloadFromInfo programsDir downloadInfo tool = do
         logWarn "`sha1` is not checked and should not be specified when `url` is a file path"
       when (isJust sha256) $
         logWarn "`sha256` is not checked and should not be specified when `url` is a file path"
+
+downloadFromInfo
+    :: (HasTerm env, HasBuildConfig env)
+    => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
+downloadFromInfo programsDir downloadInfo tool = do
+    archiveType <-
+        case extension of
+            ".tar.xz" -> return TarXz
+            ".tar.bz2" -> return TarBz2
+            ".tar.gz" -> return TarGz
+            ".7z.exe" -> return SevenZ
+            _ -> throwString $ "Error: Unknown extension for url: " ++ url
+
+    relativeFile <- parseRelFile $ toolString tool ++ extension
+    let destinationPath = programsDir </> relativeFile
+    localPath <- downloadOrUseLocal (T.pack (toolString tool)) downloadInfo destinationPath
+    return (localPath, archiveType)
+
+  where
+    url = T.unpack $ downloadInfoUrl downloadInfo
+    extension = loop url
+      where
+        loop fp
+            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z", ".gz"] = loop fp' ++ ext
+            | otherwise = ""
+          where
+            (fp', ext) = FP.splitExtension fp
 
 
 data ArchiveType
@@ -1437,7 +1447,7 @@ instance Alternative (CheckDependency env) where
             Left _ -> y
             Right x' -> return $ Right x'
 
-installGHCWindows :: HasConfig env
+installGHCWindows :: HasBuildConfig env
                   => Maybe Version
                   -> SetupInfo
                   -> Path Abs File
@@ -1450,7 +1460,7 @@ installGHCWindows mversion si archiveFile archiveType _tempDir destDir = do
     withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
     logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 
-installMsys2Windows :: HasConfig env
+installMsys2Windows :: HasBuildConfig env
                   => Text -- ^ OS Key
                   -> SetupInfo
                   -> Path Abs File
@@ -1491,7 +1501,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
 
 -- | Unpack a compressed tarball using 7zip.  Expects a single directory in
 -- the unpacked results, which is renamed to the destination directory.
-withUnpackedTarball7z :: HasConfig env
+withUnpackedTarball7z :: HasBuildConfig env
                       => String -- ^ Name of tool, used in error messages
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
@@ -1532,20 +1542,20 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (HasConfig env, MonadIO m)
+setup7z :: (HasBuildConfig env, MonadIO m)
         => SetupInfo
         -> RIO env (Path Abs Dir -> Path Abs File -> m ())
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
-    let exe = dir </> relFile7zexe
-        dll = dir </> relFile7zdll
+    let exeDestination = dir </> relFile7zexe
+        dllDestination = dir </> relFile7zdll
     case (siSevenzDll si, siSevenzExe si) of
         (Just sevenzDll, Just sevenzExe) -> do
-            chattyDownload "7z.dll" sevenzDll dll
-            chattyDownload "7z.exe" sevenzExe exe
+            _ <- downloadOrUseLocal "7z.dll" sevenzDll dllDestination
+            exePath <- downloadOrUseLocal "7z.exe" sevenzExe exeDestination
             withRunInIO $ \run -> return $ \outdir archive -> liftIO $ run $ do
-                let cmd = toFilePath exe
+                let cmd = toFilePath exePath
                     args =
                         [ "x"
                         , "-o" ++ toFilePath outdir
