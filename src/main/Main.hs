@@ -539,11 +539,11 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
-setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
+setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
   (wantedCompiler, compilerCheck, mstack) <-
     case scoCompilerVersion of
       Just v -> return (v, MatchMinor, Nothing)
-      Nothing -> withBuildConfig $ (,,)
+      Nothing -> (,,)
         <$> view wantedCompilerVersionL
         <*> view (configL.to configCompilerCheck)
         <*> (Just <$> view stackYamlL)

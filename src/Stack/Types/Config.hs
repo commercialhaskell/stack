@@ -140,7 +140,6 @@ module Stack.Types.Config
   ,VersionedDownloadInfo(..)
   ,GHCDownloadInfo(..)
   ,SetupInfo(..)
-  ,SetupInfoLocation(..)
   -- ** Docker entrypoint
   ,DockerEntrypoint(..)
   ,DockerUser(..)
@@ -182,7 +181,7 @@ import           Pantry.Internal.AesonExtended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
-                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..),
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
@@ -334,8 +333,11 @@ data Config =
          -- ^ Additional GHC options to apply to categories of packages
          ,configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
          -- ^ Additional options to be passed to ./Setup.hs configure
-         ,configSetupInfoLocations  :: ![SetupInfoLocation]
-         -- ^ Additional SetupInfo (inline or remote) to use to find tools.
+         ,configSetupInfoLocations  :: ![String]
+         -- ^ URLs or paths to stack-setup.yaml files, for finding tools.
+         -- If none present, the default setup-info is used.
+         ,configSetupInfoInline     :: !SetupInfo
+         -- ^ Additional SetupInfo to use to find tools.
          ,configPvpBounds           :: !PvpBounds
          -- ^ How PVP upper bounds should be added to packages
          ,configModifyCodePage      :: !Bool
@@ -821,8 +823,10 @@ data ConfigMonoid =
     -- ^ See 'configCabalConfigOpts'.
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
-    ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
-    -- ^ Additional setup info (inline or remote) to use for installing tools
+    ,configMonoidSetupInfoLocations  :: ![String]
+    -- ^ See 'configSetupInfoLocations'
+    ,configMonoidSetupInfoInline     :: !SetupInfo
+    -- ^ See 'configSetupInfoInline'
     ,configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
     ,configMonoidPvpBounds           :: !(First PvpBounds)
@@ -949,8 +953,8 @@ parseConfigMonoidObject rootDir obj = do
     let configMonoidCabalConfigOpts = coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
-    configMonoidSetupInfoLocations <-
-        maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
+    configMonoidSetupInfoLocations <- obj ..:? configMonoidSetupInfoLocationsName ..!= []
+    configMonoidSetupInfoInline <- jsonSubWarningsT (obj ..:? configMonoidSetupInfoInlineName) ..!= mempty
     configMonoidLocalProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
     configMonoidModifyCodePage <- FirstTrue <$> obj ..:? configMonoidModifyCodePageName
@@ -1084,7 +1088,10 @@ configMonoidExtraPathName :: Text
 configMonoidExtraPathName = "extra-path"
 
 configMonoidSetupInfoLocationsName :: Text
-configMonoidSetupInfoLocationsName = "setup-info"
+configMonoidSetupInfoLocationsName = "setup-info-locations"
+
+configMonoidSetupInfoInlineName :: Text
+configMonoidSetupInfoInlineName = "setup-info"
 
 configMonoidLocalProgramsBaseName :: Text
 configMonoidLocalProgramsBaseName = "local-programs-path"
@@ -1694,15 +1701,15 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         return SetupInfo {..}
 
 -- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
--- For all fields the values from the last @SetupInfo@ win.
+-- For all fields the values from the first @SetupInfo@ win.
 instance Semigroup SetupInfo where
     l <> r =
         SetupInfo
-        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
-        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
-        , siMsys2 = siMsys2 r <> siMsys2 l
-        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
+        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
+        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
+        , siMsys2 = siMsys2 l <> siMsys2 r
+        , siGHCs = Map.unionWith (<>) (siGHCs l) (siGHCs r)
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs l) (siGHCJSs r)
         , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
 
 instance Monoid SetupInfo where
@@ -1716,22 +1723,6 @@ instance Monoid SetupInfo where
         , siStack = Map.empty
         }
     mappend = (<>)
-
--- | Remote or inline 'SetupInfo'
-data SetupInfoLocation
-    = SetupInfoFileOrURL String
-    | SetupInfoInline SetupInfo
-    deriving (Show)
-
-instance FromJSON (WithJSONWarnings SetupInfoLocation) where
-    parseJSON v =
-        (noJSONWarnings <$>
-         withText "SetupInfoFileOrURL" (pure . SetupInfoFileOrURL . T.unpack) v) <|>
-        inline
-      where
-        inline = do
-            WithJSONWarnings si w <- parseJSON v
-            return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
 data PvpBoundsType
