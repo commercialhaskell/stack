@@ -262,7 +262,7 @@ Behavior changes:
   use to avoid multiple runs of Stack from trampling each others'
   files. See
   [#2730](https://github.com/commercialhaskell/stack/issues/2730).
-* Stack will check occassionally if there is a new version available and prompt
+* Stack will check occasionally if there is a new version available and prompt
   the user to upgrade. This will not incur any additional network traffic, as
   it will piggy-back on the existing Hackage index updates. You can set
   `recommend-stack-upgrade: false` to bypass this. See
@@ -738,7 +738,7 @@ Bug fixes:
   conflicting versions of packages without issue. See
   [Stackage issue #3185](https://github.com/fpco/stackage/issues/3185).
 * When promoting packages from snapshot to local, we were
-  occassionally discarding the actual package location content and
+  occasionally discarding the actual package location content and
   instead defaulting to pulling the package from the index. We now
   correctly retain this information. Note that if you were affected by
   this bug, you will likely need to delete the binary build cache

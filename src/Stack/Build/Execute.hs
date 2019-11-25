@@ -925,7 +925,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             -- On Windows 10, an upstream issue with the `sh autoreconf -i`
             -- command means that command clears, but does not then restore, the
             -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
-            -- folowing hack re-enables the lost ANSI-capability.
+            -- following hack re-enables the lost ANSI-capability.
             fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
         withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
           fixupOnWindows

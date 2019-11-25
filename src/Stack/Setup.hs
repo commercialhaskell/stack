@@ -1671,7 +1671,7 @@ chattyDownload label downloadInfo path = do
                 percentage = fromIntegral totalSoFar / fromIntegral total * 100
 
 -- | Given a printf format string for the decimal part and a number of
--- bytes, formats the bytes using an appropiate unit and returns the
+-- bytes, formats the bytes using an appropriate unit and returns the
 -- formatted string.
 --
 -- >>> bytesfmt "%.2" 512368

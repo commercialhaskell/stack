@@ -541,7 +541,7 @@ cueball:~$ cd yackage-0.8.0/
 ```
 
 Note that you can also unpack to the directory of your liking instead of
-the current one by issueing:
+the current one by issuing:
 
 ```
 cueball:~$ stack unpack yackage-0.8.0 --to ~/work
