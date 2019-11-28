@@ -146,7 +146,6 @@ makeConcreteResolver
     -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
 makeConcreteResolver ar = do
-    snapshots <- getSnapshots
     r <-
         case ar of
             ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
@@ -157,16 +156,18 @@ makeConcreteResolver ar = do
                 iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 ProjectAndConfigMonoid project _ <- liftIO iopc
                 return $ projectResolver project
-            ARLatestNightly -> return $ nightlySnapshotLocation $ snapshotsNightly snapshots
-            ARLatestLTSMajor x ->
+            ARLatestNightly -> nightlySnapshotLocation . snapshotsNightly <$> getSnapshots
+            ARLatestLTSMajor x -> do
+                snapshots <- getSnapshots
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ltsSnapshotLocation x y
-            ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
-                | otherwise ->
-                    let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ ltsSnapshotLocation x y
+            ARLatestLTS -> do
+                snapshots <- getSnapshots
+                if IntMap.null $ snapshotsLts snapshots
+                   then throwString "No LTS releases found"
+                   else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
+                        in return $ ltsSnapshotLocation x y
     logInfo $ "Selected resolver: " <> display r
     return r
 

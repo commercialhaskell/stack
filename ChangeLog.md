@@ -17,6 +17,9 @@ Other enhancements:
 
 Bug fixes:
 
+* `--resolver global` doesn't retrieve snapshots list from the internet
+   beause doesn't need it. See [#5103](https://github.com/commercialhaskell/stack/issues/5103)
+
 * Fix using relative links in haddocks output.  See
   [#4971](https://github.com/commercialhaskell/stack/issues/4971).
 * Do not include generated cabal file information in lock files. See
