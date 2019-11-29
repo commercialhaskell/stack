@@ -5,6 +5,12 @@
 You can use stack to visualize the dependencies between your packages and
 optionally also external dependencies.
 
+First, you need to install Graphviz:
+
+```
+$ brew install Graphviz
+```
+
 As an example, let's look at `wreq`:
 
 ```
