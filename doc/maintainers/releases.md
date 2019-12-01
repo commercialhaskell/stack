@@ -364,7 +364,7 @@ Now continue to the **General Windows setup** subsection below.
 	- In Windows settings:
 		- Search for "disk management"
 			- Extend the partition to take the whole disk.
-		- In all likelyhood, you will want to search for "remote desktop" and enable remote desktop.  Then you can connect to the VM using Microsoft Remote Desktop instead of using it from within the ESXi web UI.
+		- In all likelihood, you will want to search for "remote desktop" and enable remote desktop.  Then you can connect to the VM using Microsoft Remote Desktop instead of using it from within the ESXi web UI.
 
 Now continue to the **General Windows setup** subsection below.
 

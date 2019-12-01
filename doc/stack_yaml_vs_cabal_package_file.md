@@ -104,7 +104,7 @@ matter when in time you use it, and no matter how many new release happen in
 the interim, the build plan generated should be the same.
 
 \* There's at least one hole in this theory today, which is Hackage revisions.
-When you specify `extra-deps: [acme-missiles-0.3]`, it doesnt' specify which
+When you specify `extra-deps: [acme-missiles-0.3]`, it doesn't specify which
 revision of the cabal file to use, and Stack will just choose the latest. Stack
 version 1.6 added the ability to specify exact revisions of cabal files, but
 this isn't enforced as a requirement as it's so different from the way most

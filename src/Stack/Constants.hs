@@ -169,7 +169,7 @@ stackRootOptionName = "stack-root"
 --
 -- Deprecated since stack-1.1.0.
 --
--- TODO: Remove occurences of this variable and use 'stackRootOptionName' only
+-- TODO: Remove occurrences of this variable and use 'stackRootOptionName' only
 -- after an appropriate deprecation period.
 deprecatedStackRootOptionName :: String
 deprecatedStackRootOptionName = "global-stack-root"
