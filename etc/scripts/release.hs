@@ -282,7 +282,7 @@ rules global@Global{..} args = do
 
         liftIO $ renameFile ("stack-install" <.> exe) out
 
-    "stack-install" <.> nsiExt %> \out -> do
+    "stack-install" <.> nsiExt %> \_ -> do
         need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
         cmd "stack etc/scripts/build-stack-installer.hs" :: Action ()
 
