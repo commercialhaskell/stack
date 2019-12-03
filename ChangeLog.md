@@ -24,6 +24,9 @@ Behavior changes:
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)
 
 Other enhancements:
+* Find GHC versions in nixpkgs with "Binary" suffix. See
+  [#5094](https://github.com/commercialhaskell/stack/pull/5094)
+
 * Add `build-output-timestamps` flag in yaml. Setting it to true
   prefixes each build log output line with a timestamp.
 

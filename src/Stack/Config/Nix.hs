@@ -58,21 +58,17 @@ nixCompiler compilerVersion =
       case T.split (== '.') (fromString $ versionString version) of
         x : y : minor ->
           Right $
-          case minor of
-            [] ->
-              -- The minor version is not specified. Select the latest minor
-              -- version in Nixpkgs corresponding to the requested major
-              -- version.
-              let major = T.concat [x, y] in
-              "(let compilers = builtins.filter \
-              \(name: builtins.match \
-              \\"ghc" <> major <> "[[:digit:]]*\" name != null) \
-              \(lib.attrNames haskell.compiler); in \
-              \if compilers == [] \
-              \then abort \"No compiler found for GHC "
-              <> T.pack (versionString version) <> "\"\
-              \else haskell.compiler.${builtins.head compilers})"
-            _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
+          -- Select the latest version in Nixpkgs corresponding to the requested
+          -- version.
+          let major = T.concat (x : y : minor) in
+          "(let compilers = builtins.filter \
+          \(name: builtins.match \
+          \\"ghc" <> major <> "[[:digit:]]*(Binary)?\" name != null) \
+          \(lib.attrNames haskell.compiler); in \
+          \if compilers == [] \
+          \then abort \"No compiler found for GHC "
+          <> T.pack (versionString version) <> "\"\
+          \else haskell.compiler.${builtins.head compilers})"
         _ -> Left $ stringException "GHC major version not specified"
     WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
     WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"

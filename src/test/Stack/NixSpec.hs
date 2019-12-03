@@ -102,4 +102,4 @@ spec = beforeAll setup $ do
         nixPackages (configNix config) `shouldBe` ["glpk"]
         v <- parseVersionThrowing "7.10.3"
         ghc <- either throwIO return $ nixCompiler (WCGhc v)
-        ghc `shouldBe` "haskell.compiler.ghc7103"
+        ghc `shouldBe` "(let compilers = builtins.filter (name: builtins.match \"ghc7103[[:digit:]]*(Binary)?\" name != null) (lib.attrNames haskell.compiler); in if compilers == [] then abort \"No compiler found for GHC 7.10.3\"else haskell.compiler.${builtins.head compilers})"
