@@ -72,7 +72,7 @@ post_install_separator() {
 
 # determines the the CPU's instruction set
 get_isa() {
-  if arch | grep -q armv7 ; then
+  if arch | grep -Eq 'armv[78]l?' ; then
     echo arm
   elif arch | grep -q aarch64 ; then
     echo aarch64
