@@ -374,11 +374,9 @@ Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s
 [`appveyor.yml`](https://github.com/dhall-lang/dhall-haskell/blob/1079b7a3a7a6922f72a373e47daf6f1b74f128b1/appveyor.yml).
 Change the values of PATH and VERSION as needed.
 
-```
-install:
-  - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
-  - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
-  - 7z x stack.zip stack.exe
-  - stack setup > nul
-  - git submodule update --init --recursive
-```
+    install:
+      - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
+      - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
+      - 7z x stack.zip stack.exe
+      - stack setup > nul
+      - git submodule update --init --recursive
