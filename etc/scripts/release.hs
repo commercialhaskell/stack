@@ -270,15 +270,15 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryInstallerFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
-        need [releaseDir </> "stack-install" <.> nsiExt]
+        need [releaseDir </> binaryInstallerNSIFileName]
 
         actionOnException
             (command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
                 [ "-V3"
-                , "stack-install.nsi"])
+                , binaryInstallerNSIFileName])
             (removeFile out)
 
-    releaseDir </> "stack-install" <.> nsiExt %> \out -> do
+    releaseDir </> binaryInstallerNSIFileName %> \out -> do
         need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
         cmd "stack etc/scripts/build-stack-installer.hs" 
             [ binaryExeFileName
@@ -367,6 +367,7 @@ rules global@Global{..} args = do
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
+    binaryInstallerNSIFileName = binaryName ++ "-installer" <.> nsiExt
     binaryInstallerFileName = binaryName ++ "-installer" <.> exe
     binaryName =
         concat
