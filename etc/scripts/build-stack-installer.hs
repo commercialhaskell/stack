@@ -5,6 +5,9 @@
 -}
 {-# LANGUAGE OverloadedStrings #-}
 
+import Data.String
+import System.Environment
+
 import Development.NSIS
 import Development.NSIS.Plugins.EnvVarUpdate
 
@@ -12,76 +15,79 @@ import Development.NSIS.Plugins.EnvVarUpdate
 -- to avoid corrupting the user's $PATH.
 
 main :: IO ()
-main = writeFile "stack-install.nsi" $ nsis $ do
-  _ <- constantStr "Name" "Haskell Stack"
+main = do
+  [srcPath, execPath, nsiPath] <- getArgs
 
-  name "$Name"
-  outFile "stack-install.exe"
-  installDir "$APPDATA/local/bin"
-  installDirRegKey HKCU "Software/$Name" "Install_Dir"
-  requestExecutionLevel User
+  writeFile (fromString nsiPath) $ nsis $ do
+    _ <- constantStr "Name" "Haskell Stack"
 
-  page Directory
-  page Components
-  page InstFiles
+    name "$Name"
+    outFile $ fromString execPath
+    installDir "$APPDATA/local/bin"
+    installDirRegKey HKCU "Software/$Name" "Install_Dir"
+    requestExecutionLevel User
 
-  unpage Components
-  unpage InstFiles
+    page Directory
+    page Components
+    page InstFiles
 
-  section "Install Haskell Stack" [Required] $ do
-    setOutPath "$INSTDIR"
-    file [] "stack.exe"
+    unpage Components
+    unpage InstFiles
 
-    -- Write the installation path into the registry
-    writeRegStr HKCU "SOFTWARE/$Name" "Install_Dir" "$INSTDIR"
+    section "Install Haskell Stack" [Required] $ do
+      setOutPath "$INSTDIR"
+      file [] $ fromString srcPath
 
-    -- Write the uninstall keys for Windows
-    writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayName" "$Name"
-    writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "UninstallString" "\"$INSTDIR/uninstall-stack.exe\""
-    writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoModify" 1
-    writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoRepair" 1
-    writeUninstaller "uninstall-stack.exe"
+      -- Write the installation path into the registry
+      writeRegStr HKCU "SOFTWARE/$Name" "Install_Dir" "$INSTDIR"
 
-  section "Add to user %PATH%"
-    [ Description "Add installation directory to user %PATH% to allow running Stack in the console."
-    ] $ do
-      setEnvVarPrepend HKCU "PATH" "$INSTDIR"
-      
-  section "Set %STACK_ROOT% to recommended default"
-    [ Description "Set %STACK_ROOT% to C:\\sr to workaround issues with long paths."
-    ] $ do
-      setEnvVar HKCU "STACK_ROOT" "C:\\sr"
+      -- Write the uninstall keys for Windows
+      writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayName" "$Name"
+      writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "UninstallString" "\"$INSTDIR/uninstall-stack.exe\""
+      writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoModify" 1
+      writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoRepair" 1
+      writeUninstaller "uninstall-stack.exe"
 
-  -- Uninstallation sections. (Any section prepended with "un." is an
-  -- uninstallation option.)
-  section "un.stack" [] $ do
-    deleteRegKey HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name"
-    deleteRegKey HKCU "Software/$Name"
+    section "Add to user %PATH%"
+      [ Description "Add installation directory to user %PATH% to allow running Stack in the console."
+      ] $ do
+        setEnvVarPrepend HKCU "PATH" "$INSTDIR"
+        
+    section "Set %STACK_ROOT% to recommended default"
+      [ Description "Set %STACK_ROOT% to C:\\sr to workaround issues with long paths."
+      ] $ do
+        setEnvVar HKCU "STACK_ROOT" "C:\\sr"
 
-    delete [] "$INSTDIR/stack.exe"
-    delete [] "$INSTDIR/uninstall-stack.exe"
-    rmdir [] "$INSTDIR" -- will not remove if not empty
+    -- Uninstallation sections. (Any section prepended with "un." is an
+    -- uninstallation option.)
+    section "un.stack" [] $ do
+      deleteRegKey HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name"
+      deleteRegKey HKCU "Software/$Name"
 
-  -- The description text is not actually added to the uninstaller as of
-  -- nsis-0.3
-  section "un.Install location on %PATH%"
-    [ Description "Remove $INSTDIR from the user %PATH%. There may be other programs installed in that location."
-    ] $ do
-      setEnvVarRemove HKCU "PATH" "$INSTDIR"
+      delete [] "$INSTDIR/stack.exe"
+      delete [] "$INSTDIR/uninstall-stack.exe"
+      rmdir [] "$INSTDIR" -- will not remove if not empty
 
-  section "un.Set %STACK_ROOT% to recommended default"
-    [ Description "Remove setting of %STACK_ROOT% to C:\\sr."
-    ] $ do
-      deleteEnvVar HKCU "STACK_ROOT"
-      
-  section "un.Compilers installed by stack"
-    [ Unselected
-    , Description "Remove %LOCALAPPDATA%/Programs/stack, which contains compilers that have been installed by Stack."
-    ] $ do
-      rmdir [Recursive] "$LOCALAPPDATA/Programs/stack"
+    -- The description text is not actually added to the uninstaller as of
+    -- nsis-0.3
+    section "un.Install location on %PATH%"
+      [ Description "Remove $INSTDIR from the user %PATH%. There may be other programs installed in that location."
+      ] $ do
+        setEnvVarRemove HKCU "PATH" "$INSTDIR"
 
-  section "un.stack snapshots and configuration"
-    [ Unselected
-    , Description "Remove %APPDATA%/stack, which contains the user-defined global stack.yaml and the snapshot/compilation cache."
-    ] $ do
-      rmdir [Recursive] "$APPDATA/stack"
+    section "un.Set %STACK_ROOT% to recommended default"
+      [ Description "Remove setting of %STACK_ROOT% to C:\\sr."
+      ] $ do
+        deleteEnvVar HKCU "STACK_ROOT"
+        
+    section "un.Compilers installed by stack"
+      [ Unselected
+      , Description "Remove %LOCALAPPDATA%/Programs/stack, which contains compilers that have been installed by Stack."
+      ] $ do
+        rmdir [Recursive] "$LOCALAPPDATA/Programs/stack"
+
+    section "un.stack snapshots and configuration"
+      [ Unselected
+      , Description "Remove %APPDATA%/stack, which contains the user-defined global stack.yaml and the snapshot/compilation cache."
+      ] $ do
+        rmdir [Recursive] "$APPDATA/stack"

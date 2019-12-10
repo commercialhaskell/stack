@@ -270,21 +270,21 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryInstallerFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
-        need ["stack-install" <.> nsiExt]
-        copyFile' (releaseDir </> binaryExeFileName) stackExeFileName
+        need [releaseDir </> "stack-install" <.> nsiExt]
+
         actionOnException
-            (command_ [] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
+            (command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
                 [ "-V3"
                 , "stack-install.nsi"])
             (removeFile out)
 
-        _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
-
-        liftIO $ renameFile ("stack-install" <.> exe) out
-
-    "stack-install" <.> nsiExt %> \_ -> do
+    releaseDir </> "stack-install" <.> nsiExt %> \out -> do
         need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
-        cmd "stack etc/scripts/build-stack-installer.hs" :: Action ()
+        cmd "stack etc/scripts/build-stack-installer.hs" 
+            [ binaryExeFileName
+            , binaryInstallerFileName
+            , out
+            ] :: Action ()
 
     releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
