@@ -36,7 +36,7 @@ main = do
 
     section "Install Haskell Stack" [Required] $ do
       setOutPath "$INSTDIR"
-      file [] $ fromString srcPath
+      file [OName "stack.exe"] $ fromString srcPath
 
       -- Write the installation path into the registry
       writeRegStr HKCU "SOFTWARE/$Name" "Install_Dir" "$INSTDIR"
