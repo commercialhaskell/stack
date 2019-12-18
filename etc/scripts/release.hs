@@ -268,6 +268,24 @@ rules global@Global{..} args = do
                 cmd "strip -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
 
+    releaseDir </> binaryInstallerFileName %> \out -> do
+        need [releaseDir </> binaryExeFileName]
+        need [releaseDir </> binaryInstallerNSIFileName]
+
+        actionOnException
+            (command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
+                [ "-V3"
+                , binaryInstallerNSIFileName])
+            (removeFile out)
+
+    releaseDir </> binaryInstallerNSIFileName %> \out -> do
+        need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
+        cmd "stack etc/scripts/build-stack-installer.hs" 
+            [ binaryExeFileName
+            , binaryInstallerFileName
+            , out
+            ] :: Action ()
+
     releaseDir </> "*" <.> ascExt %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
@@ -343,12 +361,14 @@ rules global@Global{..} args = do
             Just _ -> [x, x <.> sha256Ext, x <.> ascExt]
     binaryPkgFileNames =
         case platformOS of
-            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName]
+            Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName, binaryInstallerFileName]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
+    binaryInstallerNSIFileName = binaryName ++ "-installer" <.> nsiExt
+    binaryInstallerFileName = binaryName ++ "-installer" <.> exe
     binaryName =
         concat
             [ stackProgName
@@ -368,6 +388,7 @@ rules global@Global{..} args = do
     ascExt = ".asc"
     sha256Ext = ".sha256"
     uploadExt = ".upload"
+    nsiExt = ".nsi"
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
