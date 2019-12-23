@@ -9,6 +9,7 @@ packages:
 - persistent-2.10.0@rev:0
 - persistent-sqlite-2.10.1@rev:0
 - pantry-0.2.0.0
+- http-download-0.1.0.1@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
