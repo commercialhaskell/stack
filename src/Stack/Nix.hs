@@ -95,7 +95,7 @@ runShellAndExit = do
                                                 F.</> "nix-gc-symlinks" F.</> "gc-root"] else []
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
+                           ,["--run", unwords ("export " <> inNixShellEnvVar <> "=1; ":cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
                            ]
                            -- Using --run instead of --command so we cannot
                            -- end up in the nix-shell if stack build is Ctrl-C'd
