@@ -9,6 +9,8 @@ Release notes:
 
 Major changes:
 
+* `docker-network` configuration key added to overwrite docker `--net` arg
+
 Behavior changes:
 
 Other enhancements:

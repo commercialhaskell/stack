@@ -199,6 +199,10 @@ otherwise noted.
       # What to name the Docker container.  Only useful with `detach` or
       # `persist` true.  (default none)
       container-name: "example-name"
+      
+      # Sets the network used by docker. Gets directly passed to dockers `net`
+      # argument (default: host)
+      network: host
 
       # Additional arguments to pass to `docker run`.  (default none)
       run-args: ["--net=bridge"]

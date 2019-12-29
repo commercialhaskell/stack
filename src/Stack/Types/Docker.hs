@@ -43,6 +43,8 @@ data DockerOpts = DockerOpts
   ,dockerContainerName :: !(Maybe String)
     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
     -- or `dockerDetach`.
+  ,dockerNetwork :: !(Maybe String)
+   -- ^ The network docker uses.
   ,dockerRunArgs :: ![String]
     -- ^ Arguments to pass directly to @docker run@.
   ,dockerMount :: ![Mount]
@@ -85,6 +87,8 @@ data DockerOptsMonoid = DockerOptsMonoid
   ,dockerMonoidContainerName :: !(First String)
     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
     -- or `dockerDetach`.
+  ,dockerMonoidNetwork :: !(First String)
+    -- ^ See: 'dockerNetwork'
   ,dockerMonoidRunArgs :: ![String]
     -- ^ Arguments to pass directly to @docker run@
   ,dockerMonoidMount :: ![Mount]
@@ -118,6 +122,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
               dockerMonoidDetach           <- FirstFalse <$> o ..:? dockerDetachArgName
               dockerMonoidPersist          <- FirstFalse <$> o ..:? dockerPersistArgName
               dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
+              dockerMonoidNetwork          <- First <$> o ..:? dockerNetworkArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
               dockerMonoidMountMode        <- First <$> o ..:? dockerMountModeArgName
@@ -391,6 +396,10 @@ dockerEnvArgName = "env"
 -- | Docker container name argument name.
 dockerContainerNameArgName :: Text
 dockerContainerNameArgName = "container-name"
+--
+-- | Docker container name argument name.
+dockerNetworkArgName :: Text
+dockerNetworkArgName = "network"
 
 -- | Docker persist argument name.
 dockerPersistArgName :: Text
