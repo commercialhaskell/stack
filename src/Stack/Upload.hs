@@ -42,6 +42,7 @@ import           System.Directory                      (createDirectoryIfMissing
 import           System.FilePath                       ((</>), takeFileName, takeDirectory)
 import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
+import           System.Enviroment                     (lookupEnv)
 
 -- | Username and password to log into Hackage.
 --
@@ -62,6 +63,10 @@ instance FromJSON (FilePath -> HackageCreds) where
     parseJSON = withObject "HackageCreds" $ \o -> HackageCreds
         <$> o .: "username"
         <*> o .: "password"
+
+
+lookupCredential :: String -> IO String -> IO String
+lookupCredential varName prompt = maybe prompt pure lookupEnv varName
 
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
@@ -85,8 +90,9 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      username <- prompt "Hackage username: "
-      password <- promptPassword "Hackage password: "
+
+      username <- lookupCredential "STACK_USERNAME" (prompt "Hackage username: ")
+      password <- lookupCredential "STACK_PASSWORD" (promptPassword "Hackage password: ")
       let hc = HackageCreds
             { hcUsername = username
             , hcPassword = password
