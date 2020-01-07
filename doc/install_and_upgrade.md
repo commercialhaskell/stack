@@ -358,3 +358,25 @@ There are essentially four different approaches to upgrade:
       wget -qO- https://get.haskellstack.org/ | sh -s - -f
 
 * Manually follow the steps above to download the newest binaries from the release page and replace the old binary.
+
+## Install Older Versions
+
+To install a specific version of stack, navigate to the desired version on 
+[the GitHub release page](https://github.com/fpco/stack/releases),
+and click the appropriate link under its "Assets" drop-down menu.
+
+Alternatively, use the URL 
+`https://github.com/commercialhaskell/stack/releases/download/vVERSION/stack-VERSION-PLATFORM.EXTENSION`.
+For example, the tarball for stack 2.1.0.1, osx-x86_64 is at
+`https://github.com/commercialhaskell/stack/releases/download/v2.1.0.1/stack-2.1.0.1-osx-x86_64.tar.gz`.
+
+Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s 
+[`appveyor.yml`](https://github.com/dhall-lang/dhall-haskell/blob/1079b7a3a7a6922f72a373e47daf6f1b74f128b1/appveyor.yml).
+Change the values of PATH and VERSION as needed.
+
+    install:
+      - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
+      - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
+      - 7z x stack.zip stack.exe
+      - stack setup > nul
+      - git submodule update --init --recursive
