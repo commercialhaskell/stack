@@ -29,7 +29,7 @@ packages:
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - github: commercialhaskell/pantry
-  commit: de8a0b5f88e9974fafb4a6ed5835d1da8f821d80
+  commit: 3e03159f9f344c23456aa6df35a5661cc866e4fd
 - github: fpco/casa
   commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
   subdirs:
