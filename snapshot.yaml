@@ -12,7 +12,7 @@ packages:
 - tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
 - hackage-security-0.5.3.0@rev:2
 - http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.6@rev:2
+- cabal-doctest-1.0.8@sha256:471f182dabe23bac29d47ae55a33d11f85a0b0ab64d3b8f2907b437ab47d5ba7,1467
 - unliftio-0.2.12@rev:0 #for rio-0.1.11.0
 - happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f,4667
 - fsnotify-0.3.0.1@rev:1
