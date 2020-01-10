@@ -27,7 +27,7 @@ import           Pantry.Internal.AesonExtended
 import           Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Text (disp)
+import           Distribution.Pretty (pretty)
 import qualified Distribution.Version as Cabal
 import           Distribution.Version (Version, versionNumbers, withinRange)
 import qualified Paths_stack as Meta
@@ -47,7 +47,7 @@ instance Monoid IntersectingVersionRange where
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text
-versionRangeText = T.pack . render . disp
+versionRangeText = T.pack . render . pretty
 
 -- | A modified intersection which also simplifies, for better display.
 intersectVersionRanges :: Cabal.VersionRange -> Cabal.VersionRange -> Cabal.VersionRange
