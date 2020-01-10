@@ -16,7 +16,7 @@ import qualified RIO.Text as T
 import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import           Distribution.Parsec.Common (PError (..), PWarning (..), showPos)
+import           Distribution.Parsec (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
