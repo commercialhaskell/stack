@@ -24,6 +24,7 @@ module Stack.Types.Version
 
 import           Stack.Prelude hiding (Vector)
 import           Pantry.Internal.AesonExtended
+import           Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Text (disp)
@@ -63,7 +64,7 @@ toMajorVersion v =
 -- | Given a version range and a set of versions, find the latest version from
 -- the set that is within the range.
 latestApplicableVersion :: Cabal.VersionRange -> Set Version -> Maybe Version
-latestApplicableVersion r = listToMaybe . filter (`withinRange` r) . Set.toDescList
+latestApplicableVersion r = find (`withinRange` r) . Set.toDescList
 
 -- | Get the next major version number for the given version
 nextMajorVersion :: Version -> Version
