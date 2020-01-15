@@ -3,7 +3,11 @@ import StackTest
 import System.Directory (getCurrentDirectory)
 
 main :: IO ()
-main = do
+main =
+  if isWindows
+  then do return ()
+  else do
+
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
