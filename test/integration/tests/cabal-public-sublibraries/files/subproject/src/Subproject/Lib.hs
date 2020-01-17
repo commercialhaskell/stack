@@ -1,4 +1,4 @@
-module Lib
+module Subproject.Lib
     ( say 
     ) where
 

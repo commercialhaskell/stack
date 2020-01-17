@@ -1,4 +1,6 @@
-module Lib where
+module Main where
+
+import Hello.Hello
 
 main :: IO ()
 main = do
