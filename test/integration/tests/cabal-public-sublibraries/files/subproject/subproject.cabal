@@ -1,0 +1,24 @@
+cabal-version:       3.0
+name:                subproject
+version:             0.1.0.0
+build-type:          Simple
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+  default-language:    Haskell2010
+
+library hello
+  visibility:          public
+  hs-source-dirs:      src
+  exposed-modules:     Hello.Hello
+  build-depends:       base >= 4.7 && < 5
+  default-language:    Haskell2010
+
+library world
+  visibility:          public
+  hs-source-dirs:      src
+  exposed-modules:     World.World
+  build-depends:       base >= 4.7 && < 5
+  default-language:    Haskell2010
