@@ -19,7 +19,7 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.8.1
+GHCVER=8.8.2
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
