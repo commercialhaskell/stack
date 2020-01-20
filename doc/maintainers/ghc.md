@@ -27,6 +27,12 @@
     and add the new bindists, pointing to the Github release version. Be sure to
     update the `content-length` and `sha1` values.
 
+  * In [stackage-content](https://github.com/fpco/stackage-content), run
+
+        cd stack && ./update-global-hints.hs ghc-X.Y.Z
+
+    and command the changes.
+
 
 ## Building GHC
 
