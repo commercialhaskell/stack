@@ -379,7 +379,12 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "targets"
                     "List all available stack targets"
                     ideTargetsCmd
-                    outputFlag)
+                    outputFlag
+                addCommand'
+                    "bios"
+                    "List in JSON format list of all packages, components, flags, files, etc."
+                    ideBiosCmd
+                    (pure ()))
         addSubCommands'
           Docker.dockerCmdName
           "Subcommands specific to Docker use"
@@ -825,6 +830,10 @@ idePackagesCmd = withConfig NoReexec . withBuildConfig . uncurry IDE.listPackage
 -- | List targets in the project.
 ideTargetsCmd :: IDE.OutputStream -> RIO Runner ()
 ideTargetsCmd = withConfig NoReexec . withBuildConfig . IDE.listTargets
+
+-- | List bios in the project.
+ideBiosCmd :: () -> RIO Runner ()
+ideBiosCmd = withConfig NoReexec . withDefaultEnvConfig . IDE.bios
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> RIO Runner ()
