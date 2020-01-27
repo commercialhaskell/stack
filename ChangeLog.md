@@ -3,13 +3,9 @@
 
 ## Unreleased changes
 
-**Changes since v2.1.3.1**
+**Changes since v2.1.5**
 
-Release notes:
-
-Major changes:
-
-Behavior changes:
+## v2.1.5
 
 Other enhancements:
 
