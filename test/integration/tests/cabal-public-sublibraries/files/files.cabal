@@ -1,0 +1,11 @@
+cabal-version:       3.0
+name:                files
+version:             0.1.0.0
+build-type:          Simple
+
+executable files-exe
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  build-depends:       base >= 4.7 && < 5
+                     , subproject:{subproject, hello, world} == 0.1.0.0
+  default-language:    Haskell2010
