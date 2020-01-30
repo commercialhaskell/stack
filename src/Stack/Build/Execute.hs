@@ -56,6 +56,7 @@ import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text as C
+import           Distribution.Types.Dependency (depLibraries)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
 import           Distribution.Version (mkVersion)
@@ -1557,8 +1558,28 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
+            (gpdio, _, _) <- loadCabalFilePath (parent cabalfp)
+            (C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches) <- liftIO $ gpdio YesPrintWarnings
 
+            let dependencies = concatMap getDeps subLibs <>
+                               concatMap getDeps foreignLibs <>
+                               concatMap getDeps exes <>
+                               concatMap getDeps tests <>
+                               concatMap getDeps benches <>
+                               maybe [] C.condTreeConstraints lib
+
+            let libraries = concatMap (toList . depLibraries) dependencies
+
+            let subLibDepExist = foldr (\x z ->
+                                        case x of
+                                            C.LSubLibName _ -> True
+                                            C.LMainLibName -> z
+                                    ) False libraries
+
+            when subLibDepExist
+                (error "SubLibrary dependency is not supported" )
+
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1578,7 +1599,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     return Nothing
                 _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
-
+        where
+            getDeps (_, (C.CondNode _ dep _)) = dep
     initialBuildSteps executableBuildStatuses cabal announce = do
         announce ("initial-build-steps" <> RIO.display (annSuffix executableBuildStatuses))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
