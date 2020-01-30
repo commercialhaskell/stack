@@ -1600,7 +1600,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
         where
-            getDeps (_, (C.CondNode _ dep _)) = dep
+            getDeps (_, C.CondNode _ dep _) = dep
     initialBuildSteps executableBuildStatuses cabal announce = do
         announce ("initial-build-steps" <> RIO.display (annSuffix executableBuildStatuses))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]

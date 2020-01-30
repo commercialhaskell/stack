@@ -45,6 +45,7 @@ import           Distribution.Simple.Glob (matchDirFileGlob)
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
 import qualified Distribution.Types.CondTree as Cabal
+import           Distribution.Types.Dependency (depPkgName, depVerRange)
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
@@ -250,7 +251,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
         , knownTools
         ])
     msetupDeps = fmap
-        (M.fromList . map (depName &&& depRange) . setupDepends)
+        (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
         (setupBuildInfo pkg)
 
     asLibrary range = DepValue
@@ -527,7 +528,7 @@ packageDependencies
   -> Map PackageName VersionRange
 packageDependencies pkgConfig pkg' =
   M.fromListWith intersectVersionRanges $
-  map (depName &&& depRange) $
+  map (depPkgName &&& depVerRange) $
   concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
   where
@@ -984,17 +985,6 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                         (GHCJS, ACGhcjs vghcjs _) ->
                           vghcjs `withinRange` range
                         _ -> False
-
--- TODO: Any particular reason we have these two function? Since it's already being implemented in https://github.com/haskell/cabal/blob/master/Cabal/Distribution/Types/Dependency.hs#L45-L52
---       if we're keeping these, should we introduce depLibraries as well?
-
--- | Get the name of a dependency.
-depName :: Dependency -> PackageName
-depName (Dependency n _ _) = n
-
--- | Get the version range of a dependency.
-depRange :: Dependency -> VersionRange
-depRange (Dependency _ r _) = r
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
