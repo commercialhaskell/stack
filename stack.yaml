@@ -1,6 +1,7 @@
-resolver: snapshot.yaml
+resolver: snapshot-nightly.yaml
 
 packages:
+- ../opentelemetry-haskell/opentelemetry
 - .
 
 docker:

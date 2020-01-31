@@ -46,6 +46,7 @@ import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.Terminal (fixCodePage)
+import           OpenTelemetry.Implicit
 
 -- | Build.
 --
@@ -55,7 +56,7 @@ import           System.Terminal (fixCodePage)
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
-build msetLocalFiles = do
+build msetLocalFiles = withSpan "Build.build" $ do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do

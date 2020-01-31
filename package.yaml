@@ -49,6 +49,7 @@ ghc-options:
 dependencies:
 - Cabal
 - aeson
+- opentelemetry
 - annotated-wl-pprint
 - ansi-terminal
 - array

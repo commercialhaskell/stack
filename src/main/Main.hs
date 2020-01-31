@@ -92,6 +92,8 @@ import qualified System.FilePath as FP
 import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
+import           OpenTelemetry.Implicit
+
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
 hSetTranslit :: Handle -> IO ()
@@ -105,7 +107,7 @@ hSetTranslit h = do
         _ -> return ()
 
 main :: IO ()
-main = do
+main = withZeroConfigOpenTelemetry $ withSpan "Main.main" $ do
   -- Line buffer the output by default, particularly for non-terminal runs.
   -- See https://github.com/commercialhaskell/stack/pull/360
   hSetBuffering stdout LineBuffering
@@ -554,7 +556,7 @@ cleanCmd = withConfig NoReexec . withBuildConfig . clean
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
-buildCmd opts = do
+buildCmd opts = withSpan "Main.buildCmd" $ do
   when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
     logError "Error: When building with stack, you should not use the -prof GHC option"
     logError "Instead, please use --library-profiling and --executable-profiling"
@@ -569,7 +571,7 @@ buildCmd opts = do
     inner
       :: Maybe (Set (Path Abs File) -> IO ())
       -> RIO Runner ()
-    inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
+    inner setLocalFiles = withSpan "Main.buildCmd_inner" $ withConfig YesReexec $ withEnvConfig NeedTargets opts $
         Stack.Build.build setLocalFiles
     -- Read the build command from the CLI and enable it to run
     modifyGO =

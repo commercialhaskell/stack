@@ -84,6 +84,8 @@ import           RIO.List (unzip)
 import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 
+import OpenTelemetry.Implicit
+
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
 tryDeprecatedPath
@@ -410,7 +412,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
 loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
-loadConfig inner = do
+loadConfig inner = withSpan "Stack.Config.loadConfig" $ do
     mstackYaml <- view $ globalOptsL.to globalStackYaml
     mproject <- loadProjectConfig mstackYaml
     mresolver <- view $ globalOptsL.to globalResolver
@@ -763,7 +765,7 @@ getExtraConfigs userConfigPath = do
 loadConfigYaml
     :: HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
-loadConfigYaml parser path = do
+loadConfigYaml parser path = withSpan "Stack.Config.loadConfigYaml" $ do
     eres <- loadYaml parser path
     case eres of
         Left err -> liftIO $ throwM (ParseConfigFileException path err)
@@ -818,7 +820,7 @@ loadProjectConfig :: HasLogFunc env
                   => StackYamlLoc
                   -- ^ Override stack.yaml
                   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig mstackYaml = do
+loadProjectConfig mstackYaml = withSpan "Stack.Config.loadProjectConfig" $ do
     mfp <- getProjectConfig mstackYaml
     case mfp of
         PCProject fp -> do
