@@ -354,12 +354,12 @@ checkSubLibraryDependencies proj = do
         libraries = concatMap (toList . depLibraries) dependencies
 
     when (subLibDepExist libraries)
-        (logWarn "SubLibrary dependency is not supported")
+      (logWarn "SubLibrary dependency is not supported, this will almost certainly fail")
   where
     getDeps (_, C.CondNode _ dep _) = dep
     subLibDepExist lib = 
-      foldr (\x z ->
+      any (\x ->
         case x of
           C.LSubLibName _ -> True
-          C.LMainLibName -> z
-      ) False lib
+          C.LMainLibName  -> False
+      ) lib
