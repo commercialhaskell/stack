@@ -47,6 +47,7 @@ import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.Terminal (fixCodePage)
+import           OpenTelemetry.Implicit
 
 -- | Build.
 --
@@ -56,7 +57,7 @@ import           System.Terminal (fixCodePage)
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
-build msetLocalFiles = do
+build msetLocalFiles = withSpan "Build.build" $ do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -69,26 +70,28 @@ build msetLocalFiles = do
     checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
-    -- Set local files, necessary for file watching
-    stackYaml <- view stackYamlL
-    for_ msetLocalFiles $ \setLocalFiles -> do
-      files <-
-        if boptsCLIWatchAll boptsCli
-        then sequence [lpFiles lp | lp <- allLocals]
-        else forM allLocals $ \lp -> do
-          let pn = packageName (lpPackage lp)
-          case Map.lookup pn (smtTargets $ smTargets sourceMap) of
-            Nothing ->
-              pure Set.empty
-            Just (TargetAll _) ->
-              lpFiles lp
-            Just (TargetComps components) ->
-              lpFilesForComponents components lp
-      liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
+    withSpan "Build.build_setLocalFiles" $ do
+      -- Set local files, necessary for file watching
+      stackYaml <- view stackYamlL
+      for_ msetLocalFiles $ \setLocalFiles -> do
+        files <-
+          if boptsCLIWatchAll boptsCli
+          then sequence [lpFiles lp | lp <- allLocals]
+          else forM allLocals $ \lp -> do
+            let pn = packageName (lpPackage lp)
+            case Map.lookup pn (smtTargets $ smTargets sourceMap) of
+              Nothing ->
+                pure Set.empty
+              Just (TargetAll _) ->
+                lpFiles lp
+              Just (TargetComps components) ->
+                lpFilesForComponents components lp
+        liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
-    checkComponentsBuildable allLocals
+    withSpan "Build.build_checkComponentsBuildable" $ do
+      checkComponentsBuildable allLocals
 
-    installMap <- toInstallMap sourceMap
+    installMap <- withSpan "Build.Installed.toInstallMap" $ toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled installMap
 
@@ -235,7 +238,7 @@ splitObjsWarning = unwords
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (HasEnvConfig env)
                  => BuildOptsCLI -> RIO env BaseConfigOpts
-mkBaseConfigOpts boptsCli = do
+mkBaseConfigOpts boptsCli = withSpan "Build.mkBaseConfigOpts" $ do
     bopts <- view buildOptsL
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -260,7 +263,7 @@ loadPackage
   -> [Text] -- ^ GHC options
   -> [Text] -- ^ Cabal configure options
   -> RIO env Package
-loadPackage loc flags ghcOptions cabalConfigOpts = do
+loadPackage loc flags ghcOptions cabalConfigOpts = withSpan "Build.loadPackage" $ do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig

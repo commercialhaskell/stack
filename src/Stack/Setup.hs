@@ -94,6 +94,8 @@ import              System.Permissions (setFileExecutable)
 import              System.Uname (getRelease)
 import              Data.List.Split (splitOn)
 
+import OpenTelemetry.Implicit
+
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
 defaultSetupInfoYaml =
@@ -189,7 +191,7 @@ setupEnv :: NeedTargets
          -> BuildOptsCLI
          -> Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> RIO BuildConfig EnvConfig
-setupEnv needTargets boptsCLI mResolveMissingGHC = do
+setupEnv needTargets boptsCLI mResolveMissingGHC = withSpan "setupEnv" $ do
     config <- view configL
     bc <- view buildConfigL
     let stackYaml = bcStackYaml bc

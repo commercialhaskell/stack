@@ -37,6 +37,8 @@ import Stack.Types.Cache
 import Stack.Types.Config (HasBuildConfig, buildConfigL, bcProjectStorage, ProjectStorage (..))
 import Stack.Types.GhcPkgId
 
+import OpenTelemetry.Implicit
+
 share [ mkPersist sqlSettings
       , mkDeleteCascade sqlSettings
       , mkMigrate "migrateAll"
@@ -85,7 +87,7 @@ initProjectStorage ::
     => Path Abs File -- ^ storage file
     -> (ProjectStorage -> RIO env a)
     -> RIO env a
-initProjectStorage fp f = SQLite.initStorage "Stack" migrateAll fp $ f . ProjectStorage
+initProjectStorage fp f = withSpan "Storage.Project.initProjectStorage" $ SQLite.initStorage "Stack" migrateAll fp $ f . ProjectStorage
 
 -- | Run an action in a database transaction
 withProjectStorage ::
@@ -136,7 +138,7 @@ loadConfigCache ::
     => ConfigCacheKey
     -> RIO env (Maybe ConfigCache)
 loadConfigCache key =
-    withProjectStorage $ do
+    withSpan "Storage.Project.loadConfigCache" $ withProjectStorage $ do
         mparent <- getBy key
         case mparent of
             Nothing -> return Nothing

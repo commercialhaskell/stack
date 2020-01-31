@@ -96,6 +96,8 @@ import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
 
+import OpenTelemetry.Implicit
+
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
     = ExecutableBuilt
@@ -247,7 +249,7 @@ getSetupExe :: HasEnvConfig env
             -> Path Abs File -- ^ SetupShim.hs input file
             -> Path Abs Dir -- ^ temporary directory
             -> RIO env (Maybe (Path Abs File))
-getSetupExe setupHs setupShimHs tmpdir = do
+getSetupExe setupHs setupShimHs tmpdir = withSpan "Build.Execute.getSetupExe" $ do
     wc <- view $ actualCompilerVersionL.whichCompilerL
     platformDir <- platformGhcRelDir
     config <- view configL
@@ -480,7 +482,7 @@ executePlan :: HasEnvConfig env
             -> Map PackageName Target
             -> Plan
             -> RIO env ()
-executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
+executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = withSpan "Build.Execute.executePlan" $ do
     logDebug "Executing the build plan"
     bopts <- view buildOptsL
     withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName
@@ -510,7 +512,7 @@ copyExecutables
     => Map Text InstallLocation
     -> RIO env ()
 copyExecutables exes | Map.null exes = return ()
-copyExecutables exes = do
+copyExecutables exes = withSpan "Build.Execute.copyExecutables" $ do
     snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
     localBin <- (</> bindirSuffix) `liftM` installationRootLocal
     compilerSpecific <- boptsInstallCompilerTool <$> view buildOptsL
@@ -669,7 +671,7 @@ unregisterPackages ::
     -> Path Abs Dir
     -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
     -> RIO env ()
-unregisterPackages cv localDB ids = do
+unregisterPackages cv localDB ids = withSpan "Build.Execute.unregisterPackages" $ do
     let logReason ident reason =
             logInfo $
             fromString (packageIdentifierString ident) <> ": unregistering" <>
@@ -844,7 +846,7 @@ ensureConfig :: HasEnvConfig env
              -> Path Abs File -- ^ .cabal file
              -> Task
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
+ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = withSpan "Build.Execute.ensureConfig" $ do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
     setupConfigfp <- setupConfigFromDir pkgDir
     newSetupConfigMod <- liftIO $ either (const Nothing) (Just . modificationTime) <$>
@@ -1129,7 +1131,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
         -> OutputType
         -> ((KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ()) -> RIO env a)
         -> RIO env a
-    withCabal package pkgDir outputType inner = do
+    withCabal package pkgDir outputType inner = withSpan "Build.Execute.withCabal" $ do
         config <- view configL
         unless (configAllowDifferentUser config) $
             checkOwnership (pkgDir </> configWorkDir config)
@@ -1478,7 +1480,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         return $ if b then Just pc else Nothing
             _ -> return Nothing
 
-    copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
+    copyPreCompiled (PrecompiledCache mlib sublibs exes) = withSpan "Build.Execute.copyPreCompiled" $ do
         wc <- view $ actualCompilerVersionL.whichCompilerL
         announceTask ee task "using precompiled package"
 
@@ -1586,7 +1588,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -> (Utf8Builder -> RIO env ())
         -> Map Text ExecutableBuildStatus
         -> RIO env Installed
-    realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
+    realBuild cache package pkgDir cabal0 announce executableBuildStatuses = withSpan "Build.Execute.realBuild" $ do
         let cabal = cabal0 CloseOnException
         wc <- view $ actualCompilerVersionL.whichCompilerL
 

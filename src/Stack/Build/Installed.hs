@@ -29,6 +29,8 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
+import OpenTelemetry.Implicit
+
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
     projectInstalls <-
@@ -53,7 +55,7 @@ getInstalled :: HasEnvConfig env
                   , [DumpPackage] -- snapshot installed
                   , [DumpPackage] -- locally installed
                   )
-getInstalled {-opts-} installMap = do
+getInstalled {-opts-} installMap = withSpan "Build.Installed.getInstalled" $ do
     logDebug "Finding out which packages are already installed"
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -114,7 +116,7 @@ loadDatabase :: HasEnvConfig env
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> RIO env ([LoadHelper], [DumpPackage])
-loadDatabase installMap mdb lhs0 = do
+loadDatabase installMap mdb lhs0 = withSpan "Build.Installed.loadDatabase" $ do
     pkgexe <- getGhcPkgExe
     (lhs1', dps) <- ghcPkgDump pkgexe (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage .| sink

@@ -43,16 +43,18 @@ import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
+import OpenTelemetry.Implicit
+
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
               => RIO env [LocalPackage]
-projectLocalPackages = do
+projectLocalPackages = withSpan "Build.Source.projectLocalPackages" $ do
     sm <- view $ envConfigL.to envConfigSourceMap
     for (toList $ smProject sm) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
-localDependencies = do
+localDependencies = withSpan "Build.Source.localDependencies" $ do
     bopts <- view $ configL.to configBuild
     sourceMap <- view $ envConfigL . to envConfigSourceMap
     forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
@@ -69,7 +71,7 @@ loadSourceMap :: HasBuildConfig env
               -> BuildOptsCLI
               -> SMActual DumpedGlobalPackage
               -> RIO env SourceMap
-loadSourceMap smt boptsCli sma = do
+loadSourceMap smt boptsCli sma = withSpan "Build.Source.loadSourceMap" $ do
     bconfig <- view buildConfigL
     let compiler = smaCompiler sma
         project = M.map applyOptsFlagsPP $ smaProject sma
@@ -250,7 +252,7 @@ loadCommonPackage ::
        forall env. (HasBuildConfig env, HasSourceMap env)
     => CommonPackage
     -> RIO env Package
-loadCommonPackage common = do
+loadCommonPackage common = withSpan "Build.Source.loadCommonPackage" $ do
     config <- getPackageConfig (cpFlags common) (cpGhcOptions common) (cpCabalConfigOpts common)
     gpkg <- liftIO $ cpGPD common
     return $ resolvePackage config gpkg
@@ -261,7 +263,7 @@ loadLocalPackage ::
        forall env. (HasBuildConfig env, HasSourceMap env)
     => ProjectPackage
     -> RIO env LocalPackage
-loadLocalPackage pp = do
+loadLocalPackage pp = withSpan "Build.Source.loadLocalPackage" $ do
     sm <- view sourceMapL
     let common = ppCommon pp
     bopts <- view buildOptsL

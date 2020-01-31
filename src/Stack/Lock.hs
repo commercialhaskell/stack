@@ -24,6 +24,8 @@ import Stack.SourceMap
 import Stack.Types.Config
 import Stack.Types.SourceMap
 
+import OpenTelemetry.Eventlog
+
 data LockedLocation a b = LockedLocation
     { llOriginal :: a
     , llCompleted :: b
@@ -77,7 +79,7 @@ instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
 loadYamlThrow
     :: HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
-loadYamlThrow parser path = do
+loadYamlThrow parser path = withSpan "Lock.loadYamlThrow" $ do
     val <- liftIO $ Yaml.decodeFileThrow (toFilePath path)
     case Yaml.parseEither parser val of
         Left err -> throwIO $ Yaml.AesonException err
@@ -94,7 +96,7 @@ lockCachedWanted ::
         -> Map PackageName (Bool -> RIO env DepPackage)
         -> RIO env ( SMWanted, [CompletedPLI]))
     -> RIO env SMWanted
-lockCachedWanted stackFile resolver fillWanted = do
+lockCachedWanted stackFile resolver fillWanted = withSpan "Lock.lockCacheWanted" $ do
     lockFile <- liftIO $ addExtension ".lock" stackFile
     let getLockExists = doesFileExist lockFile
     lfb <- view lockFileBehaviorL
@@ -118,7 +120,7 @@ lockCachedWanted stackFile resolver fillWanted = do
         slocCache = toMap $ lckSnapshotLocations locked
         pkgLocCache = toMap $ lckPkgImmutableLocations locked
     (snap, slocCompleted, pliCompleted) <-
-        loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
+        withSpan "Pantry.loadAndCompleteSnapshotRaw" $ loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
     let compiler = snapshotCompiler snap
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted pkgLocCache compiler snPkgs

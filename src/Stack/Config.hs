@@ -84,6 +84,8 @@ import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 import           RIO.Time (toGregorian)
 
+import OpenTelemetry.Implicit
+
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
 tryDeprecatedPath
@@ -145,7 +147,7 @@ makeConcreteResolver
     => AbstractResolver
     -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
-makeConcreteResolver ar = do
+makeConcreteResolver ar = withSpan "Config.makeConcreteResolver" $ do
     r <-
         case ar of
             ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
@@ -434,7 +436,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
 loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
-loadConfig inner = do
+loadConfig inner = withSpan "Config.loadConfig" $ do
     mstackYaml <- view $ globalOptsL.to globalStackYaml
     mproject <- loadProjectConfig mstackYaml
     mresolver <- view $ globalOptsL.to globalResolver
@@ -480,7 +482,7 @@ loadConfig inner = do
 withBuildConfig
   :: RIO BuildConfig a
   -> RIO Config a
-withBuildConfig inner = do
+withBuildConfig inner = withSpan "Config.withBuildConfig" $ do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
@@ -796,7 +798,7 @@ getExtraConfigs userConfigPath = do
 loadConfigYaml
     :: HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
-loadConfigYaml parser path = do
+loadConfigYaml parser path = withSpan "Config.loadConfigYaml" $ do
     eres <- loadYaml parser path
     case eres of
         Left err -> liftIO $ throwM (ParseConfigFileException path err)
@@ -851,7 +853,7 @@ loadProjectConfig :: HasLogFunc env
                   => StackYamlLoc
                   -- ^ Override stack.yaml
                   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig mstackYaml = do
+loadProjectConfig mstackYaml = withSpan "Config.loadProjectConfig" $ do
     mfp <- getProjectConfig mstackYaml
     case mfp of
         PCProject fp -> do
