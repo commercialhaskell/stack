@@ -339,7 +339,7 @@ checkComponentsBuildable lps =
         , c <- Set.toList (lpUnbuildable lp)
         ]
 
--- Find if sublibrary dependency exist in each project
+-- | Find if sublibrary dependency exist in each project
 checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies proj = do
   forM_ proj $ \p -> do
