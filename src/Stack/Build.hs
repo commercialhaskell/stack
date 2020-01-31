@@ -67,29 +67,7 @@ build msetLocalFiles = do
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
 
-    let proj = smProject sourceMap
-
-    -- Find if sublibrary dependency exist in each project
-    forM_ (Map.elems proj) $ \p -> do
-      C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
-
-      let dependencies = concatMap getDeps subLibs <>
-                          concatMap getDeps foreignLibs <>
-                          concatMap getDeps exes <>
-                          concatMap getDeps tests <>
-                          concatMap getDeps benches <>
-                          maybe [] C.condTreeConstraints lib
-
-      let libraries = concatMap (toList . depLibraries) dependencies
-
-      let subLibDepExist = foldr (\x z ->
-                                  case x of
-                                      C.LSubLibName _ -> True
-                                      C.LMainLibName -> z
-                              ) False libraries
-
-      when subLibDepExist
-          (logWarn "SubLibrary dependency is not supported" )
+    checkSubLibraryDependencies (smProject sourceMap)
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -129,8 +107,6 @@ build msetLocalFiles = do
                          installedMap
                          (smtTargets $ smTargets sourceMap)
                          plan
- where
-   getDeps (_, C.CondNode _ dep _) = dep
 
 justLocals :: Plan -> [PackageIdentifier]
 justLocals =
@@ -362,3 +338,28 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
+
+-- Find if sublibrary dependency exist in each project
+checkSubLibraryDependencies :: HasLogFunc env => Map PackageName ProjectPackage -> RIO env ()
+checkSubLibraryDependencies proj = do
+  forM_ (Map.elems proj) $ \p -> do
+    C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
+
+    let dependencies = concatMap getDeps subLibs <>
+                       concatMap getDeps foreignLibs <>
+                       concatMap getDeps exes <>
+                       concatMap getDeps tests <>
+                       concatMap getDeps benches <>
+                       maybe [] C.condTreeConstraints lib
+        libraries = concatMap (toList . depLibraries) dependencies
+
+    when (subLibDepExist libraries)
+        (logWarn "SubLibrary dependency is not supported")
+  where
+    getDeps (_, C.CondNode _ dep _) = dep
+    subLibDepExist lib = 
+      foldr (\x z ->
+        case x of
+          C.LSubLibName _ -> True
+          C.LMainLibName -> z
+      ) False lib
