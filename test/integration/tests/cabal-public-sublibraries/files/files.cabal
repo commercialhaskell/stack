@@ -3,9 +3,15 @@ name:                files
 version:             0.1.0.0
 build-type:          Simple
 
-executable files-exe
+library
   hs-source-dirs:      src
-  main-is:             Main.hs
+  exposed-modules:     Lib
   build-depends:       base >= 4.7 && < 5
-                     , subproject:{subproject, hello, world} == 0.1.0.0
+  default-language:    Haskell2010
+
+library sub
+  visibility:          public
+  hs-source-dirs:      src
+  exposed-modules:     Sub
+  build-depends:       base >= 4.7 && < 5
   default-language:    Haskell2010
