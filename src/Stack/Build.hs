@@ -67,7 +67,7 @@ build msetLocalFiles = do
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
 
-    checkSubLibraryDependencies (smProject sourceMap)
+    checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -340,9 +340,9 @@ checkComponentsBuildable lps =
         ]
 
 -- Find if sublibrary dependency exist in each project
-checkSubLibraryDependencies :: HasLogFunc env => Map PackageName ProjectPackage -> RIO env ()
+checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies proj = do
-  forM_ (Map.elems proj) $ \p -> do
+  forM_ proj $ \p -> do
     C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
 
     let dependencies = concatMap getDeps subLibs <>
