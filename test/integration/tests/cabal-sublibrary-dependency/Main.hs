@@ -1,6 +1,11 @@
+import Control.Monad (unless)
+import Data.List (isInfixOf)
 import StackTest
--- import Subproject.Lib
 
 main :: IO ()
 main = do
-  stackErr ["build"]
+  stackErrStderr ["build"] $ \str ->
+    let msg = "SubLibrary dependency is not supported, this will almost certainly fail" in
+
+    unless (msg `isInfixOf` str) $
+    error $ "Expected a warning: \n" ++ show msg
