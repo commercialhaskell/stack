@@ -1436,7 +1436,6 @@ compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
         ACGhc version -> versionString version
-        ACGhcjs {} -> compilerVersionString compilerVersion
         ACGhcGit {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
@@ -1685,7 +1684,6 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-    , siGHCJSs :: Map Text (Map ActualCompiler DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -1696,11 +1694,10 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         (fmap unCabalStringMap -> siGHCs) <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
-        siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
         (fmap unCabalStringMap -> siStack) <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
         return SetupInfo {..}
 
--- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
+-- | For the @siGHCs@ field maps are deeply merged.
 -- For all fields the values from the first @SetupInfo@ win.
 instance Semigroup SetupInfo where
     l <> r =
@@ -1709,7 +1706,6 @@ instance Semigroup SetupInfo where
         , siSevenzDll = siSevenzDll l <|> siSevenzDll r
         , siMsys2 = siMsys2 l <> siMsys2 r
         , siGHCs = Map.unionWith (<>) (siGHCs l) (siGHCs r)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs l) (siGHCJSs r)
         , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
 
 instance Monoid SetupInfo where
@@ -1719,7 +1715,6 @@ instance Monoid SetupInfo where
         , siSevenzDll = Nothing
         , siMsys2 = Map.empty
         , siGHCs = Map.empty
-        , siGHCJSs = Map.empty
         , siStack = Map.empty
         }
     mappend = (<>)

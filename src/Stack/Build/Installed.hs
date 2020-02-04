@@ -24,7 +24,6 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.SourceMap (getPLIVersion, loadVersion)
 import           Stack.Types.Build
-import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
@@ -116,12 +115,10 @@ loadDatabase :: HasEnvConfig env
              -> [LoadHelper] -- ^ from parent databases
              -> RIO env ([LoadHelper], [DumpPackage])
 loadDatabase installMap mdb lhs0 = do
-    wc <- view $ actualCompilerVersionL.to whichCompiler
     pkgexe <- getGhcPkgExe
     (lhs1', dps) <- ghcPkgDump pkgexe (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage .| sink
-    let ghcjsHack = wc == Ghcjs && isNothing mdb
-    lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
+    lhs1 <- mapMaybeM (processLoadResult mdb) lhs1'
     let lhs = pruneDeps
             id
             lhId
@@ -139,23 +136,10 @@ loadDatabase installMap mdb lhs0 = do
 
 processLoadResult :: HasLogFunc env
                   => Maybe (InstalledPackageLocation, Path Abs Dir)
-                  -> Bool
                   -> (Allowed, LoadHelper)
                   -> RIO env (Maybe LoadHelper)
-processLoadResult _ _ (Allowed, lh) = return (Just lh)
-processLoadResult _ True (WrongVersion actual wanted, lh)
-    -- Allow some packages in the ghcjs global DB to have the wrong
-    -- versions.  Treat them as wired-ins by setting deps to [].
-    | fst (lhPair lh) `Set.member` ghcjsBootPackages = do
-        logWarn $
-            "Ignoring that the GHCJS boot package \"" <>
-            fromString (packageNameString (fst (lhPair lh))) <>
-            "\" has a different version, " <>
-            fromString (versionString actual) <>
-            ", than the resolver's wanted version, " <>
-            fromString (versionString wanted)
-        return (Just lh)
-processLoadResult mdb _ (reason, lh) = do
+processLoadResult _ (Allowed, lh) = return (Just lh)
+processLoadResult mdb (reason, lh) = do
     logDebug $
         "Ignoring package " <>
         fromString (packageNameString (fst (lhPair lh))) <>

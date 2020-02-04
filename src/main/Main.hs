@@ -726,8 +726,6 @@ execCmd ExecOpts {..} =
           (ExecCmd cmd, args) -> return (cmd, args)
           (ExecRun, args) -> getRunCmd args
           (ExecGhc, args) -> getGhcCmd eoPackages args
-          -- NOTE: This doesn't work for GHCJS, because it doesn't have
-          -- a runghcjs binary.
           (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
       runWithPath eoCwd $ exec cmd args

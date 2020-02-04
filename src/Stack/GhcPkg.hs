@@ -103,7 +103,6 @@ createDatabase (GhcPkgExe pkgPath) db = do
 -- | Get the environment variable to use for the package DB paths.
 ghcPkgPathEnvVar :: WhichCompiler -> Text
 ghcPkgPathEnvVar Ghc = "GHC_PACKAGE_PATH"
-ghcPkgPathEnvVar Ghcjs = "GHCJS_PACKAGE_PATH"
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database
 packageDbFlags :: [Path Abs Dir] -> [String]

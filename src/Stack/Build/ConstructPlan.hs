@@ -842,10 +842,6 @@ describeConfigDiff config old new
         go ("--ghc-options":x:xs) = go' Ghc x xs
         go ((T.stripPrefix "--ghc-option=" -> Just x):xs) = go' Ghc x xs
         go ((T.stripPrefix "--ghc-options=" -> Just x):xs) = go' Ghc x xs
-        go ("--ghcjs-option":x:xs) = go' Ghcjs x xs
-        go ("--ghcjs-options":x:xs) = go' Ghcjs x xs
-        go ((T.stripPrefix "--ghcjs-option=" -> Just x):xs) = go' Ghcjs x xs
-        go ((T.stripPrefix "--ghcjs-options=" -> Just x):xs) = go' Ghcjs x xs
         go (x:xs) = x : go xs
 
         go' wc x xs = checkKeepers wc x $ go xs
