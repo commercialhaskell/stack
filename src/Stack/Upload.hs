@@ -39,6 +39,7 @@ import           Network.HTTP.StackClient              (Request, RequestBody(Req
 import           Stack.Types.Config
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile, renameFile)
+import           System.Environment                    (lookupEnv)
 import           System.FilePath                       ((</>), takeFileName, takeDirectory)
 import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
@@ -63,6 +64,9 @@ instance FromJSON (FilePath -> HackageCreds) where
         <$> o .: "username"
         <*> o .: "password"
 
+withEnvVariable :: Text -> IO Text -> IO Text
+withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
+
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
 --
@@ -85,8 +89,8 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      username <- prompt "Hackage username: "
-      password <- promptPassword "Hackage password: "
+      username <- withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
+      password <- withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
       let hc = HackageCreds
             { hcUsername = username
             , hcPassword = password

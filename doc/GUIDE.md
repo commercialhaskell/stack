@@ -1756,6 +1756,13 @@ users. Here's a quick rundown:
   per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
+    * `username` and `password` can be read by environment
+
+    ```bash
+    export $HACKAGE_USERNAME="<username>"
+    export $HACKAGE_PASSWORD="<password>"
+    ```
+
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.

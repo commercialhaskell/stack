@@ -19,6 +19,8 @@ Major changes:
 
 * The `--setup-info-yaml` may specify multiple locations for `stack-setup.yaml` files.
 
+* The `stack upload` can read first reads environment Variable `$HACKAGE_USERNAME` and `$HACKAGE_PASSWORD` if they are missing only then asks for `username` or `password`
+
 Behavior changes:
 * Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)
