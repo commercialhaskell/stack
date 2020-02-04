@@ -2,4 +2,5 @@ import StackTest
 
 main :: IO ()
 main = do
-  stack ["build"]
+  putStrLn "Disabled: CI doesn't have GHC 8.8.1"
+  --stack ["build"]
