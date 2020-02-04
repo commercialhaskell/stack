@@ -76,7 +76,6 @@ runShellAndExit = do
                               ,"runCommand ''myEnv'' { "
                               ,"buildInputs = lib.optional stdenv.isLinux glibcLocales ++ inputs; "
                               ,T.pack platformVariantEnvVar <> "=''nix''; "
-                              ,T.pack inNixShellEnvVar <> "=1; "
                               ,if inContainer
                                   -- If shell is pure, this env var would not
                                   -- be seen by stack inside nix
