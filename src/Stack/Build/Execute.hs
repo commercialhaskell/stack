@@ -1558,7 +1558,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
-
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of

@@ -244,15 +244,16 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
       )
   where
     addBounds :: Set PackageName -> InstallMap -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages installMap installedMap dep@(Dependency name range) =
+    -- FIXME
+    addBounds internalPackages installMap installedMap dep@(Dependency name range _) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
           Nothing -> dep
-          Just version -> Dependency name $ simplifyVersionRange
+          Just version -> Dependency name (simplifyVersionRange
             $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
             $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
-              range
+              range) Set.empty
       where
         foundVersion =
           case Map.lookup name installMap of
