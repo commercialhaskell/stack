@@ -85,7 +85,6 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         , soptsSkipMsys = configSkipMsys
         , soptsResolveMissingGHC = Nothing
         , soptsGHCBindistURL = scoGHCBindistURL
-        , soptsGHCJSBootOpts = scoGHCJSBootOpts ++ ["--clean" | scoGHCJSBootClean]
         }
     let compiler = case wantedCompiler of
             WCGhc _ -> "GHC"

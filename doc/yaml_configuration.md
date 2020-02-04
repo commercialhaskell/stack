@@ -61,7 +61,6 @@ are currently four resolver types:
 * Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
 * No snapshot, just use packages shipped with the compiler
     * For GHC this looks like `resolver: ghc-7.10.2`
-    * For GHCJS this looks like `resolver: ghcjs-0.1.0_ghc-7.10.2`.
 * Custom snapshot, via a URL or relative file path. (See [pantry docs](pantry.md) for more information.)
 
 Each of these resolvers will also determine what constraints are placed on the
@@ -443,14 +442,12 @@ Specifies how the compiler version in the resolver is matched against concrete v
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-7.10.2` or `ghcjs-0.1.0.20150924_ghc-7.10.2` (version used
-for the 'old-base' version of GHCJS).  While it's useful to override the
-compiler for a variety of reasons, the main usecase is to use GHCJS with a
-stackage snapshot, like this:
+resolvers like `ghc-8.6.5`. This can be used to override the
+compiler for a Stackage snapshot, like this:
 
 ```yaml
-resolver: lts-3.10
-compiler: ghcjs-0.1.0.20150924_ghc-7.10.2
+resolver: lts-14.20
+compiler: ghc-8.6.4
 compiler-check: match-exact
 ```
 

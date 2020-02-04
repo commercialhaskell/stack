@@ -21,6 +21,8 @@ Major changes:
 
 * The `stack upload` can read first reads environment Variable `$HACKAGE_USERNAME` and `$HACKAGE_PASSWORD` if they are missing only then asks for `username` or `password`
 
+* Fully remove GHCJS support.
+
 Behavior changes:
 * Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)

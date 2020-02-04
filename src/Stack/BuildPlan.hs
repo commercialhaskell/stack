@@ -372,7 +372,6 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
     where
         compilerErrors compiler errs
             | whichCompiler compiler == Ghc = ghcErrors errs
-            -- FIXME not sure how to handle ghcjs boot packages
             | otherwise = Map.empty
 
         isGhcWiredIn p _ = p `Set.member` wiredInPackages

@@ -256,8 +256,6 @@ allExposedModules gpd = do
           pure $ compiler == GHC && version `withinRange` range
         ACGhcGit {} ->
           pure $ compiler == GHC
-        ACGhcjs version _ghcVersion ->
-          pure $ compiler == GHCJS && version `withinRange` range
       -- currently we don't do flag checking here
       checkCond other = Left other
       mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd

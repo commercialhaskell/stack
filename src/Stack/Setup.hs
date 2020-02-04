@@ -123,8 +123,6 @@ data SetupOpts = SetupOpts
     -- ^ Message shown to user for how to resolve the missing GHC
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
-    , soptsGHCJSBootOpts :: [String]
-    -- ^ Additional ghcjs-boot options, the default is "--clean"
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -136,12 +134,9 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | RequireCustomGHCVariant
                     | ProblemWhileDecompressing (Path Abs File)
                     | SetupInfoMissingSevenz
-                    | GHCJSRequiresStandardVariant
-                    | GHCJSNotBooted
                     | DockerStackExeNotFound Version Text
                     | UnsupportedSetupConfiguration
                     | InvalidGhcAt (Path Abs File) SomeException
-                    | NoLongerBuildGhcjs
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -180,10 +175,6 @@ instance Show SetupException where
         "Problem while decompressing " ++ toFilePath archive
     show SetupInfoMissingSevenz =
         "SetupInfo missing Sevenz EXE/DLL"
-    show GHCJSRequiresStandardVariant =
-        "stack does not yet support using --ghc-variant with GHCJS"
-    show GHCJSNotBooted =
-        "GHCJS does not yet have its boot packages installed.  Use \"stack setup\" to attempt to run ghcjs-boot."
     show (DockerStackExeNotFound stackVersion' osKey) = concat
         [ stackProgName
         , "-"
@@ -197,8 +188,6 @@ instance Show SetupException where
         "I don't know how to install GHC on your system configuration, please install manually"
     show (InvalidGhcAt compiler e) =
         "Found an invalid compiler at " ++ show (toFilePath compiler) ++ ": " ++ displayException e
-    show NoLongerBuildGhcjs =
-        "Since Stack 2.0, Stack does not support building GHCJS itself"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: NeedTargets
@@ -211,7 +200,9 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     let stackYaml = bcStackYaml bc
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
-    wc <- view $ wantedCompilerVersionL.to wantedToActual.whichCompilerL
+    wanted <- view wantedCompilerVersionL
+    actual <- either throwIO pure $ wantedToActual wanted
+    let wc = actual^.whichCompilerL
     let sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC config
             , soptsUseSystem = configSystemGHC config
@@ -224,7 +215,6 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsSkipMsys = configSkipMsys config
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsGHCBindistURL = Nothing
-            , soptsGHCJSBootOpts = ["--clean"]
             }
 
     (compilerPaths, ghcBin) <- ensureCompilerAndMsys sopts
@@ -451,7 +441,8 @@ ensureCompilerAndMsys
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
-  didWarn <- warnUnsupportedCompiler $ getGhcVersion $ wantedToActual $ soptsWantedCompiler sopts
+  actual <- either throwIO pure $ wantedToActual $ soptsWantedCompiler sopts
+  didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
 
   getSetupInfo' <- memoizeRef getSetupInfo
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
@@ -557,14 +548,14 @@ installGhcBindist sopts getSetupInfo' installed = do
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
     config <- view configL
     ghcVariant <- view ghcVariantL
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
     possibleCompilers <-
-            case whichCompiler $ wantedToActual wanted of
+            case wc of
                 Ghc -> do
                     ghcBuilds <- getGhcBuilds
                     forM ghcBuilds $ \ghcBuild -> do
                         ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
                         return (getInstalledTool installed ghcPkgName (isWanted . ACGhc), ghcBuild)
-                Ghcjs -> return []
     let existingCompilers = concatMap
             (\(installedCompiler, compilerBuild) ->
                 case (installedCompiler, soptsForceReinstall sopts) of
@@ -605,7 +596,7 @@ installGhcBindist sopts getSetupInfo' installed = do
                     (soptsStackYaml sopts)
                     suggestion
 
--- | Ensure compiler (ghc or ghcjs) is installed, without worrying about msys
+-- | Ensure compiler is installed, without worrying about msys
 ensureCompiler
   :: forall env. (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
@@ -613,7 +604,7 @@ ensureCompiler
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-        wc = whichCompiler $ wantedToActual wanted
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
 
     Platform expectedArch _ <- view platformL
 
@@ -667,18 +658,18 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
        _ -> installGhcBindist sopts getSetupInfo' installed
     paths <- extraDirs compilerTool
 
-    let wc = whichCompiler $ wantedToActual wanted
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
     menv0 <- view processContextL
     m <- either throwM return
        $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
     menv <- mkProcessContext (removeHaskellEnvVars m)
 
-    let names =
-          case wanted of
-            WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
-            WCGhcGit{} -> ["ghc"]
-            WCGhcjs{} -> ["ghcjs"]
-        loop [] = do
+    names <-
+      case wanted of
+        WCGhc version -> pure ["ghc-" ++ versionString version, "ghc"]
+        WCGhcGit{} -> pure ["ghc"]
+        WCGhcjs{} -> throwIO GhcjsNotSupported
+    let loop [] = do
           logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
           logError $ "Could not find it on the paths " <> displayShow (edBins paths)
           throwString "Could not find sandboxed compiler"
@@ -709,7 +700,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
           let prefix =
                 case wc of
                   Ghc -> "ghc-"
-                  Ghcjs -> "ghcjs-"
           fmap ("-" ++) $ stripPrefix prefix $ toFilePath $ filename compiler
         suffixes = maybe id (:) msuffixWithVersion [suffixNoVersion]
         findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
@@ -726,7 +716,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
           loop toTry
     pkg <- fmap GhcPkgExe $ findHelper $ \case
                                Ghc -> ["ghc-pkg"]
-                               Ghcjs -> ["ghcjs-pkg"]
 
     menv0 <- view processContextL
     menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
@@ -734,11 +723,9 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
     interpreter <- findHelper $
                    \case
                       Ghc -> ["runghc"]
-                      Ghcjs -> ["runghcjs"]
     haddock <- findHelper $
                \case
                   Ghc -> ["haddock", "haddock-ghc"]
-                  Ghcjs -> ["haddock-ghcjs"]
     infobs <- proc (toFilePath compiler) ["--info"]
             $ fmap (toStrictBytes . fst) . readProcess_
     infotext <-
@@ -771,7 +758,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
               logWarn "Key 'Project version' not found in GHC info"
               getCompilerVersion wc compiler
             Just versionString' -> ACGhc <$> parseVersionThrowing versionString'
-        Ghcjs -> getCompilerVersion wc compiler
     globaldb <-
       case eglobaldb of
         Left e -> do
@@ -1049,19 +1035,19 @@ sourceSystemCompilers
   -> ConduitT i (Path Abs File) (RIO env) ()
 sourceSystemCompilers wanted = do
   searchPath <- view exeSearchPathL
+  names <-
+    case wanted of
+      WCGhc version -> pure
+        [ "ghc-" ++ versionString version
+        , "ghc"
+        ]
+      WCGhcjs{} -> throwIO GhcjsNotSupported
+      WCGhcGit{} -> pure [] -- only use sandboxed versions
   for_ names $ \name -> for_ searchPath $ \dir -> do
     fp <- resolveFile' $ addExe $ dir FP.</> name
     exists <- doesFileExist fp
     when exists $ yield fp
   where
-    names =
-      case wanted of
-        WCGhc version ->
-          [ "ghc-" ++ versionString version
-          , "ghc"
-          ]
-        WCGhcjs{} -> ["ghcjs"]
-        WCGhcGit{} -> [] -- only use sandboxed versions
     addExe
       | osIsWindows = (++ ".exe")
       | otherwise = id
@@ -1171,7 +1157,7 @@ downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL =
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) (gdiDownloadInfo downloadInfo) tool (installer si)
 
-downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO NoLongerBuildGhcjs
+downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO GhcjsNotSupported
 
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
     error "downloadAndInstallCompiler: shouldn't be reached with ghc-git"
@@ -1734,7 +1720,6 @@ sanityCheck ghc = withSystemTempDir "stack-sanity-check" $ \dir -> do
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text
 removeHaskellEnvVars =
-    Map.delete "GHCJS_PACKAGE_PATH" .
     Map.delete "GHC_PACKAGE_PATH" .
     Map.delete "GHC_ENVIRONMENT" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .

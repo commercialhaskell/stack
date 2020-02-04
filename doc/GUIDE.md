@@ -520,7 +520,6 @@ There are actually other options available, and the list will grow over time.
 At the time of writing:
 
 * `ghc-X.Y.Z`, for requiring a specific GHC version but no additional packages
-* Experimental GHCJS support
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the

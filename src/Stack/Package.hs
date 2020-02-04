@@ -981,9 +981,6 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                     Impl flavor range ->
                       case (flavor, rcCompilerVersion rc) of
                         (GHC, ACGhc vghc) -> vghc `withinRange` range
-                        (GHC, ACGhcjs _ vghc) -> vghc `withinRange` range
-                        (GHCJS, ACGhcjs vghcjs _) ->
-                          vghcjs `withinRange` range
                         _ -> False
 
 -- | Try to resolve the list of base names in the given directory by

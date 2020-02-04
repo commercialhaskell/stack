@@ -269,16 +269,12 @@ getSetupExe setupHs setupShimHs tmpdir = do
         outputNameS =
             case wc of
                 Ghc -> exeNameS
-                Ghcjs -> baseNameS ++ ".jsexe"
-        jsExeNameS =
-            baseNameS ++ ".jsexe"
         setupDir =
             view stackRootL config </>
             relDirSetupExeCache </>
             platformDir
 
     exePath <- (setupDir </>) <$> parseRelFile exeNameS
-    jsExePath <- (setupDir </>) <$> parseRelDir jsExeNameS
 
     exists <- liftIO $ D.doesFileExist $ toFilePath exePath
 
@@ -287,7 +283,6 @@ getSetupExe setupHs setupShimHs tmpdir = do
         else do
             tmpExePath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ exeNameS
             tmpOutputPath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ outputNameS
-            tmpJsExePath <- fmap (setupDir </>) $ parseRelDir $ "tmp-" ++ jsExeNameS
             ensureDir setupDir
             let args = buildSetupArgs ++
                     [ "-package"
@@ -296,15 +291,13 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath setupShimHs
                     , "-o"
                     , toFilePath tmpOutputPath
-                    ] ++
-                    ["-build-runner" | wc == Ghcjs]
+                    ]
             compilerPath <- getCompilerPath
             withWorkingDir (toFilePath tmpdir) (proc (toFilePath compilerPath) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece ->
                     throwM $ SetupHsBuildFailure (eceExitCode ece) Nothing compilerPath args Nothing []
-            when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
 
@@ -888,7 +881,6 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                   [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
                   , "--with-ghc-pkg=" ++ toFilePath pkgPath
                   ]
-                Ghcjs -> []
         exes <- forM programNames $ \name -> do
             mpath <- findExecutable name
             return $ case mpath of
@@ -1335,7 +1327,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                         then return outputFile
                         else do
                             ensureDir setupDir
-                            compiler <- view $ actualCompilerVersionL.whichCompilerL
                             compilerPath <- view $ compilerPathsL.to cpCompiler
                             packageArgs <- getPackageArgs setupDir
                             runExe compilerPath $
@@ -1351,9 +1342,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                                 , "-o", toFilePath outputFile
                                 , "-threaded"
                                 ] ++
-                                (case compiler of
-                                    Ghc -> []
-                                    Ghcjs -> ["-build-runner"]) ++
 
                                 -- Apply GHC options
                                 -- https://github.com/commercialhaskell/stack/issues/4526
@@ -1799,22 +1787,20 @@ getExecutableBuildStatuses
     :: HasEnvConfig env
     => Package -> Path Abs Dir -> RIO env (Map Text ExecutableBuildStatus)
 getExecutableBuildStatuses package pkgDir = do
-    compiler <- view $ actualCompilerVersionL.whichCompilerL
     distDir <- distDirFromDir pkgDir
     platform <- view platformL
     fmap
         M.fromList
-        (mapM (checkExeStatus compiler platform distDir) (Set.toList (packageExes package)))
+        (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
 
 -- | Check whether the given executable is defined in the given dist directory.
 checkExeStatus
     :: HasLogFunc env
-    => WhichCompiler
-    -> Platform
+    => Platform
     -> Path b Dir
     -> Text
     -> RIO env (Text, ExecutableBuildStatus)
-checkExeStatus compiler platform distDir name = do
+checkExeStatus platform distDir name = do
     exename <- parseRelDir (T.unpack name)
     exists <- checkPath (distDir </> relDirBuild </> exename)
     pure
@@ -1824,18 +1810,13 @@ checkExeStatus compiler platform distDir name = do
               else ExecutableNotBuilt)
   where
     checkPath base =
-        case compiler of
-            Ghcjs -> do
-                dir <- parseRelDir (file ++ ".jsexe")
-                doesDirExist (base </> dir)
-            _ ->
-                case platform of
-                    Platform _ Windows -> do
-                        fileandext <- parseRelFile (file ++ ".exe")
-                        doesFileExist (base </> fileandext)
-                    _ -> do
-                        fileandext <- parseRelFile file
-                        doesFileExist (base </> fileandext)
+        case platform of
+            Platform _ Windows -> do
+                fileandext <- parseRelFile (file ++ ".exe")
+                doesFileExist (base </> fileandext)
+            _ -> do
+                fileandext <- parseRelFile file
+                doesFileExist (base </> fileandext)
       where
         file = T.unpack name
 

@@ -468,8 +468,11 @@ withDotConfig opts inner =
       bconfig <- view buildConfigL
       globals <- globalsFromHints $ smwCompiler $ bcSMWanted bconfig
       fakeGhcPkgId <- parseGhcPkgId "ignored"
+      actual <- either throwIO pure $
+                wantedToActual $ smwCompiler $
+                bcSMWanted bconfig
       let smActual = SMActual
-            { smaCompiler = wantedToActual $ smwCompiler $ bcSMWanted bconfig
+            { smaCompiler = actual
             , smaProject = smwProject $ bcSMWanted bconfig
             , smaDeps = smwDeps $ bcSMWanted bconfig
             , smaGlobal = Map.mapWithKey toDump globals

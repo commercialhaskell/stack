@@ -21,7 +21,6 @@ module Stack.Constants.Config
 
 import Stack.Prelude
 import Stack.Constants
-import Stack.Types.Compiler
 import Stack.Types.Config
 import Path
 
@@ -130,11 +129,9 @@ distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 distRelativeDir = do
     cabalPkgVer <- view cabalVersionL
     platform <- platformGhcRelDir
-    wc <- view $ actualCompilerVersionL.to whichCompiler
-    -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
+    -- Cabal version
     envDir <-
         parseRelDir $
-        (if wc == Ghcjs then (++ "_ghcjs") else id) $
         packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
