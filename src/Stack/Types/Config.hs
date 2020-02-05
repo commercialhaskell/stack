@@ -188,7 +188,6 @@ import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
 import           Data.Coerce (coerce)
 import           Data.List (stripPrefix)
-import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -196,7 +195,6 @@ import qualified Data.Monoid as Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.License as C
@@ -208,7 +206,7 @@ import qualified Distribution.Text
 import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Lens.Micro (Lens', lens, _1, _2, to)
+import           Lens.Micro
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
@@ -411,7 +409,7 @@ instance FromJSON CabalConfigKey where
 instance FromJSONKey CabalConfigKey where
   fromJSONKey = FromJSONKeyTextParser parseCabalConfigKey
 
-parseCabalConfigKey :: Monad m => Text -> m CabalConfigKey
+parseCabalConfigKey :: (Monad m, MonadFail m) => Text -> m CabalConfigKey
 parseCabalConfigKey "$targets" = pure CCKTargets
 parseCabalConfigKey "$locals" = pure CCKLocals
 parseCabalConfigKey "$everything" = pure CCKEverything
@@ -987,7 +985,7 @@ parseConfigMonoidObject rootDir obj = do
 
     return ConfigMonoid {..}
   where
-    handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
+    handleExplicitSetupDep :: (Monad m, MonadFail m) => (Text, Bool) -> m (Maybe PackageName, Bool)
     handleExplicitSetupDep (name', b) = do
         name <-
             if name' == "*"

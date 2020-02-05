@@ -33,7 +33,7 @@ import           Stack.Storage.User (upgradeChecksSince, logUpgradeCheck)
 import           Stack.Types.Config
 import           Stack.Types.Docker (dockerEnable)
 import           Stack.Types.Nix (nixEnable)
-import           Stack.Types.Version (stackMinorVersion, stackVersion, minorVersion)
+import           Stack.Types.Version (stackMinorVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 

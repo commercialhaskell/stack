@@ -63,7 +63,7 @@ import           Data.List (intercalate)
 import           Data.Text (pack)
 import           Stack.Prelude
 import           System.FilePath (takeExtension)
-import           System.IO (stderr, hPutStrLn)
+import           System.IO (hPutStrLn)
 
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid

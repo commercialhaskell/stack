@@ -21,7 +21,6 @@ import           Data.Aeson (Value (Object, Array), (.=), object)
 import qualified Data.HashMap.Strict as HM
 import           Data.List ((\\), isPrefixOf)
 import           Data.List.Extra (groupSort)
-import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set

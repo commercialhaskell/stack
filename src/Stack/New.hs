@@ -17,7 +17,6 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
-import           Control.Monad (void)
 import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit

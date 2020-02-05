@@ -15,7 +15,6 @@ module Stack.Nix
 import           Stack.Prelude
 import qualified Data.Text as T
 import           Data.Version (showVersion)
-import           Lens.Micro (set)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Config (getInContainer, withBuildConfig)

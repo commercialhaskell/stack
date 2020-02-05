@@ -40,14 +40,14 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
-import           Data.List.NonEmpty (NonEmpty(..), nonEmpty)
+import           Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty (toList)
 import           Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding (decodeUtf8)
 import           Data.Tuple
 import           Data.Time (ZonedTime, getZonedTime, formatTime, defaultTimeLocale)
 import qualified Data.ByteString.Char8 as S8
@@ -89,7 +89,6 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
 import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
-import           System.IO (stderr, stdout)
 import           System.IO.Error (isDoesNotExistError)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)

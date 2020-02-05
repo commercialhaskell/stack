@@ -27,7 +27,6 @@ import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
-import           Data.Text.Encoding                    (encodeUtf8)
 import           Network.HTTP.StackClient              (Request, RequestBody(RequestBodyLBS), Response, withResponse, httpNoBody, getGlobalManager, getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
@@ -41,7 +40,7 @@ import           System.Directory                      (createDirectoryIfMissing
                                                         removeFile, renameFile)
 import           System.Environment                    (lookupEnv)
 import           System.FilePath                       ((</>), takeFileName, takeDirectory)
-import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
+import           System.IO                             (putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
 
 -- | Username and password to log into Hackage.

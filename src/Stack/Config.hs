@@ -44,7 +44,6 @@ import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text

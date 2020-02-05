@@ -1,0 +1,18 @@
+resolver: snapshot-nightly.yaml
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build-small:lts-14.22
+
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+
+ghc-options:
+   "$locals": -fhide-source-paths

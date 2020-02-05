@@ -19,7 +19,7 @@ import           Data.List
 import qualified Data.Set as S
 import           Path
 import           Stack.Prelude
-import           System.IO (BufferMode (..), hSetBinaryMode)
+import           System.IO (hSetBinaryMode)
 
 import           Distribution.ModuleName hiding (toFilePath)
 

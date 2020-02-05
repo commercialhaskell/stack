@@ -11,7 +11,7 @@ module Stack.Types.Version
   ,IntersectingVersionRange(..)
   ,VersionCheck(..)
   ,versionRangeText
-  ,withinRange
+  ,Cabal.withinRange
   ,Stack.Types.Version.intersectVersionRanges
   ,toMajorVersion
   ,latestApplicableVersion
@@ -29,7 +29,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Pretty (pretty)
 import qualified Distribution.Version as Cabal
-import           Distribution.Version (Version, versionNumbers, withinRange)
 import qualified Paths_stack as Meta
 import           Text.PrettyPrint (render)
 
@@ -56,7 +55,7 @@ intersectVersionRanges x y = Cabal.simplifyVersionRange $ Cabal.intersectVersion
 -- | Returns the first two components, defaulting to 0 if not present
 toMajorVersion :: Version -> Version
 toMajorVersion v =
-  case versionNumbers v of
+  case Cabal.versionNumbers v of
     []    -> Cabal.mkVersion [0, 0]
     [a]   -> Cabal.mkVersion [a, 0]
     a:b:_ -> Cabal.mkVersion [a, b]
@@ -64,12 +63,12 @@ toMajorVersion v =
 -- | Given a version range and a set of versions, find the latest version from
 -- the set that is within the range.
 latestApplicableVersion :: Cabal.VersionRange -> Set Version -> Maybe Version
-latestApplicableVersion r = find (`withinRange` r) . Set.toDescList
+latestApplicableVersion r = find (`Cabal.withinRange` r) . Set.toDescList
 
 -- | Get the next major version number for the given version
 nextMajorVersion :: Version -> Version
 nextMajorVersion v =
-  case versionNumbers v of
+  case Cabal.versionNumbers v of
     []    -> Cabal.mkVersion [0, 1]
     [a]   -> Cabal.mkVersion [a, 1]
     a:b:_ -> Cabal.mkVersion [a, b + 1]
@@ -94,7 +93,7 @@ instance FromJSON VersionCheck where
         expected = "VersionCheck value (match-minor, match-exact, or newer-minor)"
 
 checkVersion :: VersionCheck -> Version -> Version -> Bool
-checkVersion check (versionNumbers -> wanted) (versionNumbers -> actual) =
+checkVersion check (Cabal.versionNumbers -> wanted) (Cabal.versionNumbers -> actual) =
     case check of
         MatchMinor -> and (take 3 matching)
         MatchExact -> length wanted == length actual && and matching
@@ -113,7 +112,7 @@ checkVersion check (versionNumbers -> wanted) (versionNumbers -> actual) =
 
 -- | Get minor version (excludes any patchlevel)
 minorVersion :: Version -> Version
-minorVersion = Cabal.mkVersion . take 3 . versionNumbers
+minorVersion = Cabal.mkVersion . take 3 . Cabal.versionNumbers
 
 -- | Current Stack version
 stackVersion :: Version

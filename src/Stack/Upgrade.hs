@@ -12,7 +12,6 @@ module Stack.Upgrade
 import           Stack.Prelude               hiding (force, Display (..))
 import qualified Data.Text as T
 import           Distribution.Version        (mkVersion')
-import           Lens.Micro                  (set)
 import           Options.Applicative
 import           Path
 import qualified Paths_stack as Paths

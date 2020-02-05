@@ -7,7 +7,7 @@ import           Data.Char (isSpace)
 import           Data.List.Split (splitOn)
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Types.PackageName(PackageName, mkPackageName)
+import           Distribution.Types.PackageName(mkPackageName)
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot

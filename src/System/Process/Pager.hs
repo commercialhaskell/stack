@@ -16,8 +16,6 @@ import System.Process ( createProcess, cmdspec, shell, proc, waitForProcess
                       , StdStream (CreatePipe)
                       , CreateProcess (std_in, close_fds, delegate_ctlc)
                       )
-import System.IO (stdout)
-import Control.Applicative ((<|>))
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT, MaybeT))
 import qualified Data.Text.IO as T
 
