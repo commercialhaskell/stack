@@ -1,35 +1,13 @@
-resolver: lts-11.22
-name: snapshot-for-building-stack-with-ghc-8.2.2
+resolver: lts-14.22
+name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:
-- ansi-terminal-0.9@rev:0
 - Cabal-3.0.0.0@rev:0
-- infer-license-0.2.0@rev:0 #for hpack-0.31
-- hpack-0.32.0@sha256:31178d0c454ec1fd2222e7c4bdd4db937b030a43cc79cb5bb62b8048c38cd64b,4406
-- githash-0.1.3.0@rev:0
-- rio-orphans-0.1.1.0@sha256:15600084c56ef4e1f22ac2091d10fa6ed62f01f531d819c6a5a19492212a76c9
-- yaml-0.10.4.0@rev:0 #for hpack-0.31
-- tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
-- hackage-security-0.5.3.0@rev:6
-- http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.8@sha256:471f182dabe23bac29d47ae55a33d11f85a0b0ab64d3b8f2907b437ab47d5ba7,1467
-- unliftio-0.2.12@rev:0 #for rio-0.1.11.0
-- happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f,4667
-- fsnotify-0.3.0.1@rev:1
-- process-1.6.3.0@sha256:fc77cfe75a9653b8c54ae455ead8c06cb8adc4d7a340984d84d8ca880b579919,2370 #because of https://github.com/haskell/process/pull/101
-- persistent-2.9.2@rev:0
-- persistent-sqlite-2.9.3@rev:0
-- rio-0.1.11.0@rev:0
-- ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
-- hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
-- typed-process-0.2.6.0@rev:0 # for rio-0.1.10.0
-- rio-prettyprint-0.1.0.0@rev:0
-- hi-file-parser-0.1.0.0@rev:0
-- http-download-0.1.0.0@rev:0
+- hpack-0.33.0@rev:0
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - github: commercialhaskell/pantry
-  commit: bd6a81b85b1dc881a9e95b98887eac6bb924a917
+  commit: 86462a97c4d8091993cc6e246fd0f2ae5aa608f0
 - github: fpco/casa
   commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
   subdirs:
