@@ -13,11 +13,11 @@ module Stack.Lock
 import Pantry.Internal.AesonExtended
 import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
-import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import Pantry
-import Path (addFileExtension, parent)
+import Path (parent)
+import Path.Extended (addExtension)
 import Path.IO (doesFileExist)
 import Stack.Prelude
 import Stack.SourceMap
@@ -95,7 +95,7 @@ lockCachedWanted ::
         -> RIO env ( SMWanted, [CompletedPLI]))
     -> RIO env SMWanted
 lockCachedWanted stackFile resolver fillWanted = do
-    lockFile <- liftIO $ addFileExtension "lock" stackFile
+    lockFile <- liftIO $ addExtension ".lock" stackFile
     let getLockExists = doesFileExist lockFile
     lfb <- view lockFileBehaviorL
     readLockFile <-

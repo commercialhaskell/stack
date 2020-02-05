@@ -26,7 +26,6 @@ import           Data.Aeson
 import           Database.Persist
 import           Database.Persist.Sql
 import qualified Data.Text as T
-import           Data.Text (Text)
 import           Stack.Prelude
 import           Stack.Types.Version
 import           Distribution.Version (mkVersion)

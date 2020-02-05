@@ -1,0 +1,37 @@
+resolver: lts-15.2
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build-small:lts-15.0
+
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
+- pantry-0.3.0.0@rev:0
+- casa-client-0.0.1@rev:0
+- casa-types-0.0.1@rev:0
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- hackage-security-0.6.0.0@rev:0
+- hpack-0.33.0@rev:0
+- lukko-0.1.1.1@rev:0
+- regex-applicative-text-0.1.0.1@sha256:52463fdc8daf130f40b82fec84bad2d4b8600227751c2a5b04679a1de8bd7f7a,1155
+- http-download-0.2.0.0@sha256:54f94fbb3f28c5da2002d9f1c9ed1d72f8abfb0c41eefe40073e26500b015b63,1802
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
+
+# Force usage of Cabal that ships with GHC 8.8.2 to speed up builds
+- Cabal

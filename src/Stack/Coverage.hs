@@ -46,6 +46,15 @@ import           RIO.Process
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
+newtype CoverageException = NonTestSuiteTarget PackageName deriving Typeable
+
+instance Exception CoverageException
+instance Show CoverageException where
+    show (NonTestSuiteTarget name) = 
+        "Can't specify anything except test-suites as hpc report targets (" ++
+        packageNameString name ++
+        " is used with a non test-suite target)"
+
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: HasEnvConfig env => RIO env ()
 deleteHpcReports = do
@@ -235,10 +244,8 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                              case nc of
                                  CTest testName ->
                                      liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
-                                 _ -> fail $
-                                     "Can't specify anything except test-suites as hpc report targets (" ++
-                                     packageNameString name ++
-                                     " is used with a non test-suite target)"
+                                 _ -> throwIO $ NonTestSuiteTarget name
+                                     
                      TargetAll PTProject -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath

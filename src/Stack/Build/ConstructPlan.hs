@@ -22,12 +22,9 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
-import           Distribution.Types.PackageId (pkgVersion)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)

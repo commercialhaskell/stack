@@ -41,8 +41,6 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
 import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcessWait_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL, waitExitCode)
-import           Data.Text.Encoding (decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T

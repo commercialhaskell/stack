@@ -18,7 +18,6 @@ import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List
-import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (parent, (</>))

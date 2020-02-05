@@ -25,7 +25,7 @@ import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Options.Applicative.Builder.Extra
-import           Pantry (completeSnapshotLocation, loadSnapshot)
+import           Pantry (loadSnapshot)
 import           Path
 import qualified RIO.Map as Map
 import           RIO.Process (envVarsL)
