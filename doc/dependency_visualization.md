@@ -5,6 +5,8 @@
 You can use stack to visualize the dependencies between your packages and
 optionally also external dependencies.
 
+First, you need [Graphviz](https://www.graphviz.org/). You can [get it here](https://www.graphviz.org/download/).
+
 As an example, let's look at `wreq`:
 
 ```
