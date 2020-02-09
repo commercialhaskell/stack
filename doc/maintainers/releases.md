@@ -4,6 +4,7 @@
 
 ## Upcoming release tasks:
 
+* @nh2 says: "For the next static stack release we need to have unix-compat >= 0.5.2, because 0.5.1 breaks with musl (because it tries to use something as a symbol that is a C macro).  https://github.com/nh2/static-haskell-nix/issues/79  In my CI I've just bumped unix-compat accordingly: https://github.com/nh2/static-haskell-nix/pull/80/files"
 * Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 2.1.x.  Directories, and last Stack version uploaded:
 	- `s3://download.fpcomplete.com/archlinux` (1.0.0)
 	- `s3://download.fpcomplete.com/centos` (1.5.1)
