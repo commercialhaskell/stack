@@ -90,6 +90,7 @@ import           System.Environment (getExecutablePath, lookupEnv)
 import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
 import           System.IO (stderr, stdout)
+import           System.IO.Error (isDoesNotExistError)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
@@ -846,6 +847,9 @@ ensureConfig :: HasEnvConfig env
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
+    setupConfigfp <- setupConfigFromDir pkgDir
+    newSetupConfigMod <- liftIO $ either (const Nothing) (Just . modificationTime) <$>
+      tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
     -- See https://github.com/commercialhaskell/stack/issues/3554
     taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
@@ -864,8 +868,13 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
 
                 mOldCabalMod <- tryGetCabalMod pkgDir
 
+                -- Cabal's setup-config is created per OS/Cabal version, multiple
+                -- projects using the same package could get a conflict because of this
+                mOldSetupConfigMod <- tryGetSetupConfigMod pkgDir
+
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
+                      || mOldSetupConfigMod /= newSetupConfigMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
 
     when (taskBuildTypeConfig task) ensureConfigureScript
