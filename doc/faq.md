@@ -581,3 +581,19 @@ It's possible to bypass the warning for a specific version of GHC by modifying a
 **Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.** You should apply this fix for the version of GHC that matches your resolver.
 
 Issue [#4009](https://github.com/commercialhaskell/stack/issues/4009) on GitHub goes into further detail.
+
+## How do I install ghc in stack when it fails with the error: Missing ghc bindist for "linux64-ncurses6"?
+
+Example Error:
+```
+No setup information found for ghc-8.6.4 on your platform.
+This probably means a GHC bindist has not yet been added for OS key 'linux64-ncurses6'.
+Supported versions: ghc-7.10.3, ghc-8.0.1, ghc-8.0.2, ghc-8.2.1, ghc-8.2.2
+```
+
+Most Linux distributions have standardized on providing libtinfo.so.6 (either directly or as a symlink to libncursesw.so.6). As such, there aren't GHC 8.6.* bindists that link to libncursesw.so.6 available. 
+
+So creating a symlink to libncursesw.so.6 as libtinfo.so.6 can prevent this error (root privileges might be required).
+```
+ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.6
+```
