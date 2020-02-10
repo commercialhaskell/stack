@@ -48,6 +48,16 @@ runShellAndExit = do
              traverse (resolveFile projectRoot) $ nixInitFile (configNix config)
          Nothing -> pure Nothing
 
+     -- See: https://github.com/NixOS/nixpkgs/blob/master/lib/fetchers.nix
+     -- This looks up the proxy env vars and returns a list of tuples
+     -- containing the var name and its env value, for those that exist in the
+     -- environment
+     proxyImpureEnvVars <- do
+       let varNames = ["http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"]
+       proxyVars <- forM varNames $ \n -> do
+          fmap (\v -> (T.pack n, T.pack v)) <$> liftIO (lookupEnv n)
+       pure $ catMaybes proxyVars
+
      -- This will never result in double loading the build config, since:
      --
      -- 1. This function explicitly takes a Config, not a HasConfig
@@ -87,6 +97,8 @@ runShellAndExit = do
                               ,"STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
                                -- overriding default locale so Unicode output using base won't be broken
                               ,"LANG=\"en_US.UTF-8\";"
+                              -- Set the impure proxy env vars
+                              ,T.concat (map (\(n, v) -> n <> "=\"" <> v <> "\";") proxyImpureEnvVars)
                               ,"} \"\""]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else []
