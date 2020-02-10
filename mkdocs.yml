@@ -44,6 +44,7 @@ pages:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
     - Add GHC version: maintainers/ghc.md
+    - Docker images: maintainers/docker.md
     - Upgrading msys: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
 
