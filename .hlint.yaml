@@ -82,3 +82,7 @@
 - error: {lhs: "Network.HTTP.Types.hContentMD5", rhs: "Network.HTTP.StackClient.hContentMD5"}
 - error: {lhs: "Network.HTTP.Types.methodPut", rhs: "Network.HTTP.StackClient.methodPut"}
 - ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
+
+# Gives an incorrect hint that breaks type checking due to mismatched types
+- ignore: {name: "Too strict maybe", within: "Stack.Package" }
+- ignore: {name: "Too strict maybe", within: "Stack.Config" }
