@@ -31,14 +31,12 @@ module Stack.Setup
 import qualified    Codec.Archive.Tar as Tar
 import              Conduit
 import              Control.Applicative (empty)
-import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Pantry.Internal.AesonExtended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
-import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
@@ -50,7 +48,6 @@ import qualified    Data.Set as Set
 import qualified    Data.Text as T
 import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
-import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
@@ -61,12 +58,11 @@ import              Lens.Micro (set)
 import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
                                               drRetryPolicyDefault, getResponseBody, getResponseStatusCode,
                                               httpLbs, httpJSON, parseRequest, parseUrlThrow, setGithubHeaders,
-                                              verifiedDownload, withResponse)
+                                              verifiedDownloadWithProgress, withResponse)
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
-import              Prelude (until)
 import qualified    Pantry
 import qualified    RIO
 import              RIO.List
@@ -95,7 +91,6 @@ import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Permissions (setFileExecutable)
-import              Text.Printf (printf)
 import              System.Uname (getRelease)
 import              Data.List.Split (splitOn)
 
@@ -1619,85 +1614,12 @@ chattyDownload label downloadInfo path = do
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
-    x <- verifiedDownload dReq path chattyDownloadProgress
+    x <- verifiedDownloadWithProgress dReq path label mtotalSize
     if x
         then logStickyDone ("Downloaded " <> RIO.display label <> ".")
         else logStickyDone "Already downloaded."
   where
     mtotalSize = downloadInfoContentLength downloadInfo
-    chattyDownloadProgress _ = do
-        _ <- logSticky $ RIO.display label <> ": download has begun"
-        CL.map (Sum . S.length)
-          .| chunksOverTime 1
-          .| go
-      where
-        go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
-            modify (+ size)
-            totalSoFar <- get
-            logSticky $ fromString $
-                case mtotalSize of
-                    Nothing -> chattyProgressNoTotal totalSoFar
-                    Just 0 -> chattyProgressNoTotal totalSoFar
-                    Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
-
-        -- Example: ghc: 42.13 KiB downloaded...
-        chattyProgressNoTotal totalSoFar =
-            printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-                   (T.unpack label)
-
-        -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
-        chattyProgressWithTotal totalSoFar total =
-          printf ("%s: " <>
-                  bytesfmt "%7.2f" totalSoFar <> " / " <>
-                  bytesfmt "%.2f" total <>
-                  " (%6.2f%%) downloaded...")
-                 (T.unpack label)
-                 percentage
-          where percentage :: Double
-                percentage = fromIntegral totalSoFar / fromIntegral total * 100
-
--- | Given a printf format string for the decimal part and a number of
--- bytes, formats the bytes using an appropriate unit and returns the
--- formatted string.
---
--- >>> bytesfmt "%.2" 512368
--- "500.359375 KiB"
-bytesfmt :: Integral a => String -> a -> String
-bytesfmt formatter bs = printf (formatter <> " %s")
-                               (fromIntegral (signum bs) * dec :: Double)
-                               (bytesSuffixes !! i)
-  where
-    (dec,i) = getSuffix (abs bs)
-    getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
-      where p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
-    bytesSuffixes :: [String]
-    bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
-
--- Await eagerly (collect with monoidal append),
--- but space out yields by at least the given amount of time.
--- The final yield may come sooner, and may be a superfluous mempty.
--- Note that Integer and Float literals can be turned into NominalDiffTime
--- (these literals are interpreted as "seconds")
-chunksOverTime :: (Monoid a, Semigroup a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
-chunksOverTime diff = do
-    currentTime <- liftIO getCurrentTime
-    evalStateC (currentTime, mempty) go
-  where
-    -- State is a tuple of:
-    -- * the last time a yield happened (or the beginning of the sink)
-    -- * the accumulated awaits since the last yield
-    go = await >>= \case
-      Nothing -> do
-        (_, acc) <- get
-        yield acc
-      Just a -> do
-        (lastTime, acc) <- get
-        let acc' = acc <> a
-        currentTime <- liftIO getCurrentTime
-        if diff < diffUTCTime currentTime lastTime
-          then put (currentTime, mempty) >> yield acc'
-          else put (lastTime,    acc')
-        go
 
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (HasProcessContext env, HasLogFunc env)

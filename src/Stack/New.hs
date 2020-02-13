@@ -30,15 +30,17 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (DownloadException (..), Request, HttpException,
-                                           getResponseStatusCode, getResponseBody, httpLbs,
-                                           parseRequest, parseUrlThrow, redownload, setGithubHeaders)
+import           Network.HTTP.StackClient (DownloadRequest (..), DownloadException (..), Request, HttpException,
+                                           drRetryPolicyDefault, getResponseStatusCode, getResponseBody, httpLbs,
+                                           parseRequest, parseUrlThrow, verifiedDownloadWithProgress, setGithubHeaders)
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
+import           System.PosixCompat.Files (getFileStatus, fileSize)
+import           System.Posix.Types (COff (..))
 import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
@@ -155,9 +157,20 @@ loadTemplate name logIt = do
         downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
+        fs <- liftIO $ getFileStatus (toFilePath path)
+        let (COff size) = fileSize fs
+            downloadFileSize = fromIntegral size
+            dReq = DownloadRequest
+              { drRequest = req
+              , drHashChecks = []
+              , drLengthCheck = Just downloadFileSize
+              , drRetryPolicy = drRetryPolicyDefault
+              }
         logIt RemoteTemp
         catch
-          (void $ redownload req path)
+          (void $
+            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) (Just downloadFileSize)
+          )
           (useCachedVersionOrThrow path)
 
         loadLocalFile path
