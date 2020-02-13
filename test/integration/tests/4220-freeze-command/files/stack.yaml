@@ -1,6 +1,6 @@
 # NOTE: if you update the resolver, also update the test code to reflect
 # changed hashes
-resolver: lts-11.19
+resolver: lts-14.22
 packages:
 - .
 extra-deps:
