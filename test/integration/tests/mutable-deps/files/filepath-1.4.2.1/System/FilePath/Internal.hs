@@ -1,3 +1,6 @@
+#if __GLASGOW_HASKELL__ >= 704
+{-# LANGUAGE Safe #-}
+#endif
 {-# LANGUAGE PatternGuards #-}
 
 -- This template expects CPP definitions for:
@@ -50,7 +53,7 @@
 -- /Example 2:/ Download a file from @url@ and save it to disk:
 --
 -- @do let file = 'makeValid' url
---   System.IO.createDirectoryIfMissing True ('takeDirectory' file)@
+--   System.Directory.createDirectoryIfMissing True ('takeDirectory' file)@
 --
 -- /Example 3:/ Compile a Haskell file, putting the @.hi@ file under @interface@:
 --
@@ -72,7 +75,7 @@ module System.FilePath.MODULE_NAME
     -- * Extension functions
     splitExtension,
     takeExtension, replaceExtension, (-<.>), dropExtension, addExtension, hasExtension, (<.>),
-    splitExtensions, dropExtensions, takeExtensions, replaceExtensions,
+    splitExtensions, dropExtensions, takeExtensions, replaceExtensions, isExtensionOf,
     stripExtension,
 
     -- * Filename\/directory functions
@@ -102,7 +105,7 @@ module System.FilePath.MODULE_NAME
 
 import Data.Char(toLower, toUpper, isAsciiLower, isAsciiUpper)
 import Data.Maybe(isJust)
-import Data.List(stripPrefix)
+import Data.List(stripPrefix, isSuffixOf)
 
 import System.Environment(getEnv)
 
@@ -143,7 +146,6 @@ pathSeparator = if isWindows then '\\' else '/'
 -- > Windows: pathSeparators == ['\\', '/']
 -- > Posix:   pathSeparators == ['/']
 -- > pathSeparator `elem` pathSeparators
-{-# ANN pathSeparators "HLint: ignore" #-}
 pathSeparators :: [Char]
 pathSeparators = if isWindows then "\\/" else "/"
 
@@ -310,6 +312,18 @@ addExtension file xs@(x:_) = joinDrive a res
 hasExtension :: FilePath -> Bool
 hasExtension = any isExtSeparator . takeFileName
 
+
+-- | Does the given filename have the specified extension?
+--
+-- > "png" `isExtensionOf` "/directory/file.png" == True
+-- > ".png" `isExtensionOf` "/directory/file.png" == True
+-- > ".tar.gz" `isExtensionOf` "bar/foo.tar.gz" == True
+-- > "ar.gz" `isExtensionOf` "bar/foo.tar.gz" == False
+-- > "png" `isExtensionOf` "/directory/file.png.jpg" == False
+-- > "csv/table.csv" `isExtensionOf` "/data/csv/table.csv" == False
+isExtensionOf :: String -> FilePath -> Bool
+isExtensionOf ext@('.':_) = isSuffixOf ext . takeExtensions
+isExtensionOf ext         = isSuffixOf ('.':ext) . takeExtensions
 
 -- | Drop the given extension from a FilePath, and the @\".\"@ preceding it.
 --   Returns 'Nothing' if the FilePath does not have the given extension, or
@@ -1023,6 +1037,5 @@ breakEnd p = spanEnd (not . p)
 -- | The stripSuffix function drops the given suffix from a list. It returns
 -- Nothing if the list did not end with the suffix given, or Just the list
 -- before the suffix, if it does.
-{-# ANN stripSuffix "HLint: ignore" #-}
 stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
 stripSuffix xs ys = fmap reverse $ stripPrefix (reverse xs) (reverse ys)
