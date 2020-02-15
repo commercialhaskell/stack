@@ -70,6 +70,8 @@ Replace `<N>` with major version of new LTS snapshot, and `<N-1>` with previous 
 
 - Build the image: `docker build -t local/stack-build lts-<N>.0/`.
 
+- Ensure that all the directories listed in `PATH`, `CUDA_PATH`, and `CPATH` and any other path-like environment variables actually exist in the image.
+
 - Try building a test package with the new image: `(stack --resolver=nightly new image-test && cd image-test && stack --docker --docker-image=local/stack-build build)`. This should build without needing to install GHC.
 
 - Build the "small" variant: `docker build -t local/stack-build-small --build-arg "VARIANT=small" lts-<N>.0/`.
