@@ -2,7 +2,7 @@
 
 Each Stackage LTS release has two corresponding docker images in the [fpco/stack-build](https://hub.docker.com/r/fpco/stack-build/) and [fpco/stack-build-small](https://hub.docker.com/r/fpco/stack-build-small/) repositories.  The former contains every system library needed to build any package in the snapshot, while the latter only contains a minimal set of system libraries for basic programs.
 
-The Dockerfiles for building these images are in [etc/dockerfiles/stack-build](../../etc/dockerfiles/stack-build/).  There is also a [build.sh](../../etc/dockerfiles/stack-build/build.sh) script to help with building and pushing the images (see the [README](../../etc/dockerfiles/stack-build/README.md) for usage instructions).
+The Dockerfiles for building these images are in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/).  There is also a [build.sh](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/build.sh) script to help with building and pushing the images (see the [README](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/README.md) for usage instructions).
 
 
 ## Build images for new minor LTS snapshot
@@ -13,7 +13,7 @@ Below, replace `<N>.<M>` with the minor LTS snapshot version.
 
 - Check out the `stable` branch of the [stack repo](https://github.com/commercialhaskell/stack/).
 
-- Build and push the images (both standard and `small` variants) using the [build.sh](../../etc/dockerfiles/stack-build/build.sh) script: `./build.sh --push lts-<N>.<M> && ./build.sh --push --small lts-<N>.<M>`.
+- Build and push the images (both standard and `small` variants) using the [build.sh](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/build.sh) script: `./build.sh --push lts-<N>.<M> && ./build.sh --push --small lts-<N>.<M>`.
 
 
 ## Patch images for new minor LTS snapshot
@@ -22,7 +22,7 @@ Below, replace `<N>.<M>` with the minor LTS snapshot version. and `<N>.<M-1>` wi
 
 - Check out the `stable` branch of the [stack repo](https://github.com/commercialhaskell/stack/).
 
-- In `etc/dockerfiles/stack-build`, create a new `lts-<N>.<M>` directory.
+- In `stackage/automated/dockerfiles`, create a new `lts-<N>.<M>` directory.
 
 - Create `lts-<N>.<M>/Dockerfile`, starting with:
 
@@ -30,7 +30,7 @@ Below, replace `<N>.<M>` with the minor LTS snapshot version. and `<N>.<M-1>` wi
 
 - Add layers for any changes that need to be made to the image.
 
-- Build the new image using the [build.sh](../../etc/dockerfiles/stack-build/build.sh) script: `./build.sh lts-<N>.<M> && ./build.sh --small lts-<N>.<M>`
+- Build the new image using the [build.sh](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/build.sh) script: `./build.sh lts-<N>.<M> && ./build.sh --small lts-<N>.<M>`
 
 - Test the new image.  For example, `(stack --resolver=lts-<N>.<M> new image-test && cd image-test && stack --docker build)` (this should use the image you just built).  Make sure you test that the new image actually contains the desired changes.
 
@@ -45,7 +45,7 @@ Replace `<N>` with major version of new LTS snapshot, and `<N-1>` with previous 
 
 - Check out the `stable` branch of the [stack repo](https://github.com/commercialhaskell/stack/).
 
-- In `etc/dockerfiles/stack-build`, create a new `lts-<N>.0` directory.
+- In `stackage/automated/dockerfiles`, create a new `lts-<N>.0` directory.
 
 - Copy `lts-<N-1>.0/Dockerfile` to `lts-<N>.0/Dockerfile`.
 
@@ -59,7 +59,7 @@ Replace `<N>` with major version of new LTS snapshot, and `<N-1>` with previous 
 
 - Make sure `CUDA_VERSION` and `JVM_PATH` match what [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh) uses.
 
-- Update `LLVM_VERSION` to the version required for the GHC version.  This will be shown on the download page for the GHC version, which you can reach from https://www.haskell.org/ghc/.  It should match the version number that gets added to the `CLANG_PURE_LLVM_INCLUDE_DIR` in [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh).
+- Update `LLVM_PATH` to the version required for the GHC version.  This will be shown on the download page for the GHC version, which you can reach from https://www.haskell.org/ghc/.  It should match the version number that gets added to the `CLANG_PURE_LLVM_INCLUDE_DIR` in [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh).
 
 - Update `BOOTSTRAP_COMMIT` to the git commit ID of the latest [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh).
 
@@ -86,6 +86,6 @@ Replace `<N>` with major version of new LTS snapshot, and `<N-1>` with previous 
 
 - Repeat the tests above, except use `lts-<N>.0` instead of `nightly`.
 
-- Build and push the real images (both standard and `small` variants) using the [build.sh](../../etc/dockerfiles/stack-build/build.sh) script: `./build.sh --push lts-<N>.0 && ./build.sh --push --small lts-<N>.0`
+- Build and push the real images (both standard and `small` variants) using the [build.sh](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/build.sh) script: `./build.sh --push lts-<N>.0 && ./build.sh --push --small lts-<N>.0`
 
 - Commit and push the new Dockerfile to the `stable` branch.
