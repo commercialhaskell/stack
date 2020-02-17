@@ -58,8 +58,9 @@ getTerminalWidth = do
                         maybe (return Nothing)
                               (\hSize -> do
                                   sizeStr <- hGetContents hSize
-                                  let [_r, c] = map read $ words sizeStr :: [Int]
-                                  return $ Just c
+                                  case map read $ words sizeStr :: [Int] of
+                                    [_r, c] -> return $ Just c
+                                    _ -> return Nothing
                               )
                               mbStdout
             else do
