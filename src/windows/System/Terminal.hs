@@ -67,7 +67,7 @@ getTerminalWidth = do
                 [left,_top,right,_bottom] <- forM [0..3] $ \i -> do
                     v <- peekByteOff p ((i*2) + posCONSOLE_SCREEN_BUFFER_INFO_srWindow)
                     return $ fromIntegral (v :: Word16)
-                return $ Just $ (1+right-left)
+                return $ Just (1+right-left)
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
