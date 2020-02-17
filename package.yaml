@@ -116,7 +116,6 @@ dependencies:
 - tar
 - template-haskell
 - temporary
-- terminal-size
 - text
 - text-metrics
 - th-reify-many
