@@ -43,7 +43,7 @@ withGlobalProject inner = do
   oldSYL <- view stackYamlLocL
   case oldSYL of
     SYLDefault -> local (set stackYamlLocL SYLGlobalProject) inner
-    _ -> throwString "Cannot use this command with options which override the stack.yaml location"
+    _ -> fail "Cannot use this command with options which override the stack.yaml location"
 
 -- | Helper for 'withEnvConfig' which passes in some default arguments:
 --
@@ -105,24 +105,24 @@ reexec inner = do
   nixEnable' <- asks $ nixEnable . configNix
   dockerEnable' <- asks $ dockerEnable . configDocker
   case (nixEnable', dockerEnable') of
-    (True, True) -> throwString "Cannot use both Docker and Nix at the same time"
+    (True, True) -> fail "Cannot use both Docker and Nix at the same time"
     (False, False) -> inner
 
     -- Want to use Nix
     (True, False) -> do
-      whenM getInContainer $ throwString "Cannot use Nix from within a Docker container"
+      whenM getInContainer $ fail "Cannot use Nix from within a Docker container"
       inShell <- getInNixShell
       if inShell
         then do
           isReexec <- view reExecL
           if isReexec
             then inner
-            else throwString "In Nix shell but reExecL is False"
+            else fail "In Nix shell but reExecL is False"
         else Nix.runShellAndExit
 
     -- Want to use Docker
     (False, True) -> do
-      whenM getInNixShell $ throwString "Cannot use Docker from within a Nix shell"
+      whenM getInNixShell $ fail "Cannot use Docker from within a Nix shell"
       inContainer <- getInContainer
       if inContainer
         then do

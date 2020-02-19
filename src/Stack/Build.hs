@@ -290,7 +290,7 @@ queryBuildInfo selectors0 =
             _ -> err $ "Cannot apply selector to " ++ show value
       where
         cont = select (front . (sel:)) sels
-        err msg = throwString $ msg ++ ": " ++ show (front [sel])
+        err msg = fail $ msg ++ ": " ++ show (front [sel])
     -- Include comments to indicate that this portion of the "stack
     -- query" API is not necessarily stable.
     addGlobalHintsComment

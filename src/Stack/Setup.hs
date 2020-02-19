@@ -528,7 +528,7 @@ ensureMsys sopts getSetupInfo' = do
                       VersionedDownloadInfo version info <-
                           case Map.lookup osKey $ siMsys2 si of
                               Just x -> return x
-                              Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
+                              Nothing -> fail $ "MSYS2 not found for " ++ T.unpack osKey
                       let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
                       Just <$> downloadAndInstallTool (configLocalPrograms config) info tool (installMsys2Windows osKey si)
                   | otherwise -> do
@@ -610,8 +610,8 @@ ensureCompiler sopts getSetupInfo' = do
 
     let canUseCompiler cp
             | soptsSkipGhcCheck sopts = pure cp
-            | not $ isWanted $ cpCompilerVersion cp = throwString "Not the compiler version we want"
-            | cpArch cp /= expectedArch = throwString "Not the architecture we want"
+            | not $ isWanted $ cpCompilerVersion cp = fail "Not the compiler version we want"
+            | cpArch cp /= expectedArch = fail "Not the architecture we want"
             | otherwise = pure cp
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
@@ -672,7 +672,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
     let loop [] = do
           logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
           logError $ "Could not find it on the paths " <> displayShow (edBins paths)
-          throwString "Could not find sandboxed compiler"
+          fail "Could not find sandboxed compiler"
         loop (x:xs) = do
           res <- findExecutable x
           case res of
@@ -705,7 +705,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
         findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
         findHelper getNames = do
           let toTry = [dir ++ name ++ suffix | suffix <- suffixes, name <- getNames wc]
-              loop [] = throwString $ "Could not find any of: " <> show toTry
+              loop [] = fail $ "Could not find any of: " <> show toTry
               loop (guessedPath':rest) = do
                 guessedPath <- parseAbsFile guessedPath'
                 exists <- doesFileExist guessedPath
@@ -730,25 +730,25 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
             $ fmap (toStrictBytes . fst) . readProcess_
     infotext <-
       case decodeUtf8' infobs of
-        Left e -> throwString $ "GHC info is not valid UTF-8: " ++ show e
+        Left e -> fail $ "GHC info is not valid UTF-8: " ++ show e
         Right info -> pure info
     infoPairs :: [(String, String)] <-
       case readMaybe $ T.unpack infotext of
-        Nothing -> throwString "GHC info does not parse as a list of pairs"
+        Nothing -> fail "GHC info does not parse as a list of pairs"
         Just infoPairs -> pure infoPairs
     let infoMap = Map.fromList infoPairs
 
     eglobaldb <- tryAny $
       case Map.lookup "Global Package DB" infoMap of
-        Nothing -> throwString "Key 'Global Package DB' not found in GHC info"
+        Nothing -> fail "Key 'Global Package DB' not found in GHC info"
         Just db -> parseAbsDir db
 
     arch <-
       case Map.lookup "Target platform" infoMap of
-        Nothing -> throwString "Key 'Target platform' not found in GHC info"
+        Nothing -> fail "Key 'Target platform' not found in GHC info"
         Just targetPlatform ->
           case simpleParse $ takeWhile (/= '-') targetPlatform of
-            Nothing -> throwString $ "Invalid target platform in GHC info: " ++ show targetPlatform
+            Nothing -> fail $ "Invalid target platform in GHC info: " ++ show targetPlatform
             Just arch -> pure arch
     compilerVer <-
       case wc of
@@ -770,7 +770,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
     globalDump <- withProcessContext menv $ globalsFromDump pkg
     cabalPkgVer <-
       case Map.lookup cabalPackageName globalDump of
-        Nothing -> throwString $ "Cabal library not found in global package database for " ++ toFilePath compiler
+        Nothing -> fail $ "Cabal library not found in global package database for " ++ toFilePath compiler
         Just dp -> pure $ pkgVersion $ dpPackageIdent dp
 
     return CompilerPaths
@@ -1265,7 +1265,7 @@ downloadOrUseLocal downloadLabel downloadInfo destination =
         root <- view projectRootL
         return (root </> path)
     _ ->
-        throwString $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
+        fail $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
     warnOnIgnoredChecks = do
@@ -1288,7 +1288,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
-            _ -> throwString $ "Error: Unknown extension for url: " ++ url
+            _ -> fail $ "Error: Unknown extension for url: " ++ url
 
     relativeFile <- parseRelFile $ toolString tool ++ extension
     let destinationPath = programsDir </> relativeFile
@@ -1331,7 +1331,7 @@ installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir 
             TarXz -> return ("xz", 'J')
             TarBz2 -> return ("bzip2", 'j')
             TarGz -> return ("gzip", 'z')
-            SevenZ -> throwString "Don't know how to deal with .7z files on non-Windows"
+            SevenZ -> fail "Don't know how to deal with .7z files on non-Windows"
     -- Slight hack: OpenBSD's tar doesn't support xz.
     -- https://github.com/commercialhaskell/stack/issues/2283#issuecomment-237980986
     let tarDep =
@@ -1501,10 +1501,10 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             TarXz -> return ".xz"
             TarBz2 -> return ".bz2"
             TarGz -> return ".gz"
-            _ -> throwString $ name ++ " must be a tarball file"
+            _ -> fail $ name ++ " must be a tarball file"
     tarFile <-
         case T.stripSuffix suffix $ T.pack $ toFilePath (filename archiveFile) of
-            Nothing -> throwString $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
+            Nothing -> fail $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseRelFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
@@ -1523,7 +1523,7 @@ expectSingleUnpackedDir archiveFile destDir = do
     contents <- listDir destDir
     case contents of
         ([dir], _ ) -> return dir
-        _ -> throwString $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
+        _ -> fail $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
@@ -1887,7 +1887,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
     let code = getResponseStatusCode res
     if code >= 200 && code < 300
         then return $ StackReleaseInfo $ getResponseBody res
-        else throwString $ "Could not get release information for Stack from: " ++ url
+        else fail $ "Could not get release information for Stack from: " ++ url
 
 preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
                    => m [(Bool, String)]
@@ -1922,7 +1922,7 @@ downloadStackExe
     -> RIO env ()
 downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     (isWindows, archiveURL) <-
-      let loop [] = throwString $ "Unable to find binary Stack archive for platforms: "
+      let loop [] = fail $ "Unable to find binary Stack archive for platforms: "
                                 ++ unwords (map snd platforms0)
           loop ((isWindows, p'):ps) = do
             let p = T.pack p'

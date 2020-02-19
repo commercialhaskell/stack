@@ -225,7 +225,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
              targets <- view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     TargetAll PTDependency -> throwString $
+                     TargetAll PTDependency -> fail $
                          "Error: Expected a local package, but " ++
                          packageNameString name ++
                          " is either an extra-dep or in the snapshot."
@@ -251,7 +251,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                              else return []
     tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $
-        throwString "Not generating combined report, because no targets or tix files are specified."
+        fail "Not generating combined report, because no targets or tix files are specified."
     outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
         Nothing -> return (outputDir </> relDirCombined </> relDirCustom)

@@ -271,12 +271,12 @@ loadCompilerPaths compiler build sandboxed = do
     when
       (compilerCacheGhcSize /= sizeToInt64 (fileSize compilerStatus) ||
        compilerCacheGhcModified /= timeToInt64 (modificationTime compilerStatus))
-      (throwString "Compiler file metadata mismatch, ignoring cache")
+      (fail "Compiler file metadata mismatch, ignoring cache")
     globalDbStatus <- liftIO $ getFileStatus $ compilerCacheGlobalDb FP.</> "package.cache"
     when
       (compilerCacheGlobalDbCacheSize /= sizeToInt64 (fileSize globalDbStatus) ||
        compilerCacheGlobalDbCacheModified /= timeToInt64 (modificationTime globalDbStatus))
-      (throwString "Global package cache file metadata mismatch, ignoring cache")
+      (fail "Global package cache file metadata mismatch, ignoring cache")
 
     -- We could use parseAbsFile instead of resolveFile' below to
     -- bypass some system calls, at the cost of some really wonky
@@ -289,11 +289,11 @@ loadCompilerPaths compiler build sandboxed = do
     cabalVersion <- parseVersionThrowing $ T.unpack compilerCacheCabalVersion
     globalDump <-
       case readMaybe $ T.unpack compilerCacheGlobalDump of
-        Nothing -> throwString "Global dump did not parse correctly"
+        Nothing -> fail "Global dump did not parse correctly"
         Just globalDump -> pure globalDump
     arch <-
       case simpleParse $ T.unpack compilerCacheArch of
-        Nothing -> throwString $ "Invalid arch: " ++ show compilerCacheArch
+        Nothing -> fail $ "Invalid arch: " ++ show compilerCacheArch
         Just arch -> pure arch
 
     pure CompilerPaths

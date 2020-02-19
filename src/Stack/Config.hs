@@ -160,10 +160,10 @@ makeConcreteResolver ar = do
             ARLatestNightly -> return $ nightlySnapshotLocation $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> throwString $ "No LTS release found with major version " ++ show x
+                    Nothing -> fail $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ltsSnapshotLocation x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> throwString "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> fail "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ltsSnapshotLocation x y
@@ -368,7 +368,7 @@ configFromConfigMonoid
        case mpantryRoot of
          Just dir ->
            case parseAbsDir dir of
-             Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
+             Nothing -> fail $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
              Just x -> pure x
          Nothing -> pure $ configStackRoot </> relDirPantry
      withPantryConfig
@@ -672,7 +672,7 @@ determineStackRootAndOwnership clArgs = liftIO $ do
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
                     Just x -> case parseAbsDir x of
-                        Nothing -> throwString ("Failed to parse STACK_ROOT environment variable (expected absolute directory): " ++ show x)
+                        Nothing -> fail ("Failed to parse STACK_ROOT environment variable (expected absolute directory): " ++ show x)
                         Just parsed -> return parsed
 
     (existingStackRootOrParentDir, userOwnsIt) <- do

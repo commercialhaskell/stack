@@ -59,7 +59,7 @@ initProject currDir initOpts mresolver = do
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $
-        throwString
+        fail
             ("Error: Stack configuration file " <> reldest <>
              " exists, use '--force' to overwrite it.")
 
@@ -331,7 +331,7 @@ getSnapshots' = do
         logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
         logError ""
         logError $ "Exception was: " <> displayShow e
-        throwString ""
+        fail ""
 
 -- | Get the default resolver value
 getDefaultResolver

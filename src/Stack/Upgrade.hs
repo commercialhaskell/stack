@@ -97,7 +97,7 @@ upgrade builtHash (UpgradeOpts mbo mso) =
         -- FIXME It would be far nicer to capture this case in the
         -- options parser itself so we get better error messages, but
         -- I can't think of a way to make it happen.
-        (Nothing, Nothing) -> throwString "You must allow either binary or source upgrade paths"
+        (Nothing, Nothing) -> fail "You must allow either binary or source upgrade paths"
         (Just bo, Nothing) -> binary bo
         (Nothing, Just so) -> source so
         -- See #2977 - if --git or --git-repo is specified, do source upgrade.
@@ -162,7 +162,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
 
             unless (ec == ExitSuccess)
-                    $ throwString "Non-success exit code from running newly downloaded executable"
+                    $ fail "Non-success exit code from running newly downloaded executable"
 
 sourceUpgrade
   :: Maybe String
@@ -175,7 +175,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         remote <- liftIO $ System.Process.readProcess "git" ["ls-remote", repo, branch] []
         latestCommit <-
           case words remote of
-            [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
+            [] -> fail $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
             x:_ -> return x
         when (isNothing builtHash) $
             prettyWarnS $
@@ -212,7 +212,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         mversion <- getLatestHackageVersion YesRequireHackageIndex "stack" UsePreferredVersions
         (PackageIdentifierRevision _ version _) <-
           case mversion of
-            Nothing -> throwString "No stack found in package indices"
+            Nothing -> fail "No stack found in package indices"
             Just version -> pure version
 
         if version <= mkVersion' Paths.version
@@ -224,7 +224,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 let dir = tmp </> suffix
                 mrev <- getLatestHackageRevision YesRequireHackageIndex "stack" version
                 case mrev of
-                  Nothing -> throwString "Latest version with no revision"
+                  Nothing -> fail "Latest version with no revision"
                   Just (_rev, cfKey, treeKey) -> do
                     let ident = PackageIdentifier "stack" version
                     unpackPackageLocation dir $ PLIHackage ident cfKey treeKey

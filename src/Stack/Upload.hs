@@ -176,7 +176,7 @@ uploadBytes baseUrl creds tarName bytes = do
             401 -> do
                 putStrLn "authentication failure"
                 handleIO (const $ return ()) (removeFile (hcCredsFile creds))
-                throwString "Authentication failure uploading to server"
+                fail "Authentication failure uploading to server"
             403 -> do
                 putStrLn "forbidden upload"
                 putStrLn "Usually means: you've already uploaded this package/version combination"
@@ -190,7 +190,7 @@ uploadBytes baseUrl creds tarName bytes = do
             code -> do
                 putStrLn $ "unhandled status code: " ++ show code
                 printBody res
-                throwString $ "Upload failed on " ++ tarName
+                fail $ "Upload failed on " ++ tarName
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
 printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout

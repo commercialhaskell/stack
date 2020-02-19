@@ -122,7 +122,7 @@ getSDistTarball mpvpBounds pkgDir = do
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
-    let tarPath isDir fp = either throwString return
+    let tarPath isDir fp = either fail return
             (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
         -- convert a String of proper characters to a String of bytes
         -- in UTF8 encoding masquerading as characters. This is
