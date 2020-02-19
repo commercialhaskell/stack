@@ -31,10 +31,10 @@ posCONSOLE_SCREEN_BUFFER_INFO_srWindow = 10 -- 4 x Word16 Left,Top,Right,Bottom
 c_STD_OUTPUT_HANDLE :: Int
 c_STD_OUTPUT_HANDLE = -11
 
-foreign import stdcall unsafe "windows.h GetConsoleScreenBufferInfo"
+foreign import ccall unsafe "windows.h GetConsoleScreenBufferInfo"
     c_GetConsoleScreenBufferInfo :: HANDLE -> Ptr CONSOLE_SCREEN_BUFFER_INFO -> IO Bool
 
-foreign import stdcall unsafe "windows.h GetStdHandle"
+foreign import ccall unsafe "windows.h GetStdHandle"
     c_GetStdHandle :: Int -> IO HANDLE
 
 
