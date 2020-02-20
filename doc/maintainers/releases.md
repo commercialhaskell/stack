@@ -57,7 +57,7 @@ Examples:
 * Check for any P0 and P1 issues that should be dealt with before release
 * Check for un-merged pull requests that should be merged before release
 * Ensure `release` and `stable` branches merged to `master`
-* Ensure no bounds specified in any package.yaml (including those in `subs/`) unless truly necessary (e.g. in most cases rely on stacksnap.yaml to manage dependency versions), and ensure `base` minbound is correct for the supported GHC version(s) (check version of `base` in oldest supported Stackage snapshot)
+* Ensure no bounds specified in any package.yaml unless truly necessary (e.g. in most cases rely on stacksnap.yaml to manage dependency versions), and ensure `base` minbound is correct for the supported GHC version(s) (check version of `base` in oldest supported Stackage snapshot)
 * Check compatibility with latest LTS Stackage snapshots
     * `snapshot*.yaml` and `stack*.yaml` (where `*` is not `nightly`), __including the ones in
       subdirectories__: bump to use latest LTS minor
@@ -71,7 +71,7 @@ Examples:
       sure any extra-deps that exist only for custom flags have versions
       matching the snapshot)
     * Run `stack --stack-yaml=stack-nightly.yaml test --pedantic`
-* Update (increase lower bound) or remove (if redundant) any constraints in `package.yaml` (including under `subs/`)
+* Update (increase lower bound) or remove (if redundant) any constraints in `package.yaml`
 * Update `.azure-pipelines*.yml` and files in `.azure` for any GHC version changes made in above steps.
 * Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
 * Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
@@ -80,11 +80,9 @@ Examples:
 
 * In master branch:
     * `package.yaml`: bump to next release candidate version (bump second component to next odd number, ensure third component is `0`, and add patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`)
-    * If any changes have been made to packages in `subs/` (use `git diff --stat origin/release HEAD |grep subs/` to check), also update package versions.
     * `ChangeLog.md`
         * Check for any entries that snuck into the previous version's changes
           due to merges (`git diff origin/stable HEAD ChangeLog.md`)
-        * Do the same for any ChangeLogs for packages `subs/`.
 
 * Cut a release candidate branch `rc/vX.Y` from master
 
@@ -203,8 +201,6 @@ for requirements to perform the release, and more details about the tool.
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
 
-* For any packages in `subs/` that have changed, use `stack upload subs/<PACKAGE> --pvp-bounds=lower` to upload to Hackage.
-
 * Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
 
 
@@ -295,7 +291,7 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
 
 - Check out stack commit to be released to `~/stack-release` (or elsewhere, in which case adjust following instructions)
 
-- `rm -f ~/stack-release/*.cabal ~/stack-release/subs/*/*.cabal`, to ensure it's regenerated
+- `rm -f ~/stack-release/*.cabal`, to ensure it's regenerated
 
 - clone https://github.com/nh2/static-haskell-nix recursively (last known to work with commit 725ceb2479637b3b3ab29298a1bc0e48c54984c9)
 
