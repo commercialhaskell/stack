@@ -1,4 +1,4 @@
-resolver: snapshot.yaml
+resolver: snapshot-lts-14.yaml
 
 packages:
 - .
