@@ -103,7 +103,7 @@ module System.FilePath.MODULE_NAME
     )
     where
 
-import Control.Applicative (<$>)
+import Control.Applicative ((<$>))
 import Data.Char(toLower, toUpper, isAsciiLower, isAsciiUpper)
 import Data.Maybe(isJust)
 import Data.List(stripPrefix, isSuffixOf)
