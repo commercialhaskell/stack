@@ -31,7 +31,7 @@ extra-source-files:
 - ChangeLog.md
 - README.md
 - stack.yaml
-- snapshot.yaml
+- snapshot-lts-11.yaml
 - doc/*.md
 - src/setup-shim/StackSetupShim.hs
 - test/package-dump/ghc-7.10.txt
