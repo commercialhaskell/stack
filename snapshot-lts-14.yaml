@@ -1,0 +1,22 @@
+resolver: lts-14.27
+name: snapshot-for-building-stack-with-ghc-8.6.5
+
+packages:
+- hackage-security-0.6.0.0@sha256:69987d46e7b55fe5f0fc537021c3873c5f6f44a6665d349ee6995fd593df8147,11976
+- hpack-0.33.0@sha256:ca82f630abe0fba199aa05dcc9942ee8bf137e1425049a7a9ac8458c82d9dcc9,4406
+- regex-applicative-text-0.1.0.1@sha256:52463fdc8daf130f40b82fec84bad2d4b8600227751c2a5b04679a1de8bd7f7a,1155
+- lukko-0.1.1.1@sha256:5c674bdd8a06b926ba55d872abe254155ed49a58df202b4d842b643e5ed6bcc9,4289
+- Cabal-3.0.0.0
+- github: commercialhaskell/pantry
+  commit: 5dda16e9393da6827beeb311bab003237ee66a62
+- github: fpco/casa
+  commit: 3dee7dc1594e4d0ea2b101ad933ce23b4bc3c451
+  subdirs:
+     - casa-client
+     - casa-types
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
