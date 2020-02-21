@@ -468,17 +468,17 @@ Now continue to the **General Windows setup** subsection below.
 
     The version of LLVM needed depends on the version of GHC you need.
 
-    * GHC 8.0.2 (the standard for building Stack)
+    * GHC 8.2.2 (the standard for building Stack)
 
       ```
-      wget http://llvm.org/releases/3.7.1/clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz && \
-      sudo tar xvf clang+llvm-3.7.1-armv7a-linux-gnueabihf.tar.xz -C /opt
+      wget http://llvm.org/releases/3.9.1/clang+llvm-3.9.1-armv7a-linux-gnueabihf.tar.xz && \
+      sudo tar xvf clang+llvm-3.9.1-armv7a-linux-gnueabihf.tar.xz -C /opt
       ```
 
       Run this now and add it to the `.profile`:
 
       ```
-      export PATH="$HOME/.local/bin:/opt/clang+llvm-3.7.1-armv7a-linux-gnueabihf/bin:$PATH"
+      export PATH="$HOME/.local/bin:/opt/clang+llvm-3.9.1-armv7a-linux-gnueabihf/bin:$PATH"
       ```
 
     * GHC 7.10.3
