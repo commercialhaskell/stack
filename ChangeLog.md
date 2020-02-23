@@ -67,6 +67,10 @@ Bug fixes:
 * Resolve "'stty' is not recognized". See
   [#4901](https://github.com/commercialhaskell/stack/issues/4901)
 
+* Fix missing reconfigure check causing errors when a package gets
+  used in multiple projects. See
+  [#5147](https://github.com/commercialhaskell/stack/issues/5147)
+
 ## v2.1.3.1
 
 Hackage-only release:
