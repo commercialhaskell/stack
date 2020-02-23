@@ -64,6 +64,9 @@ Bug fixes:
 * Use Hoogle from the snapshot used and not the latest version. See
   [#4905](https://github.com/commercialhaskell/stack/issues/4905)
 
+* Resolve "'stty' is not recognized". See
+  [#4901](https://github.com/commercialhaskell/stack/issues/4901)
+
 ## v2.1.3.1
 
 Hackage-only release:
