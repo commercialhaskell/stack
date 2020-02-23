@@ -11,6 +11,7 @@ module Stack.Build.Cache
     ( tryGetBuildCache
     , tryGetConfigCache
     , tryGetCabalMod
+    , tryGetSetupConfigMod
     , getInstalledExes
     , tryGetFlagCache
     , deleteCaches
@@ -138,6 +139,17 @@ tryGetCabalMod :: HasEnvConfig env
                => Path Abs Dir -> RIO env (Maybe CTime)
 tryGetCabalMod dir = do
   fp <- toFilePath <$> configCabalMod dir
+  tryGetFileMod fp
+
+-- | Try to read the mod time of setup-config file from the last build
+tryGetSetupConfigMod :: HasEnvConfig env
+               => Path Abs Dir -> RIO env (Maybe CTime)
+tryGetSetupConfigMod dir = do
+  fp <- toFilePath <$> configSetupConfigMod dir
+  tryGetFileMod fp
+
+tryGetFileMod :: MonadIO m => FilePath -> m (Maybe CTime)
+tryGetFileMod fp =
   liftIO $ either (const Nothing) (Just . modificationTime) <$>
       tryIO (getFileStatus fp)
 
