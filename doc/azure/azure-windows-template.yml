@@ -22,7 +22,6 @@ jobs:
       stack-lts-9:
         BUILD: stack
         ARGS: "--resolver lts-9"
-    maxParallel: 6
   steps:
   - bash: |
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
