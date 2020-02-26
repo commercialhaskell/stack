@@ -19,7 +19,9 @@
 # Be sure to double check the SHA1 sums against those in
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
-GHCVER=8.8.2
+
+GHCVER=8.8.3
+
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
   exit 1
@@ -37,15 +39,16 @@ echo 'ghc:' >stack-setup-$GHCVER.yaml
 mirror_ () {
   base_url="$1"; shift
   suffix="$1"; shift
+  destsuffix="$1"; shift
   srcext="$1"; shift
   destext="$1"; shift
-  local srcfn=ghc-$GHCVER-${suffix}.tar.${srcext}
+  local srcfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${srcext}
   if [[ ! -s "$srcfn.downloaded" ]]; then
     rm -f "$srcfn"
-    curl -LO --fail "$base_url/$srcfn"
+    curl -Lo "$srcfn" --fail "$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
     date >"$srcfn.downloaded"
   fi
-  local destfn=ghc-$GHCVER-${suffix}.tar.${destext}
+  local destfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${destext}
   if [[ ! -s "$destfn.uploaded" ]]; then
     if [[ "${srcext}" == "xz" && "${destext}" == "bz2" ]]; then
       xzcat "$srcfn" | bzip2 -c > "$destfn"
@@ -79,18 +82,23 @@ mirror () {
 # NOTE: keep the 'mirror' commands in the same order as entries in
 # https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
 
-mirror i386-deb9-linux xz xz linux32
-mirror x86_64-deb8-linux xz xz linux64
-#mirror x86_64-centos67-linux xz xz linux64-gmp4
-mirror x86_64-fedora27-linux xz xz linux64-tinfo6
-mirror x86_64-apple-darwin xz bz2 macosx
-#mirror i386-unknown-mingw32 xz xz windows32
-mirror x86_64-unknown-mingw32 xz xz windows64
-#mirror x86_64-portbld-freebsd11 xz xz freebsd64-11
-mirror aarch64-deb9-linux xz xz linux-aarch64
+mirror i386-deb9-linux "" xz xz linux32
+mirror x86_64-deb8-linux "" xz xz linux64
+#mirror x86_64-centos67-linux "" xz xz linux64-gmp4
+mirror x86_64-fedora27-linux "" xz xz linux64-tinfo6
+mirror x86_64-apple-darwin "" xz bz2 macosx
+#mirror i386-unknown-mingw32 "" xz xz windows32
+mirror x86_64-unknown-mingw32 "" xz xz windows64
+#mirror x86_64-portbld-freebsd11 "" xz xz freebsd64-11
+mirror aarch64-deb9-linux "" xz xz linux-aarch64
 
-mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl xz xz linux32-musl
-mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl xz xz linux64-musl
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl "" xz xz linux32-musl
+mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl "" xz xz linux64-musl
+
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists/11 i386-portbld-freebsd "" xz xz freebsd32
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists i386-portbld-freebsd "ino64" xz xz freebsd32-ino64
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists/11 x86_64-portbld-freebsd "" xz xz freebsd64
+mirror_ http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists x86_64-portbld-freebsd "ino64" xz xz freebsd64-ino64
 
 set +x
 echo
