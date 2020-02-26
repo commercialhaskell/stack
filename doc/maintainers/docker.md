@@ -59,7 +59,7 @@ Replace `<N>` with major version of new LTS snapshot, and `<N-1>` with previous 
 
 - Make sure `CUDA_VERSION` and `JVM_PATH` match what [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh) uses.
 
-- Update `LLVM_PATH` to the version required for the GHC version.  This will be shown on the download page for the GHC version, which you can reach from https://www.haskell.org/ghc/.  It should match the version number that gets added to the `CLANG_PURE_LLVM_INCLUDE_DIR` in [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh).
+- Update `LLVM_PATH` to the version required for the GHC version.  This will be shown on the download page for the GHC version, which you can reach from https://www.haskell.org/ghc/.  It should match the base directory used in `CLANG_PURE_LLVM_INCLUDE_DIR` in [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh) (leaving off the `/include` suffix).
 
 - Update `BOOTSTRAP_COMMIT` to the git commit ID of the latest [debian-bootstrap.sh](https://github.com/commercialhaskell/stackage/blob/master/debian-bootstrap.sh).
 
