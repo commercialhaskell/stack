@@ -17,7 +17,6 @@ jobs:
         ARGS: "--resolver lts-15"
       nightly:
         ARGS: "--resolver nightly"
-    maxParallel: 3
   steps:
   - script: |
       export PATH=$HOME/.local/bin:$PATH
