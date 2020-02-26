@@ -1,5 +1,7 @@
 trigger: none
-pr: none
+pr:
+- master
+- stable
 
 schedules:
 - cron: "0 0 * * *"
