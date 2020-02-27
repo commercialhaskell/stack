@@ -1613,6 +1613,7 @@ chattyDownload label downloadInfo path = do
             , drHashChecks = hashChecks
             , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
+            , drForceDownload = False
             }
     x <- verifiedDownloadWithProgress dReq path label mtotalSize
     if x

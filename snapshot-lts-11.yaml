@@ -25,11 +25,13 @@ packages:
 - typed-process-0.2.6.0@rev:0 # for rio-0.1.10.0
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
-- http-download-0.1.0.0@rev:0
+# - http-download-0.1.0.0@rev:0
+- github: commercialhaskell/http-download
+  commit: cb989c426ea66db466222085414b69604200fdac
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - github: commercialhaskell/pantry
-  commit: bd6a81b85b1dc881a9e95b98887eac6bb924a917
+  commit: 5dda16e9393da6827beeb311bab003237ee66a62
 - github: fpco/casa
   commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
   subdirs:

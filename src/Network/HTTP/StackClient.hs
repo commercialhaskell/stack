@@ -47,7 +47,7 @@ module Network.HTTP.StackClient
   , CheckHexDigest (..)
   , DownloadRequest (..)
   , drRetryPolicyDefault
-  , DownloadException (..)
+  , VerifiedDownloadException (..)
   , HashCheck (..)
   ) where
 
