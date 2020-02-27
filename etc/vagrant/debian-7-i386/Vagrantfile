@@ -12,9 +12,9 @@ Vagrant.configure(2) do |config|
     set -xe
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
-    # echo \"deb http://archive.debian.org/debian wheezy main\" > /etc/apt/sources.list
     apt-get update
     apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates git libtinfo-dev unzip
+    echo 'root ALL=(ALL) NOPASSWD: ALL' | sudo EDITOR='tee' visudo > /dev/null
     if ! which stack; then
       wget -q -O get_stack.sh http://get.haskellstack.org/
       chmod +x get_stack.sh
