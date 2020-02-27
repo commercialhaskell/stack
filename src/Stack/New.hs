@@ -39,7 +39,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
-import           System.PosixCompat.Files (getFileStatus, fileSize)
+import           System.PosixCompat.Files (getFileStatus, fileExist, fileSize)
 import           System.Posix.Types (COff (..))
 import           RIO.Process
 import qualified Text.Mustache as Mustache
@@ -157,19 +157,26 @@ loadTemplate name logIt = do
         downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
-        fs <- liftIO $ getFileStatus (toFilePath path)
-        let (COff size) = fileSize fs
-            downloadFileSize = fromIntegral size
-            dReq = DownloadRequest
+        let path' = toFilePath path
+        exist <- liftIO $ fileExist path'
+
+        downloadFileSize <- if exist
+            then do
+                fs <- liftIO $ getFileStatus path'
+                let (COff size) = fileSize fs
+                return $ Just $ fromIntegral size
+            else return Nothing
+
+        let dReq = DownloadRequest
               { drRequest = req
               , drHashChecks = []
-              , drLengthCheck = Just downloadFileSize
+              , drLengthCheck = Nothing
               , drRetryPolicy = drRetryPolicyDefault
               }
         logIt RemoteTemp
         catch
-          (void $
-            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) (Just downloadFileSize)
+          (void $ do
+            verifiedDownloadWithProgress dReq path (T.pack path') downloadFileSize
           )
           (useCachedVersionOrThrow path)
 
