@@ -49,6 +49,7 @@ dependencies:
 - Cabal
 - aeson
 - opentelemetry
+- opentelemetry-lightstep
 - annotated-wl-pprint
 - ansi-terminal
 - array
