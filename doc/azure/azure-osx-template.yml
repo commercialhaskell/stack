@@ -1,36 +1,30 @@
 jobs:
 - job: ${{ parameters.name }}
+  timeoutInMinutes: 120
   pool:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     matrix:
-      stack-def:
-        BUILD: stack
-        STACK_YAML: stack.yaml
-      stack-lts-13:
-        BUILD: stack
-        STACK_YAML: stack-lts-13.yaml
-      stack-lts-12:
-        BUILD: stack
-        ARGS: "--resolver lts-12.26"
-      stack-lts-11:
-        BUILD: stack
-        ARGS: "--resolver lts-11"
-      stack-lts-10:
-        BUILD: stack
-        ARGS: "--resolver lts-10"
-      stack-lts-9:
-        BUILD: stack
+      GHC 8.0:
         ARGS: "--resolver lts-9"
-    maxParallel: 6
+      GHC 8.2:
+        ARGS: "--resolver lts-11"
+      GHC 8.4:
+        ARGS: "--resolver lts-12"
+      GHC 8.6:
+        ARGS: "--resolver lts-14"
+      GHC 8.8:
+        ARGS: "--resolver lts-15"
+      nightly:
+        ARGS: "--resolver nightly"
+    maxParallel: 3
   steps:
   - script: |
+      export PATH=$HOME/.local/bin:$PATH
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
       mkdir -p ~/.local/bin
       curl -skL https://get.haskellstack.org/stable/osx-x86_64.tar.gz | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin;
-      export PATH=$HOME/.local/bin:$PATH
-      stack --install-ghc $ARGS test --bench --only-dependencies
       stack $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
     env:
       OS_NAME: ${{ parameters.os }}
-    displayName: 'Installation ${{parameters.os}} & Test'
+    displayName: 'Build and test'

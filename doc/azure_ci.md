@@ -15,9 +15,7 @@ need to put the relevant configuration files:
   [azure-simple](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
   file into `azure-pipelines.yml`.
 * For complex Azure configuration, you need to take the below linked
-  four files and put all of them into the `.azure` directory except
-  the `azure-pipelines.yml` file which should be put in the root of
-  the repository.
+  four files and put all of them into the `.azure` directory.
 
 For a more detailed explanation, you can read further.
 
