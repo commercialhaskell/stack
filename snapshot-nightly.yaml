@@ -9,8 +9,7 @@ packages:
 - persistent-template-2.7.1@rev:0
 - persistent-2.10.0@rev:0
 - persistent-sqlite-2.10.1@rev:0
-- github: commercialhaskell/http-download
-  commit: c3b7eb3dcbb78491e91065a616a45cfa7ebc265c
+- http-download-0.2.0.0@rev:0
 - github: commercialhaskell/pantry
   commit: bd6a81b85b1dc881a9e95b98887eac6bb924a917
 - github: fpco/casa
