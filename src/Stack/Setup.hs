@@ -55,10 +55,10 @@ import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
 import              Lens.Micro (set)
-import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
-                                              drRetryPolicyDefault, getResponseBody, getResponseStatusCode,
-                                              httpLbs, httpJSON, parseRequest, parseUrlThrow, setGithubHeaders,
-                                              verifiedDownloadWithProgress, withResponse)
+import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
+                                              getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
+                                              mkDownloadRequest, parseRequest, parseUrlThrow, setGithubHeaders,
+                                              setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse)
 import              Path
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extra (toFilePathNoTrailingSep)
@@ -1608,13 +1608,9 @@ chattyDownload label downloadInfo path = do
     when (null hashChecks) $ logWarn $
         "No sha1 or sha256 found in metadata," <>
         " download hash won't be checked."
-    let dReq = DownloadRequest
-            { drRequest = req
-            , drHashChecks = hashChecks
-            , drLengthCheck = mtotalSize
-            , drRetryPolicy = drRetryPolicyDefault
-            , drForceDownload = False
-            }
+    let dReq = setHashChecks hashChecks $
+               setLengthCheck mtotalSize $
+               mkDownloadRequest req
     x <- verifiedDownloadWithProgress dReq path label mtotalSize
     if x
         then logStickyDone ("Downloaded " <> RIO.display label <> ".")

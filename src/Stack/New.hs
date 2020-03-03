@@ -30,9 +30,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (DownloadRequest (..), VerifiedDownloadException (..), Request, HttpException,
-                                           drRetryPolicyDefault, getResponseBody, httpLbs,
-                                           parseRequest, parseUrlThrow, verifiedDownloadWithProgress, setGithubHeaders)
+import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
+                                           getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
+                                           setForceDownload, setGithubHeaders, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -167,13 +167,7 @@ loadTemplate name logIt = do
                 return $ Just $ fromIntegral size
             else return Nothing
 
-        let dReq = DownloadRequest
-              { drRequest = req
-              , drHashChecks = []
-              , drLengthCheck = Nothing
-              , drRetryPolicy = drRetryPolicyDefault
-              , drForceDownload = True
-              }
+        let dReq = setForceDownload True $ mkDownloadRequest req
         logIt RemoteTemp
         catch
           (void $ do
