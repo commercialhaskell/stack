@@ -89,6 +89,7 @@ import           System.IO (hPutStrLn, hGetEncoding, hSetEncoding)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
 import           OpenTelemetry.Implicit
+import           OpenTelemetry.LightStep
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -103,7 +104,7 @@ hSetTranslit h = do
         _ -> return ()
 
 main :: IO ()
-main = withZeroConfigOpenTelemetry $ withSpan "Main.main" $ do
+main = withEnvConfigLightStepOpenTelemetry $ withSpan "Main.main" $ do
   -- Line buffer the output by default, particularly for non-terminal runs.
   -- See https://github.com/commercialhaskell/stack/pull/360
   hSetBuffering stdout LineBuffering
