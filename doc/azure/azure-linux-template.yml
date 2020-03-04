@@ -26,7 +26,6 @@ jobs:
       pedantic:
         BUILD: pedantic
         STACK_YAML: stack.yaml
-    maxParallel: 6
   steps:
   - script: |
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
