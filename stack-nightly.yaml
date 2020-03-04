@@ -2,7 +2,6 @@ resolver: snapshot-nightly.yaml
 
 packages:
 - .
-- ../opentelemetry-haskell/opentelemetry
 
 docker:
   enable: false
