@@ -45,10 +45,15 @@ module Network.HTTP.StackClient
   , verifiedDownload
   , verifiedDownloadWithProgress
   , CheckHexDigest (..)
-  , DownloadRequest (..)
+  , DownloadRequest
   , drRetryPolicyDefault
-  , DownloadException (..)
+  , VerifiedDownloadException (..)
   , HashCheck (..)
+  , mkDownloadRequest
+  , setHashChecks
+  , setLengthCheck
+  , setRetryPolicy
+  , setForceDownload
   ) where
 
 import           Control.Monad.State (get, put, modify)
@@ -153,7 +158,7 @@ verifiedDownload
 verifiedDownload dr destpath progressSink =
     Download.verifiedDownload dr' destpath progressSink
   where
-    dr' = dr {drRequest = setUserAgent (drRequest dr)}
+    dr' = modifyRequest setUserAgent dr
 
 verifiedDownloadWithProgress
   :: HasTerm env

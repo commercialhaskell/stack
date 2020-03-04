@@ -30,17 +30,15 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (DownloadRequest (..), DownloadException (..), Request, HttpException,
-                                           drRetryPolicyDefault, getResponseStatusCode, getResponseBody, httpLbs,
-                                           parseRequest, parseUrlThrow, verifiedDownloadWithProgress, setGithubHeaders)
+import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
+                                           getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
+                                           setForceDownload, setGithubHeaders, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
-import           System.PosixCompat.Files (getFileStatus, fileSize)
-import           System.Posix.Types (COff (..))
 import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
@@ -157,24 +155,16 @@ loadTemplate name logIt = do
         downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
-        fs <- liftIO $ getFileStatus (toFilePath path)
-        let (COff size) = fileSize fs
-            downloadFileSize = fromIntegral size
-            dReq = DownloadRequest
-              { drRequest = req
-              , drHashChecks = []
-              , drLengthCheck = Just downloadFileSize
-              , drRetryPolicy = drRetryPolicyDefault
-              }
+        let dReq = setForceDownload True $ mkDownloadRequest req
         logIt RemoteTemp
         catch
-          (void $
-            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) (Just downloadFileSize)
+          (void $ do
+            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) Nothing
           )
           (useCachedVersionOrThrow path)
 
         loadLocalFile path
-    useCachedVersionOrThrow :: Path Abs File -> DownloadException -> RIO env ()
+    useCachedVersionOrThrow :: Path Abs File -> VerifiedDownloadException -> RIO env ()
     useCachedVersionOrThrow path exception = do
       exists <- doesFileExist path
 
@@ -331,7 +321,7 @@ data NewException
     = FailedToLoadTemplate !TemplateName
                            !FilePath
     | FailedToDownloadTemplate !TemplateName
-                               !DownloadException
+                               !VerifiedDownloadException
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
@@ -350,18 +340,13 @@ instance Show NewException where
         "Failed to load download template " <> T.unpack (templateName name) <>
         " from " <>
         path
-    show (FailedToDownloadTemplate name (RedownloadInvalidResponse _ _ resp)) =
-        case getResponseStatusCode resp of
-            404 ->
-                "That template doesn't exist. Run `stack templates' to discover available templates."
-            code ->
-                "Failed to download template " <> T.unpack (templateName name) <>
-                ": unknown reason, status code was: " <>
-                show code
-
-    show (FailedToDownloadTemplate name (RedownloadHttpError httpError)) =
+    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) =
           "There was an unexpected HTTP error while downloading template " <>
           T.unpack (templateName name) <> ": " <> show httpError
+    show (FailedToDownloadTemplate name _) =
+        "Failed to download template " <> T.unpack (templateName name) <>
+        ": unknown reason"
+
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (MissingParameters name template missingKeys userConfigPath) =
