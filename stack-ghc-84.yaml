@@ -1,7 +1,23 @@
 resolver: lts-12.26
-name: snapshot-for-building-stack-with-ghc-8.4.4
 
 packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build-small:lts-12.26
+
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
 - Cabal-2.4.0.1@rev:0
 - hpack-0.31.2@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
