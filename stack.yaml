@@ -21,7 +21,9 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
+- aeson-1.4.6.0@sha256:560575b008a23960403a128331f0e59594786b5cd19a35be0cd74b9a7257958e,6980
 - ansi-terminal-0.9@rev:0
+- base-orphans-0.8.2@sha256:40ef37ed043aac2cbb6c538fdebfc62e601ee65ee161e4a6327452133b574d7e,2958
 - Cabal-3.0.0.0@rev:0
 - infer-license-0.2.0@rev:0 #for hpack-0.31
 - hpack-0.32.0@sha256:31178d0c454ec1fd2222e7c4bdd4db937b030a43cc79cb5bb62b8048c38cd64b,4406
@@ -41,6 +43,7 @@ extra-deps:
 - rio-0.1.11.0@rev:0
 - ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
 - hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
+- time-compat-1.9.2.2@sha256:ccf268e6ec91a6d9a79392697634c670c095a34a60d1ccfa1be1c84f20bb24c5,4254
 - typed-process-0.2.6.0@rev:0 # for rio-0.1.10.0
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
