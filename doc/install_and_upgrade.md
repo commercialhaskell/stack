@@ -323,6 +323,7 @@ setup-info-locations:
 - "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
 urls:
   latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
+
 package-indices:
  - name: Tsinghua
    download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/package/
