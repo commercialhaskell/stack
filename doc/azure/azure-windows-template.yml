@@ -1,34 +1,28 @@
 jobs:
 - job: ${{ parameters.name }}
+  timeoutInMinutes: 120
   pool:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     matrix:
-      stack:
-        BUILD: stack
-        STACK_YAML: stack.yaml
-      stack-lts-13:
-        BUILD: stack
-        STACK_YAML: stack-lts-13.yaml
-      stack-lts-12:
-        BUILD: stack
-        ARGS: "--resolver lts-12.26"
-      stack-lts-11:
-        BUILD: stack
-        ARGS: "--resolver lts-11"
-      stack-lts-10:
-        BUILD: stack
-        ARGS: "--resolver lts-10"
-      stack-lts-9:
-        BUILD: stack
+      GHC 8.0:
         ARGS: "--resolver lts-9"
+      GHC 8.2:
+        ARGS: "--resolver lts-11"
+      GHC 8.4:
+        ARGS: "--resolver lts-12"
+      GHC 8.6:
+        ARGS: "--resolver lts-14"
+      GHC 8.8:
+        ARGS: "--resolver lts-15"
+      nightly:
+        ARGS: "--resolver nightly"
   steps:
   - bash: |
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
-      curl -sSkL http://www.stackage.org/stack/windows-i386 -o /usr/bin/stack.zip
+      curl -sSkL http://www.stackage.org/stack/windows-x86_64 -o /usr/bin/stack.zip
       unzip -o /usr/bin/stack.zip -d /usr/bin/
-      stack --install-ghc $ARGS test --bench --only-dependencies
-      stack $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
+      stack $ARGS test --bench --no-run-benchmarks
     env:
       OS_NAME: ${{ parameters.os }}
-    displayName: 'Installation ${{parameters.os}} & Test'
+    displayName: 'Build and test'
