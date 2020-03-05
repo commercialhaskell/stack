@@ -22,6 +22,7 @@ pages:
   - Configuration (project and global): yaml_configuration.md
   - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
+  - Developing on Windows: developing_on_windows.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
   - Nix integration: nix_integration.md
@@ -42,6 +43,7 @@ pages:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
     - Add GHC version: maintainers/ghc.md
+    - Docker images: maintainers/docker.md
     - Upgrading msys: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
 

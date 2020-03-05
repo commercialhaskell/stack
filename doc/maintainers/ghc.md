@@ -11,9 +11,14 @@
         git push origin ghc-X.Y.Z-release
 
   * [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
-    with tag `ghc-X.Y.Z-release` and same name.
+    with tag `ghc-X.Y.Z-release` and same name, with description noting where the binidsts are mirrored from.  E.g.
 
-  * Download all the relevant GHC bindists from https://www.haskell.org/ghc/download_ghc_X_Y_Z and upload them to the just-created Github release (see
+        Unless otherwise indicated, bindists are mirrored from https://downloads.haskell.org/~ghc/
+        * FreeBSD bindists are mirrored from http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists
+        * musl bindists are mirrored from https://github.com/redneb/ghc-alt-libc/releases
+
+
+  * Download all the relevant GHC bindists from their sources, and upload them to the just-created Github release (see
     [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
     for the ones we used in the last GHC release).
 
@@ -26,6 +31,16 @@
   * [Edit stack-setup-2.yaml](https://github.com/fpco/stackage-content/edit/master/stack/stack-setup-2.yaml)
     and add the new bindists, pointing to the Github release version. Be sure to
     update the `content-length` and `sha1` values.
+
+    Before committing, test using a command like:
+
+        stack --resolver=ghc-X.Y.Z setup --setup-info-yaml=path/to/stackage-content/stack/stack-setup-2.yaml
+
+  * In [stackage-content](https://github.com/fpco/stackage-content), run
+
+        cd stack && ./update-global-hints.hs ghc-X.Y.Z
+
+    and command the changes.
 
 
 ## Building GHC

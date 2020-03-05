@@ -81,7 +81,7 @@ However, advanced users may want to understand exactly how `--coverage` works:
    the executable.
 
    When switching on this flag, it will usually cause all local packages to be
-   rebuilt (see [#1940](https://github.com/commercialhaskell/stack/issues/1940).
+   rebuilt (see [#1940](https://github.com/commercialhaskell/stack/issues/1940)).
 
 2. Before the build runs with `--coverage`, the contents of `stack path --local-hpc-root`
    gets deleted. This prevents old reports from getting mixed

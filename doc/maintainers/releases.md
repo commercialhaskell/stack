@@ -14,6 +14,7 @@
 * Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
 * If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
 * Try using Alpine and https://github.com/redneb/ghc-alt-libc/releases to build linux 32-bit static binaries.  This will require upgrading GHC version used (e.g. to 8.6.5).  If this works out, switch over to the same for 64-bit static binaries (rather than static-haskell-nix).
+* Fix the reference to "latest nightly stackage snapshot" below to work with a new workflow based on the GHC-named stack.yaml files.
 
 ## Iterating on release process
 
@@ -119,7 +120,7 @@ Examples:
         * Search for old Stack version, unstable stack version, and the next
           "obvious" possible versions in sequence, and
           `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd). 
-          * Do **NOT** update the Dockerfiles in `etc/dockerfiles/stack-build` yet; that will come later)
+          * Do **NOT** update the Dockerfiles in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/) yet; that will come later)
             * Do __NOT__ update templates in `.github` to point at the new release version yet!
         * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
         * Look for any links to "latest" (`latest/`) documentation, replace with version tag
@@ -246,7 +247,7 @@ for requirements to perform the release, and more details about the tool.
 
     - Update fpco/stack-build Docker images with new version
 
-      * Add `etc/dockerfiles/stack-build/lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
+      * Under [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
 
         ```
         FROM fpco/stack-build:lts-X.Z
@@ -254,9 +255,9 @@ for requirements to perform the release, and more details about the tool.
         RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
         ```
 
-      * Run `./build.sh lts` and test that the new image has the new version of Stack.
+      * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack.
 
-      * Run `./build.sh --push lts && ./build.sh --push --small lts` to push the new image to the registry.
+      * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
 
 
 * Delete the RC branch (locally and on origin).  E.g. `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
