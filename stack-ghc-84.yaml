@@ -40,13 +40,9 @@ extra-deps:
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
 - http-download-0.2.0.0@rev:0
-- github: commercialhaskell/pantry
-  commit: 86462a97c4d8091993cc6e246fd0f2ae5aa608f0
-- github: fpco/casa
-  commit: fc0ed26858bfc4f2966ed2dfb2871bae9266dda6
-  subdirs:
-     - casa-client
-     - casa-types
+- pantry-0.3.0.0@rev:0
+- casa-client-0.0.1@rev:0
+- casa-types-0.0.1@rev:0
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 
