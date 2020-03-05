@@ -53,7 +53,7 @@ spec = do
 
     prop "requested packages are pruned" $ do
       let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
-          allPackages g = Map.keysSet g `Set.union`  foldMap fst g
+          allPackages g = Map.keysSet g `Set.union` foldMap fst g
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
         in Set.null (allPackages pruned `Set.intersection` Set.fromList toPrune)
