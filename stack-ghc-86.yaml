@@ -1,7 +1,23 @@
 resolver: nightly-2019-07-15
-name: snapshot-for-building-stack-with-ghc-8.6.5
 
 packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build-small:lts-13.26
+
+nix:
+  # --nix on the command-line to enable.
+  enable: false
+  packages:
+    - zlib
+    - unzip
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
 - github: snoyberg/filelock
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - rio-0.1.11.0@rev:0

@@ -17,7 +17,6 @@ jobs:
         ARGS: "--resolver lts-15"
       nightly:
         ARGS: "--resolver nightly"
-    maxParallel: 3
   steps:
   - bash: |
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;

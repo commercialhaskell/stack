@@ -13,6 +13,7 @@
 * Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
 * If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
 * Try using Alpine and https://github.com/redneb/ghc-alt-libc/releases to build linux 32-bit static binaries.  This will require upgrading GHC version used (e.g. to 8.6.5).  If this works out, switch over to the same for 64-bit static binaries (rather than static-haskell-nix).
+* Fix the reference to "latest nightly stackage snapshot" below to work with a new workflow based on the GHC-named stack.yaml files.
 
 ## Iterating on release process
 

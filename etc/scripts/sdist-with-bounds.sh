@@ -5,13 +5,13 @@ set -eu -o pipefail
 rootdir="$(cd "$(dirname "$0")/../.."; pwd)"
 stackbin=stack
 loweryaml=$rootdir/stack.yaml
-if [[ -f $rootdir/stack-lts-12.yaml ]]; then
-  midyaml=$rootdir/stack-lts-12.yaml
+if [[ -f $rootdir/stack-ghc-84.yaml ]]; then
+  midyaml=$rootdir/stack-ghc-84.yaml
 else
   midyaml=$rootdir/stack.yaml
 fi
-if [[ -f $rootdir/stack-nightly.yaml ]]; then
-  upperyaml=$rootdir/stack-nightly.yaml
+if [[ -f $rootdir/stack-ghc-86.yaml ]]; then
+  upperyaml=$rootdir/stack-ghc-86.yaml
 else
   upperyaml=$rootdir/stack.yaml
 fi
