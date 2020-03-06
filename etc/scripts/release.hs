@@ -268,15 +268,13 @@ rules global@Global{..} args = do
                 cmd "strip -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
 
-    releaseDir </> binaryInstallerFileName %> \out -> do
+    releaseDir </> binaryInstallerFileName %> \_ -> do
         need [releaseDir </> binaryExeFileName]
         need [releaseDir </> binaryInstallerNSIFileName]
 
-        actionOnException
-            (command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
-                [ "-V3"
-                , binaryInstallerNSIFileName])
-            (removeFile out)
+        command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
+            [ "-V3"
+            , binaryInstallerNSIFileName]
 
     releaseDir </> binaryInstallerNSIFileName %> \out -> do
         need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
