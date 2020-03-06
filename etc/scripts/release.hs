@@ -43,7 +43,6 @@ import System.Console.GetOpt
 import System.Environment
 import System.Directory
 import System.IO.Error
-import System.Exit (ExitCode (..))
 import System.Process
 
 import qualified Codec.Archive.Tar as Tar
@@ -204,23 +203,9 @@ rules global@Global{..} args = do
                 [["--pedantic --no-haddock-deps "]
                 ,[" --haddock" | gTestHaddocks]
                 ,[" stack"]]
-
-            {-
             let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
             () <- cmd' "test" gBuildArgs integrationTestFlagArgs "--pedantic --exec stack-integration-test stack"
             return ()
-            -}
-
-            ec <- liftIO $ rawSystem
-                (gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName) $
-                concat
-                    [ "test" : gBuildArgs
-                    , integrationTestFlagArgs
-                    , words "--pedantic --exec stack-integration-test stack"
-                    ]
-            case ec of
-                ExitSuccess -> pure ()
-                _ -> liftIO $ throwIO ec
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
     unless gUploadOnly $ releaseDir </> binaryPkgZipFileName %> \out -> do
