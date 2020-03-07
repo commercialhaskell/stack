@@ -1,4 +1,4 @@
-cabal-version: 2.4
+cabal-version: 3.0
 name: foo
 version: 0
 build-type: Simple

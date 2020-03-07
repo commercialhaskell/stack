@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-11.22
+    --resolver lts-14.22
     --install-ghc
     --ghc-options -Wall
     --package Cabal
@@ -33,7 +33,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
 import Data.Maybe
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
 import Distribution.Text
 import Distribution.System
 import Distribution.Package

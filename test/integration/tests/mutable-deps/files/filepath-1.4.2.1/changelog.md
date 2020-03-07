@@ -2,6 +2,16 @@
 
 _Note: below all `FilePath` values are unquoted, so `\\` really means two backslashes._
 
+## 1.4.2.1 *Jul 2018*
+
+ * Bundled with GHC 8.6.1
+
+## 1.4.2 *Jan 2018*
+
+ * Bundled with GHC 8.4.1
+
+ * Add `isExtensionOf` function.
+
 ## 1.4.1.2  *Feb 2017*
 
  * Bundled with GHC 8.2.1
@@ -11,8 +21,6 @@ _Note: below all `FilePath` values are unquoted, so `\\` really means two backsl
  * Bundled with GHC 8.0.2
 
  * Documentation improvements
-
- * Allow QuickCheck-2.9
 
 ## 1.4.1.0  *Dec 2015*
 
