@@ -31,11 +31,7 @@ used on your projects:
 * The complex Azure configuration is intended for projects that need
   to support multiple GHC versions and multiple OSes, such as open
   source libraries to be released to Hackage. It tests against Stack
-  on Linux and macOS. The configuration is significantly more involved
-  to allow for all of this branching behavior. In the provided
-  template, we use the Linux build configuration to test against
-  various combinations of stack. The macOS and Windows configuration
-  is also used for testing Stack build configuration. These are the
+  for different resolves on Linux, macOS and Windows.  These are the
   files for the complex configuration:
   - [azure-pipelines.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-pipelines.yml) : This is the starter file used by the Azure CI.
   - [azure-linux-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-linux-template.yml) : Template for Azure Linux build
