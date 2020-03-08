@@ -29,6 +29,10 @@ Behavior changes:
 * Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)
 
+* We now recommend checking in generated cabal files for repos. When generating lock files for
+  extra-deps that only include `package.yaml` files, a deprecation warning will be generated.
+  See [#5210](https://github.com/commercialhaskell/stack/issues/5210).
+
 Other enhancements:
 * Add `build-output-timestamps` flag in yaml. Setting it to true
   prefixes each build log output line with a timestamp.
