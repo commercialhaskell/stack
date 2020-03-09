@@ -14,17 +14,17 @@ jobs:
 - template: azure-linux-template.yml
   parameters:
     name: Linux
-    vmImage: ubuntu-18.04
+    vmImage: ubuntu-latest
     os: linux
 
 - template: azure-osx-template.yml
   parameters:
     name: macOS
-    vmImage: macOS-10.14
+    vmImage: macOS-latest
     os: osx
 
 - template: azure-windows-template.yml
   parameters:
    name: Windows
-   vmImage: vs2017-win2016
+   vmImage: windows-latest
    os: windows
