@@ -23,6 +23,8 @@ Major changes:
 
 * Fully remove GHCJS support.
 
+* Remove the `freeze` command. It has been replaced by lock files.
+
 Behavior changes:
 * Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)

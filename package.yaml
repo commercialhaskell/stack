@@ -182,7 +182,6 @@ library:
   - Stack.Docker
   - Stack.Dot
   - Stack.FileWatch
-  - Stack.Freeze
   - Stack.GhcPkg
   - Stack.Ghci
   - Stack.Ghci.Script
@@ -202,7 +201,6 @@ library:
   - Stack.Options.DockerParser
   - Stack.Options.DotParser
   - Stack.Options.ExecParser
-  - Stack.Options.FreezeParser
   - Stack.Options.GhcBuildParser
   - Stack.Options.GhciParser
   - Stack.Options.GhcVariantParser
