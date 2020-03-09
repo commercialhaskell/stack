@@ -116,7 +116,8 @@ initProject currDir initOpts mresolver = do
           Map.mapMaybe (flip Map.lookup gpdByDir . resolvedAbsolute) rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
-      PLImmutable <$> completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+      PLImmutable . cplComplete <$>
+      completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg

@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8e24d116d573127dc291b5f529dd435b6a82081766b9ff827fc039510e98f6fa
+-- hash: 8f30d342ffc378818c52e483f656a29f7f917f5331d7b397ae245a74ff47292c
 
 name:           stack
 version:        2.2.0
@@ -266,7 +266,7 @@ library
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry >=0.2
+    , pantry >=0.4.0.0
     , path
     , path-io
     , persistent
@@ -386,7 +386,7 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry >=0.2
+    , pantry >=0.4.0.0
     , path
     , path-io
     , persistent
@@ -505,7 +505,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative
     , optparse-generic
-    , pantry >=0.2
+    , pantry >=0.4.0.0
     , path
     , path-io
     , persistent
@@ -627,7 +627,7 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry >=0.2
+    , pantry >=0.4.0.0
     , path
     , path-io
     , persistent
