@@ -62,7 +62,6 @@ import qualified Data.ByteString as Strict
 import           Data.Conduit (ConduitM, ConduitT, awaitForever, (.|), yield, await)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
-import           Data.Void (Void)
 import           Data.Monoid (Sum (..))
 import qualified Data.Text as T
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
