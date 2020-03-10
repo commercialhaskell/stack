@@ -134,3 +134,7 @@ depend on a package already present in the snapshot you've selected, there's no
 need to add it explicitly to your `stack.yaml` file: it's already there
 implicitly via the `resolver` setting. This is what you do the majority of the
 time, such as when you add `vector` or `mtl` as a `build-depends` value.
+
+## Should I check in generated cabal files?
+
+Yes, you should. This recommendation was changed in [issue #5210](https://github.com/commercialhaskell/stack/issues/5210), please see the discussion there.

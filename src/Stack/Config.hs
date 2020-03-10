@@ -592,8 +592,17 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     (deps0, mcompleted) <- fmap unzip . forM (projectDependencies project) $ \rpl -> do
       (pl, mCompleted) <- case rpl of
          RPLImmutable rpli -> do
-           compl <- maybe (completePackageLocation rpli) pure (Map.lookup rpli locCache)
-           pure (PLImmutable compl, Just (CompletedPLI rpli compl))
+           (compl, mcompl) <-
+             case Map.lookup rpli locCache of
+               Just compl -> pure (compl, Just compl)
+               Nothing -> do
+                 cpl <- completePackageLocation rpli
+                 if cplHasCabalFile cpl
+                   then pure (cplComplete cpl, Just $ cplComplete cpl)
+                   else do
+                     warnMissingCabalFile rpli
+                     pure (cplComplete cpl, Nothing)
+           pure (PLImmutable compl, CompletedPLI rpli <$> mcompl)
          RPLMutable p ->
            pure (PLMutable p, Nothing)
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl

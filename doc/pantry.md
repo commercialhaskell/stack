@@ -13,23 +13,6 @@ There are three user-visible components to Pantry's configuration which affect u
 * Package location specification (in the `extra-deps` field and inside snapshots)
 * Snapshot specification, for creating custom snapshots
 
-## Freeze command
-
-As you'll see throughout this document, there is a lot of additional
-information that can be provided to Stack to make the configuration
-more reproducible and faster to parse. However, it's tedious to
-specify these values manually. Therefore, the recommended workflow is:
-
-* Manually write the simple version of a configuration value
-* Use `stack freeze` to obtain the more reproducible version
-
-The standard `stack freeze` will operate on your `stack.yaml` file, and provide
-you with updated `resolver` and `extra-deps` values, if relevant. If you run
-`stack freeze --snapshot`, it will provide you with an update snapshot file.
-
-New contents will be printed to `stdout` instead of modifying your existing
-files to avoid mutation of user-created files.
-
 ## Snapshot location
 
 There are essentially four different ways of specifying a snapshot
@@ -55,9 +38,9 @@ resolver:
   sha256: 781ea577595dff08b9c8794761ba1321020e3e1ec3297fb833fe951cce1bee11
 ```
 
-Where the `size` is the number of bytes in the file, and `sha256` is
-its SHA256 hash. This information can automatically be generated with
-the [`stack freeze`](#freeze-command) command.
+Where the `size` is the number of bytes in the file, and `sha256` is its SHA256
+hash. If not provided, the information will automatically be generated and
+stored in a lock file.
 
 ## Package location
 
@@ -69,8 +52,7 @@ Pantry supports three types of package locations:
 
 All three of these formats support optional tree metadata to be added,
 which can be used for reproducibility and faster downloads. This
-information can automatically be generated with the [`stack
-freeze`](#freeze-command) command.
+information can automatically be generated in a lock file.
 
 ### Hackage
 
@@ -111,7 +93,7 @@ number is likely simpler to use. In practice, both should guarantee
 equally reproducible build plans.
 
 Finally, you can include the Pantry tree information. The following
-was generated with `stack freeze`:
+would be generated and stored in the lock file:
 
 ```yaml
 - hackage: acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
@@ -172,42 +154,6 @@ package in the root of the repo.  Note that if you specify a value of
 explicitly specified if a required package is found in the top-level
 directory of the repository.
 
-Using the `stack freeze` command will add in additional information,
-including not only the Pantry tree hash, but also package metadata
-which can allow Stack to work faster by bypassing cabal file
-parses. For example, this:
-
-```yaml
-extra-deps:
-- git: git@github.com:yesodweb/wai
-  commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-  subdirs:
-  - auto-update
-  - wai
-```
-
-Would be converted into:
-
-```yaml
-extra-deps:
-- subdir: auto-update
-  name: auto-update
-  version: 0.1.2.1
-  git: git@github.com:yesodweb/wai
-  pantry-tree:
-    size: 687
-    sha256: 26377897f35ccd3890b4405d72523233717afb04d62f2d36031bf6b18dcef74f
-  commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-- subdir: wai
-  name: wai
-  version: 3.0.2.3
-  git: git@github.com:yesodweb/wai
-  pantry-tree:
-    size: 10299
-    sha256: ce33fddab13592c847fbd7acd1859dfcbb9aeb6c212db3cee27c909fa3f3ae44
-  commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
-```
-
 #### Limited [git-annex](https://git-annex.branchable.com) support
 
 Pantry does not support [git-annex](https://git-annex.branchable.com). This is
@@ -246,46 +192,6 @@ extra-deps:
   - warp
 - archive: ../acme-missiles-0.3.tar.gz
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
-```
-
-With the `stack freeze` command, this would be replaced with:
-
-```yaml
-extra-deps:
-- size: 1540
-  url: https://hackage.haskell.org/package/acme-dont-1.1.tar.gz
-  name: acme-dont
-  version: '1.1'
-  sha256: c32231ff8548bccd4f3bafcc9b1eb84947a2e5e0897c50c048e0e7609fc443ce
-  pantry-tree:
-    size: 206
-    sha256: 79dbeddaf0fd507611687cefe9511c8fda489849fb0cac3894925716936290b2
-- size: 285152
-  subdir: wai
-  url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  name: wai
-  version: 3.0.2.3
-  sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
-  pantry-tree:
-    size: 10296
-    sha256: ce431f1a22fcda89375ba5e35e53aee968eea23d1124fcba7cb9eae426daa2db
-- size: 285152
-  subdir: warp
-  url: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
-  name: warp
-  version: 3.0.13.1
-  sha256: 3b6eb04f3763ca16432f3ab2135d239161fbe2c8811b8cd1778ffa67469289ba
-  pantry-tree:
-    size: 4292
-    sha256: d6b1def306a042b5fc500930302533a3ea828e916c99cbd82c0b7e2c4e3a8e09
-- size: 1442
-  filepath: acme-missiles-0.3.tar.gz
-  name: acme-missiles
-  version: '0.3'
-  sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
-  pantry-tree:
-    size: 226
-    sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ```
 
 ## Snapshots
@@ -348,41 +254,6 @@ has changed by hashing the contents of the involved files, and using it to
 identify the snapshot internally. It is often reasonably efficient to modify a
 custom snapshot, due to stack sharing snapshot packages whenever possible.
 
-Running the `stack freeze --snapshot` command yields the following
-output:
-
-```yaml
-flags:
-  unordered-containers:
-    debug: true
-ghc-options:
-  warp:
-  - -O2
-packages:
-- hackage: unordered-containers-0.2.7.1@sha256:7a1ceb6d88c0f16ec417f28dac16f6dc7b10e88fbb536a74d84941ad2f57b74b,4367
-  pantry-tree:
-    size: 1286
-    sha256: 8a8f745cacae3c11a9c6e6c2fcefc95a13d0c153a8e14b4d28485db1b59d9ef3
-- hackage: hashable-1.2.4.0@sha256:33a49b3ea87cc4a0c89a4fd48f19e4807d8c620aff710a048a28cf7d9c9b4620,4271
-  pantry-tree:
-    size: 1325
-    sha256: cb05c31a8ec43f727004e5a6c8e35ff92e0515855a85cb01fa73623683ee4b33
-- hackage: text-1.2.2.1@sha256:1c6ffad395d1674915cc9fda1d3b8f202ddcbfda7c341eb8bd99de67d3283bf9,5724
-  pantry-tree:
-    size: 7376
-    sha256: ac2601c49cf7bc0f5d66b2793eddc8352f51a6ee989980827a0d0d8169700a03
-hidden:
-  warp: false
-  wai: true
-drop-packages:
-- wai-extra
-compiler: ghc-8.0.1
-resolver:
-  size: 515969
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/8/21.yaml
-  sha256: 2ec73d520d3e55cb753eaca11a72a9ce95bd9ba7ccaf16de1150d0130a50a5a1
-```
-
 ### Overriding the compiler
 
 The following snapshot specification will be identical to `lts-7.1`, but instead
@@ -444,13 +315,3 @@ flags:
   text:
     developer: true
 ```
-
-## Updating frozen information
-
-Suppose you're depending on `foo-1.2.3` from Hackage, and have used `stack
-freeze` on your file. Now you'd like to upgrade to `foo-1.2.4`. Doing so
-requires you to:
-
-* Change the version number specified to `1.2.4`
-* Remove any freeze information that may conflict, like cabal file info, pantry tree, etc
-* Rerun the `stack freeze` command to generate the new freeze information

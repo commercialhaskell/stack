@@ -50,7 +50,6 @@ import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.FileWatch
-import           Stack.Freeze
 import           Stack.Ghci
 import           Stack.Hoogle
 import           Stack.Ls
@@ -64,7 +63,6 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
-import           Stack.Options.FreezeParser
 
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
@@ -334,10 +332,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                       })
                  (globalOpts OtherCmdGlobalOpts)
                  scriptOptsParser
-      addCommand' "freeze"
-                  "Show project or snapshot with pinned dependencies if there are any such (experimental, may be removed)"
-                  freezeCmd
-                  freezeOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"
@@ -865,9 +859,6 @@ hpcReportCmd hropts = do
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
     withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
-
-freezeCmd :: FreezeOpts -> RIO Runner ()
-freezeCmd freezeOpts = withConfig YesReexec $ withDefaultEnvConfig $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | InvalidPathForExec FilePath
