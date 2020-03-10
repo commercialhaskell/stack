@@ -17,7 +17,6 @@ import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import           Data.List.Extra                 (groupSortOn)
-import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Map.Strict                 as Map
 import qualified Data.Set                        as Set

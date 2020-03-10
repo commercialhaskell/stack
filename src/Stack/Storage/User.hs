@@ -32,7 +32,6 @@ module Stack.Storage.User
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
-import Database.Persist.Sql (SqlBackend)
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import Distribution.Text (simpleParse, display)

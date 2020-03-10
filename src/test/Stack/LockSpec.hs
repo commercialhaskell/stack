@@ -5,7 +5,6 @@
 module Stack.LockSpec where
 
 import Pantry.Internal.AesonExtended (WithJSONWarnings(..))
-import Data.ByteString (ByteString)
 import qualified Data.Yaml as Yaml
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Types.Version (mkVersion)

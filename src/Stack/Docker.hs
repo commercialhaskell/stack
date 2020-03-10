@@ -41,7 +41,12 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
 import           Data.Version (showVersion)
 import           Distribution.Version (mkVersion)
+#if MIN_VERSION_path(0,7,0)
+import           Path hiding (replaceExtension)
+#else
 import           Path
+#endif
+import           Path.Extended (replaceExtension)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
@@ -55,7 +60,6 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import qualified System.FilePath as FP
-import           System.IO (stderr,stdin)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
@@ -151,7 +155,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         exePath <- ensureDockerStackExe dockerContainerPlatform
         cmdArgs args exePath
     cmdArgs args exePath = do
-        exeBase <- exePath -<.> ""
+        exeBase <- replaceExtension "" exePath
         let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
         return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 

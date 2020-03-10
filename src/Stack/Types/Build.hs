@@ -53,8 +53,6 @@ import           Data.List.Extra
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
-import           Data.Text.Encoding              (decodeUtf8With)
-import           Data.Text.Encoding.Error        (lenientDecode)
 import           Database.Persist.Sql            (PersistField(..)
                                                  ,PersistFieldSql(..)
                                                  ,PersistValue(PersistText)

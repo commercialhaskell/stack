@@ -54,13 +54,13 @@ import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
-import              Lens.Micro (set)
 import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
                                               getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
                                               mkDownloadRequest, parseRequest, parseUrlThrow, setGithubHeaders,
                                               setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse)
-import              Path
+import              Path hiding (fileExtension)
 import              Path.CheckInstall (warnInstallSearchPathIssues)
+import              Path.Extended (fileExtension)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Pantry
@@ -853,9 +853,13 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
          bindistPath <- parseRelDir "_build/bindist"
          (_,files) <- listDir (cwd </> bindistPath)
          let
-           isBindist p = "ghc-" `isPrefixOf` (toFilePath (filename p))
-                         && fileExtension (filename p) == ".xz"
-           mbindist = filter isBindist files
+           isBindist p = do
+             extension <- fileExtension (filename p)
+
+             return $ "ghc-" `isPrefixOf` (toFilePath (filename p))
+                         && extension == ".xz"
+
+         mbindist <- filterM isBindist files
          case mbindist of
            [bindist] -> do
                let bindist' = T.pack (toFilePath bindist)

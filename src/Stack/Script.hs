@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,7 +22,11 @@ import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.VersionRange (withinRange)
 import           Distribution.System        (Platform (..))
 import qualified Pantry.SHA256 as SHA256
+#if MIN_VERSION_path(0,7,0)
+import           Path hiding (replaceExtension)
+#else
 import           Path
+#endif
 import           Path.IO
 import qualified Stack.Build
 import           Stack.Build.Installed

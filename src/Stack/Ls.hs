@@ -9,8 +9,7 @@ module Stack.Ls
   , listDependenciesCmd
   ) where
 
-import Control.Exception (Exception, throw)
-import Control.Monad (when)
+import Control.Exception (throw)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Stack.Prelude hiding (Snapshot (..))
@@ -19,11 +18,10 @@ import qualified Data.List as L
 import Data.Text hiding (pack, intercalate)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import Network.HTTP.StackClient (httpJSON, addRequestHeader, getResponseBody, parseRequest, hAccept)
 import qualified Options.Applicative as OA
-import Options.Applicative ((<|>), idm)
+import Options.Applicative (idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
 import RIO.PrettyPrint (useColorL)
