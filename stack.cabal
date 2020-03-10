@@ -1,0 +1,678 @@
+cabal-version: 2.0
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 8f30d342ffc378818c52e483f656a29f7f917f5331d7b397ae245a74ff47292c
+
+name:           stack
+version:        2.2.0
+synopsis:       The Haskell Tool Stack
+description:    Please see the documentation at <https://docs.haskellstack.org>
+                for usage information.
+                .
+                If building a 'stack' executable for distribution, please download the
+                source code from <https://github.com/commercialhaskell/stack/releases>
+                and build it using Stack itself in order to ensure identical behaviour
+                to official binaries.  This package on Hackage is provided for convenience
+                and bootstrapping purposes.
+                .
+                Note that the API for the library is not currently stable, and may
+                change significantly, even between minor releases. It is
+                currently only intended for use by the executable.
+category:       Development
+homepage:       http://haskellstack.org
+bug-reports:    https://github.com/commercialhaskell/stack/issues
+author:         Commercial Haskell SIG
+maintainer:     manny@fpcomplete.com
+license:        BSD3
+license-file:   LICENSE
+build-type:     Custom
+extra-source-files:
+    CONTRIBUTING.md
+    ChangeLog.md
+    README.md
+    stack.yaml
+    doc/azure_ci.md
+    doc/build_command.md
+    doc/build_overview.md
+    doc/ChangeLog.md
+    doc/CONTRIBUTING.md
+    doc/coverage.md
+    doc/custom_snapshot.md
+    doc/dependency_visualization.md
+    doc/developing_on_windows.md
+    doc/docker_integration.md
+    doc/faq.md
+    doc/ghci.md
+    doc/ghcjs.md
+    doc/GUIDE.md
+    doc/install_and_upgrade.md
+    doc/lock_files.md
+    doc/nix_integration.md
+    doc/nonstandard_project_init.md
+    doc/pantry.md
+    doc/README.md
+    doc/shell_autocompletion.md
+    doc/SIGNING_KEY.md
+    doc/stack_yaml_vs_cabal_package_file.md
+    doc/travis_ci.md
+    doc/yaml_configuration.md
+    src/setup-shim/StackSetupShim.hs
+    test/package-dump/ghc-7.10.txt
+    test/package-dump/ghc-7.8.4-osx.txt
+    test/package-dump/ghc-7.8.txt
+    test/package-dump/ghc-head.txt
+    src/test/Stack/Untar/test1.tar.gz
+    src/test/Stack/Untar/test2.tar.gz
+
+source-repository head
+  type: git
+  location: https://github.com/commercialhaskell/stack
+
+custom-setup
+  setup-depends:
+      Cabal
+    , base >=4.10 && <5
+    , filepath
+
+flag disable-git-info
+  description: Disable compile-time inclusion of current git info in stack
+  manual: True
+  default: False
+
+flag hide-dependency-versions
+  description: Hides dependency versions from 'stack --version', used only by building Stack and the default 'stack.yaml'.  Note to packagers/distributors: DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY (e.g. using cabal or from Hackage), as it makes debugging support requests more difficult.
+  manual: True
+  default: False
+
+flag integration-tests
+  description: Run the integration test suite
+  manual: True
+  default: False
+
+flag static
+  description: Pass -static/-pthread to ghc when linking the stack binary.
+  manual: True
+  default: False
+
+flag supported-build
+  description: If false, causes 'stack --version' to issue a warning about the build being unsupported.  Should be True only if building with Stack and the default 'stack.yaml'.  Note to packagers/distributors: DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY (e.g. using cabal or from Hackage), as it makes debugging support requests more difficult.
+  manual: True
+  default: False
+
+library
+  exposed-modules:
+      Control.Concurrent.Execute
+      Data.Attoparsec.Args
+      Data.Attoparsec.Combinators
+      Data.Attoparsec.Interpreter
+      Data.Monoid.Map
+      Network.HTTP.StackClient
+      Options.Applicative.Args
+      Options.Applicative.Builder.Extra
+      Options.Applicative.Complicated
+      Path.CheckInstall
+      Path.Extra
+      Path.Find
+      Stack.Build
+      Stack.Build.Cache
+      Stack.Build.ConstructPlan
+      Stack.Build.Execute
+      Stack.Build.Haddock
+      Stack.Build.Installed
+      Stack.Build.Source
+      Stack.Build.Target
+      Stack.BuildPlan
+      Stack.Clean
+      Stack.Config
+      Stack.Config.Build
+      Stack.Config.Docker
+      Stack.Config.Nix
+      Stack.ConfigCmd
+      Stack.Constants
+      Stack.Constants.Config
+      Stack.Coverage
+      Stack.DefaultColorWhen
+      Stack.Docker
+      Stack.Dot
+      Stack.FileWatch
+      Stack.GhcPkg
+      Stack.Ghci
+      Stack.Ghci.Script
+      Stack.Hoogle
+      Stack.IDE
+      Stack.Init
+      Stack.Ls
+      Stack.Lock
+      Stack.New
+      Stack.Nix
+      Stack.Options.BenchParser
+      Stack.Options.BuildMonoidParser
+      Stack.Options.BuildParser
+      Stack.Options.CleanParser
+      Stack.Options.ConfigParser
+      Stack.Options.Completion
+      Stack.Options.DockerParser
+      Stack.Options.DotParser
+      Stack.Options.ExecParser
+      Stack.Options.GhcBuildParser
+      Stack.Options.GhciParser
+      Stack.Options.GhcVariantParser
+      Stack.Options.GlobalParser
+      Stack.Options.HaddockParser
+      Stack.Options.HpcReportParser
+      Stack.Options.LogLevelParser
+      Stack.Options.NewParser
+      Stack.Options.NixParser
+      Stack.Options.PackageParser
+      Stack.Options.ResolverParser
+      Stack.Options.ScriptParser
+      Stack.Options.SDistParser
+      Stack.Options.TestParser
+      Stack.Options.Utils
+      Stack.Package
+      Stack.PackageDump
+      Stack.Path
+      Stack.Prelude
+      Stack.Runners
+      Stack.Script
+      Stack.SDist
+      Stack.Setup
+      Stack.Setup.Installed
+      Stack.SetupCmd
+      Stack.SourceMap
+      Stack.Storage.Project
+      Stack.Storage.User
+      Stack.Storage.Util
+      Stack.Types.Build
+      Stack.Types.CompilerBuild
+      Stack.Types.Compiler
+      Stack.Types.Config
+      Stack.Types.Config.Build
+      Stack.Types.Docker
+      Stack.Types.GhcPkgId
+      Stack.Types.NamedComponent
+      Stack.Types.Nix
+      Stack.Types.Package
+      Stack.Types.PackageName
+      Stack.Types.Resolver
+      Stack.Types.SourceMap
+      Stack.Types.TemplateName
+      Stack.Types.Version
+      Stack.Types.VersionIntervals
+      Stack.Unpack
+      Stack.Upgrade
+      Stack.Upload
+      System.Info.ShortPathName
+      System.Permissions
+      System.Process.Pager
+      System.Terminal
+      Paths_stack
+  other-modules:
+      Stack.Types.Cache
+  autogen-modules:
+      Paths_stack
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
+  build-depends:
+      Cabal
+    , aeson
+    , annotated-wl-pprint
+    , ansi-terminal
+    , array
+    , async
+    , attoparsec
+    , base >=4.10 && <5
+    , base64-bytestring
+    , bytestring
+    , casa-client
+    , casa-types
+    , colour
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , deepseq
+    , directory
+    , echo
+    , exceptions
+    , extra
+    , file-embed
+    , filelock
+    , filepath
+    , fsnotify
+    , generic-deriving
+    , hackage-security
+    , hashable
+    , hi-file-parser
+    , hpack
+    , hpc
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-download
+    , http-types
+    , memory
+    , microlens
+    , mintty
+    , mono-traversable
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , open-browser
+    , optparse-applicative
+    , pantry >=0.4.0.0
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , pretty
+    , primitive
+    , process
+    , project-template
+    , regex-applicative-text
+    , retry
+    , rio
+    , rio-prettyprint
+    , semigroups
+    , split
+    , stm
+    , streaming-commons
+    , tar
+    , template-haskell
+    , temporary
+    , text
+    , text-metrics
+    , th-reify-many
+    , time
+    , tls
+    , transformers
+    , typed-process
+    , unicode-transforms
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+    , zlib
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-tools:
+        hsc2hs
+    build-depends:
+        unix
+  if os(windows)
+    other-modules:
+        System.Uname
+    hs-source-dirs:
+        src/windows/
+  else
+    other-modules:
+        System.Uname
+    hs-source-dirs:
+        src/unix/
+    c-sources:
+        src/unix/cbits/uname.c
+  default-language: Haskell2010
+
+executable stack
+  main-is: Main.hs
+  other-modules:
+      BuildInfo
+      Build_stack
+      Paths_stack
+  autogen-modules:
+      Build_stack
+      Paths_stack
+  hs-source-dirs:
+      src/main
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
+  build-depends:
+      Cabal
+    , aeson
+    , annotated-wl-pprint
+    , ansi-terminal
+    , array
+    , async
+    , attoparsec
+    , base >=4.10 && <5
+    , base64-bytestring
+    , bytestring
+    , casa-client
+    , casa-types
+    , colour
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , deepseq
+    , directory
+    , echo
+    , exceptions
+    , extra
+    , file-embed
+    , filelock
+    , filepath
+    , fsnotify
+    , generic-deriving
+    , hackage-security
+    , hashable
+    , hi-file-parser
+    , hpack
+    , hpc
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-download
+    , http-types
+    , memory
+    , microlens
+    , mintty
+    , mono-traversable
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , open-browser
+    , optparse-applicative
+    , pantry >=0.4.0.0
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , pretty
+    , primitive
+    , process
+    , project-template
+    , regex-applicative-text
+    , retry
+    , rio
+    , rio-prettyprint
+    , semigroups
+    , split
+    , stack
+    , stm
+    , streaming-commons
+    , tar
+    , template-haskell
+    , temporary
+    , text
+    , text-metrics
+    , th-reify-many
+    , time
+    , tls
+    , transformers
+    , typed-process
+    , unicode-transforms
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+    , zlib
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-tools:
+        hsc2hs
+    build-depends:
+        unix
+  if flag(static)
+    ld-options: -static -pthread
+  if !(flag(disable-git-info))
+    cpp-options: -DUSE_GIT_INFO
+    build-depends:
+        githash
+      , optparse-simple
+  if flag(hide-dependency-versions)
+    cpp-options: -DHIDE_DEP_VERSIONS
+  if flag(supported-build)
+    cpp-options: -DSUPPORTED_BUILD
+  default-language: Haskell2010
+
+executable stack-integration-test
+  main-is: IntegrationSpec.hs
+  other-modules:
+      StackTest
+      Paths_stack
+  hs-source-dirs:
+      test/integration
+      test/integration/lib
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Cabal
+    , aeson
+    , annotated-wl-pprint
+    , ansi-terminal
+    , array
+    , async
+    , attoparsec
+    , base >=4.10 && <5
+    , base64-bytestring
+    , bytestring
+    , casa-client
+    , casa-types
+    , colour
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , deepseq
+    , directory
+    , echo
+    , exceptions
+    , extra
+    , file-embed
+    , filelock
+    , filepath
+    , fsnotify
+    , generic-deriving
+    , hackage-security
+    , hashable
+    , hi-file-parser
+    , hpack
+    , hpc
+    , hspec
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-download
+    , http-types
+    , memory
+    , microlens
+    , mintty
+    , mono-traversable
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , open-browser
+    , optparse-applicative
+    , optparse-generic
+    , pantry >=0.4.0.0
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , pretty
+    , primitive
+    , process
+    , project-template
+    , regex-applicative-text
+    , retry
+    , rio
+    , rio-prettyprint
+    , semigroups
+    , split
+    , stm
+    , streaming-commons
+    , tar
+    , template-haskell
+    , temporary
+    , text
+    , text-metrics
+    , th-reify-many
+    , time
+    , tls
+    , transformers
+    , typed-process
+    , unicode-transforms
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+    , zlib
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-tools:
+        hsc2hs
+    build-depends:
+        unix
+  if !(flag(integration-tests))
+    buildable: False
+  default-language: Haskell2010
+
+test-suite stack-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Stack.ArgsSpec
+      Stack.Build.ExecuteSpec
+      Stack.Build.TargetSpec
+      Stack.Config.DockerSpec
+      Stack.ConfigSpec
+      Stack.DotSpec
+      Stack.Ghci.PortableFakePaths
+      Stack.Ghci.ScriptSpec
+      Stack.GhciSpec
+      Stack.LockSpec
+      Stack.NixSpec
+      Stack.PackageDumpSpec
+      Stack.Types.TemplateNameSpec
+      Stack.UploadSpec
+      Paths_stack
+  hs-source-dirs:
+      src/test
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
+  build-depends:
+      Cabal
+    , QuickCheck
+    , aeson
+    , annotated-wl-pprint
+    , ansi-terminal
+    , array
+    , async
+    , attoparsec
+    , base >=4.10 && <5
+    , base64-bytestring
+    , bytestring
+    , casa-client
+    , casa-types
+    , colour
+    , conduit
+    , conduit-extra
+    , containers
+    , cryptonite
+    , cryptonite-conduit
+    , deepseq
+    , directory
+    , echo
+    , exceptions
+    , extra
+    , file-embed
+    , filelock
+    , filepath
+    , fsnotify
+    , generic-deriving
+    , hackage-security
+    , hashable
+    , hi-file-parser
+    , hpack
+    , hpc
+    , hspec
+    , http-client
+    , http-client-tls
+    , http-conduit
+    , http-download
+    , http-types
+    , memory
+    , microlens
+    , mintty
+    , mono-traversable
+    , mtl
+    , mustache
+    , neat-interpolation
+    , network-uri
+    , open-browser
+    , optparse-applicative
+    , pantry >=0.4.0.0
+    , path
+    , path-io
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , pretty
+    , primitive
+    , process
+    , project-template
+    , raw-strings-qq
+    , regex-applicative-text
+    , retry
+    , rio
+    , rio-prettyprint
+    , semigroups
+    , smallcheck
+    , split
+    , stack
+    , stm
+    , streaming-commons
+    , tar
+    , template-haskell
+    , temporary
+    , text
+    , text-metrics
+    , th-reify-many
+    , time
+    , tls
+    , transformers
+    , typed-process
+    , unicode-transforms
+    , unix-compat
+    , unliftio
+    , unordered-containers
+    , vector
+    , yaml
+    , zip-archive
+    , zlib
+  if os(windows)
+    cpp-options: -DWINDOWS
+    build-depends:
+        Win32
+  else
+    build-tools:
+        hsc2hs
+    build-depends:
+        unix
+  default-language: Haskell2010

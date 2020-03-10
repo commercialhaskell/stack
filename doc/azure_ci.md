@@ -30,14 +30,9 @@ used on your projects:
   with just the settings present in your `stack.yaml` file.
 * The complex Azure configuration is intended for projects that need
   to support multiple GHC versions and multiple OSes, such as open
-  source libraries to be released to Hackage. It tests against
-  cabal-install, as well as Stack on Linux and macOS. The
-  configuration is significantly more involved to allow for all of
-  this branching behavior. In the provided template, we use the Linux
-  build configuration to test against various combinations of
-  cabal-install and stack. The macOS and Windows configuration is used
-  only for testing Stack build configuration. These are the files for
-  the complex configuration:
+  source libraries to be released to Hackage. It tests against Stack
+  for different resolves on Linux, macOS and Windows.  These are the
+  files for the complex configuration:
   - [azure-pipelines.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-pipelines.yml) : This is the starter file used by the Azure CI.
   - [azure-linux-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-linux-template.yml) : Template for Azure Linux build
   - [azure-osx-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-osx-template.yml) : Template for Azure macOS build
@@ -100,19 +95,14 @@ specify which virtual image you want to choose using this configuration:
 
 ``` yaml
 pool:
-  vmImage: ubuntu-16.04
+  vmImage: ubuntu-latest
 ```
 
-The other popular options are `macOS-10.13`, `vs2017-win2016` for Mac
+The other popular options are `macOS-latest`, `windows-latest` for Mac
 and Windows respectively. You can find the [complete
 list](https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/hosted?view=vsts&tabs=yaml)
-here.
-
-Note that as of now, Azure CI doesn't offer any caching support. You
-can use something like [cache-s3](https://github.com/fpco/cache-s3)
-for explicit caching, although it may cost you. For a project with an
-example usage of `cache-s3`, you can see the Azure configuration of
-[stack](https://github.com/commercialhaskell/stack) repository.
+here. You also have the option to select a specific supported ubuntu
+version like `ubuntu-18.08`.
 
 ## Installing Stack
 
@@ -134,19 +124,7 @@ There are two ways to install GHC:
 - Install GHC using apt package manger. This method is only applicable
   for Debian based images.
 
-See the [simple azure
-script](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-simple.yml)
-for an example of the first option (letting Stack download GHC). Here,
-we will show the second option:
-
-```yaml
-sudo add-apt-repository -y ppa:hvr/ghc
-sudo apt-get update
-sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
-```
-
-For the above commands to work, you need to set the `CABALVER` and
-`GHCVER` environment variable properly.
+But we only use the first method of using Stack to download GHC.
 
 ### Multiple GHC - parametrised builds
 
@@ -154,34 +132,22 @@ For different GHC versions, you probably want to use different
 `stack.yaml` files. If you don't want to put a specific `stack.yaml`
 for a particular resolver and still want to test it, you have specify
 your resolver argument in `ARGS` environment variable (you will see an
-example below). For cabal based builds, you have to specify both
-`GHCVER` and `CABALVER` environment variables.
-
+example below).
 ```
 strategy:
   matrix:
-    stack-def:
-      BUILD: stack
-      STACK_YAML: stack.yaml
-    stack-lts-13:
-      BUILD: stack
-      STACK_YAML: stack-lts-13.yaml
-    cabal-8.4.4:
-      BUILD: cabal
-      GHCVER: 8.4.4
-      CABALVER: 2.4
-    cabal-8.6.5:
-      BUILD: cabal
-      GHCVER: 8.6.5
-      CABALVER: 2.4
+    GHC 8.0:
+      ARGS: "--resolver lts-9"
+    GHC 8.2:
+      ARGS: "--resolver lts-11"
+    GHC 8.4:
+      ARGS: "--resolver lts-12"
+    GHC 8.6:
+      ARGS: "--resolver lts-14"
+    GHC 8.8:
+      ARGS: "--resolver lts-15"
     nightly:
-      BUILD: stack
       ARGS: "--resolver nightly"
-    style:
-      BUILD: style
-    pedantic:
-      BUILD: pedantic
-      STACK_YAML: stack.yaml
 ```
 
 ## Running tests
@@ -189,8 +155,7 @@ strategy:
 After the environment setup, actual test running is simple:
 
 ```yaml
-script:
-  - stack test
+stack $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
 ```
 
 ## Other details
