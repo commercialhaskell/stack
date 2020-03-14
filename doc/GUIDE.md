@@ -450,7 +450,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.22`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-15.3`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -467,15 +467,14 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.22, let's change our
-`stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
-this is currently 2018-07-25 - please see the resolve from the link above to get the latest.
+Let's explore package sets a bit further. Instead of lts-15.3, let's use [the latest nightly](https://www.stackage.org/snapshots) by replacing the value of the `resolver` field in our `stack.yaml` file. Right now,
+this is currently [`nightly-2020-03-14`](https://www.stackage.org/nightly-2020-03-14) - please see the resolve from the link above to get the latest.
 
 Then, Rerunning `stack build` will produce:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-Downloaded nightly-2018-07-31 build plan.
+Downloaded nightly-2020-03-14 build plan.
 # build output ...
 ```
 
@@ -483,8 +482,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.22 build
-Downloaded lts-11.22 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-15.3 build
+Downloaded lts-15.3 build plan.
 # build output ...
 ```
 
@@ -559,7 +558,7 @@ cueball:~/yackage-0.8.0$ stack init
 # init output ...
 ```
 
-stack init does quite a few things for you behind the scenes:
+`stack init` does quite a few things for you behind the scenes:
 
 * Finds all of the `.cabal` files in your current directory and subdirectories
   (unless you use `--ignore-subdirs`) and determines the packages and versions
@@ -590,7 +589,7 @@ cueball:~/yackage-0.8.0$ stack init --force
 # init failure output
 ```
 
-stack has tested six different snapshots, and in every case discovered that
+stack has tested 18 different snapshots, and in every case discovered that
 acme-missiles is not available. In the end it suggested that you use the
 `--solver` command line switch if you want to use packages outside Stackage. So
 let's give it a try:
