@@ -36,11 +36,12 @@ import           Data.Conduit.Process.Typed hiding (proc)
 import           Data.List (dropWhileEnd,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
+import           Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
-import           Data.Version (showVersion)
-import           Distribution.Version (mkVersion)
+import qualified Data.Version (showVersion, parseVersion, Version)
+import           Distribution.Version (mkVersion, mkVersion')
 #if MIN_VERSION_path(0,7,0)
 import           Path hiding (replaceExtension)
 #else
@@ -65,6 +66,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 import           RIO.Process
 
 #ifndef WINDOWS
@@ -94,7 +96,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
             else return Nothing
     args <-
         fmap
-            (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
+            (["--" ++ reExecArgName ++ "=" ++ Data.Version.showVersion Meta.version
              ,"--" ++ dockerEntrypointArgName
              ,show DockerEntrypoint{..}] ++)
             (liftIO getArgs)
@@ -403,7 +405,7 @@ checkDockerVersion docker =
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersion (stripVersion v) of
+         case fmap mkVersion' $ parseVersion' $ stripVersion v of
            Just v'
              | v' < minimumDockerVersion ->
                throwIO (DockerTooOldException minimumDockerVersion v')
@@ -418,6 +420,9 @@ checkDockerVersion docker =
   where minimumDockerVersion = mkVersion [1, 6, 0]
         prohibitedDockerVersions = []
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
+        -- version is parsed by Data.Version provided code to avoid
+        -- Cabal's Distribution.Version lack of support for leading zeros in version
+        parseVersion' = fmap fst . listToMaybe . reverse . readP_to_S Data.Version.parseVersion
 
 -- | Remove the project's Docker sandbox.
 reset :: HasConfig env => Bool -> RIO env ()
