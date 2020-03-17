@@ -40,7 +40,7 @@ import           Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
-import qualified Data.Version (showVersion, parseVersion, Version)
+import qualified Data.Version (showVersion, parseVersion)
 import           Distribution.Version (mkVersion, mkVersion')
 #if MIN_VERSION_path(0,7,0)
 import           Path hiding (replaceExtension)
