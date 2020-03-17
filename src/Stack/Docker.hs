@@ -36,7 +36,6 @@ import           Data.Conduit.Process.Typed hiding (proc)
 import           Data.List (dropWhileEnd,isPrefixOf,isInfixOf)
 import           Data.List.Extra (trim)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
