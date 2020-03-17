@@ -40,7 +40,7 @@ extra-deps:
 - rio-prettyprint-0.1.0.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
 - http-download-0.2.0.0@rev:0
-- pantry-0.4.0.0@rev:0
+- pantry-0.4.0.1@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
 - github: snoyberg/filelock
