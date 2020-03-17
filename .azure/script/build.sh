@@ -1,0 +1,3 @@
+uname -m
+
+echo "Hello"
