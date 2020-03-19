@@ -37,12 +37,12 @@ jobs:
 #    vmImage: vs2017-win2016
 #    os: windows
 
-- template: ./.azure/azure-nightly-template-alpine.yml
-  parameters:
-   name: AlpineLinux64
-   vmImage: ubuntu-16.04
-   os: alpine-linux
-   containerImage: jeffhappily/alpine-glibc-bash:alpine-3.11_glibc-2.30@sha256:4b557ab2f1ac7dada16273f6c95cd02428ac49b66de545b4a5d92a8f80ece610
+# - template: ./.azure/azure-nightly-template-alpine.yml
+#   parameters:
+#    name: AlpineLinux64
+#    vmImage: ubuntu-16.04
+#    os: alpine-linux
+#    containerImage: jeffhappily/alpine-glibc-bash:alpine-3.11_glibc-2.30@sha256:4b557ab2f1ac7dada16273f6c95cd02428ac49b66de545b4a5d92a8f80ece610
 
 - template: ./.azure/azure-nightly-template-aarch64.yml
   parameters:
