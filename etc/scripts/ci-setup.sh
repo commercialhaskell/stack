@@ -15,11 +15,17 @@ fetch_stack_linux() {
   curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
 }
 
+fetch_stack_aarch64() {
+  curl -sL https://get.haskellstack.org/stable/linux-aarch64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
+}
+
 # We need stack to generate cabal files with precise bounds, even for cabal
 # builds.
 mkdir -p ~/.local/bin;
 if [ `uname` = "Darwin" ]; then
   travis_retry fetch_stack_osx
+elif [ `uname -m` = "aarch64" ]; then
+  travis_retry fetch_stack_aarch64
 else
   travis_retry fetch_stack_linux
 fi
