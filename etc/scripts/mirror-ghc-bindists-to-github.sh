@@ -42,10 +42,11 @@ mirror_ () {
   destsuffix="$1"; shift
   srcext="$1"; shift
   destext="$1"; shift
+  local srcurl="$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
   local srcfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${srcext}
   if [[ ! -s "$srcfn.downloaded" ]]; then
     rm -f "$srcfn"
-    curl -Lo "$srcfn" --fail "$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
+    curl -Lo "$srcfn" --fail "$srcurl"
     date >"$srcfn.downloaded"
   fi
   local destfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${destext}
@@ -65,7 +66,7 @@ mirror_ () {
     alias="$1"
     echo "    $alias:" >>stack-setup-$GHCVER.yaml
     echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
-    echo "            # Mirrored from $base_url/$srcfn" >>stack-setup-$GHCVER.yaml
+    echo "            # Mirrored from $srcurl" >>stack-setup-$GHCVER.yaml
     echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
     echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
     echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
