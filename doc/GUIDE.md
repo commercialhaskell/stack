@@ -469,13 +469,13 @@ default as well).
 
 Let's explore package sets a bit further. Instead of lts-14.27, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
-this is currently 2018-07-25 - please see the resolve from the link above to get the latest.
+this is currently 2020-03-24 - please see the resolve from the link above to get the latest.
 
 Then, Rerunning `stack build` will produce:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-Downloaded nightly-2018-07-31 build plan.
+Downloaded nightly-2020-03-24 build plan.
 # build output ...
 ```
 
