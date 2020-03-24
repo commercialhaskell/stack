@@ -1246,7 +1246,7 @@ follows the Unix convention of `--` to separate these, e.g.:
 ```
 michael@d30748af6d3d:~$ stack exec --package stm -- echo I installed the stm package via --package stm
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-3.2
+Using latest snapshot resolver: lts-14.27
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm
