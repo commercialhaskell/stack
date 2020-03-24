@@ -20,7 +20,7 @@
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
 
-GHCVER=8.8.3
+GHCVER=8.10.1
 
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
@@ -84,7 +84,7 @@ mirror () {
 # https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
 
 mirror i386-deb9-linux "" xz xz linux32
-mirror x86_64-deb8-linux "" xz xz linux64
+mirror x86_64-deb9-linux "" xz xz linux64
 #mirror x86_64-centos67-linux "" xz xz linux64-gmp4
 mirror x86_64-fedora27-linux "" xz xz linux64-tinfo6
 mirror x86_64-apple-darwin "" xz bz2 macosx
@@ -92,6 +92,7 @@ mirror x86_64-apple-darwin "" xz bz2 macosx
 mirror x86_64-unknown-mingw32 "" xz xz windows64
 #mirror x86_64-portbld-freebsd11 "" xz xz freebsd64-11
 mirror aarch64-deb9-linux "" xz xz linux-aarch64
+mirror armv7-deb9-linux "" xz xz linux-armv7
 
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl "" xz xz linux32-musl
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl "" xz xz linux64-musl
