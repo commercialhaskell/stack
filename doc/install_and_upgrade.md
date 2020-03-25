@@ -32,7 +32,6 @@ We recommend installing to the default location with these installers, as that
 will make `stack install` and `stack upgrade` work correctly out of the box.
 
   * [Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe)
-  * [Windows 32-bit Installer](https://get.haskellstack.org/stable/windows-i386-installer.exe)
 
 If in doubt: you should prefer the 64-bit installer.
 
@@ -45,7 +44,6 @@ starting" warning when you try to run the installer. If so, click on
 * Download the latest release:
 
     * [Windows 64-bit](https://get.haskellstack.org/stable/windows-x86_64.zip)
-    * [Windows 32-bit](https://get.haskellstack.org/stable/windows-i386.zip)
 
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
   [Path section below](#path)) and you can then run `stack` on the command line.
