@@ -32,9 +32,7 @@ export PATH=$HOME/.local/bin:$PATH;
 # cache-s3 --prefix="${cache_s3_prefix}" --git-branch="${source_branch}" --suffix="${os_name}" restore stack --base-branch="${base_branch}"
 # cache-s3 --prefix="${cache_s3_prefix}" --git-branch="${source_branch}" --suffix="${os_name}" restore stack work --base-branch="${base_branch}"
 etc/scripts/ci-setup.sh
-export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:$PATH
-
-echo "PATH: $PATH"
+export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:/opt/llvm/bin:$PATH
 
 set -ex
 stack etc/scripts/release.hs build
