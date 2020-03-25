@@ -242,7 +242,7 @@ or:
       (note: requires libgmp.so.10, and will not work on some older
       distributions that have libgmp.so.3, such as CentOS 6)
 
-    * [Linux ARMv7](https://get.haskellstack.org/stable/linux-arm.tar.gz)
+    <!-- * [Linux ARMv7](https://get.haskellstack.org/stable/linux-arm.tar.gz) -->
 
     * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz)
 
