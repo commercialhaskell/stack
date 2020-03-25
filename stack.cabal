@@ -4,10 +4,10 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 309106fd5040db89f02f35295c49d26635dc30bc6414602e4ef0320286721381
+-- hash: b7016e326b597327b2d7d30f53d4796d48d2c97681790613ede28067df583b32
 
 name:           stack
-version:        2.3.0.0
+version:        2.3.0.1
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
