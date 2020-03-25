@@ -183,11 +183,11 @@ for requirements to perform the release, and more details about the tool.
 
 <!-- * On Linux ARMv7:
 
-    * Run `etc/scripts/linux-armv7-release.sh`
+    * Run `etc/scripts/linux-armv7-release.sh` -->
 
 * On Linux ARM64 (aarch64):
 
-    * Run `etc/scripts/linux-aarch64-release.sh` -->
+    * Run `etc/scripts/linux-aarch64-release.sh`
 
 * Build a Linux static bindist `[RC]`
 

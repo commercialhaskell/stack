@@ -1,7 +1,7 @@
 # Changelog
 
 
-## v2.3.1 (unreleased changes)
+## v2.3.0.1 (release candidate)
 
 **Changes since v2.1.3.1**
 
