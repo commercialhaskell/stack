@@ -34,6 +34,8 @@ export PATH=$HOME/.local/bin:$PATH;
 etc/scripts/ci-setup.sh
 export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:$PATH
 
+echo "PATH: $PATH"
+
 set -ex
 stack etc/scripts/release.hs build
 set +ex
