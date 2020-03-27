@@ -1,6 +1,6 @@
 #!/bin/bash
 # set -x
-set -m
+# set -m
 
 os_name=$1
 dir=$2
@@ -34,6 +34,7 @@ export PATH=$HOME/.local/bin:$PATH;
 etc/scripts/ci-setup.sh
 export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:/opt/llvm/bin:$PATH
 
+echo "Before build"
 set -ex
 stack etc/scripts/release.hs build
 set +ex
@@ -42,9 +43,11 @@ set +ex
 #     cache-s3 --prefix="${cache_s3_prefix}" --git-branch="${source_branch}" --suffix="${os_name}" save stack;
 # fi;
 # cache-s3 --prefix="${cache_s3_prefix}" --git-branch="${source_branch}" --suffix="${os_name}" save stack work
-
+echo "After build"
 # Reset env var
 export STACK_ROOT=$ori_stack_root
 export PATH=$ori_path
 
 clean_resource
+echo "End"
+exit 0
