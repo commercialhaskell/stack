@@ -59,7 +59,7 @@ Other enhancements:
   `ls dependencies --tree`  is now `ls dependencies tree`. See
   [#4424](https://github.com/commercialhaskell/stack/pull/4424)
 
-* Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
+* Remove warning for using Stack with GHC 8.8-8.10, and Cabal 3.0-3.2.
 
 * Allow relative paths in `--setup-info-yaml` and tool paths
   [#3394](https://github.com/commercialhaskell/stack/issues/3394)
