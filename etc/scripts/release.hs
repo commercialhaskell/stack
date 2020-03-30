@@ -242,7 +242,7 @@ rules global@Global{..} args = do
     unless gUploadOnly $ releaseDir </> binaryExeFileName %> \out -> do
         need [releaseBinDir </> binaryName </> stackExeFileName]
         (Stdout versionOut) <- cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
-        () <- cmd "git diff"
+        -- () <- cmd "git diff"
         when (not gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
             error ("Refusing continue because 'stack --version' reports dirty.  Use --" ++
                    allowDirtyOptName ++ " option to continue anyway.")
