@@ -36,7 +36,7 @@ export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/happy/1.19.5/bin:/opt/ale
 
 echo "Before build"
 set -ex
-stack etc/scripts/release.hs build
+stack etc/scripts/release.hs build &> build.log
 set +ex
 
 # if [ "${source_branch}" = "${base_branch}" ]; then
