@@ -18,7 +18,7 @@ general, your stack packages should also end up being valid cabal-install
 packages.
 
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/105
+  - <https://github.com/commercialhaskell/stack/issues/105>
 
 ## Passing Flags to Cabal
 
@@ -50,12 +50,12 @@ change in a future release.
 
 
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/191
-  - https://github.com/commercialhaskell/stack/issues/417
-  - https://github.com/commercialhaskell/stack/issues/335
-  - https://github.com/commercialhaskell/stack/issues/301
-  - https://github.com/commercialhaskell/stack/issues/365
-  - https://github.com/commercialhaskell/stack/issues/105
+  - <https://github.com/commercialhaskell/stack/issues/191>
+  - <https://github.com/commercialhaskell/stack/issues/417>
+  - <https://github.com/commercialhaskell/stack/issues/335>
+  - <https://github.com/commercialhaskell/stack/issues/301>
+  - <https://github.com/commercialhaskell/stack/issues/365>
+  - <https://github.com/commercialhaskell/stack/issues/105>
 
 ## Selecting a Resolver
 
@@ -75,8 +75,8 @@ default so as to avoid unnecessary recompilation time.
 :TODO: Document `--solver`
 
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/468
-  - https://github.com/commercialhaskell/stack/issues/464
+  - <https://github.com/commercialhaskell/stack/issues/468>
+  - <https://github.com/commercialhaskell/stack/issues/464>
 
 ## Using git Repositories
 stack has support for packages that reside in remote git locations.
@@ -92,8 +92,8 @@ packages:
 ```
 
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/254
-  - https://github.com/commercialhaskell/stack/issues/199
+  - <https://github.com/commercialhaskell/stack/issues/254>
+  - <https://github.com/commercialhaskell/stack/issues/199>
 
 ## Private Hackage
 Working with a private Hackage is currently supported in certain situations.
@@ -111,15 +111,15 @@ eliminating the need to manage a Hackage database and pointless version bumps.
 For further information see [YAML configuration](yaml_configuration.md)
 
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/445
-  - https://github.com/commercialhaskell/stack/issues/565
+  - <https://github.com/commercialhaskell/stack/issues/445>
+  - <https://github.com/commercialhaskell/stack/issues/565>
 
 ## Custom Snapshots
 Currently WIP?
 ### Issues Referenced
-  - https://github.com/commercialhaskell/stack/issues/111
-  - https://github.com/commercialhaskell/stack/issues/253
-  - https://github.com/commercialhaskell/stack/issues/137
+  - <https://github.com/commercialhaskell/stack/issues/111>
+  - <https://github.com/commercialhaskell/stack/issues/253>
+  - <https://github.com/commercialhaskell/stack/issues/137>
 
 ## Intra-package Targets
 stack supports intra-package targets, similar to `cabal build COMPONENTS` for
@@ -134,4 +134,4 @@ stack test stack:test:stack-integration-test
 Note: this does require prefixing the component name with the package name.
 
 ### Issues referenced
-  - https://github.com/commercialhaskell/stack/issues/201
+  - <https://github.com/commercialhaskell/stack/issues/201>
