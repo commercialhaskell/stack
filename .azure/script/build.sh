@@ -1,5 +1,5 @@
 #!/bin/sh
-# set -x
+set -x
 # set -m
 
 os_name=$1
