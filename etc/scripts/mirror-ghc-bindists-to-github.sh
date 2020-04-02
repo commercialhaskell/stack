@@ -50,18 +50,6 @@ mirror_ () {
     date >"$srcfn.downloaded"
   fi
   local destfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${destext}
-  if [[ ! -s "$destfn.uploaded" ]]; then
-    if [[ "${srcext}" == "xz" && "${destext}" == "bz2" ]]; then
-      xzcat "$srcfn" | bzip2 -c > "$destfn"
-    elif [[ "${srcext}" != "${destext}" ]]; then
-      set +x
-      echo
-      echo "$0: Unsupported conversion: ${srcext} to ${destext}" >&2
-      exit 1
-    fi
-    curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
-    date >"$destfn.uploaded"
-  fi
   while [[ $# -gt 0 ]]; do
     alias="$1"
     echo "    $alias:" >>stack-setup-$GHCVER.yaml
@@ -74,6 +62,18 @@ mirror_ () {
     echo "" >>stack-setup-$GHCVER.yaml
     shift
   done
+  if [[ ! -s "$destfn.uploaded" ]]; then
+    if [[ "${srcext}" == "xz" && "${destext}" == "bz2" ]]; then
+      xzcat "$srcfn" | bzip2 -c > "$destfn"
+    elif [[ "${srcext}" != "${destext}" ]]; then
+      set +x
+      echo
+      echo "$0: Unsupported conversion: ${srcext} to ${destext}" >&2
+      exit 1
+    fi
+    curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
+    date >"$destfn.uploaded"
+  fi
 }
 
 mirror () {
