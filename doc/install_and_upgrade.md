@@ -142,7 +142,7 @@ Use the [generic Linux option](#linux).
 There is also an
 unofficial
 [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack2/) which
-can be enabled with: `sudo dnf copr enable petersen/stack`. Note that this Stack
+can be enabled with: `sudo dnf copr enable petersen/stack2`. Note that this Stack
 version may lag behind, so we recommend running `stack upgrade` after installing
 it.
 
