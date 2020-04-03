@@ -17,7 +17,6 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
-import           Control.Monad (void)
 import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
@@ -30,9 +29,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (DownloadException (..), Request, HttpException,
-                                           getResponseStatusCode, getResponseBody, httpLbs,
-                                           parseRequest, parseUrlThrow, redownload, setGithubHeaders)
+import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
+                                           getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
+                                           setForceDownload, setGithubHeaders, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -155,13 +154,16 @@ loadTemplate name logIt = do
         downloadTemplate req (templateDir </> rel)
     downloadTemplate :: Request -> Path Abs File -> RIO env Text
     downloadTemplate req path = do
+        let dReq = setForceDownload True $ mkDownloadRequest req
         logIt RemoteTemp
         catch
-          (void $ redownload req path)
+          (void $ do
+            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) Nothing
+          )
           (useCachedVersionOrThrow path)
 
         loadLocalFile path
-    useCachedVersionOrThrow :: Path Abs File -> DownloadException -> RIO env ()
+    useCachedVersionOrThrow :: Path Abs File -> VerifiedDownloadException -> RIO env ()
     useCachedVersionOrThrow path exception = do
       exists <- doesFileExist path
 
@@ -318,7 +320,7 @@ data NewException
     = FailedToLoadTemplate !TemplateName
                            !FilePath
     | FailedToDownloadTemplate !TemplateName
-                               !DownloadException
+                               !VerifiedDownloadException
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
@@ -337,18 +339,13 @@ instance Show NewException where
         "Failed to load download template " <> T.unpack (templateName name) <>
         " from " <>
         path
-    show (FailedToDownloadTemplate name (RedownloadInvalidResponse _ _ resp)) =
-        case getResponseStatusCode resp of
-            404 ->
-                "That template doesn't exist. Run `stack templates' to discover available templates."
-            code ->
-                "Failed to download template " <> T.unpack (templateName name) <>
-                ": unknown reason, status code was: " <>
-                show code
-
-    show (FailedToDownloadTemplate name (RedownloadHttpError httpError)) =
+    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) =
           "There was an unexpected HTTP error while downloading template " <>
           T.unpack (templateName name) <> ": " <> show httpError
+    show (FailedToDownloadTemplate name _) =
+        "Failed to download template " <> T.unpack (templateName name) <>
+        ": unknown reason"
+
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (MissingParameters name template missingKeys userConfigPath) =

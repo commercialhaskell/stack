@@ -1,0 +1,37 @@
+resolver: lts-15.5
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build:lts-15.5
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+    - zlib
+    - unzip
+flags:
+  stack:
+    hide-dependency-versions: true
+    supported-build: true
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
+- hackage-security-0.6.0.0@sha256:69987d46e7b55fe5f0fc537021c3873c5f6f44a6665d349ee6995fd593df8147,11976
+- regex-applicative-text-0.1.0.1@sha256:52463fdc8daf130f40b82fec84bad2d4b8600227751c2a5b04679a1de8bd7f7a,1155
+- lukko-0.1.1.1@sha256:5c674bdd8a06b926ba55d872abe254155ed49a58df202b4d842b643e5ed6bcc9,4289
+- hpack-0.33.0@rev:0
+- http-download-0.2.0.0@rev:0
+- github: snoyberg/filelock
+  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- pantry-0.4.0.1@rev:0
+- casa-client-0.0.1@rev:0
+- casa-types-0.0.1@rev:0
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install

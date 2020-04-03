@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -28,7 +29,6 @@ module Stack.Package
   ) where
 
 import           Data.List (find, isPrefixOf, unzip)
-import           Data.Maybe (maybe)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -40,6 +40,7 @@ import           Distribution.Package hiding (Package,PackageName,packageName,pa
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parsec
+import           Distribution.Pretty (prettyShow)
 import           Distribution.Simple.Glob (matchDirFileGlob)
 import           Distribution.System (OS (..), Arch, Platform (..))
 import qualified Distribution.Text as D
@@ -47,12 +48,17 @@ import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
+import           Distribution.Types.LibraryName (libraryNameString, maybeToLibraryName)
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import qualified Distribution.Verbosity as D
 import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
 import qualified HiFileParser as Iface
+#if MIN_VERSION_path(0,7,0)
+import           Path as FL hiding (replaceExtension)
+#else
 import           Path as FL
+#endif
 import           Path.Extra
 import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
@@ -191,7 +197,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     subLibNames
       = S.fromList
       $ map (T.pack . Cabal.unUnqualComponentName)
-      $ mapMaybe libName -- this is a design bug in the Cabal API: this should statically be known to exist
+      $ mapMaybe (libraryNameString . libName) -- this is a design bug in the Cabal API: this should statically be known to exist
       $ filter (buildable . libBuildInfo)
       $ subLibraries pkg
 
@@ -202,8 +208,8 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       $ foreignLibs pkg
 
     toInternalPackageMungedName
-      = T.pack . unMungedPackageName . computeCompatPackageName (pkgName pkgId)
-      . Just . Cabal.mkUnqualComponentName . T.unpack
+      = T.pack . prettyShow . MungedPackageName (pkgName pkgId)
+      . maybeToLibraryName . Just . Cabal.mkUnqualComponentName . T.unpack
 
     -- Gets all of the modules, files, build files, and data files that
     -- constitute the package. This is primarily used for dirtiness
@@ -248,7 +254,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
         , knownTools
         ])
     msetupDeps = fmap
-        (M.fromList . map (depName &&& depRange) . setupDepends)
+        (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
         (setupBuildInfo pkg)
 
     asLibrary range = DepValue
@@ -303,7 +309,7 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
                          (library pkg)
                    , mapMaybe
                          (\sublib -> do
-                            let maybeLib = CInternalLib . T.pack . Cabal.unUnqualComponentName <$> libName sublib
+                            let maybeLib = CInternalLib . T.pack . Cabal.unUnqualComponentName <$> (libraryNameString . libName) sublib
                             flip generate  (libBuildInfo sublib) <$> maybeLib
                           )
                          (subLibraries pkg)
@@ -383,12 +389,9 @@ generateBuildInfoOpts BioInput {..} =
     pkgs =
         biAddPackages ++
         [ name
-        | Dependency name _ <- targetBuildDepends biBuildInfo
+        | Dependency name _ _ <- targetBuildDepends biBuildInfo -- TODO: cabal 3 introduced multiple public libraries in a single dependency
         , name `notElem` biOmitPackages]
-    ghcOpts = concatMap snd . filter (isGhc . fst) $ options biBuildInfo
-      where
-        isGhc GHC = True
-        isGhc _ = False
+    PerCompilerFlavor ghcOpts _ = options biBuildInfo
     extOpts = map (("-X" ++) . D.display) (usedExtensions biBuildInfo)
     srcOpts =
         map (("-i" <>) . toFilePathNoTrailingSep)
@@ -528,7 +531,7 @@ packageDependencies
   -> Map PackageName VersionRange
 packageDependencies pkgConfig pkg' =
   M.fromListWith intersectVersionRanges $
-  map (depName &&& depRange) $
+  map (depPkgName &&& depVerRange) $
   concatMap targetBuildDepends (allBuildInfo' pkg) ++
   maybe [] setupDepends (setupBuildInfo pkg)
   where
@@ -680,7 +683,7 @@ packageDescModulesAndFiles pkg = do
     return (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
-    internalLibComponent = CInternalLib . T.pack . maybe "" Cabal.unUnqualComponentName . libName
+    internalLibComponent = CInternalLib . T.pack . maybe "" Cabal.unUnqualComponentName . libraryNameString . libName
     exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
     testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
@@ -859,7 +862,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
           desc {library =
                   fmap (resolveConditions rc updateLibDeps) mlib
                ,subLibraries =
-                  map (\(n, v) -> (resolveConditions rc updateLibDeps v){libName=Just n})
+                  map (\(n, v) -> (resolveConditions rc updateLibDeps v){libName=LSubLibName n})
                       subLibs
                ,foreignLibs =
                   map (\(n, v) -> (resolveConditions rc updateForeignLibDeps v){foreignLibName=n})
@@ -981,18 +984,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                     Impl flavor range ->
                       case (flavor, rcCompilerVersion rc) of
                         (GHC, ACGhc vghc) -> vghc `withinRange` range
-                        (GHC, ACGhcjs _ vghc) -> vghc `withinRange` range
-                        (GHCJS, ACGhcjs vghcjs _) ->
-                          vghcjs `withinRange` range
                         _ -> False
-
--- | Get the name of a dependency.
-depName :: Dependency -> PackageName
-depName (Dependency n _) = n
-
--- | Get the version range of a dependency.
-depRange :: Dependency -> VersionRange
-depRange (Dependency _ r) = r
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given

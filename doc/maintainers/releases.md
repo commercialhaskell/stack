@@ -4,6 +4,7 @@
 
 ## Upcoming release tasks:
 
+* @nh2 says: "For the next static stack release we need to have unix-compat >= 0.5.2, because 0.5.1 breaks with musl (because it tries to use something as a symbol that is a C macro).  https://github.com/nh2/static-haskell-nix/issues/79  In my CI I've just bumped unix-compat accordingly: https://github.com/nh2/static-haskell-nix/pull/80/files"
 * Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 2.1.x.  Directories, and last Stack version uploaded:
 	- `s3://download.fpcomplete.com/archlinux` (1.0.0)
 	- `s3://download.fpcomplete.com/centos` (1.5.1)
@@ -178,9 +179,9 @@ for requirements to perform the release, and more details about the tool.
     * Build Windows installers. See
       [stack-installer README](https://github.com/borsboom/stack-installer#readme).
 
-* On Linux ARMv7:
+<!-- * On Linux ARMv7:
 
-    * Run `etc/scripts/linux-armv7-release.sh`
+    * Run `etc/scripts/linux-armv7-release.sh` -->
 
 * On Linux ARM64 (aarch64):
 
@@ -361,7 +362,7 @@ Now continue to the **General Windows setup** subsection below.
 	- In Windows settings:
 		- Search for "disk management"
 			- Extend the partition to take the whole disk.
-		- In all likelyhood, you will want to search for "remote desktop" and enable remote desktop.  Then you can connect to the VM using Microsoft Remote Desktop instead of using it from within the ESXi web UI.
+		- In all likelihood, you will want to search for "remote desktop" and enable remote desktop.  Then you can connect to the VM using Microsoft Remote Desktop instead of using it from within the ESXi web UI.
 
 Now continue to the **General Windows setup** subsection below.
 

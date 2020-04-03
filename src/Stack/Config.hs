@@ -44,7 +44,6 @@ import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
 import qualified Distribution.Text
@@ -212,6 +211,7 @@ configFromConfigMonoid
            configMonoidLatestSnapshot
          clConnectionCount = fromFirst 8 configMonoidConnectionCount
          configHideTHLoading = fromFirstTrue configMonoidHideTHLoading
+         configPrefixTimestamps = fromFirst False configMonoidPrefixTimestamps
 
          configGHCVariant = getFirst configMonoidGHCVariant
          configCompilerRepository = fromFirst
@@ -282,12 +282,12 @@ configFromConfigMonoid
        shortLocalProgramsFilePath <-
          liftIO $ getShortPathName localProgramsFilePath
        when (' ' `elem` shortLocalProgramsFilePath) $ do
-         logWarn $ "Stack's 'programs' path contains a space character and " <>
+         logError $ "Stack's 'programs' path contains a space character and " <>
            "has no alternative short ('8 dot 3') name. This will cause " <>
            "problems with packages that use the GNU project's 'configure' " <>
-           "shell script. Use the 'local-programs-path' configuation option " <>
-           "to specify an alternative path. The current 'shortest' path is: " <>
-           display (T.pack shortLocalProgramsFilePath)
+           "shell script. Use the 'local-programs-path' configuration option " <>
+           "to specify an alternative path. The current path is: " <>
+           display (T.pack localProgramsFilePath)
      platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
      let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
@@ -320,6 +320,7 @@ configFromConfigMonoid
          configGhcOptionsByName = coerce configMonoidGhcOptionsByName
          configGhcOptionsByCat = coerce configMonoidGhcOptionsByCat
          configSetupInfoLocations = configMonoidSetupInfoLocations
+         configSetupInfoInline = configMonoidSetupInfoInline
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
@@ -375,6 +376,8 @@ configFromConfigMonoid
        hsc
        (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
        clConnectionCount
+       (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
+       defaultCasaMaxPerRequest
        (\configPantryConfig -> initUserStorage
          (configStackRoot </> relFileStorage)
          (\configUserStorage -> inner Config {..}))
@@ -588,8 +591,17 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     (deps0, mcompleted) <- fmap unzip . forM (projectDependencies project) $ \rpl -> do
       (pl, mCompleted) <- case rpl of
          RPLImmutable rpli -> do
-           compl <- maybe (completePackageLocation rpli) pure (Map.lookup rpli locCache)
-           pure (PLImmutable compl, Just (CompletedPLI rpli compl))
+           (compl, mcompl) <-
+             case Map.lookup rpli locCache of
+               Just compl -> pure (compl, Just compl)
+               Nothing -> do
+                 cpl <- completePackageLocation rpli
+                 if cplHasCabalFile cpl
+                   then pure (cplComplete cpl, Just $ cplComplete cpl)
+                   else do
+                     warnMissingCabalFile rpli
+                     pure (cplComplete cpl, Nothing)
+           pure (PLImmutable compl, CompletedPLI rpli <$> mcompl)
          RPLMutable p ->
            pure (PLMutable p, Nothing)
       dp <- additionalDepPackage (shouldHaddockDeps bopts) pl

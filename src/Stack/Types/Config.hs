@@ -140,7 +140,6 @@ module Stack.Types.Config
   ,VersionedDownloadInfo(..)
   ,GHCDownloadInfo(..)
   ,SetupInfo(..)
-  ,SetupInfoLocation(..)
   -- ** Docker entrypoint
   ,DockerEntrypoint(..)
   ,DockerUser(..)
@@ -182,14 +181,13 @@ import           Pantry.Internal.AesonExtended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
                   (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
-                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..), noJSONWarnings,
+                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..),
                   FromJSONKeyFunction (FromJSONKeyTextParser))
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
 import qualified Data.ByteString.Char8 as S8
 import           Data.Coerce (coerce)
 import           Data.List (stripPrefix)
-import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -197,7 +195,6 @@ import qualified Data.Monoid as Monoid
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import qualified Distribution.License as C
@@ -209,7 +206,7 @@ import qualified Distribution.Text
 import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Lens.Micro (Lens', lens, _1, _2, to)
+import           Lens.Micro
 import           Options.Applicative (ReadM)
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
@@ -234,6 +231,7 @@ import           Stack.Types.Version
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           RIO.Process (ProcessContext, HasProcessContext (..))
+import           Casa.Client (CasaRepoPrefix)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -283,6 +281,8 @@ data Config =
          ,configHideTHLoading       :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
+         ,configPrefixTimestamps    :: !Bool
+         -- ^ Prefix build output with timestamps for each line.
          ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
          ,configPlatformVariant     :: !PlatformVariant
@@ -331,8 +331,11 @@ data Config =
          -- ^ Additional GHC options to apply to categories of packages
          ,configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
          -- ^ Additional options to be passed to ./Setup.hs configure
-         ,configSetupInfoLocations  :: ![SetupInfoLocation]
-         -- ^ Additional SetupInfo (inline or remote) to use to find tools.
+         ,configSetupInfoLocations  :: ![String]
+         -- ^ URLs or paths to stack-setup.yaml files, for finding tools.
+         -- If none present, the default setup-info is used.
+         ,configSetupInfoInline     :: !SetupInfo
+         -- ^ Additional SetupInfo to use to find tools.
          ,configPvpBounds           :: !PvpBounds
          -- ^ How PVP upper bounds should be added to packages
          ,configModifyCodePage      :: !Bool
@@ -406,7 +409,7 @@ instance FromJSON CabalConfigKey where
 instance FromJSONKey CabalConfigKey where
   fromJSONKey = FromJSONKeyTextParser parseCabalConfigKey
 
-parseCabalConfigKey :: Monad m => Text -> m CabalConfigKey
+parseCabalConfigKey :: (Monad m, MonadFail m) => Text -> m CabalConfigKey
 parseCabalConfigKey "$targets" = pure CCKTargets
 parseCabalConfigKey "$locals" = pure CCKLocals
 parseCabalConfigKey "$everything" = pure CCKEverything
@@ -762,6 +765,8 @@ data ConfigMonoid =
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading      :: !FirstTrue
     -- ^ See: 'configHideTHLoading'
+    , configMonoidPrefixTimestamps   :: !(First Bool)
+    -- ^ See: 'configPrefixTimestamps'
     , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
     , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
@@ -816,8 +821,10 @@ data ConfigMonoid =
     -- ^ See 'configCabalConfigOpts'.
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
-    ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
-    -- ^ Additional setup info (inline or remote) to use for installing tools
+    ,configMonoidSetupInfoLocations  :: ![String]
+    -- ^ See 'configSetupInfoLocations'
+    ,configMonoidSetupInfoInline     :: !SetupInfo
+    -- ^ See 'configSetupInfoInline'
     ,configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
     ,configMonoidPvpBounds           :: !(First PvpBounds)
@@ -851,6 +858,7 @@ data ConfigMonoid =
     -- ^ See 'configHideSourcePaths'
     , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
+    , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
     }
   deriving (Show, Generic)
 
@@ -877,6 +885,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- First <$> obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
+    configMonoidPrefixTimestamps <- First <$> obj ..:? configMonoidPrefixTimestampsName
 
     murls :: Maybe Value <- obj ..:? configMonoidUrlsName
     configMonoidLatestSnapshot <-
@@ -942,8 +951,8 @@ parseConfigMonoidObject rootDir obj = do
     let configMonoidCabalConfigOpts = coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
 
     configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
-    configMonoidSetupInfoLocations <-
-        maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
+    configMonoidSetupInfoLocations <- obj ..:? configMonoidSetupInfoLocationsName ..!= []
+    configMonoidSetupInfoInline <- jsonSubWarningsT (obj ..:? configMonoidSetupInfoInlineName) ..!= mempty
     configMonoidLocalProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
     configMonoidModifyCodePage <- FirstTrue <$> obj ..:? configMonoidModifyCodePageName
@@ -972,9 +981,11 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidHideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
     configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
 
+    configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
+
     return ConfigMonoid {..}
   where
-    handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
+    handleExplicitSetupDep :: (Monad m, MonadFail m) => (Text, Bool) -> m (Maybe PackageName, Bool)
     handleExplicitSetupDep (name', b) = do
         name <-
             if name' == "*"
@@ -1001,6 +1012,9 @@ configMonoidConnectionCountName = "connection-count"
 
 configMonoidHideTHLoadingName :: Text
 configMonoidHideTHLoadingName = "hide-th-loading"
+
+configMonoidPrefixTimestampsName :: Text
+configMonoidPrefixTimestampsName = "build-output-timestamps"
 
 configMonoidUrlsName :: Text
 configMonoidUrlsName = "urls"
@@ -1072,7 +1086,10 @@ configMonoidExtraPathName :: Text
 configMonoidExtraPathName = "extra-path"
 
 configMonoidSetupInfoLocationsName :: Text
-configMonoidSetupInfoLocationsName = "setup-info"
+configMonoidSetupInfoLocationsName = "setup-info-locations"
+
+configMonoidSetupInfoInlineName :: Text
+configMonoidSetupInfoInlineName = "setup-info"
 
 configMonoidLocalProgramsBaseName :: Text
 configMonoidLocalProgramsBaseName = "local-programs-path"
@@ -1127,6 +1144,9 @@ configMonoidHideSourcePathsName = "hide-source-paths"
 
 configMonoidRecommendUpgradeName :: Text
 configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
+
+configMonoidCasaRepoPrefixName :: Text
+configMonoidCasaRepoPrefixName = "casa-repo-prefix"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
@@ -1414,7 +1434,6 @@ compilerVersionDir = do
     compilerVersion <- view actualCompilerVersionL
     parseRelDir $ case compilerVersion of
         ACGhc version -> versionString version
-        ACGhcjs {} -> compilerVersionString compilerVersion
         ACGhcGit {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
@@ -1663,7 +1682,6 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-    , siGHCJSs :: Map Text (Map ActualCompiler DownloadInfo)
     , siStack :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -1674,20 +1692,18 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         (fmap unCabalStringMap -> siGHCs) <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
-        siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
         (fmap unCabalStringMap -> siStack) <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
         return SetupInfo {..}
 
--- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
--- For all fields the values from the last @SetupInfo@ win.
+-- | For the @siGHCs@ field maps are deeply merged.
+-- For all fields the values from the first @SetupInfo@ win.
 instance Semigroup SetupInfo where
     l <> r =
         SetupInfo
-        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
-        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
-        , siMsys2 = siMsys2 r <> siMsys2 l
-        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
+        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
+        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
+        , siMsys2 = siMsys2 l <> siMsys2 r
+        , siGHCs = Map.unionWith (<>) (siGHCs l) (siGHCs r)
         , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
 
 instance Monoid SetupInfo where
@@ -1697,26 +1713,9 @@ instance Monoid SetupInfo where
         , siSevenzDll = Nothing
         , siMsys2 = Map.empty
         , siGHCs = Map.empty
-        , siGHCJSs = Map.empty
         , siStack = Map.empty
         }
     mappend = (<>)
-
--- | Remote or inline 'SetupInfo'
-data SetupInfoLocation
-    = SetupInfoFileOrURL String
-    | SetupInfoInline SetupInfo
-    deriving (Show)
-
-instance FromJSON (WithJSONWarnings SetupInfoLocation) where
-    parseJSON v =
-        (noJSONWarnings <$>
-         withText "SetupInfoFileOrURL" (pure . SetupInfoFileOrURL . T.unpack) v) <|>
-        inline
-      where
-        inline = do
-            WithJSONWarnings si w <- parseJSON v
-            return $ WithJSONWarnings (SetupInfoInline si) w
 
 -- | How PVP bounds should be added to .cabal files
 data PvpBoundsType

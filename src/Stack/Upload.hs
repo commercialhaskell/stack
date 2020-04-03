@@ -27,7 +27,6 @@ import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
-import           Data.Text.Encoding                    (encodeUtf8)
 import           Network.HTTP.StackClient              (Request, RequestBody(RequestBodyLBS), Response, withResponse, httpNoBody, getGlobalManager, getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
@@ -39,8 +38,9 @@ import           Network.HTTP.StackClient              (Request, RequestBody(Req
 import           Stack.Types.Config
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile, renameFile)
+import           System.Environment                    (lookupEnv)
 import           System.FilePath                       ((</>), takeFileName, takeDirectory)
-import           System.IO                             (stdout, putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
+import           System.IO                             (putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
 
 -- | Username and password to log into Hackage.
@@ -62,6 +62,9 @@ instance FromJSON (FilePath -> HackageCreds) where
     parseJSON = withObject "HackageCreds" $ \o -> HackageCreds
         <$> o .: "username"
         <*> o .: "password"
+
+withEnvVariable :: Text -> IO Text -> IO Text
+withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
@@ -85,8 +88,8 @@ loadCreds config = do
       return $ mkCreds fp
   where
     fromPrompt fp = do
-      username <- prompt "Hackage username: "
-      password <- promptPassword "Hackage password: "
+      username <- withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
+      password <- withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
       let hc = HackageCreds
             { hcUsername = username
             , hcPassword = password

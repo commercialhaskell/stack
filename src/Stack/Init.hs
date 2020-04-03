@@ -17,7 +17,6 @@ import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import           Data.List.Extra                 (groupSortOn)
-import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Map.Strict                 as Map
 import qualified Data.Set                        as Set
@@ -116,7 +115,8 @@ initProject currDir initOpts mresolver = do
           Map.mapMaybe (flip Map.lookup gpdByDir . resolvedAbsolute) rbundle
 
     deps <- for (Map.toList extraDeps) $ \(n, v) ->
-      PLImmutable <$> completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
+      PLImmutable . cplComplete <$>
+      completePackageLocation (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
 
     let p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg

@@ -4,11 +4,13 @@
 module Stack.Constants.Config
   ( distDirFromDir
   , rootDistDirFromDir
+  , setupConfigFromDir
   , workDirFromDir
   , distRelativeDir
   , imageStagingDir
   , projectDockerSandboxDir
   , configCabalMod
+  , configSetupConfigMod
   , buildCachesDir
   , testSuccessFile
   , testBuiltFile
@@ -21,7 +23,6 @@ module Stack.Constants.Config
 
 import Stack.Prelude
 import Stack.Constants
-import Stack.Types.Compiler
 import Stack.Types.Config
 import Path
 
@@ -75,6 +76,15 @@ configCabalMod dir =
         (</> $(mkRelFile "stack-cabal-mod"))
         (distDirFromDir dir)
 
+-- | The filename used for modification check of setup-config
+configSetupConfigMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+                     => Path Abs Dir      -- ^ Package directory.
+                     -> m (Path Abs File)
+configSetupConfigMod dir =
+    liftM
+        (</> $(mkRelFile "stack-setup-config-mod"))
+        (distDirFromDir dir)
+
 -- | Directory for HPC work.
 hpcDirFromDir
     :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -88,6 +98,14 @@ hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => m (Path Rel Dir)
 hpcRelativeDir =
     liftM (</> $(mkRelDir "hpc")) distRelativeDir
+
+-- | Package's setup-config storing Cabal configuration
+setupConfigFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+                   => Path Abs Dir
+                   -> m (Path Abs File)
+setupConfigFromDir fp = do
+    dist <- distDirFromDir fp
+    return $ dist </> $(mkRelFile "setup-config")
 
 -- | Package's build artifacts directory.
 distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -130,11 +148,9 @@ distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 distRelativeDir = do
     cabalPkgVer <- view cabalVersionL
     platform <- platformGhcRelDir
-    wc <- view $ actualCompilerVersionL.to whichCompiler
-    -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
+    -- Cabal version
     envDir <-
         parseRelDir $
-        (if wc == Ghcjs then (++ "_ghcjs") else id) $
         packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)

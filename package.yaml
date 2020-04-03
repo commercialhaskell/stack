@@ -1,5 +1,5 @@
 name: stack
-version: '2.1.4'
+version: '2.3.0.2'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
@@ -92,7 +92,9 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry >= 0.2
+- pantry
+- casa-client
+- casa-types
 - path
 - path-io
 - persistent
@@ -103,8 +105,6 @@ dependencies:
 - process
 - project-template
 - regex-applicative-text
-- resource-pool
-- resourcet
 - retry
 - rio
 - rio-prettyprint
@@ -115,7 +115,6 @@ dependencies:
 - tar
 - template-haskell
 - temporary
-- terminal-size
 - text
 - text-metrics
 - th-reify-many
@@ -183,7 +182,6 @@ library:
   - Stack.Docker
   - Stack.Dot
   - Stack.FileWatch
-  - Stack.Freeze
   - Stack.GhcPkg
   - Stack.Ghci
   - Stack.Ghci.Script
@@ -203,7 +201,6 @@ library:
   - Stack.Options.DockerParser
   - Stack.Options.DotParser
   - Stack.Options.ExecParser
-  - Stack.Options.FreezeParser
   - Stack.Options.GhcBuildParser
   - Stack.Options.GhciParser
   - Stack.Options.GhcVariantParser

@@ -39,9 +39,14 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
-import           Data.Version (showVersion)
-import           Distribution.Version (mkVersion)
+import qualified Data.Version (showVersion, parseVersion)
+import           Distribution.Version (mkVersion, mkVersion')
+#if MIN_VERSION_path(0,7,0)
+import           Path hiding (replaceExtension)
+#else
 import           Path
+#endif
+import           Path.Extended (replaceExtension)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
@@ -55,12 +60,12 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
 import qualified System.FilePath as FP
-import           System.IO (stderr,stdin)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 import           RIO.Process
 
 #ifndef WINDOWS
@@ -90,7 +95,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
             else return Nothing
     args <-
         fmap
-            (["--" ++ reExecArgName ++ "=" ++ showVersion Meta.version
+            (["--" ++ reExecArgName ++ "=" ++ Data.Version.showVersion Meta.version
              ,"--" ++ dockerEntrypointArgName
              ,show DockerEntrypoint{..}] ++)
             (liftIO getArgs)
@@ -151,7 +156,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         exePath <- ensureDockerStackExe dockerContainerPlatform
         cmdArgs args exePath
     cmdArgs args exePath = do
-        exeBase <- exePath -<.> ""
+        exeBase <- replaceExtension "" exePath
         let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
         return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 
@@ -399,7 +404,7 @@ checkDockerVersion docker =
      dockerVersionOut <- readDockerProcess ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersion (stripVersion v) of
+         case fmap mkVersion' $ parseVersion' $ stripVersion v of
            Just v'
              | v' < minimumDockerVersion ->
                throwIO (DockerTooOldException minimumDockerVersion v')
@@ -414,6 +419,9 @@ checkDockerVersion docker =
   where minimumDockerVersion = mkVersion [1, 6, 0]
         prohibitedDockerVersions = []
         stripVersion v = takeWhile (/= '-') (dropWhileEnd (not . isDigit) v)
+        -- version is parsed by Data.Version provided code to avoid
+        -- Cabal's Distribution.Version lack of support for leading zeros in version
+        parseVersion' = fmap fst . listToMaybe . reverse . readP_to_S Data.Version.parseVersion
 
 -- | Remove the project's Docker sandbox.
 reset :: HasConfig env => Bool -> RIO env ()

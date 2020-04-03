@@ -83,16 +83,6 @@ listInstalled programsPath = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parseToolText x
 
--- | See https://github.com/commercialhaskell/stack/issues/4086.
-warnAboutGHCJS :: HasLogFunc env => RIO env ()
-warnAboutGHCJS =
-    logWarn $ "Building a GHCJS project. " <> fromString ghcjsWarning
-
-ghcjsWarning :: String
-ghcjsWarning = unwords
-     [ "Note that GHCJS support in Stack is EXPERIMENTAL"
-     ]
-
 getCompilerVersion
   :: (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
@@ -107,16 +97,6 @@ getCompilerVersion wc exe = do
             x <- ACGhc <$> parseVersionThrowing (T.unpack $ T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
             return x
-        Ghcjs -> do
-            warnAboutGHCJS
-            logDebug "Asking GHCJS for its version"
-            -- Output looks like
-            --
-            -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- fst <$> proc (toFilePath exe) ["--version"] readProcess_
-            let (rest, ghcVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd (BL.toStrict bs)
-                (_, ghcjsVersion) = T.unpack . T.decodeUtf8 <$> versionFromEnd rest
-            ACGhcjs <$> parseVersionThrowing ghcjsVersion <*> parseVersionThrowing ghcVersion
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
     isValid c = c == '.' || ('0' <= c && c <= '9')

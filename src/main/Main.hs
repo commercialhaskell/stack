@@ -13,7 +13,6 @@ module Main (main) where
 import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
-import           Control.Monad.Reader (local)
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
@@ -30,7 +29,6 @@ import           Options.Applicative
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
-import           Options.Applicative.Types (ParserHelp(..))
 import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
@@ -50,7 +48,6 @@ import           Stack.Dot
 import           Stack.GhcPkg (findGhcPkgField)
 import qualified Stack.Nix as Nix
 import           Stack.FileWatch
-import           Stack.Freeze
 import           Stack.Ghci
 import           Stack.Hoogle
 import           Stack.Ls
@@ -64,7 +61,6 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
-import           Stack.Options.FreezeParser
 
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
@@ -89,7 +85,7 @@ import qualified System.Directory as D
 import           System.Environment (getProgName, getArgs, withArgs)
 import           System.FilePath (isValid, pathSeparator, takeDirectory)
 import qualified System.FilePath as FP
-import           System.IO (stderr, stdin, stdout, BufferMode(..), hPutStrLn, hGetEncoding, hSetEncoding)
+import           System.IO (hPutStrLn, hGetEncoding, hSetEncoding)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
 -- | Change the character encoding of the given Handle to transliterate
@@ -334,10 +330,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                       })
                  (globalOpts OtherCmdGlobalOpts)
                  scriptOptsParser
-      addCommand' "freeze"
-                  "Show project or snapshot with pinned dependencies if there are any such (experimental, may be removed)"
-                  freezeCmd
-                  freezeOptsParser
 
       unless isInterpreter (do
         addCommand' "eval"
@@ -539,11 +531,11 @@ interpreterHandler currentDir args f = do
       return (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
-setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
+setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
   (wantedCompiler, compilerCheck, mstack) <-
     case scoCompilerVersion of
       Just v -> return (v, MatchMinor, Nothing)
-      Nothing -> withBuildConfig $ (,,)
+      Nothing -> (,,)
         <$> view wantedCompilerVersionL
         <*> view (configL.to configCompilerCheck)
         <*> (Just <$> view stackYamlL)
@@ -562,8 +554,8 @@ buildCmd opts = do
     exitFailure
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
-      FileWatchPoll -> fileWatchPoll stderr (inner . Just)
-      FileWatch -> fileWatch stderr (inner . Just)
+      FileWatchPoll -> fileWatchPoll (inner . Just)
+      FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
   where
     inner
@@ -726,8 +718,6 @@ execCmd ExecOpts {..} =
           (ExecCmd cmd, args) -> return (cmd, args)
           (ExecRun, args) -> getRunCmd args
           (ExecGhc, args) -> getGhcCmd eoPackages args
-          -- NOTE: This doesn't work for GHCJS, because it doesn't have
-          -- a runghcjs binary.
           (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
       runWithPath eoCwd $ exec cmd args
@@ -867,9 +857,6 @@ hpcReportCmd hropts = do
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
     withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
-
-freezeCmd :: FreezeOpts -> RIO Runner ()
-freezeCmd freezeOpts = withConfig YesReexec $ withDefaultEnvConfig $ freeze freezeOpts
 
 data MainException = InvalidReExecVersion String String
                    | InvalidPathForExec FilePath

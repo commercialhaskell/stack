@@ -5,7 +5,6 @@
 module Stack.LockSpec where
 
 import Pantry.Internal.AesonExtended (WithJSONWarnings(..))
-import Data.ByteString (ByteString)
 import qualified Data.Yaml as Yaml
 import Distribution.Types.PackageName (mkPackageName)
 import Distribution.Types.Version (mkVersion)
@@ -44,9 +43,9 @@ spec = do
                 [r|#some
 snapshots:
 - completed:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
   original:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
 packages: []
 |]
         pkgImm <- lckPkgImmutableLocations <$> decodeLocked lockFile
@@ -60,11 +59,11 @@ snapshots:
     size: 527801
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
     sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
-  original: lts-11.22
+  original: lts-14.27
 - completed:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
   original:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
 packages: []
 |]
         pkgImm <- lckPkgImmutableLocations <$> decodeLocked lockFile
@@ -78,11 +77,11 @@ snapshots:
     size: 527801
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
     sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
-  original: lts-11.22
+  original: lts-14.27
 - completed:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
   original:
-    compiler: ghc-8.2.2
+    compiler: ghc-8.6.5
 packages:
 - original:
     subdir: wai

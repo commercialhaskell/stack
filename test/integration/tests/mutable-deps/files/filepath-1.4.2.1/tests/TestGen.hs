@@ -1,9 +1,9 @@
-{-# ANN module "HLint: ignore" #-}
 -- GENERATED CODE: See ../Generate.hs
 module TestGen(tests) where
 import TestUtil
 import qualified System.FilePath.Windows as W
 import qualified System.FilePath.Posix as P
+{-# ANN module "HLint: ignore" #-}
 tests :: [(String, Property)]
 tests =
     [("W.pathSeparator == '\\\\'", property $ W.pathSeparator == '\\')
@@ -108,6 +108,18 @@ tests =
     ,("W.hasExtension \"/directory/path\" == False", property $ W.hasExtension "/directory/path" == False)
     ,("null (P.takeExtension x) == not (P.hasExtension x)", property $ \(QFilePath x) -> null (P.takeExtension x) == not (P.hasExtension x))
     ,("null (W.takeExtension x) == not (W.hasExtension x)", property $ \(QFilePath x) -> null (W.takeExtension x) == not (W.hasExtension x))
+    ,("\"png\" `P.isExtensionOf` \"/directory/file.png\" == True", property $ "png" `P.isExtensionOf` "/directory/file.png" == True)
+    ,("\"png\" `W.isExtensionOf` \"/directory/file.png\" == True", property $ "png" `W.isExtensionOf` "/directory/file.png" == True)
+    ,("\".png\" `P.isExtensionOf` \"/directory/file.png\" == True", property $ ".png" `P.isExtensionOf` "/directory/file.png" == True)
+    ,("\".png\" `W.isExtensionOf` \"/directory/file.png\" == True", property $ ".png" `W.isExtensionOf` "/directory/file.png" == True)
+    ,("\".tar.gz\" `P.isExtensionOf` \"bar/foo.tar.gz\" == True", property $ ".tar.gz" `P.isExtensionOf` "bar/foo.tar.gz" == True)
+    ,("\".tar.gz\" `W.isExtensionOf` \"bar/foo.tar.gz\" == True", property $ ".tar.gz" `W.isExtensionOf` "bar/foo.tar.gz" == True)
+    ,("\"ar.gz\" `P.isExtensionOf` \"bar/foo.tar.gz\" == False", property $ "ar.gz" `P.isExtensionOf` "bar/foo.tar.gz" == False)
+    ,("\"ar.gz\" `W.isExtensionOf` \"bar/foo.tar.gz\" == False", property $ "ar.gz" `W.isExtensionOf` "bar/foo.tar.gz" == False)
+    ,("\"png\" `P.isExtensionOf` \"/directory/file.png.jpg\" == False", property $ "png" `P.isExtensionOf` "/directory/file.png.jpg" == False)
+    ,("\"png\" `W.isExtensionOf` \"/directory/file.png.jpg\" == False", property $ "png" `W.isExtensionOf` "/directory/file.png.jpg" == False)
+    ,("\"csv/table.csv\" `P.isExtensionOf` \"/data/csv/table.csv\" == False", property $ "csv/table.csv" `P.isExtensionOf` "/data/csv/table.csv" == False)
+    ,("\"csv/table.csv\" `W.isExtensionOf` \"/data/csv/table.csv\" == False", property $ "csv/table.csv" `W.isExtensionOf` "/data/csv/table.csv" == False)
     ,("P.stripExtension \"hs.o\" \"foo.x.hs.o\" == Just \"foo.x\"", property $ P.stripExtension "hs.o" "foo.x.hs.o" == Just "foo.x")
     ,("W.stripExtension \"hs.o\" \"foo.x.hs.o\" == Just \"foo.x\"", property $ W.stripExtension "hs.o" "foo.x.hs.o" == Just "foo.x")
     ,("P.stripExtension \"hi.o\" \"foo.x.hs.o\" == Nothing", property $ P.stripExtension "hi.o" "foo.x.hs.o" == Nothing)

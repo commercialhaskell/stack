@@ -111,6 +111,10 @@ jobs:
     compiler: ": #stack 8.6.5"
     addons: {apt: {packages: [libgmp-dev]}}
 
+  - env: BUILD=stack ARGS="--resolver lts-15"
+    compiler: ": #stack 8.8.3"
+    addons: {apt: {packages: [libgmp-dev]}}
+
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
     compiler: ": #stack nightly"
@@ -152,6 +156,10 @@ jobs:
 
   - env: BUILD=stack ARGS="--resolver lts-14"
     compiler: ": #stack 8.6.5 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-15"
+    compiler: ": #stack 8.8.3 osx"
     os: osx
 
   - env: BUILD=stack ARGS="--resolver nightly"

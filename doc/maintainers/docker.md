@@ -1,3 +1,5 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
+
 # Docker images
 
 Each Stackage LTS release has two corresponding docker images in the [fpco/stack-build](https://hub.docker.com/r/fpco/stack-build/) and [fpco/stack-build-small](https://hub.docker.com/r/fpco/stack-build-small/) repositories.  The former contains every system library needed to build any package in the snapshot, while the latter only contains a minimal set of system libraries for basic programs.

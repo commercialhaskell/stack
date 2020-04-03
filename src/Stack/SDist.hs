@@ -19,14 +19,12 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..), Concurrency(..))
 import           Stack.Prelude hiding (Display (..))
-import           Control.Monad.Reader.Class (local)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
 import           Data.List
-import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -43,7 +41,6 @@ import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
-import           Lens.Micro (set)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
 import           RIO.PrettyPrint
@@ -244,15 +241,16 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
       )
   where
     addBounds :: Set PackageName -> InstallMap -> InstalledMap -> Dependency -> Dependency
-    addBounds internalPackages installMap installedMap dep@(Dependency name range) =
+    -- FIXME
+    addBounds internalPackages installMap installedMap dep@(Dependency name range _) =
       if name `Set.member` internalPackages
         then dep
         else case foundVersion of
           Nothing -> dep
-          Just version -> Dependency name $ simplifyVersionRange
+          Just version -> Dependency name (simplifyVersionRange
             $ (if toAddUpper && not (hasUpperBound range) then addUpper version else id)
             $ (if toAddLower && not (hasLowerBound range) then addLower version else id)
-              range
+              range) Set.empty
       where
         foundVersion =
           case Map.lookup name installMap of

@@ -270,8 +270,10 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
         prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
             pp <- mkProjectPackage printWarnings resolved buildHaddocks
             pure (cpName $ ppCommon pp, pp)
+        compiler <- either throwIO pure $ wantedToActual
+                  $ snapshotCompiler snapshot
         return SMActual
-              { smaCompiler = wantedToActual $ snapshotCompiler snapshot
+              { smaCompiler = compiler
               , smaProject = prjPkgs
               , smaDeps = Map.difference deps prjPkgs
               , smaGlobal = globals

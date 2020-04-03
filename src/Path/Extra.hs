@@ -17,7 +17,6 @@ module Path.Extra
   ,tryGetModificationTime
   ) where
 
-import           Data.Bool (bool)
 import           Data.Time (UTCTime)
 import           Path
 import           Path.IO

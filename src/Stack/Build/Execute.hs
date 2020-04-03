@@ -40,15 +40,17 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (createSource)
 import qualified Data.Conduit.Text as CT
 import           Data.List hiding (any)
-import           Data.List.NonEmpty (NonEmpty(..), nonEmpty)
+import           Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty (toList)
 import           Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding (decodeUtf8)
 import           Data.Tuple
+import           Data.Time (ZonedTime, getZonedTime, formatTime, defaultTimeLocale)
+import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System            (OS (Windows),
@@ -87,7 +89,7 @@ import qualified System.Directory as D
 import           System.Environment (getExecutablePath, lookupEnv)
 import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
-import           System.IO (stderr, stdout)
+import           System.IO.Error (isDoesNotExistError)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
 import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
@@ -267,16 +269,12 @@ getSetupExe setupHs setupShimHs tmpdir = do
         outputNameS =
             case wc of
                 Ghc -> exeNameS
-                Ghcjs -> baseNameS ++ ".jsexe"
-        jsExeNameS =
-            baseNameS ++ ".jsexe"
         setupDir =
             view stackRootL config </>
             relDirSetupExeCache </>
             platformDir
 
     exePath <- (setupDir </>) <$> parseRelFile exeNameS
-    jsExePath <- (setupDir </>) <$> parseRelDir jsExeNameS
 
     exists <- liftIO $ D.doesFileExist $ toFilePath exePath
 
@@ -285,7 +283,6 @@ getSetupExe setupHs setupShimHs tmpdir = do
         else do
             tmpExePath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ exeNameS
             tmpOutputPath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ outputNameS
-            tmpJsExePath <- fmap (setupDir </>) $ parseRelDir $ "tmp-" ++ jsExeNameS
             ensureDir setupDir
             let args = buildSetupArgs ++
                     [ "-package"
@@ -294,15 +291,13 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath setupShimHs
                     , "-o"
                     , toFilePath tmpOutputPath
-                    ] ++
-                    ["-build-runner" | wc == Ghcjs]
+                    ]
             compilerPath <- getCompilerPath
             withWorkingDir (toFilePath tmpdir) (proc (toFilePath compilerPath) args $ \pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece ->
                     throwM $ SetupHsBuildFailure (eceExitCode ece) Nothing compilerPath args Nothing []
-            when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
 
@@ -851,6 +846,9 @@ ensureConfig :: HasEnvConfig env
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
+    setupConfigfp <- setupConfigFromDir pkgDir
+    newSetupConfigMod <- liftIO $ either (const Nothing) (Just . modificationTime) <$>
+      tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
     -- See https://github.com/commercialhaskell/stack/issues/3554
     taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
@@ -869,8 +867,13 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
 
                 mOldCabalMod <- tryGetCabalMod pkgDir
 
+                -- Cabal's setup-config is created per OS/Cabal version, multiple
+                -- projects using the same package could get a conflict because of this
+                mOldSetupConfigMod <- tryGetSetupConfigMod pkgDir
+
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
+                      || mOldSetupConfigMod /= newSetupConfigMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
 
     when (taskBuildTypeConfig task) ensureConfigureScript
@@ -886,7 +889,6 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                   [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
                   , "--with-ghc-pkg=" ++ toFilePath pkgPath
                   ]
-                Ghcjs -> []
         exes <- forM programNames $ \name -> do
             mpath <- findExecutable name
             return $ case mpath of
@@ -923,7 +925,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             -- On Windows 10, an upstream issue with the `sh autoreconf -i`
             -- command means that command clears, but does not then restore, the
             -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
-            -- folowing hack re-enables the lost ANSI-capability.
+            -- following hack re-enables the lost ANSI-capability.
             fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
         withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
           fixupOnWindows
@@ -1292,15 +1294,14 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                   where
                     runAndOutput :: ActualCompiler -> RIO env ()
                     runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $ withProcessContext menv $ case outputType of
-                        OTLogFile _ h ->
-                            proc (toFilePath exeName) fullArgs
-                          $ runProcess_
-                            -- Don't use closed, since that can break
-                            -- ./configure scripts. See:
-                            -- https://github.com/commercialhaskell/stack/pull/4722
-                          . setStdin (byteStringInput "")
-                          . setStdout (useHandleOpen h)
-                          . setStderr (useHandleOpen h)
+                        OTLogFile _ h -> do
+                          let prefixWithTimestamps =
+                                if configPrefixTimestamps config
+                                   then PrefixWithTimestamps
+                                   else WithoutTimestamps
+                          void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
+                              (sinkWithTimestamps prefixWithTimestamps h)
+                              (sinkWithTimestamps prefixWithTimestamps h)
                         OTConsole mprefix ->
                             let prefix = fold mprefix in
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
@@ -1334,7 +1335,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                         then return outputFile
                         else do
                             ensureDir setupDir
-                            compiler <- view $ actualCompilerVersionL.whichCompilerL
                             compilerPath <- view $ compilerPathsL.to cpCompiler
                             packageArgs <- getPackageArgs setupDir
                             runExe compilerPath $
@@ -1350,9 +1350,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                                 , "-o", toFilePath outputFile
                                 , "-threaded"
                                 ] ++
-                                (case compiler of
-                                    Ghc -> []
-                                    Ghcjs -> ["-build-runner"]) ++
 
                                 -- Apply GHC options
                                 -- https://github.com/commercialhaskell/stack/issues/4526
@@ -1557,7 +1554,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
-
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1799,22 +1795,20 @@ getExecutableBuildStatuses
     :: HasEnvConfig env
     => Package -> Path Abs Dir -> RIO env (Map Text ExecutableBuildStatus)
 getExecutableBuildStatuses package pkgDir = do
-    compiler <- view $ actualCompilerVersionL.whichCompilerL
     distDir <- distDirFromDir pkgDir
     platform <- view platformL
     fmap
         M.fromList
-        (mapM (checkExeStatus compiler platform distDir) (Set.toList (packageExes package)))
+        (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
 
 -- | Check whether the given executable is defined in the given dist directory.
 checkExeStatus
     :: HasLogFunc env
-    => WhichCompiler
-    -> Platform
+    => Platform
     -> Path b Dir
     -> Text
     -> RIO env (Text, ExecutableBuildStatus)
-checkExeStatus compiler platform distDir name = do
+checkExeStatus platform distDir name = do
     exename <- parseRelDir (T.unpack name)
     exists <- checkPath (distDir </> relDirBuild </> exename)
     pure
@@ -1824,18 +1818,13 @@ checkExeStatus compiler platform distDir name = do
               else ExecutableNotBuilt)
   where
     checkPath base =
-        case compiler of
-            Ghcjs -> do
-                dir <- parseRelDir (file ++ ".jsexe")
-                doesDirExist (base </> dir)
-            _ ->
-                case platform of
-                    Platform _ Windows -> do
-                        fileandext <- parseRelFile (file ++ ".exe")
-                        doesFileExist (base </> fileandext)
-                    _ -> do
-                        fileandext <- parseRelFile file
-                        doesFileExist (base </> fileandext)
+        case platform of
+            Platform _ Windows -> do
+                fileandext <- parseRelFile (file ++ ".exe")
+                doesFileExist (base </> fileandext)
+            _ -> do
+                fileandext <- parseRelFile file
+                doesFileExist (base </> fileandext)
       where
         file = T.unpack name
 
@@ -2192,6 +2181,28 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
            >> char ':'
            >> return ()
         where num = some digit
+
+-- | Whether to prefix log lines with timestamps.
+data PrefixWithTimestamps = PrefixWithTimestamps | WithoutTimestamps
+
+-- | Write stream of lines to handle, but adding timestamps.
+sinkWithTimestamps :: MonadIO m => PrefixWithTimestamps -> Handle -> ConduitT ByteString Void m ()
+sinkWithTimestamps prefixWithTimestamps h =
+    case prefixWithTimestamps of
+        PrefixWithTimestamps ->
+            CB.lines .| CL.mapM addTimestamp .| CL.map (<> "\n") .| sinkHandle h
+        WithoutTimestamps -> sinkHandle h
+  where
+    addTimestamp theLine = do
+        now <- liftIO getZonedTime
+        pure (formatZonedTimeForLog now <> " " <> theLine)
+
+-- | Format a time in ISO8601 format. We choose ZonedTime over UTCTime
+-- because a user expects to see logs in their local time, and would
+-- be confused to see UTC time. Stack's debug logs also use the local
+-- time zone.
+formatZonedTimeForLog :: ZonedTime -> ByteString
+formatZonedTimeForLog = S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
 
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.

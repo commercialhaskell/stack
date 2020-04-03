@@ -22,12 +22,9 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map (MonoidMap(..))
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Distribution.Text as Cabal
 import qualified Distribution.Version as Cabal
 import           Distribution.Types.BuildType (BuildType (Configure))
-import           Distribution.Types.PackageId (pkgVersion)
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Version (mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -842,10 +839,6 @@ describeConfigDiff config old new
         go ("--ghc-options":x:xs) = go' Ghc x xs
         go ((T.stripPrefix "--ghc-option=" -> Just x):xs) = go' Ghc x xs
         go ((T.stripPrefix "--ghc-options=" -> Just x):xs) = go' Ghc x xs
-        go ("--ghcjs-option":x:xs) = go' Ghcjs x xs
-        go ("--ghcjs-options":x:xs) = go' Ghcjs x xs
-        go ((T.stripPrefix "--ghcjs-option=" -> Just x):xs) = go' Ghcjs x xs
-        go ((T.stripPrefix "--ghcjs-options=" -> Just x):xs) = go' Ghcjs x xs
         go (x:xs) = x : go xs
 
         go' wc x xs = checkKeepers wc x $ go xs
@@ -1109,7 +1102,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             let prunedDeps = map (style Current . fromString . packageNameString) pruned
             in Just $ flow "Can't use GHC boot package" <+>
                       (style Current . fromString . packageNameString $ name) <+>
-                      flow "when it has an overriden dependency, " <+>
+                      flow "when it has an overridden dependency (issue #4510);" <+>
                       flow "you need to add the following as explicit dependencies to the project:" <+>
                       line <+> encloseSep "" "" ", " prunedDeps
         | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
@@ -1121,13 +1114,22 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintFlag (name, False) = "-" <> fromString (flagNameString name)
 
     pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
-        NotInBuildPlan -> Just $
-            style Error (fromString $ packageNameString name) <+>
-            align ((if range == Cabal.anyVersion
-                      then flow "needed"
-                      else flow "must match" <+> goodRange) <> "," <> softline <>
-                   flow "but the stack configuration has no specified version" <+>
-                   latestApplicable Nothing)
+        NotInBuildPlan
+          | name `elem` fold prunedGlobalDeps -> Just $
+              style Error (fromString $ packageNameString name) <+>
+              align ((if range == Cabal.anyVersion
+                        then flow "needed"
+                        else flow "must match" <+> goodRange) <> "," <> softline <>
+                     flow "but this GHC boot package has been pruned (issue #4510);" <+>
+                     flow "you need to add the package explicitly to extra-deps" <+>
+                     latestApplicable Nothing)
+          | otherwise -> Just $
+              style Error (fromString $ packageNameString name) <+>
+              align ((if range == Cabal.anyVersion
+                        then flow "needed"
+                        else flow "must match" <+> goodRange) <> "," <> softline <>
+                     flow "but the stack configuration has no specified version" <+>
+                     latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
             (style Error . fromString . packageIdentifierString) (PackageIdentifier name version) <+>

@@ -104,7 +104,7 @@ matter when in time you use it, and no matter how many new release happen in
 the interim, the build plan generated should be the same.
 
 \* There's at least one hole in this theory today, which is Hackage revisions.
-When you specify `extra-deps: [acme-missiles-0.3]`, it doesnt' specify which
+When you specify `extra-deps: [acme-missiles-0.3]`, it doesn't specify which
 revision of the cabal file to use, and Stack will just choose the latest. Stack
 version 1.6 added the ability to specify exact revisions of cabal files, but
 this isn't enforced as a requirement as it's so different from the way most
@@ -134,3 +134,7 @@ depend on a package already present in the snapshot you've selected, there's no
 need to add it explicitly to your `stack.yaml` file: it's already there
 implicitly via the `resolver` setting. This is what you do the majority of the
 time, such as when you add `vector` or `mtl` as a `build-depends` value.
+
+## Should I check in generated cabal files?
+
+Yes, you should. This recommendation was changed in [issue #5210](https://github.com/commercialhaskell/stack/issues/5210), please see the discussion there.

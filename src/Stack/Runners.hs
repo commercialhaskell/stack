@@ -33,9 +33,9 @@ import           Stack.Storage.User (upgradeChecksSince, logUpgradeCheck)
 import           Stack.Types.Config
 import           Stack.Types.Docker (dockerEnable)
 import           Stack.Types.Nix (nixEnable)
-import           Stack.Types.Version (stackMinorVersion, stackVersion, minorVersion)
+import           Stack.Types.Version (stackMinorVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import           System.Console.Terminal.Size (size, width)
+import           System.Terminal (getTerminalWidth)
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a
@@ -145,7 +145,7 @@ withRunnerGlobal go inner = do
     ColorAuto -> fromMaybe True <$>
                           hSupportsANSIWithoutEmulation stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
-                                    <$> fmap (fmap width) size)
+                                    <$> getTerminalWidth)
                                    pure (globalTermWidth go)
   menv <- mkDefaultProcessContext
   logOptions0 <- logOptionsHandle stderr False

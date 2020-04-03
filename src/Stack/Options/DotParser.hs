@@ -7,7 +7,7 @@ import           Data.Char (isSpace)
 import           Data.List.Split (splitOn)
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Types.PackageName(PackageName, mkPackageName)
+import           Distribution.Types.PackageName(mkPackageName)
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
@@ -57,23 +57,49 @@ dotOptsParser externalDefault =
         globalHints = switch (long "global-hints" <>
                               help "Do not require an install GHC; instead, use a hints file for global packages")
 
+separatorParser :: Parser Text
+separatorParser =
+  fmap escapeSep
+  (textOption (long "separator" <>
+                metavar "SEP" <>
+                help ("Separator between package name " <>
+                      "and package version.") <>
+                value " " <>
+                showDefault))
+  where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+
+licenseParser :: Parser Bool
+licenseParser = boolFlags False
+                "license"
+                "printing of dependency licenses instead of versions"
+                idm
+
+listDepsFormatOptsParser :: Parser ListDepsFormatOpts
+listDepsFormatOptsParser = ListDepsFormatOpts <$> separatorParser <*> licenseParser
+
+listDepsTreeParser :: Parser ListDepsFormat
+listDepsTreeParser =  ListDepsTree <$> listDepsFormatOptsParser
+
+listDepsTextParser :: Parser ListDepsFormat
+listDepsTextParser = ListDepsText <$> listDepsFormatOptsParser
+
+listDepsJsonParser :: Parser ListDepsFormat
+listDepsJsonParser = pure ListDepsJSON
+
+toListDepsOptsParser :: Parser ListDepsFormat -> Parser ListDepsOpts
+toListDepsOptsParser formatParser = ListDepsOpts
+      <$> formatParser
+      <*> dotOptsParser True
+
+formatSubCommand :: String -> String -> Parser ListDepsFormat -> Mod CommandFields ListDepsOpts
+formatSubCommand cmd desc formatParser =
+  command cmd (info (toListDepsOptsParser formatParser)
+               (progDesc desc))
+
 -- | Parser for arguments to `stack ls dependencies`.
 listDepsOptsParser :: Parser ListDepsOpts
-listDepsOptsParser = ListDepsOpts
-                 <$> dotOptsParser True -- Default for --external is True.
-                 <*> fmap escapeSep
-                     (textOption (long "separator" <>
-                                  metavar "SEP" <>
-                                  help ("Separator between package name " <>
-                                        "and package version.") <>
-                                  value " " <>
-                                  showDefault))
-                 <*> boolFlags False
-                                "license"
-                                "printing of dependency licenses instead of versions"
-                                idm
-                 <*> boolFlags False
-                                "tree"
-                                "printing of dependencies as a tree"
-                                idm
-  where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+listDepsOptsParser = subparser
+                     (  formatSubCommand "text" "Print dependencies as text (default)" listDepsTextParser
+                     <> formatSubCommand "tree" "Print dependencies as tree" listDepsTreeParser
+                     <> formatSubCommand "json" "Print dependencies as JSON" listDepsJsonParser
+                     ) <|> toListDepsOptsParser listDepsTextParser

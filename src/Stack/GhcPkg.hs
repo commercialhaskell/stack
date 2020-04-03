@@ -18,7 +18,6 @@ import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Data.List
-import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (parent, (</>))
@@ -103,7 +102,6 @@ createDatabase (GhcPkgExe pkgPath) db = do
 -- | Get the environment variable to use for the package DB paths.
 ghcPkgPathEnvVar :: WhichCompiler -> Text
 ghcPkgPathEnvVar Ghc = "GHC_PACKAGE_PATH"
-ghcPkgPathEnvVar Ghcjs = "GHCJS_PACKAGE_PATH"
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database
 packageDbFlags :: [Path Abs Dir] -> [String]

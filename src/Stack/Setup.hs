@@ -31,14 +31,12 @@ module Stack.Setup
 import qualified    Codec.Archive.Tar as Tar
 import              Conduit
 import              Control.Applicative (empty)
-import              Control.Monad.State (get, put, modify)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Pantry.Internal.AesonExtended
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.Conduit.Binary as CB
 import              Data.Conduit.Lazy (lazyConsume)
-import              Data.Conduit.Lift (evalStateC)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
@@ -50,23 +48,21 @@ import qualified    Data.Set as Set
 import qualified    Data.Text as T
 import qualified    Data.Text.Encoding as T
 import qualified    Data.Text.Encoding.Error as T
-import              Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
 import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
-import              Lens.Micro (set)
-import              Network.HTTP.StackClient (CheckHexDigest (..), DownloadRequest (..), HashCheck (..),
-                                              drRetryPolicyDefault, getResponseBody, getResponseStatusCode,
-                                              httpLbs, httpJSON, parseRequest, parseUrlThrow, setGithubHeaders,
-                                              verifiedDownload, withResponse)
-import              Path
+import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
+                                              getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
+                                              mkDownloadRequest, parseRequest, parseUrlThrow, setGithubHeaders,
+                                              setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse)
+import              Path hiding (fileExtension)
 import              Path.CheckInstall (warnInstallSearchPathIssues)
+import              Path.Extended (fileExtension)
 import              Path.Extra (toFilePathNoTrailingSep)
 import              Path.IO hiding (findExecutable, withSystemTempDir)
-import              Prelude (until)
 import qualified    Pantry
 import qualified    RIO
 import              RIO.List
@@ -95,7 +91,6 @@ import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
 import              System.Permissions (setFileExecutable)
-import              Text.Printf (printf)
 import              System.Uname (getRelease)
 import              Data.List.Split (splitOn)
 
@@ -121,12 +116,8 @@ data SetupOpts = SetupOpts
     -- ^ Do not use a custom msys installation on Windows
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
-    , soptsSetupInfoYaml :: !FilePath
-    -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
-    , soptsGHCJSBootOpts :: [String]
-    -- ^ Additional ghcjs-boot options, the default is "--clean"
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -138,12 +129,9 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | RequireCustomGHCVariant
                     | ProblemWhileDecompressing (Path Abs File)
                     | SetupInfoMissingSevenz
-                    | GHCJSRequiresStandardVariant
-                    | GHCJSNotBooted
                     | DockerStackExeNotFound Version Text
                     | UnsupportedSetupConfiguration
                     | InvalidGhcAt (Path Abs File) SomeException
-                    | NoLongerBuildGhcjs
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -182,10 +170,6 @@ instance Show SetupException where
         "Problem while decompressing " ++ toFilePath archive
     show SetupInfoMissingSevenz =
         "SetupInfo missing Sevenz EXE/DLL"
-    show GHCJSRequiresStandardVariant =
-        "stack does not yet support using --ghc-variant with GHCJS"
-    show GHCJSNotBooted =
-        "GHCJS does not yet have its boot packages installed.  Use \"stack setup\" to attempt to run ghcjs-boot."
     show (DockerStackExeNotFound stackVersion' osKey) = concat
         [ stackProgName
         , "-"
@@ -199,8 +183,6 @@ instance Show SetupException where
         "I don't know how to install GHC on your system configuration, please install manually"
     show (InvalidGhcAt compiler e) =
         "Found an invalid compiler at " ++ show (toFilePath compiler) ++ ": " ++ displayException e
-    show NoLongerBuildGhcjs =
-        "Since Stack 2.0, Stack does not support building GHCJS itself"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: NeedTargets
@@ -213,7 +195,9 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     let stackYaml = bcStackYaml bc
     platform <- view platformL
     wcVersion <- view wantedCompilerVersionL
-    wc <- view $ wantedCompilerVersionL.to wantedToActual.whichCompilerL
+    wanted <- view wantedCompilerVersionL
+    actual <- either throwIO pure $ wantedToActual wanted
+    let wc = actual^.whichCompilerL
     let sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC config
             , soptsUseSystem = configSystemGHC config
@@ -225,9 +209,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             , soptsSkipGhcCheck = configSkipGHCCheck config
             , soptsSkipMsys = configSkipMsys config
             , soptsResolveMissingGHC = mResolveMissingGHC
-            , soptsSetupInfoYaml = defaultSetupInfoYaml
             , soptsGHCBindistURL = Nothing
-            , soptsGHCJSBootOpts = ["--clean"]
             }
 
     (compilerPaths, ghcBin) <- ensureCompilerAndMsys sopts
@@ -450,13 +432,14 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 -- | Ensure both the compiler and the msys toolchain are installed and
 -- provide the PATHs to add if necessary
 ensureCompilerAndMsys
-  :: (HasConfig env, HasGHCVariant env)
+  :: (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
-  didWarn <- warnUnsupportedCompiler $ getGhcVersion $ wantedToActual $ soptsWantedCompiler sopts
+  actual <- either throwIO pure $ wantedToActual $ soptsWantedCompiler sopts
+  didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
 
-  getSetupInfo' <- memoizeRef (getSetupInfo (soptsSetupInfoYaml sopts))
+  getSetupInfo' <- memoizeRef getSetupInfo
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
 
   warnUnsupportedCompilerCabal cp didWarn
@@ -519,7 +502,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
 -- | Ensure that the msys toolchain is installed if necessary and
 -- provide the PATHs to add if necessary
 ensureMsys
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (Maybe Tool)
@@ -549,7 +532,7 @@ ensureMsys sopts getSetupInfo' = do
       _ -> return Nothing
 
 installGhcBindist
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> [Tool]
@@ -560,14 +543,14 @@ installGhcBindist sopts getSetupInfo' installed = do
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
     config <- view configL
     ghcVariant <- view ghcVariantL
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
     possibleCompilers <-
-            case whichCompiler $ wantedToActual wanted of
+            case wc of
                 Ghc -> do
                     ghcBuilds <- getGhcBuilds
                     forM ghcBuilds $ \ghcBuild -> do
                         ghcPkgName <- parsePackageNameThrowing ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
                         return (getInstalledTool installed ghcPkgName (isWanted . ACGhc), ghcBuild)
-                Ghcjs -> return []
     let existingCompilers = concatMap
             (\(installedCompiler, compilerBuild) ->
                 case (installedCompiler, soptsForceReinstall sopts) of
@@ -608,15 +591,15 @@ installGhcBindist sopts getSetupInfo' installed = do
                     (soptsStackYaml sopts)
                     suggestion
 
--- | Ensure compiler (ghc or ghcjs) is installed, without worrying about msys
+-- | Ensure compiler is installed, without worrying about msys
 ensureCompiler
-  :: forall env. (HasConfig env, HasGHCVariant env)
+  :: forall env. (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
-        wc = whichCompiler $ wantedToActual wanted
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
 
     Platform expectedArch _ <- view platformL
 
@@ -652,7 +635,7 @@ ensureCompiler sopts getSetupInfo' = do
         pure (cp, paths)
 
 ensureSandboxedCompiler
-  :: HasConfig env
+  :: HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
@@ -670,18 +653,18 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
        _ -> installGhcBindist sopts getSetupInfo' installed
     paths <- extraDirs compilerTool
 
-    let wc = whichCompiler $ wantedToActual wanted
+    wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
     menv0 <- view processContextL
     m <- either throwM return
        $ augmentPathMap (toFilePath <$> edBins paths) (view envVarsL menv0)
     menv <- mkProcessContext (removeHaskellEnvVars m)
 
-    let names =
-          case wanted of
-            WCGhc version -> ["ghc-" ++ versionString version, "ghc"]
-            WCGhcGit{} -> ["ghc"]
-            WCGhcjs{} -> ["ghcjs"]
-        loop [] = do
+    names <-
+      case wanted of
+        WCGhc version -> pure ["ghc-" ++ versionString version, "ghc"]
+        WCGhcGit{} -> pure ["ghc"]
+        WCGhcjs{} -> throwIO GhcjsNotSupported
+    let loop [] = do
           logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
           logError $ "Could not find it on the paths " <> displayShow (edBins paths)
           throwString "Could not find sandboxed compiler"
@@ -712,7 +695,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
           let prefix =
                 case wc of
                   Ghc -> "ghc-"
-                  Ghcjs -> "ghcjs-"
           fmap ("-" ++) $ stripPrefix prefix $ toFilePath $ filename compiler
         suffixes = maybe id (:) msuffixWithVersion [suffixNoVersion]
         findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
@@ -729,7 +711,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
           loop toTry
     pkg <- fmap GhcPkgExe $ findHelper $ \case
                                Ghc -> ["ghc-pkg"]
-                               Ghcjs -> ["ghcjs-pkg"]
 
     menv0 <- view processContextL
     menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
@@ -737,11 +718,9 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
     interpreter <- findHelper $
                    \case
                       Ghc -> ["runghc"]
-                      Ghcjs -> ["runghcjs"]
     haddock <- findHelper $
                \case
                   Ghc -> ["haddock", "haddock-ghc"]
-                  Ghcjs -> ["haddock-ghcjs"]
     infobs <- proc (toFilePath compiler) ["--info"]
             $ fmap (toStrictBytes . fst) . readProcess_
     infotext <-
@@ -774,7 +753,6 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
               logWarn "Key 'Project version' not found in GHC info"
               getCompilerVersion wc compiler
             Just versionString' -> ACGhc <$> parseVersionThrowing versionString'
-        Ghcjs -> getCompilerVersion wc compiler
     globaldb <-
       case eglobaldb of
         Left e -> do
@@ -826,7 +804,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
 buildGhcFromSource :: forall env.
    ( HasTerm env
    , HasProcessContext env
-   , HasConfig env
+   , HasBuildConfig env
    ) => Memoized SetupInfo -> [Tool] -> CompilerRepository -> Text -> Text
    -> RIO env (Tool, CompilerBuild)
 buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId flavour = do
@@ -875,9 +853,13 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
          bindistPath <- parseRelDir "_build/bindist"
          (_,files) <- listDir (cwd </> bindistPath)
          let
-           isBindist p = "ghc-" `isPrefixOf` (toFilePath (filename p))
-                         && fileExtension (filename p) == ".xz"
-           mbindist = filter isBindist files
+           isBindist p = do
+             extension <- fileExtension (filename p)
+
+             return $ "ghc-" `isPrefixOf` (toFilePath (filename p))
+                         && extension == ".xz"
+
+         mbindist <- filterM isBindist files
          case mbindist of
            [bindist] -> do
                let bindist' = T.pack (toFilePath bindist)
@@ -1052,44 +1034,43 @@ sourceSystemCompilers
   -> ConduitT i (Path Abs File) (RIO env) ()
 sourceSystemCompilers wanted = do
   searchPath <- view exeSearchPathL
+  names <-
+    case wanted of
+      WCGhc version -> pure
+        [ "ghc-" ++ versionString version
+        , "ghc"
+        ]
+      WCGhcjs{} -> throwIO GhcjsNotSupported
+      WCGhcGit{} -> pure [] -- only use sandboxed versions
   for_ names $ \name -> for_ searchPath $ \dir -> do
     fp <- resolveFile' $ addExe $ dir FP.</> name
     exists <- doesFileExist fp
     when exists $ yield fp
   where
-    names =
-      case wanted of
-        WCGhc version ->
-          [ "ghc-" ++ versionString version
-          , "ghc"
-          ]
-        WCGhcjs{} -> ["ghcjs"]
-        WCGhcGit{} -> [] -- only use sandboxed versions
     addExe
       | osIsWindows = (++ ".exe")
       | otherwise = id
 
 -- | Download the most recent SetupInfo
-getSetupInfo :: HasConfig env => String -> RIO env SetupInfo
-getSetupInfo stackSetupYaml = do
+getSetupInfo :: HasConfig env => RIO env SetupInfo
+getSetupInfo = do
     config <- view configL
-    setupInfos <-
-        mapM
-            loadSetupInfo
-            (SetupInfoFileOrURL stackSetupYaml :
-             configSetupInfoLocations config)
-    return (mconcat setupInfos)
+    let inlineSetupInfo = configSetupInfoInline config
+        locations' = configSetupInfoLocations config
+        locations = if null locations' then [defaultSetupInfoYaml] else locations'
+
+    resolvedSetupInfos <- mapM loadSetupInfo locations
+    return (inlineSetupInfo <> mconcat resolvedSetupInfos)
   where
-    loadSetupInfo (SetupInfoInline si) = return si
-    loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
-        bs <-
-            case parseUrlThrow urlOrFile of
-                Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
-                Nothing -> liftIO $ S.readFile urlOrFile
-        WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
-        when (urlOrFile /= defaultSetupInfoYaml) $
-            logJSONWarnings urlOrFile warnings
-        return si
+    loadSetupInfo urlOrFile = do
+      bs <-
+          case parseUrlThrow urlOrFile of
+              Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
+              Nothing -> liftIO $ S.readFile urlOrFile
+      WithJSONWarnings si warnings <- either throwM return (Yaml.decodeEither' bs)
+      when (urlOrFile /= defaultSetupInfoYaml) $
+          logJSONWarnings urlOrFile warnings
+      return si
 
 getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find
@@ -1108,7 +1089,7 @@ getInstalledTool installed name goodVersion =
             else Nothing
     goodPackage _ = Nothing
 
-downloadAndInstallTool :: HasTerm env
+downloadAndInstallTool :: (HasTerm env, HasBuildConfig env)
                        => Path Abs Dir
                        -> DownloadInfo
                        -> Tool
@@ -1127,7 +1108,7 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
     liftIO $ ignoringAbsence (removeDirRecur tempDir)
     return tool
 
-downloadAndInstallCompiler :: (HasConfig env, HasGHCVariant env)
+downloadAndInstallCompiler :: (HasBuildConfig env, HasGHCVariant env)
                            => CompilerBuild
                            -> SetupInfo
                            -> WantedCompiler
@@ -1175,7 +1156,7 @@ downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL =
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) (gdiDownloadInfo downloadInfo) tool (installer si)
 
-downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO NoLongerBuildGhcjs
+downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO GhcjsNotSupported
 
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
     error "downloadAndInstallCompiler: shouldn't be reached with ghc-git"
@@ -1199,7 +1180,7 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
 
 -- | Download and install the first available compiler build.
 downloadAndInstallPossibleCompilers
-    :: (HasGHCVariant env, HasConfig env)
+    :: (HasGHCVariant env, HasBuildConfig env)
     => [CompilerBuild]
     -> SetupInfo
     -> WantedCompiler
@@ -1266,41 +1247,53 @@ getOSKey platform =
         Platform AArch64               Cabal.Linux   -> return "linux-aarch64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
+downloadOrUseLocal
+    :: (HasTerm env, HasBuildConfig env)
+    => Text -> DownloadInfo -> Path Abs File -> RIO env (Path Abs File)
+downloadOrUseLocal downloadLabel downloadInfo destination =
+  case url of
+    (parseUrlThrow -> Just _) -> do
+        ensureDir (parent destination)
+        chattyDownload downloadLabel downloadInfo destination
+        return destination
+    (parseAbsFile -> Just path) -> do
+        warnOnIgnoredChecks
+        return path
+    (parseRelFile -> Just path) -> do
+        warnOnIgnoredChecks
+        root <- view projectRootL
+        return (root </> path)
+    _ ->
+        throwString $ "Error: `url` must be either an HTTP URL or a file path: " ++ url
+  where
+    url = T.unpack $ downloadInfoUrl downloadInfo
+    warnOnIgnoredChecks = do
+      let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
+                       downloadInfoSha256=sha256} = downloadInfo
+      when (isJust contentLength) $
+        logWarn "`content-length` is not checked and should not be specified when `url` is a file path"
+      when (isJust sha1) $
+        logWarn "`sha1` is not checked and should not be specified when `url` is a file path"
+      when (isJust sha256) $
+        logWarn "`sha256` is not checked and should not be specified when `url` is a file path"
+
 downloadFromInfo
-    :: HasTerm env
+    :: (HasTerm env, HasBuildConfig env)
     => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
-    at <-
+    archiveType <-
         case extension of
             ".tar.xz" -> return TarXz
             ".tar.bz2" -> return TarBz2
             ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
             _ -> throwString $ "Error: Unknown extension for url: " ++ url
+
     relativeFile <- parseRelFile $ toolString tool ++ extension
-    path <- case url of
-        (parseUrlThrow -> Just _) -> do
-            let path = programsDir </> relativeFile
-            ensureDir programsDir
-            chattyDownload (T.pack (toolString tool)) downloadInfo path
-            return path
-        (parseAbsFile -> Just path) -> do
-            let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
-                             downloadInfoSha256=sha256} =
-                    downloadInfo
-            when (isJust contentLength) $
-                logWarn ("`content-length` in not checked \n" <>
-                          "and should not be specified when `url` is a file path")
-            when (isJust sha1) $
-                logWarn ("`sha1` is not checked and \n" <>
-                          "should not be specified when `url` is a file path")
-            when (isJust sha256) $
-                logWarn ("`sha256` is not checked and \n" <>
-                          "should not be specified when `url` is a file path")
-            return path
-        _ ->
-            throwString $ "Error: `url` must be either an HTTP URL or absolute file path: " ++ url
-    return (path, at)
+    let destinationPath = programsDir </> relativeFile
+    localPath <- downloadOrUseLocal (T.pack (toolString tool)) downloadInfo destinationPath
+    return (localPath, archiveType)
+
   where
     url = T.unpack $ downloadInfoUrl downloadInfo
     extension = loop url
@@ -1310,6 +1303,7 @@ downloadFromInfo programsDir downloadInfo tool = do
             | otherwise = ""
           where
             (fp', ext) = FP.splitExtension fp
+
 
 data ArchiveType
     = TarBz2
@@ -1438,7 +1432,7 @@ instance Alternative (CheckDependency env) where
             Left _ -> y
             Right x' -> return $ Right x'
 
-installGHCWindows :: HasConfig env
+installGHCWindows :: HasBuildConfig env
                   => Maybe Version
                   -> SetupInfo
                   -> Path Abs File
@@ -1451,7 +1445,7 @@ installGHCWindows mversion si archiveFile archiveType _tempDir destDir = do
     withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
     logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 
-installMsys2Windows :: HasConfig env
+installMsys2Windows :: HasBuildConfig env
                   => Text -- ^ OS Key
                   -> SetupInfo
                   -> Path Abs File
@@ -1492,7 +1486,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
 
 -- | Unpack a compressed tarball using 7zip.  Expects a single directory in
 -- the unpacked results, which is renamed to the destination directory.
-withUnpackedTarball7z :: HasConfig env
+withUnpackedTarball7z :: HasBuildConfig env
                       => String -- ^ Name of tool, used in error messages
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
@@ -1533,20 +1527,20 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (HasConfig env, MonadIO m)
+setup7z :: (HasBuildConfig env, MonadIO m)
         => SetupInfo
         -> RIO env (Path Abs Dir -> Path Abs File -> m ())
 setup7z si = do
     dir <- view $ configL.to configLocalPrograms
     ensureDir dir
-    let exe = dir </> relFile7zexe
-        dll = dir </> relFile7zdll
+    let exeDestination = dir </> relFile7zexe
+        dllDestination = dir </> relFile7zdll
     case (siSevenzDll si, siSevenzExe si) of
         (Just sevenzDll, Just sevenzExe) -> do
-            chattyDownload "7z.dll" sevenzDll dll
-            chattyDownload "7z.exe" sevenzExe exe
+            _ <- downloadOrUseLocal "7z.dll" sevenzDll dllDestination
+            exePath <- downloadOrUseLocal "7z.exe" sevenzExe exeDestination
             withRunInIO $ \run -> return $ \outdir archive -> liftIO $ run $ do
-                let cmd = toFilePath exe
+                let cmd = toFilePath exePath
                     args =
                         [ "x"
                         , "-o" ++ toFilePath outdir
@@ -1618,91 +1612,15 @@ chattyDownload label downloadInfo path = do
     when (null hashChecks) $ logWarn $
         "No sha1 or sha256 found in metadata," <>
         " download hash won't be checked."
-    let dReq = DownloadRequest
-            { drRequest = req
-            , drHashChecks = hashChecks
-            , drLengthCheck = mtotalSize
-            , drRetryPolicy = drRetryPolicyDefault
-            }
-    x <- verifiedDownload dReq path chattyDownloadProgress
+    let dReq = setHashChecks hashChecks $
+               setLengthCheck mtotalSize $
+               mkDownloadRequest req
+    x <- verifiedDownloadWithProgress dReq path label mtotalSize
     if x
         then logStickyDone ("Downloaded " <> RIO.display label <> ".")
         else logStickyDone "Already downloaded."
   where
     mtotalSize = downloadInfoContentLength downloadInfo
-    chattyDownloadProgress _ = do
-        _ <- logSticky $ RIO.display label <> ": download has begun"
-        CL.map (Sum . S.length)
-          .| chunksOverTime 1
-          .| go
-      where
-        go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
-            modify (+ size)
-            totalSoFar <- get
-            logSticky $ fromString $
-                case mtotalSize of
-                    Nothing -> chattyProgressNoTotal totalSoFar
-                    Just 0 -> chattyProgressNoTotal totalSoFar
-                    Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
-
-        -- Example: ghc: 42.13 KiB downloaded...
-        chattyProgressNoTotal totalSoFar =
-            printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-                   (T.unpack label)
-
-        -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
-        chattyProgressWithTotal totalSoFar total =
-          printf ("%s: " <>
-                  bytesfmt "%7.2f" totalSoFar <> " / " <>
-                  bytesfmt "%.2f" total <>
-                  " (%6.2f%%) downloaded...")
-                 (T.unpack label)
-                 percentage
-          where percentage :: Double
-                percentage = fromIntegral totalSoFar / fromIntegral total * 100
-
--- | Given a printf format string for the decimal part and a number of
--- bytes, formats the bytes using an appropiate unit and returns the
--- formatted string.
---
--- >>> bytesfmt "%.2" 512368
--- "500.359375 KiB"
-bytesfmt :: Integral a => String -> a -> String
-bytesfmt formatter bs = printf (formatter <> " %s")
-                               (fromIntegral (signum bs) * dec :: Double)
-                               (bytesSuffixes !! i)
-  where
-    (dec,i) = getSuffix (abs bs)
-    getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
-      where p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
-    bytesSuffixes :: [String]
-    bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
-
--- Await eagerly (collect with monoidal append),
--- but space out yields by at least the given amount of time.
--- The final yield may come sooner, and may be a superfluous mempty.
--- Note that Integer and Float literals can be turned into NominalDiffTime
--- (these literals are interpreted as "seconds")
-chunksOverTime :: (Monoid a, Semigroup a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
-chunksOverTime diff = do
-    currentTime <- liftIO getCurrentTime
-    evalStateC (currentTime, mempty) go
-  where
-    -- State is a tuple of:
-    -- * the last time a yield happened (or the beginning of the sink)
-    -- * the accumulated awaits since the last yield
-    go = await >>= \case
-      Nothing -> do
-        (_, acc) <- get
-        yield acc
-      Just a -> do
-        (lastTime, acc) <- get
-        let acc' = acc <> a
-        currentTime <- liftIO getCurrentTime
-        if diff < diffUTCTime currentTime lastTime
-          then put (currentTime, mempty) >> yield acc'
-          else put (lastTime,    acc')
-        go
 
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (HasProcessContext env, HasLogFunc env)
@@ -1725,7 +1643,6 @@ sanityCheck ghc = withSystemTempDir "stack-sanity-check" $ \dir -> do
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text
 removeHaskellEnvVars =
-    Map.delete "GHCJS_PACKAGE_PATH" .
     Map.delete "GHC_PACKAGE_PATH" .
     Map.delete "GHC_ENVIRONMENT" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .

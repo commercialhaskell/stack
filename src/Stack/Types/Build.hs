@@ -53,8 +53,6 @@ import           Data.List.Extra
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
-import           Data.Text.Encoding              (decodeUtf8With)
-import           Data.Text.Encoding.Error        (lenientDecode)
 import           Database.Persist.Sql            (PersistField(..)
                                                  ,PersistFieldSql(..)
                                                  ,PersistValue(PersistText)
@@ -635,7 +633,6 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , map ("--extra-include-dirs=" ++) (configExtraIncludeDirs config)
     , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
-    , ["--ghcjs" | wc == Ghcjs]
     , ["--exact-configuration"]
     , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]

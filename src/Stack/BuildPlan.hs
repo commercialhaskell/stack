@@ -25,7 +25,6 @@ import           Stack.Prelude hiding (Display (..))
 import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import           Data.List (intercalate)
-import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -372,7 +371,6 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
     where
         compilerErrors compiler errs
             | whichCompiler compiler == Ghc = ghcErrors errs
-            -- FIXME not sure how to handle ghcjs boot packages
             | otherwise = Map.empty
 
         isGhcWiredIn p _ = p `Set.member` wiredInPackages

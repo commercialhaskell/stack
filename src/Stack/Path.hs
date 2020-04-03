@@ -13,9 +13,7 @@ import           Stack.Prelude
 import           Data.List (intercalate)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Lens.Micro (lens)
 import qualified Options.Applicative as OA
-import           Pantry (HasPantryConfig (..))
 import           Path
 import           Path.Extra
 import           Stack.Constants

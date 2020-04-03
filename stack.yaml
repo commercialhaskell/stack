@@ -1,11 +1,11 @@
-resolver: lts-11.22
+resolver: lts-14.27
 
 packages:
 - .
 
 docker:
   enable: false
-  repo: fpco/stack-build:lts-11.22
+  repo: fpco/stack-build:lts-14.27
 
 nix:
   # --nix on the command-line to enable.
@@ -21,33 +21,14 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
-- ansi-terminal-0.9@rev:0
-- Cabal-2.4.0.1@rev:0
-- infer-license-0.2.0@rev:0 #for hpack-0.31
-- hpack-0.31.2@rev:0
-- githash-0.1.3.0@rev:0
-- rio-orphans-0.1.1.0@sha256:15600084c56ef4e1f22ac2091d10fa6ed62f01f531d819c6a5a19492212a76c9
-- yaml-0.10.4.0@rev:0 #for hpack-0.31
-- tar-conduit-0.3.0@sha256:c220b7a74b986445d08706aed77f17f82807d0133a5f3a760f53d587d20865b2,2928
-- hackage-security-0.5.3.0@rev:2
-- http-api-data-0.3.8.1@rev:1
-- cabal-doctest-1.0.6@rev:2
-- unliftio-0.2.12@rev:0 #for rio-0.1.11.0
-- happy-1.19.9@sha256:f8c774230735a390c287b2980cfcd2703d24d8dde85a01ea721b7b4b4c82944f,4667
-- fsnotify-0.3.0.1@rev:1
-- process-1.6.3.0@sha256:fc77cfe75a9653b8c54ae455ead8c06cb8adc4d7a340984d84d8ca880b579919,2370 #because of https://github.com/haskell/process/pull/101
-- persistent-2.9.2@rev:0
-- persistent-sqlite-2.9.3@rev:0
-- rio-0.1.11.0@rev:0
-- ansi-wl-pprint-0.6.8.2@rev:1 # for ansi-terminal-0.9
-- hedgehog-0.6.1@rev:4 # for ansi-terminal-0.9
-- typed-process-0.2.6.0@rev:0 # for rio-0.1.10.0
-- rio-prettyprint-0.1.0.0@rev:0
-- hi-file-parser-0.1.0.0@rev:0
-- http-download-0.1.0.1@rev:0
-- pantry-0.2.0.0
-- github: snoyberg/filelock
+- Cabal-3.0.0.0@rev:0
+- hpack-0.33.0@rev:0
+- http-download-0.2.0.0@rev:0
+- git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- pantry-0.4.0.1@rev:0
+- casa-client-0.0.1@rev:0
+- casa-types-0.0.1@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

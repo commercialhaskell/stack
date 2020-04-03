@@ -38,7 +38,7 @@ unpackPackages mSnapshot dest input = do
     let (errs1, (names, pirs1)) =
           fmap partitionEithers $ partitionEithers $ map parse input
     locs1 <- forM pirs1 $ \pir -> do
-      loc <- completePackageLocation $ RPLIHackage pir Nothing
+      loc <- fmap cplComplete $ completePackageLocation $ RPLIHackage pir Nothing
       pure (loc, packageLocationIdent loc)
     (errs2, locs2) <- partitionEithers <$> traverse toLoc names
     case errs1 ++ errs2 of
@@ -97,7 +97,7 @@ unpackPackages mSnapshot dest input = do
           Nothing ->
             pure $ Left $ "Package does not appear in snapshot: " ++ packageNameString name
           Just sp -> do
-            loc <- completePackageLocation (rspLocation sp)
+            loc <- cplComplete <$> completePackageLocation (rspLocation sp)
             pure $ Right (loc, packageLocationIdent loc)
 
     -- Possible future enhancement: parse names as name + version range

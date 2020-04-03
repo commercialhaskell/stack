@@ -10,6 +10,7 @@ module Stack.Types.Compiler
   ( ActualCompiler (..)
   , WhichCompiler (..)
   , CompilerRepository (..)
+  , CompilerException (..)
   , defaultCompilerRepository
   , getGhcVersion
   , whichCompiler
@@ -25,7 +26,6 @@ import           Data.Aeson
 import           Database.Persist
 import           Database.Persist.Sql
 import qualified Data.Text as T
-import           Data.Text (Text)
 import           Stack.Prelude
 import           Stack.Types.Version
 import           Distribution.Version (mkVersion)
@@ -33,7 +33,6 @@ import           Distribution.Version (mkVersion)
 -- | Variety of compiler to use.
 data WhichCompiler
     = Ghc
-    | Ghcjs
     deriving (Show, Eq, Ord)
 
 -- | Specifies a compiler and its version number(s).
@@ -43,14 +42,10 @@ data WhichCompiler
 data ActualCompiler
     = ACGhc !Version
     | ACGhcGit !Text !Text
-    | ACGhcjs
-        !Version -- GHCJS version
-        !Version -- GHC version
     deriving (Generic, Show, Eq, Ord, Data, Typeable)
 instance NFData ActualCompiler
 instance Display ActualCompiler where
     display (ACGhc x) = display (WCGhc x)
-    display (ACGhcjs x y) = display (WCGhcjs x y)
     display (ACGhcGit x y) = display (WCGhcGit x y)
 instance ToJSON ActualCompiler where
     toJSON = toJSON . compilerVersionText
@@ -68,18 +63,28 @@ instance PersistField ActualCompiler where
 instance PersistFieldSql ActualCompiler where
   sqlType _ = SqlString
 
-wantedToActual :: WantedCompiler -> ActualCompiler
-wantedToActual (WCGhc x) = ACGhc x
-wantedToActual (WCGhcjs x y) = ACGhcjs x y
-wantedToActual (WCGhcGit x y) = ACGhcGit x y
+data CompilerException
+  = GhcjsNotSupported
+  | PantryException PantryException
+
+instance Show CompilerException where
+    show GhcjsNotSupported = "GHCJS is no longer supported by Stack"
+    show (PantryException p) = displayException p
+instance Exception CompilerException
+
+wantedToActual :: WantedCompiler -> Either CompilerException ActualCompiler
+wantedToActual (WCGhc x) = Right $ ACGhc x
+wantedToActual (WCGhcjs _ _) = Left GhcjsNotSupported
+wantedToActual (WCGhcGit x y) = Right $ ACGhcGit x y
 
 actualToWanted :: ActualCompiler -> WantedCompiler
 actualToWanted (ACGhc x) = WCGhc x
-actualToWanted (ACGhcjs x y) = WCGhcjs x y
 actualToWanted (ACGhcGit x y) = WCGhcGit x y
 
-parseActualCompiler :: T.Text -> Either PantryException ActualCompiler
-parseActualCompiler = fmap wantedToActual . parseWantedCompiler
+parseActualCompiler :: T.Text -> Either CompilerException ActualCompiler
+parseActualCompiler =
+  either (Left . PantryException) wantedToActual .
+  parseWantedCompiler
 
 compilerVersionText :: ActualCompiler -> T.Text
 compilerVersionText = utf8BuilderToText . display
@@ -90,20 +95,16 @@ compilerVersionString = T.unpack . compilerVersionText
 whichCompiler :: ActualCompiler -> WhichCompiler
 whichCompiler ACGhc{} = Ghc
 whichCompiler ACGhcGit{} = Ghc
-whichCompiler ACGhcjs{} = Ghcjs
 
 isWantedCompiler :: VersionCheck -> WantedCompiler -> ActualCompiler -> Bool
 isWantedCompiler check (WCGhc wanted) (ACGhc actual) =
     checkVersion check wanted actual
-isWantedCompiler check (WCGhcjs wanted wantedGhc) (ACGhcjs actual actualGhc) =
-    checkVersion check wanted actual && checkVersion check wantedGhc actualGhc
 isWantedCompiler _check (WCGhcGit wCommit wFlavour) (ACGhcGit aCommit aFlavour) =
     wCommit == aCommit && wFlavour == aFlavour
 isWantedCompiler _ _ _ = False
 
 getGhcVersion :: ActualCompiler -> Version
 getGhcVersion (ACGhc v) = v
-getGhcVersion (ACGhcjs _ v) = v
 getGhcVersion (ACGhcGit _ _) =
    -- We can't return the actual version without running the installed ghc.
    -- For now we assume that users of ghc-git use it with a recent commit so we

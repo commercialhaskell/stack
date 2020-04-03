@@ -1,9 +1,8 @@
 # Changelog
 
-
 ## Unreleased changes
 
-**Changes since v2.1.3.1**
+**Changes since v2.3.0.1**
 
 Release notes:
 
@@ -13,9 +12,63 @@ Behavior changes:
 
 Other enhancements:
 
+Bug fixes:
+
+## v2.3.0.1 (release candidate)
+
+**Changes since v2.1.3.1**
+
+Release notes:
+
+Major changes:
+* `setup-info-locations` yaml configuration now allows overwriting the default locations of `stack-setup-2.yaml`.
+  [#5031](https://github.com/commercialhaskell/stack/pull/5031)
+  [#2983](https://github.com/commercialhaskell/stack/issues/2983)
+  [#2913](https://github.com/commercialhaskell/stack/issues/2913)
+
+* The `setup-info` configuration key now allows overwriting parts of the default `setup-info`
+
+* The `--setup-info-yaml` command line flag now may be used in all stack commands such as `stack build`, and not only in `stack setup`
+
+* The `--setup-info-yaml` may specify multiple locations for `stack-setup.yaml` files.
+
+* The `stack upload` can read first reads environment Variable `$HACKAGE_USERNAME` and `$HACKAGE_PASSWORD` if they are missing only then asks for `username` or `password`
+
+* Fully remove GHCJS support.
+
+* Remove the `freeze` command. It has been replaced by lock files.
+
+Behavior changes:
+* Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
+  [#2647](https://github.com/commercialhaskell/stack/issues/2647)
+
+* We now recommend checking in generated cabal files for repos. When generating lock files for
+  extra-deps that only include `package.yaml` files, a deprecation warning will be generated.
+  Also, those packages will no longer be included in the generated lock files.
+  See [#5210](https://github.com/commercialhaskell/stack/issues/5210).
+
+Other enhancements:
+* Add `build-output-timestamps` flag in yaml. Setting it to true
+  prefixes each build log output line with a timestamp.
+
+* Show warning about `local-programs-path` with spaces on windows
+  when running scripts. See 
+  [#5013](https://github.com/commercialhaskell/stack/pull/5013)
+
+* Add `ls dependencies json` which will print dependencies as JSON.
+  `ls dependencies --tree`  is now `ls dependencies tree`. See
+  [#4424](https://github.com/commercialhaskell/stack/pull/4424)
+
 * Remove warning for using Stack with GHC 8.8 and Cabal 3.0.
 
+* Allow relative paths in `--setup-info-yaml` and tool paths
+  [#3394](https://github.com/commercialhaskell/stack/issues/3394)
+
 Bug fixes:
+
+* Upgrade `pantry`: module mapping insertions into the database are now atomic.
+  Previously, if you SIGTERMed at the wrong time while running a script, you
+  could end up with an inconsistent database state.
 
 * `--resolver global` doesn't retrieve snapshots list from the internet
    beause doesn't need it. See [#5103](https://github.com/commercialhaskell/stack/issues/5103)
@@ -33,6 +86,13 @@ Bug fixes:
 
 * Use Hoogle from the snapshot used and not the latest version. See
   [#4905](https://github.com/commercialhaskell/stack/issues/4905)
+
+* Resolve "'stty' is not recognized". See
+  [#4901](https://github.com/commercialhaskell/stack/issues/4901)
+
+* Fix missing reconfigure check causing errors when a package gets
+  used in multiple projects. See
+  [#5147](https://github.com/commercialhaskell/stack/issues/5147)
 
 ## v2.1.3.1
 
@@ -236,7 +296,7 @@ Behavior changes:
   use to avoid multiple runs of Stack from trampling each others'
   files. See
   [#2730](https://github.com/commercialhaskell/stack/issues/2730).
-* Stack will check occassionally if there is a new version available and prompt
+* Stack will check occasionally if there is a new version available and prompt
   the user to upgrade. This will not incur any additional network traffic, as
   it will piggy-back on the existing Hackage index updates. You can set
   `recommend-stack-upgrade: false` to bypass this. See
@@ -267,7 +327,7 @@ Other enhancements:
 * British English spelling of 'color' (colour) accepted as an alias for
   `--color`, `--stack-colors`, `stack ls stack-colors` at the command line and
   for `color:` and `stack-colors:` in yaml configuration files.
-* New build option `--ddump-dir`. (See 
+* New build option `--ddump-dir`. (See
   [#4225](https://github.com/commercialhaskell/stack/issues/4225))
 * Stack parses and respects the `preferred-versions` information from
   Hackage for choosing latest version of a package in some cases,
@@ -712,7 +772,7 @@ Bug fixes:
   conflicting versions of packages without issue. See
   [Stackage issue #3185](https://github.com/fpco/stackage/issues/3185).
 * When promoting packages from snapshot to local, we were
-  occassionally discarding the actual package location content and
+  occasionally discarding the actual package location content and
   instead defaulting to pulling the package from the index. We now
   correctly retain this information. Note that if you were affected by
   this bug, you will likely need to delete the binary build cache

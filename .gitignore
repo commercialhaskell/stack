@@ -9,7 +9,7 @@
 .stack-root/
 /.cabal-sandbox/
 TAGS
-Setup
+/Setup
 cabal-dev/
 cabal.sandbox.config
 dist/
@@ -24,7 +24,6 @@ tags
 /_site/
 /.dir-locals.el
 /.git/
-/stack.cabal
 /etc/scripts/stack-scripts.cabal
 .hspec-failures
 better-cache/

@@ -450,7 +450,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-11.22`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-14.27`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -467,15 +467,15 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-11.22, let's change our
+Let's explore package sets a bit further. Instead of lts-14.27, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
-this is currently 2018-07-25 - please see the resolve from the link above to get the latest.
+this is currently 2020-03-24 - please see the resolve from the link above to get the latest.
 
 Then, Rerunning `stack build` will produce:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
-Downloaded nightly-2018-07-31 build plan.
+Downloaded nightly-2020-03-24 build plan.
 # build output ...
 ```
 
@@ -483,8 +483,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-11.22 build
-Downloaded lts-11.22 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-14.27 build
+Downloaded lts-14.27 build plan.
 # build output ...
 ```
 
@@ -520,7 +520,6 @@ There are actually other options available, and the list will grow over time.
 At the time of writing:
 
 * `ghc-X.Y.Z`, for requiring a specific GHC version but no additional packages
-* Experimental GHCJS support
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
@@ -541,7 +540,7 @@ cueball:~$ cd yackage-0.8.0/
 ```
 
 Note that you can also unpack to the directory of your liking instead of
-the current one by issueing:
+the current one by issuing:
 
 ```
 cueball:~$ stack unpack yackage-0.8.0 --to ~/work
@@ -1247,7 +1246,7 @@ follows the Unix convention of `--` to separate these, e.g.:
 ```
 michael@d30748af6d3d:~$ stack exec --package stm -- echo I installed the stm package via --package stm
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-3.2
+Using latest snapshot resolver: lts-14.27
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm
@@ -1756,6 +1755,13 @@ users. Here's a quick rundown:
   per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
+    * `username` and `password` can be read by environment
+
+    ```bash
+    export $HACKAGE_USERNAME="<username>"
+    export $HACKAGE_PASSWORD="<password>"
+    ```
+
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.
