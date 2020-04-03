@@ -5,8 +5,6 @@ WORKDIR ./src
 # we should pre-build stack dependencies before coping the rest of the source
 # so we will not build the dependencies every time the source changes
 COPY *.yaml               ./
-COPY subs/curator/*.yaml  ./subs/curator/
-COPY subs/pantry/*.yaml   ./subs/pantry/
 RUN for i in $(stack ls dependencies | sed 's/ /-/g');  \
       do stack build --fast $i;                         \
       done
