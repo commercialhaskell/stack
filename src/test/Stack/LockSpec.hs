@@ -59,7 +59,7 @@ snapshots:
     size: 527801
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
     sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
-  original: lts-14.22
+  original: lts-14.27
 - completed:
     compiler: ghc-8.6.5
   original:
@@ -77,7 +77,7 @@ snapshots:
     size: 527801
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/11/22.yaml
     sha256: 7c8b1853da784bd7beb8728168bf4e879d8a2f6daf408ca0fa7933451864a96a
-  original: lts-14.22
+  original: lts-14.27
 - completed:
     compiler: ghc-8.6.5
   original:

@@ -1,11 +1,11 @@
-resolver: lts-14.22
+resolver: lts-14.27
 
 packages:
 - .
 
 docker:
   enable: false
-  repo: fpco/stack-build:lts-14.22
+  repo: fpco/stack-build:lts-14.27
 
 nix:
   # --nix on the command-line to enable.
@@ -24,7 +24,7 @@ extra-deps:
 - Cabal-3.0.0.0@rev:0
 - hpack-0.33.0@rev:0
 - http-download-0.2.0.0@rev:0
-- github: snoyberg/filelock
+- git: https://github.com/snoyberg/filelock.git
   commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
 - pantry-0.4.0.1@rev:0
 - casa-client-0.0.1@rev:0

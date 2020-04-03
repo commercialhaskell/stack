@@ -181,9 +181,9 @@ for requirements to perform the release, and more details about the tool.
     * Build Windows installers. See
       [stack-installer README](https://github.com/borsboom/stack-installer#readme).
 
-* On Linux ARMv7:
+<!-- * On Linux ARMv7:
 
-    * Run `etc/scripts/linux-armv7-release.sh`
+    * Run `etc/scripts/linux-armv7-release.sh` -->
 
 * On Linux ARM64 (aarch64):
 

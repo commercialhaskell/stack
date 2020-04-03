@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## Unreleased changes
 
 **Changes since v2.3.1**
@@ -14,7 +15,8 @@ Other enhancements:
 
 Bug fixes:
 
-## v2.3.x (unreleased changes)
+
+## v2.3.0.1 (release candidate)
 
 **Changes since v2.1.3.1**
 
