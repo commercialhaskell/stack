@@ -198,7 +198,9 @@ for requirements to perform the release, and more details about the tool.
   gpg --send-keys <OTHER-KEY-ID>
   ```
 
-* Publish Github release. Include the Changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors (contributors not necessary for release candidates). See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]` (For release candidates, you can skip the list of contributors).
+* Publish Github release. Include the Changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors. See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
+
+    * For release candidates, you should skip the list of contributors and the link to the installation instructions.
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
 
@@ -262,6 +264,8 @@ for requirements to perform the release, and more details about the tool.
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the markdown for the release description from Github. `[RC]`
+
+    * For release candidates, also include a link to the Github Release (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download it. `[RC]`
 
 * Add back to Stackage nightly if fallen out (be sure to have a `< 9.9.9` constraint to avoid the accidentally uploaded stack-9.9.9 from being used).
 
