@@ -47,8 +47,6 @@ directory. None of this should affect any existing Haskell tools at all.
 * Cabal-the-library is used by stack to build your Haskell code. See the
   [Architecture: Plan Execution](architecture.md#plan-execution) section for
   more detail, including how the Cabal version is chosen.
-* cabal-install (the executable) is used by stack for its dependency solver
-  functionality.
 * A .cabal file is provided for each package, and defines all package-level
   metadata just like it does in the cabal-install world: modules, executables,
   test suites, etc. No change at all on this front.
@@ -124,13 +122,6 @@ your `packages` list in stack.yaml. (See the previous question.)
 `stack unpack` is one approach for getting the source.
 Another would be to add the upstream package as a submodule to your
 project.
-
-## Am I required to use a Stackage snapshot to use stack?
-
-No, not at all. If you prefer dependency solving to curation, you can continue
-with that workflow. Instead of describing the details of how that works here,
-it's probably easiest to just say: run `stack init --solver` and look at the
-generated stack.yaml.
 
 ## How do I use this with sandboxes?
 
