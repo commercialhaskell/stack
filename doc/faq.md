@@ -77,9 +77,9 @@ extra-deps:
 ## I need to use a package (or version of a package) that is not available on hackage, what should I do?
 
 Add it to the 
-[`extra-deps`](yaml_configuration.md) list in your project's `stack.yaml`, specifying the
-package's source code location relative to the directory where your
-`stack.yaml` file lives, e.g.
+[`extra-deps`](yaml_configuration.md#extra-deps) list in your project's 
+`stack.yaml`, specifying the package's source code location relative to the 
+directory where your `stack.yaml` file lives, e.g.
 
 ```yaml
 resolver: lts-2.10
