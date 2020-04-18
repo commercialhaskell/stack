@@ -276,6 +276,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
+    - -eventlog
     dependencies:
     - stack
     when:
@@ -301,7 +302,6 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - eventlog
     dependencies:
     - filepath
     - hspec
