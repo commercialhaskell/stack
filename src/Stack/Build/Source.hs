@@ -43,7 +43,7 @@ import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
 import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env

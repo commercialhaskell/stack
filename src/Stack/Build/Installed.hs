@@ -29,7 +29,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do

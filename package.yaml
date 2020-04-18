@@ -49,7 +49,6 @@ dependencies:
 - Cabal
 - aeson
 - opentelemetry
-- opentelemetry-lightstep
 - annotated-wl-pprint
 - ansi-terminal
 - array
@@ -302,6 +301,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - eventlog
     dependencies:
     - filepath
     - hspec

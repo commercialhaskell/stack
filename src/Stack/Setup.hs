@@ -94,7 +94,7 @@ import              System.Permissions (setFileExecutable)
 import              System.Uname (getRelease)
 import              Data.List.Split (splitOn)
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String

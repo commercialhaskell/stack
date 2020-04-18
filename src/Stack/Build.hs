@@ -47,7 +47,7 @@ import           Stack.Types.SourceMap
 
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.Terminal (fixCodePage)
-import           OpenTelemetry.Implicit
+import           OpenTelemetry.Eventlog
 
 -- | Build.
 --

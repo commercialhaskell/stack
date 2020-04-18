@@ -84,7 +84,7 @@ import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
 import           RIO.Time (toGregorian)
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.

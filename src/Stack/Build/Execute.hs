@@ -96,7 +96,7 @@ import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus

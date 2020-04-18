@@ -37,7 +37,7 @@ import           Stack.Types.Version (stackMinorVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a

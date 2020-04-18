@@ -2,6 +2,7 @@ resolver: lts-15.5
 
 packages:
 - .
+- ../opentelemetry-haskell/opentelemetry
 
 docker:
   enable: false

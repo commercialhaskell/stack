@@ -45,7 +45,7 @@ import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
@@ -69,8 +69,8 @@ sinkProcessStderrStdout
   -> ConduitM ByteString Void (RIO env) o -- ^ Sink for stdout
   -> RIO env (e,o)
 sinkProcessStderrStdout name args sinkStderr sinkStdout = withSpan "sinkProcessStderrStdout" $ do
-  setTag "process" name
-  setTag "args" $ show args
+  setTag "process" (fromString name)
+  setTag "args" $ fromString (show args)
   proc name args $ \pc0 -> do
     let pc = setStdout createSource
            $ setStderr createSource
@@ -95,8 +95,8 @@ sinkProcessStdout
     -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
     -> RIO env a
 sinkProcessStdout name args sinkStdout = withSpan "sinkProcessStdout" $ do
-  setTag "process" name
-  setTag "args" $ show args
+  setTag "process" (fromString name)
+  setTag "args" $ fromString (show args)
   proc name args $ \pc ->
     withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
       $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)

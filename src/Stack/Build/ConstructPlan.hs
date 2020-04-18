@@ -51,7 +51,7 @@ import           System.IO (putStrLn)
 import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 data PackageInfo
     =

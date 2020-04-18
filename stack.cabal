@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.32.0.
 --
 -- see: https://github.com/sol/hpack
 --
@@ -469,7 +469,7 @@ executable stack-integration-test
   hs-source-dirs:
       test/integration
       test/integration/lib
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N eventlog
   build-depends:
       Cabal
     , aeson

@@ -37,7 +37,7 @@ import Stack.Types.Cache
 import Stack.Types.Config (HasBuildConfig, buildConfigL, bcProjectStorage, ProjectStorage (..))
 import Stack.Types.GhcPkgId
 
-import OpenTelemetry.Implicit
+import OpenTelemetry.Eventlog
 
 share [ mkPersist sqlSettings
       , mkDeleteCascade sqlSettings
