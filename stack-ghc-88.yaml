@@ -2,7 +2,6 @@ resolver: lts-15.5
 
 packages:
 - .
-- ../opentelemetry-haskell/opentelemetry
 
 docker:
   enable: false
@@ -32,6 +31,10 @@ extra-deps:
 - pantry-0.5.1.1@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
+- github: ethercrow/opentelemetry-haskell
+  commit: 01bc6c392de7a71abd4709f4ffa0e56fa88ec15f
+  subdirs:
+  - opentelemetry
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
