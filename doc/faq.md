@@ -76,38 +76,34 @@ extra-deps:
 
 ## I need to use a package (or version of a package) that is not available on hackage, what should I do?
 
-Add it to the `packages` list in your project's `stack.yaml`, specifying the
-package's source code location relative to the directory where your
-`stack.yaml` file lives, e.g.
+Add it to the 
+[`extra-deps`](yaml_configuration.md#extra-deps) list in your project's 
+`stack.yaml`, specifying the package's source code location relative to the 
+directory where your `stack.yaml` file lives, e.g.
 
 ```yaml
 resolver: lts-2.10
 packages:
 - '.'
+extra-deps:
 - third-party/proprietary-dep
 - github-version-of/conduit
 - patched/diagrams
-extra-deps: []
 ```
 
-The above example specifies that it should include the package at the root
-directory (`'.'`), that the `proprietary-dep` package is found in the project's
-`third-party` folder, that the `conduit` package is found in the project's
-`github-version-of` folder, and that the `diagrams` package is found in the
-project's `patched` folder. This autodetects changes and reinstalls the
+The above example specifies that the `proprietary-dep` package is found in the 
+project's `third-party` folder, that the `conduit` package is found in the 
+project's `github-version-of` folder, and that the `diagrams` package is found 
+in the project's `patched` folder. This autodetects changes and reinstalls the
 package.
 
 To install packages directly from a Git repository, use e.g.:
 
 ```yaml
-resolver: lts-2.10
-packages:
-- location:
-    git: https://github.com/githubuser/reponame.git
+extra-deps:
+  - git: https://github.com/githubuser/reponame.git
     commit: somecommitID
 ```
-
-Note that the `- '.'` line has been omitted, so the package in the root directory will not be used.
 
 ## What is the meaning of the arguments given to stack build, test, etc?
 
