@@ -43,8 +43,7 @@ extra-deps:
 - pantry-0.4.0.1@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
-- github: snoyberg/filelock
-  commit: 97e83ecc133cd60a99df8e1fa5a3c2739ad007dc
+- filelock-0.1.1.4@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
