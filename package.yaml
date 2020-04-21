@@ -302,6 +302,10 @@ executables:
     when:
     - condition: ! '!(flag(integration-tests))'
       buildable: false
+    - condition: flag(static)
+      ld-options:
+      - -static
+      - -pthread
 tests:
   stack-test:
     main: Spec.hs
