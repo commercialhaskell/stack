@@ -186,6 +186,7 @@ runContainerAndExit = do
          bamboo = lookup "bamboo_buildKey" env
          jenkins = lookup "JENKINS_HOME" env
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
+         mstackYaml = lookup "STACK_YAML" env
          muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
      image <- either throwIO pure (dockerImage docker)
@@ -267,6 +268,11 @@ runContainerAndExit = do
             Just sshAuthSock ->
               ["-e","SSH_AUTH_SOCK=" ++ sshAuthSock
               ,"-v",sshAuthSock ++ ":" ++ sshAuthSock]
+         ,case mstackYaml of
+            Nothing -> []
+            Just stackYaml ->
+              ["-e","STACK_YAML=" ++ stackYaml
+              ,"-v",stackYaml++ ":" ++ stackYaml ++ ":ro"]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
