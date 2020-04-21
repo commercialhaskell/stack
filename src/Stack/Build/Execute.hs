@@ -1783,7 +1783,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             [dp] -> do
                 liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
                 return $ Just (dpGhcPkgId dp)
-            _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
+            _ -> error $ "singleBuild: invariant violated: multiple results when describing installed package " ++ show (name, dps)
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
