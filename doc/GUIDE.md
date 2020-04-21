@@ -573,45 +573,6 @@ will work.
 
 (Note: yackage does not currently support hpack, but you can also hpack-convert should you need to generate a package.yaml).
 
-#### External Dependencies
-
-Given that LTS Haskell and Stackage Nightly have ~1400 of the most common
-Haskell packages, this will often be enough to build most packages. However,
-at times, you may find that not all dependencies required may be available in
-the Stackage snapshots.
-
-Let's simulate an unsatisfied dependency by adding acme-missiles to the list of dependencies
-the build requires. This is done by including it in the `Build-depends` section in the .cabal file
-and then re-initing:
-
-```
-cueball:~/yackage-0.8.0$ stack init --force
-# init failure output
-```
-
-stack has tested six different snapshots, and in every case discovered that
-acme-missiles is not available. In the end it suggested that you use the
-`--solver` command line switch if you want to use packages outside Stackage. So
-let's give it a try:
-
-```
-cueball:~/yackage-0.8.0$ stack init --force --solver
-# solver output ...
-```
-
-stack will complain that it needs a `cabal-install` installation. Let's get that:
-
-```
-cueball:~/yackage-0.8.0$ stack install cabal-install
-```
-
-Then run the above `stack init` command again and it will succeed.
-
-As you can verify by viewing `stack.yaml`, three external dependencies were added
-by stack init under the `extra-deps` field. Of course, you could have added the
-external dependencies by manually editing `stack.yaml` but stack init does the
-hard work for you.
-
 #### Excluded Packages
 
 Sometimes multiple packages in your project may have conflicting requirements.
@@ -625,10 +586,10 @@ works.
 To simulate a conflict we will use acme-missiles-0.3 in yackage and we will
 also copy `yackage.cabal` to another directory and change the name of the file
 and package to yackage-test. In this new package we will use acme-missiles-0.2
-instead. Let's see what happens when we run solver:
+instead. Let's see what happens when we re-run stack init:
 
 ```
-cueball:~/yackage-0.8.0$ stack init --force --solver --omit-packages
+cueball:~/yackage-0.8.0$ stack init --force --omit-packages
 # init failure output ...
 ```
 
@@ -696,70 +657,6 @@ Warning: Some packages were found to be incompatible with the resolver and have 
 Warning: Specified resolver could not satisfy all dependencies. Some external packages have been added as dependencies.
 You can suppress this message by removing it from stack.yaml
 ```
-### stack solver
-
-While `stack init` is used to create stack configuration file from existing
-cabal files, `stack solver` can be used to fine tune or fix an existing stack
-configuration file.
-
-`stack solver` uses the existing file as a constraint. For example it will
-use only those packages specified in the existing config file or use existing
-external dependencies as constraints to figure out other dependencies.
-
-Let's try `stack solver` to verify the config that we generated earlier with
-`stack init`:
-
-```
-cueball:~/yackage-0.8.0$ stack solver
-# solver output ...
-```
-
-It says there are no changes needed to your configuration. Notice that it also reports
-`example/yackage-test.cabal` as missing from the config. It was purposely
-omitted by `stack init` to resolve a conflict.
-
-Sometimes `stack init` may not be able to give you a perfect configuration. In
-that case, you can tweak the configuration file as per your requirements and then
-run `stack solver`, it will check the file and suggest or apply any fixes
-needed.
-
-For example, if `stack init` ignored certain packages due to name conflicts or
-dependency conflicts, the choice that `stack init` made may not be the correct
-one. In that case you can revert the choice and use solver to fix things.
-
-Let's try commenting out `.` and uncommenting `examples/` in our previously
-generated `stack.yaml` and then run `stack solver`:
-
-```
-cueball:~/yackage-0.8.0$ stack solver
-# solver failure output ...
-```
-
-Due to the change that we made, solver suggested some new dependencies.
-By default it does not make changes to the config. As it suggested you can use
-`--update-config` to make changes to the config.
-
-NOTE: You should probably back up your `stack.yaml` before doing this, such as
-committing to Git/Mercurial/Darcs.
-
-Sometimes, you may want to use specific versions of certain packages for your
-project. To do that you can fix those versions by specifying them in the
-extra-deps section and then use `stack solver` to figure out whether it is
-feasible to use those or what other dependencies are needed as a result.
-
-If you want to change the resolver for your project, you can run
-`stack solver --resolver <resolver name>` and it will figure out the changes needed for you.
-
-Let's see what happens if we change the resolver to an older resolver - lts-2.22:
-
-```
-cueball:~/yackage-0.8.0$ stack solver --resolver lts-2.22
-# solver failure output ...
-```
-
-As you can see, it automatically suggested changes in `extra-deps` due to the
-change of resolver.
-
 ## Different databases
 
 Time to take a short break from hands-on examples and discuss a little
@@ -1741,9 +1638,7 @@ users. Here's a quick rundown:
 
 * `stack update` will download the most recent set of packages from your package
   indices (e.g. Hackage). Generally, stack runs this for you automatically
-  when necessary, but it can be useful to do this manually sometimes (e.g.,
-  before running `stack solver`, to guarantee you have the most recent
-  upstream packages available).
+  when necessary, but it can be useful to do this manually sometimes.
 * `stack unpack` is a command we've already used quite a bit for examples, but
   most users won't use it regularly. It does what you'd expect: downloads a
   tarball and unpacks it. It accept optional `--to` argument to specify

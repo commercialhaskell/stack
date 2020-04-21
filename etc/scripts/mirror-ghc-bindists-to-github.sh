@@ -20,7 +20,7 @@
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
 
-GHCVER=8.8.3
+GHCVER=8.10.1
 
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
@@ -42,13 +42,26 @@ mirror_ () {
   destsuffix="$1"; shift
   srcext="$1"; shift
   destext="$1"; shift
+  local srcurl="$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
   local srcfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${srcext}
   if [[ ! -s "$srcfn.downloaded" ]]; then
     rm -f "$srcfn"
-    curl -Lo "$srcfn" --fail "$base_url/ghc-$GHCVER-${suffix}.tar.${srcext}"
+    curl -Lo "$srcfn" --fail "$srcurl"
     date >"$srcfn.downloaded"
   fi
   local destfn=ghc-$GHCVER-${suffix}${destsuffix:+_}${destsuffix}.tar.${destext}
+  while [[ $# -gt 0 ]]; do
+    alias="$1"
+    echo "    $alias:" >>stack-setup-$GHCVER.yaml
+    echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
+    echo "            # Mirrored from $srcurl" >>stack-setup-$GHCVER.yaml
+    echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
+    echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
+    echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
+    echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
+    echo "" >>stack-setup-$GHCVER.yaml
+    shift
+  done
   if [[ ! -s "$destfn.uploaded" ]]; then
     if [[ "${srcext}" == "xz" && "${destext}" == "bz2" ]]; then
       xzcat "$srcfn" | bzip2 -c > "$destfn"
@@ -61,18 +74,6 @@ mirror_ () {
     curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
     date >"$destfn.uploaded"
   fi
-  while [[ $# -gt 0 ]]; do
-    alias="$1"
-    echo "    $alias:" >>stack-setup-$GHCVER.yaml
-    echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
-    echo "            # Mirrored from $base_url/$srcfn" >>stack-setup-$GHCVER.yaml
-    echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
-    echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
-    echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
-    echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
-    echo "" >>stack-setup-$GHCVER.yaml
-    shift
-  done
 }
 
 mirror () {
@@ -83,7 +84,7 @@ mirror () {
 # https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml
 
 mirror i386-deb9-linux "" xz xz linux32
-mirror x86_64-deb8-linux "" xz xz linux64
+mirror x86_64-deb9-linux "" xz xz linux64
 #mirror x86_64-centos67-linux "" xz xz linux64-gmp4
 mirror x86_64-fedora27-linux "" xz xz linux64-tinfo6
 mirror x86_64-apple-darwin "" xz bz2 macosx
@@ -91,6 +92,7 @@ mirror x86_64-apple-darwin "" xz bz2 macosx
 mirror x86_64-unknown-mingw32 "" xz xz windows64
 #mirror x86_64-portbld-freebsd11 "" xz xz freebsd64-11
 mirror aarch64-deb9-linux "" xz xz linux-aarch64
+mirror armv7-deb9-linux "" xz xz linux-armv7
 
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl "" xz xz linux32-musl
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl "" xz xz linux64-musl
