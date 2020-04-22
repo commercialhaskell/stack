@@ -1,0 +1,5 @@
+resolver: ghc-8.6.5
+extra-deps:
+- unliftio-core-0.1.2.0@rev:2
+# Force a unique snapshot
+- acme-missiles-0.3@rev:0

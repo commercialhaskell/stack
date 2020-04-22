@@ -203,10 +203,11 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
                 tasks = M.fromList $ mapMaybe toTask adrs
                 takeSubset =
                     case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
-                        BSAll -> id
-                        BSOnlySnapshot -> stripLocals
-                        BSOnlyDependencies -> stripNonDeps (M.keysSet $ smDeps sourceMap)
-            return $ takeSubset Plan
+                        BSAll -> pure
+                        BSOnlySnapshot -> pure . stripLocals
+                        BSOnlyDependencies -> pure . stripNonDeps (M.keysSet $ smDeps sourceMap)
+                        BSOnlyLocals -> errorOnSnapshot
+            takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
@@ -266,6 +267,33 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             lp <- loadLocalPackage' pp
             return $ PSFilePath lp
       return $ pPackages <> deps
+
+-- | Throw an exception if there are any snapshot packages in the plan.
+errorOnSnapshot :: Plan -> RIO env Plan
+errorOnSnapshot plan@(Plan tasks _finals _unregister installExes) = do
+  let snapTasks = Map.keys $ Map.filter (\t -> taskLocation t == Snap) tasks
+  let snapExes = Map.keys $ Map.filter (== Snap) installExes
+  unless (null snapTasks && null snapExes) $ throwIO $
+    NotOnlyLocal snapTasks snapExes
+  pure plan
+
+data NotOnlyLocal = NotOnlyLocal [PackageName] [Text]
+
+instance Show NotOnlyLocal where
+  show (NotOnlyLocal packages exes) = concat
+    [ "Specified only-locals, but I need to build snapshot contents:\n"
+    , if null packages then "" else concat
+        [ "Packages: "
+        , intercalate ", " (map packageNameString packages)
+        , "\n"
+        ]
+    , if null exes then "" else concat
+        [ "Executables: "
+        , intercalate ", " (map T.unpack exes)
+        , "\n"
+        ]
+    ]
+instance Exception NotOnlyLocal
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
