@@ -139,8 +139,12 @@ options =
         "Label to give the uploaded release asset"
     , Option "" [noTestHaddocksOptName] (NoArg $ Right $ \g -> g{gTestHaddocks = False})
         "Disable testing building haddocks."
-    , Option "" [staticOptName] (NoArg $ Right $ \g -> g{gBuildArgs = gBuildArgs g ++ ["--flag=stack:static"]})
-        "Build a static binary."
+    , Option "" [alpineOptName]
+        (NoArg $ Right $ \g ->
+          g{gBuildArgs =
+              gBuildArgs g ++
+              ["--flag=stack:static", "--docker", "--system-ghc", "--no-install-ghc"]})
+        "Build a static binary using Alpine Docker image."
     , Option "" [buildArgsOptName]
         (ReqArg
             (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
@@ -196,18 +200,19 @@ rules global@Global{..} args = do
         Stdout dirty <- cmd "git status --porcelain"
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
-        withTempDir $ \tmpDir -> do
-            let cmd0 c = cmd [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
-                    (stackArgs global)
-                    ["--local-bin-path=" ++ tmpDir]
-                    c
-            () <- cmd0 "install" gBuildArgs integrationTestFlagArgs $ concat $ concat
-                [["--pedantic --no-haddock-deps "]
-                ,[" --haddock" | gTestHaddocks]
-                ,[" stack"]]
-            let cmd' c = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global) c
-            () <- cmd' "test" gBuildArgs integrationTestFlagArgs "--pedantic --exec stack-integration-test stack"
-            return ()
+        () <- cmd
+            [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
+            (stackArgs global)
+            ["build"]
+            gBuildArgs
+            integrationTestFlagArgs
+            ["--pedantic", "--no-haddock-deps", "--test"]
+            ["--haddock" | gTestHaddocks]
+            ["stack"]
+        () <- cmd
+            [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
+            ["exec"]
+            [gProjectRoot </> releaseBinDir </> binaryName </> "stack-integration-test"]
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
     unless gUploadOnly $ releaseDir </> binaryPkgZipFileName %> \out -> do
@@ -242,7 +247,7 @@ rules global@Global{..} args = do
     unless gUploadOnly $ releaseDir </> binaryExeFileName %> \out -> do
         need [releaseBinDir </> binaryName </> stackExeFileName]
         (Stdout versionOut) <- cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
-        -- () <- cmd "git diff"
+        () <- cmd "git diff"
         when (not gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
             error ("Refusing continue because 'stack --version' reports dirty.  Use --" ++
                    allowDirtyOptName ++ " option to continue anyway.")
@@ -265,8 +270,8 @@ rules global@Global{..} args = do
                                 ,out])
                             (removeFile out)
             Linux ->
-                cmd "strip -p --strip-unneeded --remove-section=.comment -o"
-                    [out, releaseBinDir </> binaryName </> stackExeFileName]
+                -- Using Ubuntu's strip to strip an Alpine exe doesn't work, so just copy
+                liftIO $ copyFile (releaseBinDir </> binaryName </> stackExeFileName) out
             _ ->
                 cmd "strip -o"
                     [out, releaseBinDir </> binaryName </> stackExeFileName]
@@ -534,9 +539,9 @@ noTestHaddocksOptName = "no-test-haddocks"
 buildArgsOptName :: String
 buildArgsOptName = "build-args"
 
--- | @--static@ command-line option name.
-staticOptName :: String
-staticOptName = "static"
+-- | @--alpine@ command-line option name.
+alpineOptName :: String
+alpineOptName = "alpine"
 
 -- | @--certificate-name@ command-line option name.
 certificateNameOptName :: String
@@ -548,7 +553,7 @@ uploadOnlyOptName = "upload-only"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch, "--interleaved-output"]
+stackArgs Global{..} = ["--arch=" ++ display gArch, "--interleaved-output"]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath

@@ -5,7 +5,9 @@ packages:
 
 docker:
   enable: false
-  repo: fpco/stack-build:lts-14.27
+
+  #image: fpco/alpine-haskell-stack:8.6.5
+  image: fpco/alpine-haskell-stack@sha256:49e7e15f3b1d3f882ba5bb701463b1d508fbf40e5aafce6ea31acd210da570ba
 
 nix:
   # --nix on the command-line to enable.

@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f003cdea0be4961a87f3e62f3f9e5fee3e29924f746a6154a15ac18985deb871
+-- hash: 04f6dd3ff3b1b0f7db0a0ad6192866ad73926008fd5df9215d6abae839da8874
 
 name:           stack
 version:        2.3.0.2
@@ -553,6 +553,8 @@ executable stack-integration-test
         unix
   if !(flag(integration-tests))
     buildable: False
+  if flag(static)
+    ld-options: -static -pthread
   default-language: Haskell2010
 
 test-suite stack-test
