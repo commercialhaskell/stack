@@ -13,6 +13,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Build failures now show a hint to scroll up to the corresponding section
+  [#5279](https://github.com/commercialhaskell/stack/issues/5279)
+
 Bug fixes:
 
 
