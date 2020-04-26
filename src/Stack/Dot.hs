@@ -188,7 +188,9 @@ pkgLocToJSON (PLImmutable (PLIArchive archive _)) = let url = case archiveLocati
                                                                 ALUrl u -> u
                                                                 ALFilePath (ResolvedPath _ path) -> Text.pack $ "file://" ++ Path.toFilePath path
                                                     in object [ "type" .= ("archive" :: Text)
-                                                              , "url" .= url ]
+                                                              , "url" .= url
+                                                              , "sha256" .= archiveHash archive
+                                                              , "size" .= archiveSize archive ]
 pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object [ "type" .= case repoType repo of
                                                                    RepoGit -> "git" :: Text
                                                                    RepoHg -> "hg" :: Text
