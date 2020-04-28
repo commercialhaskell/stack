@@ -1,24 +1,23 @@
 # Changelog
 
-## Unreleased changes
-
-**Changes since v2.3.0.1**
-
-Release notes:
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-## v2.3.0.1 (release candidate)
+## v2.3.1
 
 **Changes since v2.1.3.1**
 
 Release notes:
+* We have reduced the number of platforms that we support with binary releases.
+  The reason behind this is that we've been slowed down in our release process
+  until now with issues trying to build binaries for less common platforms. In
+  order to make sure we can address issues more quickly (like supporting new
+  GHC versions), we're limiting support from the Stack team to:
+
+    * Linux 64-bit (static)
+    * MacOS
+    * Windows 64-bit
+
+  If others want to provide additional binaries, we will definitely be happy
+  for the support. But since our CI system is currently able to produce these
+  three bindists only, that's what we will be providing with the next release.
 
 Major changes:
 * `setup-info-locations` yaml configuration now allows overwriting the default locations of `stack-setup-2.yaml`.
