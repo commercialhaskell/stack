@@ -1187,3 +1187,19 @@ recommend-stack-upgrade: true
 ```
 
 Since 2.0
+
+### snapshot-location-base
+Sets the base location of LTS Haskell/Stackage Nightly snapshots. Default is https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/ (as set in the `pantry` library).
+
+For example:
+```yaml
+snapshot-location-base: https://example.com/snapshots/location/
+```
+has the following effect:
+* `lts-X.Y` expands to `https://example.com/snapshots/location/lts/X/Y.yaml`
+* `nightly-YYYY-MM-DD` expands to `https://example.com/snapshots/location/nightly/YYYY/M/D.yaml`
+
+This field is convenient in setups that restrict access to GitHub, for instance closed corporate setups. In this setting, it is common for the development environment to have general access to the internet, but not for testing/building environments. To avoid the firewall, one can run a local snapshots mirror and then use a custom `snapshot-location-base` in the closed environments only.
+
+
+Since FIXME:
