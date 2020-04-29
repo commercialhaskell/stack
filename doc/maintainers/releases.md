@@ -4,26 +4,7 @@
 
 ## Upcoming release tasks:
 
-* @nh2 says: "For the next static stack release we need to have unix-compat >= 0.5.2, because 0.5.1 breaks with musl (because it tries to use something as a symbol that is a C macro).  https://github.com/nh2/static-haskell-nix/issues/79  In my CI I've just bumped unix-compat accordingly: https://github.com/nh2/static-haskell-nix/pull/80/files"
-* Eventually remove the Ubuntu, Debian, CentOS, Arch packages from our S3 bucket.  This was announced with the 1.9.x release, so can do this around time of 2.1.x.  Directories, and last Stack version uploaded:
-	- `s3://download.fpcomplete.com/archlinux` (1.0.0)
-	- `s3://download.fpcomplete.com/centos` (1.5.1)
-	- `s3://download.fpcomplete.com/debian` (1.4.0)
-	- `s3://download.fpcomplete.com/fedora` (1.3.0)
-	- `s3://download.fpcomplete.com/ubuntu` (1.5.1)
-* Look through https://fpcomplete.slack.com/files/U9U8HDGUC/FCM7UN5NJ/notes_on_doc_maintainers_releases_md.txt for hints on how to make this document more clear.
-* If `store` is no longer a dependency, likely can remove from stackage build constraints' `expected-test-failures`
-* Try using Alpine and https://github.com/redneb/ghc-alt-libc/releases to build linux 32-bit static binaries.  This will require upgrading GHC version used (e.g. to 8.6.5).  If this works out, switch over to the same for 64-bit static binaries (rather than static-haskell-nix).
-* Fix the reference to "latest nightly stackage snapshot" below to work with a new workflow based on the GHC-named stack.yaml files.
-
-## Iterating on release process
-
-**IMPORTANT: all bindists for a given release should be built from a consistent git commit** (this can be relaxed a bit for release candidates, but still should be maintained as much as possible).
-
-Since the release process and scripts sometimes need to be iterated on during the process of building all the platforms' binaries, the scripts are all designed so that you can run them *from a different directory*.  This means you can have one source tree for the version of `stack` being released, and a separate one where you work on the release scripts and process.
-
-To use this way, the current directory should be the version of `stack` to be released.  You can then call the scripts in another directory to use their version.  For example, `stack ../stack-release-scripts/etc/scripts/release.hs …` or `../stack-release-scripts/etc/scripts/vagrant-releases.hs`.
-
+* Remove the `-static` version from https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.  People still using that will get an error, and we'll add a release note to switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz instead (and note that www.stackage.org/stack is deprecated)
 
 ## Version scheme
 
@@ -54,26 +35,9 @@ Examples:
 
 ## Pre-release checks
 
-* Check that the snapshot in `stack.yaml`'s GHC version supports building on all required platforms (e.g. GHC 8.4 doesn't support FreeBSD, so it's not a candidate).  If not, will have to switch to a different snapshot (or decide that we won't support the platform for this iteration).
 * Check for any P0 and P1 issues that should be dealt with before release
 * Check for un-merged pull requests that should be merged before release
 * Ensure `release` and `stable` branches merged to `master`
-* Ensure no bounds specified in any package.yaml unless truly necessary (e.g. in most cases rely on stacksnap.yaml to manage dependency versions), and ensure `base` minbound is correct for the supported GHC version(s) (check version of `base` in oldest supported Stackage snapshot)
-* Check compatibility with latest LTS Stackage snapshots
-    * `snapshot*.yaml` and `stack*.yaml` (where `*` is not `nightly`), __including the ones in
-      subdirectories__: bump to use latest LTS minor
-      version (be sure any extra-deps that exist only for custom flags have
-      versions matching the snapshot)
-    * Check for any redundant extra-deps
-    * Run `stack --stack-yaml=stack*.yaml test --pedantic` (replace `*` with
-      the actual file)
-* Check compatibility with latest nightly stackage snapshot:
-    * Update `snapshot-nightly.yaml` with latest nightly and remove unnecessary extra-deps (be
-      sure any extra-deps that exist only for custom flags have versions
-      matching the snapshot)
-    * Run `stack --stack-yaml=stack-nightly.yaml test --pedantic`
-* Update (increase lower bound) or remove (if redundant) any constraints in `package.yaml`
-* Update `.azure-pipelines*.yml` and files in `.azure` for any GHC version changes made in above steps.
 * Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
 * Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
 
@@ -95,9 +59,9 @@ Examples:
         ```
         ## Unreleased changes
 
-        **Changes since vX.Y.Z**
-
         Release notes:
+
+        **Changes since vX.Y.Z**
 
         Major changes:
 
@@ -122,8 +86,6 @@ Examples:
             * Do __NOT__ update templates in `.github` to point at the new release version yet!
         * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
         * Look for any links to "latest" (`latest/`) documentation, replace with version tag
-    * Update `STACK_VERSION` in `etc/scripts/get-stack.sh` to the new release version (`X.Y.1`)
-    * Check if GHC version we're using has bindists using upgraded versions of operating systems (e.g. FreeBSD, Debian) and upgrade relevant Vagrantfiles in `etc/vagrant` and release shell script (`etc/scripts/*-release.sh`) to match.
     * Check that for any platform entries that need to be added to (or removed from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md).
@@ -132,7 +94,6 @@ Examples:
         - Rename the “Unreleased changes” section to the same version as package.yaml, and mark it clearly as a release candidate (e.g. `v1.9.0.1 (release candidate)`).  Remove any empty sections.
 
 * For first release candidate:
-
     * Re-do the pre-release checks (above section)
     * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`)
     * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
@@ -151,10 +112,6 @@ Examples:
 
 ## Release process
 
-See
-[stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
-for requirements to perform the release, and more details about the tool.
-
 * Manually trigger the nightly pipeline on Azure Devops for the branch you are releasing, which will build Linux, macOS, and Windows bindists. `[RC]`
 
 * Create a
@@ -163,33 +120,13 @@ for requirements to perform the release, and more details about the tool.
 
 * On each machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
 
-* Upload the Azure bindists built by Azure Pipelines to the Gitlab release `[RC]` (TODO: integrate this into `release.hs`)
+* Upload the Azure bindists built by Azure Pipelines to the Gitlab release `[RC]`
   * Download the bindist artifacts from the Azure DevOps nightly pipeline build, and put the contents under `_release/`.
-  * For each file, run `stack "$(dirname "$0")/release.hs" --upload-only "_releases/<file>.upload" "_releases/<file>.sha256.upload" "_releases/<file>.asc.upload"` to sign, hash, and upload to Github
+  * To sign, hash, and upload each file to Github, run:
 
-* On a machine with Vagrant installed:
-
-    * Run `etc/scripts/vagrant-releases.sh`
-
-* On Windows (TODO: add support for building/uploading installers to `release.hs` and the nightly CI jobs)
-
-    * Use a short path for your working tree (e.g. `C:\p\stack-release`
-    * Ensure that STACK_ROOT, TEMP, and TMP are set to short paths
-    * Put the Azure Devops pipeline-built Windows binaries in `SOME-OTHER-DIRECTORY/_release`.
-    * Build Windows installers. See
-      [stack-installer README](https://github.com/borsboom/stack-installer#readme).
-
-<!-- * On Linux ARMv7:
-
-    * Run `etc/scripts/linux-armv7-release.sh` -->
-
-* On Linux ARM64 (aarch64):
-
-    * Run `etc/scripts/linux-aarch64-release.sh`
-
-* Build a Linux static bindist `[RC]`
-
-    * Follow directions in the **Build Linux static binary distribution with Nix** section below.
+        for x in $(ls _release/stack-X.Y.Z*|grep -v asc|grep -v sha256|grep -v upload); do
+            stack "etc/scripts/release.hs" --upload-only "$x.upload" "$x.sha256.upload" "$x.asc.upload"
+        done
 
 * For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to SKS keyserver pool:
 
@@ -206,18 +143,17 @@ for requirements to perform the release, and more details about the tool.
 
 * Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
 
-
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
 
 * Activate version for new release tag, on
-  [readthedocs.org](https://readthedocs.org/dashboard/stack/versions/), and
+  [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated.
 
-* Update [get.haskellstack.org /stable rewrite rules](https://gitlab.fpcomplete.com/fpco/devops/blob/master/dockerfiles/nginx/prod-v2/etc/nginx/conf.d/haskellstack.conf) (be sure to change both places) to new released version, and update production cluster using the `deploy_nginx_prod_v2` job.
+* Update [get.haskellstack.org /stable rewrite rules](https://gitlab.com/fpco/operations/devops/-/blob/master/kubernetes/fpco-prod-v3/specs/20_get-haskellstack_ingress.yaml) and apply the manifest.
 
-    * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz >/dev/null`, make sure it redirects to the new version
+    * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null`, make sure it redirects to the new version
 
 * In the `stable` or, in the case of a release candidate, `rc/vX.Y` branch:
     - `package.yaml`: bump the version number even third component (e.g. from 1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_ component (e.g. from 1.7.0.1 to 1.7.0.2). `[RC]`
@@ -227,9 +163,9 @@ for requirements to perform the release, and more details about the tool.
       ```
       ## Unreleased changes
 
-      **Changes since vX.Y.Z**
-
       Release notes:
+
+      **Changes since vX.Y.Z**
 
       Major changes:
 
@@ -243,21 +179,6 @@ for requirements to perform the release, and more details about the tool.
 
     - Update templates in `.github` to point at the new release version (`X.Y.1`).  **SKIP THIS IN RC BRANCHES.**
 
-    - Update fpco/stack-build Docker images with new version
-
-      * Under [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
-
-        ```
-        FROM fpco/stack-build:lts-X.Z
-        ARG STACK_VERSION=X.Y.Z
-        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
-        ```
-
-      * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack.
-
-      * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
-
-
 * Delete the RC branch (locally and on origin).  E.g. `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
 
 * Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).   It is best to do this by making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then merging.  If anything is complicated to merge, consider making it a PR and getting it reviewed rather than merging immediately.
@@ -267,13 +188,23 @@ for requirements to perform the release, and more details about the tool.
 
     * For release candidates, also include a link to the Github Release (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download it. `[RC]`
 
-* Add back to Stackage nightly if fallen out (be sure to have a `< 9.9.9` constraint to avoid the accidentally uploaded stack-9.9.9 from being used).
+* Update fpco/stack-build Docker images with new version
 
+  * Under [commercilhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
+
+    ```
+    FROM $DOCKER_REPO:lts-X.Z
+    ARG STACK_VERSION=X.Y.Z
+    RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ```
+
+  * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack.
+
+  * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
 
 ## Build Linux static binary distribution with Nix
 
-TODO: script this process and/or integrate with `etc/scripts/release.hs`. 
-NOTE: With GHC 8.8.x, Alpine Linux GHC bindists are once again available and we may be able to switch back to use Alpine to build static binaries using out normal build/release process rather than this convoluted process.
+NOTE: We have switched back to Alpine Linux for building static binaries, done by CI.
 
 These instructions are tested on Ubuntu 16.04, but theoretically should work on any Linux distribution.
 
@@ -312,7 +243,7 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
     - Copy binary built above to place where `stack build` normally puts the `stack binary` (e.g. `cp  /nix/store/7vl1xvlbbqjvf864inz5vw7z2z1k4nmw-stack-2.1.0.1/bin/stack /home/vagrant/stack-release/.stack-work/install/x86_64-linux/custom-snapshot-for-building-stack-with-ghc-8.2.2-PyNP5UoO8Ott/8.2.2/bin/stack`; figure it out using `stack exec which stack`)
     - Run `stack exec stack-integration-test`
 
-- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/stack-release/_release/bin/stack-X.Y.Z-linux-x86_64-static/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
+- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/stack-release/_release/bin/stack-X.Y.Z-linux-x86_64/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
 
 - Package, sign, and upload to Github using stack's release script in the stack directory:
 
