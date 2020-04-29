@@ -54,6 +54,11 @@ buildOptsParser cmd =
          (long "only-dependencies" <>
           help
               "Only build packages that are dependencies of targets on the command line") <|>
+     flag'
+         BSOnlyLocals
+         (long "only-locals" <>
+          help
+              "Only build packages in the local database, fail if the build plan includes the snapshot database") <|>
      pure BSAll) <*>
     (flag'
          FileWatch

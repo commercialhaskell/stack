@@ -1,0 +1,9 @@
+name: foo
+version: 0.0.0
+
+dependencies:
+- base
+- unliftio-core
+
+library:
+    source-dirs: src/

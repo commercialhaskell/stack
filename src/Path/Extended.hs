@@ -33,9 +33,8 @@ replaceExtension :: MonadThrow m
   => String
   -> Path b File
   -> m (Path b File)
-replaceExtension =
 #if MIN_VERSION_path(0,7,0)
-    Path.replaceExtension
+replaceExtension ext = Path.replaceExtension ('.' : ext)
 #else
-    flip (Path.-<.>)
+replaceExtension = flip (Path.-<.>)
 #endif

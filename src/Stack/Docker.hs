@@ -41,12 +41,7 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime)
 import qualified Data.Version (showVersion, parseVersion)
 import           Distribution.Version (mkVersion, mkVersion')
-#if MIN_VERSION_path(0,7,0)
-import           Path hiding (replaceExtension)
-#else
 import           Path
-#endif
-import           Path.Extended (replaceExtension)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
@@ -156,7 +151,17 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         exePath <- ensureDockerStackExe dockerContainerPlatform
         cmdArgs args exePath
     cmdArgs args exePath = do
-        exeBase <- replaceExtension "" exePath
+        -- MSS 2020-04-21 previously used replaceExtension, but semantics changed in path 0.7
+        -- In any event, I'm not even sure _why_ we need to drop a file extension here
+        -- Originally introduced here: https://github.com/commercialhaskell/stack/commit/6218dadaf5fd7bf312bb1bd0db63b4784ba78cb2
+#if MIN_VERSION_path(0, 7, 0)
+        let exeBase =
+              case splitExtension exePath of
+                Left _ -> exePath
+                Right (x, _) -> x
+#else
+        exeBase <- exePath -<.> ""
+#endif
         let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
         return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 
@@ -186,6 +191,7 @@ runContainerAndExit = do
          bamboo = lookup "bamboo_buildKey" env
          jenkins = lookup "JENKINS_HOME" env
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
+         mstackYaml = lookup "STACK_YAML" env
          muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
      image <- either throwIO pure (dockerImage docker)
@@ -267,6 +273,11 @@ runContainerAndExit = do
             Just sshAuthSock ->
               ["-e","SSH_AUTH_SOCK=" ++ sshAuthSock
               ,"-v",sshAuthSock ++ ":" ++ sshAuthSock]
+         ,case mstackYaml of
+            Nothing -> []
+            Just stackYaml ->
+              ["-e","STACK_YAML=" ++ stackYaml
+              ,"-v",stackYaml++ ":" ++ stackYaml ++ ":ro"]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&

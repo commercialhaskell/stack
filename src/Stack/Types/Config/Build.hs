@@ -339,6 +339,9 @@ data BuildSubset
     -- ^ Only install packages in the snapshot database, skipping
     -- packages intended for the local database.
     | BSOnlyDependencies
+    | BSOnlyLocals
+    -- ^ Refuse to build anything in the snapshot database, see
+    -- https://github.com/commercialhaskell/stack/issues/5272
     deriving (Show, Eq)
 
 -- | Options for the 'FinalAction' 'DoTests'
