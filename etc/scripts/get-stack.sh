@@ -25,7 +25,6 @@
 # https://docs.haskellstack.org/en/stable/install_and_upgrade/
 #
 
-STACK_VERSION="2.3.1"
 HOME_LOCAL_BIN="$HOME/.local/bin"
 DEFAULT_DEST="/usr/local/bin/stack"
 # Windows doesn't have a good place for DEST, but all CI systems (Appveyor, Travis, Azure) support /bin
@@ -81,15 +80,15 @@ get_isa() {
   fi
 }
 
-# exits with code 0 if arm ISA is detected as described above
-is_arm() {
-  test "$(get_isa)" = arm
-}
-
-# exits with code 0 if aarch64 ISA is detected as described above
-is_aarch64() {
-  test "$(get_isa)" = aarch64
-}
+# # exits with code 0 if arm ISA is detected as described above
+# is_arm() {
+#   test "$(get_isa)" = arm
+# }
+#
+# # exits with code 0 if aarch64 ISA is detected as described above
+# is_aarch64() {
+#   test "$(get_isa)" = aarch64
+# }
 
 
 # determines 64- or 32-bit architecture
@@ -115,9 +114,9 @@ get_arch() {
   fi
 }
 
-# exits with code 0 if a 64-bit architecture is detected as described above
-is_64_bit() {
-  test "$(get_arch)" = 64
+# exits with code 0 if a x86_64-bit architecture is detected as described above
+is_x86_64() {
+  test "$(get_arch)" = 64 -a "$(get_isa)" = "x86"
 }
 
 # prints a generic bindist notice
@@ -169,22 +168,23 @@ do_ubuntu_install() {
     apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
   }
 
-  if is_arm ; then
+  #if is_arm ; then
+  #  install_dependencies
+  #  print_bindist_notice
+  #  install_arm_linux_binary
+  #elif is_aarch64 ; then
+  #  install_dependencies
+  #  print_bindist_notice
+  #  install_aarch64_linux_binary
+  if is_x86_64 ; then
     install_dependencies
     print_bindist_notice
-    install_arm_binary
-  elif is_aarch64 ; then
-    install_dependencies
-    print_bindist_notice
-    install_aarch64_binary
-  elif is_64_bit ; then
-    install_dependencies
-    print_bindist_notice
-    install_64bit_standard_binary
+    install_x86_64_linux_binary
   else
-    install_dependencies
-    print_bindist_notice
-    install_32bit_standard_binary
+    die "Sorry, currently only 64-bit (x86_64) Linux binary is available."
+    #install_dependencies
+    #print_bindist_notice
+    #install_i386_linux_binary
   fi
 
 }
@@ -199,22 +199,23 @@ do_debian_install() {
     apt_install_dependencies g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
   }
 
-  if is_arm ; then
+  #if is_arm ; then
+  #  install_dependencies
+  #  print_bindist_notice
+  #  install_arm_linux_binary
+  #elif is_aarch64 ; then
+  #  install_dependencies
+  #  print_bindist_notice
+  #  install_aarch64_linux_binary
+  if is_x86_64 ; then
     install_dependencies
     print_bindist_notice
-    install_arm_binary
-  elif is_aarch64 ; then
-    install_dependencies
-    print_bindist_notice
-    install_aarch64_binary
-  elif is_64_bit ; then
-    install_dependencies
-    print_bindist_notice
-    install_64bit_standard_binary
+    install_x86_64_linux_binary
   else
-    install_dependencies
-    print_bindist_notice
-    install_32bit_standard_binary
+    die "Sorry, currently only 64-bit (x86_64) Linux binary is available."
+  #  install_dependencies
+  #  print_bindist_notice
+  #  install_i386_linux_binary
   fi
 }
 
@@ -227,14 +228,15 @@ do_fedora_install() {
     dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib-devel xz tar git gnupg
   }
 
-  if is_64_bit ; then
+  if is_x86_64 ; then
     install_dependencies "$1"
     print_bindist_notice
-    install_64bit_standard_binary
+    install_x86_64_linux_binary
   else
-    install_dependencies "$1"
-    print_bindist_notice
-    install_32bit_standard_binary
+    die "Sorry, currently only 64-bit (x86_64) Linux binary is available."
+    #install_dependencies "$1"
+    #print_bindist_notice
+    #install_i386_linux_binary
   fi
 }
 
@@ -247,21 +249,22 @@ do_centos_install() {
     yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
   }
 
-  if is_64_bit ; then
+  if is_x86_64 ; then
     install_dependencies
     print_bindist_notice
-    install_64bit_standard_binary
+    install_x86_64_linux_binary
   else
-    case "$1" in
-      "6"*)
-        die "Sorry, there is currently no Linux 32-bit gmp4 binary available."
-        ;;
-      *)
-        install_dependencies
-        print_bindist_notice
-        install_32bit_standard_binary
-        ;;
-    esac
+    die "Sorry, currently only 64-bit (x86_64) Linux binary is available."
+    #case "$1" in
+    #  "6"*)
+    #    die "Sorry, there is currently no Linux 32-bit gmp4 binary available."
+    #    ;;
+    #  *)
+    #    install_dependencies
+    #    print_bindist_notice
+    #    install_i386_linux_binary
+    #    ;;
+    #esac
   fi
 }
 
@@ -270,7 +273,7 @@ do_windows_install() {
   info "Using Windows install.."
   info ""
   make_temp_dir
-  dl_to_file "http://www.stackage.org/stack/windows-x86_64" "$STACK_TEMP_DIR/stack.zip"
+  dl_to_file "https://get.haskellstack.org/stable/windows-x86_64.zip" "$STACK_TEMP_DIR/stack.zip"
   if [ "$(basename $DEST)" != "stack" ]; then
     # should never happen, the -d flag appends stack itself
     die "Currently the destination must always end with 'stack' on Windows, got: $DEST"
@@ -297,33 +300,33 @@ do_osx_install() {
   info ""
 }
 
-# Attempts to insall on FreeBSD.  Installs dependencies with
-# 'pkg install' and then downloads bindist.
-do_freebsd_install() {
-  install_dependencies() {
-    pkg_install_pkgs devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
-  }
-  if is_64_bit ; then
-    install_dependencies
-    install_64bit_freebsd_binary
-  else
-    die "Sorry, there is currently no 32-bit FreeBSD binary available."
-  fi
-}
-
-# Alpine distro install
-do_alpine_install() {
-  install_dependencies() {
-    apk_install_pkgs gmp libgcc xz make
-  }
-  install_dependencies
-  if is_64_bit ; then
-    print_bindist_notice
-    install_64bit_standard_binary
-  else
-    die "Sorry, there is currently no 32-bit Alpine Linux binary available."
-  fi
-}
+# # Attempts to insall on FreeBSD.  Installs dependencies with
+# # 'pkg install' and then downloads bindist.
+# do_freebsd_install() {
+#   install_dependencies() {
+#     pkg_install_pkgs devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
+#   }
+#   if is_64_bit ; then
+#     install_dependencies
+#     install_64bit_freebsd_binary
+#   else
+#     die "Sorry, there is currently no 32-bit FreeBSD binary available."
+#   fi
+# }
+#
+# # Alpine distro install
+# do_alpine_install() {
+#   install_dependencies() {
+#     apk_install_pkgs gmp libgcc xz make
+#   }
+#   install_dependencies
+#   if is_64_bit ; then
+#     print_bindist_notice
+#     install_64bit_standard_binary
+#   else
+#     die "Sorry, there is currently no 32-bit Alpine Linux binary available."
+#   fi
+# }
 
 # Attempts to install on unsupported Linux distribution by downloading
 # the bindist.
@@ -332,14 +335,15 @@ do_sloppy_install() {
   info "bindist..."
   info ""
 
-  if is_arm ; then
-    install_arm_binary
-  elif is_aarch64 ; then
-    install_aarch64_binary
-  elif is_64_bit ; then
-    install_64bit_standard_binary
+  #if is_arm ; then
+  #  install_arm_linux_binary
+  #elif is_aarch64 ; then
+  #  install_aarch64_linux_binary
+  if is_x86_64 ; then
+    install_x86_64_linux_binary
   else
-    install_32bit_standard_binary
+    die "Sorry, currently only 64-bit (x86_64) Linux binary is available."
+    #install_i386_linux_binary
   fi
   info "Since this installer doesn't support your Linux distribution,"
   info "there is no guarantee that 'stack' will work at all!  You may"
@@ -480,10 +484,10 @@ do_os() {
       set_default_dest
       do_osx_install
       ;;
-    "FreeBSD")
-      set_default_dest
-      do_freebsd_install
-      ;;
+    #"FreeBSD")
+    #  set_default_dest
+    #  do_freebsd_install
+    #  ;;
     MINGW64_NT-*|MSYS_NT-*)
       DEFAULT_DEST="$DEFAULT_DEST_WINDOWS"
       set_default_dest
@@ -522,9 +526,9 @@ check_dl_tools() {
   fi
 }
 
-# Download a Stack bindst and install it in /usr/local/bin/stack.
+# Download a Stack bindist and install it in /usr/local/bin/stack.
 install_from_bindist() {
-    IFB_URL="https://github.com/commercialhaskell/stack/releases/download/v${STACK_VERSION}/stack-${STACK_VERSION}-$1"
+    IFB_URL="https://get.haskellstack.org/stable/$1"
     check_dl_tools
     make_temp_dir
 
@@ -560,37 +564,29 @@ install_from_bindist() {
     check_dest_on_path
 }
 
-install_arm_binary() {
-  install_from_bindist "linux-arm.tar.gz"
+#install_arm_linux_binary() {
+#  install_from_bindist "linux-arm.tar.gz"
+#}
+#
+#install_i386_linux_binary() {
+#  install_from_bindist "linux-i386.tar.gz"
+#}
+
+install_x86_64_linux_binary() {
+  install_from_bindist "linux-x86_64.tar.gz"
 }
 
-install_32bit_standard_binary() {
-  install_from_bindist "linux-i386.tar.gz"
-}
-
-install_64bit_standard_binary() {
-  install_from_bindist "linux-x86_64-static.tar.gz"
-}
-
-install_aarch64_binary() {
-  install_from_bindist "linux-aarch64.tar.gz"
-}
-
-install_64bit_gmp4_linked_binary() {
-  install_from_bindist "linux-x86_64-gmp4.tar.gz"
-}
-
-install_64bit_gmp4_linked_binary() {
-  install_from_bindist "linux-x86_64-gmp4"
-}
+#install_aarch64_linux_binary() {
+#  install_from_bindist "linux-aarch64.tar.gz"
+#}
 
 install_64bit_osx_binary() {
   install_from_bindist "osx-x86_64.tar.gz"
 }
 
-install_64bit_freebsd_binary() {
-  install_from_bindist "freebsd-x86_64.tar.gz"
-}
+#install_64bit_freebsd_binary() {
+#  install_from_bindist "freebsd-x86_64.tar.gz"
+#}
 
 # Attempt to install packages using whichever of apt-get, dnf, yum, or apk is
 # available.
@@ -619,35 +615,35 @@ apt_get_install_pkgs() {
   if [ "$missing" = "" ]; then
     info "Already installed!"
   elif ! sudocmd "install required system dependencies" apt-get install -y ${QUIET:+-qq}$missing; then
-    die "Installing apt packages failed.  Please run 'apt-get update' and try again."
+    die "\nInstalling apt packages failed.  Please run 'apt-get update' and try again."
   fi
 }
 
 # Install packages using dnf
 dnf_install_pkgs() {
   if ! sudocmd "install required system dependencies" dnf install -y ${QUIET:+-q} "$@"; then
-    die "Installing dnf packages failed.  Please run 'dnf check-update' and try again."
+    die "\nInstalling dnf packages failed.  Please run 'dnf check-update' and try again."
   fi
 }
 
 # Install packages using yum
 yum_install_pkgs() {
   if ! sudocmd "install required system dependencies" yum install -y ${QUIET:+-q} "$@"; then
-    die "Installing yum packages failed.  Please run 'yum check-update' and try again."
+    die "\nInstalling yum packages failed.  Please run 'yum check-update' and try again."
   fi
 }
 
 # Install packages using apk
 apk_install_pkgs() {
   if ! sudocmd "install required system dependencies" apk add --update ${QUIET:+-q} "$@"; then
-    die "Installing apk packages failed.  Please run 'apk update' and try again."
+    die "\nInstalling apk packages failed.  Please run 'apk update' and try again."
   fi
 }
 
 # Install packages using pkg
 pkg_install_pkgs() {
     if ! sudocmd "install required system dependencies" pkg install -y "$@"; then
-        die "Installing pkg packages failed.  Please run 'pkg update' and try again."
+        die "\nInstalling pkg packages failed.  Please run 'pkg update' and try again."
     fi
 }
 
@@ -773,7 +769,7 @@ or pass '-f' to this script to over-write the existing binary, e.g.:
   $get https://get.haskellstack.org/ | sh -s - -f
 
 To install to a different location, pass '-d DESTDIR', e.g.:
-  $get https://get.haskellstack.org/ | sh -s - -d /opt/stack-$STACK_VERSION/bin"
+  $get https://get.haskellstack.org/ | sh -s - -d /opt/stack/bin"
     fi
   fi
 }

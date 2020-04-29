@@ -24,7 +24,9 @@ future, we are open to supporting more OSes (to request one, please
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 If you are writing a script that needs to download the latest binary, you can
-use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` (e.g. https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz) that always point to the latest stable release.
+use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>`
+(e.g. https://get.haskellstack.org/stable/linux-x86_64.tar.gz) that always
+point to the latest stable release.
 
 ## Windows
 
@@ -236,15 +238,17 @@ or:
 
 * Download the latest release:
 
-    * [Linux 64-bit, static](https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz)
+    * [Linux 64-bit (static)](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
 
+    <!--
     * [Linux 32-bit, standard](https://get.haskellstack.org/stable/linux-i386.tar.gz)
       (note: requires libgmp.so.10, and will not work on some older
       distributions that have libgmp.so.3, such as CentOS 6)
+    -->
 
     <!-- * [Linux ARMv7](https://get.haskellstack.org/stable/linux-arm.tar.gz) -->
 
-    * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz)
+    <!-- * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz) -->
 
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
@@ -266,6 +270,7 @@ or:
 
 * Now you can run `stack` from the terminal.
 
+<!--
 ## FreeBSD
 
 (only 64-bit currently available, tested on FreeBSD 10.3-RELEASE)
@@ -289,6 +294,7 @@ Run:
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
 * Now you can run `stack` from the terminal.
+-->
 
 ## Path
 

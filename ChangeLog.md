@@ -2,9 +2,8 @@
 
 ## v2.3.1
 
-**Changes since v2.1.3.1**
-
 Release notes:
+
 * We have reduced the number of platforms that we support with binary releases.
   The reason behind this is that we've been slowed down in our release process
   until now with issues trying to build binaries for less common platforms. In
@@ -12,14 +11,38 @@ Release notes:
   GHC versions), we're limiting support from the Stack team to:
 
     * Linux 64-bit (static)
-    * MacOS
+    * macOS
     * Windows 64-bit
 
   If others want to provide additional binaries, we will definitely be happy
   for the support. But since our CI system is currently able to produce these
   three bindists only, that's what we will be providing with the next release.
 
+* Since we no longer have dynamically linked Linux binaries, we are removing
+  removing the `-static` suffix from the static Linux binaries.  If you have
+  scripts to download the latest stable Linux binary, update them to use
+  `linux-x86_64` instead of `linux-x86_64-static` (if you are already using the
+  former, nothing needs to change).  For this release, both are supported, but
+  the next release will no longer have the `-static` variant.
+
+* We are also deprecating the download links at https://stackage.org/stack.
+  See this page for the current installation instructions:
+  https://docs.haskellstack.org/en/stable/install_and_upgrade/.
+
+* These are the canonical locations to download the latest stable binaries
+  from, and will continue to be supported going forward:
+
+    * Linux 64-bit (static): https://get.haskellstack.org/stable/linux-x86_64.tar.gz
+    * macOS: https://get.haskellstack.org/stable/osx-x86_64.tar.gz
+    * Windows 64-bit: https://get.haskellstack.org/stable/windows-x86_64.zip
+
+  As always, binaries for specific versions are available from the Github
+  releases: https://github.com/commercialhaskell/stack/releases.
+
+**Changes since v2.1.3.1**
+
 Major changes:
+
 * `setup-info-locations` yaml configuration now allows overwriting the default locations of `stack-setup-2.yaml`.
   [#5031](https://github.com/commercialhaskell/stack/pull/5031)
   [#2983](https://github.com/commercialhaskell/stack/issues/2983)
@@ -38,6 +61,7 @@ Major changes:
 * Remove the `freeze` command. It has been replaced by lock files.
 
 Behavior changes:
+
 * Remove the deprecated `--stack-setup-yaml` command line argument in favor of `--setup-info-yaml`
   [#2647](https://github.com/commercialhaskell/stack/issues/2647)
 
@@ -47,6 +71,7 @@ Behavior changes:
   See [#5210](https://github.com/commercialhaskell/stack/issues/5210).
 
 Other enhancements:
+
 * Add `build-output-timestamps` flag in yaml. Setting it to true
   prefixes each build log output line with a timestamp.
 

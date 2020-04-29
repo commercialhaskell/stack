@@ -20,7 +20,7 @@ jobs:
   steps:
   - bash: |
       export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
-      curl -sSkL http://www.stackage.org/stack/windows-x86_64 -o /usr/bin/stack.zip
+      curl -sSkL https://get.haskellstack.org/stable/windows-x86_64.zip -o /usr/bin/stack.zip
       unzip -o /usr/bin/stack.zip -d /usr/bin/
       stack $ARGS test --bench --no-run-benchmarks
     env:
