@@ -232,7 +232,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
             [ style Url "https://github.com/commercialhaskell/stack/issues/new"
             , style Url "https://github.com/haskell/cabal/issues/new"
             ]
-          , flow $ "The parse error is: " ++ unlines (map show errs)
+          , flow $ "The parse error is: " ++ unlines (map show (toList errs))
           , ""
           ]
     return
