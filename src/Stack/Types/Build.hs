@@ -348,7 +348,7 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
        (True, Nothing) -> "simple Setup.hs"
        (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')
      ) ++
-     " using:\n      " ++ fullCmd ++ "\n" ++
+     " (scroll up to its section to see the error) using:\n      " ++ fullCmd ++ "\n" ++
      "    Process exited with code: " ++ show exitCode ++
      (if exitCode == ExitFailure (-9)
           then " (THIS MAY INDICATE OUT OF MEMORY)"
