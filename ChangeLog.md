@@ -13,6 +13,9 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack ls dependencies json` now includes fields `sha256` and `size` for
+  dependencies of `type` `archive` in `location`.
+  [#5280](https://github.com/commercialhaskell/stack/issues/5280)
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
 
