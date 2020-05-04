@@ -15,6 +15,8 @@
 - ignore: {name: "Evaluate"}
 - ignore: {name: "Use &&&"}
 - ignore: {name: "Redundant compare"}
+- ignore: {name: "Use Just"}
+- ignore: {name: "Avoid lambda using `infix`"}
 
 # Added in hlint-2.0.10, ignoring for now
 - ignore: {name: "Unnecessary hiding"}

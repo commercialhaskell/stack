@@ -16,9 +16,8 @@ import           Stack.Types.Docker
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
 dockerOptsParser hide0 =
-    DockerOptsMonoid
-    <$> pure (Any False)
-    <*> firstBoolFlagsNoDefault
+    DockerOptsMonoid (Any False)
+    <$> firstBoolFlagsNoDefault
                        dockerCmdName
                        "using a Docker container. --docker implies 'system-ghc: true'"
                        hide
