@@ -15,6 +15,7 @@ Other enhancements:
 
 Bug fixes:
 
+* When using the `STACK_YAML` env var with Docker, make the path absolute.
 
 ## v2.3.1
 
