@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -62,6 +61,7 @@ import qualified System.PosixCompat.Files as Files
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 import           RIO.Process
+import qualified RIO.Directory
 
 #ifndef WINDOWS
 import           System.Posix.Signals
@@ -191,9 +191,9 @@ runContainerAndExit = do
          bamboo = lookup "bamboo_buildKey" env
          jenkins = lookup "JENKINS_HOME" env
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
-         mstackYaml = lookup "STACK_YAML" env
          muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
+     mstackYaml <- for (lookup "STACK_YAML" env) RIO.Directory.makeAbsolute
      image <- either throwIO pure (dockerImage docker)
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
