@@ -46,9 +46,8 @@ execOptsExtraParser = ExecOptsExtra
                          <*> eoCwdParser
   where
     eoEnvSettingsParser :: Parser EnvSettings
-    eoEnvSettingsParser = EnvSettings
-        <$> pure True
-        <*> boolFlags True
+    eoEnvSettingsParser = EnvSettings True
+        <$> boolFlags True
                 "ghc-package-path"
                 "setting the GHC_PACKAGE_PATH variable for the subprocess"
                 idm
