@@ -147,7 +147,7 @@ makeConcreteResolver
     => AbstractResolver
     -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
-makeConcreteResolver ar = withSpan "Config.makeConcreteResolver" $ do
+makeConcreteResolver ar = withSpan_ "Config.makeConcreteResolver" $ do
     r <-
         case ar of
             ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
@@ -436,7 +436,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
 loadConfig :: HasRunner env => (Config -> RIO env a) -> RIO env a
-loadConfig inner = withSpan "Config.loadConfig" $ do
+loadConfig inner = withSpan_ "Config.loadConfig" $ do
     mstackYaml <- view $ globalOptsL.to globalStackYaml
     mproject <- loadProjectConfig mstackYaml
     mresolver <- view $ globalOptsL.to globalResolver
@@ -482,7 +482,7 @@ loadConfig inner = withSpan "Config.loadConfig" $ do
 withBuildConfig
   :: RIO BuildConfig a
   -> RIO Config a
-withBuildConfig inner = withSpan "Config.withBuildConfig" $ do
+withBuildConfig inner = withSpan_ "Config.withBuildConfig" $ do
     config <- ask
 
     -- If provided, turn the AbstractResolver from the command line
@@ -798,7 +798,7 @@ getExtraConfigs userConfigPath = do
 loadConfigYaml
     :: HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
-loadConfigYaml parser path = withSpan "Config.loadConfigYaml" $ do
+loadConfigYaml parser path = withSpan_ "Config.loadConfigYaml" $ do
     eres <- loadYaml parser path
     case eres of
         Left err -> liftIO $ throwM (ParseConfigFileException path err)
@@ -853,7 +853,7 @@ loadProjectConfig :: HasLogFunc env
                   => StackYamlLoc
                   -- ^ Override stack.yaml
                   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig mstackYaml = withSpan "Config.loadProjectConfig" $ do
+loadProjectConfig mstackYaml = withSpan_ "Config.loadProjectConfig" $ do
     mfp <- getProjectConfig mstackYaml
     case mfp of
         PCProject fp -> do

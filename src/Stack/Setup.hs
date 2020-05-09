@@ -191,7 +191,7 @@ setupEnv :: NeedTargets
          -> BuildOptsCLI
          -> Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> RIO BuildConfig EnvConfig
-setupEnv needTargets boptsCLI mResolveMissingGHC = withSpan "setupEnv" $ do
+setupEnv needTargets boptsCLI mResolveMissingGHC = withSpan_ "setupEnv" $ do
     config <- view configL
     bc <- view buildConfigL
     let stackYaml = bcStackYaml bc

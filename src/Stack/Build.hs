@@ -57,7 +57,7 @@ import           OpenTelemetry.Eventlog
 build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
-build msetLocalFiles = withSpan "Build.build" $ do
+build msetLocalFiles = withSpan_ "Build.build" $ do
   mcp <- view $ configL.to configModifyCodePage
   ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
   fixCodePage mcp ghcVersion $ do
@@ -70,7 +70,7 @@ build msetLocalFiles = withSpan "Build.build" $ do
     checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
-    withSpan "Build.build_setLocalFiles" $ do
+    withSpan_ "Build.build_setLocalFiles" $ do
       -- Set local files, necessary for file watching
       stackYaml <- view stackYamlL
       for_ msetLocalFiles $ \setLocalFiles -> do
@@ -88,10 +88,10 @@ build msetLocalFiles = withSpan "Build.build" $ do
                 lpFilesForComponents components lp
         liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
-    withSpan "Build.build_checkComponentsBuildable" $ do
+    withSpan_ "Build.build_checkComponentsBuildable" $ do
       checkComponentsBuildable allLocals
 
-    installMap <- withSpan "Build.Installed.toInstallMap" $ toInstallMap sourceMap
+    installMap <- withSpan_ "Build.Installed.toInstallMap" $ toInstallMap sourceMap
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled installMap
 
@@ -238,7 +238,7 @@ splitObjsWarning = unwords
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (HasEnvConfig env)
                  => BuildOptsCLI -> RIO env BaseConfigOpts
-mkBaseConfigOpts boptsCli = withSpan "Build.mkBaseConfigOpts" $ do
+mkBaseConfigOpts boptsCli = withSpan_ "Build.mkBaseConfigOpts" $ do
     bopts <- view buildOptsL
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -263,7 +263,7 @@ loadPackage
   -> [Text] -- ^ GHC options
   -> [Text] -- ^ Cabal configure options
   -> RIO env Package
-loadPackage loc flags ghcOptions cabalConfigOpts = withSpan "Build.loadPackage" $ do
+loadPackage loc flags ghcOptions cabalConfigOpts = withSpan_ "Build.loadPackage" $ do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig

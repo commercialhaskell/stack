@@ -271,7 +271,7 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , opentelemetry
+    , opentelemetry >= 0.4.0
     , optparse-applicative
     , pantry
     , path

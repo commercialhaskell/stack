@@ -175,7 +175,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> InstalledMap
               -> Bool
               -> RIO env Plan
-constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = withSpan "Build.ConstructPlan.constructPlan" $ do
+constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = withSpan_ "Build.ConstructPlan.constructPlan" $ do
     logDebug "Constructing the build plan"
 
     when hasBaseInDeps $

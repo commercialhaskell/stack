@@ -61,9 +61,9 @@ ghcPkgCmdArgs
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = withSpan "PackageDump.ghcPkgCmdArgs" $ do
-    setTag "args" $ fromString (unwords cmd)
-    setTag "dbs" $ fromString (show mpkgDbs)
+ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = withSpan "PackageDump.ghcPkgCmdArgs" $ \sp -> do
+    setTag sp "args" $ fromString (unwords cmd)
+    setTag sp "dbs" $ fromString (show mpkgDbs)
     case reverse mpkgDbs of
         (pkgDb:_) -> createDatabase pkgexe pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()

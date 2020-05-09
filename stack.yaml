@@ -31,7 +31,7 @@ extra-deps:
 - pantry-0.5.1.1@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
-- opentelemetry-0.3.0@rev:0
+- ../opentelemetry-haskell/opentelemetry
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

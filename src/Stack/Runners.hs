@@ -85,7 +85,7 @@ withConfig
   -> RIO Config a
   -> RIO Runner a
 withConfig shouldReexec inner =
-    withSpan "Runners.withConfig" $ loadConfig $ \config -> do
+    withSpan_ "Runners.withConfig" $ loadConfig $ \config -> do
       -- If we have been relaunched in a Docker container, perform in-container initialization
       -- (switch UID, etc.).  We do this after first loading the configuration since it must
       -- happen ASAP but needs a configuration.
