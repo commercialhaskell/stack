@@ -4,7 +4,9 @@
 
 ## Upcoming release tasks:
 
-* Remove the `-static` version from https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.  People still using that will get an error, and we'll add a release note to switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz instead (and note that www.stackage.org/stack is deprecated)
+* Simplify branch/version structure -- just release from `master` (but will keep `stable` tracking latest stable release plus doc updates)
+
+* At some point (a couple of major releases after 2.3), remove the `-static` version from https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.  People still using that will get an error, and we'll add a release note to switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz instead (and note that www.stackage.org/stack is deprecated)
 
 ## Version scheme
 

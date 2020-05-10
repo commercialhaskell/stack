@@ -2,8 +2,8 @@ name: no-deps
 version: 0.1.0.0
 synopsis: A package with no dependencies, other than base
 license: BSD3
-author: David Baynard
-copyright: 2018-2019 David Baynard
+author: Author name here
+copyright: 2000 Author name here
 category: Development
 extra-source-files: []
 
