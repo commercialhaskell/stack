@@ -31,10 +31,7 @@ extra-deps:
 - pantry-0.5.1.1@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
-- github: ethercrow/opentelemetry-haskell
-  commit: 01bc6c392de7a71abd4709f4ffa0e56fa88ec15f
-  subdirs:
-  - opentelemetry
+- opentelemetry-0.4.0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
