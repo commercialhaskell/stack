@@ -183,8 +183,13 @@ ghci opts@GhciOpts{..} = do
               -- need is the location of main modules, not the rest.
               pkgs0 <- getGhciPkgInfos installMap addPkgs (fmap fst mfileTargets) pkgDescs
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
+    let pkgTargets pn targets =
+          case targets of
+            TargetAll _  -> [T.pack (packageNameString pn)]
+            TargetComps comps -> [renderPkgComponent (pn, c) | c <- toList comps]
     -- Build required dependencies and setup local packages.
-    buildDepsAndInitialSteps opts (map (T.pack . packageNameString . fst) localTargets)
+    buildDepsAndInitialSteps opts $
+      concatMap (\(pn, (_, t)) -> pkgTargets pn t) localTargets
     targetWarnings localTargets nonLocalTargets mfileTargets
     -- Load the list of modules _after_ building, to catch changes in
     -- unlisted dependencies (#1180)
