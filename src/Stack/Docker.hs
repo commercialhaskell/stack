@@ -78,7 +78,7 @@ getCmdArgs
 getCmdArgs docker imageInfo isRemoteDocker = do
     config <- view configL
     deUser <-
-        if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+        if fromMaybe (not isRemoteDocker) (dockerSetUser docker) && not osIsWindows
             then liftIO $ do
               duUid <- User.getEffectiveUserID
               duGid <- User.getEffectiveGroupID
@@ -244,7 +244,7 @@ runContainerAndExit = do
          liftIO
              (Files.fileExist
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)))
-     when (sshDirExists && not sshSandboxDirExists)
+     when (sshDirExists && not sshSandboxDirExists && not osIsWindows)
          (liftIO
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
@@ -254,16 +254,16 @@ runContainerAndExit = do
        (concat
          [["create"
           ,"-e",inContainerEnvVar ++ "=1"
-          ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
+          ,"-e",stackRootEnvVar ++ "=" ++ toLinuxStylePath (toFilePathNoTrailingSep stackRoot)
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
-          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
+          ,"-e","HOME=" ++ toLinuxStylePath (toFilePathNoTrailingSep sandboxHomeDir)
           ,"-e","PATH=" ++ T.unpack newPathEnv
-          ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
-          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toFilePathNoTrailingSep homeDir ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
-          ,"-w",toFilePathNoTrailingSep pwd]
+          ,"-e","PWD=" ++ toLinuxStylePath (toFilePathNoTrailingSep pwd)
+          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep homeDir ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep stackRoot ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep projectRoot ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix)
+          ,"-w", toLinuxStylePath (toFilePathNoTrailingSep pwd)]
          ,case dockerNetwork docker of
             Nothing -> ["--net=host"]
             Just name -> ["--net=" ++ name]
@@ -340,6 +340,13 @@ runContainerAndExit = do
     mountArg mountSuffix (Mount host container) =
       ["-v",host ++ ":" ++ container ++ mountSuffix]
     sshRelDir = relDirDotSsh
+    toLinuxStylePath s | osIsWindows =
+      T.pack s
+      & T.replace ":\\" "/"
+      & T.replace "\\"  "/"
+      & T.unpack
+      & ("/"++)
+                       | otherwise   = s
 
 -- | Inspect Docker image or container.
 inspect :: (HasProcessContext env, HasLogFunc env)
