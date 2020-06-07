@@ -70,6 +70,7 @@ dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
         dockerDetach = fromFirstFalse dockerMonoidDetach
         dockerPersist = fromFirstFalse dockerMonoidPersist
         dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
+        dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount
         dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)

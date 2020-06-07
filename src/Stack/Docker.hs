@@ -253,7 +253,6 @@ runContainerAndExit = do
      containerID <- withWorkingDir (toFilePath projectRoot) $ trim . decodeUtf8 <$> readDockerProcess
        (concat
          [["create"
-          ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
@@ -265,6 +264,9 @@ runContainerAndExit = do
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot ++ mountSuffix
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
           ,"-w",toFilePathNoTrailingSep pwd]
+         ,case dockerNetwork docker of
+            Nothing -> ["--net=host"]
+            Just name -> ["--net=" ++ name]
          ,case muserEnv of
             Nothing -> []
             Just userEnv -> ["-e","USER=" ++ userEnv]

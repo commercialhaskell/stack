@@ -59,6 +59,10 @@ dockerOptsParser hide0 =
                         hide <>
                         metavar "NAME" <>
                         help "Docker container name")
+    <*> firstStrOption (long (dockerOptName dockerNetworkArgName) <>
+                        hide <>
+                        metavar "NETWORK" <>
+                        help "Docker network")
     <*> argsOption (long (dockerOptName dockerRunArgsArgName) <>
                     hide <>
                     value [] <>
