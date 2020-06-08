@@ -17,6 +17,10 @@ Bug fixes:
 
 * When using the `STACK_YAML` env var with Docker, make the path absolute.
 
+* Fix `stack sdist` introducing unneded sublibrary syntax when using
+  pvp-bounds. See
+  [#5289](https://github.com/commercialhaskell/stack/issues/5289)
+
 ## v2.3.1
 
 Release notes:
