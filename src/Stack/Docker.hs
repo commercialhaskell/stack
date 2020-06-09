@@ -263,7 +263,7 @@ runContainerAndExit = do
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep stackRoot ++ mountSuffix)
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep projectRoot ++ mountSuffix)
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix)
-          ,"-w", toLinuxStylePath (toFilePathNoTrailingSep pwd)]
+          ,"-w",toLinuxStylePath (toFilePathNoTrailingSep pwd)]
          ,case dockerNetwork docker of
             Nothing -> ["--net=host"]
             Just name -> ["--net=" ++ name]
@@ -278,8 +278,8 @@ runContainerAndExit = do
          ,case mstackYaml of
             Nothing -> []
             Just stackYaml ->
-              ["-e","STACK_YAML=" ++ stackYaml
-              ,"-v",stackYaml++ ":" ++ stackYaml ++ ":ro"]
+              ["-e","STACK_YAML=" ++ toLinuxStylePath stackYaml
+              ,"-v",stackYaml ++ ":" ++ toLinuxStylePath stackYaml ++ ":ro"]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
