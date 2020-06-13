@@ -736,7 +736,8 @@ check_home_local_bin_on_path() {
   if ! on_path "$HOME_LOCAL_BIN" ; then
     #TODO: offer to add it for the user (pull requests welcome!)
     info "WARNING: '$HOME_LOCAL_BIN' is not on your PATH."
-    info "    For best results, please add it to the beginning of PATH in your profile."
+    info "    Stack will place the binaries it builds in '$HOME_LOCAL_BIN' so"
+    info "    for best results, please add it to the beginning of PATH in your profile."
     info ""
   fi
 }
