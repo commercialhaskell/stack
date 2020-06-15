@@ -13,6 +13,10 @@ Major changes:
 
 Behavior changes:
 
+* File watching now takes into account specified targets, old behavior could
+  be restored using the new flag `--watch-all`
+  [#5310](https://github.com/commercialhaskell/stack/issues/5310)
+
 Other enhancements:
 
 * `stack ls dependencies json` now includes fields `sha256` and `size` for

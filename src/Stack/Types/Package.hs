@@ -320,6 +320,14 @@ instance Show (MemoizedWith env a) where
 lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
 lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . lpComponentFiles
 
+lpFilesForComponents :: HasEnvConfig env
+                     => Set NamedComponent
+                     -> LocalPackage
+                     -> RIO env (Set.Set (Path Abs File))
+lpFilesForComponents components lp = runMemoizedWith $ do
+  componentFiles <- lpComponentFiles lp
+  pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
+
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
     deriving (Show, Eq)
