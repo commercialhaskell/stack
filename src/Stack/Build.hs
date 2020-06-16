@@ -68,11 +68,22 @@ build msetLocalFiles = do
 
     checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
+    boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do
-      files <- sequence
-        [lpFiles lp | lp <- allLocals]
+      files <-
+        if boptsCLIWatchAll boptsCli
+        then sequence [lpFiles lp | lp <- allLocals]
+        else forM allLocals $ \lp -> do
+          let pn = packageName (lpPackage lp)
+          case Map.lookup pn (smtTargets $ smTargets sourceMap) of
+            Nothing ->
+              pure Set.empty
+            Just (TargetAll _) ->
+              lpFiles lp
+            Just (TargetComps components) ->
+              lpFilesForComponents components lp
       liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
 
     checkComponentsBuildable allLocals
@@ -81,7 +92,6 @@ build msetLocalFiles = do
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled installMap
 
-    boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
 

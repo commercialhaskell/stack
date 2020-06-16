@@ -133,6 +133,7 @@ defaultBuildOptsCLI = BuildOptsCLI
     , boptsCLIGhcOptions = []
     , boptsCLIBuildSubset = BSAll
     , boptsCLIFileWatch = NoFileWatch
+    , boptsCLIWatchAll = False
     , boptsCLIExec = []
     , boptsCLIOnlyConfigure = False
     , boptsCLICommand = Build
@@ -166,6 +167,7 @@ data BuildOptsCLI = BuildOptsCLI
     , boptsCLIFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
     , boptsCLIBuildSubset :: !BuildSubset
     , boptsCLIFileWatch :: !FileWatchOpts
+    , boptsCLIWatchAll :: !Bool
     , boptsCLIExec :: ![(String, [String])]
     , boptsCLIOnlyConfigure :: !Bool
     , boptsCLICommand :: !BuildCommand

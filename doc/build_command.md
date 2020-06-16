@@ -157,7 +157,10 @@ all of them, please use `stack build --help`. Some particularly convenient ones
 worth mentioning here since they compose well with the rest of the build system
 as described:
 
-* `--file-watch` will rebuild your project every time a file changes
+* `--file-watch` will rebuild your project every time a file changes, by default
+  it will take into account all files belonging to the targets you specify,
+  alternatively one could specify `--watch-all` which will make Stack watch
+  any local files (from project packages or from local dependencies)
 * `--exec "cmd [args]"` will run a command after a successful build
 
 To come back to the composable approach described above, consider this final
