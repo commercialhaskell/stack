@@ -25,8 +25,10 @@ location:
 * Via a _convenience synonym_, which provides a short form for some
   common URLs. These are:
     * Github: `github:user/repo:path` is treated as `https://raw.githubusercontent.com/user/repo/master/path`
-    * LTS Haskell: `lts-X.Y` is treated as `github:commercialhaskell/stackage-snapshots:lts/X/Y.yaml`
-    * Stackage Nightly: `nightly-YYYY-MM-DD` is treated as `github:commercialhaskell/stackage-snapshots:nightly/YYYY/M/D.yaml`
+    * LTS Haskell: `lts-X.Y` is treated by default as `github:commercialhaskell/stackage-snapshots:lts/X/Y.yaml`
+    * Stackage Nightly: `nightly-YYYY-MM-DD` is treated by default as `github:commercialhaskell/stackage-snapshots:nightly/YYYY/M/D.yaml`
+
+By default, LTS Haskell/Stackage Nightly snapshot configurations are retrieved from `commercialhaskell`'s GitHub repository. You can set a custom location in the [snapshot-location-base](yaml_configuration.md#snapshot-location-base) yaml configuration field.
 
 For safer, more reproducible builds, you can optionally specify a URL
 together with a cryptographic hash of its content, e.g.:

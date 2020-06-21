@@ -12,7 +12,7 @@ module Stack.Ls
 import Control.Exception (throw)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
-import Stack.Prelude hiding (Snapshot (..))
+import Stack.Prelude hiding (Snapshot (..), SnapName (..))
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
 import Data.Text hiding (pack, intercalate)

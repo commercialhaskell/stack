@@ -45,7 +45,6 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
-import           Stack.Types.Resolver
 
 data BuildPlanException
     = UnknownPackages
@@ -62,7 +61,7 @@ instance Show BuildPlanException where
         , "Non existing resolver: " ++ snapName' ++ "."
         , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
         ]
-        where snapName' = show $ renderSnapName snapName
+        where snapName' = show snapName
     show (UnknownPackages stackYaml unknown shadowed) =
         unlines $ unknown' ++ shadowed'
       where
@@ -387,9 +386,7 @@ selectBestSnapshot pkgDirs snaps = do
     logInfo $ "Selecting the best among "
                <> displayShow (NonEmpty.length snaps)
                <> " snapshots...\n"
-    let resolverStackage (LTS x y) = ltsSnapshotLocation x y
-        resolverStackage (Nightly d) = nightlySnapshotLocation d
-    F.foldr1 go (NonEmpty.map (getResult . resolverStackage) snaps)
+    F.foldr1 go (NonEmpty.map (getResult <=< snapshotLocation) snaps)
     where
         go mold mnew = do
             old@(_snap, _loc, bpc) <- mold

@@ -121,11 +121,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \Project{..} ->
-        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+        projectResolver `shouldBe` RSLSynonym (LTS 2 10)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \Project{..} ->
-        projectResolver `shouldBe` ltsSnapshotLocation 2 10
+        projectResolver `shouldBe` RSLSynonym (LTS 2 10)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (return ()))

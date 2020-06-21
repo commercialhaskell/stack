@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -14,10 +13,7 @@
 module Stack.Types.Resolver
   (AbstractResolver(..)
   ,readAbstractResolver
-  ,SnapName(..)
   ,Snapshots (..)
-  ,renderSnapName
-  ,parseSnapName
   ) where
 
 import           Pantry.Internal.AesonExtended
@@ -62,23 +58,12 @@ readAbstractResolver = do
             pure $ pure $ ARLatestLTSMajor x'
         _ -> pure $ ARResolver <$> parseRawSnapshotLocation (T.pack s)
 
--- | The name of an LTS Haskell or Stackage Nightly snapshot.
-data SnapName
-    = LTS !Int !Int
-    | Nightly !Day
-    deriving (Generic, Typeable, Show, Data, Eq)
-instance NFData SnapName
-instance Display SnapName where
-  display = display . renderSnapName
-
 data BuildPlanTypesException
-    = ParseSnapNameException !Text
-    | ParseResolverException !Text
+    = ParseResolverException !Text
     | FilepathInDownloadedSnapshot !Text
     deriving Typeable
 instance Exception BuildPlanTypesException
 instance Show BuildPlanTypesException where
-    show (ParseSnapNameException t) = "Invalid snapshot name: " ++ T.unpack t
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
@@ -90,29 +75,6 @@ instance Show BuildPlanTypesException where
         , "field, but filepaths are not allowed in downloaded snapshots.\n"
         , "Filepath specified: " ++ T.unpack url
         ]
-
--- | Convert a 'SnapName' into its short representation, e.g. @lts-2.8@,
--- @nightly-2015-03-05@.
-renderSnapName :: SnapName -> Text
-renderSnapName (LTS x y) = T.pack $ concat ["lts-", show x, ".", show y]
-renderSnapName (Nightly d) = T.pack $ "nightly-" ++ show d
-
--- | Parse the short representation of a 'SnapName'.
-parseSnapName :: MonadThrow m => Text -> m SnapName
-parseSnapName t0 =
-    case lts <|> nightly of
-        Nothing -> throwM $ ParseSnapNameException t0
-        Just sn -> return sn
-  where
-    lts = do
-        t1 <- T.stripPrefix "lts-" t0
-        Right (x, t2) <- Just $ decimal t1
-        t3 <- T.stripPrefix "." t2
-        Right (y, "") <- Just $ decimal t3
-        return $ LTS x y
-    nightly = do
-        t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMaybe (T.unpack t1)
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots

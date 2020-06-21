@@ -8,7 +8,6 @@ module Stack.Config.Docker where
 import           Stack.Prelude
 import           Data.List (find)
 import qualified Data.Text as T
-import           Data.Text.Read (decimal)
 import           Distribution.Version (simplifyVersionRange)
 import           Stack.Types.Version
 import           Stack.Types.Config
@@ -24,22 +23,14 @@ addDefaultTag
   -> m String
 addDefaultTag base mproject maresolver = do
   let exc = throwM $ ResolverNotSupportedException mproject maresolver
-      onUrl url = maybe exc pure $ do
-        (x, y) <- parseLtsName url
-        Just $ concat
-          [ base
-          , ":lts-"
-          , show x
-          , "."
-          , show y
-          ]
-  case maresolver of
-    Just (ARResolver (RSLUrl url _)) -> onUrl url
+  lts <- case maresolver of
+    Just (ARResolver (RSLSynonym lts@(LTS _ _))) -> return lts
     Just _aresolver -> exc
     Nothing ->
       case projectResolver <$> mproject of
-        Just (RSLUrl url _) -> onUrl url
+        Just (RSLSynonym lts@(LTS _ _)) -> return lts
         _ -> exc
+  return $ base ++ ":" ++ show lts
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid
@@ -106,14 +97,3 @@ instance Show StackDockerConfigException where
             , "\nUse an LTS resolver, or set the '"
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
-
--- | Parse an LTS major and minor number from a snapshot URL.
---
--- This might make more sense in pantry instead.
-parseLtsName :: Text -> Maybe (Int, Int)
-parseLtsName t0 = do
-  t1 <- T.stripPrefix "https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/" t0
-  Right (x, t2) <- Just $ decimal t1
-  t3 <- T.stripPrefix "/" t2
-  Right (y, ".yaml") <- Just $ decimal t3
-  Just (x, y)

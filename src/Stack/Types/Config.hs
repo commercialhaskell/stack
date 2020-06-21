@@ -859,6 +859,8 @@ data ConfigMonoid =
     , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
     , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
+    , configMonoidSnapshotLocation :: !(First Text)
+    -- ^ Custom location of LTS/Nightly snapshots
     }
   deriving (Show, Generic)
 
@@ -982,6 +984,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
 
     configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
+    configMonoidSnapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
 
     return ConfigMonoid {..}
   where
@@ -1148,6 +1151,9 @@ configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
 configMonoidCasaRepoPrefixName :: Text
 configMonoidCasaRepoPrefixName = "casa-repo-prefix"
 
+configMonoidSnapshotLocationName :: Text
+configMonoidSnapshotLocationName = "snapshot-location-base"
+
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseCustomSnapshotException Text ParseException
@@ -1212,7 +1218,7 @@ instance Show ConfigException where
     show (NoMatchingSnapshot names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
-        , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
+        , unlines $ map (\name -> "    - " <> show name)
                         (NonEmpty.toList names)
         , resolveOptions
         ]

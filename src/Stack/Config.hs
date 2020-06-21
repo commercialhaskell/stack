@@ -82,6 +82,7 @@ import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.List (unzip)
 import           RIO.PrettyPrint (stylesUpdateL, useColorL)
 import           RIO.Process
+import           RIO.Time (toGregorian)
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -155,18 +156,18 @@ makeConcreteResolver ar = do
                 iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
                 ProjectAndConfigMonoid project _ <- liftIO iopc
                 return $ projectResolver project
-            ARLatestNightly -> nightlySnapshotLocation . snapshotsNightly <$> getSnapshots
+            ARLatestNightly -> RSLSynonym . Nightly . snapshotsNightly <$> getSnapshots
             ARLatestLTSMajor x -> do
                 snapshots <- getSnapshots
                 case IntMap.lookup x $ snapshotsLts snapshots of
                     Nothing -> throwString $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ ltsSnapshotLocation x y
+                    Just y -> return $ RSLSynonym $ LTS x y
             ARLatestLTS -> do
                 snapshots <- getSnapshots
                 if IntMap.null $ snapshotsLts snapshots
                    then throwString "No LTS releases found"
                    else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                        in return $ ltsSnapshotLocation x y
+                        in return $ RSLSynonym $ LTS x y
     logInfo $ "Selected resolver: " <> display r
     return r
 
@@ -174,9 +175,9 @@ makeConcreteResolver ar = do
 getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
 getLatestResolver = do
     snapshots <- getSnapshots
-    let mlts = uncurry ltsSnapshotLocation <$>
+    let mlts = uncurry LTS <$>
                listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
-    pure $ fromMaybe (nightlySnapshotLocation (snapshotsNightly snapshots)) mlts
+    pure $ RSLSynonym $ fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
@@ -371,6 +372,25 @@ configFromConfigMonoid
              Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
              Just x -> pure x
          Nothing -> pure $ configStackRoot </> relDirPantry
+
+     let snapLoc =
+            case getFirst configMonoidSnapshotLocation of 
+                Nothing -> defaultSnapshotLocation
+                Just addr -> customSnapshotLocation
+                                where
+                    customSnapshotLocation (LTS x y) =
+                        mkRSLUrl $ addr'
+                            <> "/lts/" <> display x
+                            <> "/" <> display y <> ".yaml"
+                    customSnapshotLocation (Nightly date) =
+                        let (year, month, day) = toGregorian date
+                        in mkRSLUrl $ addr'
+                            <> "/nightly/"
+                            <> display year
+                            <> "/" <> display month
+                            <> "/" <> display day <> ".yaml"
+                    mkRSLUrl builder = RSLUrl (utf8BuilderToText builder) Nothing
+                    addr' = display $ T.dropWhileEnd (=='/') addr
      withPantryConfig
        pantryRoot
        hsc
@@ -378,6 +398,7 @@ configFromConfigMonoid
        clConnectionCount
        (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
        defaultCasaMaxPerRequest
+       snapLoc
        (\configPantryConfig -> initUserStorage
          (configStackRoot </> relFileStorage)
          (\configUserStorage -> inner Config {..}))
