@@ -54,8 +54,30 @@ jobs:
           extra-suffix: ""
           stack-args: ""
         - os: ubuntu-latest
+          stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
     steps:
       - name: Clone project
         uses: actions/checkout@v2
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('${{ matrix.stack-yaml }}') }}-${{ matrix.extra-suffix }}
+      - shell: bash
+        run: |
+          set -ex
+          curl -sSL https://get.haskellstack.org/ | sh -s - -f
+          stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror" --copy-bins --local-bin-path bin
+
+          # Get output about whether the exe is dynamically linked
+          if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
+          then
+              # ldd returns exit code 1 if it's static, so failure is success
+              (ldd ./bin/stack && exit 1) || true
+          else
+              ldd ./bin/stack
+          fi
+
+          ./bin/stack --version
