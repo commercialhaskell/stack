@@ -1,0 +1,46 @@
+name: Unit tests
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  style:
+    name: Style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v2
+      - name: hlint
+        run: |
+          set -ex
+          ./etc/scripts/get-hlint.sh
+          export PATH="$(pwd)"/hlint:$PATH
+          hlint src/
+          hlint src/ --cpp-define=WINDOWS=1
+          hlint test/ --cpp-simple
+  unit-tests:
+    name: Unit tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - os: ubuntu-latest
+          stack-yaml: stack-ghc-84.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: ubuntu-latest
+          stack-yaml: stack-ghc-86.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: ubuntu-latest
+          stack-yaml: stack-ghc-88.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: ubuntu-latest
+          extra-suffix: "alpine"
+          stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v2
