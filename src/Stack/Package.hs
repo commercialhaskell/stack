@@ -1100,7 +1100,7 @@ parseHI hiPath = do
   result <- liftIO $ Iface.fromFile hiPath
   case result of
     Left msg -> do
-      prettyWarnL
+      prettyStackDevL
         [ flow "Failed to decode module interface:"
         , style File $ fromString hiPath
         , flow "Decoding failure:"

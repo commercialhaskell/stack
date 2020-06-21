@@ -371,6 +371,9 @@ configFromConfigMonoid
              Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
              Just x -> pure x
          Nothing -> pure $ configStackRoot </> relDirPantry
+
+     let configStackDeveloperMode = fromFirst stackDeveloperModeDefault configMonoidStackDeveloperMode
+
      withPantryConfig
        pantryRoot
        hsc
