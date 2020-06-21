@@ -19,6 +19,21 @@ jobs:
           hlint src/
           hlint src/ --cpp-define=WINDOWS=1
           hlint test/ --cpp-simple
+  pedantic:
+    name: Pedantic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v2
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-
+      - name: Pedantic build
+        run: stack --system-ghc build --pedantic
   unit-tests:
     name: Unit tests
     runs-on: ${{ matrix.os }}
