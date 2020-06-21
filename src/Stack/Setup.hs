@@ -54,10 +54,13 @@ import qualified    Distribution.System as Cabal
 import              Distribution.Text (simpleParse)
 import              Distribution.Types.PackageName (mkPackageName)
 import              Distribution.Version (mkVersion)
+import              Network.HTTP.Client (redirectCount)
 import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
                                               getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
                                               mkDownloadRequest, parseRequest, parseUrlThrow, setGithubHeaders,
-                                              setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse)
+                                              setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse,
+                                              setRequestMethod)
+import              Network.HTTP.Simple (getResponseHeader)
 import              Path hiding (fileExtension)
 import              Path.CheckInstall (warnInstallSearchPathIssues)
 import              Path.Extended (fileExtension)
@@ -1780,14 +1783,92 @@ getUtf8EnvVars compilerVer =
 
 -- Binary Stack upgrades
 
-newtype StackReleaseInfo = StackReleaseInfo Value
+-- | Information on a binary release of Stack
+data StackReleaseInfo
+  = SRIGithub !Value
+  -- ^ Metadata downloaded from GitHub releases about available binaries.
+  | SRIHaskellStackOrg !HaskellStackOrg
+  -- ^ Information on the latest available binary for the current platforms.
 
-downloadStackReleaseInfo :: (MonadIO m, MonadThrow m)
-                         => Maybe String -- Github org
-                         -> Maybe String -- Github repo
-                         -> Maybe String -- ^ optional version
-                         -> m StackReleaseInfo
-downloadStackReleaseInfo morg mrepo mver = liftIO $ do
+data HaskellStackOrg = HaskellStackOrg
+  { hsoUrl :: !Text
+  , hsoVersion :: !Version
+  }
+  deriving Show
+
+downloadStackReleaseInfo
+  :: (HasPlatform env, HasLogFunc env)
+  => Maybe String -- Github org
+  -> Maybe String -- Github repo
+  -> Maybe String -- ^ optional version
+  -> RIO env StackReleaseInfo
+downloadStackReleaseInfo Nothing Nothing Nothing = do
+    platform <- view platformL
+    -- Fallback list of URLs to try for upgrading.
+    let urls0 =
+          case platform of
+            Platform X86_64 Cabal.Linux ->
+              [ "https://get.haskellstack.org/upgrade/linux-x86_64-static.tar.gz"
+              , "https://get.haskellstack.org/upgrade/linux-x86_64.tar.gz"
+              ]
+            Platform X86_64 Cabal.OSX ->
+              [ "https://get.haskellstack.org/upgrade/osx-x86_64.tar.gz"
+              ]
+            Platform X86_64 Cabal.Windows ->
+              [ "https://get.haskellstack.org/upgrade/windows-x86_64.tar.gz"
+              ]
+            _ -> []
+        -- Helper function: extract the version from a GitHub releases URL.
+    let extractVersion loc = do
+          version0 <-
+            case reverse $ splitOn "/" $ T.unpack loc of
+              _final:version0:_ -> Right version0
+              _ -> Left $ "Insufficient pieces in location: " ++ show loc
+          version1 <- maybe (Left "no leading v on version") Right $ stripPrefix "v" version0
+          maybe (Left $ "Invalid version: " ++ show version1) Right $ parseVersion version1
+
+        -- Try out different URLs. If we've exhausted all of them, fall back to GitHub.
+        loop [] = do
+          logDebug "Could not get binary from haskellstack.org, trying GitHub"
+          downloadStackReleaseInfoGithub Nothing Nothing Nothing
+
+        -- Try the next URL
+        loop (url:urls) = do
+          -- Make a HEAD request without any redirects
+          req <- setRequestMethod "HEAD" <$> parseRequest (T.unpack url)
+          res <- httpLbs req { redirectCount = 0 }
+
+          -- Look for a redirect. We're looking for a standard GitHub releases
+          -- URL where we can extract version information from.
+          case getResponseHeader "location" res of
+            [] -> logDebug "No location header found, continuing" *> loop urls
+            -- Exactly one location header.
+            [locBS] ->
+              case decodeUtf8' locBS of
+                Left e -> logDebug ("Invalid UTF8: " <> displayShow (locBS, e)) *> loop urls
+                Right loc ->
+                  case extractVersion loc of
+                    Left s -> logDebug ("No version found: " <> displayShow (url, loc, s)) *> loop (loc:urls)
+                    -- We found a valid URL, let's use it!
+                    Right version -> do
+                      let hso = HaskellStackOrg
+                                  { hsoUrl = loc
+                                  , hsoVersion = version
+                                  }
+                      logDebug $ "Downloading from haskellstack.org: " <> displayShow hso
+                      pure $ SRIHaskellStackOrg hso
+            locs -> logDebug ("Multiple location headers found: " <> displayShow locs) *> loop urls
+    loop urls0
+downloadStackReleaseInfo morg mrepo mver = downloadStackReleaseInfoGithub morg mrepo mver
+
+-- | Same as above, but always uses Github
+downloadStackReleaseInfoGithub
+  :: (MonadIO m, MonadThrow m)
+  => Maybe String -- Github org
+  -> Maybe String -- Github repo
+  -> Maybe String -- ^ optional version
+  -> m StackReleaseInfo
+downloadStackReleaseInfoGithub morg mrepo mver = liftIO $ do
     let org = fromMaybe "commercialhaskell" morg
         repo = fromMaybe "stack" mrepo
     let url = concat
@@ -1804,7 +1885,7 @@ downloadStackReleaseInfo morg mrepo mver = liftIO $ do
     res <- httpJSON $ setGithubHeaders req
     let code = getResponseStatusCode res
     if code >= 200 && code < 300
-        then return $ StackReleaseInfo $ getResponseBody res
+        then return $ SRIGithub $ getResponseBody res
         else throwString $ "Could not get release information for Stack from: " ++ url
 
 preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
@@ -1899,7 +1980,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
       `catchAny` (logError . displayShow)
   where
 
-    findArchive (StackReleaseInfo val) pattern = do
+    findArchive (SRIGithub val) pattern = do
         Object top <- return val
         Array assets <- HashMap.lookup "assets" top
         getFirst $ fold $ fmap (First . findMatch pattern') assets
@@ -1913,6 +1994,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
             String url <- HashMap.lookup "browser_download_url" o
             Just url
         findMatch _ _ = Nothing
+    findArchive (SRIHaskellStackOrg hso) _ = pure $ hsoUrl hso
 
     handleTarball :: Path Abs File -> Bool -> T.Text -> IO ()
     handleTarball tmpFile isWindows url = do
@@ -1928,25 +2010,26 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
                     , T.unpack url
                     ]
                 loop (Tar.Fail e) = throwM e
-                loop (Tar.Next e es)
-                    | Tar.entryPath e == exeName =
-                        case Tar.entryContent e of
-                            Tar.NormalFile lbs _ -> do
-                              ensureDir destDir
-                              LBS.writeFile (toFilePath tmpFile) lbs
-                            _ -> error $ concat
-                                [ "Invalid file type for tar entry named "
-                                , exeName
-                                , " downloaded from "
-                                , T.unpack url
-                                ]
-                    | otherwise = loop es
+                loop (Tar.Next e es) =
+                    case FP.splitPath (Tar.entryPath e) of
+                        -- Ignore the first component, see: https://github.com/commercialhaskell/stack/issues/5288
+                        [_ignored, name] | name == exeName -> do
+                            case Tar.entryContent e of
+                                Tar.NormalFile lbs _ -> do
+                                  ensureDir destDir
+                                  LBS.writeFile (toFilePath tmpFile) lbs
+                                _ -> error $ concat
+                                    [ "Invalid file type for tar entry named "
+                                    , Tar.entryPath e
+                                    , " downloaded from "
+                                    , T.unpack url
+                                    ]
+                        _ -> loop es
             loop entries
       where
-        -- The takeBaseName drops the .gz, dropExtension drops the .tar
-        exeName =
-            let base = FP.dropExtension (FP.takeBaseName (T.unpack url)) FP.</> "stack"
-             in if isWindows then base FP.<.> "exe" else base
+        exeName
+          | isWindows = "stack.exe"
+          | otherwise = "stack"
 
 -- | Ensure that the Stack executable download is in the same location
 -- as the currently running executable. See:
@@ -2004,8 +2087,9 @@ performPathChecking newFile executablePath = do
         | otherwise -> throwM e
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
-getDownloadVersion (StackReleaseInfo val) = do
+getDownloadVersion (SRIGithub val) = do
     Object o <- Just val
     String rawName <- HashMap.lookup "name" o
     -- drop the "v" at the beginning of the name
     parseVersion $ T.unpack (T.drop 1 rawName)
+getDownloadVersion (SRIHaskellStackOrg hso) = Just $ hsoVersion hso
