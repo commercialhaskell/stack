@@ -57,6 +57,14 @@ jobs:
           stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
+        - os: windows-latest
+          stack-yaml: stack.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: macos-latest
+          stack-yaml: stack.yaml
+          extra-suffix: ""
+          stack-args: ""
     steps:
       - name: Clone project
         uses: actions/checkout@v2
