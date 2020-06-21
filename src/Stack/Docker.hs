@@ -229,10 +229,12 @@ runContainerAndExit = do
      when (isNothing mpath) $ do
        logWarn "The Docker image does not set the PATH env var"
        logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
-     newPathEnv <- either throwM return $ augmentPath
-                      [ hostBinDir
-                      , toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
-                      mpath
+     newPathEnv <- either throwM return $
+                   bool id (T.replace ";" ":") osIsWindows <$>
+                   augmentPath
+                     [ hostBinDir
+                       , toLinuxStylePath $ toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
+                     mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
      liftIO $ mapM_ ensureDir [sandboxHomeDir, stackRoot]
