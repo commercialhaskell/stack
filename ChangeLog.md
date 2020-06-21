@@ -13,6 +13,11 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack upgrade` will download from `haskellstack.org` before trying `github.com`. See
+  [#5288](https://github.com/commercialhaskell/stack/issues/5288)
+* `stack upgrade` makes less assumptions about archive format. See
+  [#5288](https://github.com/commercialhaskell/stack/issues/5288)
+
 Bug fixes:
 
 * GHC source builds work properly for recent GHC versions again. See
