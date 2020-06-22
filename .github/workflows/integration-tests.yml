@@ -1,0 +1,67 @@
+name: Integration tests
+
+on:
+  pull_request:
+  push:
+    branches: [master, stable]
+  schedule:
+  - cron: "0 0 * * *"
+
+jobs:
+  integration-tests:
+    name: Integration tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - os: ubuntu-latest
+          release-args: "--alpine"
+        - os: windows-latest
+          release-args: ""
+        - os: macos-latest
+          release-args: ""
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v2
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+      - shell: bash
+        name: Install deps and run checks
+        run: |
+          set -ex
+
+          stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
+
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
+          then
+            # Retry installing nix due to nondeterministic error
+            #   Fatal error: glibc detected an invalid stdio handle
+            # See:
+            #   https://github.com/nh2/static-haskell-nix/pull/27#issuecomment-502652181
+            #   https://github.com/NixOS/nix/issues/2733
+            (for i in {1..5}; do bash <(curl -sSL https://nixos.org/nix/install) && exit 0; done; exit 1)
+            . ~/.nix-profile/etc/profile.d/nix.sh
+            nix-channel --add https://nixos.org/channels/nixos-19.09 nixpkgs
+            nix-channel --update # Get GHC 8.2.2
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+          then
+            choco install nsis-unicode -y
+          fi
+
+          # Do this in the same step as installing deps to get relevant env var modifications
+          stack etc/scripts/release.hs check ${{ matrix.release-args }}
+
+          set +ex
+
+      - shell: bash
+        name: Build bindist
+        run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
+
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ runner.os }}
+          path: _release
