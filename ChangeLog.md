@@ -31,6 +31,13 @@ Other enhancements:
 Bug fixes:
 
 * When using the `STACK_YAML` env var with Docker, make the path absolute.
+* Fix the problem of `stack repl foo:test:bar` failing without a project
+  build before that. See
+  [#5213](https://github.com/commercialhaskell/stack/issues/5213)
+
+* Fix `stack sdist` introducing unneded sublibrary syntax when using
+  pvp-bounds. See
+  [#5289](https://github.com/commercialhaskell/stack/issues/5289)
 
 ## v2.3.1
 

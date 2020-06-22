@@ -313,20 +313,20 @@ do_osx_install() {
 #     die "Sorry, there is currently no 32-bit FreeBSD binary available."
 #   fi
 # }
-#
-# # Alpine distro install
-# do_alpine_install() {
-#   install_dependencies() {
-#     apk_install_pkgs gmp libgcc xz make
-#   }
-#   install_dependencies
-#   if is_64_bit ; then
-#     print_bindist_notice
-#     install_64bit_standard_binary
-#   else
-#     die "Sorry, there is currently no 32-bit Alpine Linux binary available."
-#   fi
-# }
+
+# Alpine distro install
+do_alpine_install() {
+  install_dependencies() {
+    apk_install_pkgs gmp libgcc xz make
+  }
+  install_dependencies
+  if is_x86_64 ; then
+    print_bindist_notice
+    install_x86_64_linux_binary
+  else
+    die "Sorry, currently only 64-bit (x86_64) Alpine Linux binary is available."
+  fi
+}
 
 # Attempts to install on unsupported Linux distribution by downloading
 # the bindist.
