@@ -2,7 +2,7 @@ name: Unit tests
 
 on:
   pull_request:
-  push:
+  push: [master, stable]
 
 jobs:
   style:
