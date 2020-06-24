@@ -141,6 +141,11 @@ when:
     - hsc2hs
     dependencies:
     - unix
+- condition: flag(developer-mode)
+  then:
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
+  else:
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
 library:
   source-dirs: src/
   ghc-options:
@@ -346,5 +351,9 @@ flags:
       DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY
       (e.g. using cabal or from Hackage), as it makes debugging support
       requests more difficult."
+    manual: true
+    default: false
+  developer-mode:
+    description: "By default, should extra developer information be output?"
     manual: true
     default: false

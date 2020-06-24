@@ -1187,3 +1187,13 @@ recommend-stack-upgrade: true
 ```
 
 Since 2.0
+
+### stack-developer-mode
+
+Turns on a mode where some messages are printed at WARN level instead of DEBUG level, especially useful for developers of Stack itself. For official distributed binaries, this is set to `false` by default. When you build from source, it is set to `true` by default.
+
+```yaml
+stack-developer-mode: false
+```
+
+Since 2.3.3

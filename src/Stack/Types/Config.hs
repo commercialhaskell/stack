@@ -169,6 +169,8 @@ module Stack.Types.Config
   ,envOverrideSettingsL
   ,shouldForceGhcColorFlag
   ,appropriateGhcColorFlag
+  -- * Helper logging functions
+  ,prettyStackDevL
   -- * Lens reexport
   ,view
   ,to
@@ -214,7 +216,7 @@ import           Pantry.Internal (Storage)
 import           Path
 import qualified Paths_stack as Meta
 import qualified RIO.List as List
-import           RIO.PrettyPrint (HasTerm (..))
+import           RIO.PrettyPrint (HasTerm (..), StyleDoc, prettyWarnL, prettyDebugL)
 import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
                      parseStylesUpdateFromString, HasStylesUpdate (..))
 import           Stack.Constants
@@ -377,6 +379,8 @@ data Config =
          -- ^ Enable GHC hiding source paths?
          ,configRecommendUpgrade    :: !Bool
          -- ^ Recommend a Stack upgrade?
+         ,configStackDeveloperMode  :: !Bool
+         -- ^ Turn on Stack developer mode for additional messages?
          }
 
 -- | A bit of type safety to ensure we're talking to the right database.
@@ -859,6 +863,8 @@ data ConfigMonoid =
     , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
     , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
+    , configMonoidStackDeveloperMode :: !(First Bool)
+    -- ^ See 'configStackDeveloperMode'
     }
   deriving (Show, Generic)
 
@@ -982,6 +988,8 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidRecommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
 
     configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
+
+    configMonoidStackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
 
     return ConfigMonoid {..}
   where
@@ -1147,6 +1155,9 @@ configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
 
 configMonoidCasaRepoPrefixName :: Text
 configMonoidCasaRepoPrefixName = "casa-repo-prefix"
+
+configMonoidStackDeveloperModeName :: Text
+configMonoidStackDeveloperModeName = "stack-developer-mode"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
@@ -2126,3 +2137,11 @@ terminalL = globalOptsL.lens globalTerminal (\x y -> x { globalTerminal = y })
 -- | See 'globalReExecVersion'
 reExecL :: HasRunner env => SimpleGetter env Bool
 reExecL = globalOptsL.to (isJust . globalReExecVersion)
+
+-- | In dev mode, print as a warning, otherwise as debug
+prettyStackDevL :: HasConfig env => [StyleDoc] -> RIO env ()
+prettyStackDevL docs = do
+  config <- view configL
+  if configStackDeveloperMode config
+    then prettyWarnL docs
+    else prettyDebugL docs

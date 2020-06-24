@@ -3,6 +3,10 @@ resolver: lts-12.26
 packages:
 - .
 
+flags:
+  stack:
+    developer-mode: true
+
 docker:
   enable: false
   repo: fpco/stack-build-small:lts-12.26

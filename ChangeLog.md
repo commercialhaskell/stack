@@ -13,6 +13,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Add the `stack-developer-mode` flag
+
 Bug fixes:
 
 * When using the `STACK_YAML` env var with Docker, make the path absolute.
