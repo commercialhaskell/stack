@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 96c03e5e489e5d2608d595b783306ffc7a246317770876f1c27baf00b73b994b
+-- hash: 2a288b315557ca9df67fb60c003674a0dd6618aa5f8bc2b04527fb8feae4b16d
 
 name:           stack
 version:        2.4.0
@@ -76,6 +76,11 @@ custom-setup
       Cabal
     , base >=4.10 && <5
     , filepath
+
+flag developer-mode
+  description: By default, should extra developer information be output?
+  manual: True
+  default: False
 
 flag disable-git-info
   description: Disable compile-time inclusion of current git info in stack
@@ -312,6 +317,10 @@ library
         hsc2hs
     build-depends:
         unix
+  if flag(developer-mode)
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
+  else
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   if os(windows)
     other-modules:
         System.Uname
@@ -433,6 +442,10 @@ executable stack
         hsc2hs
     build-depends:
         unix
+  if flag(developer-mode)
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
+  else
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   if flag(static)
     ld-options: -static -pthread
   if !(flag(disable-git-info))
@@ -551,6 +564,10 @@ executable stack-integration-test
         hsc2hs
     build-depends:
         unix
+  if flag(developer-mode)
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
+  else
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   if !(flag(integration-tests))
     buildable: False
   if flag(static)
@@ -678,4 +695,8 @@ test-suite stack-test
         hsc2hs
     build-depends:
         unix
+  if flag(developer-mode)
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
+  else
+    cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   default-language: Haskell2010

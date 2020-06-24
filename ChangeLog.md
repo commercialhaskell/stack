@@ -27,6 +27,7 @@ Other enhancements:
   [#5280](https://github.com/commercialhaskell/stack/issues/5280)
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
+* Add the `stack-developer-mode` flag
 
 Bug fixes:
 

@@ -374,7 +374,7 @@ configFromConfigMonoid
          Nothing -> pure $ configStackRoot </> relDirPantry
 
      let snapLoc =
-            case getFirst configMonoidSnapshotLocation of 
+            case getFirst configMonoidSnapshotLocation of
                 Nothing -> defaultSnapshotLocation
                 Just addr -> customSnapshotLocation
                                 where
@@ -391,6 +391,9 @@ configFromConfigMonoid
                             <> "/" <> display day <> ".yaml"
                     mkRSLUrl builder = RSLUrl (utf8BuilderToText builder) Nothing
                     addr' = display $ T.dropWhileEnd (=='/') addr
+
+     let configStackDeveloperMode = fromFirst stackDeveloperModeDefault configMonoidStackDeveloperMode
+
      withPantryConfig
        pantryRoot
        hsc
