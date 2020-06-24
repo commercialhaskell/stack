@@ -1188,6 +1188,16 @@ recommend-stack-upgrade: true
 
 Since 2.0
 
+### stack-developer-mode
+
+Turns on a mode where some messages are printed at WARN level instead of DEBUG level, especially useful for developers of Stack itself. For official distributed binaries, this is set to `false` by default. When you build from source, it is set to `true` by default.
+
+```yaml
+stack-developer-mode: false
+```
+
+Since 2.3.3
+
 ### snapshot-location-base
 Sets the base location of LTS Haskell/Stackage Nightly snapshots. Default is https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/ (as set in the `pantry` library).
 
@@ -1202,4 +1212,4 @@ has the following effect:
 This field is convenient in setups that restrict access to GitHub, for instance closed corporate setups. In this setting, it is common for the development environment to have general access to the internet, but not for testing/building environments. To avoid the firewall, one can run a local snapshots mirror and then use a custom `snapshot-location-base` in the closed environments only.
 
 
-Since FIXME:
+Since 2.5.0

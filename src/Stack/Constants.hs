@@ -120,6 +120,7 @@ module Stack.Constants
     ,usrLibDirs
     ,testGhcEnvRelFile
     ,relFileBuildLock
+    ,stackDeveloperModeDefault
     )
     where
 
@@ -555,3 +556,7 @@ testGhcEnvRelFile = $(mkRelFile "test-ghc-env")
 -- | File inside a dist directory to use for locking
 relFileBuildLock :: Path Rel File
 relFileBuildLock = $(mkRelFile "build-lock")
+
+-- | What should the default be for stack-developer-mode
+stackDeveloperModeDefault :: Bool
+stackDeveloperModeDefault = STACK_DEVELOPER_MODE_DEFAULT
