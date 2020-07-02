@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 811ef8ab3abe2f299804ee02091ae58f4f62d5d0cbb720d9043f393aa758ab6d
+-- hash: 89655f87a845cb110657f89477ed6ae2e33adb8ecc6b62075a5281f0e6dc0c80
 
 name:           stack
 version:        2.4.0
@@ -271,7 +271,7 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , opentelemetry >= 0.4.0
+    , opentelemetry >=0.5.0
     , optparse-applicative
     , pantry
     , path
@@ -396,7 +396,7 @@ executable stack
     , neat-interpolation
     , network-uri
     , open-browser
-    , opentelemetry
+    , opentelemetry >=0.5.0
     , optparse-applicative
     , pantry
     , path
@@ -519,7 +519,7 @@ executable stack-integration-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , opentelemetry
+    , opentelemetry >=0.5.0
     , optparse-applicative
     , optparse-generic
     , pantry
@@ -649,7 +649,7 @@ test-suite stack-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , opentelemetry
+    , opentelemetry >=0.5.0
     , optparse-applicative
     , pantry
     , path
