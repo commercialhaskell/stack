@@ -14,7 +14,7 @@ Behavior changes:
 Other enhancements:
 
 Bug fixes:
-
+* Fix Docker integration on Windows. See [#2421](https://github.com/commercialhaskell/stack/issues/2421)
 
 ## v2.5.1
 
