@@ -28,7 +28,6 @@ import              Data.List
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
-import              Foreign.C.Types (CTime)
 import              Stack.Build.Cache
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Target
@@ -406,46 +405,41 @@ checkBuildCache :: forall m. (MonadIO m)
                 -> m (Set FilePath, Map FilePath FileCacheInfo)
 checkBuildCache oldCache files = do
     fileTimes <- liftM Map.fromList $ forM files $ \fp -> do
-        mmodTime <- liftIO (getModTimeMaybe (toFilePath fp))
-        return (toFilePath fp, mmodTime)
+        mdigest <- liftIO (getFileDigestMaybe (toFilePath fp))
+        return (toFilePath fp, mdigest)
     liftM (mconcat . Map.elems) $ sequence $
         Map.mergeWithKey
-            (\fp mmodTime fci -> Just (go fp mmodTime (Just fci)))
-            (Map.mapWithKey (\fp mmodTime -> go fp mmodTime Nothing))
+            (\fp mdigest fci -> Just (go fp mdigest (Just fci)))
+            (Map.mapWithKey (\fp mdigest -> go fp mdigest Nothing))
             (Map.mapWithKey (\fp fci -> go fp Nothing (Just fci)))
             fileTimes
             oldCache
   where
-    go :: FilePath -> Maybe CTime -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
+    go :: FilePath -> Maybe (FileSize, SHA256) -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
     -- Filter out the cabal_macros file to avoid spurious recompilations
     go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
     -- Common case where it's in the cache and on the filesystem.
-    go fp (Just modTime') (Just fci)
-        | fciModTime fci == modTime' = return (Set.empty, Map.singleton fp fci)
+    go fp (Just (size, digest')) (Just fci)
+        | fciHash fci == digest' = return (Set.empty, Map.singleton fp fci)
         | otherwise = do
-            newFci <- calcFci modTime' fp
-            let isDirty =
-                    fciSize fci /= fciSize newFci ||
-                    fciHash fci /= fciHash newFci
-                newDirty = if isDirty then Set.singleton fp else Set.empty
-            return (newDirty, Map.singleton fp newFci)
+            newFci <- calcFci (size,digest') fp
+            return (Set.singleton fp, Map.singleton fp newFci)
     -- Missing file. Add it to dirty files, but no FileCacheInfo.
     go fp Nothing _ = return (Set.singleton fp, Map.empty)
     -- Missing cache. Add it to dirty files and compute FileCacheInfo.
-    go fp (Just modTime') Nothing = do
-        newFci <- calcFci modTime' fp
+    go fp (Just (size, digest')) Nothing = do
+        newFci <- calcFci (size,digest') fp
         return (Set.singleton fp, Map.singleton fp newFci)
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
     :: HasEnvConfig env
-    => CTime
-    -> Package
+    => Package
     -> Path Abs File
     -> Set NamedComponent
     -> Map NamedComponent (Map FilePath a)
     -> RIO env (Map NamedComponent [Map FilePath FileCacheInfo], [PackageWarning])
-addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCaches = do
+addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
     (componentFiles, warnings) <- getPackageFilesForTargets pkg cabalFP nonLibComponents
     results <- forM (M.toList componentFiles) $ \(component, files) -> do
         let buildCache = M.findWithDefault M.empty component buildCaches
@@ -457,13 +451,10 @@ addUnlistedToBuildCache preBuildTime pkg cabalFP nonLibComponents buildCaches = 
     return (M.fromList (map fst results), concatMap snd results)
   where
     addFileToCache fp = do
-        mmodTime <- getModTimeMaybe fp
-        case mmodTime of
+        mdigest <- getFileDigestMaybe fp
+        case mdigest of
             Nothing -> return Map.empty
-            Just modTime' ->
-                if modTime' < preBuildTime
-                    then Map.singleton fp <$> calcFci modTime' fp
-                    else return Map.empty
+            Just digest' -> Map.singleton fp <$> calcFci digest' fp
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
 --   Note that the library component, if any, is always automatically added to the
@@ -484,34 +475,33 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
                 M.filterWithKey (\component _ -> component `elem` components) compFiles
     return (componentsFiles, warnings)
 
--- | Get file modification time, if it exists.
-getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe CTime)
-getModTimeMaybe fp =
+-- | Get file digest
+getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe (FileSize,SHA256))
+getFileDigestMaybe fp =
     liftIO
         (catch
              (liftM
-                  (Just . modificationTime)
-                  (getFileStatus fp))
+                  (\ (size, digest) -> Just (FileSize size, digest))
+                  (withSourceFile fp $ \src -> runConduit $ src .| getZipSink
+                    ((,)
+                        <$> ZipSink (CL.fold
+                            (\x y -> x + fromIntegral (S.length y))
+                            0)
+                        <*> ZipSink SHA256.sinkHash)))
              (\e ->
                    if isDoesNotExistError e
                        then return Nothing
                        else throwM e))
 
 -- | Create FileCacheInfo for a file.
-calcFci :: MonadIO m => CTime -> FilePath -> m FileCacheInfo
-calcFci modTime' fp = liftIO $
-    withSourceFile fp $ \src -> do
-        (size, digest) <- runConduit $ src .| getZipSink
-            ((,)
-                <$> ZipSink (CL.fold
-                    (\x y -> x + fromIntegral (S.length y))
-                    0)
-                <*> ZipSink SHA256.sinkHash)
-        return FileCacheInfo
-            { fciModTime = modTime'
-            , fciSize = FileSize size
-            , fciHash = digest
-            }
+calcFci :: MonadIO m => (FileSize,SHA256) -> FilePath -> m FileCacheInfo
+calcFci (size, digest) fp = liftIO $ do
+    modTime' <- fmap modificationTime $ getFileStatus fp
+    return FileCacheInfo
+        { fciModTime = modTime'
+        , fciSize = size
+        , fciHash = digest
+        }
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig
