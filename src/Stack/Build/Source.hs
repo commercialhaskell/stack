@@ -496,7 +496,7 @@ getFileDigestMaybe fp =
 -- | Create FileCacheInfo for a file.
 calcFci :: MonadIO m => (FileSize,SHA256) -> FilePath -> m FileCacheInfo
 calcFci (size, digest) fp = liftIO $ do
-    modTime' <- fmap modificationTime $ getFileStatus fp
+    modTime' <- modificationTime <$> getFileStatus fp
     return FileCacheInfo
         { fciModTime = modTime'
         , fciSize = size
