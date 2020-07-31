@@ -199,7 +199,12 @@ rules global@Global{..} args = do
 
         Stdout dirty <- cmd "git status --porcelain"
         when (not gAllowDirty && not (null (trim dirty))) $
-            error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
+            error $ concat
+              [ "Working tree is dirty.  Use --"
+              , allowDirtyOptName
+              , " option to continue anyway. Output:\n"
+              , show dirty
+              ]
         () <- cmd
             [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
             (stackArgs global)
