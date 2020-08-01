@@ -194,24 +194,17 @@ rules global@Global{..} args = do
     releaseCheckDir </> binaryExeFileName %> \out -> do
         need [releaseBinDir </> binaryName </> stackExeFileName]
 
-        -- Symlinks in the repo cause a spurious git status change notification
-        -- on Windows, so we don't run this on Windows. Instead we rely on
-        -- Linux/Mac testing for that.
+        -- Run "git diff" so we can see what changes exist, in case things fail below
+        () <- cmd "git diff"
 
-        case platformOS of
-          Windows -> pure ()
-          _ -> do
-            -- Run "git diff" so we can see what changes exist, in case things fail below
-            () <- cmd "git diff"
-
-            Stdout dirty <- cmd "git status --porcelain"
-            when (not gAllowDirty && not (null (trim dirty))) $
-                error $ concat
-                  [ "Working tree is dirty.  Use --"
-                  , allowDirtyOptName
-                  , " option to continue anyway. Output:\n"
-                  , show dirty
-                  ]
+        Stdout dirty <- cmd "git status --porcelain"
+        when (not gAllowDirty && not (null (trim dirty))) $
+            error $ concat
+              [ "Working tree is dirty.  Use --"
+              , allowDirtyOptName
+              , " option to continue anyway. Output:\n"
+              , show dirty
+              ]
         () <- cmd
             [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
             (stackArgs global)
