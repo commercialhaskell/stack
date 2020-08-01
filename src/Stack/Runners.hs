@@ -37,6 +37,8 @@ import           Stack.Types.Version (stackMinorVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
+import OpenTelemetry.Eventlog
+
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a
 withGlobalProject inner = do
@@ -83,7 +85,7 @@ withConfig
   -> RIO Config a
   -> RIO Runner a
 withConfig shouldReexec inner =
-    loadConfig $ \config -> do
+    withSpan_ "Runners.withConfig" $ loadConfig $ \config -> do
       -- If we have been relaunched in a Docker container, perform in-container initialization
       -- (switch UID, etc.).  We do this after first loading the configuration since it must
       -- happen ASAP but needs a configuration.

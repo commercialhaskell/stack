@@ -51,6 +51,8 @@ import           System.IO (putStrLn)
 import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
 
+import OpenTelemetry.Eventlog
+
 data PackageInfo
     =
       -- | This indicates that the package is already installed, and
@@ -173,7 +175,7 @@ constructPlan :: forall env. HasEnvConfig env
               -> InstalledMap
               -> Bool
               -> RIO env Plan
-constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
+constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = withSpan_ "Build.ConstructPlan.constructPlan" $ do
     logDebug "Constructing the build plan"
 
     when hasBaseInDeps $

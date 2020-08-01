@@ -45,6 +45,8 @@ import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, 
 import qualified Data.Text.IO as T
 import qualified RIO.Text as T
 
+import OpenTelemetry.Eventlog
+
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
 withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
@@ -66,7 +68,9 @@ sinkProcessStderrStdout
   -> ConduitM ByteString Void (RIO env) e -- ^ Sink for stderr
   -> ConduitM ByteString Void (RIO env) o -- ^ Sink for stdout
   -> RIO env (e,o)
-sinkProcessStderrStdout name args sinkStderr sinkStdout =
+sinkProcessStderrStdout name args sinkStderr sinkStdout = withSpan "sinkProcessStderrStdout" $ \sp -> do
+  setTag sp "process" (fromString name)
+  setTag sp "args" $ fromString (show args)
   proc name args $ \pc0 -> do
     let pc = setStdout createSource
            $ setStderr createSource
@@ -90,17 +94,19 @@ sinkProcessStdout
     -> [String] -- ^ Command line arguments
     -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
     -> RIO env a
-sinkProcessStdout name args sinkStdout =
+sinkProcessStdout name args sinkStdout = withSpan "sinkProcessStdout" $ \sp -> do
+  setTag sp "process" (fromString name)
+  setTag sp "args" $ fromString (show args)
   proc name args $ \pc ->
-  withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
-    $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
-   *> Concurrently (runConduit $ getStdout p .| sinkStdout)
+    withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
+      $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
+     *> Concurrently (runConduit $ getStdout p .| sinkStdout)
 
 logProcessStderrStdout
     :: (HasCallStack, HasProcessContext env, HasLogFunc env)
     => ProcessConfig stdin stdoutIgnored stderrIgnored
     -> RIO env ()
-logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
+logProcessStderrStdout pc = withSpan_ "logProcessStderrStdout" $ withLoggedProcess_ pc $ \p ->
     let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
      in runConcurrently
             $ Concurrently (runConduit $ getStdout p .| logLines)
@@ -113,7 +119,7 @@ readProcessNull :: (HasProcessContext env, HasLogFunc env, HasCallStack)
                 => String -- ^ Command
                 -> [String] -- ^ Command line arguments
                 -> RIO env ()
-readProcessNull name args =
+readProcessNull name args = withSpan_ "readProcessNull" $
   -- We want the output to appear in any exceptions, so we capture and drop it
   void $ proc name args readProcess_
 
@@ -213,5 +219,5 @@ defaultFirstFalse _ = False
 -- | Write a @Builder@ to a file and atomically rename.
 writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
-    liftIO $
+    liftIO $ withSpan_ "writeBinaryFileAtomic" $
     withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)

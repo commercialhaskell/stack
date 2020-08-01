@@ -32,6 +32,8 @@ import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), DumpPacka
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
+import OpenTelemetry.Eventlog
+
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
     :: (HasProcessContext env, HasLogFunc env)
@@ -59,7 +61,9 @@ ghcPkgCmdArgs
     -> [Path Abs Dir] -- ^ if empty, use global
     -> ConduitM Text Void (RIO env) a
     -> RIO env a
-ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = do
+ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = withSpan "PackageDump.ghcPkgCmdArgs" $ \sp -> do
+    setTag sp "args" $ fromString (unwords cmd)
+    setTag sp "dbs" $ fromString (show mpkgDbs)
     case reverse mpkgDbs of
         (pkgDb:_) -> createDatabase pkgexe pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
