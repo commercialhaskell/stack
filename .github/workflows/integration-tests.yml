@@ -18,7 +18,9 @@ jobs:
         - os: ubuntu-latest
           release-args: "--alpine"
         - os: windows-latest
-          release-args: ""
+          # Issues with symlinks cause things to appear dirty
+          # FIXME: we probably need to fix this so we get good output on stack --version
+          release-args: "--allow-dirty"
         - os: macos-latest
           release-args: ""
     steps:
