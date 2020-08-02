@@ -28,6 +28,9 @@ Other enhancements:
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
 * Add the `stack-developer-mode` flag
+* Customisable output styles (see `stack --help` and the `--stack-colors`
+  option, and `stack ls stack-colors --help`) now include `info`, `debug`,
+  `other-level`, `secondary` and `highlight`, used with verbose output.
 
 Bug fixes:
 
@@ -118,7 +121,7 @@ Other enhancements:
   prefixes each build log output line with a timestamp.
 
 * Show warning about `local-programs-path` with spaces on windows
-  when running scripts. See 
+  when running scripts. See
   [#5013](https://github.com/commercialhaskell/stack/pull/5013)
 
 * Add `ls dependencies json` which will print dependencies as JSON.

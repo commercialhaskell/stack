@@ -148,15 +148,8 @@ withRunnerGlobal go inner = do
                                     <$> getTerminalWidth)
                                    pure (globalTermWidth go)
   menv <- mkDefaultProcessContext
-  logOptions0 <- logOptionsHandle stderr False
-  let logOptions
-        = setLogUseColor useColor
-        $ setLogUseTime (globalTimeInLog go)
-        $ setLogMinLevel (globalLogLevel go)
-        $ setLogVerboseFormat (globalLogLevel go <= LevelDebug)
-        $ setLogTerminal (globalTerminal go)
-          logOptions0
-  withLogFunc logOptions $ \logFunc -> runRIO Runner
+  let update = globalStylesUpdate go
+  withNewLogFunc go useColor update $ \logFunc -> runRIO Runner
     { runnerGlobalOpts = go
     , runnerUseColor = useColor
     , runnerLogFunc = logFunc

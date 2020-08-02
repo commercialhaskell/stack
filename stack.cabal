@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2a288b315557ca9df67fb60c003674a0dd6618aa5f8bc2b04527fb8feae4b16d
+-- hash: 40180d8b137f1935be8e5493b14ff579fc5174c0bd488f713b1020be585169e1
 
 name:           stack
 version:        2.4.0
@@ -284,8 +284,8 @@ library
     , project-template
     , regex-applicative-text
     , retry
-    , rio
-    , rio-prettyprint
+    , rio >=0.1.18.0
+    , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
     , stm
@@ -408,8 +408,8 @@ executable stack
     , project-template
     , regex-applicative-text
     , retry
-    , rio
-    , rio-prettyprint
+    , rio >=0.1.18.0
+    , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
     , stack
@@ -531,8 +531,8 @@ executable stack-integration-test
     , project-template
     , regex-applicative-text
     , retry
-    , rio
-    , rio-prettyprint
+    , rio >=0.1.18.0
+    , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
     , stm
@@ -660,8 +660,8 @@ test-suite stack-test
     , raw-strings-qq
     , regex-applicative-text
     , retry
-    , rio
-    , rio-prettyprint
+    , rio >=0.1.18.0
+    , rio-prettyprint >=0.1.1.0
     , semigroups
     , smallcheck
     , split

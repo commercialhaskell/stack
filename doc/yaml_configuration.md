@@ -614,7 +614,7 @@ Specify a variant binary distribution of GHC to use.  Known values:
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
-  [setup-info](#setup-info) or [setup-info-locations](#setup-info-locations) 
+  [setup-info](#setup-info) or [setup-info-locations](#setup-info-locations)
   so `stack setup` knows where to download it,
   or pass the `stack setup --ghc-bindist` argument on the command-line
 
@@ -1143,11 +1143,12 @@ For example, users of the popular
 terminal theme might wish to set the styles as follows:
 
 ```yaml
-stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95
+stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95:secondary=92:highlight=32
 ```
 The styles can also be set at the command line using the equivalent `--stack-colors=<STYLES>`
 global option. Styles set at the command line take precedence over those set in
-a yaml configuration file.
+a yaml configuration file. (In respect of styles used in verbose output, some of
+that output occurs before the configuration file is processed.)
 
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
