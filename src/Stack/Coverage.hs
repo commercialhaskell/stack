@@ -434,7 +434,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
         extractField path = do
             contents <- readFileUtf8 (toFilePath path)
             case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
-                Just result -> return $ Right result
+                Just result -> return $ Right $ T.strip result
                 Nothing -> notFoundErr
     cabalVer <- view cabalVersionL
     if cabalVer < mkVersion [1, 24]

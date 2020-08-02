@@ -1,0 +1,14 @@
+name: foo
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+
+tests:
+  foo-test:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+      - foo

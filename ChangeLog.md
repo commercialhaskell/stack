@@ -40,6 +40,8 @@ Bug fixes:
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
 
+* Fix `stack test --coverage` when using Cabal 3
+
 ## v2.3.1
 
 Release notes:
