@@ -48,6 +48,7 @@ ghc-options:
 dependencies:
 - Cabal
 - aeson
+- opentelemetry >= 0.5.0
 - annotated-wl-pprint
 - ansi-terminal
 - array
@@ -275,6 +276,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
+    - -eventlog
     dependencies:
     - stack
     when:
