@@ -84,13 +84,13 @@ Examples:
         * Search for old Stack version, unstable stack version, and the next
           "obvious" possible versions in sequence, and
           `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd). 
-          * Do **NOT** update the Dockerfiles in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/) yet; that will come later)
-            * Do __NOT__ update templates in `.github` to point at the new release version yet!
+            * Do **NOT** update the Dockerfiles in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/) yet; that will come later)
+            * Do **NOT** update templates in `.github` to point at the new release version yet!
         * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
         * Look for any links to "latest" (`latest/`) documentation, replace with version tag
     * Check that for any platform entries that need to be added to (or removed from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
-      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md).
+      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md), and get.haskellstack.org redirects.
     * `package.yaml`: bump to next release candidate version (bump patchlevel (fourth) component to next odd number; e.g. from `1.9.0.0` to `1.9.0.1`)
     * `ChangeLog.md`
         - Rename the “Unreleased changes” section to the same version as package.yaml, and mark it clearly as a release candidate (e.g. `v1.9.0.1 (release candidate)`).  Remove any empty sections.
@@ -114,13 +114,17 @@ Examples:
 
 ## Release process
 
-* Manually trigger the nightly pipeline on Azure Devops for the branch you are releasing, which will build Linux, macOS, and Windows bindists. `[RC]`
+* Trigger the **Integration Tests** workflow on Github Actions for the branch you are releasing, which will build Linux, macOS, and Windows bindists. `[RC]`
 
 * Create a
   [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
   with tag and title `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field and check the *This is a pre-release* checkbox.  `[RC]`
+    * See previous releases for example formatting and extra info (such as link to website for install instructions).
+    * For release candidates, you should **skip** the list of contributors and the link to the installation instructions.
+    * Include the Changelog in the description.
+    * Use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors.
 
-* On each machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
+* On the machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
 
 * Upload the Azure bindists built by Azure Pipelines to the Gitlab release `[RC]`
   * Download the bindist artifacts from the Azure DevOps nightly pipeline build, and put the contents under `_release/`.
@@ -130,6 +134,8 @@ Examples:
             stack "etc/scripts/release.hs" --upload-only "$x.upload" "$x.sha256.upload" "$x.asc.upload"
         done
 
+  TODO: have Github Actions do this automatically.
+
 * For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to SKS keyserver pool:
 
   ```
@@ -137,9 +143,7 @@ Examples:
   gpg --send-keys <OTHER-KEY-ID>
   ```
 
-* Publish Github release. Include the Changelog and in the description and use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors. See previous releases for example formatting and extra info (such as link to website for install instructions).  `[RC]`
-
-    * For release candidates, you should skip the list of contributors and the link to the installation instructions.
+* Publish the Github release. `[RC]`
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
 
@@ -153,7 +157,7 @@ Examples:
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated.
 
-* Update [get.haskellstack.org /stable rewrite rules](https://gitlab.com/fpco/operations/devops/-/blob/master/kubernetes/fpco-prod-v3/specs/20_get-haskellstack_ingress.yaml) and apply the manifest.
+* Update [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml) with the new version and [sync the application in ArgoCD](https://v4.fpcomplete.com/argo-cd/applications/fpcomplete-redirects).
 
     * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null`, make sure it redirects to the new version
 
