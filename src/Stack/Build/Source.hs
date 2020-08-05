@@ -19,10 +19,8 @@ module Stack.Build.Source
 
 import              Stack.Prelude
 import qualified    Pantry.SHA256 as SHA256
-import qualified    Data.ByteString as S
 import              Data.ByteString.Builder (toLazyByteString)
 import              Conduit (ZipSink (..), withSourceFile)
-import qualified    Data.Conduit.List as CL
 import qualified    Distribution.PackageDescription as C
 import              Data.List
 import qualified    Data.Map as Map
@@ -40,7 +38,6 @@ import              Stack.Types.Package
 import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
-import              System.PosixCompat.Files (modificationTime, getFileStatus)
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env
@@ -415,21 +412,18 @@ checkBuildCache oldCache files = do
             fileTimes
             oldCache
   where
-    go :: FilePath -> Maybe (FileSize, SHA256) -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
+    go :: FilePath -> Maybe SHA256 -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
     -- Filter out the cabal_macros file to avoid spurious recompilations
     go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
     -- Common case where it's in the cache and on the filesystem.
-    go fp (Just (size, digest')) (Just fci)
+    go fp (Just digest') (Just fci)
         | fciHash fci == digest' = return (Set.empty, Map.singleton fp fci)
-        | otherwise = do
-            newFci <- calcFci (size,digest') fp
-            return (Set.singleton fp, Map.singleton fp newFci)
+        | otherwise = return (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
     -- Missing file. Add it to dirty files, but no FileCacheInfo.
     go fp Nothing _ = return (Set.singleton fp, Map.empty)
     -- Missing cache. Add it to dirty files and compute FileCacheInfo.
-    go fp (Just (size, digest')) Nothing = do
-        newFci <- calcFci (size,digest') fp
-        return (Set.singleton fp, Map.singleton fp newFci)
+    go fp (Just digest') Nothing =
+        return (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
@@ -454,7 +448,7 @@ addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
         mdigest <- getFileDigestMaybe fp
         case mdigest of
             Nothing -> return Map.empty
-            Just digest' -> Map.singleton fp <$> calcFci digest' fp
+            Just digest' -> return . Map.singleton fp $ FileCacheInfo digest'
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
 --   Note that the library component, if any, is always automatically added to the
@@ -475,33 +469,18 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
                 M.filterWithKey (\component _ -> component `elem` components) compFiles
     return (componentsFiles, warnings)
 
--- | Get file digest
-getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe (FileSize,SHA256))
-getFileDigestMaybe fp =
+-- | Get file digest, if it exists
+getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
+getFileDigestMaybe fp = do
     liftIO
         (catch
-             (liftM
-                  (\ (size, digest) -> Just (FileSize size, digest))
-                  (withSourceFile fp $ \src -> runConduit $ src .| getZipSink
-                    ((,)
-                        <$> ZipSink (CL.fold
-                            (\x y -> x + fromIntegral (S.length y))
-                            0)
-                        <*> ZipSink SHA256.sinkHash)))
+             (liftM Just . withSourceFile fp $ getDigest)
              (\e ->
                    if isDoesNotExistError e
                        then return Nothing
                        else throwM e))
-
--- | Create FileCacheInfo for a file.
-calcFci :: MonadIO m => (FileSize,SHA256) -> FilePath -> m FileCacheInfo
-calcFci (size, digest) fp = liftIO $ do
-    modTime' <- modificationTime <$> getFileStatus fp
-    return FileCacheInfo
-        { fciModTime = modTime'
-        , fciSize = size
-        , fciHash = digest
-        }
+  where
+    getDigest src = runConduit $ src .| getZipSink (ZipSink SHA256.sinkHash)
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig

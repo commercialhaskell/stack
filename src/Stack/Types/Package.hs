@@ -11,7 +11,6 @@
 module Stack.Types.Package where
 
 import           Stack.Prelude
-import           Foreign.C.Types (CTime)
 import qualified RIO.Text as T
 import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
 import qualified Data.Map as M
@@ -342,10 +341,8 @@ instance Monoid InstallLocation where
 data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
     deriving (Show, Eq)
 
-data FileCacheInfo = FileCacheInfo
-    { fciModTime :: !CTime
-    , fciSize :: !FileSize
-    , fciHash :: !SHA256
+newtype FileCacheInfo = FileCacheInfo
+    { fciHash :: SHA256
     }
     deriving (Generic, Show, Eq, Typeable)
 instance NFData FileCacheInfo
@@ -353,16 +350,12 @@ instance NFData FileCacheInfo
 -- Provided for storing the BuildCache values in a file. But maybe
 -- JSON/YAML isn't the right choice here, worth considering.
 instance ToJSON FileCacheInfo where
-  toJSON (FileCacheInfo time size hash') = object
-    [ "modtime" .= time
-    , "size" .= size
-    , "hash" .= hash'
+  toJSON (FileCacheInfo hash') = object
+    [ "hash" .= hash'
     ]
 instance FromJSON FileCacheInfo where
   parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
-    <$> o .: "modtime"
-    <*> o .: "size"
-    <*> o .: "hash"
+    <$> o .: "hash"
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --
