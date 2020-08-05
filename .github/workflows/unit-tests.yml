@@ -55,6 +55,10 @@ jobs:
           extra-suffix: ""
           stack-args: ""
         - os: ubuntu-latest
+          stack-yaml: stack-ghc-810.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: ubuntu-latest
           stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
