@@ -39,6 +39,9 @@ Bug fixes:
 * Fix `stack sdist` introducing unneded sublibrary syntax when using
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
+* Fix modified time busting caches by always calculating sha256 digest
+  during the build process.
+  [#5125](https://github.com/commercialhaskell/stack/issues/5125)
 
 ## v2.3.1
 
@@ -116,7 +119,7 @@ Other enhancements:
   prefixes each build log output line with a timestamp.
 
 * Show warning about `local-programs-path` with spaces on windows
-  when running scripts. See 
+  when running scripts. See
   [#5013](https://github.com/commercialhaskell/stack/pull/5013)
 
 * Add `ls dependencies json` which will print dependencies as JSON.
