@@ -1,5 +1,5 @@
 name: stack
-version: '2.3.2'
+version: '2.3.3'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
@@ -92,7 +92,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry
+- pantry >= 0.4 && < 0.5
 - casa-client
 - casa-types
 - path

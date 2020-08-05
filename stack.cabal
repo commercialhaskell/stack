@@ -4,10 +4,10 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 09229f434502c702e4058371b91cc64f9e800aab8abe66fb228d8da3137558b7
+-- hash: 4088422ebf565b9347481c01d786688d78b9aadc34246063f6c05ca732b41ff1
 
 name:           stack
-version:        2.3.2
+version:        2.3.3
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
@@ -272,7 +272,7 @@ library
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry
+    , pantry >=0.4 && <0.5
     , path
     , path-io
     , persistent
@@ -396,7 +396,7 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry
+    , pantry >=0.4 && <0.5
     , path
     , path-io
     , persistent
@@ -519,7 +519,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative
     , optparse-generic
-    , pantry
+    , pantry >=0.4 && <0.5
     , path
     , path-io
     , persistent
@@ -647,7 +647,7 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative
-    , pantry
+    , pantry >=0.4 && <0.5
     , path
     , path-io
     , persistent
