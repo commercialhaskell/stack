@@ -1,0 +1,29 @@
+resolver: nightly-2020-08-03
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/stack-build:lts-16.0
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+    - zlib
+    - unzip
+flags:
+  stack:
+    hide-dependency-versions: true
+    supported-build: true
+    developer-mode: true
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
+- pantry-0.4.0.2@rev:0
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
