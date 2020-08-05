@@ -379,7 +379,7 @@ generateHpcMarkupIndex = do
                 encodeUtf8Builder (pathToHtml outputDir) <>
                 "\".</b>"
             else
-                "<table class=\"dashboard\" width=\"100%\" boder=\"1\"><tbody>" <>
+                "<table class=\"dashboard\" width=\"100%\" border=\"1\"><tbody>" <>
                 "<p><b>NOTE: This is merely a listing of the html files found in the coverage reports directory.  Some of these reports may be old.</b></p>" <>
                 "<tr><th>Package</th><th>TestSuite</th><th>Modification Time</th></tr>" <>
                 foldMap encodeUtf8Builder rows <>
