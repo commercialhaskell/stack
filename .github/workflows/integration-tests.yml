@@ -65,7 +65,7 @@ jobs:
         name: Build bindist
         run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: ${{ runner.os }}
-          path: _release
+          path: _release/stack-*
