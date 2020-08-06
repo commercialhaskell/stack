@@ -40,6 +40,9 @@ Bug fixes:
 Other enhancements:
 
 * Add the `stack-developer-mode` flag
+* Customisable output styles (see `stack --help` and the `--stack-colors`
+  option, and `stack ls stack-colors --help`) now include `info`, `debug`,
+  `other-level`, `secondary` and `highlight`, used with verbose output.
 
 Bug fixes:
 

@@ -30,11 +30,13 @@ module Stack.Config
   ,defaultConfigYaml
   ,getProjectConfig
   ,withBuildConfig
+  ,withNewLogFunc
   ) where
 
 import           Control.Monad.Extra (firstJustM)
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
+import           Data.Array.IArray ((!), (//))
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder (byteString)
 import           Data.Coerce (coerce)
@@ -74,13 +76,16 @@ import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
+import           System.Console.ANSI (hSupportsANSIWithoutEmulation, setSGRCode)
 import           System.Environment
 import           System.Info.ShortPathName (getShortPathName)
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
 import           RIO.List (unzip)
-import           RIO.PrettyPrint (stylesUpdateL, useColorL)
+import           RIO.PrettyPrint (Style (Highlight, Secondary),
+                   logLevelToStyle, stylesUpdateL, useColorL)
+import           RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
+import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.Process
 import           RIO.Time (toGregorian)
 
@@ -354,10 +359,12 @@ configFromConfigMonoid
                 ColorNever  -> False
                 ColorAlways -> True
                 ColorAuto  -> useAnsi
-         configRunner = configRunner'
-             & processContextL .~ origEnv
-             & stylesUpdateL .~ stylesUpdate'
-             & useColorL .~ fromMaybe useColor' mUseColor
+         useColor'' = fromMaybe useColor' mUseColor
+         configRunner'' = configRunner'
+               & processContextL .~ origEnv
+               & stylesUpdateL .~ stylesUpdate'
+               & useColorL .~ useColor''
+         go = runnerGlobalOpts configRunner'
 
      hsc <-
        case getFirst configMonoidPackageIndices of
@@ -394,17 +401,47 @@ configFromConfigMonoid
 
      let configStackDeveloperMode = fromFirst stackDeveloperModeDefault configMonoidStackDeveloperMode
 
-     withPantryConfig
-       pantryRoot
-       hsc
-       (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
-       clConnectionCount
-       (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
-       defaultCasaMaxPerRequest
-       snapLoc
-       (\configPantryConfig -> initUserStorage
-         (configStackRoot </> relFileStorage)
-         (\configUserStorage -> inner Config {..}))
+     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
+       let configRunner = configRunner'' & logFuncL .~ logFunc
+       withPantryConfig
+         pantryRoot
+         hsc
+         (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
+         clConnectionCount
+         (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
+         defaultCasaMaxPerRequest
+         snapLoc
+         (\configPantryConfig -> initUserStorage
+           (configStackRoot </> relFileStorage)
+           (\configUserStorage -> inner Config {..}))
+
+-- | Runs the provided action with a new 'LogFunc', given a 'StylesUpdate'.
+withNewLogFunc :: MonadUnliftIO m
+               => GlobalOpts
+               -> Bool  -- ^ Use color
+               -> StylesUpdate
+               -> (LogFunc -> m a)
+               -> m a
+withNewLogFunc go useColor (StylesUpdate update) inner = do
+  logOptions0 <- logOptionsHandle stderr False
+  let logOptions
+        = setLogUseColor useColor
+        $ setLogLevelColors logLevelColors
+        $ setLogSecondaryColor secondaryColor
+        $ setLogAccentColors (const highlightColor)
+        $ setLogUseTime (globalTimeInLog go)
+        $ setLogMinLevel (globalLogLevel go)
+        $ setLogVerboseFormat (globalLogLevel go <= LevelDebug)
+        $ setLogTerminal (globalTerminal go)
+          logOptions0
+  withLogFunc logOptions inner
+ where
+  styles = defaultStyles // update
+  logLevelColors :: LogLevel -> Utf8Builder
+  logLevelColors level =
+    fromString $ setSGRCode $ snd $ styles ! logLevelToStyle level
+  secondaryColor = fromString $ setSGRCode $ snd $ styles ! Secondary
+  highlightColor = fromString $ setSGRCode $ snd $ styles ! Highlight
 
 -- | Get the default location of the local programs directory.
 getDefaultLocalProgramsBase :: MonadThrow m
