@@ -59,7 +59,6 @@ import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
 import           Distribution.Version (mkVersion)
-import           Foreign.C.Types (CTime)
 import           Path
 import           Path.CheckInstall
 import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
@@ -91,7 +90,6 @@ import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), 
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
 import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
-import           System.PosixCompat.Time (epochTime)
 import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
@@ -1601,11 +1599,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         -- FIXME: only output these if they're in the build plan.
 
-        preBuildTime <- liftIO epochTime
         let postBuildCheck _succeeded = do
                 mlocalWarnings <- case taskType of
                     TTLocalMutable lp -> do
-                        warnings <- checkForUnlistedFiles taskType preBuildTime pkgDir
+                        warnings <- checkForUnlistedFiles taskType pkgDir
                         -- TODO: Perhaps only emit these warnings for non extra-dep?
                         return (Just (lpCabalFile lp, warnings))
                     _ -> return Nothing
@@ -1829,12 +1826,11 @@ checkExeStatus platform distDir name = do
         file = T.unpack name
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
-checkForUnlistedFiles :: HasEnvConfig env => TaskType -> CTime -> Path Abs Dir -> RIO env [PackageWarning]
-checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
+checkForUnlistedFiles :: HasEnvConfig env => TaskType -> Path Abs Dir -> RIO env [PackageWarning]
+checkForUnlistedFiles (TTLocalMutable lp) pkgDir = do
     caches <- runMemoizedWith $ lpNewBuildCaches lp
     (addBuildCache,warnings) <-
         addUnlistedToBuildCache
-            preBuildTime
             (lpPackage lp)
             (lpCabalFile lp)
             (lpComponents lp)
@@ -1844,7 +1840,7 @@ checkForUnlistedFiles (TTLocalMutable lp) preBuildTime pkgDir = do
         writeBuildCache pkgDir component $
             Map.unions (cache : newToCache)
     return warnings
-checkForUnlistedFiles TTRemotePackage{} _ _ = return []
+checkForUnlistedFiles TTRemotePackage{} _ = return []
 
 -- | Implements running a package's tests. Also handles producing
 -- coverage reports if coverage is enabled.
