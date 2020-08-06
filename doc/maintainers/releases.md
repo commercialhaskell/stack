@@ -149,6 +149,28 @@ Examples:
 
 * Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
 
+    * If you get the error
+
+      > The field "build-tools" is deprecated in the Cabal specification version 2.0. Please use 'build-tool-depends' field
+
+      then edit `stack.cabal` locally and change all instances of
+
+      ```
+      build-tools:
+        hsc2hs
+      ```
+
+      to
+
+      ```
+      build-tool-depends:
+        hsc2hs:hsc2hs
+      ```
+
+      and try again, then discard the local changes to `stack.cabal`.
+
+      Hopefully this issue will be resolved and we can remove this instruction (alternatively, we could use a `verbatim` field in `package.yaml`).
+
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
@@ -190,13 +212,13 @@ Examples:
 * Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).   It is best to do this by making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then merging.  If anything is complicated to merge, consider making it a PR and getting it reviewed rather than merging immediately.
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
-  commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the markdown for the release description from Github. `[RC]`
+  commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the release description from Github. `[RC]`
 
     * For release candidates, also include a link to the Github Release (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download it. `[RC]`
 
 * Update fpco/stack-build Docker images with new version
 
-  * Under [commercilhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
+  * Under [commercialhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
 
     ```
     FROM $DOCKER_REPO:lts-X.Z
@@ -208,9 +230,10 @@ Examples:
 
   * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
 
+
 ## Build Linux static binary distribution with Nix
 
-NOTE: We have switched back to Alpine Linux for building static binaries, done by CI.
+**NOTE: We have switched back to Alpine Linux for building static binaries, done by CI.  Leaving this section for future reference.**
 
 These instructions are tested on Ubuntu 16.04, but theoretically should work on any Linux distribution.
 
