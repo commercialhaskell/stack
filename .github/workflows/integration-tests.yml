@@ -68,4 +68,4 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: ${{ runner.os }}
-          path: _release/stack-*
+          path: _release
