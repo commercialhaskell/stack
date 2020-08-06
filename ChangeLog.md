@@ -5,7 +5,7 @@
 
 Release notes:
 
-**Changes since v2.3.1**
+**Changes since v2.3.3**
 
 Major changes:
 * Add the `snapshot-location-base` yaml configuration option, which allows to override the default location of
@@ -27,6 +27,18 @@ Other enhancements:
   [#5280](https://github.com/commercialhaskell/stack/issues/5280)
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
+
+Bug fixes:
+
+* Fix `stack test --coverage` when using Cabal 3
+
+
+## v2.3.3
+
+**Changes since v2.3.1**
+
+Other enhancements:
+
 * Add the `stack-developer-mode` flag
 
 Bug fixes:
@@ -35,15 +47,12 @@ Bug fixes:
 * Fix the problem of `stack repl foo:test:bar` failing without a project
   build before that. See
   [#5213](https://github.com/commercialhaskell/stack/issues/5213)
-
 * Fix `stack sdist` introducing unneded sublibrary syntax when using
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
 * Fix modified time busting caches by always calculating sha256 digest
   during the build process.
   [#5125](https://github.com/commercialhaskell/stack/issues/5125)
-
-* Fix `stack test --coverage` when using Cabal 3
 
 ## v2.3.1
 

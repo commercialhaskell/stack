@@ -18,9 +18,7 @@ jobs:
         - os: ubuntu-latest
           release-args: "--alpine"
         - os: windows-latest
-          # Issues with symlinks cause things to appear dirty
-          # FIXME: we probably need to fix this so we get good output on stack --version
-          release-args: "--allow-dirty"
+          release-args: ""
         - os: macos-latest
           release-args: ""
     steps:
@@ -35,6 +33,10 @@ jobs:
         name: Install deps and run checks
         run: |
           set -ex
+
+          # Work around 'git status' always showing symlinks modified on Windows; see
+          # https://github.com/git-for-windows/git/issues/2653#issuecomment-640234081
+          git config --global core.fscache false
 
           stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
 
