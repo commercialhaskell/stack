@@ -403,7 +403,7 @@ configFromConfigMonoid
 
      withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
        let configRunner = configRunner'' & logFuncL .~ logFunc
-       withPantryConfig
+       withLocalLogFunc logFunc $ withPantryConfig
          pantryRoot
          hsc
          (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
@@ -414,6 +414,10 @@ configFromConfigMonoid
          (\configPantryConfig -> initUserStorage
            (configStackRoot </> relFileStorage)
            (\configUserStorage -> inner Config {..}))
+
+-- | Runs the provided action with the given 'LogFunc' in the environment
+withLocalLogFunc :: HasLogFunc env => LogFunc -> RIO env a -> RIO env a
+withLocalLogFunc logFunc = local (set logFuncL logFunc)
 
 -- | Runs the provided action with a new 'LogFunc', given a 'StylesUpdate'.
 withNewLogFunc :: MonadUnliftIO m
