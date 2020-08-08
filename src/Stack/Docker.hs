@@ -229,8 +229,10 @@ runContainerAndExit = do
      when (isNothing mpath) $ do
        logWarn "The Docker image does not set the PATH env var"
        logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
+     let adjustPathSeparator | osIsWindows = T.replace ";" ":"
+                             | otherwise   = id
      newPathEnv <- either throwM return $
-                   bool id (T.replace ";" ":") osIsWindows <$>
+                   adjustPathSeparator <$>
                    augmentPath
                      [ hostBinDir
                        , toLinuxStylePath $ toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
@@ -297,7 +299,7 @@ runContainerAndExit = do
          ,["-i" | keepStdinOpen]
          ,dockerRunArgs docker
          ,[image]
-         ,[cmnd]
+         ,[toLinuxStylePath cmnd]
          ,args])
 -- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
 -- `docker` process so that it can handle the signals directly?
@@ -340,15 +342,18 @@ runContainerAndExit = do
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg mountSuffix (Mount host container) =
-      ["-v",host ++ ":" ++ container ++ mountSuffix]
+      ["-v",host ++ ":" ++ toLinuxStylePath (container ++ mountSuffix)]
     sshRelDir = relDirDotSsh
     toLinuxStylePath s | osIsWindows =
       T.pack s
       & T.replace ":\\" "/"
       & T.replace "\\"  "/"
       & T.unpack
-      & ("/"++)
+      & addStartingSlashIfMissing
                        | otherwise   = s
+      where
+        addStartingSlashIfMissing s@('/':_) = s
+        addStartingSlashIfMissing s         = '/':s
 
 -- | Inspect Docker image or container.
 inspect :: (HasProcessContext env, HasLogFunc env)
