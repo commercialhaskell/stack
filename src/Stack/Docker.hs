@@ -352,8 +352,8 @@ runContainerAndExit = do
       & addStartingSlashIfMissing
                        | otherwise   = s
       where
-        addStartingSlashIfMissing s@('/':_) = s
-        addStartingSlashIfMissing s         = '/':s
+        addStartingSlashIfMissing path@('/':_) = path
+        addStartingSlashIfMissing path         = '/':path
 
 -- | Inspect Docker image or container.
 inspect :: (HasProcessContext env, HasLogFunc env)
