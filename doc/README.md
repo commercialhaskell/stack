@@ -17,7 +17,10 @@ It features:
 
 #### How to install
 
-For many Un*x operating systems, all you need to do is run:
+Stack can be installed on most Unix-like (Un*x) operating systems, including
+macOS, and on Windows.
+
+For most Un*x operating systems, the easiest way to install is to run:
 
     curl -sSL https://get.haskellstack.org/ | sh
 
@@ -194,4 +197,3 @@ label on the Github issue tracker.
 
 #### How to uninstall
 Removing ``~/.stack`` and ``/usr/local/bin/stack`` should be sufficient. You may want to delete ``.stack-work`` folders in any Haskell projects that you have built.
-
