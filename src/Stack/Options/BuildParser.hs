@@ -76,8 +76,8 @@ buildOptsParser cmd =
          help "Watch all local files not taking targets into account") <*>
     many (cmdOption
              (long "exec" <>
-              metavar "CMD [ARGS]" <>
-              help "Command and arguments to run after a successful build")) <*>
+              metavar "COMMAND [ARGUMENT(S)]" <>
+              help "Command and argument(s) to run after a successful build")) <*>
     switch
         (long "only-configure" <>
          help
