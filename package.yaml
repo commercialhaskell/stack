@@ -137,8 +137,9 @@ when:
     dependencies:
     - Win32
   else:
-    build-tools:
-    - hsc2hs
+    verbatim: |
+      build-tool-depends:
+          hsc2hs:hsc2hs
     dependencies:
     - unix
 - condition: flag(developer-mode)

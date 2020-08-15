@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 40180d8b137f1935be8e5493b14ff579fc5174c0bd488f713b1020be585169e1
+-- hash: 2991e5ffcda3a90f2be71a0df883bf7706afef078dd3cc0abfc98868a3e8028f
 
 name:           stack
 version:        2.4.0
@@ -313,10 +313,10 @@ library
     build-depends:
         Win32
   else
-    build-tools:
-        hsc2hs
     build-depends:
         unix
+    build-tool-depends:
+        hsc2hs:hsc2hs
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -438,10 +438,10 @@ executable stack
     build-depends:
         Win32
   else
-    build-tools:
-        hsc2hs
     build-depends:
         unix
+    build-tool-depends:
+        hsc2hs:hsc2hs
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -560,10 +560,10 @@ executable stack-integration-test
     build-depends:
         Win32
   else
-    build-tools:
-        hsc2hs
     build-depends:
         unix
+    build-tool-depends:
+        hsc2hs:hsc2hs
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -691,10 +691,10 @@ test-suite stack-test
     build-depends:
         Win32
   else
-    build-tools:
-        hsc2hs
     build-depends:
         unix
+    build-tool-depends:
+        hsc2hs:hsc2hs
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
