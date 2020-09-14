@@ -31,7 +31,8 @@ Other enhancements:
 Bug fixes:
 
 * Fix `stack test --coverage` when using Cabal 3
-
+* `stack new` now generates PascalCase'd module name correctly.
+  [#5376](https://github.com/commercialhaskell/stack/issues/5376)
 
 ## v2.3.3
 
