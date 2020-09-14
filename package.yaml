@@ -91,7 +91,7 @@ dependencies:
 - neat-interpolation
 - network-uri
 - open-browser
-- optparse-applicative
+- optparse-applicative >= 0.15.0.0 && < 0.16.0.0
 - pantry
 - casa-client
 - casa-types
