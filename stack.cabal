@@ -271,7 +271,7 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative
+    , optparse-applicative >=0.14.0.0 && < 0.16.0.0
     , pantry
     , path
     , path-io
