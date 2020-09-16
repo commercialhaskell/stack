@@ -50,6 +50,7 @@ import qualified Stack.Nix as Nix
 import           Stack.FileWatch
 import           Stack.Ghci
 import           Stack.Hoogle
+import           Stack.List
 import           Stack.Ls
 import qualified Stack.IDE as IDE
 import           Stack.Init
@@ -349,6 +350,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Query general build information (experimental)"
                     queryCmd
                     (many $ strArgument $ metavar "SELECTOR...")
+        addCommand' "list"
+                    "List package id's in snapshot (experimental)"
+                    listCmd
+                    (many $ strArgument $ metavar "PACKAGE")
         addSubCommands'
             "ide"
             "IDE-specific commands"
@@ -850,7 +855,17 @@ templatesCmd () = withConfig NoReexec templatesHelp
 queryCmd :: [String] -> RIO Runner ()
 queryCmd selectors = withConfig YesReexec $ withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
 
--- | Generate a combined HPC report
+-- | List packages
+listCmd :: [String] -> RIO Runner ()
+listCmd names = withConfig NoReexec $ do
+    mresolver <- view $ globalOptsL.to globalResolver
+    mSnapshot <- forM mresolver $ \resolver -> do
+      concrete <- makeConcreteResolver resolver
+      loc <- completeSnapshotLocation concrete
+      loadSnapshot loc
+    listPackages mSnapshot names
+
+-- | generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
     let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
