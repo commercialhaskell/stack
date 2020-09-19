@@ -726,9 +726,14 @@ has_cmd() {
   command -v "$1" > /dev/null 2>&1
 }
 
-# Check whether the given path is listed in the PATH environment variable
+# Check whether the given (query) path is listed in the PATH environment variable.
 on_path() {
-  echo ":$PATH:" | grep -q :"$1":
+    # We normalize PATH and query regarding ~ by ensuring ~ is expanded to $HOME, avoiding
+    # false negatives in case where ~ is expanded in query but not in PATH and vice versa.
+    local PATH_BOUNDED=":$PATH:"
+    local PATH_NORMALIZED="${PATH_BOUNDED//:\~/:$HOME}" # Expand all ~ that are after :
+    local QUERY_NORMALIZED=":${1/#\~/$HOME}:" # Expand ~ if it is first character.
+    echo "$PATH_NORMALIZED" | grep -q "$QUERY_NORMALIZED"
 }
 
 # Check whether ~/.local/bin is on the PATH, and print a warning if not.
