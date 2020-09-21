@@ -43,6 +43,7 @@ import System.IO.Error
 import System.Process
 
 import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as TarEntry
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
 import Data.List.Extra
@@ -76,6 +77,7 @@ main =
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
                 gBuildArgs = ["--flag", "stack:-developer-mode"]
+                gStaticLinux = False
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags
 
@@ -110,7 +112,8 @@ options =
         (NoArg $ Right $ \g ->
           g{gBuildArgs =
               gBuildArgs g ++
-              ["--flag=stack:static", "--docker", "--system-ghc", "--no-install-ghc"]})
+              ["--flag=stack:static", "--docker", "--system-ghc", "--no-install-ghc"],
+            gStaticLinux = True})
         "Build a static binary using Alpine Docker image."
     , Option "" [buildArgsOptName]
         (ReqArg
@@ -186,7 +189,14 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryPkgTarGzFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
-        writeTarGz out releaseStageDir stageFiles
+        writeTarGz id out releaseStageDir stageFiles
+
+    releaseDir </> binaryPkgStaticTarGzFileName %> \out -> do
+        stageFiles <- getBinaryPkgStageFiles
+        let fixPath path =
+                let (x, y) = break (== '/') path
+                 in concat [x, "-static", y]
+        writeTarGz fixPath out releaseStageDir stageFiles
 
     releaseStageDir </> binaryName </> stackExeFileName %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
@@ -288,16 +298,21 @@ rules global@Global{..} args = do
     binaryPkgFileNames =
         case platformOS of
             Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName, binaryInstallerFileName]
+            Linux -> concat
+              [ [binaryExeFileName, binaryPkgTarGzFileName]
+              , [binaryPkgStaticTarGzFileName | gStaticLinux]
+              ]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
+    binaryPkgStaticTarGzFileName = binaryStaticName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
     -- Prefix with 'installer-' so it doesn't get included in release artifacts
     -- (due to NSIS limitation, needs to be in same directory as executable)
     binaryInstallerNSIFileName = "installer-" ++ binaryName <.> nsiExt
     binaryInstallerFileName = binaryName ++ "-installer" <.> exe
-    binaryName =
+    mkBinaryName isStatic =
         concat
             [ stackProgName
             , "-"
@@ -306,7 +321,10 @@ rules global@Global{..} args = do
             , display platformOS
             , "-"
             , display gArch
+            , if isStatic then "-static" else ""
             , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
+    binaryName = mkBinaryName False
+    binaryStaticName = mkBinaryName True
     stackExeFileName = stackProgName <.> exe
 
     zipExt = ".zip"
@@ -317,10 +335,21 @@ rules global@Global{..} args = do
 
 -- | Create a .tar.gz files from files.  The paths should be absolute, and will
 -- be made relative to the base directory in the tarball.
-writeTarGz :: FilePath -> FilePath -> [FilePath] -> Action ()
-writeTarGz out baseDir inputFiles = liftIO $ do
+writeTarGz :: (FilePath -> FilePath) -> FilePath -> FilePath -> [FilePath] -> Action ()
+writeTarGz fixPath out baseDir inputFiles = liftIO $ do
     content <- Tar.pack baseDir $ map (dropDirectoryPrefix baseDir) inputFiles
-    L8.writeFile out $ GZip.compress $ Tar.write content
+    L8.writeFile out $ GZip.compress $ Tar.write $ map fixPath' content
+  where
+    fixPath' :: Tar.Entry -> Tar.Entry
+    fixPath' entry =
+        case TarEntry.toTarPath isDir $ fixPath $ TarEntry.entryPath entry of
+            Left e -> error $ show (Tar.entryPath entry, e)
+            Right tarPath -> entry { TarEntry.entryTarPath = tarPath }
+      where
+        isDir =
+            case TarEntry.entryContent entry of
+                TarEntry.Directory -> True
+                _ -> False
 
 -- | Drops a directory prefix from a path.  The prefix automatically has a path
 -- separator character appended.  Fails if the path does not begin with the prefix.
@@ -399,6 +428,7 @@ data Global = Global
     , gBinarySuffix :: !String
     , gTestHaddocks :: !Bool
     , gBuildArgs :: [String]
+    , gStaticLinux :: !Bool
     , gCertificateName :: !(Maybe String)
     }
     deriving (Show)
