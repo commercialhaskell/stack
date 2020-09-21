@@ -241,6 +241,10 @@ rules global@Global{..} args = do
         stageFiles <- getBinaryPkgStageFiles
         writeTarGz out releaseStageDir stageFiles
 
+    unless gUploadOnly $ releaseDir </> binaryPkgStaticTarGzFileName %> \out -> do
+        stageFiles <- getBinaryPkgStageFiles
+        writeTarGz out releaseStageDir stageFiles
+
     releaseStageDir </> binaryName </> stackExeFileName %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
 
@@ -371,14 +375,16 @@ rules global@Global{..} args = do
     binaryPkgFileNames =
         case platformOS of
             Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName, binaryInstallerFileName]
+            Linux -> [binaryExeFileName, binaryPkgTarGzFileName, binaryPkgStaticTarGzFileName]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
+    binaryPkgStaticTarGzFileName = binaryStaticName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
     binaryInstallerNSIFileName = binaryName ++ "-installer" <.> nsiExt
     binaryInstallerFileName = binaryName ++ "-installer" <.> exe
-    binaryName =
+    mkBinaryName isStatic =
         concat
             [ stackProgName
             , "-"
@@ -387,7 +393,10 @@ rules global@Global{..} args = do
             , display platformOS
             , "-"
             , display gArch
+            , if isStatic then "-static" else ""
             , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
+    binaryName = mkBinaryName False
+    binaryStaticName = mkBinaryName True
     stackExeFileName = stackProgName <.> exe
 
     zipExt = ".zip"
