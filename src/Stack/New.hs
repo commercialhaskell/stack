@@ -199,7 +199,7 @@ applyTemplate project template nonceParams dir templateText = do
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
             nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
-            nameAsModule = T.filter (/= '-') $ T.toTitle $ T.pack $ packageNameString project
+            nameAsModule = T.filter (/= ' ') $ T.toTitle $ T.replace "-" " " $ T.pack $ packageNameString project
             nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                     , ("name-as-varid", nameAsVarId)
                                     , ("name-as-module", nameAsModule) ]
