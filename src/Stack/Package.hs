@@ -811,7 +811,7 @@ resolveComponentFiles component build names = do
       distDir <- asks ctxDistDir
       let compDir = componentAutogenDir cabalVer component distDir
           pkgDir = maybeToList $ packageAutogenDir cabalVer distDir
-      return $ compDir : pkgDir
+      filterM doesDirExist $ compDir : pkgDir
 
 -- | Get all C sources and extra source files in a build.
 buildOtherSources :: BuildInfo -> RIO Ctx [DotCabalPath]
