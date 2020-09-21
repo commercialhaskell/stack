@@ -82,6 +82,7 @@ import qualified RIO.PrettyPrint as PP (Style (Module))
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
                , ctxBuildConfig :: !BuildConfig
+               , ctxCabalVer :: !Version
                }
 
 instance HasPlatform Ctx
@@ -219,9 +220,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
              let pkgDir = parent cabalfp
              distDir <- distDirFromDir pkgDir
              bc <- view buildConfigL
+             cabalVer <- view cabalVersionL
              (componentModules,componentFiles,dataFiles',warnings) <-
                  runRIO
-                     (Ctx cabalfp distDir bc)
+                     (Ctx cabalfp distDir bc cabalVer)
                      (packageDescModulesAndFiles pkg)
              setupFiles <-
                  if buildType pkg == Custom
@@ -795,13 +797,21 @@ resolveComponentFiles
 resolveComponentFiles component build names = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
+    agdirs <- autogenDirs
     (modules,files,warnings) <-
         resolveFilesAndDeps
             component
-            (if null dirs then [dir] else dirs)
+            ((if null dirs then [dir] else dirs) ++ agdirs)
             names
     cfiles <- buildOtherSources build
     return (modules, files <> cfiles, warnings)
+  where
+    autogenDirs = do
+      cabalVer <- asks ctxCabalVer
+      distDir <- asks ctxDistDir
+      let compDir = componentAutogenDir cabalVer component distDir
+          pkgDir = maybeToList $ packageAutogenDir cabalVer distDir
+      return $ compDir : pkgDir
 
 -- | Get all C sources and extra source files in a build.
 buildOtherSources :: BuildInfo -> RIO Ctx [DotCabalPath]
