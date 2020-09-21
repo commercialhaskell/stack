@@ -29,7 +29,7 @@ extra-deps:
 - http-download-0.2.0.0@rev:0
 - filelock-0.1.1.5@rev:0
 - pantry-0.5.1.1@rev:0
-- rio-0.1.18.0@rev:0
+- rio-0.1.19.0@rev:0
 - rio-prettyprint-0.1.1.0@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
