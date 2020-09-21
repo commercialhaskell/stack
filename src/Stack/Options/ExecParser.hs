@@ -16,16 +16,16 @@ execOptsParser mcmd =
         <*> eoArgsParser
         <*> execOptsExtraParser
   where
-    eoCmdParser = ExecCmd <$> strArgument (metavar "CMD" <> completer projectExeCompleter)
+    eoCmdParser = ExecCmd <$> strArgument (metavar "COMMAND" <> completer projectExeCompleter)
     eoArgsParser = many (strArgument (metavar txt))
       where
         txt = case mcmd of
             Nothing -> normalTxt
             Just ExecCmd{} -> normalTxt
-            Just ExecRun -> "-- ARGS (e.g. stack run -- file.txt)"
-            Just ExecGhc -> "-- ARGS (e.g. stack runghc -- X.hs -o x)"
-            Just ExecRunGhc -> "-- ARGS (e.g. stack runghc -- X.hs)"
-        normalTxt = "-- ARGS (e.g. stack exec -- ghc-pkg describe base)"
+            Just ExecRun -> "-- ARGUMENT(S) (e.g. stack run -- file.txt)"
+            Just ExecGhc -> "-- ARGUMENT(S) (e.g. stack runghc -- X.hs -o x)"
+            Just ExecRunGhc -> "-- ARGUMENT(S) (e.g. stack runghc -- X.hs)"
+        normalTxt = "-- ARGUMENT(S) (e.g. stack exec ghc-pkg -- describe base)"
 
 evalOptsParser :: String -- ^ metavar
                -> Parser EvalOpts
@@ -59,7 +59,10 @@ execOptsExtraParser = ExecOptsExtra
         <*> pure True
 
     eoPackagesParser :: Parser [String]
-    eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+    eoPackagesParser = many
+                       (strOption (long "package"
+                                  <> help "Additional package(s) that must be installed"
+                                  <> metavar "PACKAGE(S)"))
 
     eoRtsOptionsParser :: Parser [String]
     eoRtsOptionsParser = concat <$> many (argsOption

@@ -53,7 +53,7 @@ import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Lens.Micro ((.~))
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
-import           Options.Applicative (Parser, strOption, long, help)
+import           Options.Applicative (Parser, help, long, metavar, strOption)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
@@ -948,7 +948,10 @@ getDefaultUserConfigPath stackRoot = do
     return path
 
 packagesParser :: Parser [String]
-packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+packagesParser = many (strOption
+                   (long "package" <>
+                     metavar "PACKAGE(S)" <>
+                     help "Additional package(s) that must be installed"))
 
 defaultConfigYaml :: IsString s => s
 defaultConfigYaml =

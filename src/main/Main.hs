@@ -277,11 +277,12 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     execCmd
                     (execOptsParser $ Just ExecGhc)
         addCommand' "hoogle"
-                    ("Run hoogle, the Haskell API search engine. Use 'stack exec' syntax " ++
-                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20 or " ++
-                     "stack hoogle -- server --local")
+                    ("Run hoogle, the Haskell API search engine. Use the '-- ARGUMENT(S)' syntax " ++
+                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20, or " ++
+                     "stack hoogle -- server --local.")
                     hoogleCmd
-                    ((,,,) <$> many (strArgument (metavar "ARG"))
+                    ((,,,) <$> many (strArgument
+                                 (metavar "-- ARGUMENT(S) (e.g. stack hoogle -- server --local)"))
                           <*> boolFlags
                                   True
                                   "setup"
@@ -297,7 +298,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
 
       -- These are the only commands allowed in interpreter mode as well
       addCommand' "exec"
-                  "Execute a command"
+                  "Execute a command. If the command is absent, the first of any arguments is taken as the command."
                   execCmd
                   (execOptsParser Nothing)
       addCommand' "run"
