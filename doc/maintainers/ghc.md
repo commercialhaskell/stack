@@ -40,7 +40,7 @@
 
         cd stack && ./update-global-hints.hs ghc-X.Y.Z
 
-    and commit the changes.
+    and commit and push the changes.
 
 
 ## Building GHC
