@@ -92,7 +92,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative
-- pantry
+- pantry >= 0.5.1.3
 - casa-client
 - casa-types
 - path
