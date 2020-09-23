@@ -5,6 +5,21 @@
 
 Release notes:
 
+**Changes since v2.5.1**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
+## v2.5.1
+
+Release notes:
+
 **Changes since v2.3.3**
 
 Major changes:
