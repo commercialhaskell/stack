@@ -17,7 +17,6 @@
         * FreeBSD bindists are mirrored from http://distcache.FreeBSD.org/local-distfiles/arrowd/stack-bindists
         * musl bindists are mirrored from https://github.com/redneb/ghc-alt-libc/releases
 
-
   * Download all the relevant GHC bindists from their sources, and upload them to the just-created Github release (see
     [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
     for the ones we used in the last GHC release).
@@ -40,10 +39,12 @@
 
         cd stack && ./update-global-hints.hs ghc-X.Y.Z
 
-    and commit and push the changes.
+    and commit the changes.
 
 
 ## Building GHC
+
+**NOTE: We are no longer building custom GHC bindists.  This section remains for future reference, but GHC's build system has changed substantially since it was written.**
 
 TODO: look into using https://github.com/bgamari/ghc-utils/blob/master/rel-eng/bin-release.sh, which is the script used to official bindists.
 
