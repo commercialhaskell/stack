@@ -8,9 +8,10 @@ Release notes:
 **Changes since v2.3.3**
 
 Major changes:
-* Add the `snapshot-location-base` yaml configuration option, which allows to override the default location of
-   snapshot configuration files. This option affects how snapshot synonyms (LTS/Nightly) are expanded to URLs
-   by the `pantry` library.
+* Add the `snapshot-location-base` yaml configuration option, which allows to
+  override the default location of snapshot configuration files. This option
+  affects how snapshot synonyms (LTS/Nightly) are expanded to URLs by the
+  `pantry` library.
 
 * `docker-network` configuration key added to overwrite docker `--net` arg
 
@@ -27,13 +28,20 @@ Other enhancements:
   [#5280](https://github.com/commercialhaskell/stack/issues/5280)
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
+* Customisable output styles (see `stack --help` and the `--stack-colors`
+  option, and `stack ls stack-colors --help`) now include `info`, `debug`,
+  `other-level`, `secondary` and `highlight`, used with verbose output.
 
 Bug fixes:
 
 * Fix `stack test --coverage` when using Cabal 3
 * `stack new` now generates PascalCase'd module name correctly.
   [#5376](https://github.com/commercialhaskell/stack/issues/5376)
-* Connection issues to Casa server no longer cause builds to failure. Casa acts only as an optimizing cache layer, not a critical piece of infrastructure.
+* Connection issues to Casa server no longer cause builds to failure. Casa acts
+  only as an optimizing cache layer, not a critical piece of infrastructure.
+* Fix modified time busting caches by always calculating sha256 digest during
+  the build process.
+  [#5125](https://github.com/commercialhaskell/stack/issues/5125)
 
 ## v2.3.3
 
@@ -42,9 +50,6 @@ Bug fixes:
 Other enhancements:
 
 * Add the `stack-developer-mode` flag
-* Customisable output styles (see `stack --help` and the `--stack-colors`
-  option, and `stack ls stack-colors --help`) now include `info`, `debug`,
-  `other-level`, `secondary` and `highlight`, used with verbose output.
 
 Bug fixes:
 
@@ -55,9 +60,6 @@ Bug fixes:
 * Fix `stack sdist` introducing unneded sublibrary syntax when using
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
-* Fix modified time busting caches by always calculating sha256 digest
-  during the build process.
-  [#5125](https://github.com/commercialhaskell/stack/issues/5125)
 
 ## v2.3.1
 
