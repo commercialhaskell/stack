@@ -33,6 +33,7 @@ Bug fixes:
 * Fix `stack test --coverage` when using Cabal 3
 * `stack new` now generates PascalCase'd module name correctly.
   [#5376](https://github.com/commercialhaskell/stack/issues/5376)
+* Connection issues to Casa server no longer cause builds to failure. Casa acts only as an optimizing cache layer, not a critical piece of infrastructure.
 
 ## v2.3.3
 
