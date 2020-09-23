@@ -44,8 +44,7 @@ extra-deps:
 - rio-prettyprint-0.1.1.0@rev:0
 - hi-file-parser-0.1.0.0@rev:0
 - http-download-0.2.0.0@rev:0
-- github: commercialhaskell/pantry
-  commit: dc3714166bb9b8a7a58c19751a238fb0efe40e5e
+- pantry-0.5.1.3@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
 - filelock-0.1.1.5@rev:0
