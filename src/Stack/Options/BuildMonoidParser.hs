@@ -112,7 +112,7 @@ buildOptsMonoidParser hide0 =
     copyBins =
         firstBoolFlagsFalse
             "copy-bins"
-            "copying binaries to the local-bin-path (see 'stack path')"
+            "copying binaries to local-bin (see 'stack path')"
             hide
     copyCompilerTool =
         firstBoolFlagsFalse
