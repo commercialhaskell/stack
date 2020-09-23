@@ -1,9 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
+## v2.5.0.1 (release candidate)
 
 **Changes since v2.3.3**
 
@@ -42,6 +40,7 @@ Bug fixes:
 * Fix modified time busting caches by always calculating sha256 digest during
   the build process.
   [#5125](https://github.com/commercialhaskell/stack/issues/5125)
+
 
 ## v2.3.3
 

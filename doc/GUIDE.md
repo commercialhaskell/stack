@@ -450,7 +450,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-14.27`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-16.15`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -467,7 +467,7 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-14.27, let's change our
+Let's explore package sets a bit further. Instead of lts-16.15, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
 this is currently 2020-03-24 - please see the resolve from the link above to get the latest.
 
@@ -483,8 +483,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-14.27 build
-Downloaded lts-14.27 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-16.15 build
+Downloaded lts-16.15 build plan.
 # build output ...
 ```
 
@@ -1143,7 +1143,7 @@ follows the Unix convention of `--` to separate these, e.g.:
 ```
 michael@d30748af6d3d:~$ stack exec --package stm -- echo I installed the stm package via --package stm
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-14.27
+Using latest snapshot resolver: lts-16.15
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm

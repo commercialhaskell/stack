@@ -3,9 +3,13 @@ name: Integration tests
 on:
   pull_request:
   push:
-    branches: [master, stable]
+    branches:
+      - master
+      - stable
+      - rc/**
   schedule:
   - cron: "0 0 * * *"
+  workflow_dispatch:
 
 jobs:
   integration-tests:

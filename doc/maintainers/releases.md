@@ -77,13 +77,13 @@ Examples:
 
 * In RC branch:
     * Review documentation for any changes that need to be made
-        * Ensure all documentation pages listed in `mkdocs.yaml`
-          (`git diff --stat origin/stable..HEAD doc/`)
+        * Ensure all documentation pages listed in `mkdocs.yaml` (use `git diff
+          --stat origin/stable..HEAD doc/` to look for new/deleted files)
         * Any new documentation pages should have the "may not be correct for
           the released version of Stack" warning at the top.
         * Search for old Stack version, unstable stack version, and the next
           "obvious" possible versions in sequence, and
-          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd). 
+          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd).
             * Do **NOT** update the Dockerfiles in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/) yet; that will come later)
             * Do **NOT** update templates in `.github` to point at the new release version yet!
         * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
@@ -91,13 +91,14 @@ Examples:
     * Check that for any platform entries that need to be added to (or removed from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
       [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md), and get.haskellstack.org redirects.
-    * `package.yaml`: bump to next release candidate version (bump patchlevel (fourth) component to next odd number; e.g. from `1.9.0.0` to `1.9.0.1`)
-    * `ChangeLog.md`
-        - Rename the “Unreleased changes” section to the same version as package.yaml, and mark it clearly as a release candidate (e.g. `v1.9.0.1 (release candidate)`).  Remove any empty sections.
 
 * For first release candidate:
     * Re-do the pre-release checks (above section)
     * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`)
+    * `ChangeLog.md`
+        - Rename the “Unreleased changes” section to the same version as
+          package.yaml, and mark it clearly as a release candidate (e.g.
+          `vX.Y.0.1 (release candidate)`).  Remove any empty sections.
     * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
 
 * For subsequent release candidates:
