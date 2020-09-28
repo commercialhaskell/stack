@@ -82,6 +82,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
+import           Stack.Types.PackageComponent (forgetComponentName, PackageComponentName, getPackageNameLength)
 import           Stack.Types.Package
 import           Stack.Types.Version
 import qualified System.Directory as D
@@ -500,7 +501,7 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
   where
     mlargestPackageName =
       Set.lookupMax $
-      Set.map (length . packageNameString) $
+      Set.map getPackageNameLength $
       Map.keysSet (planTasks plan) <> Map.keysSet (planFinals plan)
 
 copyExecutables
@@ -647,7 +648,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         when (boptsOpenHaddocks eeBuildOpts) $ do
             let planPkgs, localPkgs, installedPkgs, availablePkgs
                     :: Map PackageName (PackageIdentifier, InstallLocation)
-                planPkgs = Map.map (taskProvides &&& taskLocation) (planTasks plan)
+                planPkgs = Map.mapKeys forgetComponentName $ Map.map (taskProvides &&& taskLocation) (planTasks plan)
                 localPkgs =
                     Map.fromList
                         [(packageName p, (packageIdentifier p, Local)) | p <- map lpPackage eeLocals]

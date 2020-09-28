@@ -70,6 +70,7 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
+import           Stack.Types.PackageComponent (PackageComponentName)
 import           Stack.Types.Version
 import           System.FilePath                 (pathSeparator)
 import           RIO.Process                     (showProcessArgDebug)
@@ -513,8 +514,8 @@ installLocationIsMutable Local = Mutable
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
-    { planTasks :: !(Map PackageName Task)
-    , planFinals :: !(Map PackageName Task)
+    { planTasks :: !(Map PackageComponentName Task)
+    , planFinals :: !(Map PackageComponentName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only

@@ -43,6 +43,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
+import           Stack.Types.PackageComponent (libraryPackage)
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
@@ -90,26 +91,29 @@ data AddDepRes
 
 type ParentMap = MonoidMap PackageName (First Version, [(PackageIdentifier, VersionRange)])
 
-data W = W
-    { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
-    , wInstall :: !(Map Text InstallLocation)
+data PlanDraft = PlanDraft
+    { pdFinals :: !(Map PackageName (Either ConstructPlanException Task))
+    , pdInstall :: !(Map Text InstallLocation)
     -- ^ executable to be installed, and location where the binary is placed
-    , wDirty :: !(Map PackageName Text)
+    , pdDirty :: !(Map PackageName Text)
     -- ^ why a local package is considered dirty
-    , wWarnings :: !([Text] -> [Text])
+    , pdWarning :: !([Text] -> [Text])
     -- ^ Warnings
-    , wParents :: !ParentMap
+    , pdParents :: !ParentMap
     -- ^ Which packages a given package depends on, along with the package's version
     } deriving Generic
-instance Semigroup W where
+instance Semigroup PlanDraft where
     (<>) = mappenddefault
-instance Monoid W where
+instance Monoid PlanDraft where
     mempty = memptydefault
     mappend = (<>)
 
+-- | A monad transformer adding reading an environment of type 'Ctx',
+-- collecting an output of type 'PlanDraft' and updating a state of type 
+-- '(Map PackageName (Either ConstructPlanException AddDepRes))' to an inner monad 'IO'.
 type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
-    W
+    PlanDraft
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
 
@@ -188,7 +192,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
-    ((), m, W efinals installExes dirtyReason warnings parents) <-
+    ((), m, PlanDraft efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
     mapM_ (logWarn . RIO.display) (warnings [])
     let toEither (_, Left e)  = Left e
@@ -200,7 +204,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
         then do
             let toTask (_, ADRFound _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
-                tasks = M.fromList $ mapMaybe toTask adrs
+                tasks = first libraryPackage $ M.fromList $ mapMaybe toTask adrs
                 takeSubset =
                     case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
                         BSAll -> pure
@@ -412,7 +416,7 @@ addFinal lp package isAllInOne buildHaddocks = do
                 , taskAnyMissing = not $ Set.null missing
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
-    tell mempty { wFinals = Map.singleton (packageName package) res }
+    tell mempty { pdFinals = Map.singleton (packageName package) res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
@@ -513,7 +517,7 @@ tellExecutablesPackage loc p = do
             | otherwise = Set.empty
         goSource PSRemote{} = Set.empty
 
-    tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
+    tell mempty { pdInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
     filterComps myComps x
         | Set.null myComps = x
@@ -618,7 +622,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
-            tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
+            tell mempty { pdDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
     let loc = psLocation ps
@@ -716,7 +720,7 @@ addPackageDeps package = do
                     then return True
                     else do
                         let warn_ reason =
-                                tell mempty { wWarnings = (msg:) }
+                                tell mempty { pdWarning = (msg:) }
                               where
                                 msg = T.concat
                                     [ "WARNING: Ignoring "
@@ -771,7 +775,7 @@ addPackageDeps package = do
     adrVersion (ADRFound _ installed) = installedVersion installed
     -- Update the parents map, for later use in plan construction errors
     -- - see 'getShortestDepsPath'.
-    addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
+    addParent depname range mversion = tell mempty { pdParents = MonoidMap $ M.singleton depname val }
       where
         val = (First mversion, [(packageIdentifier package, range)])
 
@@ -837,7 +841,7 @@ checkDirtiness ps installed package present buildHaddocks = do
     case mreason of
         Nothing -> return False
         Just reason -> do
-            tell mempty { wDirty = Map.singleton (packageName package) reason }
+            tell mempty { pdDirty = Map.singleton (packageName package) reason }
             return True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
@@ -935,7 +939,7 @@ packageDepsWithTools p = do
         case mfound of
             Left _ -> return $ Just $ ToolWarning name (packageName p)
             Right _ -> return Nothing
-    tell mempty { wWarnings = (map toolWarningText warnings ++) }
+    tell mempty { pdWarning = (map toolWarningText warnings ++) }
     return $ packageDeps p
 
 -- | Warn about tools in the snapshot definition. States the tool name

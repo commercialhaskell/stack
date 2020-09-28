@@ -22,12 +22,20 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 
 -- | A single, fully resolved component of a package
+-- This type is Cabal based, and follows the .cabal files
+-- possibilities.
+-- These options are build targets.
 data NamedComponent
     = CLib
+    -- ^ The default library in a haskell project.
     | CInternalLib !Text
+    -- ^ An optional (named) internal library.
     | CExe !Text
+    -- ^ An executable.
     | CTest !Text
+    -- ^ A test target.
     | CBench !Text
+    -- ^ A benchmark target.
     deriving (Show, Eq, Ord)
 
 renderComponent :: NamedComponent -> Text

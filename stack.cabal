@@ -218,6 +218,7 @@ library
   other-modules:
       Path.Extended
       Stack.Types.Cache
+      Stack.Types.PackageComponent
   autogen-modules:
       Paths_stack
   hs-source-dirs:
