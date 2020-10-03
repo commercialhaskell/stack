@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v2.5.0.1**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 
 ## v2.5.0.1 (release candidate)
 
@@ -10,8 +24,7 @@ Major changes:
   override the default location of snapshot configuration files. This option
   affects how snapshot synonyms (LTS/Nightly) are expanded to URLs by the
   `pantry` library.
-
-* `docker-network` configuration key added to overwrite docker `--net` arg
+* `docker-network` configuration key added to override docker `--net` arg
 
 Behavior changes:
 
