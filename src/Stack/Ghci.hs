@@ -823,7 +823,7 @@ checkForDuplicateModules :: HasTerm env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs = do
     unless (null duplicates) $ do
         borderedWarning $ do
-            prettyError $ "Multiple files use the same module name:" <>
+            prettyWarn $ "Multiple files use the same module name:" <>
               line <> bulletedList (map prettyDuplicate duplicates)
         -- MSS 2020-10-13 Disabling, may remove entirely in the future
         -- See: https://github.com/commercialhaskell/stack/issues/5407#issuecomment-707339928
