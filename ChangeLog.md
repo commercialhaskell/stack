@@ -5,7 +5,7 @@
 
 Release notes:
 
-**Changes since v2.5.1**
+**Changes since v2.5.1:**
 
 Major changes:
 
@@ -18,8 +18,6 @@ Bug fixes:
 
 ## v2.5.1
 
-Release notes:
-
 **Changes since v2.3.3**
 
 Major changes:
@@ -27,8 +25,7 @@ Major changes:
   override the default location of snapshot configuration files. This option
   affects how snapshot synonyms (LTS/Nightly) are expanded to URLs by the
   `pantry` library.
-
-* `docker-network` configuration key added to overwrite docker `--net` arg
+* `docker-network` configuration key added to override docker `--net` arg
 
 Behavior changes:
 
@@ -57,6 +54,7 @@ Bug fixes:
 * Fix modified time busting caches by always calculating sha256 digest during
   the build process.
   [#5125](https://github.com/commercialhaskell/stack/issues/5125)
+
 
 ## v2.3.3
 
