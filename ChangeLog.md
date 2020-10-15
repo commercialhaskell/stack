@@ -1,21 +1,7 @@
 # Changelog
 
-## Unreleased changes
 
-Release notes:
-
-**Changes since v2.5.0.1**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-
-## v2.5.0.1 (release candidate)
+## v2.5.1
 
 **Changes since v2.3.3**
 
