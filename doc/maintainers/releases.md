@@ -41,12 +41,16 @@ Examples:
 * Check for un-merged pull requests that should be merged before release
 * Ensure `release` and `stable` branches merged to `master`
 * Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
+* Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest nightly (go over the extra-deps too) and ensure the project builds and tests pass (e.g. `stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks`)
 * Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
 
 ## Release preparation
 
 * In master branch:
-    * `package.yaml`: bump to next release candidate version (bump second component to next odd number, ensure third component is `0`, and add patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`)
+    * `package.yaml`: bump to next release candidate version (bump second
+      component to next odd number, ensure third component is `0`, and add
+      patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`).  Be sure to also update
+      `stack.cabal` (e.g. by running `stack build`).
     * `ChangeLog.md`
         * Check for any entries that snuck into the previous version's changes
           due to merges (`git diff origin/stable HEAD ChangeLog.md`)
@@ -54,7 +58,9 @@ Examples:
 * Cut a release candidate branch `rc/vX.Y` from master
 
 * In master branch:
-    * `package.yaml`: bump version to next unstable version (next even second component with `.0` third component (e.g. from 1.9.0 to 1.10.0)
+    * `package.yaml`: bump version to next unstable version (next even second
+      component with `.0` third component (e.g. from 1.9.0 to 1.10.0).  Be sure
+      to also update `stack.cabal` (e.g. by running `stack build`).
     * `Changelog.md`:
       * Change the title of the existing **Unreleased changes** section to what will be the next final (non-RC) release (e.g. `v2.1.1`).
       * add new "Unreleased changes" section:
@@ -63,7 +69,7 @@ Examples:
 
         Release notes:
 
-        **Changes since vX.Y.Z**
+        **Changes since vX.Y.Z:**
 
         Major changes:
 
@@ -94,7 +100,7 @@ Examples:
 
 * For first release candidate:
     * Re-do the pre-release checks (above section)
-    * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`)
+    * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`). Be sure to also update `stack.cabal` (e.g. by running `stack build`).
     * `ChangeLog.md`
         - Rename the “Unreleased changes” section to the same version as
           package.yaml, and mark it clearly as a release candidate (e.g.
@@ -103,74 +109,36 @@ Examples:
 
 * For subsequent release candidates:
     * Re-do the pre-release checks (above section)
-    * `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`)
+    * `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`).  Be
+      sure to also update `stack.cabal` (e.g. by running `stack build`).
     * `ChangeLog.md`: Rename the "Unreleased changes" section to the new version, clearly marked as a release candidate (e.g. `vX.Y.0.3 (release candidate)`).  Remove any empty sections.
     * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
 
 * For final release:
-    * `package.yaml`: bump version to odd last component and no patchlevel (e.g. from `X.Y.0.2` to `X.Y.1`).
+    * Re-do the pre-release checks (above section)
+    * `package.yaml`: bump version to odd last component and no patchlevel
+      (e.g. from `X.Y.0.2` to `X.Y.1`).  Be sure to also update `stack.cabal`
+      (e.g. by running `stack build`).
     * `ChangeLog.md`: consolidate all the RC changes into a single section for the release version
     * Follow all steps in the *Release process* section below.
 
 
 ## Release process
 
-* Trigger the **Integration Tests** workflow on Github Actions for the branch you are releasing, which will build Linux, macOS, and Windows bindists. `[RC]`
+* Ensure that the [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22) passes the branch you are releasing. This will run automatically for `master`, `stable`, and `rc/*` branches (if another branch, you can run it manually). `[RC]`
 
-* Create a
-  [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
-  with tag and title `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step), targeting the RC branch.  In the case of a release candidate, add `(RELEASE CANDIDATE)` to the name field and check the *This is a pre-release* checkbox.  `[RC]`
-    * See previous releases for example formatting and extra info (such as link to website for install instructions).
-    * For release candidates, you should **skip** the list of contributors and the link to the installation instructions.
-    * Include the Changelog in the description.
-    * Use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors.
+* Push signed Git tag.  For final releases the tag should be `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step); for release candidates it should be `rc/vX.Y.Z.A`.  e.g.: `git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z && git push origin vX.Y.Z`.  `[RC]`
 
-* On the machine you'll be releasing from, set environment variables `GITHUB_AUTHORIZATION_TOKEN` and `STACK_RELEASE_GPG_KEY` (see [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)). `[RC]`
+* Wait for [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22) to complete for the branch you just created.  This will create a draft Github release and upload the bindists (plus signatures and hashes) to it.
 
-* Upload the Azure bindists built by Azure Pipelines to the Gitlab release `[RC]`
-  * Download the bindist artifacts from the Azure DevOps nightly pipeline build, and put the contents under `_release/`.
-  * To sign, hash, and upload each file to Github, run:
-
-        for x in $(ls _release/stack-X.Y.Z*|grep -v asc|grep -v sha256|grep -v upload); do
-            stack "etc/scripts/release.hs" --upload-only "$x.upload" "$x.sha256.upload" "$x.asc.upload"
-        done
-
-  TODO: have Github Actions do this automatically.
-
-* For any GPG key used to sign an uploaded bindist, ensure that `dev@fpcomplete.com` signs their key and uploads to SKS keyserver pool:
-
-  ```
-  gpg --sign-key -u 0x575159689BEFB442 <OTHER-KEY-ID>
-  gpg --send-keys <OTHER-KEY-ID>
-  ```
-
-* Publish the Github release. `[RC]`
-
-* Push signed Git tag, matching Github release tag name, e.g.: `git tag -d vX.Y.Z; git tag -s -m vX.Y.Z vX.Y.Z && git push -f origin vX.Y.Z`.  `[RC]`
+* Edit the draft
+  [Github release](https://github.com/commercialhaskell/stack/releases/), and `[RC]`
+    * In the case of a release candidate, add `(release candidate)` to the name field and ensure that *This is a pre-release* is checked.
+    * Add the Changelog to the description.
+    * For final releases (**not** release candidates), use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors and add it to the description.
+    * Publish the Github release. `[RC]`
 
 * Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
-
-    * If you get the error
-
-      > The field "build-tools" is deprecated in the Cabal specification version 2.0. Please use 'build-tool-depends' field
-
-      then edit `stack.cabal` locally and change all instances of
-
-      ```
-      build-tools:
-        hsc2hs
-      ```
-
-      to
-
-      ```
-      build-tool-depends:
-        hsc2hs:hsc2hs
-      ```
-
-      and try again, then discard the local changes to `stack.cabal`.
-
-      Hopefully this issue will be resolved and we can remove this instruction (alternatively, we could use a `verbatim` field in `package.yaml`).
 
 * Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
@@ -180,12 +148,15 @@ Examples:
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated.
 
-* Update [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml) with the new version and [sync the application in ArgoCD](https://v4.fpcomplete.com/argo-cd/applications/fpcomplete-redirects).
+* Update [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml) with the new version and [sync the application in ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
 
     * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null`, make sure it redirects to the new version
 
 * In the `stable` or, in the case of a release candidate, `rc/vX.Y` branch:
-    - `package.yaml`: bump the version number even third component (e.g. from 1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_ component (e.g. from 1.7.0.1 to 1.7.0.2). `[RC]`
+    - `package.yaml`: bump the version number even third component (e.g. from
+      1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_
+      component (e.g. from 1.7.0.1 to 1.7.0.2).  Be sure to also update
+      `stack.cabal` (e.g. by running `stack build`). `[RC]`
 
     - `ChangeLog.md`: Add an “Unreleased changes” section (update “changes since” version):`[RC]`
 
@@ -194,7 +165,7 @@ Examples:
 
       Release notes:
 
-      **Changes since vX.Y.Z**
+      **Changes since vX.Y.Z:**
 
       Major changes:
 
@@ -206,14 +177,13 @@ Examples:
 
       ```
 
-    - Update templates in `.github` to point at the new release version (`X.Y.1`).  **SKIP THIS IN RC BRANCHES.**
+    - Update templates in `.github` to point at the new release version (`X.Y.1`).
 
 * Delete the RC branch (locally and on origin).  E.g. `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
 
 * Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).   It is best to do this by making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then merging.  If anything is complicated to merge, consider making it a PR and getting it reviewed rather than merging immediately.
 
-* Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
-  commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: stack-X.Y release candidate`), containing the release description from Github. `[RC]`
+* Announce to haskell-cafe@haskell.org; haskell-stack@googlegroups.com; commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: first release candidate for stack-X.Y.x`), containing the release description from Github. `[RC]`
 
     * For release candidates, also include a link to the Github Release (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download it. `[RC]`
 
@@ -227,7 +197,7 @@ Examples:
     RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
     ```
 
-  * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack.
+  * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack (e.g. `docker run --rm fpco/stack-build:lts stack --version`).
 
   * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
 
