@@ -1226,6 +1226,19 @@ ensure the turtle package is available.
 If you're on Windows: you can run `stack turtle.hs` instead of `./turtle.hs`.
 The shebang line is not required in that case.
 
+### Just-in-time compilation
+
+You can add the `--compile` flag to make stack compile the script,
+and then run the compiled executable. Compilation is done quickly, 
+without optimization. To compile with optimization, use the `--optimize` flag 
+instead. Compilation is done only if needed; if the executable already exists,
+and is newer than the script, stack just runs the executable directly.
+
+This feature can be good for speed (your script runs faster) and also
+for durability (the executable remains runnable even if the script is
+disturbed, eg due to changes in your installed ghc/snapshots, changes
+to source files during git bisect, etc.)
+
 ### Using multiple packages
 
 You can also specify multiple packages, either with multiple `--package`
