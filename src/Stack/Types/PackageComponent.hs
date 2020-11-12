@@ -1,9 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
@@ -14,7 +9,8 @@ module Stack.Types.PackageComponent where
 import Stack.Prelude
 import Stack.Types.NamedComponent (NamedComponent(CLib))
 
--- | Required for component-addressed build plans.
+-- | A tuple of a package name and component name (e.g. arrow:lib or stack:exec).
+-- Required for component-addressed build plans.
 -- Before introducing this, most packages were 'PackageName' addressed.
 -- See <https://github.com/commercialhaskell/stack/issues/4745 this issue>
 -- for more details.
@@ -35,5 +31,6 @@ libraryPackage pckName = PackageComponentName {
     componentName = CLib
   }
 
+-- | Ditch the @componentName :: NamedComponent@ part of a 'PackageComponentName'.
 forgetComponentName :: PackageComponentName -> PackageName
 forgetComponentName = packageName

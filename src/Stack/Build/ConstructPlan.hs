@@ -108,9 +108,10 @@ instance Monoid PlanDraft where
     mempty = memptydefault
     mappend = (<>)
 
--- | A monad transformer adding reading an environment of type 'Ctx',
+-- | A monad transformer reading an environment of type 'Ctx',
 -- collecting an output of type 'PlanDraft' and updating a state of type 
 -- '(Map PackageName (Either ConstructPlanException AddDepRes))' to an inner monad 'IO'.
+-- The R stands for read, W for write and S for state.
 type M = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
     PlanDraft
