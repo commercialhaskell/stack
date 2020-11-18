@@ -1245,6 +1245,7 @@ getOSKey platform =
         Platform X86_64                Cabal.Windows -> return "windows64"
         Platform Arm                   Cabal.Linux   -> return "linux-armv7"
         Platform AArch64               Cabal.Linux   -> return "linux-aarch64"
+        Platform Sparc                 Cabal.Linux   -> return "linux-sparc"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadOrUseLocal
