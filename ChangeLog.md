@@ -35,6 +35,9 @@ Other enhancements:
   stack to be aware of any custom preprocessors you have added to `Setup.hs`.
   See [#3491](https://github.com/commercialhaskell/stack/issues/3491)
 
+* Added `--candidate` flag to `upload` command to upload a package candidate
+  rather than publishing the package.
+
 Bug fixes:
 
 * `stack new` now suppports branches other than `master` as default for

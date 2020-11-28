@@ -222,6 +222,7 @@ library:
   - Stack.Options.ScriptParser
   - Stack.Options.SDistParser
   - Stack.Options.TestParser
+  - Stack.Options.UploadParser
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
