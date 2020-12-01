@@ -11,6 +11,7 @@ module Network.HTTP.StackClient
   , httpNoBody
   , httpSink
   , withResponse
+  , setRequestCheckStatus
   , setRequestMethod
   , setRequestHeader
   , addRequestHeader
@@ -66,7 +67,7 @@ import           Data.Monoid (Sum (..))
 import qualified Data.Text as T
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Network.HTTP.Client (Request, RequestBody(..), Response, parseRequest, getUri, path, checkResponse, parseUrlThrow)
-import           Network.HTTP.Simple (setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, HttpException(..), getResponseBody, getResponseStatusCode, getResponseHeaders)
+import           Network.HTTP.Simple (setRequestCheckStatus, setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, HttpException(..), getResponseBody, getResponseStatusCode, getResponseHeaders)
 import           Network.HTTP.Types (hAccept, hContentLength, hContentMD5, methodPut)
 import           Network.HTTP.Conduit (requestHeaders)
 import           Network.HTTP.Client.TLS (getGlobalManager, applyDigestAuth, displayDigestAuthException)
