@@ -32,7 +32,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
 import           RIO.PrettyPrint
-import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
+import           RIO.Process (HasProcessContext, exec, proc, readProcess_, withWorkingDir)
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -412,7 +412,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
-            withProcessContext menv $ exec
+            withPackageWorkingDir $ withProcessContext menv $ exec
                  (fromMaybe compilerExeName ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -420,6 +420,10 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
                   odir <> pkgopts <> extras <> ghciGhcOptions <> ghciArgs)
+        withPackageWorkingDir =
+            case pkgs of
+              [pkg] -> withWorkingDir (toFilePath $ ghciPkgDir pkg)
+              _ -> id
         -- TODO: Consider optimizing this check. Perhaps if no
         -- "with-ghc" is specified, assume that it is not using intero.
         checkIsIntero =
