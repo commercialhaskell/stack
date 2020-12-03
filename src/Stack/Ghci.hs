@@ -32,7 +32,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
 import           RIO.PrettyPrint
-import           RIO.Process (HasProcessContext, exec, proc, readProcess_)
+import           RIO.Process (HasProcessContext, exec, proc, readProcess_, withWorkingDir)
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -412,7 +412,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
-            withProcessContext menv $ exec
+            withPackageWorkingDir $ withProcessContext menv $ exec
                  (fromMaybe compilerExeName ghciGhcCommand)
                  (("--interactive" : ) $
                  -- This initial "-i" resets the include directories to
@@ -420,6 +420,10 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                  -- is included.
                   (if null pkgs then id else ("-i" : )) $
                   odir <> pkgopts <> extras <> ghciGhcOptions <> ghciArgs)
+        withPackageWorkingDir =
+            case pkgs of
+              [pkg] -> withWorkingDir (toFilePath $ ghciPkgDir pkg)
+              _ -> id
         -- TODO: Consider optimizing this check. Perhaps if no
         -- "with-ghc" is specified, assume that it is not using intero.
         checkIsIntero =
@@ -747,48 +751,63 @@ wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
 checkForIssues pkgs = do
-    unless (null issues) $ borderedWarning $ do
-        logWarn "Warning: There are cabal settings for this project which may prevent GHCi from loading your code properly."
-        logWarn "In some cases it can also load some projects which would otherwise fail to build."
-        logWarn ""
-        mapM_ (logWarn . RIO.display) $ intercalate [""] issues
-        logWarn ""
-        logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
-        logWarn ""
+    when (length pkgs > 1) $ borderedWarning $ do
+        -- Cabal flag issues could arise only when there are at least 2 packages
+        unless (null cabalFlagIssues) $ borderedWarning $ do
+            logWarn "Warning: There are cabal flags for this project which may prevent GHCi from loading your code properly."
+            logWarn "In some cases it can also load some projects which would otherwise fail to build."
+            logWarn ""
+            mapM_ (logWarn . RIO.display) $ intercalate [""] cabalFlagIssues
+            logWarn ""
+            logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+            logWarn ""
         logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
         logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
   where
-    issues = concat
-        [ mixedFlag "-XNoImplicitPrelude"
-          [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude." ]
-        , mixedFlag "-XCPP"
-          [ "-XCPP will be used, but it can cause issues with multiline strings."
-          , "See https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/options-phases.html#cpp-string-gaps"
-          ]
-        , mixedFlag "-XNoTraditionalRecordSyntax"
-          [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
-        , mixedFlag "-XTemplateHaskell"
-          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of '$' when there's no space after it." ]
-        , mixedFlag "-XQuasiQuotes"
-          [ "-XQuasiQuotes will be used, but it may cause parse failures due to a different meaning for list comprehension syntax like [x| ... ]" ]
-        , mixedFlag "-XSafe"
-          [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
-        , mixedFlag "-XArrows"
-          [ "-XArrows will be used, but it will cause non-arrow usages of proc, (-<), (-<<) to fail" ]
-        , mixedFlag "-XOverloadedStrings"
-          [ "-XOverloadedStrings will be used, but it can cause type ambiguity in code not usually compiled with it." ]
-        , mixedFlag "-XOverloadedLists"
-          [ "-XOverloadedLists will be used, but it can cause type ambiguity in code not usually compiled with it." ]
-        , mixedFlag "-XMonoLocalBinds"
-          [ "-XMonoLocalBinds will be used, but it can cause type errors in code which expects generalized local bindings." ]
-        , mixedFlag "-XTypeFamilies"
-          [ "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
-        , mixedFlag "-XGADTs"
-          [ "-XGADTs will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
-        , mixedFlag "-XNewQualifiedOperators"
-          [ "-XNewQualifiedOperators will be used, but this will break usages of the old qualified operator syntax." ]
+    cabalFlagIssues = concatMap mixedFlag
+        [ ( "-XNoImplicitPrelude"
+          , [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude."]
+          )
+        , ( "-XCPP"
+          , [ "-XCPP will be used, but it can cause issues with multiline strings."
+            , "See https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/options-phases.html#cpp-string-gaps"
+            ]
+          )
+        , ( "-XNoTraditionalRecordSyntax"
+          , [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
+          )
+        , ( "-XTemplateHaskell"
+          , [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of '$' when there's no space after it." ]
+          )
+        , ( "-XQuasiQuotes"
+          , [ "-XQuasiQuotes will be used, but it may cause parse failures due to a different meaning for list comprehension syntax like [x| ... ]" ]
+          )
+        , ( "-XSafe"
+          , [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
+          )
+        , ( "-XArrows"
+          , [ "-XArrows will be used, but it will cause non-arrow usages of proc, (-<), (-<<) to fail" ]
+          )
+        , ( "-XOverloadedStrings"
+          , [ "-XOverloadedStrings will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+          )
+        , ( "-XOverloadedLists"
+          , [ "-XOverloadedLists will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+          )
+        , ( "-XMonoLocalBinds"
+          , [ "-XMonoLocalBinds will be used, but it can cause type errors in code which expects generalized local bindings." ]
+          )
+        , ( "-XTypeFamilies"
+          , [ "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+          )
+        , ( "-XGADTs"
+          , [ "-XGADTs will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+          )
+        , ( "-XNewQualifiedOperators"
+          , [ "-XNewQualifiedOperators will be used, but this will break usages of the old qualified operator syntax." ]
+          )
         ]
-    mixedFlag flag msgs =
+    mixedFlag (flag, msgs) =
         let x = partitionComps (== flag) in
         [ msgs ++ showWhich x | mixedSettings x ]
     mixedSettings (xs, ys) = xs /= [] && ys /= []

@@ -11,6 +11,11 @@ Major changes:
 
 Behavior changes:
 
+* `stack repl` now always warns about GHCi problems with loading multiple
+  packages. It also sets now proper working directory when invoked with
+  one package. See
+  [#5421](https://github.com/commercialhaskell/stack/issues/5421)
+
 Other enhancements:
 
 Bug fixes:
