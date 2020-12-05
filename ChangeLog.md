@@ -20,6 +20,9 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack new` now suppports branches other than `master` as default for
+  GitHub repositories. See
+  [#5422](https://github.com/commercialhaskell/stack/issues/5422)
 
 ## v2.5.1
 

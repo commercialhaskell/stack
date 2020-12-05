@@ -17,6 +17,8 @@ module Stack.New
 
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
+import           Data.Aeson as A
+import qualified Data.ByteString.Base64 as B64
 import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
@@ -31,13 +33,14 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
                                            getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
-                                           setForceDownload, setGithubHeaders, verifiedDownloadWithProgress)
+                                           setForceDownload, setGithubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
+import qualified RIO.HashMap as HM
 import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
@@ -116,45 +119,56 @@ loadTemplate
 loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
-        AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
-        UrlPath s -> downloadFromUrl s templateDir
+        AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile eitherByteStringToText
+        UrlPath s -> do
+            let settings = asIsFromUrl s
+            downloadFromUrl settings templateDir
         RelPath rawParam relFile ->
             catch
-                (do f <- loadLocalFile relFile
+                (do f <- loadLocalFile relFile eitherByteStringToText
                     logIt LocalTemp
                     return f)
-                (\(e :: NewException) ->
-                      case relRequest rawParam of
-                        Just req -> downloadTemplate req
-                                                     (templateDir </> relFile)
+                (\(e :: NewException) -> do
+                      case relSettings rawParam of
+                        Just settings -> do
+                          req <- parseRequest (tplDownloadUrl settings)
+                          let extract = tplExtract settings
+                          downloadTemplate req extract (templateDir </> relFile)
                         Nothing -> throwM e
                 )
         RepoPath rtp -> do
-            let url = urlFromRepoTemplatePath rtp
-            downloadFromUrl (T.unpack url) templateDir
+            let settings = settingsFromRepoTemplatePath rtp
+            downloadFromUrl settings templateDir
                             
   where
-    loadLocalFile :: Path b File -> RIO env Text
-    loadLocalFile path = do
+    loadLocalFile :: Path b File -> (ByteString -> Either String Text) -> RIO env Text
+    loadLocalFile path extract = do
         logDebug ("Opening local template: \"" <> fromString (toFilePath path)
                                                 <> "\"")
         exists <- doesFileExist path
         if exists
-            then readFileUtf8 (toFilePath path)
+            then do
+                bs <- readFileBinary (toFilePath path) --readFileUtf8 (toFilePath path)
+                case extract bs of
+                    Left err -> do
+                        logWarn $ "Template extraction error: " <> display (T.pack err)
+                        throwM (FailedToLoadTemplate name (toFilePath path))
+                    Right template ->
+                        pure template
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    relRequest :: String -> Maybe Request
-    relRequest req = do
+    relSettings :: String -> Maybe TemplateDownloadSettings
+    relSettings req = do
         rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
-        let url = urlFromRepoTemplatePath rtp
-        parseRequest (T.unpack url)
-    downloadFromUrl :: String -> Path Abs Dir -> RIO env Text
-    downloadFromUrl s templateDir = do
-        req <- parseRequest s
-        let rel = fromMaybe backupUrlRelPath (parseRelFile s)
-        downloadTemplate req (templateDir </> rel)
-    downloadTemplate :: Request -> Path Abs File -> RIO env Text
-    downloadTemplate req path = do
-        let dReq = setForceDownload True $ mkDownloadRequest req
+        pure (settingsFromRepoTemplatePath rtp)
+    downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
+    downloadFromUrl settings templateDir = do
+        let url = tplDownloadUrl settings
+        req <- parseRequest url
+        let rel = fromMaybe backupUrlRelPath (parseRelFile url)
+        downloadTemplate req (tplExtract settings) (templateDir </> rel)
+    downloadTemplate :: Request -> (ByteString -> Either String Text) -> Path Abs File -> RIO env Text
+    downloadTemplate req extract path = do
+        let dReq = setForceDownload True $ mkDownloadRequest (setRequestCheckStatus req)
         logIt RemoteTemp
         catch
           (void $ do
@@ -162,7 +176,7 @@ loadTemplate name logIt = do
           )
           (useCachedVersionOrThrow path)
 
-        loadLocalFile path
+        loadLocalFile path extract
     useCachedVersionOrThrow :: Path Abs File -> VerifiedDownloadException -> RIO env ()
     useCachedVersionOrThrow path exception = do
       exists <- doesFileExist path
@@ -172,14 +186,41 @@ loadTemplate name logIt = do
                 logWarn "Using cached local version. It may not be the most recent version though."
         else throwM (FailedToDownloadTemplate name exception)
 
+data TemplateDownloadSettings = TemplateDownloadSettings
+  { tplDownloadUrl :: String
+  , tplExtract :: ByteString -> Either String Text
+  }
+
+eitherByteStringToText :: ByteString -> Either String Text
+eitherByteStringToText = mapLeft show . decodeUtf8'
+
+asIsFromUrl :: String -> TemplateDownloadSettings
+asIsFromUrl url = TemplateDownloadSettings
+  { tplDownloadUrl = url
+  , tplExtract = eitherByteStringToText
+  }
+
 -- | Construct a URL for downloading from a repo.
-urlFromRepoTemplatePath :: RepoTemplatePath -> Text
-urlFromRepoTemplatePath (RepoTemplatePath Github user name) =
-    T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
-urlFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
-    T.concat ["https://gitlab.com",                "/", user, "/stack-templates/raw/master/", name]
-urlFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
-    T.concat ["https://bitbucket.org",             "/", user, "/stack-templates/raw/master/", name]
+settingsFromRepoTemplatePath :: RepoTemplatePath -> TemplateDownloadSettings
+settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
+    -- T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
+    TemplateDownloadSettings
+    { tplDownloadUrl = concat ["https://api.github.com/repos/", T.unpack user, "/stack-templates/contents/", T.unpack name]
+    , tplExtract = \bs -> do
+        decodedJson <- eitherDecode (LB.fromStrict bs)
+        case decodedJson of
+          Object o | Just (String content) <- HM.lookup "content" o -> do
+                       let noNewlines = T.filter (/= '\n')
+                       bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)
+                       mapLeft show $ decodeUtf8' bsContent
+          _ ->
+            fail "Couldn't parse GitHub response as a JSON object with a \"content\" field"
+    }
+
+settingsFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+    asIsFromUrl $ concat ["https://gitlab.com",                "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
+settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
+    asIsFromUrl $ concat ["https://bitbucket.org",             "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
