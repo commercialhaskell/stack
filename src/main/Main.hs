@@ -553,7 +553,7 @@ cleanCmd = withConfig NoReexec . withBuildConfig . clean
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
-  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
+  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
     logError "Error: When building with stack, you should not use the -prof GHC option"
     logError "Instead, please use --library-profiling and --executable-profiling"
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"

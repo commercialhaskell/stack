@@ -29,6 +29,8 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 
+-- | Returns all the stack.yaml-specified project and dependencies
+-- as a map of package names and package/file locations.
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
     projectInstalls <-

@@ -33,6 +33,8 @@ data ActionType
     deriving (Show, Eq, Ord)
 data ActionId = ActionId !PackageIdentifier !ActionType
     deriving (Show, Eq, Ord)
+-- | This is mainly the result of one or more 'Task' in "Stack.Types.Build".
+-- Its actual content is completely contained in actionDo.
 data Action = Action
     { actionId :: !ActionId
     , actionDeps :: !(Set ActionId)

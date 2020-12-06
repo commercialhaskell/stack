@@ -380,7 +380,7 @@ loadLocalPackage pp = do
         , lpDirtyFiles = dirtyFiles
         , lpNewBuildCaches = newBuildCaches
         , lpCabalFile = ppCabalFP pp
-        , lpWanted = isWanted
+        , lpShouldBeBuilt = isWanted
         , lpComponents = nonLibComponents
         -- TODO: refactor this so that it's easier to be sure that these
         -- components are indeed unbuildable.
