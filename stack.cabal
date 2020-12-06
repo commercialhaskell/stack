@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e0fafccff758c3515731220888162806b25dd39ae06a130f30cba3f9955f20dc
+-- hash: 921d1d75f45e1413bf27bb605231ab84c688fd4a5e8c3c02486759fd6ccba8eb
 
 name:           stack
 version:        2.6.0
@@ -218,7 +218,9 @@ library
       Paths_stack
   other-modules:
       Path.Extended
+      Stack.Build.Precompiled
       Stack.Types.Cache
+      Stack.Types.Execute
   autogen-modules:
       Paths_stack
   hs-source-dirs:

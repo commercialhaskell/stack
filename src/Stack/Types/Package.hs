@@ -92,29 +92,103 @@ newtype ExeName = ExeName { unExeName :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
 
 -- | Some package info.
+-- A lot of the fields are derived from cabal:
+--
+--    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-Types-PackageId.html#t:PackageIdentifier PackageIdentifier>
+--    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:PackageDescription PackageDescription>
+--    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:buildTypeRaw buildTypeRaw function (and buildType, but it's about the same)>
 data Package =
-  Package {packageName :: !PackageName                    -- ^ Name of the package.
-          ,packageVersion :: !Version                     -- ^ Version of the package
-          ,packageLicense :: !(Either SPDX.License License) -- ^ The license the package was released under.
-          ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
-          ,packageDeps :: !(Map PackageName DepValue)     -- ^ Packages that the package depends on, both as libraries and build tools.
-          ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
-          ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
-          ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
-          ,packageCabalConfigOpts :: ![Text]              -- ^ Additional options passed to ./Setup.hs configure
-          ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
-          ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
-          ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
-          ,packageInternalLibraries :: !(Set Text)        -- ^ names of internal libraries
-          ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
-          ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
-          ,packageExes :: !(Set Text)                     -- ^ names of executables
-          ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
-          ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
-          ,packageBuildType :: !BuildType                 -- ^ Package build-type.
+  Package {packageName :: !PackageName
+          -- ^ Name of the package.
+          -- This is PackageIdentifier pkgName in Cabal. 
+          ,packageVersion :: !Version
+          -- ^ Version of the package.
+          -- This is PackageIdentifier pkgVersion in cabal.
+          ,packageLicense :: !(Either SPDX.License License)
+          -- ^ The license the package was released under.
+          -- This is PackageDescription licenseRaw in cabal. 
+          ,packageFiles :: !GetPackageFiles
+          -- ^ Get all files of the package.
+          -- Absent in cabal.
+          ,packageDeps :: !(Map PackageName DepValue)
+          -- ^ Packages that the package depends on, both as libraries and build tools.
+          -- Derived from cabal:
+          --
+          --    - allBuildInfo (allBuildInfo') function (see main comment)
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:targetBuildDepends targetBuildDepends function>
+          --
+          -- see packageDependencies and packageDescTools for more details.
+          -- Note that this filters out _itself_ and all the non buildables. 
+          ,packageUnknownTools :: !(Set ExeName)
+          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
+          -- Likely derived from cabal see the field just before.
+          ,packageAllDeps :: !(Set PackageName)
+          -- ^ Original dependencies (not sieved).
+          -- The keyset of package deps.
+          ,packageGhcOptions :: ![Text]
+          -- ^ Ghc options used on package.
+          -- Comes from 'PackageConfig' 'packageConfigGhcOptions'.
+          -- Likely derived from cabal in
+          --
+          --    - buildTypeRaw function (see main comment)
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:options options function>
+          --
+          -- see 'generateBuildInfoOpts', and then all the way from loadPackage.
+          ,packageCabalConfigOpts :: ![Text]
+          -- ^ Additional options passed to ./Setup.hs configure
+          -- Absent in cabal ? Comes from 'PackageConfig' 'packageConfigCabalConfigOpts'.
+          ,packageFlags :: !(Map FlagName Bool)
+          -- ^ Flags used on package.
+          -- Absent in cabal ?
+          ,packageDefaultFlags :: !(Map FlagName Bool)
+          -- ^ Defaults for unspecified flags.
+          -- Absent in cabal ?
+          ,packageLibraries :: !PackageLibraries
+          -- ^ Does the package have a buildable library stanza?
+          -- Derived from the library and foreignLibs in Cabal.
+          -- If no main library or no buildable, we consider there is none.
+          --
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:foreignLibs foreignLibs>
+          --
+          ,packageInternalLibraries :: !(Set Text)
+          -- ^ names of internal libraries
+          -- Derived from cabal in:
+          --
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:subLibraries subLibraries>
+          --
+          ,packageTests :: !(Map Text TestSuiteInterface)
+          -- ^ names and interfaces of test suites
+          -- Derived from cabal in:
+          --
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:testSuites testSuites>
+          --
+          ,packageBenchmarks :: !(Set Text)
+          -- ^ names of benchmarks
+          -- Derived from cabal through:
+          --
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:benchmarks benchmarks>
+          --
+          ,packageExes :: !(Set Text)
+          -- ^ names of executables
+          -- Derived from cabal through:
+          --
+          --    - <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:executables executables>
+          --
+          ,packageOpts :: !GetPackageOpts
+          -- ^ Args to pass to GHC.
+          -- Absent in cabal.
+          ,packageHasExposedModules :: !Bool
+          -- ^ Does the package have exposed modules?
+          -- Derived from cabal's exposed modules list
+          -- in the main lib.
+          ,packageBuildType :: !BuildType
+          -- ^ Package build-type.
+          -- This is in cabal in <https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/Distribution-PackageDescription.html#v:buildType buildType>
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
-                                                          -- ^ If present: custom-setup dependencies
-          ,packageCabalSpec :: !VersionRange              -- ^ Cabal spec range
+          -- ^ If present: custom-setup dependencies
+          -- Derived from cabal 'SetupBuildInfo'.
+          ,packageCabalSpec :: !VersionRange
+          -- ^ Cabal spec range
           }
  deriving (Show,Typeable)
 
@@ -149,6 +223,8 @@ packageIdentifier pkg =
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+-- | The map of package names and their location & version.
+-- It does not contain any installed information.
 type InstallMap = Map PackageName (InstallLocation, Version)
 
 -- | Files that the package depends on, relative to package directory.
@@ -210,7 +286,7 @@ data PackageWarning
       -- ^ Modules not found in file system, which are listed in cabal file
     -}
 
--- | Package build configuration
+-- | Package build configuration.
 data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
                 ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
@@ -263,8 +339,8 @@ data LocalPackage = LocalPackage
     , lpUnbuildable   :: !(Set NamedComponent)
     -- ^ Components explicitly requested for build, that are marked
     -- "buildable: false".
-    , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
-    -- ^ Whether this package is wanted as a target.
+    , lpShouldBeBuilt :: !Bool
+    -- ^ Whether this package should be built or not.
     , lpTestDeps      :: !(Map PackageName VersionRange)
     -- ^ Used for determining if we can use --enable-tests in a normal build.
     , lpBenchDeps     :: !(Map PackageName VersionRange)
@@ -414,8 +490,12 @@ dotCabalGetPath dcp =
         DotCabalFilePath fp -> fp
         DotCabalCFilePath fp -> fp
 
+-- | This is a type derived from a '[DumpPackage]'.
+-- It's essentially a reorganization of the @ghc-pkg dump@
+-- command.
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
+-- This is the type extracted from the 'DumpPackage' 
 data Installed
     = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
     | Executable PackageIdentifier

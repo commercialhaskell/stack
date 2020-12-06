@@ -151,7 +151,8 @@ instance Show PackageDumpException where
     show (Couldn'tParseField name ls) =
         "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 
--- | Convert a stream of bytes into a stream of @DumpPackage@s
+-- | Convert a stream of bytes into a stream of @DumpPackage@s.
+-- Essentially parses the output of @ghc-pkg dump@.
 conduitDumpPackage :: MonadThrow m
                    => ConduitM Text DumpPackage m ()
 conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do

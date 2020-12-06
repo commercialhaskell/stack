@@ -89,33 +89,43 @@ data AddDepRes
     deriving Show
 
 type ParentMap = MonoidMap PackageName (First Version, [(PackageIdentifier, VersionRange)])
-
-data W = W
-    { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
-    , wInstall :: !(Map Text InstallLocation)
+ 
+-- | This is a temporary object used to build the final 'Plan' object.
+-- It's the outcome of running the ConstructPlanMonad.
+data PlanDraft = PlanDraft
+    { pdFinals :: !(Map PackageName (Either ConstructPlanException Task))
+    , pdInstall :: !(Map Text InstallLocation)
     -- ^ executable to be installed, and location where the binary is placed
-    , wDirty :: !(Map PackageName Text)
+    , pdDirty :: !(Map PackageName Text)
     -- ^ why a local package is considered dirty
-    , wWarnings :: !([Text] -> [Text])
+    , pdWarnings :: !([Text] -> [Text])
     -- ^ Warnings
-    , wParents :: !ParentMap
+    , pdParents :: !ParentMap
     -- ^ Which packages a given package depends on, along with the package's version
     } deriving Generic
-instance Semigroup W where
+instance Semigroup PlanDraft where
     (<>) = mappenddefault
-instance Monoid W where
+instance Monoid PlanDraft where
     mempty = memptydefault
     mappend = (<>)
 
-type M = RWST -- TODO replace with more efficient WS stack on top of StackT
+-- | A monad transformer reading an environment of type 'Ctx',
+-- collecting an output of type 'PlanDraft' and updating a state of type 
+-- 'ConstructPlanState' to an inner monad 'IO'.
+--      - <https://hackage.haskell.org/package/mtl-2.2.2/docs/Control-Monad-Reader-Class.html R stands for read>,
+--      - <http://hackage.haskell.org/package/mtl-2.2.2/docs/Control-Monad-Writer-Class.html W stands for write>,
+--      - <http://hackage.haskell.org/package/mtl-2.2.2/docs/Control-Monad-State-Class.html S stands for state>,
+type ConstructPlanMonad = RWST -- TODO replace with more efficient WS stack on top of StackT
     Ctx
-    W
-    (Map PackageName (Either ConstructPlanException AddDepRes))
+    PlanDraft
+    ConstructPlanState
     IO
+
+type ConstructPlanState = Map PackageName (Either ConstructPlanException AddDepRes) 
 
 data Ctx = Ctx
     { baseConfigOpts :: !BaseConfigOpts
-    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> M Package)
+    , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> ConstructPlanMonad Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
@@ -155,7 +165,7 @@ instance HasEnvConfig Ctx where
 --
 -- 1) It determines which packages need to be built, based on the
 -- transitive deps of the current targets. For local packages, this is
--- indicated by the 'lpWanted' boolean. For extra packages to build,
+-- indicated by the 'lpShouldBeBuilt' boolean. For extra packages to build,
 -- this comes from the @extraToBuild0@ argument of type @Set
 -- PackageName@. These are usually packages that have been specified on
 -- the commandline.
@@ -171,6 +181,8 @@ constructPlan :: forall env. HasEnvConfig env
               -> (PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> RIO EnvConfig Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
+              -- ^ This is the installed map extracted
+              -- from the sourceMap with toInstallMap and getInstalled
               -> Bool
               -> RIO env Plan
 constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
@@ -185,15 +197,15 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     mcur <- view $ buildConfigL.to bcCurator
 
     let onTarget = void . addDep
-    let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
+    let projectInitPlan = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
-    ((), m, W efinals installExes dirtyReason warnings parents) <-
-        liftIO $ runRWST inner ctx M.empty
+    ((), addDepPackageMap, planDraft) <- liftIO $ runRWST projectInitPlan ctx M.empty
+    let PlanDraft efinals installExes dirtyReason warnings parents = planDraft
     mapM_ (logWarn . RIO.display) (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
-        (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
+        (errlibs, adrs) = partitionEithers $ map toEither $ M.toList addDepPackageMap
         (errfinals, finals) = partitionEithers $ map toEither $ M.toList efinals
         errs = errlibs ++ errfinals
     if null errs
@@ -311,6 +323,7 @@ mkUnregisterLocal :: Map PackageName Task
                   -- ^ Reasons why packages are dirty and must be rebuilt
                   -> [DumpPackage]
                   -- ^ Local package database dump
+                  -- These are the _registered_ packages.
                   -> Bool
                   -- ^ If true, we're doing a special initialBuildSteps
                   -- build - don't unregister target packages.
@@ -384,7 +397,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
+addFinal :: LocalPackage -> Package -> Bool -> Bool -> ConstructPlanMonad ()
 addFinal lp package isAllInOne buildHaddocks = do
     depsRes <- addPackageDeps package
     res <- case depsRes of
@@ -412,7 +425,7 @@ addFinal lp package isAllInOne buildHaddocks = do
                 , taskAnyMissing = not $ Set.null missing
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
-    tell mempty { wFinals = Map.singleton (packageName package) res }
+    tell mempty { pdFinals = Map.singleton (packageName package) res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
@@ -425,7 +438,7 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- directly wanted. This makes sense - if we left out packages that are
 -- deps, it would break the --only-dependencies build plan.
 addDep :: PackageName
-       -> M (Either ConstructPlanException AddDepRes)
+       -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
 addDep name = do
     ctx <- ask
     m <- get
@@ -474,9 +487,9 @@ addDep name = do
             return res
 
 -- FIXME what's the purpose of this? Add a Haddock!
-tellExecutables :: PackageName -> PackageSource -> M ()
+tellExecutables :: PackageName -> PackageSource -> ConstructPlanMonad ()
 tellExecutables _name (PSFilePath lp)
-    | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
+    | lpShouldBeBuilt lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
@@ -485,10 +498,10 @@ tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
 
 tellExecutablesUpstream ::
        PackageName
-    -> M (Maybe PackageLocationImmutable)
+    -> ConstructPlanMonad (Maybe PackageLocationImmutable)
     -> InstallLocation
     -> Map FlagName Bool
-    -> M ()
+    -> ConstructPlanMonad ()
 tellExecutablesUpstream name retrievePkgLoc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
@@ -497,7 +510,7 @@ tellExecutablesUpstream name retrievePkgLoc loc flags = do
             p <- loadPackage ctx pkgLoc flags [] []
             tellExecutablesPackage loc p
 
-tellExecutablesPackage :: InstallLocation -> Package -> M ()
+tellExecutablesPackage :: InstallLocation -> Package -> ConstructPlanMonad ()
 tellExecutablesPackage loc p = do
     cm <- asks combinedMap
     -- Determine which components are enabled so we know which ones to copy
@@ -509,11 +522,11 @@ tellExecutablesPackage loc p = do
                 Just (PIBoth ps _) -> goSource ps
 
         goSource (PSFilePath lp)
-            | lpWanted lp = exeComponents (lpComponents lp)
+            | lpShouldBeBuilt lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
         goSource PSRemote{} = Set.empty
 
-    tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
+    tell mempty { pdInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
     filterComps myComps x
         | Set.null myComps = x
@@ -524,7 +537,7 @@ tellExecutablesPackage loc p = do
 installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
-               -> M (Either ConstructPlanException AddDepRes)
+               -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
@@ -590,7 +603,7 @@ resolveDepsAndInstall :: Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
-                      -> M (Either ConstructPlanException AddDepRes)
+                      -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
 resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
     res <- addPackageDeps package
     case res of
@@ -608,7 +621,7 @@ installPackageGivenDeps :: Bool
                         -> ( Set PackageIdentifier
                            , Map PackageIdentifier GhcPkgId
                            , IsMutable )
-                        -> M AddDepRes
+                        -> ConstructPlanMonad AddDepRes
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minMutable) = do
     let name = packageName package
     ctx <- ask
@@ -618,7 +631,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
-            tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
+            tell mempty { pdDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
     let loc = psLocation ps
@@ -658,7 +671,7 @@ packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.
-updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
+updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
 updateLibMap name val = modify $ \mp ->
     case (M.lookup name mp, val) of
         (Just (Left DependencyCycleDetected{}), Left _) -> mp
@@ -679,13 +692,13 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
+addPackageDeps :: Package -> ConstructPlanMonad (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
 addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep depname
-        let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
+        let getLatestApplicableVersionAndRev :: ConstructPlanMonad (Maybe (Version, BlobKey))
             getLatestApplicableVersionAndRev = do
               vsAndRevs <- runRIO ctx $ getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions depname
               pure $ do
@@ -716,7 +729,7 @@ addPackageDeps package = do
                     then return True
                     else do
                         let warn_ reason =
-                                tell mempty { wWarnings = (msg:) }
+                                tell mempty { pdWarnings = (msg:) }
                               where
                                 msg = T.concat
                                     [ "WARNING: Ignoring "
@@ -771,7 +784,7 @@ addPackageDeps package = do
     adrVersion (ADRFound _ installed) = installedVersion installed
     -- Update the parents map, for later use in plan construction errors
     -- - see 'getShortestDepsPath'.
-    addParent depname range mversion = tell mempty { wParents = MonoidMap $ M.singleton depname val }
+    addParent depname range mversion = tell mempty { pdParents = MonoidMap $ M.singleton depname val }
       where
         val = (First mversion, [(packageIdentifier package, range)])
 
@@ -799,7 +812,7 @@ checkDirtiness :: PackageSource
                -> Package
                -> Map PackageIdentifier GhcPkgId
                -> Bool
-               -> M Bool
+               -> ConstructPlanMonad Bool
 checkDirtiness ps installed package present buildHaddocks = do
     ctx <- ask
     moldOpts <- runRIO ctx $ tryGetFlagCache installed
@@ -837,7 +850,7 @@ checkDirtiness ps installed package present buildHaddocks = do
     case mreason of
         Nothing -> return False
         Just reason -> do
-            tell mempty { wDirty = Map.singleton (packageName package) reason }
+            tell mempty { pdDirty = Map.singleton (packageName package) reason }
             return True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
@@ -923,7 +936,7 @@ psLocation PSRemote{} = Snap
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
-packageDepsWithTools :: Package -> M (Map PackageName DepValue)
+packageDepsWithTools :: Package -> ConstructPlanMonad (Map PackageName DepValue)
 packageDepsWithTools p = do
     -- Check whether the tool is on the PATH before warning about it.
     warnings <- fmap catMaybes $ forM (Set.toList $ packageUnknownTools p) $
@@ -935,7 +948,7 @@ packageDepsWithTools p = do
         case mfound of
             Left _ -> return $ Just $ ToolWarning name (packageName p)
             Right _ -> return Nothing
-    tell mempty { wWarnings = (map toolWarningText warnings ++) }
+    tell mempty { pdWarnings = (map toolWarningText warnings ++) }
     return $ packageDeps p
 
 -- | Warn about tools in the snapshot definition. States the tool name
@@ -983,7 +996,7 @@ stripNonDeps deps plan = plan
       mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
 -- | Is the given package/version combo defined in the snapshot or in the global database?
-inSnapshot :: PackageName -> Version -> M Bool
+inSnapshot :: PackageName -> Version -> ConstructPlanMonad Bool
 inSnapshot name version = do
     ctx <- ask
     return $ fromMaybe False $ do
@@ -1000,11 +1013,25 @@ inSnapshot name version = do
               Just True
             _ -> return False
 
+-- | This datatype contains all the potential errors when constructing the
+-- 'Plan'. Its structure is awkward given the pretty similar cases in 
+-- its 'DependencyPlanFailures' constructor part : 'BadDependency'
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
+    -- ^ Circular reference between package dependencies.
+    -- e.g. A depends on B and B depends on A where A and B are package names.
+    -- This is meant to be global, it also exists in 'DependencyPlanFailures' at the
+    -- 'Package' dependencies level.
     | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
+    -- ^ This is used to group all the potential errors while
+    -- adding the dependency of a given 'Package'.
+    -- The 'BadDependency' type replicate 'UnknownPackage' constructor and
+    -- 'DependencyCycleDetected' constructor to some extent.
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
+    -- This happens when you reference a package in your cabal file (or package.yaml)
+    -- which does not exist in the snapshot + added deps.
+    -- It's the equivalent of 'NotInBuildPlan' for a 'BadDependency'.
     deriving (Typeable, Eq, Show)
 
 -- | The latest applicable version and it's latest cabal file revision.

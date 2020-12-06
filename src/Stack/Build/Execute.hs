@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
@@ -67,6 +68,7 @@ import qualified RIO
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
+import           Stack.Build.Precompiled (copyPreCompiled, getPrecompiled, loadInstalledPkg, getExecutableBuildStatuses)
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Config
@@ -80,6 +82,7 @@ import           Stack.PackageDump
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.Execute
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
@@ -89,16 +92,10 @@ import           System.Environment (getExecutablePath, lookupEnv)
 import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
 import qualified System.FilePath as FP
 import           System.IO.Error (isDoesNotExistError)
-import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
+import           System.PosixCompat.Files (modificationTime, getFileStatus)
 import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
-
--- | Has an executable been built or not?
-data ExecutableBuildStatus
-    = ExecutableBuilt
-    | ExecutableNotBuilt
-  deriving (Show, Eq, Ord)
 
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: HasEnvConfig env => Plan -> RIO env ()
@@ -116,105 +113,6 @@ preFetch plan
         case taskType task of
             TTLocalMutable{} -> Set.empty
             TTRemotePackage _ _ pkgloc -> Set.singleton pkgloc
-
--- | Print a description of build plan for human consumption.
-printPlan :: HasRunner env => Plan -> RIO env ()
-printPlan plan = do
-    case Map.elems $ planUnregisterLocal plan of
-        [] -> logInfo "No packages would be unregistered."
-        xs -> do
-            logInfo "Would unregister locally:"
-            forM_ xs $ \(ident, reason) -> logInfo $
-                fromString (packageIdentifierString ident) <>
-                if T.null reason
-                  then ""
-                  else " (" <> RIO.display reason <> ")"
-
-    logInfo ""
-
-    case Map.elems $ planTasks plan of
-        [] -> logInfo "Nothing to build."
-        xs -> do
-            logInfo "Would build:"
-            mapM_ (logInfo . displayTask) xs
-
-    let hasTests = not . Set.null . testComponents . taskComponents
-        hasBenches = not . Set.null . benchComponents . taskComponents
-        tests = Map.elems $ Map.filter hasTests $ planFinals plan
-        benches = Map.elems $ Map.filter hasBenches $ planFinals plan
-
-    unless (null tests) $ do
-        logInfo ""
-        logInfo "Would test:"
-        mapM_ (logInfo . displayTask) tests
-    unless (null benches) $ do
-        logInfo ""
-        logInfo "Would benchmark:"
-        mapM_ (logInfo . displayTask) benches
-
-    logInfo ""
-
-    case Map.toList $ planInstallExes plan of
-        [] -> logInfo "No executables to be installed."
-        xs -> do
-            logInfo "Would install executables:"
-            forM_ xs $ \(name, loc) -> logInfo $
-                RIO.display name <>
-                " from " <>
-                (case loc of
-                   Snap -> "snapshot"
-                   Local -> "local") <>
-                " database"
-
--- | For a dry run
-displayTask :: Task -> Utf8Builder
-displayTask task =
-    fromString (packageIdentifierString (taskProvides task)) <>
-    ": database=" <>
-    (case taskLocation task of
-        Snap -> "snapshot"
-        Local -> "local") <>
-    ", source=" <>
-    (case taskType task of
-        TTLocalMutable lp -> fromString $ toFilePath $ parent $ lpCabalFile lp
-        TTRemotePackage _ _ pl -> RIO.display pl) <>
-    (if Set.null missing
-        then ""
-        else ", after: " <>
-             mconcat (intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
-  where
-    missing = tcoMissing $ taskConfigOpts task
-
-data ExecuteEnv = ExecuteEnv
-    { eeConfigureLock  :: !(MVar ())
-    , eeInstallLock    :: !(MVar ())
-    , eeBuildOpts      :: !BuildOpts
-    , eeBuildOptsCLI   :: !BuildOptsCLI
-    , eeBaseConfigOpts :: !BaseConfigOpts
-    , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
-    , eeTempDir        :: !(Path Abs Dir)
-    , eeSetupHs        :: !(Path Abs File)
-    -- ^ Temporary Setup.hs for simple builds
-    , eeSetupShimHs    :: !(Path Abs File)
-    -- ^ Temporary SetupShim.hs, to provide access to initial-build-steps
-    , eeSetupExe       :: !(Maybe (Path Abs File))
-    -- ^ Compiled version of eeSetupHs
-    , eeCabalPkgVer    :: !Version
-    , eeTotalWanted    :: !Int
-    , eeLocals         :: ![LocalPackage]
-    , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalDumpPkgs :: !(Map GhcPkgId DumpPackage)
-    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
-    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
-    , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
-    , eeCustomBuilt    :: !(IORef (Set PackageName))
-    -- ^ Stores which packages with custom-setup have already had their
-    -- Setup.hs built.
-    , eeLargestPackageName :: !(Maybe Int)
-    -- ^ For nicer interleaved output: track the largest package name size
-    , eePathEnvVar :: !Text
-    -- ^ Value of the PATH environment variable
-    }
 
 buildSetupArgs :: [String]
 buildSetupArgs =
@@ -239,7 +137,10 @@ simpleSetupHash =
     Data.ByteString.Builder.toLazyByteString $
     encodeUtf8Builder (T.pack (unwords buildSetupArgs)) <> setupGhciShimCode <> simpleSetupCode
 
--- | Get a compiled Setup exe
+-- | Get a compiled Setup exe based on the path of a Setup.hs file.
+-- Note that this is never invoked directly, it is passed to the
+-- relevant functions (realBuild essentially) through the 'withExecuteEnv'
+-- bracket-style function.
 getSetupExe :: HasEnvConfig env
             => Path Abs File -- ^ Setup.hs input file
             -> Path Abs File -- ^ SetupShim.hs input file
@@ -340,7 +241,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
         localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         logFilesTChan <- liftIO $ atomically newTChan
-        let totalWanted = length $ filter lpWanted locals
+        let totalWanted = length $ filter lpShouldBeBuilt locals
         pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
         inner ExecuteEnv
             { eeBuildOpts = bopts
@@ -503,6 +404,9 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
       Set.map (length . packageNameString) $
       Map.keysSet (planTasks plan) <> Map.keysSet (planFinals plan)
 
+-- | This is not doing the cabal copy.
+-- It is the copying done by @stack install@.
+-- The cabal copying is done in 'realBuild'.
 copyExecutables
     :: HasEnvConfig env
     => Map Text InstallLocation
@@ -602,13 +506,8 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     -- which is empty while each test is being run.
     concurrentTests <- view $ configL.to configConcurrentTests
     mtestLock <- if concurrentTests then return Nothing else Just <$> liftIO (newMVar ())
-
-    let actions = concatMap (toActions installedMap' mtestLock run ee) $ Map.elems $ Map.mergeWithKey
-            (\_ b f -> Just (Just b, Just f))
-            (fmap (\b -> (Just b, Nothing)))
-            (fmap (\f -> (Nothing, Just f)))
-            (planTasks plan)
-            (planFinals plan)
+    let taskAndFinals = mergeTasksAndFinal plan
+    let actions = concatMap (toActions installedMap' mtestLock run ee) taskAndFinals
     threads <- view $ configL.to configJobs
     let keepGoing =
             fromMaybe (not (M.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
@@ -705,82 +604,83 @@ unregisterPackages cv localDB ids = do
 
         _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
 
+-- | Transforms the 'Task' from 'Plan' into a list of 'Action'.
+-- The 'Action' datatype is not openely descriptive such as the 'Task' datatype,
+-- instead, it contains an arbitrary function (actionDo) which is executed when
+-- the action is passed to 'runAction'.
+-- The end result may have more than one action, because a 'Task'
+-- can appear as normal and final.
+-- See "Stack.Build.ConstructPlan", the addFinal function for more details about final/normal.
 toActions :: HasEnvConfig env
           => InstalledMap
+          -- ^ The map of installed packages in the package database
+          -- (see 'InstalledMap' for more info).
           -> Maybe (MVar ())
           -> (RIO env () -> IO ())
           -> ExecuteEnv
-          -> (Maybe Task, Maybe Task) -- build and final
-          -> [Action]
+          -> (Maybe Task, Maybe Task)
+          -- ^ fst is build and snd is final.
+          -- They both represent the same package.
+          -- It's taken from the 'Plan' in "ConstructPlan"
+          -> [Action] 
 toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
   where
-    abuild =
-        case mbuild of
-            Nothing -> []
-            Just task@Task {..} ->
-                [ Action
-                    { actionId = ActionId taskProvides ATBuild
-                    , actionDeps =
-                        Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts)
-                    , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap False
-                    , actionConcurrency = ConcurrencyAllowed
-                    }
-                ]
+    abuild = maybeToList $ (\bTask -> setupAction bTask ATBuild mempty) <$> mbuild
     afinal =
         case mfinal of
             Nothing -> []
-            Just task@Task {..} ->
-                (if taskAllInOne then id else (:)
-                    Action
-                        { actionId = ActionId taskProvides ATBuildFinal
-                        , actionDeps = addBuild
-                            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                        , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap True
-                        , actionConcurrency = ConcurrencyAllowed
-                        }) $
+            Just fTask ->
+                appendIfNot (taskAllInOne fTask) (setupAction fTask ATBuildFinal mempty) $
                 -- These are the "final" actions - running tests and benchmarks.
-                (if Set.null tests then id else (:)
-                    Action
-                        { actionId = ActionId taskProvides ATRunTests
-                        , actionDeps = finalDeps
-                        , actionDo = \ac -> withLock mtestLock $ runInBase $ do
-                            singleTest topts (Set.toList tests) ac ee task installedMap
-                        -- Always allow tests tasks to run concurrently with
-                        -- other tasks, particularly build tasks. Note that
-                        -- 'mtestLock' can optionally make it so that only
-                        -- one test is run at a time.
-                        , actionConcurrency = ConcurrencyAllowed
-                        }) $
-                (if Set.null benches then id else (:)
-                    Action
-                        { actionId = ActionId taskProvides ATRunBenchmarks
-                        , actionDeps = finalDeps
-                        , actionDo = \ac -> runInBase $ do
-                            singleBench beopts (Set.toList benches) ac ee task installedMap
-                        -- Never run benchmarks concurrently with any other task, see #3663
-                        , actionConcurrency = ConcurrencyDisallowed
-                        })
+                appendIfNot (Set.null tests) (setupAction fTask ATRunTests tests) $
+                appendIfNot (Set.null benches) (setupAction fTask ATRunBenchmarks benches)
                 []
               where
-                comps = taskComponents task
+                -- | Takes a condition and an element, append the element if the condition is false.
+                appendIfNot ifCond e = if ifCond then id else (:) e
+                comps = taskComponents fTask
                 tests = testComponents comps
                 benches = benchComponents comps
-                finalDeps =
-                    if taskAllInOne
-                        then addBuild mempty
-                        else Set.singleton (ActionId taskProvides ATBuildFinal)
-                addBuild =
-                    case mbuild of
-                        Nothing -> id
-                        Just _ -> Set.insert $ ActionId taskProvides ATBuild
-    withLock Nothing f = f
-    withLock (Just lock) f = withMVar lock $ \() -> f
-    bopts = eeBuildOpts ee
-    topts = boptsTestOpts bopts
-    beopts = boptsBenchmarkOpts bopts
+    setupAction :: Task -> ActionType -> Set Text -> Action
+    setupAction task !actType compSet = Action
+        { actionId = ActionId taskProvidesVal actType
+        , actionDeps = case actType of
+            ATBuild -> mainBuildValDeps
+            ATBuildFinal -> addBuild mainBuildValDeps
+            _ -> finalDeps
+        , actionDo = case actType of
+            ATRunTests -> \ac -> withLock mtestLock $ runInBase $ do
+                            let topts = boptsTestOpts bopts
+                            singleTest topts (Set.toList compSet) ac ee task installedMap
+            ATRunBenchmarks -> \ac -> runInBase $ do
+                            let beopts = boptsBenchmarkOpts bopts
+                            singleBench beopts (Set.toList compSet) ac ee task installedMap
+            _ -> \ac -> runInBase $ singleBuild ac ee task installedMap (actType == ATBuildFinal)
+        , actionConcurrency = case actType of
+            -- Never run benchmarks concurrently with any other task, see #3663
+            ATRunBenchmarks -> ConcurrencyDisallowed
+            -- Always allow tests tasks to run concurrently with
+            -- other tasks, particularly build tasks. Note that
+            -- 'mtestLock' can optionally make it so that only
+            -- one test is run at a time.
+            _ -> ConcurrencyAllowed
+        }
+        where
+            tcoMissingVal = tcoMissing $ taskConfigOpts task
+            mainBuildValDeps = Set.map (\ident -> ActionId ident ATBuild) tcoMissingVal
+            finalDeps
+                | taskAllInOne task = addBuild mempty
+                | otherwise = Set.singleton (ActionId taskProvidesVal ATBuildFinal)
+            taskProvidesVal = taskProvides task
+            addBuild
+                | isNothing mbuild = id -- has no normal build
+                | otherwise = Set.insert $ ActionId taskProvidesVal ATBuild
+            withLock Nothing f = f
+            withLock (Just lock) f = withMVar lock $ \() -> f
+            bopts = eeBuildOpts ee
 
--- | Generate the ConfigCache
+-- | Generate the ConfigCache.
 getConfigCache :: HasEnvConfig env
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
@@ -953,21 +853,6 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             logInfo ""
         fixupOnWindows
 
--- | Make a padded prefix for log messages
-packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
-packageNamePrefix ee name' =
-  let name = packageNameString name'
-      paddedName =
-        case eeLargestPackageName ee of
-          Nothing -> name
-          Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
-   in fromString paddedName <> "> "
-
-announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Utf8Builder -> RIO env ()
-announceTask ee task action = logInfo $
-    packageNamePrefix ee (pkgName (taskProvides task)) <>
-    action
-
 -- | Ensure we're the only action using the directory.  See
 -- <https://github.com/commercialhaskell/stack/issues/2730>
 withLockedDistDir
@@ -1002,12 +887,6 @@ withLockedDistDir announce root inner = do
         withRunInIO $ \run ->
         withFileLock (toFilePath lockFP) Exclusive $ \_ ->
         run $ stopComplaining *> inner
-
--- | How we deal with output from GHC, either dumping to a log file or the
--- console (with some prefix).
-data OutputType
-  = OTLogFile !(Path Abs File) !Handle
-  | OTConsole !(Maybe Utf8Builder)
 
 -- | This sets up a context for executing build steps which need to run
 -- Cabal (via a compiled Setup.hs).  In particular it does the following:
@@ -1048,7 +927,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
 
     wanted =
         case taskType of
-            TTLocalMutable lp -> lpWanted lp
+            TTLocalMutable lp -> lpShouldBeBuilt lp
             TTRemotePackage{} -> False
 
     -- Output to the console if this is the last task, and the user
@@ -1113,7 +992,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
 
             -- We only want to dump logs for local non-dependency packages
             case taskType of
-                TTLocalMutable lp | lpWanted lp ->
+                TTLocalMutable lp | lpShouldBeBuilt lp ->
                     liftIO $ atomically $ writeTChan eeLogFiles (pkgDir, logPath)
                 _ -> return ()
 
@@ -1168,7 +1047,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                 warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
-                        (TTLocalMutable lp, C.Custom) | lpWanted lp -> do
+                        (TTLocalMutable lp, C.Custom) | lpShouldBeBuilt lp -> do
                             prettyWarnL
                                 [ flow "Package"
                                 , fromString $ packageNameString $ packageName package
@@ -1365,19 +1244,21 @@ singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             -> RIO env ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
     (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
-    mprecompiled <- getPrecompiled cache
-    minstalled <-
-        case mprecompiled of
-            Just precompiled -> copyPreCompiled precompiled
-            Nothing -> do
-                mcurator <- view $ buildConfigL.to bcCurator
-                realConfigAndBuild cache mcurator allDepsMap
+    minstalled <- installIfNotPrecompiled allDepsMap cache
     case minstalled of
         Nothing -> return ()
         Just installed -> do
             writeFlagCache installed cache
             liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
   where
+    installIfNotPrecompiled :: Map PackageIdentifier GhcPkgId -> ConfigCache -> RIO env (Maybe Installed)
+    installIfNotPrecompiled allDepsMap confCache = do
+        mprecompiled <- getPrecompiled taskType eeBaseConfigOpts confCache
+        case mprecompiled of
+            Just precompiled -> copyPreCompiled pname ee task precompiled
+            Nothing -> do
+                mcurator <- view $ buildConfigL.to bcCurator
+                realConfigAndBuild confCache mcurator allDepsMap
     pname = pkgName taskProvides
     doHaddock mcurator package
                       = taskBuildHaddock &&
@@ -1423,101 +1304,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             _ -> (False, False, False)
-
-    getPrecompiled cache =
-        case taskType of
-            TTRemotePackage Immutable _ loc -> do
-                mpc <- readPrecompiledCache
-                       loc
-                       (configCacheOpts cache)
-                       (configCacheHaddock cache)
-                       (configCacheDeps cache)
-                case mpc of
-                    Nothing -> return Nothing
-                    -- Only pay attention to precompiled caches that refer to packages within
-                    -- the snapshot.
-                    Just pc | maybe False
-                                    (bcoSnapInstallRoot eeBaseConfigOpts `isProperPrefixOf`)
-                                    (pcLibrary pc) ->
-                        return Nothing
-                    -- If old precompiled cache files are left around but snapshots are deleted,
-                    -- it is possible for the precompiled file to refer to the very library
-                    -- we're building, and if flags are changed it may try to copy the library
-                    -- to itself. This check prevents that from happening.
-                    Just pc -> do
-                        let allM _ [] = return True
-                            allM f (x:xs) = do
-                                b <- f x
-                                if b then allM f xs else return False
-                        b <- liftIO $ allM doesFileExist $ maybe id (:) (pcLibrary pc) $ pcExes pc
-                        return $ if b then Just pc else Nothing
-            _ -> return Nothing
-
-    copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
-        wc <- view $ actualCompilerVersionL.whichCompilerL
-        announceTask ee task "using precompiled package"
-
-        -- We need to copy .conf files for the main library and all sublibraries which exist in the cache,
-        -- from their old snapshot to the new one. However, we must unregister any such library in the new
-        -- snapshot, in case it was built with different flags.
-        let
-          subLibNames = map T.unpack . Set.toList $ case taskType of
-            TTLocalMutable lp -> packageInternalLibraries $ lpPackage lp
-            TTRemotePackage _ p _ -> packageInternalLibraries p
-          PackageIdentifier name version = taskProvides
-          mainLibName = packageNameString name
-          mainLibVersion = versionString version
-          pkgName = mainLibName ++ "-" ++ mainLibVersion
-          -- z-package-z-internal for internal lib internal of package package
-          toCabalInternalLibName n = concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
-          allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
-          allToRegister = maybeToList mlib ++ sublibs
-
-        unless (null allToRegister) $ do
-            withMVar eeInstallLock $ \() -> do
-                -- We want to ignore the global and user databases.
-                -- Unfortunately, ghc-pkg doesn't take such arguments on the
-                -- command line. Instead, we'll set GHC_PACKAGE_PATH. See:
-                -- https://github.com/commercialhaskell/stack/issues/1146
-
-                let modifyEnv = Map.insert
-                      (ghcPkgPathEnvVar wc)
-                      (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
-
-                withModifyEnvVars modifyEnv $ do
-                  GhcPkgExe ghcPkgExe <- getGhcPkgExe
-
-                  -- first unregister everything that needs to be unregistered
-                  forM_ allToUnregister $ \packageName -> catchAny
-                      (readProcessNull (toFilePath ghcPkgExe) [ "unregister", "--force", packageName])
-                      (const (return ()))
-
-                  -- now, register the cached conf files
-                  forM_ allToRegister $ \libpath ->
-                    proc (toFilePath ghcPkgExe) [ "register", "--force", toFilePath libpath] readProcess_
-
-        liftIO $ forM_ exes $ \exe -> do
-            ensureDir bindir
-            let dst = bindir </> filename exe
-            createLink (toFilePath exe) (toFilePath dst) `catchIO` \_ -> copyFile exe dst
-        case (mlib, exes) of
-            (Nothing, _:_) -> markExeInstalled (taskLocation task) taskProvides
-            _ -> return ()
-
-        -- Find the package in the database
-        let pkgDbs = [bcoSnapDB eeBaseConfigOpts]
-
-        case mlib of
-            Nothing -> return $ Just $ Executable taskProvides
-            Just _ -> do
-                mpkgid <- loadInstalledPkg pkgDbs eeSnapshotDumpPkgs pname
-
-                return $ Just $
-                    case mpkgid of
-                        Nothing -> assert False $ Executable taskProvides
-                        Just pkgid -> Library taskProvides pkgid Nothing
-      where
-        bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
     realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task allDepsMap Nothing
         $ \package cabalfp pkgDir cabal0 announce _outputType -> do
@@ -1748,59 +1534,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             TTLocalMutable{} -> return ()
 
         return mpkgid
-
-    loadInstalledPkg pkgDbs tvar name = do
-        pkgexe <- getGhcPkgExe
-        dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
-        case dps of
-            [] -> return Nothing
-            [dp] -> do
-                liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
-                return $ Just (dpGhcPkgId dp)
-            _ -> error $ "singleBuild: invariant violated: multiple results when describing installed package " ++ show (name, dps)
-
--- | Get the build status of all the package executables. Do so by
--- testing whether their expected output file exists, e.g.
---
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.exe
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.jsexe/ (NOTE: a dir)
-getExecutableBuildStatuses
-    :: HasEnvConfig env
-    => Package -> Path Abs Dir -> RIO env (Map Text ExecutableBuildStatus)
-getExecutableBuildStatuses package pkgDir = do
-    distDir <- distDirFromDir pkgDir
-    platform <- view platformL
-    fmap
-        M.fromList
-        (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
-
--- | Check whether the given executable is defined in the given dist directory.
-checkExeStatus
-    :: HasLogFunc env
-    => Platform
-    -> Path b Dir
-    -> Text
-    -> RIO env (Text, ExecutableBuildStatus)
-checkExeStatus platform distDir name = do
-    exename <- parseRelDir (T.unpack name)
-    exists <- checkPath (distDir </> relDirBuild </> exename)
-    pure
-        ( name
-        , if exists
-              then ExecutableBuilt
-              else ExecutableNotBuilt)
-  where
-    checkPath base =
-        case platform of
-            Platform _ Windows -> do
-                fileandext <- parseRelFile (file ++ ".exe")
-                doesFileExist (base </> fileandext)
-            _ -> do
-                fileandext <- parseRelFile file
-                doesFileExist (base </> fileandext)
-      where
-        file = T.unpack name
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles :: HasEnvConfig env => TaskType -> Path Abs Dir -> RIO env [PackageWarning]
@@ -2242,7 +1975,7 @@ primaryComponentOptions executableBuildStatuses lp =
 --
 exesToBuild :: Map Text ExecutableBuildStatus -> LocalPackage -> Set Text
 exesToBuild executableBuildStatuses lp =
-    if cabalIsSatisfied executableBuildStatuses && lpWanted lp
+    if cabalIsSatisfied executableBuildStatuses && lpShouldBeBuilt lp
         then exeComponents (lpComponents lp)
         else packageExes (lpPackage lp)
 
@@ -2256,12 +1989,6 @@ finalComponentOptions lp =
     map (T.unpack . renderComponent) $
     Set.toList $
     Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
-
-taskComponents :: Task -> Set NamedComponent
-taskComponents task =
-    case taskType task of
-        TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpWanted
-        TTRemotePackage{} -> Set.empty
 
 expectTestFailure :: PackageName -> Maybe Curator -> Bool
 expectTestFailure pname mcurator =

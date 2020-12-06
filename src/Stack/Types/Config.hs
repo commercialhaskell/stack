@@ -1960,7 +1960,14 @@ newtype GhcPkgExe = GhcPkgExe (Path Abs File)
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
 getGhcPkgExe = view $ compilerPathsL.to cpPkg
 
--- | Dump information for a single package
+-- | Dump information for a single package.
+-- This is essentially a replicate of
+-- <https://downloads.haskell.org/ghc/latest/docs/html/libraries/Cabal-3.2.0.0/Distribution-InstalledPackageInfo.html#t:InstalledPackageInfo the cabal ghc-pkg dump type>.
+-- The real format from which it is aprsed is the GHC package database (@ghc-pkg describe x@)
+-- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/packages.html#installedpackageinfo-a-package-specification see this>.
+-- Why is this not the full cabal datatype ?
+-- There seems to be no trace of components in this (at the ghc-pkg level at least, the 
+-- cabal type has it).
 data DumpPackage = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
