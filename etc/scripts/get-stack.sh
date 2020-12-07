@@ -728,12 +728,20 @@ has_cmd() {
 
 # Check whether the given (query) path is listed in the PATH environment variable.
 on_path() {
-    # We normalize PATH and query regarding ~ by ensuring ~ is expanded to $HOME, avoiding
+    # Below we normalize PATH and query regarding ~ by ensuring ~ is expanded to $HOME, avoiding
     # false negatives in case where ~ is expanded in query but not in PATH and vice versa.
-    local PATH_BOUNDED=":$PATH:"
-    local PATH_NORMALIZED="${PATH_BOUNDED//:\~/:$HOME}" # Expand all ~ that are after :
-    local QUERY_NORMALIZED=":${1/#\~/$HOME}:" # Expand ~ if it is first character.
-    echo "$PATH_NORMALIZED" | grep -q "$QUERY_NORMALIZED"
+
+    # NOTE: If PATH or query have '|' somewhere in it, sed commands bellow will fail due to using | as their delimiter.
+
+    # If ~ is after : or if it is the first character in the path, replace it with expanded $HOME.
+    # For example, if $PATH is ~/martin/bin:~/martin/~tmp/bin,
+    # result will be /home/martin/bin:/home/martin/~tmp/bin .
+    local PATH_NORMALIZED=$(printf '%s' "$PATH" | sed -e "s|:~|:$HOME|g" | sed -e "s|^~|$HOME|")
+
+    # Replace ~ with expanded $HOME if it is the first character in the query path.
+    local QUERY_NORMALIZED=$(printf '%s' "$1" | sed -e "s|^~|$HOME|")
+
+    echo ":$PATH_NORMALIZED:" | grep -q ":$QUERY_NORMALIZED:"
 }
 
 # Check whether ~/.local/bin is on the PATH, and print a warning if not.
