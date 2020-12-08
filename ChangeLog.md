@@ -1,6 +1,13 @@
 # Changelog
 
 
+## v2.5.1.1
+
+Hackage-only release:
+
+* Support build with persistent-2.11.x and optparse-applicative-0.16.x
+
+
 ## v2.5.1
 
 **Changes since v2.3.3**
