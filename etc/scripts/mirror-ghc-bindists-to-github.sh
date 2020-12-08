@@ -93,7 +93,7 @@ mirror x86_64-unknown-mingw32 "" xz xz windows64
 mirror x86_64-unknown-freebsd "" xz xz freebsd64-11
 mirror aarch64-deb10-linux "" xz xz linux-aarch64
 mirror armv7-deb10-linux "" xz xz linux-armv7
-#mirror x86_64-alpine3.10-linux-integer-simple "" xz xz @@@
+#mirror x86_64-alpine3.10-linux-integer-simple "" xz xz
 
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl "" xz xz linux32-musl
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl "" xz xz linux64-musl

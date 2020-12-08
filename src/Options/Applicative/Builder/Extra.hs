@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -31,6 +32,7 @@ module Options.Applicative.Builder.Extra
   ,defaultPathCompleterOpts
   ,pathCompleterWith
   ,unescapeBashArg
+  ,showHelpText
   ) where
 
 import Data.List (isPrefixOf)
@@ -164,7 +166,7 @@ execExtraHelp args helpOpt parser pd =
                                 some (strArgument (metavar "OTHER ARGUMENTS") :: Parser String)))
                         (fullDesc <> progDesc pd))
         return ()
-  where hiddenHelper = abortOption ShowHelpText (long "help" <> hidden <> internal)
+  where hiddenHelper = abortOption showHelpText (long "help" <> hidden <> internal)
 
 -- | 'option', specialized to 'Text'.
 textOption :: Mod OptionFields Text -> Parser Text
@@ -283,3 +285,10 @@ unescapeBashArg input = go input
     go [] = []
     go ('\\' : x : xs) = x : go xs
     go (x : xs) = x : go xs
+
+showHelpText :: ParseError
+#if MIN_VERSION_optparse_applicative(0,16,0)
+showHelpText = ShowHelpText Nothing
+#else
+showHelpText = ShowHelpText
+#endif
