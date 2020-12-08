@@ -1666,6 +1666,9 @@ users. Here's a quick rundown:
   (`-l`) and nightly (`-n`) snapshots.
 * `stack ls dependencies` lists all of the packages and versions used for a
   project
+* `stack list [PACKAGE]...` list the version of the specified package(s) in a
+  snapshot, or without an argument list all the snapshot's package versions.
+  If no resolver is specified the latest package version from Hackage is given.
 * `stack sig` subcommand can help you with GPG signing & verification
     * `sign` will sign an sdist tarball and submit the signature to
       sig.commercialhaskell.org for storage in the sig-archive git repo.

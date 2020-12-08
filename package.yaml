@@ -194,6 +194,7 @@ library:
   - Stack.Hoogle
   - Stack.IDE
   - Stack.Init
+  - Stack.List
   - Stack.Ls
   - Stack.Lock
   - Stack.New

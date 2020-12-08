@@ -18,6 +18,9 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack list` is a new command to list package versions in a snapshot.
+  See [#5431](https://github.com/commercialhaskell/stack/pull/5431)
+
 Bug fixes:
 
 * `stack new` now suppports branches other than `master` as default for
