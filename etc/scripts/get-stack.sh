@@ -278,7 +278,7 @@ do_windows_install() {
     # should never happen, the -d flag appends stack itself
     die "Currently the destination must always end with 'stack' on Windows, got: $DEST"
   fi
-  if ! 7z x $STACK_TEMP_DIR/stack.zip stack.exe "-o$(dirname $DEST)"; then
+  if ! 7z x $STACK_TEMP_DIR/stack.zip stack.exe "-o$(dirname $DEST)" -y; then
     die "Extract zip file failed, you probably don't have 7z installed"
   fi
   post_install_separator

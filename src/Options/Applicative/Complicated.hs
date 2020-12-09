@@ -17,6 +17,7 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
 import           Options.Applicative
 import           Options.Applicative.Types
+import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Builder.Internal
 import           Stack.Prelude
 import           System.Environment
@@ -152,6 +153,6 @@ hsubparser' commandMetavar m = mkParser d g rdr
 -- | Non-hidden help option.
 helpOption :: Parser (a -> a)
 helpOption =
-    abortOption ShowHelpText $
+    abortOption showHelpText $
     long "help" <>
     help "Show this help text"

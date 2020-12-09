@@ -5,7 +5,7 @@
 
 Release notes:
 
-**Changes since v2.5.1:**
+**Changes since v2.5.1.1:**
 
 Major changes:
 
@@ -26,6 +26,13 @@ Bug fixes:
 * `stack new` now suppports branches other than `master` as default for
   GitHub repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
+
+## v2.5.1.1
+
+Hackage-only release:
+
+* Support build with persistent-2.11.x and optparse-applicative-0.16.x
+
 
 ## v2.5.1
 
