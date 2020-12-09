@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d8238b931bb25661f8ecb43afaa8bd6a3478b566df5d876c97ff5d42a3c714f9
+-- hash: 2f9f16e2b05f9ff43d6b170c94cc5bdd6727b90d35a2526dcd5677798784320c
 
 name:           stack
 version:        2.5.2
@@ -271,7 +271,7 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0 && <0.16
+    , optparse-applicative >=0.14.3.0
     , pantry >=0.5.1.3
     , path
     , path-io
@@ -395,7 +395,7 @@ executable stack
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0 && <0.16
+    , optparse-applicative >=0.14.3.0
     , pantry >=0.5.1.3
     , path
     , path-io
@@ -517,7 +517,7 @@ executable stack-integration-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0 && <0.16
+    , optparse-applicative >=0.14.3.0
     , optparse-generic
     , pantry >=0.5.1.3
     , path
@@ -646,7 +646,7 @@ test-suite stack-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0 && <0.16
+    , optparse-applicative >=0.14.3.0
     , pantry >=0.5.1.3
     , path
     , path-io
