@@ -21,6 +21,7 @@ import           Data.ByteString.Builder (byteString)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.List
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -41,7 +42,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
-import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -346,14 +346,17 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
     let targets = localTargets ++ map T.pack ghciAdditionalPackages
     -- If necessary, do the build, for local packagee targets, only do
     -- 'initialBuildSteps'.
-    when (not ghciNoBuild && not (null targets)) $ do
-        -- only new local targets could appear here
-        eres <- tryAny $ withNewLocalBuildTargets targets $ build Nothing
+    case NE.nonEmpty targets of
+      -- only new local targets could appear here
+      Just nonEmptyTargets | not ghciNoBuild -> do
+        eres <- buildLocalTargets nonEmptyTargets
         case eres of
             Right () -> return ()
             Left err -> do
                 prettyError $ fromString (show err)
                 prettyWarn "Build failed, but trying to launch GHCi anyway"
+      _ ->
+        return ()
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do

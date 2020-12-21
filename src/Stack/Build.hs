@@ -9,6 +9,7 @@
 
 module Stack.Build
   (build
+  ,buildLocalTargets
   ,loadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo
@@ -39,6 +40,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Package
+import           Stack.Setup (withNewLocalBuildTargets)
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -116,6 +118,10 @@ build msetLocalFiles = do
                          installedMap
                          (smtTargets $ smTargets sourceMap)
                          plan
+
+buildLocalTargets :: HasEnvConfig env => NonEmpty Text -> RIO env (Either SomeException ())
+buildLocalTargets targets =
+  tryAny $ withNewLocalBuildTargets (NE.toList targets) $ build Nothing
 
 justLocals :: Plan -> [PackageIdentifier]
 justLocals =
