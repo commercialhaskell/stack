@@ -329,7 +329,6 @@ configFromConfigMonoid
          configSetupInfoInline = configMonoidSetupInfoInline
          configPvpBounds = fromFirst (PvpBounds PvpBoundsNone False) configMonoidPvpBounds
          configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
-         configExplicitSetupDeps = configMonoidExplicitSetupDeps
          configRebuildGhcOptions = fromFirstFalse configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromFirst False configMonoidAllowNewer

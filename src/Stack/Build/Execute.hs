@@ -1024,10 +1024,8 @@ withSingleContext :: forall env a. HasEnvConfig env
                   => ActionContext
                   -> ExecuteEnv
                   -> Task
-                  -> Maybe (Map PackageIdentifier GhcPkgId)
-                  -- ^ All dependencies' package ids to provide to Setup.hs. If
-                  -- Nothing, just provide global and snapshot package
-                  -- databases.
+                  -> Map PackageIdentifier GhcPkgId
+                  -- ^ All dependencies' package ids to provide to Setup.hs.
                   -> Maybe String
                   -> (  Package                                -- Package info
                      -> Path Abs File                          -- Cabal file path
@@ -1040,7 +1038,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                      -> OutputType
                      -> RIO env a)
                   -> RIO env a
-withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
+withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withOutputType pkgDir package $ \outputType ->
     withCabal package pkgDir outputType $ \cabal ->
@@ -1180,24 +1178,18 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
 
                 getPackageArgs :: Path Abs Dir -> RIO env [String]
                 getPackageArgs setupDir =
-                    case (packageSetupDeps package, mdeps) of
+                    case packageSetupDeps package of
                         -- The package is using the Cabal custom-setup
                         -- configuration introduced in Cabal 1.24. In
                         -- this case, the package is providing an
                         -- explicit list of dependencies, and we
                         -- should simply use all of them.
-                        (Just customSetupDeps, _) -> do
+                        Just customSetupDeps -> do
                             unless (Map.member (mkPackageName "Cabal") customSetupDeps) $
                                 prettyWarnL
                                     [ fromString $ packageNameString $ packageName package
                                     , "has a setup-depends field, but it does not mention a Cabal dependency. This is likely to cause build errors."
                                     ]
-                            allDeps <-
-                                case mdeps of
-                                    Just x -> return x
-                                    Nothing -> do
-                                        prettyWarnS "In getPackageArgs: custom-setup in use, but no dependency map present"
-                                        return Map.empty
                             matchedDeps <- forM (Map.toList customSetupDeps) $ \(name, range) -> do
                                 let matches (PackageIdentifier name' version) =
                                         name == name' &&
@@ -1218,21 +1210,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                             writeBinaryFileAtomic cppMacrosFile (encodeUtf8Builder (T.pack (C.generatePackageVersionMacros macroDeps)))
                             return (packageDBArgs ++ depsArgs ++ cppArgs)
 
-                        -- This branch is taken when
-                        -- 'explicit-setup-deps' is requested in your
-                        -- stack.yaml file.
-                        (Nothing, Just deps) | explicitSetupDeps (packageName package) config -> do
-                            warnCustomNoDeps
-                            -- Stack always builds with the global Cabal for various
-                            -- reproducibility issues.
-                            let depsMinusCabal
-                                 = map ghcPkgIdString
-                                 $ Set.toList
-                                 $ addGlobalPackages deps (Map.elems eeGlobalDumpPkgs)
-                            return (
-                                packageDBArgs ++
-                                cabalPackageArg ++
-                                map ("-package-id=" ++) depsMinusCabal)
                         -- This branch is usually taken for builds, and
                         -- is always taken for `stack sdist`.
                         --
@@ -1250,7 +1227,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} mdeps msu
                         -- Currently, this branch is only taken via `stack
                         -- sdist` or when explicitly requested in the
                         -- stack.yaml file.
-                        (Nothing, _) -> do
+                        Nothing -> do
                             warnCustomNoDeps
                             return $ cabalPackageArg ++
                                     -- NOTE: This is different from
@@ -1542,7 +1519,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       where
         bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
-    realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task (Just allDepsMap) Nothing
+    realConfigAndBuild cache mcurator allDepsMap = withSingleContext ac ee task allDepsMap Nothing
         $ \package cabalfp pkgDir cabal0 announce _outputType -> do
             let cabal = cabal0 CloseOnException
             executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
@@ -1859,7 +1836,7 @@ singleTest topts testsToRun ac ee task installedMap = do
     mcurator <- view $ buildConfigL.to bcCurator
     let pname = pkgName $ taskProvides task
         expectFailure = expectTestFailure pname mcurator
-    withSingleContext ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce outputType -> do
+    withSingleContext ac ee task allDepsMap (Just "test") $ \package _cabalfp pkgDir _cabal announce outputType -> do
         config <- view configL
         let needHpc = toCoverage topts
 
@@ -2087,7 +2064,7 @@ singleBench :: HasEnvConfig env
             -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-    withSingleContext ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _outputType -> do
+    withSingleContext ac ee task allDepsMap (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _outputType -> do
         let args = map T.unpack benchesToRun <> maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
@@ -2285,81 +2262,6 @@ taskComponents task =
     case taskType task of
         TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpWanted
         TTRemotePackage{} -> Set.empty
-
--- | Take the given list of package dependencies and the contents of the global
--- package database, and construct a set of installed package IDs that:
---
--- * Excludes the Cabal library (it's added later)
---
--- * Includes all packages depended on by this package
---
--- * Includes all global packages, unless: (1) it's hidden, (2) it's shadowed
---   by a depended-on package, or (3) one of its dependencies is not met.
---
--- See:
---
--- * https://github.com/commercialhaskell/stack/issues/941
---
--- * https://github.com/commercialhaskell/stack/issues/944
---
--- * https://github.com/commercialhaskell/stack/issues/949
-addGlobalPackages :: Map PackageIdentifier GhcPkgId -- ^ dependencies of the package
-                  -> [DumpPackage] -- ^ global packages
-                  -> Set GhcPkgId
-addGlobalPackages deps globals0 =
-    res
-  where
-    -- Initial set of packages: the installed IDs of all dependencies
-    res0 = Map.elems $ Map.filterWithKey (\ident _ -> not $ isCabal ident) deps
-
-    -- First check on globals: it's not shadowed by a dep, it's not Cabal, and
-    -- it's exposed
-    goodGlobal1 dp = not (isDep dp)
-                  && not (isCabal $ dpPackageIdent dp)
-                  && dpIsExposed dp
-    globals1 = filter goodGlobal1 globals0
-
-    -- Create a Map of unique package names in the global database
-    globals2 = Map.fromListWith chooseBest
-             $ map (pkgName . dpPackageIdent &&& id) globals1
-
-    -- Final result: add in globals that have their dependencies met
-    res = loop id (Map.elems globals2) $ Set.fromList res0
-
-    ----------------------------------
-    -- Some auxiliary helper functions
-    ----------------------------------
-
-    -- Is the given package identifier for any version of Cabal
-    isCabal (PackageIdentifier name _) = name == mkPackageName "Cabal"
-
-    -- Is the given package name provided by the package dependencies?
-    isDep dp = pkgName (dpPackageIdent dp) `Set.member` depNames
-    depNames = Set.map pkgName $ Map.keysSet deps
-
-    -- Choose the best of two competing global packages (the newest version)
-    chooseBest dp1 dp2
-        | getVer dp1 < getVer dp2 = dp2
-        | otherwise               = dp1
-      where
-        getVer = pkgVersion . dpPackageIdent
-
-    -- Are all dependencies of the given package met by the given Set of
-    -- installed packages
-    depsMet dp gids = all (`Set.member` gids) (dpDepends dp)
-
-    -- Find all globals that have all of their dependencies met
-    loop front (dp:dps) gids
-        -- This package has its deps met. Add it to the list of dependencies
-        -- and then traverse the list from the beginning (this package may have
-        -- been a dependency of an earlier one).
-        | depsMet dp gids = loop id (front dps) (Set.insert (dpGhcPkgId dp) gids)
-        -- Deps are not met, keep going
-        | otherwise = loop (front . (dp:)) dps gids
-    -- None of the packages we checked can be added, therefore drop them all
-    -- and return our results
-    loop _ [] gids = gids
-
 
 expectTestFailure :: PackageName -> Maybe Curator -> Bool
 expectTestFailure pname mcurator =

@@ -781,31 +781,6 @@ is to modify.
 modify-code-page: false
 ```
 
-### explicit-setup-deps
-
-(Since 0.1.6)
-
-Decide whether a custom `Setup.hs` script should be run with an explicit list of
-dependencies, based on the dependencies of the package itself. It associates the
-name of a local package with a boolean. When it's `true`, the `Setup.hs` script
-is built with an explicit list of packages. When it's `false` (default), the
-`Setup.hs` script is built without access to the local DB, but can access any
-package in the snapshot / global DB.
-
-Note that in the future, this will be unnecessary, once Cabal provides full
-support for explicit Setup.hs dependencies.
-
-```yaml
-explicit-setup-deps:
-    "*": true # change the default
-    entropy: false # override the new default for one package
-```
-
-NOTE: since 1.4.0, Stack has support for Cabal's `custom-setup` block
-(introduced in Cabal 1.24). If a `custom-setup` block is provided in a `.cabal`
-file, it will override the setting of `explicit-setup-deps`, and instead rely
-on the stated dependencies.
-
 ### allow-newer
 
 (Since 0.1.7)

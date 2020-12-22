@@ -44,10 +44,11 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
 import           RIO.PrettyPrint
-import           Stack.Build (mkBaseConfigOpts, build)
+import           Stack.Build (mkBaseConfigOpts, build, buildLocalTargets)
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source (projectLocalPackages)
+import           Stack.Types.GhcPkgId
 import           Stack.Package
 import           Stack.SourceMap
 import           Stack.Types.Build
@@ -103,9 +104,27 @@ getSDistTarball mpvpBounds pkgDir = do
         tweakCabal = pvpBounds /= PvpBoundsNone
         pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
+    forM_ (packageSetupDeps (lpPackage lp)) $ \customSetupDeps ->
+        case NE.nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
+          Just nonEmptyDepTargets -> do
+            eres <- buildLocalTargets nonEmptyDepTargets
+            case eres of
+              Left err ->
+                logError $ "Error building custom-setup dependencies: " <> displayShow err
+              Right _ ->
+                return ()
+          Nothing ->
+            logWarn "unexpected empty custom-setup dependencies"
     sourceMap <- view $ envConfigL.to envConfigSourceMap
+
+    installMap <- toInstallMap sourceMap
+    (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, _localDumpPkgs) <-
+        getInstalled installMap
+    let deps = Map.fromList [ (pid, ghcPkgId)
+                            | (_, Library pid ghcPkgId _) <- Map.elems installedMap]
+
     logInfo $ "Getting file list for " <> fromString pkgFp
-    (fileList, cabalfp) <- getSDistFileList lp
+    (fileList, cabalfp) <- getSDistFileList lp deps
     logInfo $ "Building sdist tarball for " <> fromString pkgFp
     files <- normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
 
@@ -305,8 +324,8 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList :: HasEnvConfig env => LocalPackage -> RIO env (String, Path Abs File)
-getSDistFileList lp =
+getSDistFileList :: HasEnvConfig env => LocalPackage -> Map PackageIdentifier GhcPkgId -> RIO env (String, Path Abs File)
+getSDistFileList lp deps =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts
         let boptsCli = defaultBuildOptsCLI
@@ -315,7 +334,7 @@ getSDistFileList lp =
         withExecuteEnv bopts boptsCli baseConfigOpts locals
             [] [] [] Nothing -- provide empty list of globals. This is a hack around custom Setup.hs files
             $ \ee ->
-            withSingleContext ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
+            withSingleContext ac ee task deps (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _outputType -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal CloseOnException KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)

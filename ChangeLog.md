@@ -16,6 +16,11 @@ Behavior changes:
   one package. See
   [#5421](https://github.com/commercialhaskell/stack/issues/5421)
 
+* `custom-setup` dependencies are now properly initialized for `stack dist`.
+  This makes `explicit-setup-deps` no longer required and that option was
+  removed. See
+  [#4006](https://github.com/commercialhaskell/stack/issues/4006)
+
 Other enhancements:
 
 * `stack list` is a new command to list package versions in a snapshot.

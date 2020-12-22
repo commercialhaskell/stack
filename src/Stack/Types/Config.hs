@@ -33,7 +33,6 @@ module Stack.Types.Config
   ,Config(..)
   ,HasConfig(..)
   ,askLatestSnapshotUrl
-  ,explicitSetupDeps
   ,configProjectRoot
   -- ** BuildConfig & HasBuildConfig
   ,BuildConfig(..)
@@ -342,8 +341,6 @@ data Config =
          -- ^ How PVP upper bounds should be added to packages
          ,configModifyCodePage      :: !Bool
          -- ^ Force the code page to UTF-8 on Windows
-         ,configExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
-         -- ^ See 'explicitSetupDeps'. 'Nothing' provides the default value.
          ,configRebuildGhcOptions   :: !Bool
          -- ^ Rebuild on GHC options changes
          ,configApplyGhcOptions     :: !ApplyGhcOptions
@@ -835,8 +832,6 @@ data ConfigMonoid =
     -- ^ See 'configPvpBounds'
     ,configMonoidModifyCodePage      :: !FirstTrue
     -- ^ See 'configModifyCodePage'
-    ,configMonoidExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
-    -- ^ See 'configExplicitSetupDeps'
     ,configMonoidRebuildGhcOptions   :: !FirstFalse
     -- ^ See 'configMonoidRebuildGhcOptions'
     ,configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
@@ -964,9 +959,6 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidLocalProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
     configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
     configMonoidModifyCodePage <- FirstTrue <$> obj ..:? configMonoidModifyCodePageName
-    configMonoidExplicitSetupDeps <-
-        (obj ..:? configMonoidExplicitSetupDepsName ..!= mempty)
-        >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
     configMonoidRebuildGhcOptions <- FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- First <$> obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
@@ -995,16 +987,6 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidStackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
 
     return ConfigMonoid {..}
-  where
-    handleExplicitSetupDep :: (Monad m, MonadFail m) => (Text, Bool) -> m (Maybe PackageName, Bool)
-    handleExplicitSetupDep (name', b) = do
-        name <-
-            if name' == "*"
-                then return Nothing
-                else case parsePackageName $ T.unpack name' of
-                        Nothing -> fail $ "Invalid package name: " ++ show name'
-                        Just x -> return $ Just x
-        return (name, b)
 
 configMonoidWorkDirName :: Text
 configMonoidWorkDirName = "work-dir"
@@ -1110,9 +1092,6 @@ configMonoidPvpBoundsName = "pvp-bounds"
 
 configMonoidModifyCodePageName :: Text
 configMonoidModifyCodePageName = "modify-code-page"
-
-configMonoidExplicitSetupDepsName :: Text
-configMonoidExplicitSetupDepsName = "explicit-setup-deps"
 
 configMonoidRebuildGhcOptionsName :: Text
 configMonoidRebuildGhcOptionsName = "rebuild-ghc-options"
@@ -1775,16 +1754,6 @@ instance ToJSON PvpBounds where
     toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
-
--- | Provide an explicit list of package dependencies when running a custom Setup.hs
-explicitSetupDeps :: (MonadReader env m, HasConfig env) => PackageName -> m Bool
-explicitSetupDeps name = do
-    m <- view $ configL.to configExplicitSetupDeps
-    return $
-      Map.findWithDefault
-        (Map.findWithDefault False Nothing m)
-        (Just name)
-        m
 
 -- | Data passed into Docker container for the Docker entrypoint's use
 newtype DockerEntrypoint = DockerEntrypoint
