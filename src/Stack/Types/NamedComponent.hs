@@ -14,6 +14,7 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
+  , naiveExecutionOrdering
   ) where
 
 import Pantry
@@ -36,6 +37,12 @@ renderComponent (CInternalLib x) = "internal-lib:" <> x
 renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
+
+naiveExecutionOrdering :: NamedComponent -> Int
+naiveExecutionOrdering CLib = 1
+naiveExecutionOrdering (CInternalLib _) = 2
+naiveExecutionOrdering (CExe _) = 3
+naiveExecutionOrdering _ = 4
 
 renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent

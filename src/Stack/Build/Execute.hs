@@ -656,7 +656,15 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
             ATRunBenchmarks -> \ac -> runInBase $ do
                             let beopts = boptsBenchmarkOpts bopts
                             singleBench beopts (Set.toList compSet) ac ee task installedMap
-            _ -> \ac -> runInBase $ singleBuild ac ee task installedMap (actType == ATBuildFinal)
+            _ -> \ac -> runInBase $ do
+                let builder = singleBuild ac ee task installedMap (actType == ATBuildFinal)
+                -- The idea here, is that, if we can we use component based builds, we should.
+                -- I.e, if no components exist in the Task,
+                -- we fallback to the previous (full-package) build system.
+                -- For now this only supports component builds for local packages.
+                if null taskCompList
+                    then builder Nothing
+                    else sequence_ $ (builder . Just) <$> taskCompList
         , actionConcurrency = case actType of
             -- Never run benchmarks concurrently with any other task, see #3663
             ATRunBenchmarks -> ConcurrencyDisallowed
@@ -673,6 +681,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                 | taskAllInOne task = addBuild mempty
                 | otherwise = Set.singleton (ActionId taskProvidesVal ATBuildFinal)
             taskProvidesVal = taskProvides task
+            taskCompList = sortOn naiveExecutionOrdering ((Set.toList . taskComponents $ task) <> [])
             addBuild
                 | isNothing mbuild = id -- has no normal build
                 | otherwise = Set.insert $ ActionId taskProvidesVal ATBuild
@@ -682,9 +691,9 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
 
 -- | Generate the ConfigCache.
 getConfigCache :: HasEnvConfig env
-               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
+               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool -> Bool
                -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
-getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
+getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench isNotComponentBuild = do
     let extra =
             -- We enable tests if the test suite dependencies are already
             -- installed, so that we avoid unnecessary recompilation based on
@@ -696,8 +705,8 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                   -- FIXME: make this work with exact-configuration.
                   -- Not sure how to plumb the info atm. See
                   -- https://github.com/commercialhaskell/stack/issues/2049
-                  [ "--enable-tests" | enableTest] ++
-                  [ "--enable-benchmarks" | enableBench]
+                  [ "--enable-tests" | isNotComponentBuild && enableTest] ++
+                  [ "--enable-benchmarks" | isNotComponentBuild && enableBench]
                 TTRemotePackage{} -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
@@ -741,8 +750,9 @@ ensureConfig :: HasEnvConfig env
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
              -> Task
+             -> Maybe NamedComponent
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
+ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task maybeComp = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
     setupConfigfp <- setupConfigFromDir pkgDir
     newSetupConfigMod <- liftIO $ either (const Nothing) (Just . modificationTime) <$>
@@ -794,7 +804,11 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                 Right x -> return $ concat ["--with-", name, "=", x]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
-        cabal KeepTHLoading $ "configure" : concat
+        let componentBasedArg = case maybeComp of
+                    Just CLib -> []
+                    Nothing -> []
+                    Just a -> [T.unpack . renderComponent $ a]
+        cabal KeepTHLoading $ "configure" : componentBasedArg <> concat
             [ concat exes
             , dirs
             , nodirs
@@ -1241,9 +1255,11 @@ singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             -> Task
             -> InstalledMap
             -> Bool             -- ^ Is this a final build?
+            -> Maybe NamedComponent
+            -- ^ If given, this triggers a component based build of the specified component
             -> RIO env ()
-singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
-    (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
+singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild maybeComp = do
+    (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks (isNothing maybeComp)
     minstalled <- installIfNotPrecompiled allDepsMap cache
     case minstalled of
         Nothing -> return ()
@@ -1258,7 +1274,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             Just precompiled -> copyPreCompiled pname ee task precompiled
             Nothing -> do
                 mcurator <- view $ buildConfigL.to bcCurator
-                realConfigAndBuild confCache mcurator allDepsMap
+                realConfigAndBuild confCache mcurator allDepsMap 
     pname = pkgName taskProvides
     doHaddock mcurator package
                       = taskBuildHaddock &&
@@ -1314,7 +1330,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task maybeComp
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1565,7 +1581,7 @@ singleTest :: HasEnvConfig env
 singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
-    (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap True False True
     mcurator <- view $ buildConfigL.to bcCurator
     let pname = pkgName $ taskProvides task
         expectFailure = expectTestFailure pname mcurator
@@ -1796,7 +1812,7 @@ singleBench :: HasEnvConfig env
             -> InstalledMap
             -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
-    (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap False True True
     withSingleContext ac ee task allDepsMap (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _outputType -> do
         let args = map T.unpack benchesToRun <> maybe []
                          ((:[]) . ("--benchmark-options=" <>))

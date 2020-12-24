@@ -33,6 +33,7 @@ import Distribution.System
 import Stack.Constants
 import Stack.Constants.Config
 
+-- | A precompiled task only exists for remote packages, never for local packages.
 getPrecompiled :: HasEnvConfig env =>
     TaskType
     -> BaseConfigOpts
