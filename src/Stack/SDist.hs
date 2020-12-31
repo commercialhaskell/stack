@@ -345,6 +345,7 @@ getSDistFileList lp deps =
     task = Task
         { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
         , taskType = TTLocalMutable lp
+        , taskComponentSet = mempty
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
             , tcoOpts = \_ -> ConfigureOpts [] []

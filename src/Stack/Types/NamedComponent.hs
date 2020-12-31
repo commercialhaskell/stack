@@ -15,12 +15,14 @@ module Stack.Types.NamedComponent
   , isCTest
   , isCBench
   , naiveExecutionOrdering
+  , configureComponentFlag
   ) where
 
 import Pantry
 import Stack.Prelude
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import Distribution.Types.PackageName (unPackageName)
 
 -- | A single, fully resolved component of a package
 data NamedComponent
@@ -37,6 +39,15 @@ renderComponent (CInternalLib x) = "internal-lib:" <> x
 renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
+
+configureComponentFlag :: PackageName -> Maybe NamedComponent -> [String]
+configureComponentFlag _ Nothing = mempty
+configureComponentFlag pn (Just np) = case np of
+    CLib -> ["lib:" <> (show . unPackageName $ pn)]
+    (CInternalLib x) -> ["lib:" <> show x]
+    (CExe x) -> ["exe:" <> show x]
+    (CTest x) -> ["test:" <> show x]
+    (CBench x) -> ["bench:" <> show x]
 
 naiveExecutionOrdering :: NamedComponent -> Int
 naiveExecutionOrdering CLib = 1

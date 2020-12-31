@@ -19,7 +19,7 @@ import           Distribution.Parsec (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
-import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
+import           Distribution.PackageDescription (PackageDescription, TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -109,6 +109,9 @@ data Package =
           -- This is PackageDescription licenseRaw in Cabal. 
           ,packageFiles :: !GetPackageFiles
           -- ^ Get all files of the package.
+          -- Absent in cabal.
+          ,packageCabalDescription :: PackageDescription
+          -- ^ The original package description in Cabal format.
           ,packageDeps :: !(Map PackageName DepValue)
           -- ^ Packages that the package depends on, both as libraries and build tools.
           -- Derived from Cabal:

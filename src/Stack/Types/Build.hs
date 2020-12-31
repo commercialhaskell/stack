@@ -44,6 +44,7 @@ module Stack.Types.Build
     ,ConfigureOpts (..)
     ,PrecompiledCache (..)
     ,mergeTasksAndFinal
+    ,taskPackageName
     )
     where
 
@@ -429,6 +430,10 @@ data Task = Task
     -- ^ the package/version to be built
     , taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
+    , taskComponentSet    :: Set NamedComponent
+    -- ^ If this is non empty we trigger a component based build.
+    -- Eventually we'll switch this to a non empty set/list to ensure
+    -- every build is component based. 
     , taskConfigOpts      :: !TaskConfigOpts
     , taskBuildHaddock    :: !Bool
     , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
@@ -511,10 +516,15 @@ taskTargetIsMutable task =
 -- | For now, there is no component set for the remote packages.
 -- This should change with full component based builds.
 taskComponents :: Task -> Set NamedComponent
+-- taskComponents = taskComponentSet
 taskComponents task =
     case taskType task of
         TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpShouldBeBuilt
         TTRemotePackage{} -> Set.empty
+
+taskPackageName :: Task -> PackageName
+taskPackageName t = case taskProvides t of
+    PackageIdentifier pn _ -> pn
 
 -- | Useful for a dry run.
 displayTask :: Task -> Utf8Builder

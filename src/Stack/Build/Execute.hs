@@ -681,7 +681,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                 | taskAllInOne task = addBuild mempty
                 | otherwise = Set.singleton (ActionId taskProvidesVal ATBuildFinal)
             taskProvidesVal = taskProvides task
-            taskCompList = sortOn naiveExecutionOrdering ((Set.toList . taskComponents $ task) <> [])
+            taskCompList = sortOn naiveExecutionOrdering ((Set.toList . taskComponentSet $ task) <> [])
             addBuild
                 | isNothing mbuild = id -- has no normal build
                 | otherwise = Set.insert $ ActionId taskProvidesVal ATBuild
@@ -804,10 +804,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task m
                 Right x -> return $ concat ["--with-", name, "=", x]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
-        let componentBasedArg = case maybeComp of
-                    Just CLib -> []
-                    Nothing -> []
-                    Just a -> [T.unpack . renderComponent $ a]
+        let componentBasedArg = configureComponentFlag (taskPackageName task) maybeComp
         cabal KeepTHLoading $ "configure" : componentBasedArg <> concat
             [ concat exes
             , dirs
@@ -1329,7 +1326,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-
+            -- announce (fromString $ show task)
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task maybeComp
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
@@ -1408,13 +1405,16 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         let stripTHLoading
                 | configHideTHLoading config = ExcludeTHLoading
                 | otherwise                  = KeepTHLoading
-        cabal stripTHLoading (("build" :) $ (++ extraOpts) $
-            case (taskType, taskAllInOne, isFinalBuild) of
-                (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTLocalMutable lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
-                (TTLocalMutable lp, False, True) -> finalComponentOptions lp
-                (TTLocalMutable lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
-                (TTRemotePackage{}, _, _) -> [])
+        let moreOpt
+                | isNothing maybeComp = (++ extraOpts) $
+                    case (taskType, taskAllInOne, isFinalBuild) of
+                        (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                        (TTLocalMutable lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
+                        (TTLocalMutable lp, False, True) -> finalComponentOptions lp
+                        (TTLocalMutable _, True, False) -> [] -- primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
+                        (TTRemotePackage{}, _, _) -> []
+                | otherwise = []
+        cabal stripTHLoading (("build" :) moreOpt)
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
               _ -> throwM ex

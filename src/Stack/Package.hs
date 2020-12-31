@@ -136,6 +136,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     { packageName = name
     , packageVersion = pkgVersion pkgId
     , packageLicense = licenseRaw pkg
+    , packageCabalDescription = pkgNoMod
     , packageDeps = deps
     , packageFiles = pkgFiles
     , packageUnknownTools = unknownTools

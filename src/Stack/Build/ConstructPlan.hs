@@ -85,9 +85,9 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     globalCabalVersion <- view $ compilerPathsL.to cpCabalVersion
     sources <- getSources globalCabalVersion
     mcur <- view $ buildConfigL.to bcCurator
-
-    let onTarget = void . addDep
-    let projectInitPlan = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
+    let targetsToAdd = Map.assocs . smtTargets $ smTargets sourceMap
+    let packageAndComponentSet = fmap getTargetPackageAndComponent <$> targetsToAdd
+    let projectInitPlan = mapM_ addDep packageAndComponentSet
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
     ((), addedPackageMap, planDraft) <- liftIO $ runRWST projectInitPlan ctx M.empty
@@ -261,8 +261,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> Bool -> ConstructPlanMonad ()
-addFinal lp package isAllInOne buildHaddocks = do
+addFinal :: LocalPackage -> Package -> Bool -> Bool -> Set NamedComponent -> ConstructPlanMonad ()
+addFinal lp package isAllInOne buildHaddocks compSet = do
     depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
@@ -284,6 +284,7 @@ addFinal lp package isAllInOne buildHaddocks = do
                 , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
                 , taskType = TTLocalMutable lp
+                , taskComponentSet = compSet
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
@@ -301,9 +302,10 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- forcing this package to be marked as a dependency, even if it is
 -- directly wanted. This makes sense - if we left out packages that are
 -- deps, it would break the --only-dependencies build plan.
-addDep :: PackageName
+addDep :: (PackageName, Set NamedComponent)
+       -- ^ Empty set means every component will be built.
        -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-addDep name = do
+addDep (name, compSet) = do
     ctx <- ask
     m <- get
     case Map.lookup name m of
@@ -343,10 +345,10 @@ addDep name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage name ps Nothing
+                            installPackage name ps Nothing compSet
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage name ps (Just installed)
+                            installPackage name ps (Just installed) compSet
             updateLibMap name res
             return res
 
@@ -416,8 +418,10 @@ tellExecutablesPackage loc p = do
 installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
+               -> Set NamedComponent
+               -- ^ empty set means every component should be built.
                -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-installPackage name ps minstalled = do
+installPackage name ps minstalled compSet = do
     ctx <- ask
     case ps of
         PSRemote pkgLoc _version _fromSnaphot cp -> do
@@ -430,6 +434,9 @@ installPackage name ps minstalled = do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
                     resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                 Just tb -> do
+                    let realCompSet = if null compSet
+                                then lpComponents lp <> Set.singleton CLib
+                                else mempty
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
@@ -454,7 +461,7 @@ installPackage name ps minstalled = do
                                 _ -> True
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb finalAllInOne False
+                          addFinal lp tb finalAllInOne False (if finalAllInOne then realCompSet else mempty)
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -467,9 +474,9 @@ installPackage name ps minstalled = do
                             res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
-                                -- available for addFinal.
+                                -- available for @addFinal@.
                                 updateLibMap name res'
-                                addFinal lp tb False False
+                                addFinal lp tb False False realCompSet
                             return res'
  where
    expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
@@ -532,6 +539,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
                         package
             , taskBuildHaddock = buildHaddocks
             , taskPresent = present
+            , taskComponentSet = mempty
             , taskType =
                 case ps of
                     PSFilePath lp ->
@@ -588,7 +596,7 @@ addPackageDeps package = do
             (Map.fromList errs)
   where
     singleDepHandling (depname, DepValue range depType) = do
-        addDepResult <- addDep depname
+        addDepResult <- addDep (depname, Set.singleton CLib)
         case addDepResult of
             Left e -> whenAddDepFailed depname range e
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
