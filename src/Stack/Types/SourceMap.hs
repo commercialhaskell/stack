@@ -120,10 +120,10 @@ data Target
 data PackageType = PTProject | PTDependency
   deriving (Eq, Show)
 
-getTargetPackageAndComponent :: Target -> Set NamedComponent
+getTargetPackageAndComponent :: Target -> ComponentMapName
 getTargetPackageAndComponent target = case target of
   TargetAll{} -> mempty
-  TargetComps s -> s
+  TargetComps s -> fromNamedComponent s
 
 -- | Builds on an 'SMActual' by resolving the targets specified on the
 -- command line, potentially adding in new dependency packages in the

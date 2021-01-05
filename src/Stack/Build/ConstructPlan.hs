@@ -261,9 +261,9 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> Bool -> Set NamedComponent -> ConstructPlanMonad ()
-addFinal lp package isAllInOne buildHaddocks compSet = do
-    depsRes <- addPackageDeps package
+addFinal :: LocalPackage -> Package -> Bool -> Bool -> ComponentMapName -> ConstructPlanMonad ()
+addFinal lp package isAllInOne buildHaddocks compMap = do
+    depsRes <- addPackageDeps package compMap
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -284,7 +284,7 @@ addFinal lp package isAllInOne buildHaddocks compSet = do
                 , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
                 , taskType = TTLocalMutable lp
-                , taskComponentSet = compSet
+                , taskComponentSet = toNamedComponent compMap
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
@@ -302,10 +302,10 @@ addFinal lp package isAllInOne buildHaddocks compSet = do
 -- forcing this package to be marked as a dependency, even if it is
 -- directly wanted. This makes sense - if we left out packages that are
 -- deps, it would break the --only-dependencies build plan.
-addDep :: (PackageName, Set NamedComponent)
+addDep :: (PackageName, ComponentMapName)
        -- ^ Empty set means every component will be built.
        -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-addDep (name, compSet) = do
+addDep (name, compMap) = do
     ctx <- ask
     m <- get
     case Map.lookup name m of
@@ -345,11 +345,11 @@ addDep (name, compSet) = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage name ps Nothing compSet
+                            installPackage name ps Nothing compMap
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage name ps (Just installed) compSet
-            updateLibMap name res
+                            installPackage name ps (Just installed) compMap
+            updateLibMap name compMap res
             return res
 
 -- | Update the location of executables (if any) in the pdInstall map.
@@ -418,31 +418,28 @@ tellExecutablesPackage loc p = do
 installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
-               -> Set NamedComponent
+               -> ComponentMapName
                -- ^ empty set means every component should be built.
                -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-installPackage name ps minstalled compSet = do
+installPackage name ps minstalled compMap = do
     ctx <- ask
     case ps of
         PSRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
-            resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
+            resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled compMap
         PSFilePath lp -> do
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                    resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled compMap
                 Just tb -> do
-                    let realCompSet = if null compSet
-                                then lpComponents lp <> Set.singleton CLib
-                                else mempty
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
                     res <- pass $ do
-                        res <- addPackageDeps tb
+                        res <- addPackageDeps tb compMap
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -461,7 +458,7 @@ installPackage name ps minstalled compSet = do
                                 _ -> True
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb finalAllInOne False (if finalAllInOne then realCompSet else mempty)
+                          addFinal lp tb finalAllInOne False (if finalAllInOne then compMap else mempty)
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -471,12 +468,12 @@ installPackage name ps minstalled compSet = do
                             put s
                             -- Otherwise, fall back on building the
                             -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                            res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled compMap
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
                                 -- available for @addFinal@.
-                                updateLibMap name res'
-                                addFinal lp tb False False realCompSet
+                                updateLibMap name compMap res'
+                                addFinal lp tb False False compMap
                             return res'
  where
    expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
@@ -489,9 +486,10 @@ resolveDepsAndInstall :: Bool
                       -> PackageSource
                       -> Package
                       -> Maybe Installed
+                      -> ComponentMapName
                       -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
-    res <- addPackageDeps package
+resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled compSet = do
+    res <- addPackageDeps package compSet
     case res of
         Left err -> return $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
@@ -558,8 +556,8 @@ packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.
-updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
-updateLibMap name val = modify $ \mp ->
+updateLibMap :: PackageName -> ComponentMapName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
+updateLibMap name _ val = modify $ \mp ->
     case (M.lookup name mp, val) of
         (Just (Left DependencyCycleDetected{}), Left _) -> mp
         _ -> M.insert name val mp
@@ -579,11 +577,10 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> ConstructPlanMonad (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
-addPackageDeps package = do
+addPackageDeps :: Package -> ComponentMapName -> ConstructPlanMonad (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
+addPackageDeps package compSet = do
     addUnkownToolsWarning package
-    let packageDepsList = Map.toList $ packageDeps package
-    packageDepsResultList <- forM packageDepsList singleDepHandling
+    packageDepsResultList <- iterateOnPackageDeps singleDepHandling package compSet
     case partitionEithers packageDepsResultList of
         -- Note that the Monoid for 'InstallLocation' means that if any
         -- is 'Local', the result is 'Local', indicating that the parent
@@ -595,8 +592,8 @@ addPackageDeps package = do
             package
             (Map.fromList errs)
   where
-    singleDepHandling (depname, DepValue range depType) = do
-        addDepResult <- addDep (depname, Set.singleton CLib)
+    singleDepHandling (depname, DepValue range depType, depCompSet) = do
+        addDepResult <- addDep (depname, depCompSet) -- Set.singleton CLib)
         case addDepResult of
             Left e -> whenAddDepFailed depname range e
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->

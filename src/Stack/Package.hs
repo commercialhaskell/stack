@@ -39,6 +39,7 @@ import qualified Distribution.Package as D
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
+import           Distribution.Types.PackageDescription (pkgComponents)
 import           Distribution.PackageDescription.Parsec
 import           Distribution.Pretty (prettyShow)
 import           Distribution.Simple.Glob (matchDirFileGlob)
@@ -136,9 +137,9 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     { packageName = name
     , packageVersion = pkgVersion pkgId
     , packageLicense = licenseRaw pkg
-    , packageCabalDescription = pkgNoMod
     , packageDeps = deps
     , packageFiles = pkgFiles
+    , packageComponentBuildInfo = fromComponentList pkgNoMod (pkgComponents pkgNoMod)
     , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig

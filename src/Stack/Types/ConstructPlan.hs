@@ -7,7 +7,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Stack.Types.ConstructPlan where
+module Stack.Types.ConstructPlan (
+  PackageInfo(..),
+  psForceDirty,
+  psDirty,
+  psLocal,
+  psLocation,
+  combineSourceInstalled,
+  CombinedMap,
+  combineMap,
+  AddDepRes(..),
+  ParentMap,
+  PlanDraft(..),
+  ConstructPlanMonad,
+  ConstructPlanState,
+  getLatestApplicableVersionAndRev,
+  adrHasLibrary,
+  Ctx(..),
+  UnregisterState(..),
+  NotOnlyLocal(..),
+  ToolWarning(..),
+  toolWarningText,
+  DepsPath(..),
+  startDepsPath,
+  extendDepsPath,
+  ConstructPlanException(..),
+  LatestApplicableVersion,
+  BadDependency(..),
+  -- * The ConstructPlan state related functions.
+  iterateOnPackageDeps
+) where
 
 import Stack.Prelude
 import Stack.Types.Config
@@ -21,6 +50,13 @@ import Stack.Types.Config
       HasPlatform,
       HasRunner(..),
       HasSourceMap(..) )
+import Stack.Types.NamedComponent
+    ( ComponentMapName,
+      ComponentMap(exeComp, libComp),
+      ComponentBuildInfo(cbiDependencyList, cbiExeDependencyList),
+      NamedComponent,
+      intersectComponentMap,
+      toComponentNameList )
 import Stack.Types.GhcPkgId ( GhcPkgId )
 import Stack.Types.Version ( latestApplicableVersion )
 import Stack.Types.Build
@@ -32,12 +68,16 @@ import Stack.Types.Build
       Task(taskType),
       TaskType(TTRemotePackage, TTLocalMutable) )
 import Stack.Types.Package
-    (ExeName(ExeName),  installedVersion,
-      runMemoizedWith,
-      InstalledMap,
-      Package(packageLibraries, packageInternalLibraries),
+    ( InstalledMap,
+      PackageSource(..),
+      DepType(AsBuildTool),
+      DepValue(DepValue, dvType),
+      Package(packageComponentBuildInfo, packageDeps, packageLibraries,
+              packageInternalLibraries),
+      ExeName(ExeName),
       PackageLibraries(NoLibraries, HasLibraries),
-      PackageSource(..) )
+      runMemoizedWith,
+      installedVersion )
 import qualified Data.Map.Strict as Map
 import Control.Monad.Trans.RWS.Strict (RWST)
 import Distribution.Version (VersionRange)
@@ -48,6 +88,11 @@ import RIO.Process ( HasProcessContext(..) )
 import qualified Data.Text as T
 import Data.List (intercalate)
 import qualified Data.Set as Set
+import Distribution.Types.ExeDependency
+    ( ExeDependency(ExeDependency) )
+import Distribution.PackageDescription
+    ( LibraryName(LMainLibName) )
+import Distribution.Simple (Dependency(Dependency))
 
 data PackageInfo
   = -- | This indicates that the package is already installed, and
@@ -145,8 +190,6 @@ type ConstructPlanMonad = RWST -- TODO replace with more efficient WS stack on t
     PlanDraft
     ConstructPlanState
     IO
-
-type ConstructPlanState = Map PackageName (Either ConstructPlanException AddDepRes) 
 
 getLatestApplicableVersionAndRev :: PackageName -> VersionRange -> ConstructPlanMonad (Maybe (Version, BlobKey))
 getLatestApplicableVersionAndRev depname range = do
@@ -312,3 +355,93 @@ data BadDependency
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
 -- package.  This is why VersionRange is in the parent map.
+
+--
+-- * The package dependencies state.
+--
+
+
+-- | switch to 
+type ConstructPlanState = Map PackageName (Either ConstructPlanException AddDepRes) 
+type ConstructPlanState2 = Map PackageName (Either ConstructPlanException (IntersectionSet NamedComponent AddDepRes))
+
+-- | A list of mutually exclusive sets along with a value.
+newtype IntersectionSet a b = IntersectionSet [(Set a, b)] deriving (Show)
+
+-- | Search for the presence of an intersection between the given set and any of the list
+-- elements. If none is found, return the list with a new set/value pair, otherwise, return the
+-- intersection set.
+--
+-- >>> let set = Set.singleton
+-- >>> let current = IntersectionSet [(set 1, "a"), (set 2, "b")]
+-- >>> let addNoIntersect = addToIntersectionSet (set 3) "c" current
+-- >>> let addWithIntersect = addToIntersectionSet (set 2) "d" current
+-- >>> (addNoIntersect, addWithIntersect)
+-- (Right (IntersectionSet [(fromList [3],"c"),(fromList [1],"a"),(fromList [2],"b")]),Left (fromList [2]))
+addToIntersectionSet :: Ord a =>
+  Set a -> b -> IntersectionSet a b -> Either (Set a) (IntersectionSet a b)
+addToIntersectionSet givenSet val (IntersectionSet currentList)
+  | Set.null globalIntersection = Right . IntersectionSet $ (givenSet, val) : currentList
+  | otherwise = Left globalIntersection
+  where
+    globalIntersection = foldMap hasIntersection currentList
+    hasIntersection tupleWithSet = givenSet `Set.intersection` (fst tupleWithSet)
+
+-- | Add the current package & component set to the construct plan state,
+-- trigger a failure in case of overlapping component sets.
+-- If a failure already happened for the package keep it as-is.
+addPackageTask ::
+    PackageName ->
+    Set NamedComponent ->
+    AddDepRes ->
+    ConstructPlanState2 ->
+    ConstructPlanState2
+addPackageTask pName compSet adr currentState = Map.alter insertion pName currentState
+  where
+    insertion maybeOldVal = case maybeOldVal of
+      Nothing -> Just . Right . IntersectionSet $ [(compSet, adr)]
+      Just (Left err) -> Just (Left err)
+      Just (Right oldIntersectionSet) -> Just $ first (const $ DependencyCycleDetected []) addedRes
+        where
+          addedRes = addToIntersectionSet compSet adr oldIntersectionSet
+
+-- | Retrieves all package deps and iterate on them.
+iterateOnPackageDeps :: Monad m =>
+  ((PackageName, DepValue, ComponentMapName) -> m (Either a b)) ->
+  Package ->
+  -- | The set of activated components.
+  ComponentMapName ->
+  m [Either a b]
+iterateOnPackageDeps func package targetedCompMap = do
+  packageSetupDepsRes <- forM (packageSetupDepsList) (\(pn, dV) -> func (pn, dV, mempty{libComp=mainLibDefault}))
+  listOfListOfEither <- traverse iteration componentList
+  pure $ join (packageSetupDepsRes : listOfListOfEither) -- forM (Map.toList $ packageDeps package) func
+  where
+    packageSetupDepsList = Map.toList $ (
+      Map.filter (\DepValue{dvType= dT} -> dT == AsBuildTool) $ packageDeps package
+      )
+    iteration (_, bi) = do
+      exeRes <- traverse handleExeDeps $ cbiExeDependencyList bi
+      libRes <- traverse handleLibDeps $ cbiDependencyList bi
+      pure $ exeRes <> libRes
+    componentList = toComponentNameList restrictedPackageMap
+    targetedCompDefaulted = if targetedCompMap == mempty then
+      mempty{
+        libComp = Map.mapMaybeWithKey (\a _ -> if a == LMainLibName then Just () else Nothing) $ libComp rawPackageCompMap,
+        exeComp = Map.mapWithKey (\_ _ -> ()) $ exeComp rawPackageCompMap
+        }
+      else
+      targetedCompMap
+    restrictedPackageMap = intersectComponentMap rawPackageCompMap targetedCompDefaulted
+    rawPackageCompMap = packageComponentBuildInfo package
+    versionTable = packageDeps package
+    handleLibDeps (Dependency pName _ libSet) = case Map.lookup pName versionTable of
+      Nothing -> error "todo : no version for this package ??"
+      Just depVal  -> func (pName, depVal, mempty{
+          -- If nothing is specified we infer the deps is on the main library.
+          libComp = if null libSet then Map.singleton LMainLibName () else foldMap (\k -> Map.singleton k ()) libSet }
+          )
+    handleExeDeps (ExeDependency pName compName _) = case Map.lookup pName versionTable of
+      Nothing -> error "todo : no version for this package ??"
+      Just depVal  -> func (pName, depVal, mempty{exeComp = Map.singleton compName ()})
+    mainLibDefault = Map.singleton LMainLibName ()
