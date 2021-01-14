@@ -214,7 +214,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
                        bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)
                        mapLeft show $ decodeUtf8' bsContent
           _ ->
-            fail "Couldn't parse GitHub response as a JSON object with a \"content\" field"
+            Left "Couldn't parse GitHub response as a JSON object with a \"content\" field"
     }
 
 settingsFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =

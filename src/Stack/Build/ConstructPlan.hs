@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
     ( constructPlan
@@ -95,7 +96,11 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     mapM_ (logWarn . RIO.display) (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
-        (errlibs, adrs) = partitionEithers $ map toEither $ M.toList addedPackageMap
+        innerIterator k (compMap, adr) (listofErr, listOfRes) = case adr of
+            Left e -> (e : listofErr, listOfRes)
+            Right v -> (listofErr, (k, v) : listOfRes)
+        packageMapIterator k listOfComp st = foldr (innerIterator k) st listOfComp
+        (errlibs, adrs) = M.foldrWithKey packageMapIterator ([], []) addedPackageMap
         (errfinals, finals) = partitionEithers $ map toEither $ M.toList efinals
         errs = errlibs ++ errfinals
     if null errs
@@ -304,20 +309,35 @@ addFinal lp package isAllInOne buildHaddocks compMap = do
 -- deps, it would break the --only-dependencies build plan.
 addDep :: (PackageName, ComponentMapName)
        -- ^ Empty set means every component will be built.
-       -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
+       -> ConstructPlanMonad [Either ConstructPlanException AddDepRes]
 addDep (name, compMap) = do
-    ctx <- ask
-    m <- get
-    case Map.lookup name m of
-        Just res -> do
-            planDebug $ "addDep: Using cached result for " ++ show name ++ ": " ++ show res
-            return res
-        Nothing -> do
-            res <- if name `elem` callStack ctx
+    constructPlanState <- get
+    case Map.lookup name constructPlanState of
+        Just listOfTuple -> do
+            -- We need to know whether some intersection happened or none.
+            -- specifically, every element part which is contained in an
+            -- existing tuple should be saved, to get the existing res for it.
+            let (unmatchedComponentMap, matchedList) = removeAllIntersection compMap listOfTuple
+            -- everything intersected =>
+            if isNullComponentMap unmatchedComponentMap then do
+                logInfo . fromString $ "addDep caching " <> componentMapAndPackagePPrint (name, compMap)
+                -- planDebug $ "addDep: Using cached result for " ++ show name ++ ": " ++ show matchedList
+                return (snd <$> matchedList)
+            else
+                whenNoResultAlreadyAvailable unmatchedComponentMap
+        Nothing -> whenNoResultAlreadyAvailable compMap
+    where
+        whenNoResultAlreadyAvailable givenCompMap = do
+            logInfo . fromString $ "addDep " <> componentMapAndPackagePPrint (name, compMap)
+            ctx <- ask
+            let packageAndComp = (name, givenCompMap)
+            let iterator (!pName, insideCompMap) = name == pName
+                        && (not . isNullComponentMap $ givenCompMap `intersectComponentMapFull` insideCompMap)
+            res <- if any iterator $ callStack ctx
                 then do
                     planDebug $ "addDep: Detected cycle " ++ show name ++ ": " ++ show (callStack ctx)
-                    return $ Left $ DependencyCycleDetected $ name : callStack ctx
-                else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
+                    return $ Left $ DependencyCycleDetected $ packageAndComp : callStack ctx
+                else local (\ctx' -> ctx' { callStack = packageAndComp : callStack ctx' }) $ do
                     let mpackageInfo = Map.lookup name $ combinedMap ctx
                     planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ show mpackageInfo
                     case mpackageInfo of
@@ -336,7 +356,7 @@ addDep (name, compMap) = do
                                       -- this could happen for GHC boot libraries missing from Hackage
                                       logWarn $ "No latest package revision found for: " <>
                                           fromString (packageNameString name) <> ", dependency callstack: " <>
-                                          displayShow (map packageNameString $ callStack ctx)
+                                          displayShow (map (packageNameString . fst) $ callStack ctx)
                                       return Nothing
                                     Just (_rev, cfKey, treeKey) ->
                                       return . Just $
@@ -345,12 +365,12 @@ addDep (name, compMap) = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage name ps Nothing compMap
+                            installPackage name ps Nothing givenCompMap
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage name ps (Just installed) compMap
-            updateLibMap name compMap res
-            return res
+                            installPackage name ps (Just installed) givenCompMap
+            updateLibMap name givenCompMap res
+            return [res]
 
 -- | Update the location of executables (if any) in the pdInstall map.
 tellExecutables :: PackageName
@@ -557,10 +577,10 @@ packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> ComponentMapName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
-updateLibMap name _ val = modify $ \mp ->
-    case (M.lookup name mp, val) of
-        (Just (Left DependencyCycleDetected{}), Left _) -> mp
-        _ -> M.insert name val mp
+updateLibMap name compMap val = modify $ \mp -> addPackageTask name compMap val mp
+    -- case (M.lookup name mp, val) of
+    --     (Just (Left DependencyCycleDetected{}), Left _) -> mp
+    --     _ -> M.insert name val mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -593,14 +613,13 @@ addPackageDeps package compSet = do
             (Map.fromList errs)
   where
     singleDepHandling (depname, DepValue range depType, depCompSet) = do
-        addDepResult <- addDep (depname, depCompSet) -- Set.singleton CLib)
-        case addDepResult of
-            Left e -> whenAddDepFailed depname range e
-            Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
-                -- Dependency on a non existing library.
-                return $ Left (depname, (range, Nothing, HasNoLibrary))
-            Right adr -> whenAddDepSucceededAndHasLib depname range adr
-    whenAddDepSucceededAndHasLib depname range adr = do
+        addDepResultList <- addDep (depname, depCompSet)
+        case partitionEithers addDepResultList of
+            ([], pairs) -> traverse (whenAddDepSucceeded depname depType range) pairs
+            (errList, _) -> traverse (whenAddDepFailed depname range) errList
+    whenAddDepSucceeded depname AsLibrary range adr
+        | not (adrHasLibrary adr) = return $ Left (depname, (range, Nothing, HasNoLibrary))
+    whenAddDepSucceeded depname _ range adr = do
         addParent depname range Nothing
         inRange <- if adrVersion adr `withinRange` range
             then return True
@@ -921,7 +940,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (style Error . fromString . packageNameString) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (style Error . fromString . componentMapAndPackagePPrint) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -992,7 +1011,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
             style Error (fromString $ packageNameString name) <+>
-            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map (packageNameString . fst) names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =

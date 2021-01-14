@@ -1134,6 +1134,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                 runExe :: Path Abs File -> [String] -> RIO env ()
                 runExe exeName fullArgs = do
                     compilerVer <- view actualCompilerVersionL
+                    logInfo $ fromString $ mconcat $ intersperse "; " fullArgs
                     runAndOutput compilerVer `catch` \ece -> do
                         (mlogFile, bss) <-
                             case outputType of

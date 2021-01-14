@@ -7,7 +7,11 @@ module Stack.Types.NamedComponent
   , ComponentBuildInfo(..)
   , fromComponentList
   , toComponentNameList
+  , isNullComponentMap
   , intersectComponentMap
+  , intersectComponentMapFull
+  , excludeComponentMap
+  , componentMapAndPackagePPrint
   , fromNamedComponent
   , toNamedComponent
   , toComponentName
@@ -37,10 +41,11 @@ import Distribution.Types.LibraryName (LibraryName(..))
 import Distribution.Simple.LocalBuildInfo (componentBuildInfo, Component, ComponentName(..))
 import qualified Data.Map.Strict as Map
 import Distribution.PackageDescription
-    (benchmarkName, benchmarkBuildInfo, testBuildInfo, testName,  BuildInfo(targetBuildDepends),
-      PackageDescription,
+    ( Library(libName),
       Executable(exeName),
-      Library(libBuildInfo, libName), buildInfo )
+      TestSuite(testName),
+      Benchmark(benchmarkName),
+      BuildInfo(targetBuildDepends) )
 import Distribution.Types.ExeDependency (ExeDependency)
 import Distribution.Types.Dependency (Dependency)
 import Distribution.Types.Mixin (Mixin)
@@ -77,7 +82,7 @@ naiveExecutionOrdering :: NamedComponent -> Int
 naiveExecutionOrdering CLib = 1
 naiveExecutionOrdering (CInternalLib _) = 2
 naiveExecutionOrdering (CExe _) = 3
-naiveExecutionOrdering _ = 4
+naiveExecutionOrdering _ = 4        
 
 renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent
@@ -150,7 +155,7 @@ data ComponentMap contentType = ComponentMap {
   foreignLibComp :: Map UnqualComponentName contentType,
   benchComp :: Map UnqualComponentName contentType,
   testComp :: Map UnqualComponentName contentType
-} deriving (Show, Eq)
+} deriving (Show, Eq, Ord)
 type ComponentMapName = ComponentMap ()
 instance Semigroup (ComponentMap contentType) where
   (<>) a b = ComponentMap {
@@ -168,19 +173,42 @@ instance Monoid (ComponentMap contentType) where
     benchComp = mempty,
     testComp = mempty
     }
+
+isNullComponentMap :: ComponentMap contentType -> Bool 
+isNullComponentMap compMap = null (exeComp compMap)
+  && null (libComp compMap)
+  && null (foreignLibComp compMap)
+  && null (benchComp compMap)
+  && null (testComp compMap)
+
 -- | Only keep the components where names (keys) are present in both arguments (a and b here).
-intersectComponentMap :: ComponentMap contentA -> ComponentMap contentB -> ComponentMap contentA
-intersectComponentMap a b = ComponentMap {
+intersectComponentMap :: Bool -> ComponentMap contentA -> ComponentMap contentB -> ComponentMap contentA
+intersectComponentMap intersectForeign a b = ComponentMap {
     exeComp = Map.intersection (exeComp a) (exeComp b),
     libComp = Map.intersection (libComp a) (libComp b),
-    foreignLibComp = Map.intersection (foreignLibComp a) (foreignLibComp b),
+    foreignLibComp = if intersectForeign then
+      Map.intersection (foreignLibComp a) (foreignLibComp b)
+      else foreignLibComp a,
     benchComp = Map.intersection (benchComp a) (benchComp b),
     testComp = Map.intersection (testComp a) (testComp b)
     }
+-- | Remove the components in a where names (keys) are present in both arguments (a and b here).
+excludeComponentMap :: ComponentMap contentA -> ComponentMap contentB -> ComponentMap contentA
+excludeComponentMap a b = ComponentMap {
+    exeComp = Map.difference (exeComp a) (exeComp b),
+    libComp = Map.difference (libComp a) (libComp b),
+    foreignLibComp =
+      Map.difference (foreignLibComp a) (foreignLibComp b),
+    benchComp = Map.difference (benchComp a) (benchComp b),
+    testComp = Map.difference (testComp a) (testComp b)
+    }
+
+intersectComponentMapFull :: ComponentMap contentA -> ComponentMap contentB -> ComponentMap contentA
+intersectComponentMapFull = intersectComponentMap True
 
 -- | This is the main way to get the component map from Cabal.
-fromComponentList :: PackageDescription -> [Component] -> ComponentMap ComponentBuildInfo
-fromComponentList pkgDesc compList = foldMap insertComponent compList
+fromComponentList :: (BuildInfo -> [ExeDependency]) -> [Component] -> ComponentMap ComponentBuildInfo
+fromComponentList trans compList = foldMap insertComponent compList
   where
     insertComponent c = case c of
       CabalComp.CLib lib -> mempty{libComp = Map.singleton (libName lib) value}
@@ -193,7 +221,7 @@ fromComponentList pkgDesc compList = foldMap insertComponent compList
         cbuildInfo = componentBuildInfo c
     cabalBuildInfoToCBI bi = ComponentBuildInfo {
         cbiDependencyList = targetBuildDepends bi,
-        cbiExeDependencyList = getAllToolDependencies pkgDesc bi -- Cabal's Haddock for buildToolDepends prescribes this procedure
+        cbiExeDependencyList = trans bi
       }
     
 
@@ -238,3 +266,16 @@ toComponentNameList input = exe <> bench <> test <> lib <> flib
     lib = getter libComp CLibName
     flib = getter foreignLibComp CFLibName
     getter accessor cstruct = fmap (first cstruct) (Map.assocs $ accessor input)
+
+componentMapPrettyPrint :: ComponentMap contentType -> String
+componentMapPrettyPrint input = mconcat ["{", exe, ",", bench, ",", test, ",", lib, ",", flib, "}"]
+  where
+    exe = getter exeComp
+    bench = getter benchComp
+    test = getter testComp
+    lib = getter libComp
+    flib = getter foreignLibComp
+    getter accessor = show <$> Map.keys $ accessor input
+  
+componentMapAndPackagePPrint :: (PackageName, ComponentMap contentType) -> String
+componentMapAndPackagePPrint (pName, compName) = packageNameString pName <> componentMapPrettyPrint compName
