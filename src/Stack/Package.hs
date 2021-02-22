@@ -1173,7 +1173,9 @@ findCandidate
     -> RIO Ctx (Maybe DotCabalPath)
 findCandidate dirs name = do
     pkg <- asks ctxFile >>= parsePackageNameFromFilePath
-    candidates <- liftIO makeNameCandidates
+    customPreprocessorExts <- view $ configL . to configCustomPreprocessorExts
+    let haskellPreprocessorExts = haskellDefaultPreprocessorExts ++ customPreprocessorExts
+    candidates <- liftIO $ makeNameCandidates haskellPreprocessorExts
     case candidates of
         [candidate] -> return (Just (cons candidate))
         [] -> do
@@ -1193,11 +1195,12 @@ findCandidate dirs name = do
             DotCabalFile{} -> DotCabalFilePath
             DotCabalCFile{} -> DotCabalCFilePath
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
-    makeNameCandidates =
-        liftM (nubOrd . concat) (mapM makeDirCandidates dirs)
-    makeDirCandidates :: Path Abs Dir
+    makeNameCandidates haskellPreprocessorExts =
+        liftM (nubOrd . concat) (mapM (makeDirCandidates haskellPreprocessorExts) dirs)
+    makeDirCandidates :: [Text]
+                      -> Path Abs Dir
                       -> IO [Path Abs File]
-    makeDirCandidates dir =
+    makeDirCandidates haskellPreprocessorExts dir =
         case name of
             DotCabalMain fp -> resolveCandidate dir fp
             DotCabalFile fp -> resolveCandidate dir fp
