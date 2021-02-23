@@ -274,6 +274,17 @@ as a reminder for the user to review the configuration and make any changes if
 needed. The user can delete this message if the generated configuration is
 acceptable.
 
+### custom-preprocessor-extensions
+
+In order for stack to be aware of any custom preprocessors you are using, add their extensions here
+
+```yaml
+custom-preprocessor-extensions:
+- erb
+```
+
+TODO: Add a simple example of how to use custom preprocessors.
+
 ## Non-project-specific config
 
 Non-project config options may go in the global config (`/etc/stack/config.yaml`) or the user config (`~/.stack/config.yaml`).

@@ -1271,8 +1271,8 @@ logPossibilities dirs mn = do
         , flow "but did find:"
         , line <> bulletedList (map pretty possibilities)
         , flow "If you are using a custom preprocessor for this module"
-        , flow "with its own file extension, consider adding the file(s)"
-        , flow "to your .cabal under extra-source-files."
+        , flow "with its own file extension, consider adding the extension"
+        , flow "to the 'custom-preprocessor-extensions' field in stack.yaml."
         ]
   where
     makePossibilities name =
