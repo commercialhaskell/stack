@@ -5,6 +5,7 @@
 module Stack.Config.Nix
        (nixOptsFromMonoid
        ,nixCompiler
+       ,nixCompilerVersion
        ,StackNixException(..)
        ) where
 
@@ -73,6 +74,16 @@ nixCompiler compilerVersion =
               <> T.pack (versionString version) <> "\"\
               \else haskell.compiler.${builtins.head compilers})"
             _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
+        _ -> Left $ stringException "GHC major version not specified"
+    WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
+    WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
+
+nixCompilerVersion :: WantedCompiler -> Either StringException T.Text
+nixCompilerVersion compilerVersion =
+  case compilerVersion of
+    WCGhc version ->
+      case T.split (== '.') (fromString $ versionString version) of
+        x : y : minor -> Right $ "ghc" <> T.concat (x : y : minor)
         _ -> Left $ stringException "GHC major version not specified"
     WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
     WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
