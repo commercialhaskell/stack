@@ -23,6 +23,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Nix integration now passes `ghcVersion` (in addition to existing `ghc`) to 
+  `shell-file` as an identifier that can be looked up in a compiler attribute set.
+
 * `stack list` is a new command to list package versions in a snapshot.
   See [#5431](https://github.com/commercialhaskell/stack/pull/5431)
 

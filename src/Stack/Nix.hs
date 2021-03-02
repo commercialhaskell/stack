@@ -18,7 +18,7 @@ import           Data.Version (showVersion)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.Config (getInContainer, withBuildConfig)
-import           Stack.Config.Nix (nixCompiler)
+import           Stack.Config.Nix (nixCompiler, nixCompilerVersion)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -56,14 +56,16 @@ runShellAndExit = do
      compilerVersion <- withBuildConfig $ view wantedCompilerVersionL
 
      ghc <- either throwIO return $ nixCompiler compilerVersion
+     ghcVersion <- either throwIO return $ nixCompilerVersion compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
          pureShell = nixPureShell (configNix config)
          addGCRoots = nixAddGCRoots (configNix config)
          nixopts = case mshellFile of
-           Just fp -> [toFilePath fp, "--arg", "ghc"
-                      ,"with (import <nixpkgs> {}); " ++ T.unpack ghc]
+           Just fp -> [toFilePath fp
+                      ,"--arg", "ghc", "with (import <nixpkgs> {}); " ++ T.unpack ghc
+                      ,"--argstr", "ghcVersion", T.unpack ghcVersion]
            Nothing -> ["-E", T.unpack $ T.concat
                               ["with (import <nixpkgs> {}); "
                               ,"let inputs = ",pkgsStr,"; "
