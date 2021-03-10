@@ -185,7 +185,7 @@ ghci opts@GhciOpts{..} = do
               figureOutMainFile bopts mainIsTargets localTargets pkgs0
     let pkgTargets pn targets =
           case targets of
-            TargetAll _  -> [T.pack (packageNameString pn)]
+            TargetAll{} -> [T.pack (packageNameString pn)]
             TargetComps comps -> [renderPkgComponent (pn, c) | c <- toList comps]
     -- Build required dependencies and setup local packages.
     buildDepsAndInitialSteps opts $
@@ -671,7 +671,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
     mbuildinfo <- forM mbuildinfofp readDotBuildinfo
     let pdp = resolvePackageDescription config gpkgdesc
         pkg =
-            packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
+            packageFromPackageDescription config (C.genPackageFlags gpkgdesc) gpkgdesc $
             maybe
               pdp
               (\bi ->

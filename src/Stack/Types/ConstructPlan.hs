@@ -39,7 +39,8 @@ module Stack.Types.ConstructPlan (
   ConstructPlanState2,
   addPackageTask,
   findIntersection,
-  removeAllIntersection
+  removeAllIntersection,
+  CompDepsRes(..)
 ) where
 
 import Stack.Prelude
@@ -57,12 +58,15 @@ import Stack.Types.Config
 import Stack.Types.NamedComponent
     ( ComponentMapName,
       ComponentMap(exeComp, libComp),
+      CompName(..),
       ComponentBuildInfo(cbiDependencyList, cbiExeDependencyList),
       NamedComponent,
+      getBuildInfo,
       intersectComponentMap,
       intersectComponentMapFull,
       excludeComponentMap,
       toComponentNameList,
+      foreignLibComp,
       isNullComponentMap )
 import Stack.Types.GhcPkgId ( GhcPkgId )
 import Stack.Types.Version ( latestApplicableVersion )
@@ -73,6 +77,7 @@ import Stack.Types.Build
       LocalPackage(lpPackage, lpDirtyFiles, lpForceDirty),
       BaseConfigOpts,
       Task(taskType),
+      IsMutable,
       TaskType(TTRemotePackage, TTLocalMutable) )
 import Stack.Types.Package
     ( InstalledMap,
@@ -98,7 +103,7 @@ import qualified Data.Set as Set
 import Distribution.Types.ExeDependency
     ( ExeDependency(ExeDependency) )
 import Distribution.PackageDescription
-    ( LibraryName(LMainLibName) )
+    ( LibraryName(..), ComponentName(..) )
 import Distribution.Simple (Dependency(Dependency))
 import Data.Foldable (Foldable(foldr'), find)
 
@@ -168,7 +173,7 @@ type ParentMap = MonoidMap PackageName (First Version, [(PackageIdentifier, Vers
 -- The monoid/semigroup generic instances enable the common @tell mempty{pdX = ..}@
 -- idiom in the 'ConstructPlanMonad' without losing information.
 data PlanDraft = PlanDraft
-    { pdFinals :: !(Map PackageName (Either ConstructPlanException Task))
+    { pdFinals :: !(Map PackageName (Map CompName (Either ConstructPlanException Task)))
     -- ^ The finals exist because we want to run benchmarks and tests
     -- after having built all the libraries/executables. So this should be all about
     -- benchmark and tests.
@@ -233,7 +238,7 @@ data Ctx = Ctx
     , loadPackage    :: !(PackageLocationImmutable -> Map FlagName Bool -> [Text] -> [Text] -> ConstructPlanMonad Package)
     , combinedMap    :: !CombinedMap
     , ctxEnvConfig   :: !EnvConfig
-    , callStack      :: ![(PackageName, ComponentMapName)]
+    , callStack      :: ![(PackageName, CompName)]
     , wanted         :: !(Set PackageName)
     , localNames     :: !(Set PackageName)
     , mcurator       :: !(Maybe Curator)
@@ -273,14 +278,14 @@ data UnregisterState = UnregisterState
     }
 
 -- | Only used when throwing an exception in 'errorOnSnapshot'
-data NotOnlyLocal = NotOnlyLocal [PackageName] [Text]
+data NotOnlyLocal = NotOnlyLocal [(PackageName, CompName)] [Text]
 
 instance Show NotOnlyLocal where
   show (NotOnlyLocal packages exes) = concat
     [ "Specified only-locals, but I need to build snapshot contents:\n"
     , if null packages then "" else concat
         [ "Packages: "
-        , intercalate ", " (map packageNameString packages)
+        , intercalate ", " (map (packageNameString . fst) packages)
         , "\n"
         ]
     , if null exes then "" else concat
@@ -330,7 +335,7 @@ extendDepsPath ident dp = DepsPath
 -- 'Plan'. Its structure is awkward given the pretty similar cases in 
 -- its 'DependencyPlanFailures' constructor part : 'BadDependency'
 data ConstructPlanException
-    = DependencyCycleDetected [(PackageName, ComponentMapName)]
+    = DependencyCycleDetected [(PackageName, CompName)]
     -- ^ Circular reference between package dependencies.
     -- e.g. A depends on B and B depends on A where A and B are package names.
     -- This is meant to be global, it also exists in 'DependencyPlanFailures' at the
@@ -358,7 +363,7 @@ data BadDependency
     | DependencyMismatch Version
     | HasNoLibrary
     -- ^ See description of 'DepType'
-    | BDDependencyCycleDetected ![(PackageName, ComponentMapName)]
+    | BDDependencyCycleDetected ![(PackageName, CompName)]
     deriving (Typeable, Eq, Ord, Show)
 
 -- TODO: Consider intersecting version ranges for multiple deps on a
@@ -371,7 +376,7 @@ data BadDependency
 
 -- | switch to 
 type ConstructPlanState = Map PackageName (Either ConstructPlanException AddDepRes) 
-type ConstructPlanState2 = Map PackageName [(ComponentMapName, Either ConstructPlanException AddDepRes)]
+type ConstructPlanState2 = Map PackageName (Map CompName (Either ConstructPlanException AddDepRes))
 
 findIntersection ::
   ComponentMapName ->
@@ -379,7 +384,7 @@ findIntersection ::
   Maybe (Either ConstructPlanException AddDepRes)
 findIntersection givenCompMap currentCompList = snd <$> result
   where
-    result = find hasIntersection currentCompList 
+    result = find hasIntersection currentCompList
     hasIntersection tupleWithSet = isNullComponentMap $ givenCompMap `intersectComponentMapFull` fst tupleWithSet
 
 -- this should gather the eitherRes for the elements matched, and
@@ -416,56 +421,77 @@ removeAllIntersection givenCompMap currentCompList = (compMapRes, matchedRes)
 -- | Add the current package & component set to the construct plan state,
 -- trigger a failure in case of overlapping component sets.
 -- If a failure already happened for the package keep it as-is.
+
+-- | Adds the dependency computation to the monad's state.
+-- If the package name was never computed : creates a new entry in the map.
+-- If the package and component name already exist and have a failure,
+-- keep the first dependency cycle found.
 addPackageTask ::
     PackageName ->
-    ComponentMapName ->
+    CompName ->
     Either ConstructPlanException AddDepRes ->
     ConstructPlanState2 ->
     ConstructPlanState2
-addPackageTask pName compSet adr currentState = Map.alter insertion pName currentState
+addPackageTask pName compName adr currentState = Map.alter packageLevelInsertion pName currentState
   where
-    insertion maybeOldVal = case maybeOldVal of
-      Nothing -> Just . pure $ (compSet, adr)
-      -- We don't check the invariant in the csae below, this is "unsafe"
-      -- but it's only used once in a case were the invariant is checked before.
-      Just oldList -> Just $ (compSet, adr) : oldList
+    packageLevelInsertion maybeOldVal = case maybeOldVal of
+      Nothing -> Just $ Map.singleton compName adr
+      Just oldMap -> Just $ Map.alter componentLevelInsertion compName oldMap
+    componentLevelInsertion maybeOldCompValue = case (maybeOldCompValue, adr) of
+      (Just (Left err@DependencyCycleDetected{}), Left _) -> Just (Left err)
+      _ -> Just adr
 
 -- | Retrieves all package deps and iterate on them.
-iterateOnPackageDeps :: (Monad m, MonadReader env0 m, MonadIO m, HasLogFunc env0) =>
-  ((PackageName, DepValue, ComponentMapName) -> m [Either a b]) ->
+iterateOnPackageDeps ::
+  ((PackageName, DepValue, CompName) -> ConstructPlanMonad (Either a b)) ->
   Package ->
-  -- | The set of activated components for the current package.
-  ComponentMapName ->
-  m [Either a b]
-iterateOnPackageDeps func package targetedCompMap = do
+  CompName ->
+  -- ^ The component to build for now
+  ConstructPlanMonad [Either a b]
+iterateOnPackageDeps func package (CompName compName) = do
+  -- ctx <- ask
   -- logInfo . fromString $ "iterateOnPackageDeps " <> show (packageName package)
   -- logInfo . fromString $ "iterateOnPackageDeps " <> show (packageComponentBuildInfo package)
-  listOfListOfEither <- traverse iteration componentList
+  listOfListOfEither <- traverse iteration (maybeToList maybeBuildInfo)
   pure $ join listOfListOfEither -- forM (Map.toList $ packageDeps package) func
   where
-    iteration (_, bi) = do
-      exeRes <- traverse handleExeDeps $ cbiExeDependencyList bi
-      libRes <- traverse handleLibDeps $ cbiDependencyList bi
-      pure $ join exeRes <> join libRes
-    componentList = toComponentNameList restrictedPackageMap
-    targetedCompDefaulted = if isNullComponentMap targetedCompMap then
-      mempty{
-        libComp = Map.mapMaybeWithKey (\a _ -> if a == LMainLibName then Just () else Nothing) $ libComp rawPackageCompMap,
-        exeComp = Map.mapWithKey (\_ _ -> ()) $ exeComp rawPackageCompMap
-        }
-      else
-      targetedCompMap
-    restrictedPackageMap = intersectComponentMap False rawPackageCompMap targetedCompDefaulted
+    iteration bi = do
+      let exeDep = handleExeDeps <$> cbiExeDependencyList bi
+      let libDep = handleLibDeps <$> cbiDependencyList bi
+      traverse func (exeDep <> (join libDep))
     rawPackageCompMap = packageComponentBuildInfo package
-    handleLibDeps (Dependency pName range libSet) = func (pName, DepValue
+    maybeBuildInfo = getBuildInfo compName rawPackageCompMap
+    handleLibDeps (Dependency pName range libSet)
+      | null libSet = [libBuilder pName range LMainLibName]
+      | otherwise = libBuilder pName range <$> toList libSet
+    libBuilder pName range libName = (pName, DepValue
               { dvVersionRange = range
               , dvType = AsLibrary
-              }, mempty{
-          -- If nothing is specified we infer the deps is on the main library.
-          libComp = if null libSet then mainLibDefault else foldMap (\k -> Map.singleton k ()) libSet }
+              },
+              CompName $ CLibName libName
           )
-    handleExeDeps (ExeDependency pName compName range) = func (pName, DepValue
+    handleExeDeps (ExeDependency pName exeName range) = (pName, DepValue
               { dvVersionRange = range
               , dvType = AsBuildTool
-              }, mempty{exeComp = Map.singleton compName ()})
-    mainLibDefault = Map.singleton LMainLibName ()
+              }, CompName $ CExeName exeName)
+
+-- | The outcome of transforming a 
+data CompDepsRes = CompDepsRes {
+  cdrMissing :: !(Set (PackageIdentifier, CompName)),
+  cdrPresent :: !(Map (PackageIdentifier, CompName) GhcPkgId),
+  cdrMinMutable :: !IsMutable
+} deriving (Show, Eq)
+
+instance Semigroup CompDepsRes where
+  (<>) a b = CompDepsRes{
+      cdrMissing = cdrMissing a <> cdrMissing b,
+      cdrPresent = cdrPresent a <> cdrPresent b,
+      cdrMinMutable = cdrMinMutable a <> cdrMinMutable b
+    }
+
+instance Monoid CompDepsRes where
+  mempty = CompDepsRes{
+      cdrMissing = mempty,
+      cdrPresent = mempty,
+      cdrMinMutable = mempty
+    }

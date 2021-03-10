@@ -39,7 +39,7 @@ import qualified Distribution.Package as D
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
-import           Distribution.Types.PackageDescription (pkgComponents)
+import           Distribution.Types.PackageDescription (pkgBuildableComponents)
 import           Distribution.PackageDescription.Parsec
 import           Distribution.Pretty (prettyShow)
 import           Distribution.Simple.Glob (matchDirFileGlob)
@@ -79,6 +79,7 @@ import           System.IO.Error
 import           RIO.Process
 import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (Style (Module))
+import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
@@ -126,13 +127,15 @@ resolvePackage packageConfig gpkg =
     packageFromPackageDescription
         packageConfig
         (genPackageFlags gpkg)
+        gpkg
         (resolvePackageDescription packageConfig gpkg)
 
 packageFromPackageDescription :: PackageConfig
                               -> [D.Flag]
+                              -> GenericPackageDescription
                               -> PackageDescriptionPair
                               -> Package
-packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
+packageFromPackageDescription packageConfig pkgFlags gpkDesc (PackageDescriptionPair pkgNoMod pkg) =
     Package
     { packageName = name
     , packageVersion = pkgVersion pkgId
@@ -140,7 +143,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
     , packageComponentBuildInfo =
-        fromComponentList (fmap snd $ componentDescTools $ isExePreinstalled Cabal.ExeDependency) (pkgComponents pkgNoMod)
+        fromComponentList (fmap snd $ componentDescTools $ isExePreinstalled Cabal.ExeDependency) (pkgBuildableComponents pkg)
     , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig

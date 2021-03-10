@@ -55,6 +55,7 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
+import           Stack.Types.NamedComponent
 import           Stack.Types.Version
 import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
@@ -120,7 +121,10 @@ getSDistTarball mpvpBounds pkgDir = do
     installMap <- toInstallMap sourceMap
     (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, _localDumpPkgs) <-
         getInstalled installMap
-    let deps = Map.fromList [ (pid, ghcPkgId)
+        -- TODO : handle issue here =>
+        -- add libname, what to do with exe ??
+        -- theobat
+    let deps = Map.fromList [ ((pid, CompName $ Cabal.CLibName Cabal.LMainLibName), ghcPkgId)
                             | (_, Library pid ghcPkgId _) <- Map.elems installedMap]
 
     logInfo $ "Getting file list for " <> fromString pkgFp
@@ -324,7 +328,7 @@ readLocalPackage pkgDir = do
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
-getSDistFileList :: HasEnvConfig env => LocalPackage -> Map PackageIdentifier GhcPkgId -> RIO env (String, Path Abs File)
+getSDistFileList :: HasEnvConfig env => LocalPackage -> Map (PackageIdentifier, CompName) GhcPkgId -> RIO env (String, Path Abs File)
 getSDistFileList lp deps =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         let bopts = defaultBuildOpts

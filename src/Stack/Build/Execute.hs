@@ -401,7 +401,7 @@ executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages local
   where
     mlargestPackageName =
       Set.lookupMax $
-      Set.map (length . packageNameString) $
+      Set.map (length . packageNameString . fst) $
       Map.keysSet (planTasks plan) <> Map.keysSet (planFinals plan)
 
 -- | This is not doing the cabal copy.
@@ -512,6 +512,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     let keepGoing =
             fromMaybe (not (M.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
     terminal <- view terminalL
+    -- traverse_ (logInfo . fromString . show) actions
     errs <- liftIO $ runActions threads keepGoing actions $ \doneVar actionsVar -> do
         let total = length actions
             loop prev
@@ -519,7 +520,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     run $ logStickyDone ("Completed " <> RIO.display total <> " action(s).")
                 | otherwise = do
                     inProgress <- readTVarIO actionsVar
-                    let packageNames = map (\(ActionId pkgID _) -> pkgName pkgID) (toList inProgress)
+                    let packageNames = map (\(ActionId (pkgID, _) _) -> pkgName pkgID) (toList inProgress)
                         nowBuilding :: [PackageName] -> Utf8Builder
                         nowBuilding []    = ""
                         nowBuilding names = mconcat $ ": " : intersperse ", " (map (fromString . packageNameString) names)
@@ -546,7 +547,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
         when (boptsOpenHaddocks eeBuildOpts) $ do
             let planPkgs, localPkgs, installedPkgs, availablePkgs
                     :: Map PackageName (PackageIdentifier, InstallLocation)
-                planPkgs = Map.map (taskProvides &&& taskLocation) (planTasks plan)
+                planPkgs = Map.map (taskProvides &&& taskLocation) (M.mapKeys fst $ planTasks plan)
                 localPkgs =
                     Map.fromList
                         [(packageName p, (packageIdentifier p, Local)) | p <- map lpPackage eeLocals]
@@ -644,7 +645,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                 benches = benchComponents comps
     setupAction :: Task -> ActionType -> Set Text -> Action
     setupAction task !actType compSet = Action
-        { actionId = ActionId taskProvidesVal actType
+        { actionId = ActionId ident actType
         , actionDeps = case actType of
             ATBuild -> mainBuildValDeps
             ATBuildFinal -> addBuild mainBuildValDeps
@@ -676,15 +677,17 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
         }
         where
             tcoMissingVal = tcoMissing $ taskConfigOpts task
-            mainBuildValDeps = Set.map (\ident -> ActionId ident ATBuild) tcoMissingVal
+            mainBuildValDeps = Set.map (\valMissing -> ActionId (Set.singleton <$> valMissing) ATBuild) tcoMissingVal
             finalDeps
                 | taskAllInOne task = addBuild mempty
-                | otherwise = Set.singleton (ActionId taskProvidesVal ATBuildFinal)
+                | otherwise = Set.singleton (ActionId ident ATBuildFinal)
             taskProvidesVal = taskProvides task
-            taskCompList = sortOn naiveExecutionOrdering ((Set.toList . taskComponentSet $ task) <> [])
+            taskCompList = Set.toList componentSet
+            componentSet = taskComponentSet task
+            ident = (taskProvidesVal, componentSet)
             addBuild
                 | isNothing mbuild = id -- has no normal build
-                | otherwise = Set.insert $ ActionId taskProvidesVal ATBuild
+                | otherwise = Set.insert $ ActionId ident ATBuild
             withLock Nothing f = f
             withLock (Just lock) f = withMVar lock $ \() -> f
             bopts = eeBuildOpts ee
@@ -692,7 +695,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
 -- | Generate the ConfigCache.
 getConfigCache :: HasEnvConfig env
                => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool -> Bool
-               -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
+               -> RIO env (Map (PackageIdentifier, CompName) GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench isNotComponentBuild = do
     let extra =
             -- We enable tests if the test suite dependencies are already
@@ -709,18 +712,18 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                   [ "--enable-benchmarks" | isNotComponentBuild && enableBench]
                 TTRemotePackage{} -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
-    let getMissing ident =
+    let getMissing (ident, compName) =
             case Map.lookup ident idMap of
                 Nothing
                     -- Expect to instead find it in installedMap if it's
                     -- an initialBuildSteps target.
                     | boptsCLIInitialBuildSteps eeBuildOptsCLI && taskIsTarget task,
                       Just (_, installed) <- Map.lookup (pkgName ident) installedMap
-                        -> installedToGhcPkgId ident installed
-                Just installed -> installedToGhcPkgId ident installed
+                        -> installedToGhcPkgId compName ident installed
+                Just installed -> installedToGhcPkgId compName ident installed
                 _ -> error $ "singleBuild: invariant violated, missing package ID missing: " ++ show ident
-        installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
-        installedToGhcPkgId _ (Executable _) = Nothing
+        installedToGhcPkgId compName ident (Library ident' x _) = assert (ident == ident') $ Just ((ident, compName), x)
+        installedToGhcPkgId _ _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
         opts = mkOpts missing'
@@ -750,7 +753,7 @@ ensureConfig :: HasEnvConfig env
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ .cabal file
              -> Task
-             -> Maybe NamedComponent
+             -> Maybe CompName
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task maybeComp = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
@@ -914,7 +917,7 @@ withSingleContext :: forall env a. HasEnvConfig env
                   => ActionContext
                   -> ExecuteEnv
                   -> Task
-                  -> Map PackageIdentifier GhcPkgId
+                  -> Map (PackageIdentifier, CompName) GhcPkgId
                   -- ^ All dependencies' package ids to provide to Setup.hs.
                   -> Maybe String
                   -> (  Package                                -- Package info
@@ -951,7 +954,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     -- console from concurrent tasks.
     console =
       (wanted &&
-       all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining) &&
+       all (\(ActionId (ident, _) _) -> ident == taskProvides) (Set.toList acRemaining) &&
        eeTotalWanted == 1
       ) || (acConcurrency == ConcurrencyDisallowed)
 
@@ -1084,11 +1087,11 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                                 let matches (PackageIdentifier name' version) =
                                         name == name' &&
                                         version `withinRange` range
-                                case filter (matches . fst) (Map.toList allDeps) of
+                                case filter (matches . fst . fst) (Map.toList allDeps) of
                                     x:xs -> do
                                         unless (null xs)
                                             (logWarn ("Found multiple installed packages for custom-setup dep: " <> fromString (packageNameString name)))
-                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
+                                        return ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst $ fst x))
                                     [] -> do
                                         logWarn ("Could not find custom-setup dep: " <> fromString (packageNameString name))
                                         return ("-package=" ++ packageNameString name, Nothing)
@@ -1253,7 +1256,7 @@ singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             -> Task
             -> InstalledMap
             -> Bool             -- ^ Is this a final build?
-            -> Maybe NamedComponent
+            -> Maybe CompName
             -- ^ If given, this triggers a component based build of the specified component
             -> RIO env ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild maybeComp = do
@@ -1265,7 +1268,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             writeFlagCache installed cache
             liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
   where
-    installIfNotPrecompiled :: Map PackageIdentifier GhcPkgId -> ConfigCache -> RIO env (Maybe Installed)
+    installIfNotPrecompiled :: Map (PackageIdentifier, CompName) GhcPkgId -> ConfigCache -> RIO env (Maybe Installed)
     installIfNotPrecompiled allDepsMap confCache = do
         mprecompiled <- getPrecompiled taskType eeBaseConfigOpts confCache
         case mprecompiled of
@@ -1546,7 +1549,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- directory. We eagerly delete it if no other tasks
             -- require it, to reduce space usage in tmp (#3018).
             TTRemotePackage{} -> do
-                let remaining = filter (\(ActionId x _) -> x == taskProvides) (Set.toList acRemaining)
+                let remaining = filter (\(ActionId (x, _) _) -> x == taskProvides) (Set.toList acRemaining)
                 when (null remaining) $ removeDirRecur pkgDir
             TTLocalMutable{} -> return ()
 

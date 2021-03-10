@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
+  , CompName(..)
   , ComponentMap(..)
   , ComponentMapName
   , ComponentBuildInfo(..)
@@ -12,8 +13,8 @@ module Stack.Types.NamedComponent
   , intersectComponentMapFull
   , excludeComponentMap
   , componentMapAndPackagePPrint
-  , fromNamedComponent
-  , toNamedComponent
+  , namedComponentToCompName
+  , getBuildInfo
   , toComponentName
   , renderComponent
   , renderPkgComponents
@@ -27,8 +28,9 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
-  , naiveExecutionOrdering
   , configureComponentFlag
+  , componentToNamedComponent
+  , getExeName
   ) where
 
 import Pantry
@@ -36,16 +38,20 @@ import Stack.Prelude
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Distribution.Types.PackageName (unPackageName)
-import Distribution.Types.UnqualComponentName (mkUnqualComponentName, UnqualComponentName)
+import Distribution.Types.Component (componentName, Component)
+import Distribution.Types.ComponentName (componentNameString, ComponentName(..))
+import Distribution.Types.UnqualComponentName (unUnqualComponentName, mkUnqualComponentName, UnqualComponentName)
 import Distribution.Types.LibraryName (LibraryName(..))
-import Distribution.Simple.LocalBuildInfo (componentBuildInfo, Component, ComponentName(..))
+import Distribution.Simple.LocalBuildInfo (componentBuildInfo)
 import qualified Data.Map.Strict as Map
 import Distribution.PackageDescription
     ( Library(libName),
       Executable(exeName),
       TestSuite(testName),
       Benchmark(benchmarkName),
-      BuildInfo(targetBuildDepends) )
+      BuildInfo(targetBuildDepends),
+      GenericPackageDescription(..)
+      )
 import Distribution.Types.ExeDependency (ExeDependency)
 import Distribution.Types.Dependency (Dependency)
 import Distribution.Types.Mixin (Mixin)
@@ -62,6 +68,12 @@ data NamedComponent
     | CBench !Text
     deriving (Show, Eq, Ord)
 
+-- | Simple wrapper around Cabal's named component. 
+-- Reusing Cabal type while retaining some flexibility in typeclasse instances.
+-- this may appear as a duplicate for the type above, but ultimately, for packages
+-- stack reuse the cabal type, so it should probably be the same for component names.
+newtype CompName = CompName ComponentName deriving (Show, Eq, Ord)
+
 renderComponent :: NamedComponent -> Text
 renderComponent CLib = "lib"
 renderComponent (CInternalLib x) = "internal-lib:" <> x
@@ -69,20 +81,16 @@ renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
 
-configureComponentFlag :: PackageName -> Maybe NamedComponent -> [String]
+configureComponentFlag :: PackageName -> Maybe CompName -> [String]
 configureComponentFlag _ Nothing = mempty
-configureComponentFlag pn (Just np) = case np of
-    CLib -> ["lib:" <> (show . unPackageName $ pn)]
-    (CInternalLib x) -> ["lib:" <> show x]
-    (CExe x) -> ["exe:" <> show x]
-    (CTest x) -> ["test:" <> show x]
-    (CBench x) -> ["bench:" <> show x]
-
-naiveExecutionOrdering :: NamedComponent -> Int
-naiveExecutionOrdering CLib = 1
-naiveExecutionOrdering (CInternalLib _) = 2
-naiveExecutionOrdering (CExe _) = 3
-naiveExecutionOrdering _ = 4        
+configureComponentFlag pn (Just (CompName comp)) = case componentNameString comp of
+    Nothing -> ["lib:" <> unPackageName pn]
+    Just val -> [(case comp of
+      CLibName{} -> "lib"	 
+      CFLibName{} -> "flib"	 
+      CExeName{} -> "exe"	 
+      CTestName{} -> "test"	 
+      CBenchName{} -> "bench") <> ":" <> unUnqualComponentName val]
 
 renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent
@@ -134,7 +142,27 @@ isCBench :: NamedComponent -> Bool
 isCBench CBench{} = True
 isCBench _ = False
 textNameToCabalName :: Text -> UnqualComponentName
-textNameToCabalName = mkUnqualComponentName . show
+textNameToCabalName = mkUnqualComponentName . T.unpack
+
+componentToNamedComponent :: Component -> NamedComponent
+componentToNamedComponent comp = case componentName comp of
+  CLibName LMainLibName -> CLib
+  CLibName (LSubLibName n) -> CInternalLib $ T.pack $ unUnqualComponentName n	 
+  CFLibName n -> error "unsupported foerign lib component" 	 
+  CExeName n -> CExe $ T.pack $ unUnqualComponentName n	 
+  CTestName n -> CTest $ T.pack $ unUnqualComponentName n 	 
+  CBenchName n -> CBench $ T.pack $ unUnqualComponentName n
+
+namedComponentToCompName :: NamedComponent -> CompName
+namedComponentToCompName nc = CompName $ case nc of
+  CExe n -> CExeName . textNameToCabalName $ n
+  CLib -> CLibName LMainLibName
+  CInternalLib n -> CLibName . LSubLibName . textNameToCabalName $ n	 
+  CBench n -> CBenchName . textNameToCabalName $ n
+  CTest n -> CTestName . textNameToCabalName $ n
+
+getExeName (CompName (CExeName n)) = Just $ T.pack $ unUnqualComponentName n
+getExeName _ = Nothing
 
 -- | This is a simplified equivalent of the BuildInfo Cabal type.
 data ComponentBuildInfo = ComponentBuildInfo {
@@ -213,9 +241,9 @@ fromComponentList trans compList = foldMap insertComponent compList
     insertComponent c = case c of
       CabalComp.CLib lib -> mempty{libComp = Map.singleton (libName lib) value}
       CabalComp.CFLib flib -> mempty{foreignLibComp = Map.singleton (foreignLibName flib) value}
-      CabalComp.CExe exe -> mempty{foreignLibComp = Map.singleton (exeName exe) value}
-      CabalComp.CTest test -> mempty{foreignLibComp = Map.singleton (testName test) value}
-      CabalComp.CBench bench -> mempty{foreignLibComp = Map.singleton (benchmarkName bench) value}
+      CabalComp.CExe exe -> mempty{exeComp = Map.singleton (exeName exe) value}
+      CabalComp.CTest test -> mempty{benchComp = Map.singleton (testName test) value}
+      CabalComp.CBench bench -> mempty{testComp = Map.singleton (benchmarkName bench) value}
       where
         value = cabalBuildInfoToCBI cbuildInfo
         cbuildInfo = componentBuildInfo c
@@ -223,10 +251,13 @@ fromComponentList trans compList = foldMap insertComponent compList
         cbiDependencyList = targetBuildDepends bi,
         cbiExeDependencyList = trans bi
       }
-    
 
-fromNamedComponent :: Set NamedComponent -> ComponentMapName
-fromNamedComponent input = Set.foldr' (insertNamedComponent ()) mempty input
+getBuildInfo compName packageCompMap = case compName of
+  CLibName libName -> Map.lookup libName (libComp packageCompMap)
+  CFLibName cabalCompName -> Map.lookup cabalCompName (foreignLibComp packageCompMap) 	 
+  CExeName cabalCompName -> Map.lookup cabalCompName (exeComp packageCompMap) 	 
+  CTestName cabalCompName -> Map.lookup cabalCompName (testComp packageCompMap) 	 
+  CBenchName cabalCompName -> Map.lookup cabalCompName (benchComp packageCompMap) 	 
 
 insertNamedComponent :: contentType -> NamedComponent -> (ComponentMap contentType) -> (ComponentMap contentType)
 insertNamedComponent content namedComp compSet = case namedComp of
@@ -235,17 +266,6 @@ insertNamedComponent content namedComp compSet = case namedComp of
   CInternalLib n -> compSet{libComp = Map.insert (LSubLibName $ textNameToCabalName n) content (libComp compSet)}
   CBench n -> compSet{benchComp = Map.insert (textNameToCabalName n) content (benchComp compSet)}
   CTest n -> compSet{testComp = Map.insert (textNameToCabalName n) content (testComp compSet)}
-
-toNamedComponent :: (ComponentMap contentType) -> Set NamedComponent
-toNamedComponent input = exe <> bench <> test <> lib
-  where
-    exe = Set.map (CExe . T.pack . show) $ Map.keysSet $ exeComp input
-    bench = Set.map (CBench . T.pack . show) $ Map.keysSet $ benchComp input
-    test = Set.map (CTest . T.pack . show) $ Map.keysSet $ testComp input
-    lib = Set.map handleLib $ Map.keysSet $ libComp input
-    handleLib lName = case lName of
-      LMainLibName -> CLib
-      LSubLibName name -> CInternalLib . T.pack . show $ name
 
 toComponentName :: (ComponentMap contentType) -> Set ComponentName
 toComponentName input = exe <> bench <> test <> lib <> flib
@@ -277,5 +297,13 @@ componentMapPrettyPrint input = mconcat ["{", exe, ",", bench, ",", test, ",", l
     flib = getter foreignLibComp
     getter accessor = show <$> Map.keys $ accessor input
   
-componentMapAndPackagePPrint :: (PackageName, ComponentMap contentType) -> String
-componentMapAndPackagePPrint (pName, compName) = packageNameString pName <> componentMapPrettyPrint compName
+componentMapAndPackagePPrint :: (PackageName, CompName) -> String
+componentMapAndPackagePPrint (pName, compName) = join $ configureComponentFlag pName (Just compName)
+
+-- getLocalNamedComponent :: Maybe Bool -> GenericPackageDescription -> [NamedComponent]
+-- getLocalNamedComponent isBuildable cpd = componentToNamedComponent allComp
+--     where
+--       allComp = CLib lib
+--       extractComp input = case input of
+
+--       GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches = cpd

@@ -16,6 +16,8 @@ import           Control.Concurrent.STM   (retry)
 import           Stack.Prelude
 import           Data.List (sortBy)
 import qualified Data.Set                 as Set
+import Stack.Types.NamedComponent
+-- import Prelude (print)
 
 data ActionType
     = ATBuild
@@ -31,7 +33,7 @@ data ActionType
     | ATRunBenchmarks
       -- ^ Task for running the package's benchmarks.
     deriving (Show, Eq, Ord)
-data ActionId = ActionId !PackageIdentifier !ActionType
+data ActionId = ActionId !(PackageIdentifier, Set CompName) !ActionType
     deriving (Show, Eq, Ord)
 -- | This is mainly the result of one or more 'Task' in "Stack.Types.Build".
 -- Its actual content is completely contained in actionDo.
@@ -41,6 +43,8 @@ data Action = Action
     , actionDo :: !(ActionContext -> IO ())
     , actionConcurrency :: !Concurrency
     }
+instance Show Action where
+    show a = "Action {actionId=" <> show (actionId a) <> ", actionDeps=" <> show (actionDeps a) <> "}" 
 
 data Concurrency = ConcurrencyAllowed | ConcurrencyDisallowed
     deriving (Eq)
@@ -126,6 +130,7 @@ runActions' ExecuteState {..} =
                         return $ return ()
                     else retry
             (xs, action:ys) -> do
+                -- print (show $ actionId action)
                 inAction <- readTVar esInAction
                 case actionConcurrency action of
                   ConcurrencyAllowed -> return ()

@@ -82,7 +82,7 @@ build msetLocalFiles = do
           case Map.lookup pn (smtTargets $ smTargets sourceMap) of
             Nothing ->
               pure Set.empty
-            Just (TargetAll _) ->
+            Just TargetAll{} ->
               lpFiles lp
             Just (TargetComps components) ->
               lpFilesForComponents components lp
@@ -211,7 +211,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     exesToBuild =
         collect
             [ (exe,pkgName')
-            | (pkgName',task) <- Map.toList (planTasks plan)
+            | ((pkgName', _),task) <- Map.toList (planTasks plan)
             , TTLocalMutable lp <- [taskType task]
             , exe <- (Set.toList . exeComponents . lpComponents) lp
             ]

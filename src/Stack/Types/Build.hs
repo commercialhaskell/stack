@@ -430,13 +430,13 @@ data Task = Task
     -- ^ the package/version to be built
     , taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
-    , taskComponentSet    :: Set NamedComponent
+    , taskComponentSet    :: Set CompName
     -- ^ If this is non empty we trigger a component based build.
     -- Eventually we'll switch this to a non empty set/list to ensure
     -- every build is component based. 
     , taskConfigOpts      :: !TaskConfigOpts
     , taskBuildHaddock    :: !Bool
-    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
+    , taskPresent         :: !(Map (PackageIdentifier, CompName) GhcPkgId)
     -- ^ GhcPkgIds of already-installed dependencies
     , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
@@ -460,9 +460,9 @@ data Task = Task
 
 -- | Given the IDs of any missing packages, produce the configure options
 data TaskConfigOpts = TaskConfigOpts
-    { tcoMissing :: !(Set PackageIdentifier)
+    { tcoMissing :: !(Set (PackageIdentifier, CompName))
       -- ^ Dependencies for which we don't yet have an GhcPkgId
-    , tcoOpts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
+    , tcoOpts    :: !(Map (PackageIdentifier, CompName) GhcPkgId -> ConfigureOpts)
       -- ^ Produce the list of options given the missing @GhcPkgId@s
     }
 instance Show TaskConfigOpts where
@@ -516,7 +516,6 @@ taskTargetIsMutable task =
 -- | For now, there is no component set for the remote packages.
 -- This should change with full component based builds.
 taskComponents :: Task -> Set NamedComponent
--- taskComponents = taskComponentSet
 taskComponents task =
     case taskType task of
         TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpShouldBeBuilt
@@ -541,7 +540,7 @@ displayTask task =
     (if Set.null missing
         then ""
         else ", after: " <>
-             mconcat (intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
+             mconcat (intersperse "," (fromString . packageIdentifierString . fst <$> Set.toList missing)))
   where
     missing = tcoMissing $ taskConfigOpts task
 
@@ -551,9 +550,9 @@ installLocationIsMutable Local = Mutable
 
 -- | A complete plan of what needs to be built and how to do it.
 data Plan = Plan
-    { planTasks :: !(Map PackageName Task)
+    { planTasks :: !(Map (PackageName, CompName) Task)
     -- ^ All the libs and executables Task.
-    , planFinals :: !(Map PackageName Task)
+    , planFinals :: !(Map (PackageName, CompName) Task)
     -- ^ Final actions to be taken (test, benchmark, etc).
     -- See <https://github.com/commercialhaskell/stack/issues/283 this> for the motivation.
     , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
@@ -645,7 +644,7 @@ data BaseConfigOpts = BaseConfigOpts
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts :: EnvConfig
               -> BaseConfigOpts
-              -> Map PackageIdentifier GhcPkgId -- ^ dependencies
+              -> Map (PackageIdentifier, CompName) GhcPkgId -- ^ dependencies
               -> Bool -- ^ local non-extra-dep?
               -> IsMutable
               -> Package
@@ -715,7 +714,7 @@ configureOptsDirs bco isMutable package = concat
 -- | Same as 'configureOpts', but does not include directory path options
 configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
-                   -> Map PackageIdentifier GhcPkgId -- ^ dependencies
+                   -> Map (PackageIdentifier, CompName) GhcPkgId -- ^ dependencies
                    -> Bool -- ^ is this a local, non-extra-dep?
                    -> Package
                    -> [String]
@@ -762,14 +761,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 
-    toDepOption1_22 (PackageIdentifier name _) gid = concat
+    toDepOption1_22 ((PackageIdentifier name _), _) gid = concat
         [ "--dependency="
         , packageNameString name
         , "="
         , ghcPkgIdString gid
         ]
 
-    toDepOption1_18 ident _gid = concat
+    toDepOption1_18 (ident, _) _gid = concat
         [ "--constraint="
         , packageNameString name
         , "=="

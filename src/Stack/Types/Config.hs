@@ -41,6 +41,7 @@ module Stack.Types.Config
   ,ppRoot
   ,ppVersion
   ,ppComponents
+  ,ppComponentsBuildable
   ,ppGPD
   ,stackYamlL
   ,projectRootL
@@ -198,12 +199,15 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.Compat.Lens as CL
 import qualified Distribution.License as C
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform, Arch)
 import qualified Distribution.Text
+import           Distribution.Types.BuildInfo.Lens (HasBuildInfo(buildable))
+import qualified Distribution.Types.Dependency as C
 import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
@@ -233,6 +237,7 @@ import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           RIO.Process (ProcessContext, HasProcessContext (..))
 import           Casa.Client (CasaRepoPrefix)
+import           Distribution.Types.PackageDescription (pkgBuildableComponents, pkgComponents)
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -655,6 +660,18 @@ ppGPD = liftIO . cpGPD . ppCommon
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
 ppRoot = parent . ppCabalFP
+
+
+ppComponentsBuildable ::  MonadIO m => ProjectPackage -> m (Set NamedComponent)
+-- ppComponentsBuildable pp = do
+--   gpd <- ppGPD pp
+--   let componentList = pkgComponents $ C.packageDescription gpd 
+--   pure $ Set.fromList $ componentToNamedComponent <$> componentList
+ppComponentsBuildable pp = ppComponents pp
+
+-- test :: (HasBuildInfo hasBuildInfo) => (C.UnqualComponentName, C.CondTree C.ConfVar [C.Dependency] hasBuildInfo) -> Maybe NamedComponent
+-- test input = case input of
+--   (unQualName, C.CondNode _ _ comp) -> if CL.view buildable comp then Nothing else Nothing  
 
 -- | All components available in the given 'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
@@ -1967,6 +1984,7 @@ getGhcPkgExe = view $ compilerPathsL.to cpPkg
 -- <https://downloads.haskell.org/~ghc/8.10.4/docs/html/users_guide/packages.html#installedpackageinfo-a-package-specification see this>.
 data DumpPackage = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
+    , dpComponent :: Maybe C.UnqualComponentName
     , dpPackageIdent :: !PackageIdentifier
     , dpParentLibIdent :: !(Maybe PackageIdentifier)
     , dpLicense :: !(Maybe C.License)
