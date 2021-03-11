@@ -7,7 +7,6 @@
 {-# LANGUAGE OverloadedStrings          #-}
 
 -- | Build-specific types.
-
 module Stack.Types.Build
     (StackBuildException(..)
     ,FlagSource(..)
@@ -16,6 +15,7 @@ module Stack.Types.Build
     ,Installed(..)
     ,psVersion
     ,Task(..)
+    ,taskComponents
     ,taskIsTarget
     ,taskLocation
     ,taskTargetIsMutable
@@ -29,6 +29,7 @@ module Stack.Types.Build
     ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
+    ,printPlan
     ,IsMutable(..)
     ,installLocationIsMutable
     ,TaskConfigOpts(..)
@@ -42,6 +43,7 @@ module Stack.Types.Build
     ,FileCacheInfo (..)
     ,ConfigureOpts (..)
     ,PrecompiledCache (..)
+    ,mergeTasksAndFinal
     )
     where
 
@@ -51,6 +53,7 @@ import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
 import           Data.List.Extra
 import qualified Data.Map                        as Map
+import qualified Data.Map.Merge.Strict           as MapMerge
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import           Database.Persist.Sql            (PersistField(..)
@@ -73,9 +76,10 @@ import           Stack.Types.Package
 import           Stack.Types.Version
 import           System.FilePath                 (pathSeparator)
 import           RIO.Process                     (showProcessArgDebug)
+import qualified RIO
 
 ----------------------------------------------
--- Exceptions
+-- | Exceptions
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
@@ -365,11 +369,6 @@ instance Exception StackBuildException
 
 ----------------------------------------------
 
--- | Package dependency oracle.
-newtype PkgDepsOracle =
-    PkgDeps PackageName
-    deriving (Show,Typeable,Eq,NFData)
-
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
     { buildCacheTimes :: Map FilePath FileCacheInfo
@@ -422,7 +421,9 @@ toCachePkgSrc :: PackageSource -> CachePkgSrc
 toCachePkgSrc (PSFilePath lp) = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
--- | A task to perform when building
+-- | A task to perform when building.
+-- This is the link between the 'Plan' (build plan, created in "Stack.Build.ConstructPlan"),
+-- and its execution (in "Stack.Build.Execute").
 data Task = Task
     { taskProvides        :: !PackageIdentifier -- FIXME turn this into a function on taskType?
     -- ^ the package/version to be built
@@ -491,7 +492,7 @@ instance Monoid IsMutable where
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
     case taskType t of
-        TTLocalMutable lp -> lpWanted lp
+        TTLocalMutable lp -> lpShouldBeBuilt lp
         _ -> False
 
 taskLocation :: Task -> InstallLocation
@@ -507,21 +508,117 @@ taskTargetIsMutable task =
         TTLocalMutable _ -> Mutable
         TTRemotePackage mutable _ _ -> mutable
 
+-- | For now, there is no component set for the remote packages.
+-- This should change with full component based builds.
+taskComponents :: Task -> Set NamedComponent
+taskComponents task =
+    case taskType task of
+        TTLocalMutable lp -> lpComponents lp -- FIXME probably just want lpShouldBeBuilt
+        TTRemotePackage{} -> Set.empty
+
+-- | Useful for a dry run.
+displayTask :: Task -> Utf8Builder
+displayTask task =
+    fromString (packageIdentifierString (taskProvides task)) <>
+    ": database=" <>
+    (case taskLocation task of
+        Snap -> "snapshot"
+        Local -> "local") <>
+    ", source=" <>
+    (case taskType task of
+        TTLocalMutable lp -> fromString $ toFilePath $ parent $ lpCabalFile lp
+        TTRemotePackage _ _ pl -> RIO.display pl) <>
+    (if Set.null missing
+        then ""
+        else ", after: " <>
+             mconcat (intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
+  where
+    missing = tcoMissing $ taskConfigOpts task
+
 installLocationIsMutable :: InstallLocation -> IsMutable
 installLocationIsMutable Snap = Immutable
 installLocationIsMutable Local = Mutable
 
--- | A complete plan of what needs to be built and how to do it
+-- | A complete plan of what needs to be built and how to do it.
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
+    -- ^ All the libs and executables Task.
     , planFinals :: !(Map PackageName Task)
-    -- ^ Final actions to be taken (test, benchmark, etc)
+    -- ^ Final actions to be taken (test, benchmark, etc).
+    -- See <https://github.com/commercialhaskell/stack/issues/283 this> for the motivation.
     , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
     }
     deriving Show
+
+-- | Print a description of build plan for human consumption.
+printPlan :: HasRunner env => Plan -> RIO env ()
+printPlan plan = do
+    case Map.elems $ planUnregisterLocal plan of
+        [] -> logInfo "No packages would be unregistered."
+        xs -> do
+            logInfo "Would unregister locally:"
+            forM_ xs $ \(ident, reason) -> logInfo $
+                fromString (packageIdentifierString ident) <>
+                if T.null reason
+                  then ""
+                  else " (" <> RIO.display reason <> ")"
+
+    logInfo ""
+
+    case Map.elems $ planTasks plan of
+        [] -> logInfo "Nothing to build."
+        xs -> do
+            logInfo "Would build:"
+            mapM_ (logInfo . displayTask) xs
+
+    let hasTests = not . Set.null . testComponents . taskComponents
+        hasBenches = not . Set.null . benchComponents . taskComponents
+        tests = Map.elems $ Map.filter hasTests $ planFinals plan
+        benches = Map.elems $ Map.filter hasBenches $ planFinals plan
+
+    unless (null tests) $ do
+        logInfo ""
+        logInfo "Would test:"
+        mapM_ (logInfo . displayTask) tests
+    unless (null benches) $ do
+        logInfo ""
+        logInfo "Would benchmark:"
+        mapM_ (logInfo . displayTask) benches
+
+    logInfo ""
+
+    case Map.toList $ planInstallExes plan of
+        [] -> logInfo "No executables to be installed."
+        xs -> do
+            logInfo "Would install executables:"
+            forM_ xs $ \(name, loc) -> logInfo $
+                RIO.display name <>
+                " from " <>
+                (case loc of
+                   Snap -> "snapshot"
+                   Local -> "local") <>
+                " database"
+
+-- | This is a preparation for transforming tasks into actions
+-- when executing the buildplan. This exists because we need
+-- to have final tasks.
+-- The notion of a final Tasks cannot be solved by a simple ordering
+-- on 'Task' for now, because we may want to trigger more than one action
+-- from a single task (and we need to know it's a final one in these cases).
+mergeTasksAndFinal :: Plan -> [(Maybe Task, Maybe Task)]
+mergeTasksAndFinal plan = Map.elems $ MapMerge.merge
+    (MapMerge.mapMissing whenOnlyInTasks)
+    (MapMerge.mapMissing whenOnlyInFinal)
+    (MapMerge.zipWithMatched whenInBoth)
+    (planTasks plan)
+    (planFinals plan)
+    where
+        whenInBoth _ aTask aFinal = (Just aTask, Just aFinal)
+        whenOnlyInTasks _ b = (Just b, Nothing)
+        whenOnlyInFinal _ f = (Nothing, Just f)
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
@@ -673,7 +770,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
-wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
+wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpShouldBeBuilt
 
 -- | Configure options to be sent to Setup.hs configure
 data ConfigureOpts = ConfigureOpts

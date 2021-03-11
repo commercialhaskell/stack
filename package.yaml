@@ -242,6 +242,7 @@ library:
   - Stack.Types.Compiler
   - Stack.Types.Config
   - Stack.Types.Config.Build
+  - Stack.Types.ConstructPlan
   - Stack.Types.Docker
   - Stack.Types.GhcPkgId
   - Stack.Types.NamedComponent

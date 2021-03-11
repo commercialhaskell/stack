@@ -132,7 +132,7 @@ createDependencyGraph
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList $ smProject sourceMap) loadLocalPackage
-  let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpWanted locals)
+  let graph = Map.fromList $ projectPackageDependencies dotOpts (filter lpShouldBeBuilt locals)
   globalDump <- view $ to dcGlobalDump
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
