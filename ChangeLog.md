@@ -35,6 +35,10 @@ Bug fixes:
   GitHub repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
 
+* Ignore all errors from `hi-file-parser`. See
+  [#5445](https://github.com/commercialhaskell/stack/issues/5445) and
+  [#5486](https://github.com/commercialhaskell/stack/issues/5486).
+
 ## v2.5.1.1
 
 Hackage-only release:
