@@ -1107,7 +1107,7 @@ parseHI
     :: FilePath -> RIO Ctx (Set ModuleName, [Path Abs File])
 parseHI hiPath = do
   dir <- asks (parent . ctxFile)
-  result <- liftIO $ Iface.fromFile hiPath
+  result <- liftIO $ Iface.fromFile hiPath `catchAnyDeep` \e -> pure (Left (show e))
   case result of
     Left msg -> do
       prettyStackDevL

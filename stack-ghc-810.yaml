@@ -20,6 +20,7 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
+- hi-file-parser-0.1.1.0@rev:2
 - persistent-2.11.0.1@rev:0
 - persistent-sqlite-2.11.0.0@rev:0
 - persistent-template-2.9.1.0@rev:0

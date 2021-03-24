@@ -29,11 +29,17 @@ Other enhancements:
 * `stack list` is a new command to list package versions in a snapshot.
   See [#5431](https://github.com/commercialhaskell/stack/pull/5431)
 
+* Consider GHC 9.0 a tested compiler and remove warnings.
+
 Bug fixes:
 
 * `stack new` now suppports branches other than `master` as default for
   GitHub repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
+
+* Ignore all errors from `hi-file-parser`. See
+  [#5445](https://github.com/commercialhaskell/stack/issues/5445) and
+  [#5486](https://github.com/commercialhaskell/stack/issues/5486).
 
 ## v2.5.1.1
 
