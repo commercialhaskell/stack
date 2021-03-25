@@ -230,6 +230,7 @@ configFromConfigMonoid
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
+         configCustomPreprocessorExts = configMonoidCustomPreprocessorExts
          configOverrideGccPath = getFirst configMonoidOverrideGccPath
 
          -- Only place in the codebase where platform is hard-coded. In theory

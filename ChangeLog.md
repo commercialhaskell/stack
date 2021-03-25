@@ -31,6 +31,10 @@ Other enhancements:
 
 * Consider GHC 9.0 a tested compiler and remove warnings.
 
+* `custom-preprocessor-extensions` is a new configuration option for allowing
+  stack to be aware of any custom preprocessors you have added to `Setup.hs`.
+  See [#3491](https://github.com/commercialhaskell/stack/issues/3491)
+
 Bug fixes:
 
 * `stack new` now suppports branches other than `master` as default for

@@ -9,7 +9,7 @@ module Stack.Constants
     (buildPlanDir
     ,buildPlanCacheDir
     ,haskellFileExts
-    ,haskellPreprocessorExts
+    ,haskellDefaultPreprocessorExts
     ,stackDotYaml
     ,stackWorkEnvVar
     ,stackRootEnvVar
@@ -142,8 +142,8 @@ haskellFileExts :: [Text]
 haskellFileExts = ["hs", "hsc", "lhs"]
 
 -- | Extensions for modules that are preprocessed by common preprocessors.
-haskellPreprocessorExts :: [Text]
-haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
+haskellDefaultPreprocessorExts :: [Text]
+haskellDefaultPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 
 -- | Name of the 'stack' program, uppercased
 stackProgNameUpper :: String

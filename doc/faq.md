@@ -74,9 +74,9 @@ extra-deps:
 
 ## I need to use a package (or version of a package) that is not available on hackage, what should I do?
 
-Add it to the 
-[`extra-deps`](yaml_configuration.md#extra-deps) list in your project's 
-`stack.yaml`, specifying the package's source code location relative to the 
+Add it to the
+[`extra-deps`](yaml_configuration.md#extra-deps) list in your project's
+`stack.yaml`, specifying the package's source code location relative to the
 directory where your `stack.yaml` file lives, e.g.
 
 ```yaml
@@ -89,9 +89,9 @@ extra-deps:
 - patched/diagrams
 ```
 
-The above example specifies that the `proprietary-dep` package is found in the 
-project's `third-party` folder, that the `conduit` package is found in the 
-project's `github-version-of` folder, and that the `diagrams` package is found 
+The above example specifies that the `proprietary-dep` package is found in the
+project's `third-party` folder, that the `conduit` package is found in the
+project's `github-version-of` folder, and that the `diagrams` package is found
 in the project's `patched` folder. This autodetects changes and reinstalls the
 package.
 
@@ -171,9 +171,21 @@ test<%= i %> = <%= i %>
 ```
 
 To ensure that Stack picks up changes to this file for rebuilds, add
+the following lines to your stack.yaml file:
+
+```yaml
+    custom-preprocessor-extensions:
+    - erb
+
+    require-stack-version: ">= 2.6.0"
+```
+
+And for backwards compatability with older versions of stack, also add
 the following line to your .cabal file:
 
     extra-source-files:   B.erb
+
+You could also use the [`--custom-preprocessor-extensions` flag](yaml_configuration.md#custom-preprocessor-extensions)
 
 ## I already have GHC installed, can I still use stack?
 
@@ -578,7 +590,7 @@ This probably means a GHC bindist has not yet been added for OS key 'linux64-ncu
 Supported versions: ghc-7.10.3, ghc-8.0.1, ghc-8.0.2, ghc-8.2.1, ghc-8.2.2
 ```
 
-Most Linux distributions have standardized on providing libtinfo.so.6 (either directly or as a symlink to libncursesw.so.6). As such, there aren't GHC 8.6.* bindists that link to libncursesw.so.6 available. 
+Most Linux distributions have standardized on providing libtinfo.so.6 (either directly or as a symlink to libncursesw.so.6). As such, there aren't GHC 8.6.* bindists that link to libncursesw.so.6 available.
 
 So creating a symlink to libncursesw.so.6 as libtinfo.so.6 can prevent this error (root privileges might be required).
 ```

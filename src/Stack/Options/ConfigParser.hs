@@ -20,7 +20,7 @@ import qualified System.FilePath as FilePath
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
     (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
-        ghcVariant ghcBuild jobs includes libs overrideGccPath overrideHpack
+        ghcVariant ghcBuild jobs includes libs preprocs overrideGccPath overrideHpack
         skipGHCCheck skipMsys localBin setupInfoLocations modifyCodePage
         allowDifferentUser dumpLogs colorWhen snapLoc -> mempty
             { configMonoidStackRoot = stackRoot
@@ -37,6 +37,7 @@ configOptsParser currentDir hide0 =
             , configMonoidJobs = jobs
             , configMonoidExtraIncludeDirs = includes
             , configMonoidExtraLibDirs = libs
+            , configMonoidCustomPreprocessorExts = preprocs
             , configMonoidOverrideGccPath = overrideGccPath
             , configMonoidOverrideHpack = overrideHpack
             , configMonoidSkipMsys = skipMsys
@@ -101,6 +102,12 @@ configOptsParser currentDir hide0 =
            <> metavar "DIR"
            <> completer dirCompleter
            <> help "Extra directories to check for libraries"
+           <> hide
+            ))
+    <*> many (strOption
+            ( long "custom-preprocessor-extensions"
+           <> metavar "EXT"
+           <> help "Extensions used for custom preprocessors"
            <> hide
             ))
     <*> optionalFirst (absFileOption

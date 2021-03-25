@@ -320,6 +320,8 @@ data Config =
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: ![FilePath]
          -- ^ --extra-lib-dirs arguments
+         ,configCustomPreprocessorExts :: ![Text]
+         -- ^ List of custom preprocessors to complete the hard coded ones
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
          ,configTemplateParams      :: !(Map Text Text)
@@ -798,6 +800,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: ![FilePath]
     -- ^ See: 'configExtraLibDirs'
+    ,configMonoidCustomPreprocessorExts :: ![Text]
+    -- ^ See: 'configCustomPreprocessorExts'
     , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
     ,configMonoidOverrideHpack       :: !(First FilePath)
@@ -915,6 +919,7 @@ parseConfigMonoidObject rootDir obj = do
         obj ..:?  configMonoidExtraIncludeDirsName ..!= []
     configMonoidExtraLibDirs <- map (toFilePath rootDir FilePath.</>) <$>
         obj ..:?  configMonoidExtraLibDirsName ..!= []
+    configMonoidCustomPreprocessorExts <- obj ..:?  configMonoidCustomPreprocessorExtsName ..!= []
     configMonoidOverrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
     configMonoidOverrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
     configMonoidConcurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
@@ -1047,6 +1052,9 @@ configMonoidExtraIncludeDirsName = "extra-include-dirs"
 
 configMonoidExtraLibDirsName :: Text
 configMonoidExtraLibDirsName = "extra-lib-dirs"
+
+configMonoidCustomPreprocessorExtsName  :: Text
+configMonoidCustomPreprocessorExtsName  = "custom-preprocessor-extensions"
 
 configMonoidOverrideGccPathName :: Text
 configMonoidOverrideGccPathName = "with-gcc"
