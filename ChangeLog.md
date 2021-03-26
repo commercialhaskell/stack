@@ -45,6 +45,9 @@ Bug fixes:
   [#5445](https://github.com/commercialhaskell/stack/issues/5445) and
   [#5486](https://github.com/commercialhaskell/stack/issues/5486).
 
+* Support basic auth in package-indices. see
+  [#5509](https://github.com/commercialhaskell/stack/issues/5509).
+
 ## v2.5.1.1
 
 Hackage-only release:
