@@ -68,6 +68,7 @@ import           Stack.Options.NewParser
 import           Stack.Options.NixParser
 import           Stack.Options.ScriptParser
 import           Stack.Options.SDistParser
+import           Stack.Options.UploadParser
 import           Stack.Options.Utils
 import qualified Stack.Path
 import           Stack.Runners
@@ -263,7 +264,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "upload"
             "Upload a package to Hackage"
             uploadCmd
-            sdistOptsParser
+            uploadOptsParser
         addCommand'
             "sdist"
             "Create source distribution tarballs"
@@ -618,20 +619,21 @@ upgradeCmd upgradeOpts' = do
         upgradeOpts'
 
 -- | Upload to Hackage
-uploadCmd :: SDistOpts -> RIO Runner ()
-uploadCmd (SDistOpts [] _ _ _ _) = do
+uploadCmd :: UploadOpts -> RIO Runner ()
+uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
     prettyErrorL
         [ flow "To upload the current package, please run"
         , PP.style Shell "stack upload ."
         , flow "(with the period at the end)"
         ]
     liftIO exitFailure
-uploadCmd sdistOpts = do
+uploadCmd uploadOpts = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
+        sdistOpts = uoptsSDistOpts uploadOpts
     (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
     withConfig YesReexec $ withDefaultEnvConfig $ do
@@ -652,24 +654,22 @@ uploadCmd sdistOpts = do
             exitFailure
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
+            uploadVariant = uoptsUploadVariant uploadOpts
         getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
-        forM_
-            files
-            (\file ->
-                  do tarFile <- resolveFile' file
-                     liftIO $ do
-                       creds <- runMemoized getCreds
-                       Upload.upload hackageUrl creds (toFilePath tarFile))
-        unless (null dirs) $
-            forM_ dirs $ \dir -> do
-                pkgDir <- resolveDir' dir
-                (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
-                checkSDistTarball' sdistOpts tarName tarBytes
-                liftIO $ do
-                  creds <- runMemoized getCreds
-                  Upload.uploadBytes hackageUrl creds tarName tarBytes
-                  forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
+        forM_ files $ \file -> do
+            tarFile <- resolveFile' file
+            liftIO $ do
+              creds <- runMemoized getCreds
+              Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
+        forM_ dirs $ \dir -> do
+            pkgDir <- resolveDir' dir
+            (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
+            checkSDistTarball' sdistOpts tarName tarBytes
+            liftIO $ do
+              creds <- runMemoized getCreds
+              Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+              forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =

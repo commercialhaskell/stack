@@ -35,6 +35,7 @@ import           Network.HTTP.StackClient              (Request, RequestBody(Req
                                                         partBS, partLBS,
                                                         applyDigestAuth,
                                                         displayDigestAuthException)
+import           Stack.Options.UploadParser
 import           Stack.Types.Config
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile, renameFile)
@@ -159,11 +160,17 @@ applyCreds creds req0 = do
 uploadBytes :: String -- ^ Hackage base URL
             -> HackageCreds
             -> String -- ^ tar file name
+            -> UploadVariant
             -> L.ByteString -- ^ tar file contents
             -> IO ()
-uploadBytes baseUrl creds tarName bytes = do
+uploadBytes baseUrl creds tarName uploadVariant bytes = do
     let req1 = setRequestHeader "Accept" ["text/plain"]
-               (fromString $ baseUrl <> "packages/")
+               (fromString $ baseUrl
+                          <> "packages/"
+                          <> case uploadVariant of
+                               Publishing -> ""
+                               Candidate -> "candidates/"
+               )
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
     req2 <- formDataBody formData req1
     req3 <- applyCreds creds req2
@@ -200,8 +207,10 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 upload :: String -- ^ Hackage base URL
        -> HackageCreds
        -> FilePath
+       -> UploadVariant
        -> IO ()
-upload baseUrl creds fp = uploadBytes baseUrl creds (takeFileName fp) =<< L.readFile fp
+upload baseUrl creds fp uploadVariant =
+  uploadBytes baseUrl creds (takeFileName fp) uploadVariant =<< L.readFile fp
 
 uploadRevision :: String -- ^ Hackage base URL
                -> HackageCreds

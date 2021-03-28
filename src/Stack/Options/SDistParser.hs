@@ -7,7 +7,7 @@ import           Stack.Prelude
 import           Stack.SDist
 import           Stack.Options.HpcReportParser (pvpBoundsOption)
 
--- | Parser for arguments to `stack sdist` and `stack upload`
+-- | Parser for arguments to `stack sdist`
 sdistOptsParser :: Parser SDistOpts
 sdistOptsParser = SDistOpts <$>
   many (strArgument $ metavar "DIR" <> completer dirCompleter) <*>

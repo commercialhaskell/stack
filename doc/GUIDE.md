@@ -1663,6 +1663,7 @@ users. Here's a quick rundown:
   per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
+    * `--candidate` upload a [package candidate](http://hackage.haskell.org/upload#candidates)
     * `username` and `password` can be read by environment
 
     ```bash
