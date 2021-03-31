@@ -81,7 +81,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles('${{ matrix.stack-yaml }}') }}-${{ matrix.extra-suffix }}
+          key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
       - shell: bash
         run: |
           set -ex
