@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-bust1
       - shell: bash
         name: Install deps and run checks
         run: |
