@@ -40,6 +40,7 @@ Examples:
 * Check for any P0 and P1 issues that should be dealt with before release
 * Check for un-merged pull requests that should be merged before release
 * Ensure `release` and `stable` branches merged to `master`
+* Check copyright dates, and update if needed
 * Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
 * Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest nightly (go over the extra-deps too) and ensure the project builds and tests pass (e.g. `stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks`)
 * Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
