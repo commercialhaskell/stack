@@ -20,7 +20,7 @@
 # https://downloads.haskell.org/~ghc/X.Y.Z/.
 #
 
-GHCVER=8.10.2
+GHCVER=9.0.1
 
 if [[ -z "$GITHUB_AUTH_TOKEN" ]]; then
   echo "$0: GITHUB_AUTH_TOKEN environment variable is required" >&2
@@ -59,15 +59,20 @@ mirror_ () {
       echo "$0: Unsupported conversion: ${srcext} to ${destext}" >&2
       exit 1
     fi
-    curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn"
+    curl --fail -X POST --data-binary "@$destfn" -H "Content-type: application/octet-stream" -H "Authorization: token $GITHUB_AUTH_TOKEN" "$UPLOAD_URL?name=$destfn" |cat
     date >"$destfn.uploaded"
   fi
   while [[ $# -gt 0 ]]; do
     alias="$1"
     echo "    $alias:" >>stack-setup-$GHCVER.yaml
     echo "        $GHCVER:" >>stack-setup-$GHCVER.yaml
-    echo "            # Mirrored from $srcurl" >>stack-setup-$GHCVER.yaml
-    echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
+    if [[ "$srcfn" == "$destfn" ]]; then
+      echo "            url: \"$srcurl\"" >>stack-setup-$GHCVER.yaml
+      echo "            #mirror-url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
+    else
+      echo "            # Converted to $destext from $srcurl" >>stack-setup-$GHCVER.yaml
+      echo "            url: \"https://github.com/commercialhaskell/ghc/releases/download/ghc-$GHCVER-release/$destfn\"" >>stack-setup-$GHCVER.yaml
+    fi
     echo "            content-length: $(stat --printf="%s" "$destfn" 2>/dev/null || stat -f%z "$destfn")" >>stack-setup-$GHCVER.yaml
     echo "            sha1: $(shasum -a 1 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
     echo "            sha256: $(shasum -a 256 $destfn |cut -d' ' -f1)" >>stack-setup-$GHCVER.yaml
@@ -87,13 +92,11 @@ mirror i386-deb9-linux "" xz xz linux32
 mirror x86_64-deb9-linux "" xz xz linux64
 #mirror x86_64-centos67-linux "" xz xz linux64-gmp4
 mirror x86_64-fedora27-linux "" xz xz linux64-tinfo6
-mirror x86_64-apple-darwin "" xz bz2 macosx
+mirror x86_64-apple-darwin "" bz2 bz2 macosx
 #mirror i386-unknown-mingw32 "" xz xz windows32
 mirror x86_64-unknown-mingw32 "" xz xz windows64
-mirror x86_64-unknown-freebsd "" xz xz freebsd64-11
-mirror aarch64-deb10-linux "" xz xz linux-aarch64
-mirror armv7-deb10-linux "" xz xz linux-armv7
-#mirror x86_64-alpine3.10-linux-integer-simple "" xz xz
+mirror armv7-deb9-linux "" xz xz linux-armv7
+mirror aarch64-deb9-linux "" xz xz linux-aarch64
 
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl i386-unknown-linux-musl "" xz xz linux32-musl
 mirror_ https://github.com/redneb/ghc-alt-libc/releases/download/ghc-$GHCVER-musl x86_64-unknown-linux-musl "" xz xz linux64-musl
