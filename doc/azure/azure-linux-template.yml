@@ -5,16 +5,20 @@ jobs:
     vmImage: ${{ parameters.vmImage }}
   strategy:
     matrix:
-      GHC 8.0:
-        ARGS: "--resolver lts-9"
-      GHC 8.2:
-        ARGS: "--resolver lts-11"
-      GHC 8.4:
-        ARGS: "--resolver lts-12"
+      #GHC 8.0:
+      #  ARGS: "--resolver lts-9"
+      #GHC 8.2:
+      #  ARGS: "--resolver lts-11"
+      #GHC 8.4:
+      #  ARGS: "--resolver lts-12"
       GHC 8.6:
         ARGS: "--resolver lts-14"
+      #GHC 8.8:
+      #  ARGS: "--resolver lts-15"
       GHC 8.8:
-        ARGS: "--resolver lts-15"
+        ARGS: "--resolver lts-16"
+      GHC 8.10:
+        ARGS: "--resolver lts-17"
       nightly:
         ARGS: "--resolver nightly"
   steps:
