@@ -19,7 +19,8 @@ flags:
 ghc-options:
    "$locals": -fhide-source-paths
 
-extra-deps: []
+extra-deps:
+- hi-file-parser-0.1.2.0@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
