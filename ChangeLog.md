@@ -48,8 +48,11 @@ Bug fixes:
   [#5445](https://github.com/commercialhaskell/stack/issues/5445) and
   [#5486](https://github.com/commercialhaskell/stack/issues/5486).
 
-* Support basic auth in package-indices. see
+* Support basic auth in package-indices. See
   [#5509](https://github.com/commercialhaskell/stack/issues/5509).
+
+* Add support for parsing `.hi`. files from GHC 8.10 and 9.0. See
+  [hi-file-parser#2](https://github.com/commercialhaskell/hi-file-parser/pull/2).
 
 ## v2.5.1.1
 
