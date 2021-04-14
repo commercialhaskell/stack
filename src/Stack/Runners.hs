@@ -111,14 +111,10 @@ reexec inner = do
     -- Want to use Nix
     (True, False) -> do
       whenM getInContainer $ throwString "Cannot use Nix from within a Docker container"
-      inShell <- getInNixShell
-      if inShell
-        then do
-          isReexec <- view reExecL
-          if isReexec
-            then inner
-            else throwString "In Nix shell but reExecL is False"
-        else Nix.runShellAndExit
+      isReexec <- view reExecL
+      if isReexec
+      then inner
+      else Nix.runShellAndExit
 
     -- Want to use Docker
     (False, True) -> do
