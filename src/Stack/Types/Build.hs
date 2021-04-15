@@ -356,9 +356,9 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
      logLocations ++
      (if null bss
           then ""
-          else "\n\n" ++ doubleIndent (map T.unpack bss))
+          else "\n\n" ++ removeTrailingSpaces (map T.unpack bss))
    where
-    doubleIndent = dropWhileEnd isSpace . unlines . fmap (\line -> "    " ++ line)
+    removeTrailingSpaces = dropWhileEnd isSpace . unlines
     dropQuotes = filter ('\"' /=)
 
 instance Exception StackBuildException
