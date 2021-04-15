@@ -38,6 +38,11 @@ Other enhancements:
 * Added `--candidate` flag to `upload` command to upload a package candidate
   rather than publishing the package.
 
+* Error output using `--no-interleaved-output` no longer prepends indentating
+  whitespace. This allows emacs compilation-mode and vim quickfix to locate
+  and track errors. See
+  [#5523](https://github.com/commercialhaskell/stack/pull/5523)
+
 Bug fixes:
 
 * `stack new` now suppports branches other than `master` as default for
