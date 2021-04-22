@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
     ( constructPlan
@@ -85,18 +86,20 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     globalCabalVersion <- view $ compilerPathsL.to cpCabalVersion
     sources <- getSources globalCabalVersion
     mcur <- view $ buildConfigL.to bcCurator
-
-    let onTarget = void . addDep
-    let projectInitPlan = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
+    let targetsToAdd = Map.assocs . smtTargets $ smTargets sourceMap
+    let packageAndComponentSet = fmap getTargetPackageAndComponent <$> targetsToAdd
+    logInfo . fromString $ "--- packageAndComponentSet  " <> show packageAndComponentSet
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
+    let projectInitPlan = traverse_ (\(pn, compL) -> traverse_ (addPackageComp pn) compL) packageAndComponentSet
     ((), addedPackageMap, planDraft) <- liftIO $ runRWST projectInitPlan ctx M.empty
     let PlanDraft efinals installExes dirtyReason warnings parents = planDraft
     mapM_ (logWarn . RIO.display) (warnings [])
+    let gatherRes (k, innerMap) = first (k,) <$> Map.assocs innerMap
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
-        (errlibs, adrs) = partitionEithers $ map toEither $ M.toList addedPackageMap
-        (errfinals, finals) = partitionEithers $ map toEither $ M.toList efinals
+        (errlibs, adrs) = partitionEithers $ map toEither $ join $ gatherRes <$> M.assocs addedPackageMap
+        (errfinals, finals) = partitionEithers $ map toEither $ join $ gatherRes <$> M.assocs efinals
         errs = errlibs ++ errfinals
     if null errs
         then do
@@ -181,7 +184,7 @@ errorOnSnapshot plan@(Plan tasks _finals _unregister installExes) = do
 
 -- | Determine which packages to unregister based on the given tasks and
 -- already registered local packages
-mkUnregisterLocal :: Map PackageName Task
+mkUnregisterLocal :: Map (PackageName, CompName) Task
                   -- ^ Tasks
                   -> Map PackageName Text
                   -- ^ Reasons why packages are dirty and must be rebuilt
@@ -232,12 +235,13 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
         gid = dpGhcPkgId dp
         ident = dpPackageIdent dp
         deps = dpDepends dp
+        -- maybeLibComp = dpComponent dp -- ADD THIS
 
     go' toUnregister ident deps
       -- If we're planning on running a task on it, then it must be
       -- unregistered, unless it's a target and an initial-build-steps
       -- build is being done.
-      | Just task <- Map.lookup name tasks
+      | Just task <- Map.lookup (name, error "okokokokok") tasks
           = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
               then Nothing
               else Just $ fromMaybe "" $ Map.lookup name dirtyReason
@@ -261,12 +265,12 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
 -- these should have already been taken care of as part of the build
 -- step.
-addFinal :: LocalPackage -> Package -> Bool -> Bool -> ConstructPlanMonad ()
-addFinal lp package isAllInOne buildHaddocks = do
-    depsRes <- addPackageDeps package
+addFinal :: LocalPackage -> Package -> CompName -> Bool -> Bool -> ConstructPlanMonad ()
+addFinal lp package compName buildHaddocks isAllInOne = do
+    depsRes <- addPackageDeps package compName
     res <- case depsRes of
         Left e -> return $ Left e
-        Right (missing, present, _minLoc) -> do
+        Right (CompDepsRes missing present _minLoc) -> do
             ctx <- ask
             return $ Right Task
                 { taskProvides = PackageIdentifier
@@ -284,12 +288,13 @@ addFinal lp package isAllInOne buildHaddocks = do
                 , taskBuildHaddock = buildHaddocks
                 , taskPresent = present
                 , taskType = TTLocalMutable lp
+                , taskComponentSet = Set.singleton compName
                 , taskAllInOne = isAllInOne
                 , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
                 , taskAnyMissing = not $ Set.null missing
                 , taskBuildTypeConfig = packageBuildTypeConfig package
                 }
-    tell mempty { pdFinals = Map.singleton (packageName package) res }
+    tell mempty { pdFinals = Map.singleton (packageName package) (Map.singleton compName res) }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the
 -- package, if needed.
@@ -301,23 +306,37 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- forcing this package to be marked as a dependency, even if it is
 -- directly wanted. This makes sense - if we left out packages that are
 -- deps, it would break the --only-dependencies build plan.
-addDep :: PackageName
+addPackageComp :: PackageName
+        -> CompName
+       -- ^ Empty set means every component will be built.
        -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-addDep name = do
-    ctx <- ask
-    m <- get
-    case Map.lookup name m of
-        Just res -> do
-            planDebug $ "addDep: Using cached result for " ++ show name ++ ": " ++ show res
-            return res
-        Nothing -> do
-            res <- if name `elem` callStack ctx
+addPackageComp name compName = do
+    constructPlanState <- get
+    logInfo . fromString $ "call " <> show (name, compName)
+    -- logInfo . fromString $ show constructPlanState
+    case Map.lookup name constructPlanState of
+        Just compMap ->
+            -- We need to know whether some intersection happened or none.
+            -- specifically, every element part which is contained in an
+            -- existing tuple should be saved, to get the existing res for it.
+            case Map.lookup compName compMap of
+                Just existingResult -> do
+                    logInfo . fromString $ "existing " <> show (name, compName, existingResult)
+                    return existingResult
+                Nothing -> whenNoResultAlreadyAvailable compName
+        Nothing -> whenNoResultAlreadyAvailable compName
+    where
+        whenNoResultAlreadyAvailable givenCompName = do
+            ctx <- ask
+            -- logInfo . fromString $ "addPackageComp " <> show (name, givenCompName)
+            let packageAndComp = (name, givenCompName)
+            res <- if any ((==) packageAndComp) $ callStack ctx
                 then do
-                    planDebug $ "addDep: Detected cycle " ++ show name ++ ": " ++ show (callStack ctx)
-                    return $ Left $ DependencyCycleDetected $ name : callStack ctx
-                else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
+                    planDebug $ "addPackageComp: Detected cycle " ++ show name ++ ": " ++ show (callStack ctx)
+                    return $ Left $ DependencyCycleDetected $ packageAndComp : callStack ctx
+                else local (\ctx' -> ctx' { callStack = packageAndComp : callStack ctx' }) $ do
                     let mpackageInfo = Map.lookup name $ combinedMap ctx
-                    planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ show mpackageInfo
+                    planDebug $ "addPackageComp: Package info for " ++ show name ++ ": " ++ show mpackageInfo
                     case mpackageInfo of
                         -- TODO look up in the package index and see if there's a
                         -- recommendation available
@@ -334,34 +353,35 @@ addDep name = do
                                       -- this could happen for GHC boot libraries missing from Hackage
                                       logWarn $ "No latest package revision found for: " <>
                                           fromString (packageNameString name) <> ", dependency callstack: " <>
-                                          displayShow (map packageNameString $ callStack ctx)
+                                          displayShow (map (packageNameString . fst) $ callStack ctx)
                                       return Nothing
                                     Just (_rev, cfKey, treeKey) ->
                                       return . Just $
                                           PLIHackage (PackageIdentifier name version) cfKey treeKey
-                            tellExecutablesUpstream name askPkgLoc loc Map.empty
+                            tellExecutablesUpstream name givenCompName askPkgLoc loc Map.empty
+                            logInfo . fromString $ "ADRFOUND installed " <> show (name, givenCompName)
                             return $ Right $ ADRFound loc installed
-                        Just (PIOnlySource ps) -> do
-                            tellExecutables name ps
-                            installPackage name ps Nothing
-                        Just (PIBoth ps installed) -> do
-                            tellExecutables name ps
-                            installPackage name ps (Just installed)
-            updateLibMap name res
+                        Just (PIOnlySource ps) -> installFromSource ps givenCompName Nothing
+                        Just (PIBoth ps installed) -> installFromSource ps givenCompName (Just installed)
+            updateLibMap name givenCompName res
             return res
+        installFromSource ps givenCompName maybeInstalled = do
+            tellExecutables name givenCompName ps
+            installPackage name givenCompName ps maybeInstalled
 
 -- | Update the location of executables (if any) in the pdInstall map.
 tellExecutables :: PackageName
+    -> CompName
     -> PackageSource
     -- ^ The package source for which the exe locations should (possibly) be updated.
     -> ConstructPlanMonad ()
-tellExecutables _name (PSFilePath lp)
-    | lpShouldBeBuilt lp = tellExecutablesPackage Local $ lpPackage lp
+tellExecutables _name compName (PSFilePath lp)
+    | lpShouldBeBuilt lp = tellExecutablesPackage Local (lpPackage lp) compName
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
-    tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
+tellExecutables name compName (PSRemote pkgloc _version _fromSnaphot cp) =
+    tellExecutablesUpstream name compName (pure $ Just pkgloc) Snap (cpFlags cp)
 
 -- | When the package is remote, the function check if it's a source map's
 -- target, load the package and run 'tellExecutablesPackage' on it.
@@ -369,17 +389,18 @@ tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
 -- TL;DR loads a remote package and update its exe location.
 tellExecutablesUpstream ::
        PackageName
+    -> CompName
     -> ConstructPlanMonad (Maybe PackageLocationImmutable)
     -> InstallLocation
     -> Map FlagName Bool
     -> ConstructPlanMonad ()
-tellExecutablesUpstream name retrievePkgLoc loc flags = do
+tellExecutablesUpstream name compName retrievePkgLoc loc flags = do
     ctx <- ask
     when (name `Set.member` wanted ctx) $ do
         mPkgLoc <- retrievePkgLoc
         forM_ mPkgLoc $ \pkgLoc -> do
             p <- loadPackage ctx pkgLoc flags [] []
-            tellExecutablesPackage loc p
+            tellExecutablesPackage loc p compName
 
 -- | Updates the 'PlanDraft' with the exe-to-install locations.
 -- install here refers to stack copying the executable in the user path. 
@@ -388,8 +409,9 @@ tellExecutablesPackage ::
     InstallLocation ->
     -- | The package to update in the PlanDraft pdInstall
     Package ->
+    CompName ->
     ConstructPlanMonad ()
-tellExecutablesPackage loc p = do
+tellExecutablesPackage loc p compName = do
     combinedMapValue <- asks combinedMap
     -- Determine which components are enabled so we know which ones to copy
     let localInstalledComp =
@@ -403,8 +425,8 @@ tellExecutablesPackage loc p = do
             | lpShouldBeBuilt lp = exeComponents (lpComponents lp)
             | otherwise = Set.empty
         goSource PSRemote{} = Set.empty
-    let mergedLocalAndPackage = filterComps localInstalledComp $ packageExes p
-    let exeToInstall = map (, loc) $ Set.toList mergedLocalAndPackage
+    -- let mergedLocalAndPackage = filterComps localInstalledComp $ packageExes p
+    let exeToInstall = map (, loc) $ maybeToList (getExeName compName)
     tell mempty { pdInstall = Map.fromList exeToInstall }
   where
     filterComps localComp pkgComp
@@ -414,28 +436,38 @@ tellExecutablesPackage loc p = do
 -- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
 -- build 'Task's for the package and its dependencies.
 installPackage :: PackageName
+               -> CompName
                -> PackageSource
                -> Maybe Installed
+               -- ^ empty set means every component should be built.
                -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-installPackage name ps minstalled = do
+installPackage name compName ps minstalled = do
     ctx <- ask
+    logInfo . fromString $ "--- installing  " <> show (name, compName)
+    let resolveDepsAndInstallPS = resolveDepsAndInstall ps minstalled compName
     case ps of
         PSRemote pkgLoc _version _fromSnaphot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
-            resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
+            resolveDepsAndInstallPS False (cpHaddocks cp) package
         PSFilePath lp -> do
             case lpTestBench lp of
                 Nothing -> do
                     planDebug $ "installPackage: No test / bench component for " ++ show name ++ " so doing an all-in-one build."
-                    resolveDepsAndInstall True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+                    res' <- resolveDepsAndInstallPS False (lpBuildHaddocks lp) (lpPackage lp)
+                    when (isRight res') $ do
+                        -- Insert it into the map so that it's
+                        -- available for @addFinal@.
+                        updateLibMap name compName res'
+                    return res'
                 Just tb -> do
                     -- Attempt to find a plan which performs an all-in-one
                     -- build.  Ignore the writer action + reset the state if
                     -- it fails.
                     s <- get
+                    let addFinalLP = addFinal lp tb compName False
                     res <- pass $ do
-                        res <- addPackageDeps tb
+                        res <- addPackageDeps tb compName
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
@@ -448,13 +480,13 @@ installPackage name ps minstalled = do
                           -- but when it's already available it's OK to do that
                           splitRequired <- expectedTestOrBenchFailures <$> asks mcurator
                           let isAllInOne = not splitRequired
-                          adr <- installPackageGivenDeps isAllInOne (lpBuildHaddocks lp) ps tb minstalled deps
+                          adr <- installPackageGivenDeps isAllInOne (lpBuildHaddocks lp) ps tb minstalled deps compName
                           let finalAllInOne = case adr of
                                 ADRToInstall _ | splitRequired -> False
                                 _ -> True
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
-                          addFinal lp tb finalAllInOne False
+                          addFinalLP finalAllInOne
                           return $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
@@ -462,14 +494,16 @@ installPackage name ps minstalled = do
                             -- plan.
                             planDebug $ "installPackage: Before trying cyclic plan, resetting lib result map to " ++ show s
                             put s
-                            -- Otherwise, fall back on building the
-                            -- tests / benchmarks in a separate step.
-                            res' <- resolveDepsAndInstall False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
+
+                    -- indented 2
+                    -- Otherwise, fall back on building the
+                    -- tests / benchmarks in a separate step.
+                            res' <- resolveDepsAndInstallPS False (lpBuildHaddocks lp) (lpPackage lp)
                             when (isRight res') $ do
                                 -- Insert it into the map so that it's
-                                -- available for addFinal.
-                                updateLibMap name res'
-                                addFinal lp tb False False
+                                -- available for @addFinal@.
+                                updateLibMap name compName res'
+                                addFinal lp tb compName False False
                             return res'
  where
    expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
@@ -477,17 +511,18 @@ installPackage name ps minstalled = do
      pure $ Set.member name (curatorExpectTestFailure curator) ||
             Set.member name (curatorExpectBenchmarkFailure curator)
 
-resolveDepsAndInstall :: Bool
-                      -> Bool
-                      -> PackageSource
-                      -> Package
+resolveDepsAndInstall :: PackageSource
                       -> Maybe Installed
+                      -> CompName
+                      -> Bool
+                      -> Bool
+                      -> Package
                       -> ConstructPlanMonad (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
-    res <- addPackageDeps package
+resolveDepsAndInstall ps minstalled compName isAllInOne buildHaddocks package = do
+    res <- addPackageDeps package compName
     case res of
         Left err -> return $ Left err
-        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
+        Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps compName
 
 -- | Checks if we need to install the given 'Package', given the results
 -- of 'addPackageDeps'. If dependencies are missing, the package is
@@ -497,19 +532,20 @@ installPackageGivenDeps :: Bool
                         -> PackageSource
                         -> Package
                         -> Maybe Installed
-                        -> ( Set PackageIdentifier
-                           , Map PackageIdentifier GhcPkgId
-                           , IsMutable )
+                        -> CompDepsRes
+                        -> CompName
                         -> ConstructPlanMonad AddDepRes
-installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing, present, minMutable) = do
+installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled compDepRes compName = do
     let name = packageName package
+    let CompDepsRes !missing !present !minMutable = compDepRes
+    logInfo . fromString $ "--- installPackageGivenDeps  " <> show missing
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
             shouldInstall <- checkDirtiness ps installed package present buildHaddocks
             return $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
-            let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
+            let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName . fst) (Set.toList missing)
             tell mempty { pdDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
             return Nothing
         (Nothing, _) -> return Nothing
@@ -532,6 +568,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
                         package
             , taskBuildHaddock = buildHaddocks
             , taskPresent = present
+            , taskComponentSet = Set.singleton compName
             , taskType =
                 case ps of
                     PSFilePath lp ->
@@ -550,11 +587,11 @@ packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
 -- Update response in the lib map. If it is an error, and there's
 -- already an error about cyclic dependencies, prefer the cyclic error.
-updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
-updateLibMap name val = modify $ \mp ->
-    case (M.lookup name mp, val) of
-        (Just (Left DependencyCycleDetected{}), Left _) -> mp
-        _ -> M.insert name val mp
+updateLibMap :: PackageName -> CompName -> Either ConstructPlanException AddDepRes -> ConstructPlanMonad ()
+updateLibMap name compName val = modify $ \mp -> addPackageTask name compName val mp
+    -- case (M.lookup name mp, val) of
+    --     (Just (Left DependencyCycleDetected{}), Left _) -> mp
+    --     _ -> M.insert name val mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -571,11 +608,12 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> ConstructPlanMonad (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
-addPackageDeps package = do
+addPackageDeps :: Package -> CompName -> ConstructPlanMonad (Either ConstructPlanException CompDepsRes)
+addPackageDeps package parentCompName = do
     addUnkownToolsWarning package
-    let packageDepsList = Map.toList $ packageDeps package
-    packageDepsResultList <- forM packageDepsList singleDepHandling
+    logInfo . fromString $ "--- addPDeps  " <> show (packageName package, parentCompName)
+    packageDepsResultList <- iterateOnPackageDeps singleDepHandling package parentCompName
+    logInfo . fromString $ "--- addPDepsRES  " <> show packageDepsResultList
     case partitionEithers packageDepsResultList of
         -- Note that the Monoid for 'InstallLocation' means that if any
         -- is 'Local', the result is 'Local', indicating that the parent
@@ -587,15 +625,15 @@ addPackageDeps package = do
             package
             (Map.fromList errs)
   where
-    singleDepHandling (depname, DepValue range depType) = do
-        addDepResult <- addDep depname
-        case addDepResult of
-            Left e -> whenAddDepFailed depname range e
-            Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
-                -- Dependency on a non existing library.
-                return $ Left (depname, (range, Nothing, HasNoLibrary))
-            Right adr -> whenAddDepSucceededAndHasLib depname range adr
-    whenAddDepSucceededAndHasLib depname range adr = do
+    singleDepHandling (depname, DepValue range depType, compName) = do
+        res <- addPackageComp depname compName
+        logInfo . fromString $ "--- singleDeps  " <> show (depname, compName)
+        case res of
+            Left err -> whenAddDepFailed depname range err
+            Right adr -> whenAddDepSucceeded depname compName depType range adr
+    whenAddDepSucceeded depname _ AsLibrary range adr
+        | not (adrHasLibrary adr) = return $ Left (depname, (range, Nothing, HasNoLibrary))
+    whenAddDepSucceeded depname compName _ range adr = do
         addParent depname range Nothing
         inRange <- if adrVersion adr `withinRange` range
             then return True
@@ -632,12 +670,14 @@ addPackageDeps package = do
                             else return False
         if inRange
             then case adr of
-                ADRToInstall task -> return $ Right
-                    (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
-                ADRFound loc (Executable _) -> return $ Right
-                    (Set.empty, Map.empty, installLocationIsMutable loc)
-                ADRFound loc (Library ident gid _) -> return $ Right
-                    (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
+                ADRToInstall task -> return $ Right $
+                    CompDepsRes (Set.singleton (taskProvides task, compName)) Map.empty (taskTargetIsMutable task)
+                ADRFound loc minstalled -> do
+                    let pkgIdMap = case minstalled of
+                                Executable{} -> Map.empty
+                                (Library ident gid _) -> Map.singleton (ident, compName) gid
+                    return $ Right $
+                        CompDepsRes Set.empty pkgIdMap (installLocationIsMutable loc)
             else do
                 mlatestApplicable <- getLatestApplicableVersionAndRev depname range
                 return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
@@ -667,7 +707,7 @@ addPackageDeps package = do
 checkDirtiness :: PackageSource
                -> Installed
                -> Package
-               -> Map PackageIdentifier GhcPkgId
+               -> Map (PackageIdentifier, CompName) GhcPkgId
                -> Bool
                -> ConstructPlanMonad Bool
 checkDirtiness ps installed package present buildHaddocks = do
@@ -801,24 +841,24 @@ stripLocals plan = plan
 
 stripNonDeps :: Set PackageName -> Plan -> Plan
 stripNonDeps deps plan = plan
-    { planTasks = Map.filter checkTask $ planTasks plan
+    { planTasks = {-- Map.filter checkTask $--} planTasks plan
     , planFinals = Map.empty
     , planInstallExes = Map.empty -- TODO maybe don't disable this?
     }
-  where
-    checkTask task = taskProvides task `Set.member` missingForDeps
-    providesDep task = pkgName (taskProvides task) `Set.member` deps
-    missing = Map.fromList $ map (taskProvides &&& tcoMissing . taskConfigOpts) $
-              Map.elems (planTasks plan)
-    missingForDeps = flip execState mempty $ do
-      for_ (Map.elems $ planTasks plan) $ \task ->
-        when (providesDep task) $ collectMissing mempty (taskProvides task)
+--   where
+--     checkTask task = taskProvides task `Set.member` missingForDeps
+--     providesDep task = pkgName (taskProvides task) `Set.member` deps
+--     missing = Map.fromList $ map (taskProvides &&& tcoMissing . taskConfigOpts) $
+--               Map.elems (planTasks plan)
+--     missingForDeps = flip execState mempty $ do
+--       for_ (Map.elems $ planTasks plan) $ \task ->
+--         when (providesDep task) $ collectMissing mempty (taskProvides task)
 
-    collectMissing dependents pid = do
-      when (pid `elem` dependents) $ error $
-        "Unexpected: task cycle for " <> packageNameString (pkgName pid)
-      modify'(<> Set.singleton pid)
-      mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
+--     collectMissing dependents pid = do
+--       when (pid `elem` dependents) $ error $
+--         "Unexpected: task cycle for " <> packageNameString (pkgName pid)
+--       modify'(<> Set.singleton pid)
+--       mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
 -- | Is the given package/version combo defined in the snapshot or in the global database?
 inSnapshot :: PackageName -> Version -> ConstructPlanMonad Bool
@@ -916,7 +956,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
 
     pprintException (DependencyCycleDetected pNames) = Just $
         flow "Dependency cycle detected in packages:" <> line <>
-        indent 4 (encloseSep "[" "]" "," (map (style Error . fromString . packageNameString) pNames))
+        indent 4 (encloseSep "[" "]" "," (map (style Error . fromString . componentMapAndPackagePPrint) pNames))
     pprintException (DependencyPlanFailures pkg pDeps) =
         case mapMaybe pprintDep (Map.toList pDeps) of
             [] -> Nothing
@@ -987,7 +1027,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
             style Error (fromString $ packageNameString name) <+>
-            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
+            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map (packageNameString . fst) names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =

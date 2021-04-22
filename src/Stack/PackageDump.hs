@@ -26,6 +26,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified RIO.Text as T
 import qualified Distribution.Text as C
+import qualified Distribution.Types.UnqualComponentName as CabalT
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Stack.GhcPkg
 import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), DumpPackage (..))
@@ -184,6 +185,9 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
             name <- parseS "name" >>= parsePackageNameThrowing . T.unpack
             version <- parseS "version" >>= parseVersionThrowing . T.unpack
             ghcPkgId <- parseS "id" >>= parseGhcPkgId
+            let libName = case Map.lookup "lib-name" m of
+                                Just [libNameRaw] -> Just $ CabalT.mkUnqualComponentName $ T.unpack libNameRaw
+                                Nothing -> Nothing
 
             -- if a package has no modules, these won't exist
             let libDirKey = "library-dirs"
@@ -214,6 +218,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
+                , dpComponent = libName
                 , dpPackageIdent = PackageIdentifier name version
                 , dpParentLibIdent = parentLib
                 , dpLicense = license

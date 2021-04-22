@@ -39,6 +39,7 @@ import qualified Distribution.Package as D
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription hiding (FlagName)
+import           Distribution.Types.PackageDescription (pkgBuildableComponents)
 import           Distribution.PackageDescription.Parsec
 import           Distribution.Pretty (prettyShow)
 import           Distribution.Simple.Glob (matchDirFileGlob)
@@ -78,6 +79,7 @@ import           System.IO.Error
 import           RIO.Process
 import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (Style (Module))
+import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
@@ -125,19 +127,23 @@ resolvePackage packageConfig gpkg =
     packageFromPackageDescription
         packageConfig
         (genPackageFlags gpkg)
+        gpkg
         (resolvePackageDescription packageConfig gpkg)
 
 packageFromPackageDescription :: PackageConfig
                               -> [D.Flag]
+                              -> GenericPackageDescription
                               -> PackageDescriptionPair
                               -> Package
-packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
+packageFromPackageDescription packageConfig pkgFlags gpkDesc (PackageDescriptionPair pkgNoMod pkg) =
     Package
     { packageName = name
     , packageVersion = pkgVersion pkgId
     , packageLicense = licenseRaw pkg
     , packageDeps = deps
     , packageFiles = pkgFiles
+    , packageComponentBuildInfo =
+        fromComponentList (fmap snd $ componentDescTools $ isExePreinstalled Cabal.ExeDependency) (pkgBuildableComponents pkg)
     , packageUnknownTools = unknownTools
     , packageGhcOptions = packageConfigGhcOptions packageConfig
     , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
@@ -567,35 +573,37 @@ packageDescTools
 packageDescTools pd =
     (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
   where
-    (unknowns, knowns) = unzip $ map perBI $ allBuildInfo' pd
+    (unknowns, knowns) = unzip $ componentDescTools filterTransformer <$> allBuildInfo' pd
+    filterTransformer = isExePreinstalled transformer
+    transformer pkg _ range =
+          ( pkg
+          , DepValue
+              { dvVersionRange = range
+              , dvType = AsBuildTool
+              }
+          )
 
-    perBI :: BuildInfo -> ([ExeName], [(PackageName, DepValue)])
-    perBI bi =
-        (unknownTools, tools)
-      where
-        (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
+isExePreinstalled ::
+  (PackageName -> Cabal.UnqualComponentName -> VersionRange -> a) ->
+  Cabal.ExeDependency ->
+  Maybe a
+isExePreinstalled fn (Cabal.ExeDependency pkg name range)
+  | pkg `S.member` preInstalledPackages = Nothing
+  | otherwise = Just $ fn pkg name range
 
-        tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
-
-        -- This is similar to desugarBuildTool from Cabal, however it
-        -- uses our own hard-coded map which drops tools shipped with
-        -- GHC (like hsc2hs), and includes some tools from Stackage.
-        go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
-        go1 (Cabal.LegacyExeDependency name range) =
-          case M.lookup name hardCodedMap of
-            Just pkgName -> Right $ Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
-            Nothing -> Left $ ExeName $ T.pack name
-
-        go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
-        go2 (Cabal.ExeDependency pkg _name range)
-          | pkg `S.member` preInstalledPackages = Nothing
-          | otherwise = Just
-              ( pkg
-              , DepValue
-                  { dvVersionRange = range
-                  , dvType = AsBuildTool
-                  }
-              )
+componentDescTools :: (Cabal.ExeDependency -> Maybe a) -> BuildInfo -> ([ExeName], [a])             
+componentDescTools filerFn bi = (unknownTools, tools)
+  where
+    tools = mapMaybe filerFn (knownTools ++ buildToolDepends bi)
+    (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
+    -- This is similar to desugarBuildTool from Cabal, however it
+    -- uses our own hard-coded map which drops tools shipped with
+    -- GHC (like hsc2hs), and includes some tools from Stackage.
+    go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
+    go1 (Cabal.LegacyExeDependency name range) =
+      case M.lookup name hardCodedMap of
+        Just pkgName -> Right $ Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
+        Nothing -> Left $ ExeName $ T.pack name
 
 -- | A hard-coded map for tool dependencies
 hardCodedMap :: Map String D.PackageName

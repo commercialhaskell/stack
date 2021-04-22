@@ -19,7 +19,7 @@ import           Distribution.Parsec (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
 import           Distribution.ModuleName (ModuleName)
-import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
+import           Distribution.PackageDescription (PackageDescription, TestSuiteInterface, BuildType)
 import           Distribution.System (Platform (..))
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -109,8 +109,17 @@ data Package =
           -- This is PackageDescription licenseRaw in Cabal. 
           ,packageFiles :: !GetPackageFiles
           -- ^ Get all files of the package.
+          -- Absent in Cabal.
+          ,packageComponentBuildInfo :: ComponentMap ComponentBuildInfo
+          -- ^ All the build info stack cares about, organized by component types
+          -- (i.e. lib, exe, test, bench).
+          -- This is mainly used for determining which components to install when
+          -- constructing the build plan.
+          -- This only contains buildable components.
           ,packageDeps :: !(Map PackageName DepValue)
-          -- ^ Packages that the package depends on, both as libraries and build tools.
+          -- ^ This is deprecated. 
+          -- The dependencies are component specific now. 
+          -- Packages that the package depends on, both as libraries and build tools.
           -- Derived from Cabal:
           --
           --    - allBuildInfo (allBuildInfo') function (see main comment)

@@ -200,7 +200,7 @@ parseRawTarget t =
 data ResolveResult = ResolveResult
   { rrName :: !PackageName
   , rrRaw :: !RawInput
-  , rrComponent :: !(Maybe NamedComponent)
+  , rrComponent :: !(Set NamedComponent)
   -- ^ Was a concrete component specified?
   , rrAddedDep :: !(Maybe PackageLocationImmutable)
   -- ^ Only if we're adding this as a dependency
@@ -215,8 +215,10 @@ resolveRawTarget ::
     -> Map PackageName PackageLocation
     -> (RawInput, RawTarget)
     -> RIO env (Either Text ResolveResult)
-resolveRawTarget sma allLocs (ri, rt) =
-  go rt
+resolveRawTarget sma allLocs (ri, rt) = do
+  allComponentSet <- traverse ppComponentsBuildable locals
+  traverse_ (\a -> logInfo . fromString $ "--- rr target  " <> show a) allComponentSet
+  go rt allComponentSet
   where
     locals = smaProject sma
     deps = smaDeps sma
@@ -229,7 +231,7 @@ resolveRawTarget sma allLocs (ri, rt) =
     isCompNamed t1 (CTest t2) = t1 == t2
     isCompNamed t1 (CBench t2) = t1 == t2
 
-    go (RTComponent cname) = do
+    go (RTComponent cname) _ = do
         -- Associated list from component name to package that defines
         -- it. We use an assoc list and not a Map so we can detect
         -- duplicates.
@@ -242,7 +244,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                 [(name, comp)] -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
-                  , rrComponent = Just comp
+                  , rrComponent = Set.singleton comp
                   , rrAddedDep = Nothing
                   , rrPackageType = PTProject
                   }
@@ -252,7 +254,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                     , ", matches: "
                     , T.pack $ show matches
                     ]
-    go (RTPackageComponent name ucomp) =
+    go (RTPackageComponent name ucomp) _ =
         case Map.lookup name locals of
             Nothing -> pure $ Left $ T.pack $ "Unknown local package: " ++ packageNameString name
             Just pp -> do
@@ -262,7 +264,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                         | comp `Set.member` comps -> Right ResolveResult
                             { rrName = name
                             , rrRaw = ri
-                            , rrComponent = Just comp
+                            , rrComponent = Set.singleton comp
                             , rrAddedDep = Nothing
                             , rrPackageType = PTProject
                             }
@@ -283,7 +285,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                             [x] -> Right ResolveResult
                               { rrName = name
                               , rrRaw = ri
-                              , rrComponent = Just x
+                              , rrComponent = Set.singleton x
                               , rrAddedDep = Nothing
                               , rrPackageType = PTProject
                               }
@@ -296,28 +298,28 @@ resolveRawTarget sma allLocs (ri, rt) =
                                 , T.pack $ show matches
                                 ]
 
-    go (RTPackage name)
+    go (RTPackage name) allCompSet
       | Map.member name locals = return $ Right ResolveResult
           { rrName = name
           , rrRaw = ri
-          , rrComponent = Nothing
+          , rrComponent = mconcat $ Map.elems allCompSet
           , rrAddedDep = Nothing
           , rrPackageType = PTProject
           }
       | Map.member name deps =
-          pure $ deferToConstructPlan name
+          pure $ deferToConstructPlan name allCompSet
       | Just gp <- Map.lookup name globals =
           case gp of
-              GlobalPackage _ -> pure $ deferToConstructPlan name
-              ReplacedGlobalPackage _ -> hackageLatest name
-      | otherwise = hackageLatest name
+              GlobalPackage _ -> pure $ deferToConstructPlan name allCompSet
+              ReplacedGlobalPackage _ -> hackageLatest name allCompSet
+      | otherwise = hackageLatest name allCompSet
 
     -- Note that we use getLatestHackageRevision below, even though it's
     -- non-reproducible, to avoid user confusion. In any event,
     -- reproducible builds should be done by updating your config
     -- files!
 
-    go (RTPackageIdentifier ident@(PackageIdentifier name version))
+    go (RTPackageIdentifier ident@(PackageIdentifier name version)) allCompSet
       | Map.member name locals = return $ Left $ T.concat
             [ tshow (packageNameString name)
             , " target has a specific version number, but it is a local package."
@@ -330,8 +332,8 @@ resolveRawTarget sma allLocs (ri, rt) =
             -- with overriding it if necessary
             Just (PLImmutable (PLIHackage (PackageIdentifier _name versionLoc) _cfKey _treeKey)) ->
               if version == versionLoc
-              then pure $ deferToConstructPlan name
-              else hackageLatestRevision name version
+              then pure $ deferToConstructPlan name allCompSet
+              else hackageLatestRevision name version allCompSet
             -- The package was coming from something besides the
             -- index, so refuse to do the override
             Just loc' -> pure $ Left $ T.concat
@@ -345,36 +347,36 @@ resolveRawTarget sma allLocs (ri, rt) =
             Nothing -> do
               mrev <- getLatestHackageRevision YesRequireHackageIndex name version
               pure $ case mrev of
-                Nothing -> deferToConstructPlan name
+                Nothing -> deferToConstructPlan name allCompSet
                 Just (_rev, cfKey, treeKey) -> Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
-                  , rrComponent = Nothing
+                  , rrComponent = mconcat $ Map.elems allCompSet
                   , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
                   , rrPackageType = PTDependency
                   }
 
-    hackageLatest name = do
+    hackageLatest name allCompSet = do
         mloc <- getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
         pure $ case mloc of
-          Nothing -> deferToConstructPlan name
+          Nothing -> deferToConstructPlan name allCompSet
           Just loc -> do
             Right ResolveResult
                   { rrName = name
                   , rrRaw = ri
-                  , rrComponent = Nothing
+                  , rrComponent = mconcat $ Map.elems allCompSet
                   , rrAddedDep = Just loc
                   , rrPackageType = PTDependency
                   }
 
-    hackageLatestRevision name version = do
+    hackageLatestRevision name version allCompSet = do
         mrev <- getLatestHackageRevision YesRequireHackageIndex name version
         pure $ case mrev of
-          Nothing -> deferToConstructPlan name
+          Nothing -> deferToConstructPlan name allCompSet
           Just (_rev, cfKey, treeKey) -> Right ResolveResult
             { rrName = name
             , rrRaw = ri
-            , rrComponent = Nothing
+            , rrComponent = mconcat $ Map.elems allCompSet
             , rrAddedDep = Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
             , rrPackageType = PTDependency
             }
@@ -385,10 +387,10 @@ resolveRawTarget sma allLocs (ri, rt) =
     -- about the missing package so that we get more errors
     -- together, plus the fancy colored output from that
     -- module.
-    deferToConstructPlan name = Right ResolveResult
+    deferToConstructPlan name allCompSet = Right ResolveResult
               { rrName = name
               , rrRaw = ri
-              , rrComponent = Nothing
+              , rrComponent = mconcat $ Map.elems allCompSet
               , rrAddedDep = Nothing
               , rrPackageType = PTDependency
               }
@@ -409,14 +411,15 @@ combineResolveResults results = do
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
-            let mcomps = map rrComponent rrs in
+            let mcomps = mconcat $ map rrComponent rrs in
             -- Confirm that there is either exactly 1 with no component, or
             -- that all rrs are components
+
             case rrs of
                 [] -> assert False $ Left "Somehow got no rrComponent values, that can't happen"
-                [rr] | isNothing (rrComponent rr) -> Right $ Map.singleton name $ TargetAll $ rrPackageType rr
+                [rr] | null (rrComponent rr) -> Right $ Map.singleton name $ TargetAll $ rrPackageType rr
                 _
-                  | all isJust mcomps -> Right $ Map.singleton name $ TargetComps $ Set.fromList $ catMaybes mcomps
+                  | (not . null) mcomps -> Right $ Map.singleton name $ TargetComps mcomps
                   | otherwise -> Left $ T.concat
                       [ "The package "
                       , T.pack $ packageNameString name
