@@ -1,13 +1,9 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
+## v2.7.0.1 (release candidate)
 
 **Changes since v2.5.1.1:**
-
-Major changes:
 
 Behavior changes:
 
@@ -61,6 +57,7 @@ Bug fixes:
 
 * Add support for parsing `.hi`. files from GHC 8.10 and 9.0. See
   [hi-file-parser#2](https://github.com/commercialhaskell/hi-file-parser/pull/2).
+
 
 ## v2.5.1.1
 
