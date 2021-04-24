@@ -141,7 +141,6 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           body: |
-            [APPEND ` (release candidate)` TO RELEASE NAME]
             **Changes since v[INSERT PREVIOUS VERSION]:**
 
             [INSERT CHANGELOG]
