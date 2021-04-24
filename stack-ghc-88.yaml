@@ -1,11 +1,11 @@
-resolver: lts-15.5
+resolver: lts-15.16
 
 packages:
 - .
 
 docker:
   enable: false
-  repo: fpco/stack-build:lts-15.5
+  repo: fpco/stack-build:lts-15.16
 
 nix:
   # --nix on the command-line to enable.
