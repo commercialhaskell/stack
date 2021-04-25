@@ -293,7 +293,9 @@ rules global@Global{..} args = do
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
     -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
-    binaryInstallerNSIFileName = binaryName ++ "-installer" <.> nsiExt
+    -- Prefix with 'installer-' so it doesn't get included in release artifacts
+    -- (due to NSIS limitation, needs to be in same directory as executable)
+    binaryInstallerNSIFileName = "installer-" ++ binaryName <.> nsiExt
     binaryInstallerFileName = binaryName ++ "-installer" <.> exe
     binaryName =
         concat
