@@ -531,7 +531,7 @@ extra-deps:
 #### Bootstrapping compiler
 
 Building GHC from source requires a working GHC (known as the bootstrap
-compiler). As we use a Stack based version of Hadrian (`hadrian/build.stack.sh` in
+compiler). As we use a Stack based version of Hadrian (`hadrian/build-stack` in
 GHC sources), the bootstrap compiler is configured into `hadrian/stack.yaml` and
 fully managed by Stack.
 

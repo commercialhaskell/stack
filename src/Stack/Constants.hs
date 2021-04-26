@@ -535,11 +535,11 @@ ghcShowOptionsOutput =
 
 -- | Relative path inside a GHC repo to the Hadrian build batch script
 hadrianCmdWindows :: Path Rel File
-hadrianCmdWindows = $(mkRelFile "hadrian/build.stack.bat")
+hadrianCmdWindows = $(mkRelFile "hadrian/build-stack.bat")
 
 -- | Relative path inside a GHC repo to the Hadrian build shell script
 hadrianCmdPosix :: Path Rel File
-hadrianCmdPosix = $(mkRelFile "hadrian/build.stack.sh")
+hadrianCmdPosix = $(mkRelFile "hadrian/build-stack")
 
 -- | Used in Stack.Setup for detecting libtinfo, see comments at use site
 usrLibDirs :: [Path Abs Dir]
