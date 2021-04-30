@@ -4,7 +4,7 @@ cabal-version: 2.0
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a7991e56b8dd0142add4bc2a07936396678427485a932aab9ca6c721d036b3a3
+-- hash: 08598058e5bbf079a51f3a86109460e78eca2b1157c655b140096979963c432e
 
 name:           stack
 version:        2.7.0.2
@@ -74,7 +74,7 @@ source-repository head
 custom-setup
   setup-depends:
       Cabal
-    , base >=4.10 && <5
+    , base >=4.13 && <5
     , filepath
 
 flag developer-mode

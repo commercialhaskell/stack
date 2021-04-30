@@ -47,14 +47,6 @@ jobs:
       matrix:
         include:
         - os: ubuntu-latest
-          stack-yaml: stack-ghc-84.yaml
-          extra-suffix: ""
-          stack-args: ""
-        - os: ubuntu-latest
-          stack-yaml: stack-ghc-86.yaml
-          extra-suffix: ""
-          stack-args: ""
-        - os: ubuntu-latest
           stack-yaml: stack-ghc-88.yaml
           extra-suffix: ""
           stack-args: ""
