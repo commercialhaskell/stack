@@ -7,7 +7,9 @@ Release notes:
 
 * Stack's bindists are now built with GHC 8.10.4, and our `stack.yaml` has
   moved to lts-17.10.  This means Stack can now be built on macOS 11.0 (Big
-  Sur) without ugly workarounds.
+  Sur) without ugly workarounds.  GHC 8.8 is now the minimum GHC version
+  supported for building Stack itself (but this does not effect _users_ of
+  Stack, which still supports using much older GHC versions).
 
 
 ## v2.7.0.1 (release candidate)
