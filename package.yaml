@@ -22,7 +22,7 @@ github: commercialhaskell/stack
 homepage: http://haskellstack.org
 custom-setup:
   dependencies:
-  - base >=4.10 && < 5
+  - base >=4.13 && < 5
   - Cabal
   - filepath
 extra-source-files:
