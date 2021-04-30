@@ -51,7 +51,6 @@ import           Distribution.System (OS (..), Platform (..), buildPlatform, Arc
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
-import           Lens.Micro ((.~))
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
 import           Options.Applicative (Parser, help, long, metavar, strOption)
 import           Path

@@ -1115,23 +1115,19 @@ downloadAndInstallCompiler :: (HasBuildConfig env, HasGHCVariant env)
                            -> VersionCheck
                            -> Maybe String
                            -> RIO env Tool
-downloadAndInstallCompiler ghcBuild si wanted@WCGhc{} versionCheck mbindistURL = do
+downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbindistURL = do
     ghcVariant <- view ghcVariantL
     (selectedVersion, downloadInfo) <- case mbindistURL of
         Just bindistURL -> do
             case ghcVariant of
                 GHCCustom _ -> return ()
                 _ -> throwM RequireCustomGHCVariant
-            case wanted of
-                WCGhc version ->
-                    return (version, GHCDownloadInfo mempty mempty DownloadInfo
-                             { downloadInfoUrl = T.pack bindistURL
-                             , downloadInfoContentLength = Nothing
-                             , downloadInfoSha1 = Nothing
-                             , downloadInfoSha256 = Nothing
-                             })
-                _ ->
-                    throwM WantedMustBeGHC
+            return (version, GHCDownloadInfo mempty mempty DownloadInfo
+                     { downloadInfoUrl = T.pack bindistURL
+                     , downloadInfoContentLength = Nothing
+                     , downloadInfoSha1 = Nothing
+                     , downloadInfoSha256 = Nothing
+                     })
         _ -> do
             ghcKey <- getGhcKey ghcBuild
             case Map.lookup ghcKey $ siGHCs si of
