@@ -450,7 +450,7 @@ reset keepHome = do
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
 entrypoint :: (HasProcessContext env, HasLogFunc env)
            => Config -> DockerEntrypoint -> RIO env ()
-entrypoint config@Config{..} DockerEntrypoint{..} =
+entrypoint config@Config{} DockerEntrypoint{..} =
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
