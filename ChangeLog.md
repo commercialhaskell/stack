@@ -1,19 +1,13 @@
 # Changelog
 
 
-## Unreleased changes
+## v2.7.0.3 (release candidate)
 
 Release notes:
 
-**Changes since v2.7.0.1:**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
+* Stack's bindists are now built with GHC 8.10.4, and our `stack.yaml` has
+  moved to lts-17.10.  This means Stack can now be built on macOS 11.0 (Big
+  Sur) without ugly workarounds.
 
 
 ## v2.7.0.1 (release candidate)
