@@ -78,7 +78,7 @@ getCmdArgs
 getCmdArgs docker imageInfo isRemoteDocker = do
     config <- view configL
     deUser <-
-        if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+        if fromMaybe (not isRemoteDocker) (dockerSetUser docker) && not osIsWindows
             then liftIO $ do
               duUid <- User.getEffectiveUserID
               duGid <- User.getEffectiveGroupID
@@ -229,10 +229,14 @@ runContainerAndExit = do
      when (isNothing mpath) $ do
        logWarn "The Docker image does not set the PATH env var"
        logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
-     newPathEnv <- either throwM return $ augmentPath
-                      [ hostBinDir
-                      , toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
-                      mpath
+     let adjustPathSeparator | osIsWindows = T.replace ";" ":"
+                             | otherwise   = id
+     newPathEnv <- either throwM return $
+                   adjustPathSeparator <$>
+                   augmentPath
+                     [ hostBinDir
+                       , toLinuxStylePath $ toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)]
+                     mpath
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker imageInfo isRemoteDocker
      pwd <- getCurrentDir
      liftIO $ mapM_ ensureDir [sandboxHomeDir, stackRoot]
@@ -244,7 +248,7 @@ runContainerAndExit = do
          liftIO
              (Files.fileExist
                  (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)))
-     when (sshDirExists && not sshSandboxDirExists)
+     when (sshDirExists && not sshSandboxDirExists && not osIsWindows)
          (liftIO
              (Files.createSymbolicLink
                  (toFilePathNoTrailingSep sshDir)
@@ -254,16 +258,16 @@ runContainerAndExit = do
        (concat
          [["create"
           ,"-e",inContainerEnvVar ++ "=1"
-          ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
+          ,"-e",stackRootEnvVar ++ "=" ++ toLinuxStylePath (toFilePathNoTrailingSep stackRoot)
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
-          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
+          ,"-e","HOME=" ++ toLinuxStylePath (toFilePathNoTrailingSep sandboxHomeDir)
           ,"-e","PATH=" ++ T.unpack newPathEnv
-          ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
-          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toFilePathNoTrailingSep homeDir ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot ++ mountSuffix
-          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
-          ,"-w",toFilePathNoTrailingSep pwd]
+          ,"-e","PWD=" ++ toLinuxStylePath (toFilePathNoTrailingSep pwd)
+          ,"-v",toFilePathNoTrailingSep homeDir ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep homeDir ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep stackRoot ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep projectRoot ++ mountSuffix)
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toLinuxStylePath (toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix)
+          ,"-w",toLinuxStylePath (toFilePathNoTrailingSep pwd)]
          ,case dockerNetwork docker of
             Nothing -> ["--net=host"]
             Just name -> ["--net=" ++ name]
@@ -278,8 +282,8 @@ runContainerAndExit = do
          ,case mstackYaml of
             Nothing -> []
             Just stackYaml ->
-              ["-e","STACK_YAML=" ++ stackYaml
-              ,"-v",stackYaml++ ":" ++ stackYaml ++ ":ro"]
+              ["-e","STACK_YAML=" ++ toLinuxStylePath stackYaml
+              ,"-v",stackYaml ++ ":" ++ toLinuxStylePath stackYaml ++ ":ro"]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
@@ -295,7 +299,7 @@ runContainerAndExit = do
          ,["-i" | keepStdinOpen]
          ,dockerRunArgs docker
          ,[image]
-         ,[cmnd]
+         ,[toLinuxStylePath cmnd]
          ,args])
 -- MSS 2018-08-30 can the CPP below be removed entirely, and instead exec the
 -- `docker` process so that it can handle the signals directly?
@@ -338,8 +342,18 @@ runContainerAndExit = do
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg mountSuffix (Mount host container) =
-      ["-v",host ++ ":" ++ container ++ mountSuffix]
+      ["-v",host ++ ":" ++ toLinuxStylePath (container ++ mountSuffix)]
     sshRelDir = relDirDotSsh
+    toLinuxStylePath s | osIsWindows =
+      T.pack s
+      & T.replace ":\\" "/"
+      & T.replace "\\"  "/"
+      & T.unpack
+      & addStartingSlashIfMissing
+                       | otherwise   = s
+      where
+        addStartingSlashIfMissing path@('/':_) = path
+        addStartingSlashIfMissing path         = '/':path
 
 -- | Inspect Docker image or container.
 inspect :: (HasProcessContext env, HasLogFunc env)
