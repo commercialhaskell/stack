@@ -5,7 +5,7 @@ about: Report a bug in Stack
 
 Please follow the steps below for reporting a bug:
 
-Make sure that you are using the latest release (currently stack-2.5.1).
+Make sure that you are using the latest release (currently stack-2.7.1).
 See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
 
 Please use the following schema for your bug report:
