@@ -1,37 +1,7 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
-
-**Changes since v2.7.0.3:**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-
-## v2.7.0.3 (release candidate)
-
-Release notes:
-
-* Stack's bindists are now built with GHC 8.10.4, and our `stack.yaml` has
-  moved to lts-17.10.  This means Stack can now be built on macOS 11.0 (Big
-  Sur) without ugly workarounds.  GHC 8.8 is now the minimum GHC version
-  supported for building Stack itself (but this does not effect _users_ of
-  Stack, which still supports using much older GHC versions).
-
-**Changes since v2.7.0.1:**
-
-(no changes)
-
-
-## v2.7.0.1 (release candidate)
+## v2.7.1
 
 **Changes since v2.5.1.1:**
 
@@ -49,7 +19,7 @@ Behavior changes:
 
 Other enhancements:
 
-* Nix integration now passes `ghcVersion` (in addition to existing `ghc`) to 
+* Nix integration now passes `ghcVersion` (in addition to existing `ghc`) to
   `shell-file` as an identifier that can be looked up in a compiler attribute set.
 
 * Nix integration now allows Nix integration if the user is ready in nix-shell.
