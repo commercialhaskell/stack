@@ -333,6 +333,7 @@ do_alpine_install() {
 # KaOS distro install
 
 do_kaos_install() {
+    install_x86_64_linux_binary
     while true; do
      printf "For stack to work in KaOS is it fundamental to install libtinfo.\nDo you like to do that?" 
      read -p " y or n: " yn
@@ -433,6 +434,9 @@ distro_info() {
       "Arch Linux"*)
         echo "arch;" # n.b. Version is not available in /etc/issue on Arch
         ;;
+      "KaOS"*)
+        echo "kaos;" # no version used, rolling release. 
+        ;;  
       "Ubuntu"*)
         echo "ubuntu;$(perl -ne 'if(/Ubuntu (\d+\.\d+)/) { print $1; }' < /etc/issue)"
         ;;
@@ -490,6 +494,9 @@ GETDISTRO
       ;;
     alpine)
       do_alpine_install "$VERSION"
+      ;;
+    kaosx)
+      do_kaos_install
       ;;
     *)
       do_sloppy_install
