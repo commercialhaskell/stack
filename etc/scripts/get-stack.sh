@@ -330,6 +330,31 @@ do_alpine_install() {
   fi
 }
 
+# KaOS distro install
+
+do_kaos_install() {
+    while true; do
+     printf "For stack to work in KaOS is it fundamental to install libtinfo.\nDo you like to do that?" 
+     read -p " y or n: " yn
+    case $yn in
+        [Yy]*)  printf "\e[1;31m Do not edit the PKGBUILD\e[0m " && kcp -u && kcp -i libtinfo; break;;
+        [Nn]*)  break;;
+        *) printf "Please answer with y or n. ";;
+      esac
+    done
+
+    while true; do
+      echo
+      printf  "To be detectable by IDEs and other applications is it recommended to symlink \e[34mGHC\e[0m to the PATH.\nDo you like to do that?" 
+      read -p " y or n: " yn
+    case $yn in
+        [Yy]*)  sudo ln -s /home/$USER/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/bin/ghc /usr/bin; break;;
+        [Nn]*)  exit;;
+        *) printf "Please answer with y or n. ";;
+      esac
+    done
+}
+
 # Attempts to install on unsupported Linux distribution by downloading
 # the bindist.
 do_sloppy_install() {
