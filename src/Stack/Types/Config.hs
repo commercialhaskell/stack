@@ -1212,7 +1212,10 @@ instance Show ConfigException where
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
-        , ")." ]
+        , ").\n"
+        , "You can upgrade stack by running:\n\n"
+        , "stack upgrade"
+        ]
     show (NoMatchingSnapshot names) = concat
         [ "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
