@@ -20,6 +20,9 @@ Bug fixes:
 * `stack setup` always looks for the unpacked directory name to support
   different tar file naming conventions. See
   [#5545](https://github.com/commercialhaskell/stack/issues/5545)
+* Bump `pantry` version for better OS support. See
+  [pantry#33](https://github.com/commercialhaskell/pantry/issues/33)
+
 
 ## v2.7.1
 
