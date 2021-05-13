@@ -841,7 +841,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
              | otherwise   = hadrianScriptsPosix
 
          foundHadrianPaths <- filterM doesFileExist $ (cwd </>) <$> hadrianScripts
-         let hadrianPath = fromMaybe (error "No Hadrian build script found") $ listToMaybe foundHadrianPaths
+         hadrianPath <- maybe (throwString "No Hadrian build script found") pure $ listToMaybe foundHadrianPaths
 
          logSticky $ "Building GHC from source with `"
             <> RIO.display flavour
