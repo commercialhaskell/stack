@@ -115,8 +115,8 @@ module Stack.Constants
     ,relFileStackDotTmpDotExe
     ,relFileStackDotTmp
     ,ghcShowOptionsOutput
-    ,hadrianCmdWindows
-    ,hadrianCmdPosix
+    ,hadrianScriptsWindows
+    ,hadrianScriptsPosix
     ,usrLibDirs
     ,testGhcEnvRelFile
     ,relFileBuildLock
@@ -533,13 +533,15 @@ ghcShowOptionsOutput :: [String]
 ghcShowOptionsOutput =
   $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift . lines)
 
--- | Relative path inside a GHC repo to the Hadrian build batch script
-hadrianCmdWindows :: Path Rel File
-hadrianCmdWindows = $(mkRelFile "hadrian/build.stack.bat")
+-- | Relative paths inside a GHC repo to the Hadrian build batch script.
+-- The second path is maintained for compatibility with older GHC versions.
+hadrianScriptsWindows :: [Path Rel File]
+hadrianScriptsWindows = [$(mkRelFile "hadrian/build-stack.bat"), $(mkRelFile "hadrian/build.stack.bat")]
 
--- | Relative path inside a GHC repo to the Hadrian build shell script
-hadrianCmdPosix :: Path Rel File
-hadrianCmdPosix = $(mkRelFile "hadrian/build.stack.sh")
+-- | Relative paths inside a GHC repo to the Hadrian build shell script
+-- The second path is maintained for compatibility with older GHC versions.
+hadrianScriptsPosix :: [Path Rel File]
+hadrianScriptsPosix = [$(mkRelFile "hadrian/build-stack"), $(mkRelFile "hadrian/build.stack.sh")]
 
 -- | Used in Stack.Setup for detecting libtinfo, see comments at use site
 usrLibDirs :: [Path Abs Dir]

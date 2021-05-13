@@ -836,9 +836,12 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
                , "--flavour=" <> flavour -- selected flavour
                , "binary-dist"
                ]
-           hadrianCmd
-             | osIsWindows = hadrianCmdWindows
-             | otherwise   = hadrianCmdPosix
+           hadrianScripts
+             | osIsWindows = hadrianScriptsWindows
+             | otherwise   = hadrianScriptsPosix
+
+         foundHadrianPaths <- filterM doesFileExist $ (cwd </>) <$> hadrianScripts
+         hadrianPath <- maybe (throwString "No Hadrian build script found") pure $ listToMaybe foundHadrianPaths
 
          logSticky $ "Building GHC from source with `"
             <> RIO.display flavour
@@ -847,7 +850,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
          -- We need to provide an absolute path to the script since
          -- the process package only sets working directory _after_
          -- discovering the executable
-         proc (toFilePath (cwd </> hadrianCmd)) hadrianArgs runProcess_
+         proc (toFilePath hadrianPath) hadrianArgs runProcess_
 
          -- find the bindist and install it
          bindistPath <- parseRelDir "_build/bindist"

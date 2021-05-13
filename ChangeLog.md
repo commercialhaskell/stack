@@ -15,6 +15,8 @@ Other enhancements:
 
 Bug fixes:
 
+* GHC source builds work properly for recent GHC versions again. See
+  [#5528](https://github.com/commercialhaskell/stack/issues/5528)
 
 ## v2.7.1
 
