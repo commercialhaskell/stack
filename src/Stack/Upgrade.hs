@@ -231,7 +231,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
 
     let modifyGO dir go = go
           { globalResolver = Nothing -- always use the resolver settings in the stack.yaml file
-          , globalStackYaml = SYLOverride $ dir </> stackDotYaml
+          , globalStackYaml = SYLOverride $ (:| []) $ dir </> stackDotYaml
           }
         boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = ["stack"]

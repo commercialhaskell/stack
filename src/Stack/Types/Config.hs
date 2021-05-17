@@ -91,6 +91,7 @@ module Stack.Types.Config
   ,defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
   ,Project(..)
+  ,StackedProject(..)
   ,ProjectConfig(..)
   ,Curator(..)
   ,ProjectAndConfigMonoid(..)
@@ -517,7 +518,7 @@ data GlobalOpts = GlobalOpts
 data StackYamlLoc
     = SYLDefault
     -- ^ Use the standard parent-directory-checking logic
-    | SYLOverride !(Path Abs File)
+    | SYLOverride !(NonEmpty (Path Abs File))
     -- ^ Use a specific stack.yaml file provided
     | SYLNoProject ![PackageIdentifierRevision]
     -- ^ Do not load up a project, just user configuration. Include
@@ -587,7 +588,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
     , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
-    , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
+    , globalMonoidStackYaml    :: ![FilePath] -- ^ Override project stack.yaml
     , globalMonoidLockFileBehavior :: !(First LockFileBehavior) -- ^ See 'globalLockFileBehavior'
     } deriving Generic
 
@@ -749,6 +750,54 @@ instance FromJSON (WithJSONWarnings Curator) where
     <*> fmap (Set.map unCabalString) (o ..:? "expect-benchmark-failure" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
+
+-- | A newtype wrapper around 'Project' used to merge the project information
+-- from several stack.yaml files.
+--
+-- Consider two project @proj1@ and @proj2@. Then
+-- the merge @StackedProject proj1 <> StackedProject proj2@ allows @proj2@ to
+-- alter the values of @proj1@ by
+--
+--   * adding extra dependencies. If a package with the same name appears
+--     in both package sets the one of @proj2@ takes precedence.
+--   * setting or overwriting flags.
+--   * setting the resolver.
+--   * setting the compiler.
+--   * adding extra package databases.
+--   * dropping additional package.
+newtype StackedProject = StackedProject Project
+
+instance Semigroup StackedProject where
+    StackedProject p1 <> StackedProject p2 = StackedProject $ Project
+        { projectUserMsg = projectUserMsg p1
+        , projectPackages = projectPackages p1
+        , projectDependencies = deps
+        , projectFlags = projectFlags p2 <> projectFlags p1
+        , projectResolver = projectResolver p2
+        , projectCompiler = projectCompiler p2 <|> projectCompiler p1
+        , projectExtraPackageDBs = projectExtraPackageDBs p1 <> projectExtraPackageDBs p2
+        , projectCurator = projectCurator p1
+        , projectDropPackages = projectDropPackages p1 <> projectDropPackages p2
+        }
+        where
+            deps = filter inProject2 (projectDependencies p1) <> projectDependencies p2
+
+            inProject2 rpl
+                | mn <- rplNameMaybe rpl
+                , isJust mn
+                , mn `elem` mnames2 = False
+                | otherwise = True
+
+            mnames2 = map rplNameMaybe $ projectDependencies p2
+
+            rplNameMaybe (RPLImmutable x) = rpliNameMaybe x
+            rplNameMaybe (RPLMutable _) = Nothing
+
+            rpliNameMaybe (RPLIHackage x _) = Just $ pirName x
+            rpliNameMaybe (RPLIArchive _ x) = rpmName x
+            rpliNameMaybe (RPLIRepo _ x) = rpmName x
+
+            pirName (PackageIdentifierRevision n _ _) = n
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
