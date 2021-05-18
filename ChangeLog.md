@@ -17,6 +17,9 @@ Bug fixes:
 
 * GHC source builds work properly for recent GHC versions again. See
   [#5528](https://github.com/commercialhaskell/stack/issues/5528)
+* `stack setup` always looks for the unpacked directory name to support
+  different tar file naming conventions. See
+  [#5545](https://github.com/commercialhaskell/stack/issues/5545)
 
 ## v2.7.1
 

@@ -525,7 +525,7 @@ ensureMsys sopts getSetupInfo' = do
                               Just x -> return x
                               Nothing -> throwString $ "MSYS2 not found for " ++ T.unpack osKey
                       let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
-                      Just <$> downloadAndInstallTool (configLocalPrograms config) info tool (installMsys2Windows osKey si)
+                      Just <$> downloadAndInstallTool (configLocalPrograms config) info tool (installMsys2Windows si)
                   | otherwise -> do
                       logWarn "Continuing despite missing tool: msys2"
                       return Nothing
@@ -875,8 +875,8 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
                              }
                    ghcdlinfo = GHCDownloadInfo mempty mempty dlinfo
                    installer
-                      | osIsWindows = installGHCWindows Nothing
-                      | otherwise   = installGHCPosix Nothing ghcdlinfo
+                      | osIsWindows = installGHCWindows
+                      | otherwise   = installGHCPosix ghcdlinfo
                si <- runMemoized getSetupInfo'
                _ <- downloadAndInstallTool
                  (configLocalPrograms config)
@@ -1139,8 +1139,8 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     config <- view configL
     let installer =
             case configPlatform config of
-                Platform _ Cabal.Windows -> installGHCWindows (Just selectedVersion)
-                _ -> installGHCPosix (Just selectedVersion) downloadInfo
+                Platform _ Cabal.Windows -> installGHCWindows
+                _ -> installGHCPosix downloadInfo
     logInfo $
         "Preparing to install GHC" <>
         (case ghcVariant of
@@ -1312,15 +1312,14 @@ data ArchiveType
     | SevenZ
 
 installGHCPosix :: HasConfig env
-                => Maybe Version
-                -> GHCDownloadInfo
+                => GHCDownloadInfo
                 -> SetupInfo
                 -> Path Abs File
                 -> ArchiveType
                 -> Path Abs Dir
                 -> Path Abs Dir
                 -> RIO env ()
-installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir = do
+installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
     platform <- view platformL
     menv0 <- view processContextL
     menv <- mkProcessContext (removeHaskellEnvVars (view envVarsL menv0))
@@ -1383,11 +1382,7 @@ installGHCPosix mversion downloadInfo _ archiveFile archiveType tempDir destDir 
     logDebug $ "Unpacking " <> fromString (toFilePath archiveFile)
     runStep "unpacking" tempDir mempty tarTool [compOpt : "xf", toFilePath archiveFile]
 
-    dir <- case mversion of
-            Just version -> do
-               relDir <- parseRelDir $ "ghc-" ++ versionString version
-               return (tempDir </> relDir)
-            Nothing      -> expectSingleUnpackedDir archiveFile tempDir
+    dir <- expectSingleUnpackedDir archiveFile tempDir
 
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
@@ -1433,27 +1428,24 @@ instance Alternative (CheckDependency env) where
             Right x' -> return $ Right x'
 
 installGHCWindows :: HasBuildConfig env
-                  => Maybe Version
-                  -> SetupInfo
+                  => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
                   -> RIO env ()
-installGHCWindows mversion si archiveFile archiveType _tempDir destDir = do
-    tarComponent <- mapM (\v -> parseRelDir $ "ghc-" ++ versionString v) mversion
-    withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
+installGHCWindows si archiveFile archiveType _tempDir destDir = do
+    withUnpackedTarball7z "GHC" si archiveFile archiveType destDir
     logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
 
 installMsys2Windows :: HasBuildConfig env
-                  => Text -- ^ OS Key
-                  -> SetupInfo
+                  => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> Path Abs Dir
                   -> RIO env ()
-installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
+installMsys2Windows si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
         logError $
@@ -1461,8 +1453,7 @@ installMsys2Windows osKey si archiveFile archiveType _tempDir destDir = do
             fromString (toFilePath destDir)
         throwM e
 
-    msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
-    withUnpackedTarball7z "MSYS2" si archiveFile archiveType (Just msys) destDir
+    withUnpackedTarball7z "MSYS2" si archiveFile archiveType destDir
 
 
     -- I couldn't find this officially documented anywhere, but you need to run
@@ -1491,10 +1482,9 @@ withUnpackedTarball7z :: HasBuildConfig env
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
                       -> ArchiveType
-                      -> Maybe (Path Rel Dir) -- ^ Name of directory expected in archive.  If Nothing, expects a single folder.
                       -> Path Abs Dir -- ^ Destination directory.
                       -> RIO env ()
-withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
+withUnpackedTarball7z name si archiveFile archiveType destDir = do
     suffix <-
         case archiveType of
             TarXz -> return ".xz"
@@ -1512,9 +1502,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z tmpDir archiveFile
         run7z tmpDir (tmpDir </> tarFile)
-        absSrcDir <- case msrcDir of
-            Just srcDir -> return $ tmpDir </> srcDir
-            Nothing -> expectSingleUnpackedDir archiveFile tmpDir
+        absSrcDir <- expectSingleUnpackedDir archiveFile tmpDir
         renameDir absSrcDir destDir
 
 expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)
