@@ -27,7 +27,7 @@ extra-deps:
 - hpack-0.33.0@rev:0
 - http-download-0.2.0.0@rev:0
 - filelock-0.1.1.5@rev:0
-- pantry-0.5.1.5@rev:0
+- pantry-0.5.2@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
 - rio-0.1.19.0@rev:0
