@@ -36,6 +36,9 @@ import Distribution.Text
 import Distribution.System
 import Distribution.Package
 import Distribution.PackageDescription hiding (options)
+#if MIN_VERSION_Cabal(3, 0, 0)
+import Distribution.Utils.ShortText (fromShortText)
+#endif
 import Distribution.Verbosity
 import System.Console.GetOpt
 import System.Directory
@@ -49,6 +52,11 @@ import Data.List.Extra
 import Development.Shake
 import Development.Shake.FilePath
 import Prelude -- Silence AMP warning
+
+#if !MIN_VERSION_Cabal(3, 0, 0)
+fromShortText :: String -> String
+fromShortText = id
+#endif
 
 -- | Entrypoint.
 main :: IO ()
@@ -214,8 +222,8 @@ rules global@Global{..} args = do
                             (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
                                 ["sign"
                                 ,"/v"
-                                ,"/d", synopsis gStackPackageDescription
-                                ,"/du", homepage gStackPackageDescription
+                                ,"/d", fromShortText $ synopsis gStackPackageDescription
+                                ,"/du", fromShortText $ homepage gStackPackageDescription
                                 ,"/n", certName
                                 ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
                                 ,out])
