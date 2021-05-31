@@ -22,6 +22,8 @@ Bug fixes:
   [#5545](https://github.com/commercialhaskell/stack/issues/5545)
 * Bump `pantry` version for better OS support. See
   [pantry#33](https://github.com/commercialhaskell/pantry/issues/33)
+* When building the sanity check for a new GHC install, make sure to clear
+  `GHC_PACKAGE_PATH`.
 
 
 ## v2.7.1

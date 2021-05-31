@@ -673,9 +673,16 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
           case res of
             Left _ -> loop xs
             Right y -> parseAbsFile y
-    compiler <- withProcessContext menv $ loop names
+    compiler <- withProcessContext menv $ do
+      compiler <- loop names
 
-    when (soptsSanityCheck sopts) $ sanityCheck compiler
+      -- Run this here to ensure that the sanity check uses the modified
+      -- environment, otherwise we may infect GHC_PACKAGE_PATH and break sanity
+      -- checks.
+      when (soptsSanityCheck sopts) $ sanityCheck compiler
+
+      pure compiler
+
     cp <- pathsFromCompiler wc compilerBuild True compiler
     pure (cp, paths)
 
