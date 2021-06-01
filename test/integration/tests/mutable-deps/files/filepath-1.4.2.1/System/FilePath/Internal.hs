@@ -103,7 +103,6 @@ module System.FilePath.MODULE_NAME
     )
     where
 
-import Control.Applicative ((<$>))
 import Data.Char(toLower, toUpper, isAsciiLower, isAsciiUpper)
 import Data.Maybe(isJust)
 import Data.List(stripPrefix, isSuffixOf)
@@ -147,7 +146,7 @@ pathSeparator = if isWindows then '\\' else '/'
 -- > Windows: pathSeparators == ['\\', '/']
 -- > Posix:   pathSeparators == ['/']
 -- > pathSeparator `elem` pathSeparators
-pathSeparators :: String
+pathSeparators :: [Char]
 pathSeparators = if isWindows then "\\/" else "/"
 
 -- | Rather than using @(== 'pathSeparator')@, use this. Test if something
@@ -1039,4 +1038,4 @@ breakEnd p = spanEnd (not . p)
 -- Nothing if the list did not end with the suffix given, or Just the list
 -- before the suffix, if it does.
 stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-stripSuffix xs ys = reverse <$> stripPrefix (reverse xs) (reverse ys)
+stripSuffix xs ys = fmap reverse $ stripPrefix (reverse xs) (reverse ys)

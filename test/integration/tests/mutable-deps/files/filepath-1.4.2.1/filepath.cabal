@@ -1,19 +1,19 @@
 cabal-version:  >= 1.18
 name:           filepath
 version:        1.4.2.1
-x-revision: 1
+x-revision:     2
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
 author:         Neil Mitchell <ndmitchell@gmail.com>
 maintainer:     Neil Mitchell <ndmitchell@gmail.com>
-copyright:      Neil Mitchell 2005-2018
+copyright:      Neil Mitchell 2005-2020
 bug-reports:    https://github.com/haskell/filepath/issues
 homepage:       https://github.com/haskell/filepath#readme
 category:       System
 build-type:     Simple
 synopsis:       Library for manipulating FilePaths in a cross platform way.
-tested-with:    GHC==8.6.3, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2
+tested-with:    GHC==8.10.1, GHC==8.8.3, GHC==8.6.5, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2
 description:
     This package provides functionality for manipulating @FilePath@ values, and is shipped with both <https://www.haskell.org/ghc/ GHC> and the <https://www.haskell.org/platform/ Haskell Platform>. It provides three modules:
     .
@@ -49,7 +49,7 @@ library
         System.FilePath.Windows
 
     build-depends:
-        base >= 4 && < 4.14
+        base >= 4 && < 4.15
 
     ghc-options: -Wall
 
@@ -65,4 +65,4 @@ test-suite filepath-tests
     build-depends:
         filepath,
         base,
-        QuickCheck >= 2.7 && < 2.13
+        QuickCheck >= 2.7 && < 2.14

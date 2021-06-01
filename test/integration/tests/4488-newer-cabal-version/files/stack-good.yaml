@@ -1,4 +1,4 @@
-resolver: ghc-8.6.5
+resolver: ghc-8.10.4
 extra-deps:
 - Cabal-3.0.0.0@sha256:1ba37b8d80e89213b17db7b8b9ea0108da55ca65f8c0cbb7433881a284c5cf67,26027
 - mtl-2.2.2@sha256:1050fb71acd9f5d67da7d992583f5bd0eb14407b9dc7acc122af1b738b706ca3,2261

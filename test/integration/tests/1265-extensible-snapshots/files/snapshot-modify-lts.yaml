@@ -1,4 +1,4 @@
-resolver: lts-14.27
+resolver: lts-17.10
 name: snapshot-modify-lts
 drop-packages:
 - zlib

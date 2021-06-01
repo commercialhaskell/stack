@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-14.27
+    --resolver lts-17.10
     --install-ghc
     --ghc-options -Wall
     --package Cabal
@@ -36,6 +36,7 @@ import Distribution.Text
 import Distribution.System
 import Distribution.Package
 import Distribution.PackageDescription hiding (options)
+import Distribution.Utils.ShortText (fromShortText)
 import Distribution.Verbosity
 import System.Console.GetOpt
 import System.Directory
@@ -214,8 +215,8 @@ rules global@Global{..} args = do
                             (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
                                 ["sign"
                                 ,"/v"
-                                ,"/d", synopsis gStackPackageDescription
-                                ,"/du", homepage gStackPackageDescription
+                                ,"/d", fromShortText $ synopsis gStackPackageDescription
+                                ,"/du", fromShortText $ homepage gStackPackageDescription
                                 ,"/n", certName
                                 ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
                                 ,out])
