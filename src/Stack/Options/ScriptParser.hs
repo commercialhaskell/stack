@@ -13,6 +13,7 @@ data ScriptOpts = ScriptOpts
   , soCompile :: !ScriptExecute
   , soGhcOptions :: ![String]
   , soScriptExtraDeps :: ![PackageIdentifierRevision]
+  , soShouldRun :: !ShouldRun
   }
   deriving Show
 
@@ -20,6 +21,9 @@ data ScriptExecute
   = SEInterpret
   | SECompile
   | SEOptimize
+  deriving Show
+
+data ShouldRun = YesRun | NoRun
   deriving Show
 
 scriptOptsParser :: Parser ScriptOpts
@@ -48,5 +52,6 @@ scriptOptsParser = ScriptOpts
           (long "extra-dep" <>
             metavar "PACKAGE-VERSION" <>
             help "Extra dependencies to be added to the snapshot"))
+    <*> (flag' NoRun (long "no-run" <> help "Don't run, just compile.") <|> pure YesRun)
   where
     extraDepRead = eitherReader $ mapLeft show . parsePackageIdentifierRevision . fromString

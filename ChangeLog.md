@@ -13,6 +13,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Add a `--no-run` flag to the `script` command when compiling.
+
 Bug fixes:
 
 * GHC source builds work properly for recent GHC versions again. See

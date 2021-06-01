@@ -84,6 +84,15 @@ scriptCmd opts = do
             , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
             }
 
+    case soShouldRun opts of
+      YesRun -> pure ()
+      NoRun -> do
+        unless (null $ soArgs opts) $ throwString "--no-run incompatible with arguments"
+        case soCompile opts of
+          SEInterpret -> throwString "--no-run requires either --compile or --optimize"
+          SECompile -> pure ()
+          SEOptimize -> pure ()
+
     -- Optimization: if we're compiling, and the executable is newer
     -- than the source file, run it immediately.
     local (over globalOptsL modifyGO) $
@@ -93,11 +102,16 @@ scriptCmd opts = do
         SEOptimize -> shortCut file scriptDir
 
   where
+  runCompiled file = do
+    let exeName = toExeName $ toFilePath file
+    case soShouldRun opts of
+      YesRun -> exec exeName (soArgs opts)
+      NoRun -> logInfo $ "Compilation finished, executable available at " <> fromString exeName
   shortCut file scriptDir = handleIO (const $ longWay file scriptDir) $ do
     srcMod <- getModificationTime file
     exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
     if srcMod < exeMod
-      then exec (toExeName $ toFilePath file) (soArgs opts)
+      then runCompiled file
       else longWay file scriptDir
 
   longWay file scriptDir =
@@ -168,7 +182,7 @@ scriptCmd opts = do
               compilerExeName
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
-            exec (toExeName $ toFilePath file) (soArgs opts)
+            runCompiled file
 
   toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
