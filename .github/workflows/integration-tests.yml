@@ -55,7 +55,7 @@ jobs:
             #   https://github.com/NixOS/nix/issues/2733
             (for i in {1..5}; do bash <(curl -sSL https://nixos.org/nix/install) && exit 0; done; exit 1)
             . ~/.nix-profile/etc/profile.d/nix.sh
-            nix-channel --add https://nixos.org/channels/nixos-19.09 nixpkgs
+            nix-channel --add https://nixos.org/channels/nixos-21.05 nixpkgs
             nix-channel --update # Get GHC 8.2.2
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]
           then
