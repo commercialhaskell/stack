@@ -863,7 +863,7 @@ data PackageDescriptionPair = PackageDescriptionPair
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescriptionPair
-resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib subLibs foreignLibs' exes tests benches) =
+resolvePackageDescription packageConfig (GenericPackageDescription desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches) =
     PackageDescriptionPair
       { pdpOrigBuildable = go False
       , pdpModifiedBuildable = go True
