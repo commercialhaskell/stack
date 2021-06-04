@@ -20,6 +20,9 @@ flags:
 ghc-options:
    "$locals": -fhide-source-paths
 
+extra-deps:
+- Cabal-3.4.0.0
+
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install
