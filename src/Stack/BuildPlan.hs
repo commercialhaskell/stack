@@ -224,7 +224,7 @@ selectPackageBuildPlan platform compiler pool gpd =
     flagCombinations :: NonEmpty [(FlagName, Bool)]
     flagCombinations = mapM getOptions (genPackageFlags gpd)
       where
-        getOptions :: C.Flag -> NonEmpty (FlagName, Bool)
+        getOptions :: C.PackageFlag -> NonEmpty (FlagName, Bool)
         getOptions f
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]
