@@ -32,6 +32,7 @@ import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import           Distribution.CabalSpecVersion (CabalSpecVersion, cabalSpecMinimumLibraryVersion)
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -190,7 +191,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           (library pkg)
     , packageBuildType = buildType pkg
     , packageSetupDeps = msetupDeps
-    , packageCabalSpec = either orLaterVersion id $ specVersionRaw pkg
+    , packageCabalSpec = orLaterVersion $ mkVersion $ cabalSpecMinimumLibraryVersion $ specVersion pkg
     }
   where
     extraLibNames = S.union subLibNames foreignLibNames
@@ -696,7 +697,7 @@ packageDescModulesAndFiles pkg = do
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles
-  :: Version -- ^ cabal file version
+  :: CabalSpecVersion -- ^ cabal file version
   -> [String]
   -> RIO Ctx (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
