@@ -18,6 +18,7 @@ import           Distribution.Compiler      (CompilerFlavor (..))
 import           Distribution.ModuleName    (ModuleName)
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
+import qualified Distribution.Types.ModuleReexport as ModuleReexport
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.VersionRange (withinRange)
 import           Distribution.System        (Platform (..))
@@ -280,7 +281,7 @@ allExposedModules gpd = do
       mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
   pure $ case mlibrary  of
     Just lib -> PD.exposedModules lib ++
-                map PD.moduleReexportName (PD.reexportedModules lib)
+                map ModuleReexport.moduleReexportName (PD.reexportedModules lib)
     Nothing  -> mempty
 
 -- | The Stackage project introduced the concept of hidden packages,
