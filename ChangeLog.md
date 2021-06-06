@@ -13,6 +13,8 @@ Behavior changes:
 
 Other enhancements:
 
+* `stack setup` supports installing GHC for macOS aarch64 (M1)
+
 Bug fixes:
 
 * Ensure that `extra-path` works for case-insensitive `PATH`s on Windows.
