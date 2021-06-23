@@ -629,7 +629,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        flagNameString name)
                     (Map.toList flags)
     , map T.unpack $ packageCabalConfigOpts package
-    , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
+    , processGhcOptions (packageGhcOptions package)
     , map ("--extra-include-dirs=" ++) (configExtraIncludeDirs config)
     , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
@@ -637,6 +637,28 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]
   where
+    processGhcOptions :: [Text] -> [String]
+    processGhcOptions ("+RTS" : xs) =
+        let
+            (rtsArgs, rest) =
+                takeRtsArgs xs
+        in
+            ("--ghc-options=+RTS " ++ rtsArgs) : processGhcOptions rest
+    processGhcOptions (x : xs) =
+        [compilerOptionsCabalFlag wc, T.unpack x] ++ processGhcOptions xs
+    processGhcOptions [] =
+        []
+    takeRtsArgs :: [Text] -> (String, [Text])
+    takeRtsArgs ("-RTS" : xs) =
+        ("-RTS", xs)
+    takeRtsArgs (x : xs) =
+        let
+            (other, rest) =
+                takeRtsArgs xs
+        in
+            (T.unpack x ++ " " ++ other, rest)
+    takeRtsArgs [] =
+        ([], [])
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
     cv = view (actualCompilerVersionL.to getGhcVersion) econfig
 

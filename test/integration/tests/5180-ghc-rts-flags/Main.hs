@@ -1,4 +1,6 @@
 import StackTest
 
 main :: IO ()
-main = stack ["build"]
+main = do
+    stack ["clean"]
+    stack ["build"]
