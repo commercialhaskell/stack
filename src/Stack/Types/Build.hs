@@ -637,28 +637,45 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]
   where
+    -- This function parses the GHC options that are providing in the
+    -- stack.yaml file. In order to handle RTS arguments correctly, we need
+    -- to provide the RTS arguments as a single argument.
     processGhcOptions :: [Text] -> [String]
-    processGhcOptions ("+RTS" : xs) =
+    processGhcOptions args =
         let
-            (rtsArgs, rest) =
-                takeRtsArgs xs
+            (preRtsArgs, mid) =
+                break ("+RTS" ==) args
+            (rtsArgs, end) =
+                break ("-RTS" ==) mid
+            fullRtsArgs =
+                case rtsArgs of
+                    [] ->
+                        -- This means that we didn't have any RTS args - no
+                        -- `+RTS` - and therefore no need for a `-RTS`.
+                        []
+                    _ ->
+                        -- In this case, we have some RTS args. `break`
+                        -- puts the `"-RTS"` string in the `snd` list, so
+                        -- we want to append it on the end of `rtsArgs`
+                        -- here.
+                        --
+                        -- We're not checking that `-RTS` is the first
+                        -- element of `end`. This is because the GHC RTS
+                        -- allows you to omit a trailing -RTS if that's the
+                        -- last of the arguments. This permits a GHC
+                        -- options in stack.yaml that matches what you
+                        -- might pass directly to GHC.
+                        [T.unwords $ rtsArgs ++ ["-RTS"]]
+            -- We drop the first element from `end`, because it is always
+            -- either `"-RTS"` (and we don't want that as a separate
+            -- argument) or the list is empty (and `drop _ [] = []`).
+            postRtsArgs =
+                drop 1 end
+            newArgs =
+                concat [preRtsArgs, fullRtsArgs, postRtsArgs]
         in
-            ("--ghc-options=+RTS " ++ rtsArgs) : processGhcOptions rest
-    processGhcOptions (x : xs) =
-        [compilerOptionsCabalFlag wc, T.unpack x] ++ processGhcOptions xs
-    processGhcOptions [] =
-        []
-    takeRtsArgs :: [Text] -> (String, [Text])
-    takeRtsArgs ("-RTS" : xs) =
-        ("-RTS", xs)
-    takeRtsArgs (x : xs) =
-        let
-            (other, rest) =
-                takeRtsArgs xs
-        in
-            (T.unpack x ++ " " ++ other, rest)
-    takeRtsArgs [] =
-        ([], [])
+            concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) newArgs
+
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
     cv = view (actualCompilerVersionL.to getGhcVersion) econfig
 

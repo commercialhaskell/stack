@@ -3,4 +3,4 @@ packages:
 - .
 
 ghc-options:
-  "$locals": +RTS -A128M -RTS
+  "$locals": -j8 +RTS -s -A128M
