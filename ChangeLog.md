@@ -29,7 +29,7 @@ Bug fixes:
   [pantry#33](https://github.com/commercialhaskell/pantry/issues/33)
 * When building the sanity check for a new GHC install, make sure to clear
   `GHC_PACKAGE_PATH`.
-
+* Specifying GHC RTS flags in the `stack.yaml` no longer fails with an error. [#5568](https://github.com/commercialhaskell/stack/pull/5568)
 
 ## v2.7.1
 

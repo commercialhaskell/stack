@@ -629,7 +629,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                        flagNameString name)
                     (Map.toList flags)
     , map T.unpack $ packageCabalConfigOpts package
-    , concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) (packageGhcOptions package)
+    , processGhcOptions (packageGhcOptions package)
     , map ("--extra-include-dirs=" ++) (configExtraIncludeDirs config)
     , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)
     , maybe [] (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc]) (configOverrideGccPath config)
@@ -637,6 +637,45 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
     ]
   where
+    -- This function parses the GHC options that are providing in the
+    -- stack.yaml file. In order to handle RTS arguments correctly, we need
+    -- to provide the RTS arguments as a single argument.
+    processGhcOptions :: [Text] -> [String]
+    processGhcOptions args =
+        let
+            (preRtsArgs, mid) =
+                break ("+RTS" ==) args
+            (rtsArgs, end) =
+                break ("-RTS" ==) mid
+            fullRtsArgs =
+                case rtsArgs of
+                    [] ->
+                        -- This means that we didn't have any RTS args - no
+                        -- `+RTS` - and therefore no need for a `-RTS`.
+                        []
+                    _ ->
+                        -- In this case, we have some RTS args. `break`
+                        -- puts the `"-RTS"` string in the `snd` list, so
+                        -- we want to append it on the end of `rtsArgs`
+                        -- here.
+                        --
+                        -- We're not checking that `-RTS` is the first
+                        -- element of `end`. This is because the GHC RTS
+                        -- allows you to omit a trailing -RTS if that's the
+                        -- last of the arguments. This permits a GHC
+                        -- options in stack.yaml that matches what you
+                        -- might pass directly to GHC.
+                        [T.unwords $ rtsArgs ++ ["-RTS"]]
+            -- We drop the first element from `end`, because it is always
+            -- either `"-RTS"` (and we don't want that as a separate
+            -- argument) or the list is empty (and `drop _ [] = []`).
+            postRtsArgs =
+                drop 1 end
+            newArgs =
+                concat [preRtsArgs, fullRtsArgs, postRtsArgs]
+        in
+            concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) newArgs
+
     wc = view (actualCompilerVersionL.to whichCompiler) econfig
     cv = view (actualCompilerVersionL.to getGhcVersion) econfig
 
