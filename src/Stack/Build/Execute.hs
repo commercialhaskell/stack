@@ -997,7 +997,7 @@ withLockedDistDir announce root inner = do
               announce $ "still blocking for directory lock on " <>
                          fromString (toFilePath lockFP) <>
                          "; maybe another Stack process is running?"
-      withCompanion complainer $
+      withCompanion (\x -> complainer x) $
         \stopComplaining ->
         withRunInIO $ \run ->
         withFileLock (toFilePath lockFP) Exclusive $ \_ ->

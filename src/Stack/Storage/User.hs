@@ -134,8 +134,9 @@ withUserStorage ::
        (HasConfig env, HasLogFunc env)
     => ReaderT SqlBackend (RIO env) a
     -> RIO env a
-withUserStorage inner =
-    flip SQLite.withStorage_ inner =<< view (configL . to configUserStorage . to unUserStorage)
+withUserStorage inner = do
+    storage <- view (configL . to configUserStorage . to unUserStorage)
+    SQLite.withStorage_ storage inner
 
 -- | Key used to retrieve the precompiled cache
 type PrecompiledCacheKey = Unique PrecompiledCacheParent
