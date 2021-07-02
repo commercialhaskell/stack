@@ -1157,6 +1157,10 @@ Flags worth mentioning:
   variable from being set. Some tools — notably cabal-install — do not behave
   well with that variable set.
 
+You may also find it convenient to use `stack exec` to launch a subshell (substitute `bash` with your preferred shell) where your compiled executable is available at the front of your `PATH`:
+
+    stack exec bash
+
 ## ghci (the repl)
 
 GHCi is the interactive GHC environment, a.k.a. the REPL. You *could* access it
