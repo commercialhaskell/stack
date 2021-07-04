@@ -93,8 +93,9 @@ withProjectStorage ::
        (HasBuildConfig env, HasLogFunc env)
     => ReaderT SqlBackend (RIO env) a
     -> RIO env a
-withProjectStorage inner =
-    flip SQLite.withStorage_ inner =<< view (buildConfigL . to bcProjectStorage . to unProjectStorage)
+withProjectStorage inner = do
+    storage <- view (buildConfigL . to bcProjectStorage . to unProjectStorage)
+    SQLite.withStorage_ storage inner
 
 -- | Key used to retrieve configuration or flag cache
 type ConfigCacheKey = Unique ConfigCacheParent
