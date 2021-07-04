@@ -17,6 +17,7 @@ Other enhancements:
   [#5288](https://github.com/commercialhaskell/stack/issues/5288)
 * `stack upgrade` makes less assumptions about archive format. See
   [#5288](https://github.com/commercialhaskell/stack/issues/5288)
+* Add a `--no-run` flag to the `script` command when compiling.
 
 Bug fixes:
 
