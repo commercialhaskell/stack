@@ -667,15 +667,26 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
         WCGhc version -> pure ["ghc-" ++ versionString version, "ghc"]
         WCGhcGit{} -> pure ["ghc"]
         WCGhcjs{} -> throwIO GhcjsNotSupported
+
+    -- Previously, we used findExecutable to locate these executables. This was
+    -- actually somewhat sloppy, as it could discover executables outside of the
+    -- sandbox. This led to a specific issue on Windows with GHC 9.0.1. See
+    -- https://gitlab.haskell.org/ghc/ghc/-/issues/20074. Instead, now, we look
+    -- on the paths specified only.
     let loop [] = do
           logError $ "Looked for sandboxed compiler named one of: " <> displayShow names
           logError $ "Could not find it on the paths " <> displayShow (edBins paths)
           throwString "Could not find sandboxed compiler"
         loop (x:xs) = do
-          res <- findExecutable x
+          res <- liftIO $ D.findExecutablesInDirectories (map toFilePath (edBins paths)) x
           case res of
-            Left _ -> loop xs
-            Right y -> parseAbsFile y
+            [] -> loop xs
+            compiler:rest -> do
+              unless (null rest) $ do
+                logWarn "Found multiple candidate compilers:"
+                for_ res $ \y -> logWarn $ "- " <> fromString y
+                logWarn $ "This usually indicates a failed installation. Trying anyway with " <> fromString compiler
+              parseAbsFile compiler
     compiler <- withProcessContext menv $ do
       compiler <- loop names
 
