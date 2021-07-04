@@ -31,6 +31,9 @@ Bug fixes:
 * When building the sanity check for a new GHC install, make sure to clear
   `GHC_PACKAGE_PATH`.
 * Specifying GHC RTS flags in the `stack.yaml` no longer fails with an error. [#5568](https://github.com/commercialhaskell/stack/pull/5568)
+* `stack setup` will look in sandboxed directories for executables, not
+  relying on `findExecutables. See
+  [GHC issue 20074](https://gitlab.haskell.org/ghc/ghc/-/issues/20074)
 
 ## v2.7.1
 
