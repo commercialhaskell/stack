@@ -8,7 +8,7 @@ main :: IO ()
 main =
     if isWindows
         then logInfo "Disabled on Windows (see https://github.com/commercialhaskell/stack/issues/1337#issuecomment-166118678)"
-        else do
+        else when isLinux $ do
             safeNew "1234a-4b-b4-abc-12b34"
             doesExist "./1234a-4b-b4-abc-12b34/stack.yaml"
             stackErr ["new", "1234-abc"]

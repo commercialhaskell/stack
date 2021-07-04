@@ -4,10 +4,10 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>))
 import Data.List (filter)
 import System.IO (hPutStrLn, withFile, IOMode(..))
-import Control.Monad (unless)
+import Control.Monad (when)
 
 main :: IO ()
-main = unless isWindows $ do
+main = when isLinux $ do
     let
       gitInit = do
          runShell "git init ."

@@ -23,10 +23,13 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
+          cache-bust: ""
         - os: windows-latest
           release-args: ""
+          cache-bust: ""
         - os: macos-latest
           release-args: ""
+          cache-bust: "1"
     steps:
       - name: Clone project
         uses: actions/checkout@v2
@@ -34,7 +37,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
       - shell: bash
         name: Install deps and run checks
         run: |
