@@ -252,6 +252,9 @@ exeExt = if isWindows then ".exe" else ""
 isWindows :: Bool
 isWindows = os == "mingw32"
 
+isLinux :: Bool
+isLinux = os == "linux"
+
 -- | Is the OS Alpine Linux?
 getIsAlpine :: IO Bool
 getIsAlpine = doesFileExist "/etc/alpine-release"
