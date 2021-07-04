@@ -30,6 +30,7 @@ or:
 
 On Windows, you can download and install the
 [Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
+Note that systems with antivirus software may need `stack` added to the list of "trusted" applications.
 
 For other operating systems and direct downloads, check out the
 [install and upgrade guide](install_and_upgrade.md).
