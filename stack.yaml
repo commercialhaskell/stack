@@ -22,6 +22,7 @@ ghc-options:
 
 extra-deps:
 - pantry-0.5.2@rev:0
+- Cabal-3.4.0.0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

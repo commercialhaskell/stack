@@ -358,7 +358,7 @@ checkComponentsBuildable lps =
 checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies proj = do
   forM_ proj $ \p -> do
-    C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
+    C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
 
     let dependencies = concatMap getDeps subLibs <>
                        concatMap getDeps foreignLibs <>
