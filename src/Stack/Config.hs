@@ -861,7 +861,7 @@ loadYaml parser path = do
 getProjectConfig :: HasLogFunc env
                  => StackYamlLoc
                  -- ^ Override stack.yaml
-                 -> RIO env (ProjectConfig (Path Abs File))
+                 -> RIO env (ProjectConfig (NonEmpty (Path Abs File)))
 getProjectConfig (SYLOverride stackYaml) = return $ PCProject stackYaml
 getProjectConfig SYLGlobalProject = return PCGlobalProject
 getProjectConfig SYLDefault = do
@@ -869,10 +869,10 @@ getProjectConfig SYLDefault = do
     case lookup "STACK_YAML" env of
         Just fp -> do
             logInfo "Getting project config file from STACK_YAML environment"
-            liftM PCProject $ resolveFile' fp
+            PCProject . (:| []) <$> resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            maybe PCGlobalProject PCProject <$> findInParents getStackDotYaml currDir
+            maybe PCGlobalProject (PCProject . (:| [])) <$> findInParents getStackDotYaml currDir
   where
     getStackDotYaml dir = do
         let fp = dir </> stackDotYaml
@@ -894,11 +894,13 @@ loadProjectConfig :: HasLogFunc env
 loadProjectConfig mstackYaml = do
     mfp <- getProjectConfig mstackYaml
     case mfp of
-        PCProject fp -> do
+        PCProject (mainFp :| fps) -> do
             currDir <- getCurrentDir
             logDebug $ "Loading project config file " <>
-                        fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
-            PCProject <$> load fp
+                        fromString (maybe (toFilePath mainFp) toFilePath (stripProperPrefix currDir mainFp))
+            (p1, mainP, c1) <- load mainFp
+            (StackedProject p, c) <- foldl' (loadAdditional currDir) (return (p1, c1)) fps
+            return $ PCProject (p, mainP, c)
         PCGlobalProject -> do
             logDebug "No project config file found, using defaults."
             return PCGlobalProject
@@ -906,10 +908,17 @@ loadProjectConfig mstackYaml = do
             logDebug "Ignoring config files"
             return $ PCNoProject extraDeps
   where
+    loadAdditional currDir memoM fp = do
+        memo <- memoM
+        logDebug $ "Loading additional config file " <>
+                    fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
+        (p, _, c) <- load fp
+        return $ memo <> (p, c)
+
     load fp = do
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         ProjectAndConfigMonoid project config <- liftIO iopc
-        return (project, fp, config)
+        return (StackedProject project, fp, config)
 
 -- | Get the location of the default stack configuration file.
 -- If a file already exists at the deprecated location, its location is returned.

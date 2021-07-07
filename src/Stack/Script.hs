@@ -68,7 +68,7 @@ scriptCmd opts = do
     -- interpreter mode, only error messages are shown. See:
     -- https://github.com/commercialhaskell/stack/issues/3007
     view (globalOptsL.to globalStackYaml) >>= \case
-      SYLOverride fp -> logError $
+      SYLOverride (fp :| _) -> logError $
         "Ignoring override stack.yaml file for script command: " <>
         fromString (toFilePath fp)
       SYLGlobalProject -> logError "Ignoring SYLGlobalProject for script command"

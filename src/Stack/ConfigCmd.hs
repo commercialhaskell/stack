@@ -65,7 +65,7 @@ cfgCmdSet cmd = do
                      mstackYamlOption <- view $ globalOptsL.to globalStackYaml
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
-                         PCProject stackYaml -> return stackYaml
+                         PCProject (stackYaml :| _) -> return stackYaml
                          PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
                          PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> return (configUserConfigPath conf)

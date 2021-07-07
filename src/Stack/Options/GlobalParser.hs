@@ -53,7 +53,7 @@ globalOptsParser currentDir kind defLogLevel =
          metavar "INT" <>
          help "Specify the width of the terminal, used for pretty-print messages" <>
          hide)) <*>
-    optionalFirst
+    many
         (strOption
             (long "stack-yaml" <>
              metavar "STACK-YAML" <>
@@ -79,9 +79,9 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
         First (Just dir) -> resolveDir' dir
     resolvePaths (Just root) ur
   stackYaml <-
-    case getFirst globalMonoidStackYaml of
-      Nothing -> pure SYLDefault
-      Just fp -> SYLOverride <$> resolveFile' fp
+    case globalMonoidStackYaml of
+      [] -> pure SYLDefault
+      mainFp:fps -> SYLOverride <$> mapM resolveFile' (mainFp :| fps)
   pure GlobalOpts
     { globalReExecVersion = getFirst globalMonoidReExecVersion
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
