@@ -726,9 +726,14 @@ has_cmd() {
   command -v "$1" > /dev/null 2>&1
 }
 
-# Check whether the given path is listed in the PATH environment variable
+# Check whether the given (query) path is listed in the PATH environment variable.
 on_path() {
-  echo ":$PATH:" | grep -q :"$1":
+    # Below we normalize PATH and query by ensuring ~ is expanded to $HOME, avoiding
+    # false negatives in case where ~ is expanded in query but not in PATH and vice versa.
+    # NOTE: If PATH or query have '|' somewhere in it, sed commands bellow will fail due to using | as their delimiter.
+    local PATH_NORMALIZED=$(printf '%s' "$PATH" | sed -e "s|:~|:$HOME|g" | sed -e "s|^~|$HOME|")
+    local QUERY_NORMALIZED=$(printf '%s' "$1" | sed -e "s|^~|$HOME|")
+    echo ":$PATH_NORMALIZED:" | grep -q ":$QUERY_NORMALIZED:"
 }
 
 # Check whether ~/.local/bin is on the PATH, and print a warning if not.
