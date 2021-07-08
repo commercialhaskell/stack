@@ -421,7 +421,7 @@ instance Show NewException where
     show (AttemptedOverwrites fps) =
         "The template would create the following files, but they already exist:\n" <>
         unlines (map (("  " ++) . toFilePath) fps) <>
-        "Use --force to ignore this, and overwite these files."
+        "Use --force to ignore this, and overwrite these files."
     show (FailedToDownloadTemplatesHelp ex) =
         "Failed to download `stack templates` help. The HTTP error was: " <> show ex
     show (BadTemplatesHelpEncoding url err) =
