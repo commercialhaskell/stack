@@ -11,6 +11,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf            #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -128,6 +129,7 @@ module Stack.Types.Config
   ,shaPath
   ,shaPathForBytes
   ,workDirL
+  ,ghcInstallHook
   -- * Command-specific types
   -- ** Eval
   ,EvalOpts(..)
@@ -1304,6 +1306,18 @@ askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
 workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
+
+-- | @STACK_ROOT\/hooks\/@
+hooksDir :: HasConfig env => RIO env (Path Abs Dir)
+hooksDir = do
+  sr <- view $ configL.to configStackRoot
+  pure (sr </> [reldir|hooks|])
+
+-- | @STACK_ROOT\/hooks\/ghc-install.sh@
+ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
+ghcInstallHook = do
+  hd <- hooksDir
+  pure (hd </> [relfile|ghc-install.sh|])
 
 -- | Per-project work dir
 getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)

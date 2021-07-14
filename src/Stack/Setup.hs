@@ -52,7 +52,9 @@ import              Data.List hiding (concat, elem, maximumBy, any)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
+import qualified    Data.Text.Lazy as TL
 import qualified    Data.Text.Encoding as T
+import qualified    Data.Text.Lazy.Encoding as TL
 import qualified    Data.Text.Encoding.Error as T
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
@@ -95,7 +97,7 @@ import              Stack.Types.Docker
 import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
-import              System.Environment (getExecutablePath, lookupEnv)
+import              System.Environment (getExecutablePath, lookupEnv, getEnvironment)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -602,13 +604,16 @@ installGhcBindist sopts getSetupInfo' installed = do
 
 -- | Ensure compiler is installed, without worrying about msys
 ensureCompiler
-  :: forall env. (HasBuildConfig env, HasGHCVariant env)
+  :: forall env. (HasConfig env, HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
     wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
+    
+    hook <- ghcInstallHook
+    hookIsExecutable <- handleIO (\_ -> pure False) $ executable <$> getPermissions hook
 
     Platform expectedArch _ <- view platformL
 
@@ -629,19 +634,77 @@ ensureCompiler sopts getSetupInfo' = do
             Right cp -> pure $ Just cp
 
     mcp <-
-        if soptsUseSystem sopts
-            then do
-                logDebug "Getting system compiler version"
-                runConduit $
-                  sourceSystemCompilers wanted .|
-                  concatMapMC checkCompiler .|
-                  await
-            else return Nothing
+      if | soptsUseSystem sopts -> do
+            logDebug "Getting system compiler version"
+            runConduit $
+              sourceSystemCompilers wanted .|
+              concatMapMC checkCompiler .|
+              await
+         | hookIsExecutable -> do
+          -- if the hook fails, we fall through to stacks sandboxed installation
+            hookGHC <- runGHCInstallHook sopts hook
+            maybe (pure Nothing) checkCompiler hookGHC
+         | otherwise -> return Nothing           
     case mcp of
       Nothing -> ensureSandboxedCompiler sopts getSetupInfo'
       Just cp -> do
         let paths = ExtraDirs { edBins = [parent $ cpCompiler cp], edInclude = [], edLib = [] }
         pure (cp, paths)
+
+
+-- | Runs @STACK_ROOT\/hooks\/ghc-install.sh@.
+--
+-- Reads and possibly validates the output of the process as the GHC
+-- binary and returns it.
+runGHCInstallHook
+  :: HasBuildConfig env
+  => SetupOpts
+  -> Path Abs File
+  -> RIO env (Maybe (Path Abs File))
+runGHCInstallHook sopts hook = do
+    logDebug "Getting hook installed compiler version"
+    let wanted = soptsWantedCompiler sopts
+    curEnv <- Map.fromList . map (T.pack *** T.pack) <$> liftIO getEnvironment
+    let newEnv = Map.union (wantedCompilerToEnv wanted) curEnv
+    pCtx <- mkProcessContext newEnv
+    (exit, out) <- withProcessContext pCtx $ proc "sh" [toFilePath hook] readProcessStdout
+    case exit of
+      ExitSuccess -> do
+        let ghcPath = stripNewline . TL.unpack . TL.decodeUtf8With T.lenientDecode $ out
+        case parseAbsFile ghcPath of
+          Just compiler -> do
+            when (soptsSanityCheck sopts) $ sanityCheck compiler
+            logDebug ("Using GHC compiler at: " <> fromString (toFilePath compiler))
+            pure (Just compiler)
+          Nothing -> do
+            logWarn ("Path to GHC binary is not a valid path: " <> fromString ghcPath)
+            pure Nothing
+      ExitFailure i -> do
+        logWarn ("GHC install hook exited with code: " <> fromString (show i))
+        pure Nothing
+ where
+    wantedCompilerToEnv :: WantedCompiler -> EnvVars
+    wantedCompilerToEnv (WCGhc ver) =
+      Map.fromList [("HOOK_GHC_TYPE", "bindist")
+                   ,("HOOK_GHC_VERSION", T.pack (versionString ver))
+                   ]
+    wantedCompilerToEnv (WCGhcGit commit flavor) =
+      Map.fromList [("HOOK_GHC_TYPE", "git")
+                   ,("HOOK_GHC_COMMIT", commit)
+                   ,("HOOK_GHC_FLAVOR", flavor)
+                   ,("HOOK_GHC_FLAVOUR", flavor)
+                   ]
+    wantedCompilerToEnv (WCGhcjs ghcjs_ver ghc_ver) =
+      Map.fromList [("HOOK_GHC_TYPE", "ghcjs")
+                   ,("HOOK_GHC_VERSION", T.pack (versionString ghc_ver))
+                   ,("HOOK_GHCJS_VERSION", T.pack (versionString ghcjs_ver))
+                   ]
+    newlines :: [Char]
+    newlines = ['\n', '\r']
+
+    stripNewline :: String -> String
+    stripNewline str = filter (flip notElem newlines) str
+
 
 ensureSandboxedCompiler
   :: HasBuildConfig env

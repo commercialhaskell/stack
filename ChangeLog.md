@@ -34,6 +34,8 @@ Other enhancements:
 * `stack upload` supports authentication with a Hackage API key (via
   `HACKAGE_KEY` environment variable).
 
+* Add GHC installation hooks wrt [#5585](https://github.com/commercialhaskell/stack/pull/5585)
+
 Bug fixes:
 
 * Ensure that `extra-path` works for case-insensitive `PATH`s on Windows.

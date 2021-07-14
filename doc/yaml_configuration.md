@@ -1200,3 +1200,65 @@ This field is convenient in setups that restrict access to GitHub, for instance 
 
 
 Since 2.5.0
+
+## Hooks
+
+### GHC installation hooks (experimental)
+
+Stack's installation procedure can be fully customized by placing a shell script at
+`~/.stack/hooks/ghc-install.sh` and making it executable.
+
+The script **must** return an exit code of `0` and the standard output **must** be the
+absolute path to the ghc binary that was installed. Otherwise stack will ignore
+the hook and possibly fall back to its own installation procedure.
+
+Hooks are not run when `system-ghc: true`.
+
+When `install-ghc: false`, hooks are still run,
+which allows you to ensure that only your hook will install GHC and stack won't default
+to its own installation logic, even when the hook fails.
+
+An example hook is:
+
+```sh
+#!/bin/sh
+
+set -eu
+
+case $HOOK_GHC_TYPE in
+	bindist)
+		# install GHC here, not printing to stdout, e.g.:
+		#   command install $HOOK_GHC_VERSION >/dev/null
+		;;
+	git)
+		>&2 echo "Hook doesn't support installing from source"
+		exit 1
+		;;
+	*)
+		>&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
+		exit 2
+		;;
+esac
+		
+echo "location/to/ghc/executable"
+```
+
+The following environment variables are always passed to the hook:
+
+* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
+
+For "bindist", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+
+For "git", additional variables are:
+
+* `HOOK_GHC_COMMIT = <commit>`
+* `HOOK_GHC_FLAVOR = <flavor>`
+
+For "ghcjs", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+* `HOOK_GHCJS_VERSION = <ver>`
+
+Since 2.8.X
