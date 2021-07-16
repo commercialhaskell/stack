@@ -845,8 +845,10 @@ ensureConfig :: HasEnvConfig env
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
     newCabalMod <- liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
     setupConfigfp <- setupConfigFromDir pkgDir
-    newSetupConfigMod <- liftIO $ either (const Nothing) (Just . modificationTime) <$>
-      tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
+    let getNewSetupConfigMod =
+          liftIO $ either (const Nothing) (Just . modificationTime) <$>
+          tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
+    newSetupConfigMod <- getNewSetupConfigMod
     -- See https://github.com/commercialhaskell/stack/issues/3554
     taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
@@ -905,6 +907,11 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             TTLocalMutable{} -> writeConfigCache pkgDir newConfigCache
             TTRemotePackage{} -> return ()
         writeCabalMod pkgDir newCabalMod
+        -- This file gets updated one more time by the configure step, so get
+        -- the most recent value. We could instead change our logic above to
+        -- check if our config mod file is newer than the file above, but this
+        -- seems reasonable too.
+        getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
 
     return needConfig
   where

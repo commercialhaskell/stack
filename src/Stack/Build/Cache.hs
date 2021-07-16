@@ -21,6 +21,7 @@ module Stack.Build.Cache
     , writeBuildCache
     , writeConfigCache
     , writeCabalMod
+    , writeSetupConfigMod
     , TestStatus (..)
     , setTestStatus
     , getTestStatus
@@ -179,6 +180,20 @@ writeCabalMod :: HasEnvConfig env
               -> RIO env ()
 writeCabalMod dir x = do
     fp <- configCabalMod dir
+    writeBinaryFileAtomic fp "Just used for its modification time"
+    liftIO $ setFileTimes (toFilePath fp) x x
+
+-- | See 'tryGetSetupConfigMod'
+writeSetupConfigMod
+  :: HasEnvConfig env
+  => Path Abs Dir
+  -> Maybe CTime
+  -> RIO env ()
+writeSetupConfigMod dir Nothing = do
+    fp <- configSetupConfigMod dir
+    ignoringAbsence $ removeFile fp
+writeSetupConfigMod dir (Just x) = do
+    fp <- configSetupConfigMod dir
     writeBinaryFileAtomic fp "Just used for its modification time"
     liftIO $ setFileTimes (toFilePath fp) x x
 
