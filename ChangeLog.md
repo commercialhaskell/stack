@@ -1,19 +1,14 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
+## v2.7.3
 
 **Changes since v2.7.1:**
 
-Major changes:
-
-Behavior changes:
-
 Other enhancements:
 
-* `stack upgrade` will download from `haskellstack.org` before trying `github.com`. See
+* `stack upgrade` will download from `haskellstack.org` before trying
+  `github.com`. See
   [#5288](https://github.com/commercialhaskell/stack/issues/5288)
 * `stack upgrade` makes less assumptions about archive format. See
   [#5288](https://github.com/commercialhaskell/stack/issues/5288)
@@ -30,12 +25,14 @@ Bug fixes:
   [pantry#33](https://github.com/commercialhaskell/pantry/issues/33)
 * When building the sanity check for a new GHC install, make sure to clear
   `GHC_PACKAGE_PATH`.
-* Specifying GHC RTS flags in the `stack.yaml` no longer fails with an error. [#5568](https://github.com/commercialhaskell/stack/pull/5568)
+* Specifying GHC RTS flags in the `stack.yaml` no longer fails with an error.
+  [#5568](https://github.com/commercialhaskell/stack/pull/5568)
 * `stack setup` will look in sandboxed directories for executables, not
   relying on `findExecutables. See
   [GHC issue 20074](https://gitlab.haskell.org/ghc/ghc/-/issues/20074)
-* Track changes to `setup-config` properly to avoid reconfiguring on every change.
-  See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
+* Track changes to `setup-config` properly to avoid reconfiguring on every
+  change. See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
+
 
 ## v2.7.1
 

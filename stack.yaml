@@ -1,4 +1,4 @@
-resolver: lts-17.10
+resolver: lts-17.15
 
 packages:
 - .
@@ -19,9 +19,6 @@ flags:
 
 ghc-options:
    "$locals": -fhide-source-paths
-
-extra-deps:
-- pantry-0.5.2@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
