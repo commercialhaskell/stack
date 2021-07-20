@@ -3,8 +3,6 @@ cabal-version: 2.0
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 77dce7b7a1439cd2e0a568e2821a6dcb8139f3c9a6a2afbf0b768e7dcf53ec53
 
 name:           stack
 version:        2.7.4
@@ -284,7 +282,6 @@ library
     , primitive
     , process
     , project-template
-    , regex-applicative-text
     , retry
     , rio >=0.1.18.0
     , rio-prettyprint >=0.1.1.0
@@ -408,7 +405,6 @@ executable stack
     , primitive
     , process
     , project-template
-    , regex-applicative-text
     , retry
     , rio >=0.1.18.0
     , rio-prettyprint >=0.1.1.0
@@ -531,7 +527,6 @@ executable stack-integration-test
     , primitive
     , process
     , project-template
-    , regex-applicative-text
     , retry
     , rio >=0.1.18.0
     , rio-prettyprint >=0.1.1.0
@@ -660,7 +655,6 @@ test-suite stack-test
     , process
     , project-template
     , raw-strings-qq
-    , regex-applicative-text
     , retry
     , rio >=0.1.18.0
     , rio-prettyprint >=0.1.1.0
