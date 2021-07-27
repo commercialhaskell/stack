@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE TypeApplications      #-}
 -- | Perform a build
 module Stack.Build.Execute
     ( printPlan
@@ -884,8 +885,8 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         let exes =
               case cpWhich cp of
                 Ghc ->
-                  [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
-                  , "--with-ghc-pkg=" ++ toFilePath pkgPath
+                  [ "--with-ghc=" ++ toFilePath @Abs @File (cpCompiler cp)
+                  , "--with-ghc-pkg=" ++ toFilePath @Abs @File pkgPath
                   ]
         -- Configure cabal with arguments determined by
         -- Stack.Types.Build.configureOpts
