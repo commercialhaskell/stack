@@ -17,6 +17,8 @@ Bug fixes:
 
 * Ensure that `extra-path` works for case-insensitive `PATH`s on Windows.
   See [rio#237](https://github.com/commercialhaskell/rio/pull/237)
+* Fix handling of overwritten `ghc` and `ghc-pkg` locations.
+  [#5597](https://github.com/commercialhaskell/stack/pull/5597)
 
 ## v2.7.3
 

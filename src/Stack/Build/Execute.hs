@@ -886,11 +886,11 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         let programNames =
               case cpWhich cp of
                 Ghc ->
-                  [ "--with-ghc=" ++ toFilePath (cpCompiler cp)
-                  , "--with-ghc-pkg=" ++ toFilePath pkgPath
+                  [ ("ghc", toFilePath (cpCompiler cp))
+                  , ("ghc-pkg", toFilePath pkgPath)
                   ]
-        exes <- forM programNames $ \name -> do
-            mpath <- findExecutable name
+        exes <- forM programNames $ \(name, file) -> do
+            mpath <- findExecutable file
             return $ case mpath of
                 Left _ -> []
                 Right x -> return $ concat ["--with-", name, "=", x]
