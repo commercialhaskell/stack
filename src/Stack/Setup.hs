@@ -97,7 +97,7 @@ import              Stack.Types.Docker
 import              Stack.Types.SourceMap
 import              Stack.Types.Version
 import qualified    System.Directory as D
-import              System.Environment (getExecutablePath, lookupEnv, getEnvironment)
+import              System.Environment (getExecutablePath, lookupEnv)
 import              System.IO.Error (isPermissionError)
 import              System.FilePath (searchPathSeparator)
 import qualified    System.FilePath as FP
@@ -447,21 +447,18 @@ ensureCompilerAndMsys
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
+  getSetupInfo' <- memoizeRef getSetupInfo
+  mmsys2Tool <- ensureMsys sopts getSetupInfo'
+  msysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
+
   actual <- either throwIO pure $ wantedToActual $ soptsWantedCompiler sopts
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
 
-  getSetupInfo' <- memoizeRef getSetupInfo
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
 
   warnUnsupportedCompilerCabal cp didWarn
 
-  mmsys2Tool <- ensureMsys sopts getSetupInfo'
-  paths <-
-    case mmsys2Tool of
-      Nothing -> pure ghcPaths
-      Just msys2Tool -> do
-        msys2Paths <- extraDirs msys2Tool
-        pure $ ghcPaths <> msys2Paths
+  let paths = maybe ghcPaths (ghcPaths <>) msysPaths
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
@@ -613,7 +610,9 @@ ensureCompiler sopts getSetupInfo' = do
     wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
     
     hook <- ghcInstallHook
-    hookIsExecutable <- handleIO (\_ -> pure False) $ executable <$> getPermissions hook
+    hookIsExecutable <- handleIO (\_ -> pure False) $ if osIsWindows
+      then doesFileExist hook  -- can't really detect executable on windows, only file extension
+      else executable <$> getPermissions hook
 
     Platform expectedArch _ <- view platformL
 
@@ -664,10 +663,10 @@ runGHCInstallHook
 runGHCInstallHook sopts hook = do
     logDebug "Getting hook installed compiler version"
     let wanted = soptsWantedCompiler sopts
-    curEnv <- Map.fromList . map (T.pack *** T.pack) <$> liftIO getEnvironment
-    let newEnv = Map.union (wantedCompilerToEnv wanted) curEnv
-    pCtx <- mkProcessContext newEnv
-    (exit, out) <- withProcessContext pCtx $ proc "sh" [toFilePath hook] readProcessStdout
+    menv0 <- view processContextL
+    menv <- mkProcessContext (Map.union (wantedCompilerToEnv wanted) $
+      removeHaskellEnvVars (view envVarsL menv0))
+    (exit, out) <- withProcessContext menv $ proc "sh" [toFilePath hook] readProcessStdout
     case exit of
       ExitSuccess -> do
         let ghcPath = stripNewline . TL.unpack . TL.decodeUtf8With T.lenientDecode $ out

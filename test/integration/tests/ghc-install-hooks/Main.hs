@@ -4,4 +4,4 @@ import StackTest
 import Control.Monad (unless)
 
 main :: IO ()
-main = unless isWindows $ rawSystem "bash" ["run.sh"] >>= throwIO
+main = rawSystem "sh" ["run.sh"] >>= throwIO
