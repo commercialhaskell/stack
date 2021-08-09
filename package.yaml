@@ -325,6 +325,9 @@ tests:
     - raw-strings-qq
     - stack
     - smallcheck
+    verbatim: |
+      build-tool-depends:
+          hspec-discover:hspec-discover
 flags:
   static:
     description: Pass -static/-pthread to ghc when linking the stack binary.

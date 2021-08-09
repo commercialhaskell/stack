@@ -696,3 +696,5 @@ test-suite stack-test
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   default-language: Haskell2010
+  build-tool-depends:
+      hspec-discover:hspec-discover
