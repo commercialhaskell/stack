@@ -1,5 +1,5 @@
 name: stack
-version: '2.8.0'
+version: '2.7.4'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
@@ -104,7 +104,6 @@ dependencies:
 - primitive
 - process
 - project-template
-- regex-applicative-text
 - retry
 - rio >= 0.1.18.0
 - rio-prettyprint >= 0.1.1.0
@@ -326,6 +325,9 @@ tests:
     - raw-strings-qq
     - stack
     - smallcheck
+    verbatim: |
+      build-tool-depends:
+          hspec-discover:hspec-discover
 flags:
   static:
     description: Pass -static/-pthread to ghc when linking the stack binary.

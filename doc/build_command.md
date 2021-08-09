@@ -96,8 +96,6 @@ of different syntaxes supported for this list:
       the local packages." This will result in an error if multiple packages
       have a component with the same name. To continue the above example,
       `stack build :mytestsuite`.
-        * Side note: the commonly requested `run` command is not available
-          because it's a simple combination of `stack build :exename && stack exec exename`
 
 * *directory*, e.g. `stack build foo/bar`, will find all local packages that
   exist in the given directory hierarchy and then follow the same procedure as

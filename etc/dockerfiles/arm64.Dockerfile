@@ -30,4 +30,4 @@ USER stack
 RUN cd /src && stack build --only-snapshot --test && stack build shake
 
 COPY etc/scripts/release.hs /src
-RUN stack script --resolver lts-17.10 --compile /src/release.hs -- --version && cp /src/release /home/stack
+RUN stack script --resolver lts-17.15 --compile /src/release.hs -- --version && cp /src/release /home/stack

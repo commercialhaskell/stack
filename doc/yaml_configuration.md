@@ -41,7 +41,7 @@ user's local packages, these dependencies aren't built by default. They only get
 built when needed.
 
 Shadowing semantics, described
-[here](http://docs.haskellstack.org/en/stable/architecture/#shadowing), are
+[here](https://docs.haskellstack.org/en/v1.5.1/architecture/#shadowing), are
 applied to your configuration. So, if you add a package to your `packages` list,
 it will be used even if you're using a snapshot that specifies a particular
 version. Similarly, `extra-deps` will shadow the version specified in the

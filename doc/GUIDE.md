@@ -450,7 +450,7 @@ With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
 information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-17.9`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-18.3`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -467,7 +467,7 @@ default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of lts-17.9, let's change our
+Let's explore package sets a bit further. Instead of lts-18.3, let's change our
 `stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
 this is currently 2020-03-24 - please see the resolve from the link above to get the latest.
 
@@ -483,8 +483,8 @@ We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example:
 
 ```
-michael@d30748af6d3d:~/helloworld$ stack --resolver lts-17.9 build
-Downloaded lts-17.9 build plan.
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-18.3 build
+Downloaded lts-18.3 build plan.
 # build output ...
 ```
 
@@ -1143,7 +1143,7 @@ follows the Unix convention of `--` to separate these, e.g.:
 ```
 michael@d30748af6d3d:~$ stack exec --package stm -- echo I installed the stm package via --package stm
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-17.9
+Using latest snapshot resolver: lts-18.3
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm
@@ -1156,6 +1156,10 @@ Flags worth mentioning:
 * `--no-ghc-package-path` can be used to stop the `GHC_PACKAGE_PATH` environment
   variable from being set. Some tools — notably cabal-install — do not behave
   well with that variable set.
+
+You may also find it convenient to use `stack exec` to launch a subshell (substitute `bash` with your preferred shell) where your compiled executable is available at the front of your `PATH`:
+
+    stack exec bash
 
 ## ghci (the repl)
 
