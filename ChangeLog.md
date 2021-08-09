@@ -15,6 +15,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Ensure that `extra-path` works for case-insensitive `PATH`s on Windows.
+  See [rio#237](https://github.com/commercialhaskell/rio/pull/237)
 
 ## v2.7.3
 

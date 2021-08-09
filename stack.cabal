@@ -283,7 +283,7 @@ library
     , process
     , project-template
     , retry
-    , rio >=0.1.18.0
+    , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -406,7 +406,7 @@ executable stack
     , process
     , project-template
     , retry
-    , rio >=0.1.18.0
+    , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -528,7 +528,7 @@ executable stack-integration-test
     , process
     , project-template
     , retry
-    , rio >=0.1.18.0
+    , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -656,7 +656,7 @@ test-suite stack-test
     , project-template
     , raw-strings-qq
     , retry
-    , rio >=0.1.18.0
+    , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , smallcheck

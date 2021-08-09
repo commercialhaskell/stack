@@ -30,7 +30,7 @@ extra-deps:
 - pantry-0.5.2@rev:0
 - casa-client-0.0.1@rev:0
 - casa-types-0.0.1@rev:0
-- rio-0.1.19.0@rev:0
+- rio-0.1.21.0@rev:0
 - rio-prettyprint-0.1.1.0@rev:0
 
 drop-packages:

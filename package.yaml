@@ -105,7 +105,7 @@ dependencies:
 - process
 - project-template
 - retry
-- rio >= 0.1.18.0
+- rio >= 0.1.21.0
 - rio-prettyprint >= 0.1.1.0
 - semigroups
 - split
