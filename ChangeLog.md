@@ -45,8 +45,10 @@ Bug fixes:
 * `stack setup` will look in sandboxed directories for executables, not
   relying on `findExecutables. See
   [GHC issue 20074](https://gitlab.haskell.org/ghc/ghc/-/issues/20074)
-* Track changes to `setup-config` properly to avoid reconfiguring on every
-  change. See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
+* Track changes to `setup-config` properly to avoid reconfiguring on every change.
+  See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
+* `stack ghci` now uses package flags in `stack.yaml`
+  [#5434](https://github.com/commercialhaskell/stack/issues/5434)
 
 
 ## v2.7.1

@@ -644,11 +644,12 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
           (cpCabalConfigOpts . ppCommon <$> M.lookup name smProject)
           <|>
           (cpCabalConfigOpts . dpCommon <$> M.lookup name smDeps)
+        sourceMapFlags = maybe mempty (cpFlags . ppCommon) $ M.lookup name smProject
         config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = getLocalFlags buildOptsCLI name
+            , packageConfigFlags = getLocalFlags buildOptsCLI name `M.union` sourceMapFlags
             , packageConfigGhcOptions = sourceMapGhcOptions
             , packageConfigCabalConfigOpts = sourceMapCabalConfigOpts
             , packageConfigCompilerVersion = compilerVersion
