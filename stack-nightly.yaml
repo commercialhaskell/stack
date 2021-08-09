@@ -21,6 +21,7 @@ ghc-options:
 
 extra-deps:
 - pantry-0.5.2@rev:0
+- rio-0.1.21.0@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

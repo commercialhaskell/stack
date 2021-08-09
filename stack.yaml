@@ -3,6 +3,9 @@ resolver: lts-17.15
 packages:
 - .
 
+extra-deps:
+- rio-0.1.21.0@rev:0
+
 docker:
   enable: false
   #repo: fpco/alpine-haskell-stack:8.10.4
