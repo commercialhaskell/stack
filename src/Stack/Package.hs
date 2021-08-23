@@ -358,7 +358,7 @@ data BioInput = BioInput
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts BioInput {..} =
     BuildInfoOpts
-        { bioOpts = ghcOpts ++ cppOptions biBuildInfo
+        { bioOpts = ghcOpts ++ fmap ("-optP" <>) (cppOptions biBuildInfo)
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
