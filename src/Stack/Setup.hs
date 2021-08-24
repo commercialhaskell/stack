@@ -1405,9 +1405,10 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
 
     dir <- expectSingleUnpackedDir archiveFile tempDir
 
+    gccEnvMaybe <- fmap (\gcc -> Map.fromList [("CC", T.pack (toFilePath gcc))]) <$> (view $ configL.to configOverrideGccPath)
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
-        (gdiConfigureEnv downloadInfo)
+        (fromMaybe Map.empty gccEnvMaybe `Map.union` gdiConfigureEnv downloadInfo)
         (toFilePath $ dir </> relFileConfigure)
         (("--prefix=" ++ toFilePath destDir) : map T.unpack (gdiConfigureOpts downloadInfo))
 
