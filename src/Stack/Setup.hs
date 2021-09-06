@@ -1260,6 +1260,7 @@ getOSKey platform =
         Platform AArch64               Cabal.Linux   -> return "linux-aarch64"
         Platform Sparc                 Cabal.Linux   -> return "linux-sparc"
         Platform AArch64               Cabal.OSX     -> return "macosx-aarch64"
+        Platform AArch64               Cabal.FreeBSD -> return "freebsd-aarch64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadOrUseLocal
