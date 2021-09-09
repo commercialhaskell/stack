@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | The general Stack configuration that starts everything off. This should
 -- be smart to falback if there is no stack.yaml, instead relying on
@@ -651,6 +652,14 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
       let resolved = ResolvedPath fp abs'
       pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
       pure (cpName $ ppCommon pp, pp)
+
+    -- prefetch git repos to avoid cloning per subdirectory
+    -- see https://github.com/commercialhaskell/stack/issues/5411
+    let gitRepos = mapMaybe (\case
+                              (RPLImmutable (RPLIRepo repo rpm)) -> Just (repo, rpm)
+                              _ -> Nothing) (projectDependencies project)
+    logDebug ("Prefetching git repos: " <> display (T.pack (show gitRepos)))
+    fetchReposRaw gitRepos
 
     (deps0, mcompleted) <- fmap unzip . forM (projectDependencies project) $ \rpl -> do
       (pl, mCompleted) <- case rpl of
