@@ -11,6 +11,8 @@ Major changes:
 
 Behavior changes:
 
+* cloning git repositories isn't per sub-directory anymore, see [#5411](https://github.com/commercialhaskell/stack/issues/5411)
+
 Other enhancements:
 
 * `stack setup` supports installing GHC for macOS aarch64 (M1)

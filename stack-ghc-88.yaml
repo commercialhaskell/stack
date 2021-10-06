@@ -32,6 +32,7 @@ extra-deps:
 - casa-types-0.0.1@rev:0
 - rio-0.1.21.0@rev:0
 - rio-prettyprint-0.1.1.0@rev:0
+- pantry-0.5.3@rev:0
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

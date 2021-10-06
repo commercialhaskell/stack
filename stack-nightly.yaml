@@ -20,7 +20,7 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
-- pantry-0.5.2@rev:0
+- pantry-0.5.3@rev:0
 - rio-0.1.21.0@rev:0
 
 drop-packages:

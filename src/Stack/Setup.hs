@@ -836,15 +836,8 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
    if compilerTool `elem` installed
      then return (compilerTool,CompilerBuildStandard)
      else do
-       let repo = Repo
-            { repoCommit = commitId
-            , repoUrl    = url
-            , repoType   = RepoGit
-            , repoSubdir = mempty
-            }
-
        -- clone the repository and execute the given commands
-       Pantry.withRepo repo $ do
+       Pantry.withRepo (Pantry.SimpleRepo url commitId RepoGit) $ do
          -- withRepo is guaranteed to set workingDirL, so let's get it
          mcwd <- traverse parseAbsDir =<< view workingDirL
          let cwd = fromMaybe (error "Invalid working directory") mcwd
