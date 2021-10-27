@@ -104,6 +104,7 @@ dependencies:
 - primitive
 - process
 - project-template
+- random
 - retry
 - rio >= 0.1.21.0
 - rio-prettyprint >= 0.1.1.0

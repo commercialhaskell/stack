@@ -282,6 +282,7 @@ library
     , primitive
     , process
     , project-template
+    , random
     , retry
     , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
@@ -405,6 +406,7 @@ executable stack
     , primitive
     , process
     , project-template
+    , random
     , retry
     , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
@@ -527,6 +529,7 @@ executable stack-integration-test
     , primitive
     , process
     , project-template
+    , random
     , retry
     , rio >=0.1.21.0
     , rio-prettyprint >=0.1.1.0
@@ -654,6 +657,7 @@ test-suite stack-test
     , primitive
     , process
     , project-template
+    , random
     , raw-strings-qq
     , retry
     , rio >=0.1.21.0
