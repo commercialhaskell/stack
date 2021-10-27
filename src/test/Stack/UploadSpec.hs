@@ -9,6 +9,7 @@ import Stack.Upload
 import Test.Hspec
 import System.Permissions (osIsWindows)
 import System.PosixCompat.Files (getFileStatus, fileMode)
+import System.Environment (setEnv)
 import Data.Bits ((.&.))
 
 spec :: Spec
@@ -26,3 +27,8 @@ spec = do
     unless osIsWindows $ do
       status <- getFileStatus fp
       (fileMode status .&. 0o777) `shouldBe` 0o600
+
+  it "finds a HACKAGE_KEY env variable" $ do
+    maybeGetHackageKey `shouldReturn` Nothing
+    setEnv "HACKAGE_KEY" "api_key"
+    maybeGetHackageKey `shouldReturn` Just "api_key"

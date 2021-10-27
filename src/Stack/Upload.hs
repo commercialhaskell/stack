@@ -14,6 +14,8 @@ module Stack.Upload
     , HackageCreds
     , loadCreds
     , writeFilePrivate
+      -- * Internal
+    , maybeGetHackageKey
     ) where
 
 import           Stack.Prelude
@@ -27,7 +29,13 @@ import qualified Data.ByteString.Char8                 as S
 import qualified Data.ByteString.Lazy                  as L
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Text                             as T
-import           Network.HTTP.StackClient              (Request, RequestBody(RequestBodyLBS), Response, withResponse, httpNoBody, getGlobalManager, getResponseStatusCode,
+import           Network.HTTP.StackClient              (Request,
+                                                        RequestBody(RequestBodyLBS),
+                                                        Response,
+                                                        withResponse,
+                                                        httpNoBody,
+                                                        getGlobalManager,
+                                                        getResponseStatusCode,
                                                         getResponseBody,
                                                         setRequestHeader,
                                                         parseRequest,
@@ -67,12 +75,32 @@ instance FromJSON (FilePath -> HackageCreds) where
 withEnvVariable :: Text -> IO Text -> IO Text
 withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
+maybeGetHackageKey :: IO (Maybe String)
+maybeGetHackageKey = lookupEnv (T.unpack "HACKAGE_KEY")
+
+getCredsWithApiKey :: String -> FilePath -> HackageCreds
+getCredsWithApiKey key fp = HackageCreds {
+    hcUsername = ""
+  , hcPassword = fromString key
+  , hcCredsFile = fp
+}
+
+loadCreds :: Config -> IO HackageCreds
+loadCreds config = do
+  maybeHackageKey <- maybeGetHackageKey
+  case maybeHackageKey of
+    Just key -> do
+      putStrLn "HACKAGE_KEY found in env, using that for credentials."
+      fp <- credsFile config
+      return $ getCredsWithApiKey key fp
+    Nothing -> loadUserAndPassword config
+
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
 --
 -- Since 0.1.0.0
-loadCreds :: Config -> IO HackageCreds
-loadCreds config = do
+loadUserAndPassword :: Config -> IO HackageCreds
+loadUserAndPassword config = do
   fp <- credsFile config
   elbs <- tryIO $ L.readFile fp
   case either (const Nothing) Just elbs >>= \lbs -> (lbs, ) <$> decode' lbs of
@@ -136,6 +164,16 @@ credsFile config = do
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
 
+addAPIKey :: String -> Request -> Request
+addAPIKey key req =
+  setRequestHeader "Authorization" [fromString $ "X-ApiKey" ++ " " ++ key] req
+
+applyKeyOrCreds :: HackageCreds -> Request -> IO Request
+applyKeyOrCreds creds req0 = do
+    case hcUsername creds of
+        "" -> return (addAPIKey (T.unpack $ hcPassword creds) req0)
+        _ -> applyCreds creds req0
+
 applyCreds :: HackageCreds -> Request -> IO Request
 applyCreds creds req0 = do
   manager <- getGlobalManager
@@ -173,7 +211,7 @@ uploadBytes baseUrl creds tarName uploadVariant bytes = do
                )
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
     req2 <- formDataBody formData req1
-    req3 <- applyCreds creds req2
+    req3 <- applyKeyOrCreds creds req2
     putStr $ "Uploading " ++ tarName ++ "... "
     hFlush stdout
     withResponse req3 $ \res ->
@@ -231,5 +269,5 @@ uploadRevision baseUrl creds ident@(PackageIdentifier name _) cabalFile = do
     , partBS "publish" "on"
     ]
     req0
-  req2 <- applyCreds creds req1
+  req2 <- applyKeyOrCreds creds req1
   void $ httpNoBody req2

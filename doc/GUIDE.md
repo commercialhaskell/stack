@@ -1668,6 +1668,12 @@ users. Here's a quick rundown:
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
     * `--candidate` upload a [package candidate](http://hackage.haskell.org/upload#candidates)
+    * Hackage API key can be used instead of username and password. Usage example:
+
+    ```bash
+    HACKAGE_KEY=<api_key> stack upload .
+    ```
+
     * `username` and `password` can be read by environment
 
     ```bash
