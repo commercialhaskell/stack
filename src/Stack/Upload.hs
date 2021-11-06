@@ -81,7 +81,7 @@ maybeGetHackageKey = lookupEnv (T.unpack "HACKAGE_KEY")
 getCredsWithApiKey :: String -> FilePath -> HackageCreds
 getCredsWithApiKey key fp = HackageCreds {
     hcUsername = ""
-  , hcPassword = fromString key
+  , hcPassword = T.pack key
   , hcCredsFile = fp
 }
 
