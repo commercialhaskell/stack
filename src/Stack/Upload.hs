@@ -49,7 +49,6 @@ import           System.Directory                      (createDirectoryIfMissing
                                                         removeFile, renameFile)
 import           System.Environment                    (lookupEnv)
 import           System.FilePath                       ((</>), takeFileName, takeDirectory)
-import           System.IO                             (putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
 
 
@@ -81,16 +80,16 @@ instance FromJSON (FilePath -> HackageCreds) where
 withEnvVariable :: Text -> IO Text -> IO Text
 withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
-maybeGetHackageKey :: IO (Maybe HackageKey)
-maybeGetHackageKey = fmap (HackageKey . T.pack) <$> lookupEnv (T.unpack "HACKAGE_KEY")
+maybeGetHackageKey :: RIO m (Maybe HackageKey)
+maybeGetHackageKey = fmap (HackageKey . T.pack) <$> (liftIO $ lookupEnv (T.unpack "HACKAGE_KEY"))
 
 
-loadCreds :: Config -> IO HackageAuth
+loadCreds :: HasLogFunc m => Config -> RIO m HackageAuth
 loadCreds config = do
   maybeHackageKey <- maybeGetHackageKey
   case maybeHackageKey of
     Just key -> do
-      putStrLn "HACKAGE_KEY found in env, using that for credentials."
+      logInfo "HACKAGE_KEY found in env, using that for credentials."
       return $ HAKey key
     Nothing -> HACreds <$> loadUserAndPassword config
 
@@ -98,10 +97,10 @@ loadCreds config = do
 -- line.
 --
 -- Since 0.1.0.0
-loadUserAndPassword :: Config -> IO HackageCreds
+loadUserAndPassword :: HasLogFunc m => Config -> RIO m HackageCreds
 loadUserAndPassword config = do
-  fp <- credsFile config
-  elbs <- tryIO $ L.readFile fp
+  fp <- liftIO $ credsFile config
+  elbs <- liftIO $ tryIO $ L.readFile fp
   case either (const Nothing) Just elbs >>= \lbs -> (lbs, ) <$> decode' lbs of
     Nothing -> fromPrompt fp
     Just (lbs, mkCreds) -> do
@@ -110,14 +109,15 @@ loadUserAndPassword config = do
       writeFilePrivate fp $ lazyByteString lbs
 
       unless (configSaveHackageCreds config) $ do
-        putStrLn "WARNING: You've set save-hackage-creds to false"
-        putStrLn "However, credentials were found at:"
-        putStrLn $ "  " ++ fp
+        logWarn "WARNING: You've set save-hackage-creds to false"
+        logWarn "However, credentials were found at:"
+        logWarn $ "  " <> fromString fp
       return $ mkCreds fp
   where
+    fromPrompt :: HasLogFunc m => FilePath -> RIO m HackageCreds
     fromPrompt fp = do
-      username <- withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
-      password <- withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
+      username <- liftIO $ withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
+      password <- liftIO $ withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
       let hc = HackageCreds
             { hcUsername = username
             , hcPassword = password
@@ -127,10 +127,10 @@ loadUserAndPassword config = do
       when (configSaveHackageCreds config) $ do
         shouldSave <- promptBool $ T.pack $
           "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
-        putStrLn "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
+        logInfo "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
         when shouldSave $ do
           writeFilePrivate fp $ fromEncoding $ toEncoding hc
-          putStrLn "Saved!"
+          logInfo "Saved!"
           hFlush stdout
 
       return hc
@@ -167,26 +167,26 @@ addAPIKey :: HackageKey -> Request -> Request
 addAPIKey (HackageKey key) req =
   setRequestHeader "Authorization" [fromString $ "X-ApiKey" ++ " " ++ T.unpack key] req
 
-applyKeyOrCreds :: HackageAuth -> Request -> IO Request
+applyKeyOrCreds :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
 applyKeyOrCreds haAuth req0 = do
     case haAuth of
         HAKey key -> return (addAPIKey key req0)
         HACreds creds -> applyCreds creds req0
 
-applyCreds :: HackageCreds -> Request -> IO Request
+applyCreds :: HasLogFunc m => HackageCreds -> Request -> RIO m Request
 applyCreds creds req0 = do
-  manager <- getGlobalManager
-  ereq <- applyDigestAuth
+  manager <- liftIO $ getGlobalManager
+  ereq <- liftIO $ applyDigestAuth
     (encodeUtf8 $ hcUsername creds)
     (encodeUtf8 $ hcPassword creds)
     req0
     manager
   case ereq of
       Left e -> do
-          putStrLn "WARNING: No HTTP digest prompt found, this will probably fail"
+          logWarn "WARNING: No HTTP digest prompt found, this will probably fail"
           case fromException e of
-              Just e' -> putStrLn $ displayDigestAuthException e'
-              Nothing -> print e
+              Just e' -> logWarn $ fromString (displayDigestAuthException e')
+              Nothing -> logWarn $ fromString $ displayException e
           return req0
       Right req -> return req
 
@@ -194,12 +194,13 @@ applyCreds creds req0 = do
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: String -- ^ Hackage base URL
+uploadBytes :: HasLogFunc m
+            => String -- ^ Hackage base URL
             -> HackageAuth
             -> String -- ^ tar file name
             -> UploadVariant
             -> L.ByteString -- ^ tar file contents
-            -> IO ()
+            -> RIO m ()
 uploadBytes baseUrl auth tarName uploadVariant bytes = do
     let req1 = setRequestHeader "Accept" ["text/plain"]
                (fromString $ baseUrl
@@ -209,33 +210,36 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
                                Candidate -> "candidates/"
                )
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
-    req2 <- formDataBody formData req1
+    req2 <- liftIO $ formDataBody formData req1
     req3 <- applyKeyOrCreds auth req2
-    putStr $ "Uploading " ++ tarName ++ "... "
+    logInfo $ "Uploading " <> fromString tarName <> "... "
     hFlush stdout
-    withResponse req3 $ \res ->
+    withRunInIO $ \runInIO -> withResponse req3 (runInIO . inner)
+ where
+    inner :: HasLogFunc m => Response (ConduitM () S.ByteString IO ()) -> RIO m ()
+    inner res =
         case getResponseStatusCode res of
-            200 -> putStrLn "done!"
+            200 -> logInfo "done!"
             401 -> do
-                putStrLn "authentication failure"
+                logError "authentication failure"
                 case auth of
-                  HACreds creds -> handleIO (const $ return ()) (removeFile (hcCredsFile creds))
+                  HACreds creds -> handleIO (const $ return ()) (liftIO $ removeFile (hcCredsFile creds))
                   _ -> pure ()
                 throwString "Authentication failure uploading to server"
             403 -> do
-                putStrLn "forbidden upload"
-                putStrLn "Usually means: you've already uploaded this package/version combination"
-                putStrLn "Ignoring error and continuing, full message from Hackage below:\n"
-                printBody res
+                logError "forbidden upload"
+                logError "Usually means: you've already uploaded this package/version combination"
+                logError "Ignoring error and continuing, full message from Hackage below:\n"
+                liftIO $ printBody res
             503 -> do
-                putStrLn "service unavailable"
-                putStrLn "This error some times gets sent even though the upload succeeded"
-                putStrLn "Check on Hackage to see if your pacakge is present"
-                printBody res
+                logError "service unavailable"
+                logError "This error some times gets sent even though the upload succeeded"
+                logError "Check on Hackage to see if your pacakge is present"
+                liftIO $ printBody res
             code -> do
-                putStrLn $ "unhandled status code: " ++ show code
-                printBody res
-                throwString $ "Upload failed on " ++ tarName
+                logError $ "unhandled status code: " <> fromString (show code)
+                liftIO $ printBody res
+                throwString $ "Upload failed on " <> fromString tarName
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
 printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
@@ -243,19 +247,21 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
-upload :: String -- ^ Hackage base URL
+upload :: HasLogFunc m
+       => String -- ^ Hackage base URL
        -> HackageAuth
        -> FilePath
        -> UploadVariant
-       -> IO ()
+       -> RIO m ()
 upload baseUrl auth fp uploadVariant =
-  uploadBytes baseUrl auth (takeFileName fp) uploadVariant =<< L.readFile fp
+  uploadBytes baseUrl auth (takeFileName fp) uploadVariant =<< (liftIO $ L.readFile fp)
 
-uploadRevision :: String -- ^ Hackage base URL
+uploadRevision :: HasLogFunc m
+               => String -- ^ Hackage base URL
                -> HackageAuth
                -> PackageIdentifier
                -> L.ByteString
-               -> IO ()
+               -> RIO m ()
 uploadRevision baseUrl auth ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
     [ baseUrl

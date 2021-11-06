@@ -655,21 +655,19 @@ uploadCmd uploadOpts = do
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
             uploadVariant = uoptsUploadVariant uploadOpts
-        getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
+        getCreds <- memoizeRef $ Upload.loadCreds config
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_ files $ \file -> do
             tarFile <- resolveFile' file
-            liftIO $ do
-              creds <- runMemoized getCreds
-              Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
+            creds <- runMemoized getCreds
+            Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
         forM_ dirs $ \dir -> do
             pkgDir <- resolveDir' dir
             (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
             checkSDistTarball' sdistOpts tarName tarBytes
-            liftIO $ do
-              creds <- runMemoized getCreds
-              Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
-              forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
+            creds <- runMemoized getCreds
+            Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+            forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
