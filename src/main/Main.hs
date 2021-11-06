@@ -655,7 +655,7 @@ uploadCmd uploadOpts = do
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
             uploadVariant = uoptsUploadVariant uploadOpts
-        getCreds <- memoizeRef $ Upload.loadCreds config
+        getCreds <- memoizeRef $ Upload.loadAuth config
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_ files $ \file -> do
             tarFile <- resolveFile' file

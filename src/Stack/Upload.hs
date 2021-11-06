@@ -12,7 +12,7 @@ module Stack.Upload
     , uploadRevision
       -- * Credentials
     , HackageCreds
-    , loadCreds
+    , loadAuth
     , writeFilePrivate
       -- * Internal
     , maybeGetHackageKey
@@ -84,8 +84,8 @@ maybeGetHackageKey :: RIO m (Maybe HackageKey)
 maybeGetHackageKey = fmap (HackageKey . T.pack) <$> (liftIO $ lookupEnv (T.unpack "HACKAGE_KEY"))
 
 
-loadCreds :: HasLogFunc m => Config -> RIO m HackageAuth
-loadCreds config = do
+loadAuth :: HasLogFunc m => Config -> RIO m HackageAuth
+loadAuth config = do
   maybeHackageKey <- maybeGetHackageKey
   case maybeHackageKey of
     Just key -> do
@@ -167,8 +167,8 @@ addAPIKey :: HackageKey -> Request -> Request
 addAPIKey (HackageKey key) req =
   setRequestHeader "Authorization" [fromString $ "X-ApiKey" ++ " " ++ T.unpack key] req
 
-applyKeyOrCreds :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
-applyKeyOrCreds haAuth req0 = do
+applyAuth :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
+applyAuth haAuth req0 = do
     case haAuth of
         HAKey key -> return (addAPIKey key req0)
         HACreds creds -> applyCreds creds req0
@@ -211,7 +211,7 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
                )
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
     req2 <- liftIO $ formDataBody formData req1
-    req3 <- applyKeyOrCreds auth req2
+    req3 <- applyAuth auth req2
     logInfo $ "Uploading " <> fromString tarName <> "... "
     hFlush stdout
     withRunInIO $ \runInIO -> withResponse req3 (runInIO . inner)
@@ -276,5 +276,5 @@ uploadRevision baseUrl auth ident@(PackageIdentifier name _) cabalFile = do
     , partBS "publish" "on"
     ]
     req0
-  req2 <- applyKeyOrCreds auth req1
+  req2 <- applyAuth auth req1
   void $ httpNoBody req2
