@@ -52,6 +52,9 @@ import           System.FilePath                       ((</>), takeFileName, tak
 import           System.IO                             (putStrLn, putStr, print) -- TODO remove putStrLn, use logInfo
 import           System.PosixCompat.Files              (setFileMode)
 
+
+newtype HackageKey = HackageKey Text
+
 -- | Username and password to log into Hackage.
 --
 -- Since 0.1.0.0
@@ -61,6 +64,9 @@ data HackageCreds = HackageCreds
     , hcCredsFile :: !FilePath
     }
     deriving Show
+
+data HackageAuth = HAKey HackageKey
+                 | HACreds HackageCreds
 
 instance ToJSON HackageCreds where
     toJSON (HackageCreds u p _) = object
@@ -75,25 +81,18 @@ instance FromJSON (FilePath -> HackageCreds) where
 withEnvVariable :: Text -> IO Text -> IO Text
 withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
-maybeGetHackageKey :: IO (Maybe String)
-maybeGetHackageKey = lookupEnv (T.unpack "HACKAGE_KEY")
+maybeGetHackageKey :: IO (Maybe HackageKey)
+maybeGetHackageKey = fmap (HackageKey . T.pack) <$> lookupEnv (T.unpack "HACKAGE_KEY")
 
-getCredsWithApiKey :: String -> FilePath -> HackageCreds
-getCredsWithApiKey key fp = HackageCreds {
-    hcUsername = ""
-  , hcPassword = T.pack key
-  , hcCredsFile = fp
-}
 
-loadCreds :: Config -> IO HackageCreds
+loadCreds :: Config -> IO HackageAuth
 loadCreds config = do
   maybeHackageKey <- maybeGetHackageKey
   case maybeHackageKey of
     Just key -> do
       putStrLn "HACKAGE_KEY found in env, using that for credentials."
-      fp <- credsFile config
-      return $ getCredsWithApiKey key fp
-    Nothing -> loadUserAndPassword config
+      return $ HAKey key
+    Nothing -> HACreds <$> loadUserAndPassword config
 
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
@@ -164,15 +163,15 @@ credsFile config = do
     createDirectoryIfMissing True dir
     return $ dir </> "credentials.json"
 
-addAPIKey :: String -> Request -> Request
-addAPIKey key req =
-  setRequestHeader "Authorization" [fromString $ "X-ApiKey" ++ " " ++ key] req
+addAPIKey :: HackageKey -> Request -> Request
+addAPIKey (HackageKey key) req =
+  setRequestHeader "Authorization" [fromString $ "X-ApiKey" ++ " " ++ T.unpack key] req
 
-applyKeyOrCreds :: HackageCreds -> Request -> IO Request
-applyKeyOrCreds creds req0 = do
-    case hcUsername creds of
-        "" -> return (addAPIKey (T.unpack $ hcPassword creds) req0)
-        _ -> applyCreds creds req0
+applyKeyOrCreds :: HackageAuth -> Request -> IO Request
+applyKeyOrCreds haAuth req0 = do
+    case haAuth of
+        HAKey key -> return (addAPIKey key req0)
+        HACreds creds -> applyCreds creds req0
 
 applyCreds :: HackageCreds -> Request -> IO Request
 applyCreds creds req0 = do
@@ -196,12 +195,12 @@ applyCreds creds req0 = do
 --
 -- Since 0.1.2.1
 uploadBytes :: String -- ^ Hackage base URL
-            -> HackageCreds
+            -> HackageAuth
             -> String -- ^ tar file name
             -> UploadVariant
             -> L.ByteString -- ^ tar file contents
             -> IO ()
-uploadBytes baseUrl creds tarName uploadVariant bytes = do
+uploadBytes baseUrl auth tarName uploadVariant bytes = do
     let req1 = setRequestHeader "Accept" ["text/plain"]
                (fromString $ baseUrl
                           <> "packages/"
@@ -211,7 +210,7 @@ uploadBytes baseUrl creds tarName uploadVariant bytes = do
                )
         formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
     req2 <- formDataBody formData req1
-    req3 <- applyKeyOrCreds creds req2
+    req3 <- applyKeyOrCreds auth req2
     putStr $ "Uploading " ++ tarName ++ "... "
     hFlush stdout
     withResponse req3 $ \res ->
@@ -219,7 +218,9 @@ uploadBytes baseUrl creds tarName uploadVariant bytes = do
             200 -> putStrLn "done!"
             401 -> do
                 putStrLn "authentication failure"
-                handleIO (const $ return ()) (removeFile (hcCredsFile creds))
+                case auth of
+                  HACreds creds -> handleIO (const $ return ()) (removeFile (hcCredsFile creds))
+                  _ -> pure ()
                 throwString "Authentication failure uploading to server"
             403 -> do
                 putStrLn "forbidden upload"
@@ -243,19 +244,19 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 --
 -- Since 0.1.0.0
 upload :: String -- ^ Hackage base URL
-       -> HackageCreds
+       -> HackageAuth
        -> FilePath
        -> UploadVariant
        -> IO ()
-upload baseUrl creds fp uploadVariant =
-  uploadBytes baseUrl creds (takeFileName fp) uploadVariant =<< L.readFile fp
+upload baseUrl auth fp uploadVariant =
+  uploadBytes baseUrl auth (takeFileName fp) uploadVariant =<< L.readFile fp
 
 uploadRevision :: String -- ^ Hackage base URL
-               -> HackageCreds
+               -> HackageAuth
                -> PackageIdentifier
                -> L.ByteString
                -> IO ()
-uploadRevision baseUrl creds ident@(PackageIdentifier name _) cabalFile = do
+uploadRevision baseUrl auth ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
     [ baseUrl
     , "package/"
@@ -269,5 +270,5 @@ uploadRevision baseUrl creds ident@(PackageIdentifier name _) cabalFile = do
     , partBS "publish" "on"
     ]
     req0
-  req2 <- applyKeyOrCreds creds req1
+  req2 <- applyKeyOrCreds auth req1
   void $ httpNoBody req2
