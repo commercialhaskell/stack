@@ -12,6 +12,8 @@ module Stack.Upload
     , uploadRevision
       -- * Credentials
     , HackageCreds
+    , HackageAuth(..)
+    , HackageKey(..)
     , loadAuth
     , writeFilePrivate
       -- * Internal
@@ -53,6 +55,7 @@ import           System.PosixCompat.Files              (setFileMode)
 
 
 newtype HackageKey = HackageKey Text
+    deriving (Eq, Show)
 
 -- | Username and password to log into Hackage.
 --
@@ -62,10 +65,11 @@ data HackageCreds = HackageCreds
     , hcPassword :: !Text
     , hcCredsFile :: !FilePath
     }
-    deriving Show
+    deriving (Eq, Show)
 
 data HackageAuth = HAKey HackageKey
                  | HACreds HackageCreds
+    deriving (Eq, Show)
 
 instance ToJSON HackageCreds where
     toJSON (HackageCreds u p _) = object

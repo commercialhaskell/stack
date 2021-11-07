@@ -29,6 +29,6 @@ spec = do
       (fileMode status .&. 0o777) `shouldBe` 0o600
 
   it "finds a HACKAGE_KEY env variable" $ do
-    maybeGetHackageKey `shouldReturn` Nothing
+    runRIO () maybeGetHackageKey `shouldReturn` Nothing
     setEnv "HACKAGE_KEY" "api_key"
-    maybeGetHackageKey `shouldReturn` Just "api_key"
+    runRIO () maybeGetHackageKey `shouldReturn` Just (HackageKey "api_key")
