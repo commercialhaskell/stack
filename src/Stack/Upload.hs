@@ -188,7 +188,7 @@ applyCreds creds req0 = do
       Left e -> do
           logWarn "WARNING: No HTTP digest prompt found, this will probably fail"
           case fromException e of
-              Just e' -> logWarn $ fromString (displayDigestAuthException e')
+              Just e' -> logWarn $ fromString $ displayDigestAuthException e'
               Nothing -> logWarn $ fromString $ displayException e
           return req0
       Right req -> return req
