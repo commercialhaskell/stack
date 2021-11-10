@@ -85,7 +85,7 @@ withEnvVariable :: Text -> IO Text -> IO Text
 withEnvVariable varName fromPrompt = lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
 maybeGetHackageKey :: RIO m (Maybe HackageKey)
-maybeGetHackageKey = fmap (HackageKey . T.pack) <$> (liftIO $ lookupEnv (T.unpack "HACKAGE_KEY"))
+maybeGetHackageKey = liftIO $ fmap (HackageKey . T.pack) <$> lookupEnv "HACKAGE_KEY"
 
 loadAuth :: HasLogFunc m => Config -> RIO m HackageAuth
 loadAuth config = do
