@@ -20,12 +20,12 @@ import           Options.Applicative.Types
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Builder.Internal
 import           Stack.Prelude
+import           Stack.Types.Config
 import           System.Environment
 
 -- | Generate and execute a complicated options parser.
 complicatedOptions
-  :: Monoid a
-  => Version
+  :: Version
   -- ^ numeric version
   -> Maybe String
   -- ^ version string
@@ -37,14 +37,14 @@ complicatedOptions
   -- ^ program description (displayed between usage and options listing in the help output)
   -> String
   -- ^ footer
-  -> Parser a
+  -> Parser GlobalOptsMonoid
   -- ^ common settings
-  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (a,(b,a)))
+  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (GlobalOptsMonoid,(RIO env (),GlobalOptsMonoid)))
   -- ^ optional handler for parser failure; 'handleParseResult' is called by
   -- default
-  -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
+  -> ExceptT (RIO env ()) (Writer (Mod CommandFields (RIO env (),GlobalOptsMonoid))) ()
   -- ^ commands (use 'addCommand')
-  -> IO (a,b)
+  -> IO (GlobalOptsMonoid, RIO env ())
 complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
