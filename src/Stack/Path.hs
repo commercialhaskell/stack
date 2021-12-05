@@ -45,12 +45,9 @@ path keys =
            toEither (_, k, UseHaddocks p) = Left (k, p)
            toEither (_, k, WithoutHaddocks p) = Right (k, p)
            (with, without) = partitionEithers $ map toEither goodPaths
-       -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
-       -- withDefaultEnvConfig each time, need to figure out what
-       -- purpose is served and whether we can achieve it without two
-       -- completely separate Config setups
-       runHaddock True $ printKeys with singlePath
-       runHaddock False $ printKeys without singlePath
+       withConfig YesReexec $ withDefaultEnvConfig $ do
+         runHaddock True $ printKeys with singlePath
+         runHaddock False $ printKeys without singlePath
 
 printKeys
   :: HasEnvConfig env
@@ -63,11 +60,9 @@ printKeys extractors single = do
        let prefix = if single then "" else key <> ": "
        T.putStrLn $ prefix <> extractPath pathInfo
 
-runHaddock :: Bool -> RIO EnvConfig a -> RIO Runner a
-runHaddock x = local
-    (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
-    withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
-    withDefaultEnvConfig
+runHaddock :: Bool -> RIO EnvConfig a -> RIO EnvConfig a
+runHaddock x =
+    local (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x))
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
