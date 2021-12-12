@@ -257,7 +257,7 @@ upload :: HasLogFunc m
        -> UploadVariant
        -> RIO m ()
 upload baseUrl auth fp uploadVariant =
-  uploadBytes baseUrl auth (takeFileName fp) uploadVariant =<< (liftIO $ L.readFile fp)
+  uploadBytes baseUrl auth (takeFileName fp) uploadVariant =<< liftIO (L.readFile fp)
 
 uploadRevision :: HasLogFunc m
                => String -- ^ Hackage base URL
