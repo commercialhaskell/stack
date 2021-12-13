@@ -178,7 +178,7 @@ applyAuth haAuth req0 = do
 
 applyCreds :: HasLogFunc m => HackageCreds -> Request -> RIO m Request
 applyCreds creds req0 = do
-  manager <- liftIO $ getGlobalManager
+  manager <- liftIO getGlobalManager
   ereq <- liftIO $ applyDigestAuth
     (encodeUtf8 $ hcUsername creds)
     (encodeUtf8 $ hcPassword creds)
