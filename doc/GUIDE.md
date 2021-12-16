@@ -444,7 +444,12 @@ extra-deps:
 - acme-missiles-0.3 # not in the LTS
 ```
 
-Now `stack build` will succeed.
+Now `stack build` will succeed.  To recap you needed to 
+* add `acme-missiles` to **dependencies** in `package.yaml` and
+* add `acme-missiles-0.3` to **extra-deps** in `stack.yaml`
+
+If you failed to do this you may experience 
+[Could not find module ‘Acme.Missiles’](https://stackoverflow.com/questions/48251027/cannot-add-extra-deps-to-stack-project)
 
 With that out of the way, let's dig a little bit more into these package sets,
 also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
