@@ -16,6 +16,8 @@ import           Data.Monoid.Map ( MonoidMap(..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Types.BuildType ( BuildType (Configure) )
+import           Distribution.Types.MungedPackageName
+                   ( encodeCompatPackageName )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
@@ -239,7 +241,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   sources <- getSources globalCabalVersion
   mcur <- view $ buildConfigL.to bcCurator
 
-  let onTarget = void . addDep
+  let onTarget = void . addDep . toMungedPackageName
   let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
   pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
   let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
@@ -519,8 +521,9 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- marked as a dependency, even if it is directly wanted. This makes sense - if
 -- we left out packages that are deps, it would break the --only-dependencies
 -- build plan.
-addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep name = do
+addDep :: MungedPackageName -> M (Either ConstructPlanException AddDepRes)
+addDep mungedName = do
+  let name = encodeCompatPackageName mungedName
   libMap <- get
   case Map.lookup name libMap of
     Just res -> do
@@ -822,6 +825,9 @@ addEllipsis t
   | T.length t < 100 = t
   | otherwise = T.take 97 t <> "..."
 
+toMungedPackageName :: PackageName -> MungedPackageName
+toMungedPackageName pn = MungedPackageName pn LMainLibName
+
 -- | Given a package, recurses into all of its dependencies. The results
 -- indicate which packages are missing, meaning that their 'GhcPkgId's will be
 -- figured out during the build, after they've been built. The 2nd part of the
@@ -843,9 +849,12 @@ addPackageDeps ::
 addPackageDeps package = do
   ctx <- ask
   checkAndWarnForUnknownTools package
-  let deps' = packageDeps package
-  deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
-    eres <- addDep depname
+  let deps' =
+        map (first toMungedPackageName) (Map.toList $ packageDeps package) <>
+        Map.toList (packageSubLibDeps package)
+  deps <- forM deps' $ \(mungedDepname, DepValue range depType) -> do
+    let MungedPackageName depname _ = mungedDepname
+    eres <- addDep mungedDepname
     let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
         getLatestApplicableVersionAndRev = do
           vsAndRevs <-
