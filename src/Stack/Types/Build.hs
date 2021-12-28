@@ -60,6 +60,7 @@ import           Database.Persist.Sql            (PersistField(..)
 import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System             (Arch)
 import qualified Distribution.Text               as C
+import           Distribution.Types.PackageName  (mkPackageName, unPackageName)
 import           Distribution.Version            (mkVersion)
 import           Path                            (parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
@@ -690,7 +691,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     -- with --exact-configuration.
     flags = packageFlags package `Map.union` packageDefaultFlags package
 
-    depOptions = map (uncurry toDepOption) $ Map.toList deps
+    -- FIXME: drunk code
+    sublibDeps = flip mapMaybe (Set.toList (packageSubLibDeps package)) $ \sublib ->
+        let subname = T.unpack sublib
+        in case find (\(PackageIdentifier pn _, _) -> unPackageName pn == takeWhile (/= ':') subname) (Map.toList deps) of
+            Just (PackageIdentifier _ v, gid) -> Just (PackageIdentifier (mkPackageName subname) v, gid)
+            _ -> Nothing
+
+    depOptions = map (uncurry toDepOption) (Map.toList deps <> sublibDeps)
       where
         toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 

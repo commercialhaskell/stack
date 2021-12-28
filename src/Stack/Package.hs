@@ -9,6 +9,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Dealing with Cabal.
 
@@ -145,6 +146,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]
     , packageAllDeps = S.fromList (M.keys deps)
+    , packageSubLibDeps = subLibDeps
     , packageLibraries =
         let mlib = do
               lib <- library pkg
@@ -258,6 +260,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     msetupDeps = fmap
         (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
         (setupBuildInfo pkg)
+
+    -- TODO: Should merge this calculation with deps.
+    subLibDeps = S.fromList $ concatMap
+      (\(Dependency n _ libs) -> mapMaybe (getSubLibName n) (S.toList libs))
+      (concatMap targetBuildDepends (allBuildInfo' pkg))
+    getSubLibName pn (LSubLibName cn) = Just (T.pack (unPackageName pn <> ":" <> Cabal.unUnqualComponentName cn))
+    getSubLibName _ _ = Nothing
 
     asLibrary range = DepValue
       { dvVersionRange = range

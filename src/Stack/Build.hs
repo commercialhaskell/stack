@@ -31,8 +31,6 @@ import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
-import qualified Distribution.PackageDescription as C
-import           Distribution.Types.Dependency (depLibraries)
 import           Distribution.Version (mkVersion)
 import           Path (parent)
 import           Stack.Build.ConstructPlan
@@ -67,8 +65,6 @@ build msetLocalFiles = do
     locals <- projectLocalPackages
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
-
-    checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     -- Set local files, necessary for file watching
@@ -353,28 +349,3 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
-
--- | Find if sublibrary dependency exist in each project
-checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
-checkSubLibraryDependencies proj = do
-  forM_ proj $ \p -> do
-    C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
-
-    let dependencies = concatMap getDeps subLibs <>
-                       concatMap getDeps foreignLibs <>
-                       concatMap getDeps exes <>
-                       concatMap getDeps tests <>
-                       concatMap getDeps benches <>
-                       maybe [] C.condTreeConstraints lib
-        libraries = concatMap (toList . depLibraries) dependencies
-
-    when (subLibDepExist libraries)
-      (logWarn "SubLibrary dependency is not supported, this will almost certainly fail")
-  where
-    getDeps (_, C.CondNode _ dep _) = dep
-    subLibDepExist lib = 
-      any (\x ->
-        case x of
-          C.LSubLibName _ -> True
-          C.LMainLibName  -> False
-      ) lib
