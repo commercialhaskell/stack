@@ -20,6 +20,9 @@ Other enhancements:
 * `stack upload` supports authentication with a Hackage API key (via
   `HACKAGE_KEY` environment variable).
 
+* `DisplayVersion` in the Windows registry is now set by the installer,
+  enabling tools like `winget` to properly read the version number.
+
 Bug fixes:
 
 * Ensure that `extra-path` works for case-insensitive `PATH`s on Windows.
