@@ -119,7 +119,7 @@ behind the scenes).
 `stack setup` will start a nix-shell, so it will gather all the required
 packages, but given nix handles GHC installation, instead of stack, this will
 happen when running `stack build` if no setup has been performed
-before. Therefore it is not longer necessary to run `stack setup` unless you
+before. Therefore it is no longer necessary to run `stack setup` unless you
 want to cache a GHC installation before running the build.
 
 If `enable:` is omitted or set to `false`, you can still build in a nix-shell by
