@@ -79,7 +79,7 @@ dependencies in `packages`. See some conversion notes below.
 A list of packages that are part of your local project. These are
 specified via paths to local directories. The paths are considered
 relative to the directory containing the `stack.yaml` file. For
-example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and
+example, if your `stack.yaml` is located at `./foo/bar/stack.yaml`, and
 you have:
 
 ```yaml
@@ -88,8 +88,8 @@ packages:
 - there/world
 ```
 
-Your configuration means "I have packages in `/foo/bar/hello` and
-`/foo/bar/there/world`.
+Your configuration means "I have packages in `./foo/bar/hello` and
+`./foo/bar/there/world`.
 
 If these packages should be treated as dependencies instead, specify
 them in `extra-deps`, described below.
