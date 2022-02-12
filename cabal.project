@@ -1,0 +1,8 @@
+packages:
+    ./
+
+allow-older: *
+allow-newer: *
+
+package stack
+    ghc-options: -fhide-source-paths
