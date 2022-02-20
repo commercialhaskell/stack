@@ -849,6 +849,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           liftIO $ either (const Nothing) (Just . modificationTime) <$>
           tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
     newSetupConfigMod <- getNewSetupConfigMod
+    newProjectRoot <- (S8.pack . toFilePath) <$> view projectRootL
     -- See https://github.com/commercialhaskell/stack/issues/3554
     taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
@@ -870,10 +871,12 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
                 -- Cabal's setup-config is created per OS/Cabal version, multiple
                 -- projects using the same package could get a conflict because of this
                 mOldSetupConfigMod <- tryGetSetupConfigMod pkgDir
+                mOldProjectRoot <- tryGetPackageProjectRoot pkgDir
 
                 return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
                       || mOldSetupConfigMod /= newSetupConfigMod
+                      || mOldProjectRoot /= Just newProjectRoot
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
 
     when (taskBuildTypeConfig task) ensureConfigureScript
@@ -912,6 +915,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
         -- check if our config mod file is newer than the file above, but this
         -- seems reasonable too.
         getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
+        writePackageProjectRoot pkgDir newProjectRoot
 
     return needConfig
   where

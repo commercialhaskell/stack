@@ -11,6 +11,7 @@ module Stack.Constants.Config
   , projectDockerSandboxDir
   , configCabalMod
   , configSetupConfigMod
+  , configPackageProjectRoot
   , buildCachesDir
   , testSuccessFile
   , testBuiltFile
@@ -83,6 +84,15 @@ configSetupConfigMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 configSetupConfigMod dir =
     liftM
         (</> $(mkRelFile "stack-setup-config-mod"))
+        (distDirFromDir dir)
+
+-- | The filename used for the project root from the last build of a package
+configPackageProjectRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+                     => Path Abs Dir      -- ^ Package directory.
+                     -> m (Path Abs File)
+configPackageProjectRoot dir =
+    liftM
+        (</> $(mkRelFile "stack-project-root"))
         (distDirFromDir dir)
 
 -- | Directory for HPC work.
