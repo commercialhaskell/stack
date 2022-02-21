@@ -26,6 +26,8 @@ Bug fixes:
   See [rio#237](https://github.com/commercialhaskell/rio/pull/237)
 * Fix handling of overwritten `ghc` and `ghc-pkg` locations.
   [#5597](https://github.com/commercialhaskell/stack/pull/5597)
+* Fix failure to find package when a dependency is shared between projects.
+  [#5680](https://github.com/commercialhaskell/stack/issues/5680)
 
 ## v2.7.3
 

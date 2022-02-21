@@ -1,0 +1,4 @@
+resolver: lts-17.15
+packages:
+- .
+- ../package-c
