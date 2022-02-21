@@ -849,7 +849,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           liftIO $ either (const Nothing) (Just . modificationTime) <$>
           tryJust (guard . isDoesNotExistError) (getFileStatus (toFilePath setupConfigfp))
     newSetupConfigMod <- getNewSetupConfigMod
-    newProjectRoot <- (S8.pack . toFilePath) <$> view projectRootL
+    newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
     -- See https://github.com/commercialhaskell/stack/issues/3554
     taskAnyMissingHack <- view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
     needConfig <-
