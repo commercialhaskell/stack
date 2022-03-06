@@ -1,17 +1,14 @@
 # Changelog
 
 
-## Unreleased changes
-
-Release notes:
+## v2.7.5
 
 **Changes since v2.7.3:**
 
-Major changes:
-
 Behavior changes:
 
-* cloning git repositories isn't per sub-directory anymore, see [#5411](https://github.com/commercialhaskell/stack/issues/5411)
+* Cloning git repositories isn't per sub-directory anymore, see
+  [#5411](https://github.com/commercialhaskell/stack/issues/5411)
 
 Other enhancements:
 
@@ -28,6 +25,9 @@ Bug fixes:
   [#5597](https://github.com/commercialhaskell/stack/pull/5597)
 * Fix failure to find package when a dependency is shared between projects.
   [#5680](https://github.com/commercialhaskell/stack/issues/5680)
+* `stack ghci` now uses package flags in `stack.yaml`
+  [#5434](https://github.com/commercialhaskell/stack/issues/5434)
+
 
 ## v2.7.3
 
@@ -60,8 +60,6 @@ Bug fixes:
   [GHC issue 20074](https://gitlab.haskell.org/ghc/ghc/-/issues/20074)
 * Track changes to `setup-config` properly to avoid reconfiguring on every change.
   See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
-* `stack ghci` now uses package flags in `stack.yaml`
-  [#5434](https://github.com/commercialhaskell/stack/issues/5434)
 
 
 ## v2.7.1
