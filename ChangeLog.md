@@ -1,6 +1,21 @@
 # Changelog
 
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v2.7.5:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+
 ## v2.7.5
 
 **Changes since v2.7.3:**
