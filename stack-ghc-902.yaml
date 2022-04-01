@@ -1,0 +1,27 @@
+resolver: lts-19.1
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: fpco/alpine-haskell-stack:8.10.4
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+    - zlib
+    - unzip
+flags:
+  stack:
+    developer-mode: true
+
+ghc-options:
+   "$locals": -fhide-source-paths
+
+extra-deps:
+- mustache-2.4.0@sha256:09a2eac7b8d093231cd8c5355dc87d7f882be77aebf88de18c4d9e612beca453,3345
+- unordered-containers-0.2.16.0@sha256:859ec9a017e51194755cb8a445b767afc5ce0ac991cd50b0f96abd31b3687aab,5217
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install

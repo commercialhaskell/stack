@@ -32,6 +32,9 @@ import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+#if MIN_VERSION_Cabal(3,4,0)
+import           Distribution.CabalSpecVersion
+#endif
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
@@ -128,7 +131,11 @@ resolvePackage packageConfig gpkg =
         (resolvePackageDescription packageConfig gpkg)
 
 packageFromPackageDescription :: PackageConfig
+#if MIN_VERSION_Cabal(3,4,0)
+                              -> [PackageFlag]
+#else
                               -> [D.Flag]
+#endif
                               -> PackageDescriptionPair
                               -> Package
 packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
@@ -190,7 +197,11 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           (library pkg)
     , packageBuildType = buildType pkg
     , packageSetupDeps = msetupDeps
+#if MIN_VERSION_Cabal(3,4,0)
+    , packageCabalSpec = specVersion pkg
+#else
     , packageCabalSpec = either orLaterVersion id $ specVersionRaw pkg
+#endif
     }
   where
     extraLibNames = S.union subLibNames foreignLibNames
@@ -696,7 +707,11 @@ packageDescModulesAndFiles pkg = do
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles
+#if MIN_VERSION_Cabal(3,4,0)
+  :: CabalSpecVersion -- ^ cabal file version
+#else
   :: Version -- ^ cabal file version
+#endif
   -> [String]
   -> RIO Ctx (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
@@ -862,7 +877,11 @@ data PackageDescriptionPair = PackageDescriptionPair
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescriptionPair
+#if MIN_VERSION_Cabal(3,4,0)
+resolvePackageDescription packageConfig (GenericPackageDescription desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches) =
+#else
 resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib subLibs foreignLibs' exes tests benches) =
+#endif
     PackageDescriptionPair
       { pdpOrigBuildable = go False
       , pdpModifiedBuildable = go True
@@ -935,9 +954,17 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
 -- | Make a map from a list of flag specifications.
 --
 -- What is @flagManual@ for?
+#if MIN_VERSION_Cabal(3,4,0)
+flagMap :: [PackageFlag] -> Map FlagName Bool
+#else
 flagMap :: [Flag] -> Map FlagName Bool
+#endif
 flagMap = M.fromList . map pair
+#if MIN_VERSION_Cabal(3,4,0)
+  where pair :: PackageFlag -> (FlagName, Bool)
+#else
   where pair :: Flag -> (FlagName, Bool)
+#endif
         pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
@@ -986,7 +1013,11 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                   case v of
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
+#if MIN_VERSION_Cabal(3,4,0)
+                    PackageFlag flag ->
+#else
                     Flag flag ->
+#endif
                       fromMaybe False $ M.lookup flag (rcFlags rc)
                       -- NOTE:  ^^^^^ This should never happen, as all flags
                       -- which are used must be declared. Defaulting to
@@ -1394,7 +1425,13 @@ applyForceCustomBuild cabalVersion package
           }
     | otherwise = package
   where
+#if MIN_VERSION_Cabal(3,4,0)
+    cabalVersionRange =
+      orLaterVersion $ mkVersion $ cabalSpecToVersionDigits $
+        packageCabalSpec package
+#else
     cabalVersionRange = packageCabalSpec package
+#endif
     forceCustomBuild =
       packageBuildType package == Simple &&
       not (cabalVersion `withinRange` cabalVersionRange)

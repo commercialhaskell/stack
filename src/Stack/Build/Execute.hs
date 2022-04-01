@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -1218,7 +1219,11 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                             let macroDeps = mapMaybe snd matchedDeps
                                 cppMacrosFile = setupDir </> relFileSetupMacrosH
                                 cppArgs = ["-optP-include", "-optP" ++ toFilePath cppMacrosFile]
+#if MIN_VERSION_Cabal(3,4,0)
+                            writeBinaryFileAtomic cppMacrosFile (encodeUtf8Builder (T.pack (C.generatePackageVersionMacros (packageVersion package) macroDeps)))
+#else
                             writeBinaryFileAtomic cppMacrosFile (encodeUtf8Builder (T.pack (C.generatePackageVersionMacros macroDeps)))
+#endif
                             return (packageDBArgs ++ depsArgs ++ cppArgs)
 
                         -- This branch is usually taken for builds, and

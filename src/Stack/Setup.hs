@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -33,6 +34,9 @@ import              Conduit
 import              Control.Applicative (empty)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Pantry.Internal.AesonExtended
+#if MIN_VERSION_aeson(2,0,0)
+import qualified    Data.Aeson.KeyMap as KeyMap
+#endif
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.Conduit.Binary as CB
@@ -41,7 +45,9 @@ import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
 import              Data.Foldable (maximumBy)
+#if !MIN_VERSION_aeson(2,0,0)
 import qualified    Data.HashMap.Strict as HashMap
+#endif
 import              Data.List hiding (concat, elem, maximumBy, any)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
@@ -1988,16 +1994,28 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     findArchive (SRIGithub val) pattern = do
         Object top <- return val
+#if MIN_VERSION_aeson(2,0,0)
+        Array assets <- KeyMap.lookup "assets" top
+#else
         Array assets <- HashMap.lookup "assets" top
+#endif
         getFirst $ fold $ fmap (First . findMatch pattern') assets
       where
         pattern' = mconcat ["-", pattern, "."]
 
         findMatch pattern'' (Object o) = do
+#if MIN_VERSION_aeson(2,0,0)
+            String name <- KeyMap.lookup "name" o
+#else
             String name <- HashMap.lookup "name" o
+#endif
             guard $ not $ ".asc" `T.isSuffixOf` name
             guard $ pattern'' `T.isInfixOf` name
+#if MIN_VERSION_aeson(2,0,0)
+            String url <- KeyMap.lookup "browser_download_url" o
+#else
             String url <- HashMap.lookup "browser_download_url" o
+#endif
             Just url
         findMatch _ _ = Nothing
     findArchive (SRIHaskellStackOrg hso) _ = pure $ hsoUrl hso
@@ -2095,7 +2113,11 @@ performPathChecking newFile executablePath = do
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (SRIGithub val) = do
     Object o <- Just val
+#if MIN_VERSION_aeson(2,0,0)
+    String rawName <- KeyMap.lookup "name" o
+#else
     String rawName <- HashMap.lookup "name" o
+#endif
     -- drop the "v" at the beginning of the name
     parseVersion $ T.unpack (T.drop 1 rawName)
 getDownloadVersion (SRIHaskellStackOrg hso) = Just $ hsoVersion hso
