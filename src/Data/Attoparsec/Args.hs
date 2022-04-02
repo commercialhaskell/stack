@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 -- | Parsing of stack command line arguments
 
 module Data.Attoparsec.Args

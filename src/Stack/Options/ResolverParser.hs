@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds         #-}
+
 module Stack.Options.ResolverParser where
 
 import qualified Data.Text                         as T

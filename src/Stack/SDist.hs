@@ -1,10 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TypeFamilies       #-}
+
 -- Create a source distribution tarball
 module Stack.SDist
     ( getSDistTarball

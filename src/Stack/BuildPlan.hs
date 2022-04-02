@@ -1,11 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE CPP                #-}
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Resolving a build plan for a set of packages in a given Stackage

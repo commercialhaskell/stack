@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds         #-}
 
 -- | Finding files.
 

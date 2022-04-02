@@ -1,6 +1,6 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Stack.LockSpec where
 

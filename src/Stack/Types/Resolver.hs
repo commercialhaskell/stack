@@ -1,14 +1,14 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE CPP                  #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Stack.Types.Resolver

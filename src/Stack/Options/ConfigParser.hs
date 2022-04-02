@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.ConfigParser where
 
 import           Data.Char

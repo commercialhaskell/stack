@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}

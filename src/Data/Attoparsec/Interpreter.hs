@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 {- |  This module implements parsing of additional arguments embedded in a
       comment when stack is invoked as a script interpreter
 

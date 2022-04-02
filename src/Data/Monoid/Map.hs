@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Data.Monoid.Map where
 
 import qualified Data.Map as M

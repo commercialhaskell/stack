@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TupleSections         #-}
 
 -- | Generate HPC (Haskell Program Coverage) reports
@@ -50,7 +50,7 @@ newtype CoverageException = NonTestSuiteTarget PackageName deriving Typeable
 
 instance Exception CoverageException
 instance Show CoverageException where
-    show (NonTestSuiteTarget name) = 
+    show (NonTestSuiteTarget name) =
         "Can't specify anything except test-suites as hpc report targets (" ++
         packageNameString name ++
         " is used with a non test-suite target)"
@@ -245,7 +245,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                                  CTest testName ->
                                      liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
                                  _ -> throwIO $ NonTestSuiteTarget name
-                                     
+
                      TargetAll PTProject -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath

@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
+
 module Stack.Types.VersionIntervals -- to be removed with https://github.com/commercialhaskell/stack/issues/4213
   ( VersionIntervals
   , toVersionRange

@@ -1,9 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TupleSections      #-}
+
 module Stack.PackageDump
     ( Line
     , eachSection

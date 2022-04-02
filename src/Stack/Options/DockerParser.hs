@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.DockerParser where
 
 import           Data.List                         (intercalate)

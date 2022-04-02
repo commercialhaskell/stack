@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.ScriptParser where
 
 import           Options.Applicative

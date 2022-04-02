@@ -1,9 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections       #-}
+
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
     ( -- * Upload

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 -- | Args parser test suite.
 
 module Stack.ArgsSpec where

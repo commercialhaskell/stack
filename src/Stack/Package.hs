@@ -1,14 +1,14 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections       #-}
 
 -- | Dealing with Cabal.
 

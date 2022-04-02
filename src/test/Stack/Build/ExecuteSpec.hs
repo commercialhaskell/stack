@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Build.ExecuteSpec (main, spec) where
 
 import Stack.Prelude

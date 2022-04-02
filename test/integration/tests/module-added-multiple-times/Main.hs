@@ -1,5 +1,3 @@
-
-
 import Control.Monad
 import Data.List
 import StackTest

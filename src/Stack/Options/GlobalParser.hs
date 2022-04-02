@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Options.GlobalParser where
 

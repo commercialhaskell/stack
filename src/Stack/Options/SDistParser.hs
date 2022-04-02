@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.SDistParser where
 
 import           Options.Applicative

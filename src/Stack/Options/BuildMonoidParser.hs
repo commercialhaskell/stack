@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.BuildMonoidParser where
 
 import qualified Data.Text as T

@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Stack.Setup.Installed
     ( getCompilerVersion

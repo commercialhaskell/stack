@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 -- | A sourcemap maps a package name to how it should be built,
 -- including source code, flags, options, etc. This module contains
 -- various stages of source map construction. See the
