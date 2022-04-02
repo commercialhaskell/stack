@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.34.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -462,6 +462,8 @@ executable stack-integration-test
   other-modules:
       StackTest
       Paths_stack
+  autogen-modules:
+      Paths_stack
   hs-source-dirs:
       test/integration
       test/integration/lib
@@ -589,6 +591,8 @@ test-suite stack-test
       Stack.PackageDumpSpec
       Stack.Types.TemplateNameSpec
       Stack.UploadSpec
+      Paths_stack
+  autogen-modules:
       Paths_stack
   hs-source-dirs:
       src/test

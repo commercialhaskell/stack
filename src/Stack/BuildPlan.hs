@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts   #-}
@@ -224,7 +225,11 @@ selectPackageBuildPlan platform compiler pool gpd =
     flagCombinations :: NonEmpty [(FlagName, Bool)]
     flagCombinations = mapM getOptions (genPackageFlags gpd)
       where
+#if MIN_VERSION_Cabal(3,4,0)
+        getOptions :: C.PackageFlag -> NonEmpty (FlagName, Bool)
+#else
         getOptions :: C.Flag -> NonEmpty (FlagName, Bool)
+#endif
         getOptions f
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]
