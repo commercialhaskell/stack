@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.GhcBuildParser where
 
 import           Options.Applicative

@@ -1,10 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 -- | Cache information about previous builds
 module Stack.Build.Cache
@@ -404,4 +404,3 @@ readPrecompiledCache loc copts buildHaddocks depIDs = do
         , pcSubLibs = mkAbs' <$> pcSubLibs pc0
         , pcExes = mkAbs' <$> pcExes pc0
         }
-

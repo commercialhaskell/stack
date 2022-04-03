@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 -- | Simple interface to complicated program arguments.
 --
 -- This is a "fork" of the @optparse-simple@ package that has some workarounds for
