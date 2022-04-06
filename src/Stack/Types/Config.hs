@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
@@ -204,7 +205,9 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform, Arch)
 import qualified Distribution.Text
+#if !MIN_VERSION_Cabal(3,4,0)
 import qualified Distribution.Types.UnqualComponentName as C
+#endif
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro
