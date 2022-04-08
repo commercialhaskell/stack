@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -39,7 +40,9 @@ import Stack.Types.Config (HasBuildConfig, buildConfigL, bcProjectStorage, Proje
 import Stack.Types.GhcPkgId
 
 share [ mkPersist sqlSettings
+#if !MIN_VERSION_persistent(2,13,0)
       , mkDeleteCascade sqlSettings
+#endif
       , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
@@ -54,27 +57,43 @@ ConfigCacheParent sql="config_cache"
   deriving Show
 
 ConfigCacheDirOption
+#if MIN_VERSION_persistent(2,13,0)
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
+#else
   parent ConfigCacheParentId sql="config_cache_id"
+#endif
   index Int
   value String sql="option"
   UniqueConfigCacheDirOption parent index
   deriving Show
 
 ConfigCacheNoDirOption
+#if MIN_VERSION_persistent(2,13,0)
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
+#else
   parent ConfigCacheParentId sql="config_cache_id"
+#endif
   index Int
   value String sql="option"
   UniqueConfigCacheNoDirOption parent index
   deriving Show
 
 ConfigCacheDep
+#if MIN_VERSION_persistent(2,13,0)
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
+#else
   parent ConfigCacheParentId sql="config_cache_id"
+#endif
   value GhcPkgId sql="ghc_pkg_id"
   UniqueConfigCacheDep parent value
   deriving Show
 
 ConfigCacheComponent
+#if MIN_VERSION_persistent(2,13,0)
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
+#else
   parent ConfigCacheParentId sql="config_cache_id"
+#endif
   value S.ByteString sql="component"
   UniqueConfigCacheComponent parent value
   deriving Show

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -16,7 +17,9 @@ import           Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
+#if !MIN_VERSION_Cabal(3,4,0)
 import qualified Distribution.Types.UnqualComponentName as C
+#endif
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Constants (ghcShowOptionsOutput)
