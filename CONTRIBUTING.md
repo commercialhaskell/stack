@@ -54,6 +54,17 @@ entry and
 [documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
 updates with your pull request.
 
+## Backwards Compatability
+
+The `stack` executable does not need to, and does not, strive for the same broad
+compatability with versions of GHC that a library package (such as `pantry`)
+would seek. Instead, the `stack` executable aims to define a well-known
+combination of dependencies on which it relies. That is applies in particular to
+the `Cabal` package, where the `stack` executable aims to support one, and only
+one, version of `Cabal` with each release of the executable. At the time of
+writing (April 2022) that combination is defined by resolver `lts-17.5` (for
+GHC 8.10.4, and including `Cabal-3.2.1.0`) - see `stack.yaml`.
+
 ## Code Quality
 
 The Stack projects uses [HLint](https://github.com/ndmitchell/hlint) as a code
