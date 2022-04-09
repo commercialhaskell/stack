@@ -47,23 +47,23 @@ jobs:
       matrix:
         include:
         - os: ubuntu-latest
-          stack-yaml: stack-ghc-88.yaml
-          extra-suffix: ""
-          stack-args: ""
-        - os: ubuntu-latest
-          stack-yaml: stack-ghc-810.yaml
-          extra-suffix: ""
-          stack-args: ""
-        - os: ubuntu-latest
-          stack-yaml: stack-nightly.yaml
+          stack-yaml: stack.yaml
           extra-suffix: ""
           stack-args: ""
         - os: ubuntu-latest
           stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
+        - os: ubuntu-latest
+          stack-yaml: stack-ghc-902.yaml
+          extra-suffix: ""
+          stack-args: ""
         - os: windows-latest
           stack-yaml: stack.yaml
+          extra-suffix: ""
+          stack-args: ""
+        - os: windows-latest
+          stack-yaml: stack-ghc-902.yaml
           extra-suffix: ""
           stack-args: ""
         - os: macos-latest
