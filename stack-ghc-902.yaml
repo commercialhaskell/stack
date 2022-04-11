@@ -1,5 +1,5 @@
 # GHC 9.0.2
-resolver: lts-19.1
+resolver: lts-19.3
 
 packages:
 - .
@@ -22,8 +22,7 @@ ghc-options:
    "$locals": -fhide-source-paths
 
 extra-deps:
-- mustache-2.4.0@sha256:09a2eac7b8d093231cd8c5355dc87d7f882be77aebf88de18c4d9e612beca453,3345
-- unordered-containers-0.2.16.0@sha256:859ec9a017e51194755cb8a445b767afc5ce0ac991cd50b0f96abd31b3687aab,5217
+- mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
