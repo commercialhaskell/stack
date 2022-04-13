@@ -19,10 +19,13 @@ flags:
     developer-mode: true
 
 ghc-options:
-   "$locals": -fhide-source-paths
+  "$locals": -fhide-source-paths
 
 extra-deps:
+# mustache absent from lts-19.3
 - mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
+# lts-19.3 provides pantry-0.5.4. pantry-0.5.5 provides important fixes
+- pantry-0.5.5@sha256:60c7b840ed9dcaac699ac9ac6cd5a93f79c0f256ee337990cf18788a58760c01,3913
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
