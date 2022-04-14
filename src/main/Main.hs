@@ -216,9 +216,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          (buildOptsParser Haddock)
         addCommand' "new"
          (unwords [ "Create a new project from a template."
-                  , "Run `stack templates' to see available templates."
+                  , "Run `stack templates' to see available templates. Will"
+                  , "also initialise if there is no stack.yaml file."
                   , "Note: you can also specify a local file or a"
-                  , "remote URL as a template."
+                  , "remote URL as a template; or force an initialisation."
                   ] )
                     newCmd
                     newOptsParser
@@ -836,8 +837,8 @@ initCmd initOpts = do
     withGlobalProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
-newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
-newCmd (newOpts,initOpts) =
+newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
+newCmd (newOpts, initOpts) =
     withGlobalProject $ withConfig YesReexec $ do
         dir <- new newOpts (forceOverwrite initOpts)
         exists <- doesFileExist $ dir </> stackDotYaml
