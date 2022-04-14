@@ -477,14 +477,20 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
     -- in order - Latest LTS, Latest Nightly, all LTS most recent first
-    case NonEmpty.nonEmpty ltss of
+    case NonEmpty.nonEmpty supportedLtss of
         Just (mostRecent :| older)
             -> mostRecent :| (nightly : older)
         Nothing
             -> nightly :| []
   where
     ltss = map (uncurry LTS) (IntMap.toDescList $ snapshotsLts snapshots)
+    supportedLtss = filter (>= minSupportedLts) ltss
     nightly = Nightly (snapshotsNightly snapshots)
+
+-- |Yields the minimum LTS supported by stack.
+minSupportedLts :: SnapName
+minSupportedLts = LTS 3 0 -- See https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md
+                          -- under stack version 2.1.1.
 
 data InitOpts = InitOpts
     { searchDirs     :: ![T.Text]
