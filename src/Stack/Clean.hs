@@ -16,6 +16,7 @@ import           Stack.Prelude
 import           Data.List ((\\),intercalate)
 import qualified Data.Map.Strict as Map
 import           Path.IO (ignoringAbsence, removeDirRecur)
+import           Stack.Config (withBuildConfig)
 import           Stack.Constants.Config (rootDistDirFromDir, workDirFromDir)
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
@@ -23,9 +24,9 @@ import           Stack.Types.SourceMap
 -- | Deletes build artifacts in the current project.
 --
 -- Throws 'StackCleanException'.
-clean :: HasBuildConfig env => CleanOpts -> RIO env ()
+clean :: CleanOpts -> RIO Config ()
 clean cleanOpts = do
-    toDelete <- dirsToDelete cleanOpts
+    toDelete <- withBuildConfig $ dirsToDelete cleanOpts
     logDebug $ "Need to delete: " <> fromString (show (map toFilePath toDelete))
     failures <- mapM cleanDir toDelete
     when (or failures) exitFailure
@@ -37,7 +38,7 @@ clean cleanOpts = do
         logError "Perhaps you do not have permission to delete these files or they are in use?"
         return True
 
-dirsToDelete :: HasBuildConfig env => CleanOpts -> RIO env [Path Abs Dir]
+dirsToDelete :: CleanOpts -> RIO BuildConfig [Path Abs Dir]
 dirsToDelete cleanOpts = do
     packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     case cleanOpts of

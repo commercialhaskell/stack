@@ -549,7 +549,7 @@ setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
   setup sco wantedCompiler compilerCheck mstack
 
 cleanCmd :: CleanOpts -> RIO Runner ()
-cleanCmd = withConfig NoReexec . withBuildConfig . clean
+cleanCmd = withConfig NoReexec . clean
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
