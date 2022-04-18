@@ -1233,8 +1233,8 @@ The shebang line is not required in that case.
 ### Just-in-time compilation
 
 You can add the `--compile` flag to make stack compile the script,
-and then run the compiled executable. Compilation is done quickly, 
-without optimization. To compile with optimization, use the `--optimize` flag 
+and then run the compiled executable. Compilation is done quickly,
+without optimization. To compile with optimization, use the `--optimize` flag
 instead. Compilation is done only if needed; if the executable already exists,
 and is newer than the script, stack just runs the executable directly.
 
@@ -1399,12 +1399,18 @@ is that it's the catch-all project whenever you're running stack somewhere else.
 
 ## Setting stack root location
 
-`stack path --stack-root` will tell you the location of the "stack root". Among
-other things, this is where stack stores downloaded programs and snapshot
-packages. This location can be configured by setting the STACK_ROOT environment
-variable or passing the `--stack-root` commandline option. It is particularly
-useful to do this on Windows, where filepaths are limited (MAX_PATH), and things
-can break when this limit is exceeded.
+`stack path --stack-root` will tell you the location of the 'stack root'. This
+is where stack stores snapshot packages, among other things. On operating
+systems other than Windows, it is also where stack stores tools such as ghc and
+msys by default, in a `programs` folder. (On Windows, the default location for
+such tools is `%LOCALAPPDATA%\Programs\stack`.)
+
+The location of the stack root can be configured by setting the `STACK_ROOT`
+environment variable or using stack's `--stack-root` option on the command line.
+It is particularly useful to do this on Windows, where the length of filepaths
+may be limited (to
+[MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
+and things can break when this limit is exceeded.
 
 ## `stack.yaml` vs `.cabal` files
 
