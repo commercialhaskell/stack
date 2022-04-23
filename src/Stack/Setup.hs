@@ -44,7 +44,6 @@ import              Data.Conduit.Lazy (lazyConsume)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
-import              Data.Foldable (maximumBy)
 #if !MIN_VERSION_aeson(2,0,0)
 import qualified    Data.HashMap.Strict as HashMap
 #endif
@@ -85,7 +84,10 @@ import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.SourceMap
-import              Stack.Setup.Installed
+import              Stack.Setup.Installed (Tool (..), extraDirs, filterTools,
+                                          installDir, getCompilerVersion,
+                                          listInstalled, markInstalled, tempInstallDir,
+                                          toolString, unmarkInstalled)
 import              Stack.Storage.User (loadCompilerPaths, saveCompilerPaths)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
@@ -1099,18 +1101,8 @@ getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find
                  -> (Version -> Bool) -- ^ which versions are acceptable
                  -> Maybe Tool
-getInstalledTool installed name goodVersion =
-    if null available
-        then Nothing
-        else Just $ Tool $ maximumBy (comparing pkgVersion) available
-  where
-    available = mapMaybe goodPackage installed
-    goodPackage (Tool pi') =
-        if pkgName pi' == name &&
-           goodVersion (pkgVersion pi')
-            then Just pi'
-            else Nothing
-    goodPackage _ = Nothing
+getInstalledTool installed name goodVersion = Tool <$>
+  maximumByMaybe (comparing pkgVersion) (filterTools name goodVersion installed)
 
 downloadAndInstallTool :: (HasTerm env, HasBuildConfig env)
                        => Path Abs Dir

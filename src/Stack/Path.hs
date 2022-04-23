@@ -155,7 +155,7 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , WithoutHaddocks $ T.pack . intercalate [FP.searchPathSeparator] . view exeSearchPathL)
-    , ( "Install location for GHC and other core tools"
+    , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
       , "programs"
       , WithoutHaddocks $ view (configL.to configLocalPrograms.to toFilePathNoTrailingSep.to T.pack))
     , ( "Compiler binary (e.g. ghc)"
