@@ -24,6 +24,8 @@ ghc-options:
 extra-deps:
 # mustache absent from lts-19.4
 - mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
+# lts-19.4 is limited to hpack-0.34.7
+- hpack-0.35.0@sha256:8cd6146fae269390f41dc7237ebd2c479074d4163806d349a41f5a7751d6cea5,4726
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

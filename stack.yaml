@@ -4,8 +4,9 @@ packages:
 - .
 
 extra-deps:
-- rio-0.1.21.0@rev:0
+- hpack-0.35.0@rev:0
 - pantry-0.5.3@rev:0
+- rio-0.1.21.0@rev:0
 
 
 docker:
