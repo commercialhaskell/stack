@@ -1,5 +1,5 @@
 # GHC 9.0.2
-resolver: lts-19.4
+resolver: lts-19.5
 
 packages:
 - .
@@ -22,7 +22,7 @@ ghc-options:
   "$locals": -fhide-source-paths
 
 extra-deps:
-# mustache absent from lts-19.4
+# mustache absent from lts-19.5
 - mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
 
 drop-packages:
