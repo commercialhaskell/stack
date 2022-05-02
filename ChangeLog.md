@@ -11,6 +11,11 @@ Major changes:
 
 Behavior changes:
 
+* `stack build --coverage` will generate a unified coverage report, even if
+  there is only one `*.tix` file, in case a package has tested the library of
+  another package that has not tested its own library. See
+  [#5713](https://github.com/commercialhaskell/stack/issues/5713)
+
 Other enhancements:
 
 Bug fixes:
