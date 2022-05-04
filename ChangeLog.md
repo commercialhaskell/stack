@@ -13,6 +13,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to `hpack-0.35.0`.
+
 Bug fixes:
 
 * Fix `stack clean --full`, so that the files to be deleted are not in use. See
