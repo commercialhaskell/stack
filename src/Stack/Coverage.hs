@@ -288,10 +288,25 @@ generateHpcUnifiedReport = do
     extraTixFiles <- findExtraTixFiles
     let tixFiles = tixFiles0  ++ extraTixFiles
         reportDir = outputDir </> relDirCombined </> relDirAll
-    if length tixFiles < 2
-        then logInfo $
-            (if null tixFiles then "No tix files" else "Only one tix file") <>
-            " found in " <>
+-- Previously, the test below was:
+--
+--  if length tixFiles < 2
+--      then logInfo $
+--          (if null tixFiles then "No tix files" else "Only one tix file") <>
+--          " found in " <>
+--          fromString (toFilePath outputDir) <>
+--          ", so not generating a unified coverage report."
+--      else ...
+--
+-- However, a single *.tix file does not necessarily mean that a unified
+-- coverage report is redundant. For example, one package may test the library
+-- of another package that does not test its own library. See
+-- https://github.com/commercialhaskell/stack/issues/5713
+--
+-- As an interim solution, a unified coverage report will always be produced
+-- even if may be redundant in some circumstances.
+    if null tixFiles
+        then logInfo $ "No tix files found in " <>
             fromString (toFilePath outputDir) <>
             ", so not generating a unified coverage report."
         else do
