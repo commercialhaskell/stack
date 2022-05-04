@@ -144,7 +144,7 @@ generateHpcReport pkgDir package tests = do
                         Just includeNames -> "--include" : intersperse "--include" (map (\n -> n ++ ":") includeNames)
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
-                forM_ mreportPath (displayReportPath report . pretty)
+                forM_ mreportPath (displayReportPath "The" report . pretty)
 
 generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
@@ -273,7 +273,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
             then do
                 prettyInfo $ "Opening" <+> pretty reportPath <+> "in the browser."
                 void $ liftIO $ openBrowser (toFilePath reportPath)
-            else displayReportPath report (pretty reportPath)
+            else displayReportPath "The" report (pretty reportPath)
 
 generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
@@ -297,7 +297,7 @@ generateHpcUnifiedReport = do
         else do
             let report = "unified report"
             mreportPath <- generateUnionReport report reportDir tixFiles
-            forM_ mreportPath (displayReportPath report . pretty)
+            forM_ mreportPath (displayReportPath "The" report . pretty)
 
 generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]
@@ -386,8 +386,8 @@ generateHpcMarkupIndex = do
                 "</tbody></table>") <>
         "</body></html>"
     unless (null rows) $
-        logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
-            fromString (toFilePath outputFile)
+        displayReportPath "\nAn" "index of the generated HTML coverage reports"
+            (pretty outputFile)
 
 generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Utf8Builder -> m ()
 generateHpcErrorReport dir err = do
@@ -478,9 +478,10 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath :: (HasTerm env)
-                  => Text -> StyleDoc -> RIO env ()
-displayReportPath report reportPath =
-     prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> reportPath
+                  => StyleDoc -> Text -> StyleDoc -> RIO env ()
+displayReportPath prefix report reportPath =
+     prettyInfo $ prefix <+> fromString (T.unpack report) <+>
+                  "is available at" <+> reportPath
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do

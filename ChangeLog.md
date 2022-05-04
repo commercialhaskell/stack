@@ -17,6 +17,8 @@ Bug fixes:
 
 * Fix `stack clean --full`, so that the files to be deleted are not in use. See
   [#5714](https://github.com/commercialhaskell/stack/issues/5714)
+* Fix an inconsistency in the pretty formatting of the output of
+  `stack build --coverage`
 
 ## v2.7.5
 
