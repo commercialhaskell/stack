@@ -1,5 +1,6 @@
 *.hi
 *.o
+*.exe
 *.swp
 *.tag
 *~

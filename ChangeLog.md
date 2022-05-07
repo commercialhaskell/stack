@@ -5,6 +5,10 @@
 
 Release notes:
 
+* `stack` is now built with GHC 9.0.2 and depends on `Cabal-3.4.1.0`. This
+  change will cause a once-off rebuilding of any existing CompilerPaths cache
+  when the updated `stack` is first used.
+
 **Changes since v2.7.5:**
 
 Major changes:

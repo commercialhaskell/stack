@@ -1,12 +1,13 @@
 #!/usr/bin/env stack
 {- stack script
-    --resolver lts-14.27
+    --resolver lts-19.7
     --package base
     --package directory
     --package filepath
     --package process
     --package safe
     --package temporary
+    --extra-dep process-1.6.14.0
 -}
 
 -- # Usage summary

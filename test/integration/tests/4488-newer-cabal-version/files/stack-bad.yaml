@@ -1,1 +1,2 @@
-resolver: ghc-8.6.5
+# Cabal 3.2.1.0
+resolver: ghc-8.10.7

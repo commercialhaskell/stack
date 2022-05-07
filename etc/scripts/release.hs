@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-14.27
+    --resolver lts-19.7
     --install-ghc
     --ghc-options -Wall
     --package Cabal
@@ -21,6 +21,8 @@
     --package text
     --package zip-archive
     --package zlib
+    --extra-dep Cabal-3.4.1.0
+    --extra-dep process-1.6.14.0
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}

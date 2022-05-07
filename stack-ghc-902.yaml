@@ -1,4 +1,4 @@
-# GHC 9.0.2
+# GHC 9.0.2, Cabal-3.4.1.0, pantry-0.5.5, process-1.6.13.2 and rio-0.1.22.0
 resolver: lts-19.11
 
 packages:
@@ -22,10 +22,14 @@ ghc-options:
   "$locals": -fhide-source-paths
 
 extra-deps:
-# mustache absent from lts-19.11
-- mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
+# Required becase a GHC boot package (process) is an extra-dep
+- Cabal-3.4.1.0@sha256:48e64c97688149fac15445803830177248f15a9b1a783389efed5e375d70d2d0,31402
 # lts-19.11 is limited to hpack-0.34.7
 - hpack-0.35.0@sha256:8cd6146fae269390f41dc7237ebd2c479074d4163806d349a41f5a7751d6cea5,4726
+# mustache absent from lts-19.11
+- mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
+# lts-19.11 provides process-1.6.13.2, which excludes certain macOS fixes
+- process-1.6.14.0@sha256:b6ad76fd3f4bf133cdc2dc9176e23447f2a0a8e9316047d53154cd11f871446d,2845
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

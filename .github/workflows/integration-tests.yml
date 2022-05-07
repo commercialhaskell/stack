@@ -49,6 +49,14 @@ jobs:
 
           stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
 
+          # Report all ghc versions in the stack environment
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]
+          then
+          stack exec -- where.exe ghc
+          else
+          stack exec -- which -a ghc
+          fi
+
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
           then
             # Retry installing nix due to nondeterministic error

@@ -1,4 +1,4 @@
-resolver: nightly-2020-01-17
+resolver: nightly-2022-03-17
 packages:
 - .
 - subproject
