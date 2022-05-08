@@ -100,14 +100,13 @@ The `packages` field is _optional_. If omitted, it is treated as:
 packages:
 - .
 ```
+Meaning that your project has exactly one package, and it is located
+in the current directory.
 
 Each package directory specified must have a valid cabal file or hpack
 `package.yaml` file present. Note that the subdirectories of the
 directory are not searched for cabal files. Subdirectories will have
 to be specified as independent items in the list of packages.
-
-Meaning that your project has exactly one package, and it is located
-in the current directory.
 
 Project packages are different from snapshot dependencies (via
 `resolver`) and extra dependencies (via `extra-deps`) in multiple
