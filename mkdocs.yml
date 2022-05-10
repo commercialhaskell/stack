@@ -44,7 +44,7 @@ pages:
     - Maintainer team process: maintainers/team_process.md
     - Add GHC version: maintainers/ghc.md
     - Docker images: maintainers/docker.md
-    - Upgrading msys: maintainers/msys.md
+    - Upgrading MSYS2: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
 
 markdown_extensions:

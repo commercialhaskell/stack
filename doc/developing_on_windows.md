@@ -3,7 +3,7 @@
 # Developing on windows #
 
 On Windows, Stack comes with an installation of
-[msys2](https://www.msys2.org/). Msys2 will be used by Stack to
+[MSYS2](https://www.msys2.org/). MSYS2 will be used by Stack to
 provide a unix-like shell for Stack. This may be necessary for installing some Haskell packages, such as those which use `configure` scripts.
 No
 matter which terminal you choose (cmd.exe, powershell, git bash or any
@@ -38,7 +38,7 @@ additional entries via a pull request.
 Cmake has trouble finding other tools even if they are available on
 the `PATH`. Likely this is not a cmake problem but one of the
 environment not fully integrating. For example GHC comes with a copy
-of GCC which is not installed by msys itself. If you want to use this
+of GCC which is not installed by MSYS2 itself. If you want to use this
 GCC you can provide a full path to it, or find it first with
 `System.Directory.findExecutable` if you want to launch GCC from a
 Haskell file such as `Setup.hs`.
