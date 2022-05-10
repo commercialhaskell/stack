@@ -15,7 +15,7 @@ note on [issue #4252](https://github.com/commercialhaskell/stack/issues/4252).
 ## Stack's functions
 
 stack handles the management of your toolchain (including GHC — the Glasgow
-Haskell Compiler — and, for Windows users, MSYS), building and registering
+Haskell Compiler — and, for Windows users, MSYS2), building and registering
 libraries, building build tool dependencies, and more. While it can use existing
 tools on your system, stack has the capacity to be your one-stop shop for all
 Haskell tooling you need. This guide will follow that stack-centric approach.
@@ -1402,7 +1402,7 @@ is that it's the catch-all project whenever you're running stack somewhere else.
 `stack path --stack-root` will tell you the location of the 'stack root'. This
 is where stack stores snapshot packages, among other things. On operating
 systems other than Windows, it is also where stack stores tools such as ghc and
-msys by default, in a `programs` folder. (On Windows, the default location for
+MSYS2 by default, in a `programs` folder. (On Windows, the default location for
 such tools is `%LOCALAPPDATA%\Programs\stack`.)
 
 The location of the stack root can be configured by setting the `STACK_ROOT`

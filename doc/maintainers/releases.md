@@ -339,7 +339,10 @@ Now continue to the **General Windows setup** subsection below.
 
 15. Run `C:\p\env.bat` (do this every time you open a new command prompt)
 
-16. `stack exec -- gpg --import`, and paste in the your GPG secret key (must be done using `stack exec` because that uses the right keyring for the embedded msys GPG; you can get the key from another machine with `gpg --export-secret-keys --armor <KEY ID>`)
+16. `stack exec -- gpg --import`, and paste in the your GPG secret key (must be
+    done using `stack exec` because that uses the right keyring for the embedded
+    MSYS2 GPG; you can get the key from another machine with
+    `gpg --export-secret-keys --armor <KEY ID>`)
 
 17. Run in command prompt (adjust the `user.email` and `user.name` settings):
 
