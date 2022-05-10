@@ -26,8 +26,9 @@ the steps required to upgrade the MSYS2 version used by Stack.
     MSYS2, in PowerShell and located in a folder with write permissions (so the `.tar.xz` file can be created):
 
     ```
-    > stack exec -- pacman -S tar
-    > stack exec -- tar cJf msys2-YYYYMMDD-x86_64.tar.xz C:\msys64
+    stack exec -- pacman -S tar
+
+    stack exec -- tar cJf msys2-YYYYMMDD-x86_64.tar.xz C:\msys64
     ```
 
 4.  Create a new release tagged and named `msys2-YYYYMMDD` in the `master`
@@ -38,7 +39,7 @@ the steps required to upgrade the MSYS2 version used by Stack.
     file, to switch over to using the newly uploaded files. For example
     (extract):
 
-    ~~~yaml
+    ```
     # For upgrade instructions, see: https://github.com/commercialhaskell/stack/blob/stable/doc/maintainers/msys.md
     msys2:
         windows32:
@@ -51,15 +52,15 @@ the steps required to upgrade the MSYS2 version used by Stack.
             url: "https://github.com/commercialhaskell/stackage-content/releases/download/msys2-20220503/msys2-20220503-x86_64.tar.xz"
             content-length: 93835868
             sha256: c918f66e984f70add313ee3a5c5b101132cd93d5a3f8e3555e129e2d3dcb3718
-    ~~~
+    ```
 
     The `content-length:` key's value is the size of the file in bytes. It can
     be obtained from the `Length` field of the `dir` command. The `sha256:`
     key's value can be obtained from the command (in PowerShell):
 
-    ~~~
-    ❯ (Get-FileHash msys2-YYYYMMDD-x86_64.tar.xz -Algorithm SHA256).Hash.ToLower()
-    ~~~
+    ```
+    (Get-FileHash msys2-YYYYMMDD-x86_64.tar.xz -Algorithm SHA256).Hash.ToLower()
+    ```
 
     The `sha256:` key only accepts lowercase hash results as values.
 
@@ -71,9 +72,9 @@ the steps required to upgrade the MSYS2 version used by Stack.
 
     * executing the command:
 
-      ~~~
-      > stack setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>
-      ~~~
+      ```
+      stack setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>
+      ```
 
     If all is well, the command should proceed to download the updated version
     of MSYS2 that has been specified.
