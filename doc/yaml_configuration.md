@@ -719,7 +719,7 @@ ghc:
 
 (Since 0.1.5)
 
-Allows augmenting from where tools like GHC and msys2 (on Windows) are
+Allows augmenting from where tools like GHC and MSYS2 (on Windows) are
 downloaded. Most useful for specifying locations of custom GHC binary
 distributions (for use with the [ghc-variant](#ghc-variant) option).
 
@@ -1014,7 +1014,7 @@ Since 0.1.10.0
 
 ### skip-msys
 
-Skips checking for and installing msys2 when stack is setting up the
+Skips checking for and installing MSYS2 when stack is setting up the
 environment.  This is only useful on Windows machines, and usually doesn't make
 sense in project configurations, just in `config.yaml`.  Defaults to `false`, so
 if this is used, it only really makes sense to use it like this:
@@ -1062,7 +1062,7 @@ Since 0.1.4.0
 ### local-programs-path
 
 This overrides the location of the programs directory, where tools like ghc and
-msys get installed.
+MSYS2 get installed.
 
 On most systems, this defaults to a folder called `programs`
 within the stack root directory. On Windows, if the `LOCALAPPDATA` environment
