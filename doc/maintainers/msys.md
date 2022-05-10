@@ -64,9 +64,7 @@ the steps required to upgrade the MSYS2 version used by Stack.
       name of the `msys2-YYYYMMDD.installed` file in the `stack path --programs` directory; and
 
     * executing the command:
-
-
-          > stack setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>
+      `stack setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>`
 
     If all is well, the command should proceed to download the updated version
     of MSYS2 that has been specified.
