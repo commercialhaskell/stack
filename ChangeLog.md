@@ -19,6 +19,8 @@ Behavior changes:
 Other enhancements:
 
 * Bump to `hpack-0.35.0`.
+* On Windows, the installer now sets `DisplayVersion` in the registry, enabling
+  tools like `winget` to properly read the version number.
 
 Bug fixes:
 
@@ -42,9 +44,6 @@ Other enhancements:
 
 * `stack upload` supports authentication with a Hackage API key (via
   `HACKAGE_KEY` environment variable).
-
-* `DisplayVersion` in the Windows registry is now set by the installer,
-  enabling tools like `winget` to properly read the version number.
 
 Bug fixes:
 
