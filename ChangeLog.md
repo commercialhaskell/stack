@@ -19,6 +19,8 @@ Behavior changes:
 Other enhancements:
 
 * Bump to `hpack-0.35.0`.
+* On Windows, the installer now sets `DisplayVersion` in the registry, enabling
+  tools like `winget` to properly read the version number.
 
 Bug fixes:
 
