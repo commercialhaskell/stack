@@ -16,7 +16,7 @@ import Development.NSIS.Plugins.EnvVarUpdate
 
 main :: IO ()
 main = do
-  [srcPath, execPath, nsiPath] <- getArgs
+  [srcPath, execPath, nsiPath, stackVersionStr] <- getArgs
 
   writeFile (fromString nsiPath) $ nsis $ do
     _ <- constantStr "Name" "Haskell Stack"
@@ -43,6 +43,7 @@ main = do
 
       -- Write the uninstall keys for Windows
       writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayName" "$Name"
+      writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayVersion" (str stackVersionStr)
       writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "UninstallString" "\"$INSTDIR/uninstall-stack.exe\""
       writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoModify" 1
       writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoRepair" 1
