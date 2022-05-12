@@ -44,18 +44,26 @@ directory. None of this should affect any existing Haskell tools at all.
 
 ## What is the relationship between stack and cabal?
 
-* Cabal-the-library is used by stack to build your Haskell code. See the
-  [Architecture: Plan Execution](architecture.md#plan-execution) section for
-  more detail, including how the Cabal version is chosen.
-* A .cabal file is provided for each package, and defines all package-level
-  metadata just like it does in the cabal-install world: modules, executables,
-  test suites, etc. No change at all on this front.
-* A stack.yaml file references 1 or more packages, and provides information on
-  where dependencies come from.
-* `stack build` currently initializes a stack.yaml from the existing .cabal
-  file. Project initialization is something that is still being discussed and
-  there may be more options here for new projects in the future (see issue
-  [253](https://github.com/commercialhaskell/stack/issues/253))
+* 'Cabal' can refer to the `Cabal` library or to the `cabal` command-line tool
+  (provided by the `cabal-install` package). Cabal-the-library is used by stack
+  to build your Haskell code.
+* A `.cabal` file is provided for each package. It  defines all package-level
+  metadata, just like it does in the `cabal-install` world: modules,
+  executables, test suites, etc. No change at all on this front.
+* A `stack.yaml` file references one or more packages, and provides information
+  on where dependencies come from.
+* The `stack init` command initializes a `stack.yaml` file from an existing
+  `.cabal` file.
+* Stack uses `Cabal` via an executable. For `build-type: Simple` (the most
+  common case), stack builds that executable using the version of `Cabal` which
+  came with the compiler. Stack caches such executables, in the stack root under
+  folder `setup-exe-cache`.
+* In rare or complex cases, a different version of `Cabal` to the one that came
+  with the compiler may be needed. `build-type: Custom` and a `setup-custom`
+  stanza in the `.cabal` file, and a `Setup.hs` file in the package folder, can
+  be specified. The `stack.yaml` file can then specify the version of `Cabal`
+  that stack will use to build the executable (named `setup`) from `Setup.hs`.
+  Stack will use `Cabal` via `setup`.
 
 For detail on the differences between a `stack.yaml` and Cabal package file, see
 [stack.yaml vs cabal package file](stack_yaml_vs_cabal_package_file.md).
