@@ -1,23 +1,31 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Developing on windows #
+# Developing on Windows #
 
-On Windows, Stack comes with an installation of
-[MSYS2](https://www.msys2.org/). MSYS2 will be used by Stack to
-provide a unix-like shell for Stack. This may be necessary for installing some Haskell packages, such as those which use `configure` scripts.
-No
-matter which terminal you choose (cmd.exe, powershell, git bash or any
-other) you can use this environment too by executing all programs
-through `stack exec -- program`. This is especially useful if your
+On Windows, Stack comes with an installation of [MSYS2](https://www.msys2.org/).
+MSYS2 will be used by Stack to provide a Unix-like shell and environment for
+Stack. This may be necessary for installing some Haskell packages, such as those
+which use `configure` scripts. No matter which terminal software you choose
+(Windows Terminal, Console Windows Host, Command Prompt, PowerShell, Git bash or
+any other) you can use this environment too by executing all programs through
+`stack exec -- <program_name>`. This is especially useful if your
 project needs some additional tools during the build phase.
 
-Executables and libraries can be installed with Pacman. All tools can
-be found [in the package
-list](https://github.com/msys2/msys2/wiki/Packages). A [list of
-commands](https://github.com/msys2/msys2/wiki/Using-packages) that
-work with Pacman is also available. Just remember that
-pacman&mdash;like all other tools&mdash;should be started with `stack
-exec -- pacman`.
+Executables and libraries can be installed with the MSYS2 package manager
+`pacman`. All tools can be found in the
+[package list](https://github.com/msys2/msys2/wiki/Packages). A [list of
+commands](https://github.com/msys2/msys2/wiki/Using-packages) that work with
+`pacman` is also available. Just remember that `pacman` &mdash; like all other
+tools &mdash; should be started with `stack exec -- pacman`.
+
+The Stack-supplied MSYS2 can itself be updated with the Stack-supplied `pacman`.
+See the MSYS2 guide ['III. Updating packages'](https://www.msys2.org/wiki/MSYS2-installation/). If the Stack-supplied `pacman` has a version that is
+5.0.1.6403 or greater (see `stack exec -- pacman --version`) then the command to
+update is simply:
+
+    stack exec -- pacman -Syuu
+
+This command may need to be run more than once, until everything is reported by `pacman` as 'up to date' and 'nothing to do'.
 
 ## Setup.hs ##
 
@@ -27,7 +35,7 @@ with `stack exec --` within the custom `Setup.hs` file.
 
 ## Pacman packages to install for common Haskell packages ##
 
-The following lists Pacman packages known to allow the installation of
+The following lists MSYS2 packages known to allow the installation of
 some common Haskell packages on Windows. Feel free to submit
 additional entries via a pull request.
 
