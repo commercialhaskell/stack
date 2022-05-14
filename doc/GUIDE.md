@@ -22,12 +22,12 @@ Haskell tooling you need. This guide will follow that stack-centric approach.
 
 ### What makes stack special?
 
-The primary stack design point is __reproducible builds__. If you run `stack build`
-today, you should get the same result running `stack build` tomorrow.
-There are some cases that can break that rule (changes in your operating system
-configuration, for example), but, overall, stack follows this design philosophy
-closely. To make this a simple process, stack uses curated package sets
-called __snapshots__.
+The primary stack design point is __reproducible builds__. If you run
+`stack build` today, you should get the same result running `stack build`
+tomorrow. There are some cases that can break that rule (changes in your
+operating system configuration, for example), but, overall, stack follows this
+design philosophy closely. To make this a simple process, stack uses curated
+package sets called __snapshots__.
 
 stack has also been designed from the ground up to be user friendly, with an
 intuitive, discoverable command line interface. For many users, simply
@@ -217,7 +217,8 @@ import Distribution.Simple
 main = defaultMain
 ```
 
-Next, let's look at our `stack.yaml` file, which gives our project-level settings.
+Next, let's look at our `stack.yaml` file, which gives our project-level
+settings.
 
 If you're familiar with YAML, you may recognize that the `flags` and
 `extra-deps` keys have empty values. We'll see more interesting usages for these
@@ -237,21 +238,23 @@ can use for `resolver`, which we'll cover later.
 Another file important to the build is `package.yaml`.
 
 Since Stack 1.6.1, the `package.yaml` is the preferred package format that is
-provided built-in by stack through [the hpack tool](https://github.com/sol/hpack).
-The default behaviour is to generate the `.cabal` file from this `package.yaml`,
-and accordingly you should **not** modify the `.cabal` file.
+provided built-in by stack through
+[the hpack tool](https://github.com/sol/hpack). The default behaviour is to
+generate the `.cabal` file from this `package.yaml`, and accordingly you should
+**not** modify the `.cabal` file.
 
-It is also important to remember that stack is built on top of the Cabal build system. Therefore, an
-understanding of the moving parts in Cabal are necessary. In Cabal, we have individual
-*packages*, each of which contains a single `.cabal` file. The `.cabal` file
-can define 1 or more *components*: a library, executables, test suites, and benchmarks.
-It also specifies additional information such as library dependencies, default language
-pragmas, and so on.
+It is also important to remember that stack is built on top of the Cabal build
+system. Therefore, an understanding of the moving parts in Cabal are necessary.
+In Cabal, we have individual *packages*, each of which contains a single
+`.cabal` file. The `.cabal` file can define 1 or more *components*: a library,
+executables, test suites, and benchmarks. It also specifies additional
+information such as library dependencies, default language pragmas, and so on.
 
 In this guide, we'll discuss the bare minimum necessary to understand how to
 modify a `package.yaml` file. You can see a full list of the available options
-at the [hpack documentation](https://github.com/sol/hpack#quick-reference). Haskell.org
-has the definitive [reference for the `.cabal` file format](https://www.haskell.org/cabal/users-guide/developing-packages.html).
+at the [hpack documentation](https://github.com/sol/hpack#quick-reference).
+Haskell.org has the definitive
+[reference for the `.cabal` file format](https://www.haskell.org/cabal/users-guide/developing-packages.html).
 
 ### The setup command
 
@@ -283,21 +286,25 @@ even different GHC versions installed by stack.
 
 ## Cleaning your project
 
-You can clean up build artifacts for your project using the `stack clean` and `stack purge` commands.
+You can clean up build artifacts for your project using the `stack clean` and
+`stack purge` commands.
 
 ### `stack clean`
 
 `stack clean` deletes the local working directories containing compiler output.
-By default, that means the contents of directories in `.stack-work/dist`, for all the `.stack-work` directories within a project.
+By default, that means the contents of directories in `.stack-work/dist`, for
+all the `.stack-work` directories within a project.
 
-Use `stack clean <specific-package>` to delete the output for the package _specific-package_ only.
+Use `stack clean <specific-package>` to delete the output for the package
+_specific-package_ only.
 
 ### `stack purge`
 
-`stack purge` deletes the local stack working directories, including extra-deps, git dependencies and the compiler output (including logs).
-It does not delete any snapshot packages, compilers or programs installed using `stack install`. This essentially
-reverts the project to a completely fresh state, as if it had never been built.
-`stack purge` is just a shortcut for `stack clean --full`
+`stack purge` deletes the local stack working directories, including extra-deps,
+git dependencies and the compiler output (including logs). It does not delete
+any snapshot packages, compilers or programs installed using `stack install`.
+This essentially reverts the project to a completely fresh state, as if it had
+never been built. `stack purge` is just a shortcut for `stack clean --full`
 
 ### The build command
 
@@ -314,8 +321,9 @@ between different runs.
 
 ## Adding dependencies
 
-Let's say we decide to modify our `helloworld` source a bit to use a new library,
-perhaps the ubiquitous text package. In `src/Lib.hs`, we can, for example add:
+Let's say we decide to modify our `helloworld` source a bit to use a new
+library, perhaps the ubiquitous text package. In `src/Lib.hs`, we can, for
+example add:
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
@@ -342,9 +350,10 @@ michael@d30748af6d3d:~/helloworld$ stack build
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-This means that the package containing the module in question is not available. To tell
-stack to use [text](https://hackage.haskell.org/package/text), you need to add it to your
-`package.yaml` file — specifically in your `dependencies` section, like this:
+This means that the package containing the module in question is not available.
+To tell stack to use [text](https://hackage.haskell.org/package/text), you need
+to add it to your `package.yaml` file — specifically in your `dependencies`
+section, like this:
 
 ```
 dependencies:
@@ -366,8 +375,9 @@ does so automatically.
 
 ### Listing Dependencies
 
-Let's have stack add a few more dependencies to our project. First, we'll include two new packages in the
-`dependencies` section for our library in our `package.yaml`:
+Let's have stack add a few more dependencies to our project. First, we'll
+include two new packages in the `dependencies` section for our library in our
+`package.yaml`:
 
 ```
 dependencies:
@@ -375,14 +385,16 @@ dependencies:
 - containers
 ```
 
-After adding these two dependencies, we can again run `stack build` to have them installed:
+After adding these two dependencies, we can again run `stack build` to have them
+installed:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
 # build output ...
 ```
 
-Finally, to find out which versions of these libraries stack installed, we can ask stack to `ls dependencies`:
+Finally, to find out which versions of these libraries stack installed, we can
+ask stack to `ls dependencies`:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack ls dependencies
@@ -430,9 +442,10 @@ This brings us to the next major topic in using stack.
 
 ## Curated package sets
 
-Remember above when `stack new` selected some [LTS resolver](https://github.com/fpco/lts-haskell#readme)
-for us? That defined our build plan and available packages. When we tried using the
-`text` package, it just worked, because it was part of the LTS *package set*.
+Remember above when `stack new` selected some
+[LTS resolver](https://github.com/fpco/lts-haskell#readme) for us? That defined
+our build plan and available packages. When we tried using the `text` package,
+it just worked, because it was part of the LTS *package set*.
 
 But `acme-missiles` is not part of that package set, so building failed.
 
@@ -447,10 +460,12 @@ extra-deps:
 Now `stack build` will succeed.
 
 With that out of the way, let's dig a little bit more into these package sets,
-also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite a bit of
-information about it at [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
+also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite
+a bit of information about it at
+[https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-18.3`, as is currently the latest LTS)
+* The appropriate resolver value (`resolver: lts-18.3`, as is currently the
+  latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -468,8 +483,9 @@ default as well).
 ## Resolvers and changing your compiler version
 
 Let's explore package sets a bit further. Instead of lts-18.3, let's change our
-`stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly). Right now,
-this is currently 2020-03-24 - please see the resolve from the link above to get the latest.
+`stack.yaml` file to use [the latest nightly](https://www.stackage.org/nightly).
+Right now, this is currently 2020-03-24 - please see the resolve from the link
+above to get the latest.
 
 Then, Rerunning `stack build` will produce:
 
@@ -563,15 +579,16 @@ stack init does quite a few things for you behind the scenes:
 * Finds all of the `.cabal` files in your current directory and subdirectories
   (unless you use `--ignore-subdirs`) and determines the packages and versions
   they require
-* Finds the best combination of snapshot and package flags that allows everything to
-  compile with minimum external dependencies
+* Finds the best combination of snapshot and package flags that allows
+  everything to compile with minimum external dependencies
 * It tries to look for the best matching snapshot from latest LTS, latest
   nightly, other LTS versions in that order
 
 Assuming it finds a match, it will write your `stack.yaml` file, and everything
 will work.
 
-(Note: yackage does not currently support hpack, but you can also hpack-convert should you need to generate a package.yaml).
+(Note: yackage does not currently support hpack, but you can also hpack-convert
+should you need to generate a package.yaml).
 
 #### Excluded Packages
 
@@ -618,8 +635,8 @@ under the `extra-deps` section.
 
 #### Installing the compiler
 
-stack will automatically install the compiler when you run `stack build` but you can
-manually specify the compiler by running `stack setup <GHC-VERSION>`.
+stack will automatically install the compiler when you run `stack build` but you
+can manually specify the compiler by running `stack setup <GHC-VERSION>`.
 
 #### Miscellaneous and diagnostics
 
@@ -985,8 +1002,8 @@ and with GHC options.
 
 ### Cabal flag management
 
-In the `stack.yaml` file above, you can see that `stack init` has detected that —
-for the yackage package — the upload flag can be set to true, and for
+In the `stack.yaml` file above, you can see that `stack init` has detected that
+— for the yackage package — the upload flag can be set to true, and for
 wai-app-static, the print flag to false (it's chosen those values because
 they're the default flag values, and their dependencies are compatible with the
 snapshot we're using.) To change a flag setting, we can use the command
@@ -1103,7 +1120,8 @@ local-hpc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.
 
 In addition, `stack path` accepts command line arguments to state which of
 these keys you're interested in, which can be convenient for scripting. As a
-simple example, let's find out the sandboxed versions of GHC that stack installed:
+simple example, let's find out the sandboxed versions of GHC that stack
+installed:
 
 ```
 michael@d30748af6d3d:~/wai$ ls $(stack path --programs)/*.installed
@@ -1157,7 +1175,9 @@ Flags worth mentioning:
   variable from being set. Some tools — notably cabal-install — do not behave
   well with that variable set.
 
-You may also find it convenient to use `stack exec` to launch a subshell (substitute `bash` with your preferred shell) where your compiled executable is available at the front of your `PATH`:
+You may also find it convenient to use `stack exec` to launch a subshell
+(substitute `bash` with your preferred shell) where your compiled executable is
+available at the front of your `PATH`:
 
     stack exec bash
 
@@ -1261,8 +1281,8 @@ arguments, or by providing a comma or space separated list. For example:
 
 ### Stack configuration for scripts
 
-With the `script` command, all Stack configuration files are ignored to provide a
-completely reliable script running experience. However, see the example below
+With the `script` command, all Stack configuration files are ignored to provide
+a completely reliable script running experience. However, see the example below
 with `runghc` for an approach to scripts which will respect your configuration
 files. When using `runghc`, if the current working directory is inside a
 project then that project's stack configuration is effective when running the
@@ -1348,7 +1368,8 @@ On Mac OSX:
   ([GHC #6132](https://gitlab.haskell.org/ghc/ghc/issues/6132))
 
 - Use a compiled executable, not another script, in the hashbang line.
-  Eg `#!/usr/bin/env runhaskell` will work but `#!/usr/local/bin/runhaskell` would not.
+  Eg `#!/usr/bin/env runhaskell` will work but `#!/usr/local/bin/runhaskell`
+  would not.
 
 ### Loading scripts in ghci
 
@@ -1378,9 +1399,9 @@ algorithm stack uses to find this is:
 The first two provide a convenient method for using an alternate configuration.
 For example: `stack build --stack-yaml stack-7.8.yaml` can be used by your CI
 system to check your code against GHC 7.8. Setting the `STACK_YAML` environment
-variable can be convenient if you're going to be running commands like `stack ghc`
-in other directories, but you want to use the configuration you defined in
-a specific project.
+variable can be convenient if you're going to be running commands like
+`stack ghc` in other directories, but you want to use the configuration you
+defined in a specific project.
 
 If stack does not find a `stack.yaml` in any of the three specified locations,
 the *implicit global* logic kicks in. You've probably noticed that phrase a few
@@ -1415,15 +1436,16 @@ and things can break when this limit is exceeded.
 ## `stack.yaml` vs `.cabal` files
 
 Now that we've covered a lot of stack use cases, this quick summary of
-`stack.yaml` vs `.cabal` files will hopefully make sense and be a good reminder for
-future uses of stack:
+`stack.yaml` vs `.cabal` files will hopefully make sense and be a good reminder
+for future uses of stack:
 
 * A project can have multiple packages.
 * Each project has a `stack.yaml`.
 * Each package has a `.cabal` file.
 * The `.cabal` file specifies which packages are dependencies.
 * The `stack.yaml` file specifies which packages are available to be used.
-* `.cabal` specifies the components, modules, and build flags provided by a package
+* `.cabal` specifies the components, modules, and build flags provided by a
+  package
 * `stack.yaml` can override the flag settings for individual packages
 * `stack.yaml` specifies which packages to include
 
@@ -1474,8 +1496,7 @@ Now the differences:
       `cabal install --run-tests`, though the latter *additionally* performs an
       installation that you may not want. The closer command equivalent is
       `cabal install --enable-tests --only-dependencies && cabal configure --enable-tests && cabal build && cabal test`
-      (newer versions of
-      cabal-install may make this command shorter).
+      (newer versions of cabal-install may make this command shorter).
 * __Isolated by default__.
     * This has been a pain point for new stack users. In cabal, the
       default behavior is a non-isolated build where working on two projects can
@@ -1486,10 +1507,22 @@ Now the differences:
 
 __Other tools for comparison (including active and historical)__
 
-* [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in favor of cabal-install)
-* [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of the multi-package functionality of stack. If you're still using cabal-install, cabal-meta is relevant. For stack work, the feature set is fully subsumed by stack.
-* [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly irrelevant in the presence of both stack and cabal sandboxes, both of which make it easier to add additional package sources easily. The mega-sdist executable that ships with cabal-src is, however, still relevant. Its functionality may some day be folded into stack
-* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an initial attempt to make cabal-install work more easily with curated snapshots, but due to a slight impedance mismatch between cabal.config constraints and snapshots, it did not work as well as hoped. It is deprecated in favor of stack.
+* [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in
+  favor of cabal-install)
+* [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of
+  the multi-package functionality of stack. If you're still using cabal-install,
+  cabal-meta is relevant. For stack work, the feature set is fully subsumed by
+  stack.
+* [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly
+  irrelevant in the presence of both stack and cabal sandboxes, both of which
+  make it easier to add additional package sources easily. The mega-sdist
+  executable that ships with cabal-src is, however, still relevant. Its
+  functionality may some day be folded into stack
+* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an
+  initial attempt to make cabal-install work more easily with curated snapshots,
+  but due to a slight impedance mismatch between cabal.config constraints and
+  snapshots, it did not work as well as hoped. It is deprecated in favor of
+  stack.
 
 
 ## Fun features
@@ -1548,9 +1581,10 @@ Selected resolver: lts-3.2
 Wrote project config to: /home/michael/my-yesod-project/stack.yaml
 ```
 
-The default `stack-templates` repository is on [Github](https://github.com/commercialhaskell/stack-templates),
-under the user account `commercialstack`. You can download templates from a
-different Github user by prefixing the username and a slash:
+The default `stack-templates` repository is on
+[Github](https://github.com/commercialhaskell/stack-templates), under the user
+account `commercialstack`. You can download templates from a different Github
+user by prefixing the username and a slash:
 
 ```
 stack new my-yesod-project yesodweb/simple
@@ -1583,9 +1617,11 @@ Alternatively you can use a local template by specifying the path:
 stack new project ~/location/of/your/template.hsfiles
 ```
 
-As a starting point for creating your own templates, you can use [the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
+As a starting point for creating your own templates, you can use
+[the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
 An introduction into template-writing and a place for submitting official templates,
-you will find at [the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
+you will find at
+[the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
 ### Editor integration
 
@@ -1667,14 +1703,15 @@ users. Here's a quick rundown:
   tarball and unpacks it. It accept optional `--to` argument to specify
   the destination directory.
 * `stack sdist` generates an uploading tarball containing your package code
-* `stack upload` uploads an sdist to Hackage. As of
-  version [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack
-  will also attempt to GPG sign your packages as
-  per
+* `stack upload` uploads an sdist to Hackage. As of version
+  [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack will also
+  attempt to GPG sign your packages as per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
-    * `--candidate` upload a [package candidate](http://hackage.haskell.org/upload#candidates)
-    * Hackage API key can be used instead of username and password. Usage example:
+    * `--candidate` upload a
+      [package candidate](http://hackage.haskell.org/upload#candidates)
+    * Hackage API key can be used instead of username and password. Usage
+      example:
 
     ```bash
     HACKAGE_KEY=<api_key> stack upload .
@@ -1741,11 +1778,11 @@ build:
 
 ### Further reading
 
-For more commands and uses, see [the official GHC chapter on
-profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
+For more commands and uses, see
+[the official GHC chapter on profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
 [the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
-and [the chapter on profiling in Real World
-Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
+and
+[the chapter on profiling in Real World Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
 
 ### Tracing
 
@@ -1755,9 +1792,20 @@ but adds the `+RTS -xc` runtime option.
 
 ### Debugging symbols
 
-Building with debugging symbols in the [DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF) is supported by `stack`. This can be done by passing the flag `--ghc-options="-g"` and also to override the default behaviour of stripping executables of debugging symbols by passing either one of the following flags: `--no-strip`, `--no-library-stripping` or `--no-executable-stripping`.
+Building with debugging symbols in the
+[DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF) is supported by
+`stack`. This can be done by passing the flag `--ghc-options="-g"` and also to
+override the default behaviour of stripping executables of debugging symbols by
+passing either one of the following flags: `--no-strip`,
+`--no-library-stripping` or `--no-executable-stripping`.
 
-In Windows GDB can be installed to debug an executable with `stack exec -- pacman -S gdb`. Windows visual studio compiler's debugging format PDB is not supported at the moment. This might be possible by [separating](https://stackoverflow.com/questions/866721/how-to-generate-gcc-debug-symbol-outside-the-build-target) debugging symbols and [converting](https://github.com/rainers/cv2pdb) their format. Or as an option when [using the LLVM backend](http://blog.llvm.org/2017/08/llvm-on-windows-now-supports-pdb-debug.html).
+In Windows GDB can be installed to debug an executable with
+`stack exec -- pacman -S gdb`. Windows visual studio compiler's debugging format
+PDB is not supported at the moment. This might be possible by
+[separating](https://stackoverflow.com/questions/866721/how-to-generate-gcc-debug-symbol-outside-the-build-target) debugging symbols and
+[converting](https://github.com/rainers/cv2pdb) their format. Or as an option
+when
+[using the LLVM backend](http://blog.llvm.org/2017/08/llvm-on-windows-now-supports-pdb-debug.html).
 
 ## More resources
 
@@ -1765,7 +1813,8 @@ There are lots of resources available for learning more about stack:
 
 * `stack --help`
 * `stack --version` — identify the version and Git hash of the stack executable
-* `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
+* `--verbose` (or `-v`) — much more info about internal operations (useful for
+  bug reports)
 * The [home page](http://haskellstack.org)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
 * The [FAQ](faq.md)
