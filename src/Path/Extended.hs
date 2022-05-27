@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP #-}
-
-module Path.Extended 
+module Path.Extended
  ( fileExtension
  , addExtension
  , replaceExtension
@@ -11,30 +9,16 @@ import qualified Path
 import           Path (Path, File)
 
 fileExtension :: MonadThrow m => Path b File -> m String
-fileExtension = 
-#if MIN_VERSION_path(0,7,0)
-    Path.fileExtension
-#else
-    pure . Path.fileExtension
-#endif
+fileExtension = Path.fileExtension
 
 addExtension :: MonadThrow m
   => String
   -> Path b File
   -> m (Path b File)
-addExtension =
-#if MIN_VERSION_path(0,7,0)
-    Path.addExtension
-#else
-    Path.addFileExtension
-#endif
+addExtension = Path.addExtension
 
 replaceExtension :: MonadThrow m
   => String
   -> Path b File
   -> m (Path b File)
-#if MIN_VERSION_path(0,7,0)
 replaceExtension ext = Path.replaceExtension ('.' : ext)
-#else
-replaceExtension = flip (Path.-<.>)
-#endif

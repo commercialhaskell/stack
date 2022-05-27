@@ -5,17 +5,45 @@
 
 Release notes:
 
-**Changes since v2.7.3:**
+**Changes since v2.7.5:**
 
 Major changes:
 
 Behavior changes:
 
-* cloning git repositories isn't per sub-directory anymore, see [#5411](https://github.com/commercialhaskell/stack/issues/5411)
+* `stack build --coverage` will generate a unified coverage report, even if
+  there is only one `*.tix` file, in case a package has tested the library of
+  another package that has not tested its own library. See
+  [#5713](https://github.com/commercialhaskell/stack/issues/5713)
+
+Other enhancements:
+
+* Bump to `hpack-0.35.0`.
+* On Windows, the installer now sets `DisplayVersion` in the registry, enabling
+  tools like `winget` to properly read the version number.
+
+Bug fixes:
+
+* Fix `stack clean --full`, so that the files to be deleted are not in use. See
+  [#5714](https://github.com/commercialhaskell/stack/issues/5714)
+* Fix an inconsistency in the pretty formatting of the output of
+  `stack build --coverage`
+
+## v2.7.5
+
+**Changes since v2.7.3:**
+
+Behavior changes:
+
+* Cloning git repositories isn't per sub-directory anymore, see
+  [#5411](https://github.com/commercialhaskell/stack/issues/5411)
 
 Other enhancements:
 
 * `stack setup` supports installing GHC for macOS aarch64 (M1)
+
+* `stack upload` supports authentication with a Hackage API key (via
+  `HACKAGE_KEY` environment variable).
 
 Bug fixes:
 
@@ -23,6 +51,11 @@ Bug fixes:
   See [rio#237](https://github.com/commercialhaskell/rio/pull/237)
 * Fix handling of overwritten `ghc` and `ghc-pkg` locations.
   [#5597](https://github.com/commercialhaskell/stack/pull/5597)
+* Fix failure to find package when a dependency is shared between projects.
+  [#5680](https://github.com/commercialhaskell/stack/issues/5680)
+* `stack ghci` now uses package flags in `stack.yaml`
+  [#5434](https://github.com/commercialhaskell/stack/issues/5434)
+
 
 ## v2.7.3
 
@@ -55,8 +88,6 @@ Bug fixes:
   [GHC issue 20074](https://gitlab.haskell.org/ghc/ghc/-/issues/20074)
 * Track changes to `setup-config` properly to avoid reconfiguring on every change.
   See [#5578](https://github.com/commercialhaskell/stack/issues/5578)
-* `stack ghci` now uses package flags in `stack.yaml`
-  [#5434](https://github.com/commercialhaskell/stack/issues/5434)
 
 
 ## v2.7.1

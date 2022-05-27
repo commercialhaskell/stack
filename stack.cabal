@@ -1,11 +1,11 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        2.7.4
+version:        2.7.6
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
@@ -206,7 +206,6 @@ library
       Stack.Types.SourceMap
       Stack.Types.TemplateName
       Stack.Types.Version
-      Stack.Types.VersionIntervals
       Stack.Unpack
       Stack.Upgrade
       Stack.Upload
@@ -308,6 +307,7 @@ library
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -333,7 +333,6 @@ library
         src/unix/
     c-sources:
         src/unix/cbits/uname.c
-  default-language: Haskell2010
 
 executable stack
   main-is: Main.hs
@@ -433,6 +432,7 @@ executable stack
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -457,12 +457,13 @@ executable stack
     cpp-options: -DHIDE_DEP_VERSIONS
   if flag(supported-build)
     cpp-options: -DSUPPORTED_BUILD
-  default-language: Haskell2010
 
 executable stack-integration-test
   main-is: IntegrationSpec.hs
   other-modules:
       StackTest
+      Paths_stack
+  autogen-modules:
       Paths_stack
   hs-source-dirs:
       test/integration
@@ -555,6 +556,7 @@ executable stack-integration-test
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -572,7 +574,6 @@ executable stack-integration-test
     buildable: False
   if flag(static)
     ld-options: -static -pthread
-  default-language: Haskell2010
 
 test-suite stack-test
   type: exitcode-stdio-1.0
@@ -592,6 +593,8 @@ test-suite stack-test
       Stack.PackageDumpSpec
       Stack.Types.TemplateNameSpec
       Stack.UploadSpec
+      Paths_stack
+  autogen-modules:
       Paths_stack
   hs-source-dirs:
       src/test
@@ -686,6 +689,7 @@ test-suite stack-test
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -699,6 +703,5 @@ test-suite stack-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
-  default-language: Haskell2010
   build-tool-depends:
       hspec-discover:hspec-discover

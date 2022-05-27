@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module System.Permissions
   ( setScriptPerms
   , osIsWindows

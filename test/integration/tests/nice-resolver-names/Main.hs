@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 import StackTest
 import Control.Exception (throwIO)
 import Data.Maybe (mapMaybe)

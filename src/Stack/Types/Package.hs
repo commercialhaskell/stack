@@ -1,13 +1,15 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RankNTypes                 #-}
+
 module Stack.Types.Package where
 
 import           Stack.Prelude
@@ -15,6 +17,9 @@ import qualified RIO.Text as T
 import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
 import qualified Data.Map as M
 import qualified Data.Set as Set
+#if MIN_VERSION_Cabal(3,4,0)
+import           Distribution.CabalSpecVersion
+#endif
 import           Distribution.Parsec (PError (..), PWarning (..), showPos)
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License)
@@ -114,7 +119,11 @@ data Package =
           ,packageBuildType :: !BuildType                 -- ^ Package build-type.
           ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
                                                           -- ^ If present: custom-setup dependencies
+#if MIN_VERSION_Cabal(3,4,0)
+          ,packageCabalSpec :: !CabalSpecVersion          -- ^ Cabal spec range
+#else
           ,packageCabalSpec :: !VersionRange              -- ^ Cabal spec range
+#endif
           }
  deriving (Show,Typeable)
 

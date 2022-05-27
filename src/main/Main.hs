@@ -1,10 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
 
 -- | Main stack tool entry point.
 
@@ -216,9 +216,10 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          (buildOptsParser Haddock)
         addCommand' "new"
          (unwords [ "Create a new project from a template."
-                  , "Run `stack templates' to see available templates."
+                  , "Run `stack templates' to see available templates. Will"
+                  , "also initialise if there is no stack.yaml file."
                   , "Note: you can also specify a local file or a"
-                  , "remote URL as a template."
+                  , "remote URL as a template; or force an initialisation."
                   ] )
                     newCmd
                     newOptsParser
@@ -549,7 +550,7 @@ setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
   setup sco wantedCompiler compilerCheck mstack
 
 cleanCmd :: CleanOpts -> RIO Runner ()
-cleanCmd = withConfig NoReexec . withBuildConfig . clean
+cleanCmd = withConfig NoReexec . clean
 
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
@@ -655,21 +656,19 @@ uploadCmd uploadOpts = do
         config <- view configL
         let hackageUrl = T.unpack $ configHackageBaseUrl config
             uploadVariant = uoptsUploadVariant uploadOpts
-        getCreds <- liftIO $ memoizeRef $ Upload.loadCreds config
+        getCreds <- memoizeRef $ Upload.loadAuth config
         mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
         forM_ files $ \file -> do
             tarFile <- resolveFile' file
-            liftIO $ do
-              creds <- runMemoized getCreds
-              Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
+            creds <- runMemoized getCreds
+            Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
         forM_ dirs $ \dir -> do
             pkgDir <- resolveDir' dir
             (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
             checkSDistTarball' sdistOpts tarName tarBytes
-            liftIO $ do
-              creds <- runMemoized getCreds
-              Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
-              forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
+            creds <- runMemoized getCreds
+            Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+            forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
@@ -838,8 +837,8 @@ initCmd initOpts = do
     withGlobalProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
-newCmd :: (NewOpts,InitOpts) -> RIO Runner ()
-newCmd (newOpts,initOpts) =
+newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
+newCmd (newOpts, initOpts) =
     withGlobalProject $ withConfig YesReexec $ do
         dir <- new newOpts (forceOverwrite initOpts)
         exists <- doesFileExist $ dir </> stackDotYaml

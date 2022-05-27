@@ -1,4 +1,4 @@
-{-#LANGUAGE ScopedTypeVariables#-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module StackTest where
 
@@ -289,14 +289,19 @@ removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
     then return ()
     else throwIO e
 
--- | Changes working directory to Stack source directory
-withSourceDirectory :: HasCallStack => IO () -> IO ()
-withSourceDirectory action = do
-  dir <- stackSrc
+-- | Changes to the specified working directory.
+withCwd :: HasCallStack => FilePath -> IO () -> IO ()
+withCwd dir action = do
   currentDirectory <- getCurrentDirectory
   let enterDir = setCurrentDirectory dir
       exitDir = setCurrentDirectory currentDirectory
   bracket_ enterDir exitDir action
+
+-- | Changes working directory to Stack source directory.
+withSourceDirectory :: HasCallStack => IO () -> IO ()
+withSourceDirectory action = do
+  dir <- stackSrc
+  withCwd dir action
 
 -- | Mark a test as superslow, only to be run when explicitly requested.
 superslow :: HasCallStack => IO () -> IO ()

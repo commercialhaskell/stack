@@ -1,13 +1,14 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE CPP                  #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Stack.Types.Resolver
@@ -19,7 +20,12 @@ module Stack.Types.Resolver
 import           Pantry.Internal.AesonExtended
                  (FromJSON, parseJSON,
                   withObject, (.:), withText)
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
+#else
 import qualified Data.HashMap.Strict as HashMap
+#endif
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
@@ -86,8 +92,13 @@ instance FromJSON Snapshots where
     parseJSON = withObject "Snapshots" $ \o -> Snapshots
         <$> (o .: "nightly" >>= parseNightly)
         <*> fmap IntMap.unions (mapM (parseLTS . snd)
+#if MIN_VERSION_aeson(2,0,0)
+                $ filter (isLTS . Key.toText . fst)
+                $ KeyMap.toList o)
+#else
                 $ filter (isLTS . fst)
                 $ HashMap.toList o)
+#endif
       where
         parseNightly t =
             case parseSnapName t of

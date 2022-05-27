@@ -259,6 +259,7 @@ rules global@Global{..} args = do
             [ binaryExeFileName
             , binaryInstallerFileName
             , out
+            , stackVersionStr global
             ] :: Action ()
 
     releaseBinDir </> binaryName </> stackExeFileName %> \out -> do

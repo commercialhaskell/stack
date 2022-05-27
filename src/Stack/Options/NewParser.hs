@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.NewParser where
 
 import qualified Data.Map.Strict                   as M

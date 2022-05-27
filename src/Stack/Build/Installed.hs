@@ -1,8 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+
 -- Determine which packages are already installed
 module Stack.Build.Installed
     ( InstalledMap
@@ -146,7 +148,9 @@ processLoadResult mdb (reason, lh) = do
         maybe mempty (\db -> ", from " <> displayShow db <> ",") mdb <>
         " due to" <>
         case reason of
+#if !MIN_VERSION_GLASGOW_HASKELL(9,0,1,0)
             Allowed -> " the impossible?!?!"
+#endif
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
             WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
             WrongVersion actual wanted ->

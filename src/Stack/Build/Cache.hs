@@ -1,10 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 -- | Cache information about previous builds
 module Stack.Build.Cache
@@ -12,6 +12,7 @@ module Stack.Build.Cache
     , tryGetConfigCache
     , tryGetCabalMod
     , tryGetSetupConfigMod
+    , tryGetPackageProjectRoot
     , getInstalledExes
     , tryGetFlagCache
     , deleteCaches
@@ -22,6 +23,7 @@ module Stack.Build.Cache
     , writeConfigCache
     , writeCabalMod
     , writeSetupConfigMod
+    , writePackageProjectRoot
     , TestStatus (..)
     , setTestStatus
     , getTestStatus
@@ -34,6 +36,7 @@ module Stack.Build.Cache
 import           Stack.Prelude
 import           Crypto.Hash (hashWith, SHA256(..))
 import qualified Data.ByteArray as Mem (convert)
+import           Data.ByteString.Builder (byteString)
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -154,6 +157,18 @@ tryGetFileMod fp =
   liftIO $ either (const Nothing) (Just . modificationTime) <$>
       tryIO (getFileStatus fp)
 
+-- | Try to read the project root from the last build of a package
+tryGetPackageProjectRoot :: HasEnvConfig env
+               => Path Abs Dir -> RIO env (Maybe ByteString)
+tryGetPackageProjectRoot dir = do
+  fp <- toFilePath <$> configPackageProjectRoot dir
+  tryReadFileBinary fp
+
+tryReadFileBinary :: MonadIO m => FilePath -> m (Maybe ByteString)
+tryReadFileBinary fp =
+  liftIO $ either (const Nothing) Just <$>
+      tryIO (readFileBinary fp)
+
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: HasEnvConfig env
                 => Path Abs Dir
@@ -196,6 +211,16 @@ writeSetupConfigMod dir (Just x) = do
     fp <- configSetupConfigMod dir
     writeBinaryFileAtomic fp "Just used for its modification time"
     liftIO $ setFileTimes (toFilePath fp) x x
+
+-- | See 'tryGetPackageProjectRoot'
+writePackageProjectRoot
+  :: HasEnvConfig env
+  => Path Abs Dir
+  -> ByteString
+  -> RIO env ()
+writePackageProjectRoot dir projectRoot = do
+    fp <- configPackageProjectRoot dir
+    writeBinaryFileAtomic fp (byteString projectRoot)
 
 -- | Delete the caches for the project.
 deleteCaches :: HasEnvConfig env => Path Abs Dir -> RIO env ()
@@ -379,4 +404,3 @@ readPrecompiledCache loc copts buildHaddocks depIDs = do
         , pcSubLibs = mkAbs' <$> pcSubLibs pc0
         , pcExes = mkAbs' <$> pcExes pc0
         }
-

@@ -1,4 +1,5 @@
-resolver: nightly-2021-04-30
+# GHC 9.2.2
+resolver: nightly-2022-04-09
 
 packages:
 - .
@@ -12,6 +13,7 @@ nix:
   packages:
     - zlib
     - unzip
+
 flags:
   stack:
     developer-mode: true
@@ -19,9 +21,7 @@ flags:
 ghc-options:
    "$locals": -fhide-source-paths
 
-extra-deps:
-- pantry-0.5.3@rev:0
-- rio-0.1.21.0@rev:0
+extra-deps: []
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

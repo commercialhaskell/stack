@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Stack.Build.TargetSpec (main, spec) where
 
 import qualified Data.Text           as T

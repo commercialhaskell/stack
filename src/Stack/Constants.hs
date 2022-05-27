@@ -1,7 +1,7 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-} -- keep TH usage here
+{-# LANGUAGE TemplateHaskell   #-} -- keep TH usage here
 
 -- | Constants used throughout the project.
 

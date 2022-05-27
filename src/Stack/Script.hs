@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Stack.Script
@@ -18,15 +18,14 @@ import           Distribution.Compiler      (CompilerFlavor (..))
 import           Distribution.ModuleName    (ModuleName)
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
+#if MIN_VERSION_Cabal(3,4,0)
+import           Distribution.Types.ModuleReexport
+#endif
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.VersionRange (withinRange)
 import           Distribution.System        (Platform (..))
 import qualified Pantry.SHA256 as SHA256
-#if MIN_VERSION_path(0,7,0)
 import           Path hiding (replaceExtension)
-#else
-import           Path
-#endif
 import           Path.IO
 import qualified Stack.Build
 import           Stack.Build.Installed
@@ -280,7 +279,11 @@ allExposedModules gpd = do
       mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
   pure $ case mlibrary  of
     Just lib -> PD.exposedModules lib ++
+#if MIN_VERSION_Cabal(3,4,0)
+                map moduleReexportName (PD.reexportedModules lib)
+#else
                 map PD.moduleReexportName (PD.reexportedModules lib)
+#endif
     Nothing  -> mempty
 
 -- | The Stackage project introduced the concept of hidden packages,

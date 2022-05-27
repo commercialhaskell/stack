@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 -- | More readable combinators for writing parsers.
 
 module Data.Attoparsec.Combinators where

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.GhcVariantParser where
 
 import           Options.Applicative

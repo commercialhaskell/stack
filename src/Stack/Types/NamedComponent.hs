@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
   , renderComponent

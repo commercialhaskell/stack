@@ -117,8 +117,8 @@ dependencies. See the
 [build command section of the user guide](GUIDE.md#the-build-command) for
 details of how these dependencies get specified.
 
-In addition to specifying targets, you can also control what gets built with the
-following flags:
+In addition to specifying targets, you can also control what gets built, or
+retained, with the following flags:
 
 * `--haddock`, to build documentation.  This may cause a lot of packages to get
   re-built, so that the documentation links work.
@@ -140,13 +140,17 @@ following flags:
 * `--keep-going`, to continue building packages even after some build step
   fails. The packages which depend upon the failed build won't get built.
 
+* `--keep-tmp-files`, to keep intermediate files and build directories that
+  would otherwise be considered temporary and deleted. It may be useful to
+  inspect these, if a build fails. By default, they are not kept.
+
 * `--skip`, to skip building components of a local package. It allows
   you to skip test suites and benchmark without specifying other components
   (e.g. `stack test --skip long-test-suite` will run the tests without the
   `long-test-suite` test suite). Be aware that skipping executables won't work
-  the first time the package is built due to 
+  the first time the package is built due to
   [an issue in cabal](https://github.com/commercialhaskell/stack/issues/3229).
-  This option can be specified multiple times to skip multiple components. 
+  This option can be specified multiple times to skip multiple components.
 
 ## Flags
 
