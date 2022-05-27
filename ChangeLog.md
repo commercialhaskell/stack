@@ -28,6 +28,9 @@ Bug fixes:
   [#5714](https://github.com/commercialhaskell/stack/issues/5714)
 * Fix an inconsistency in the pretty formatting of the output of
   `stack build --coverage`
+* Fix non-deterministic test failures when executing a test suite for a
+  multi-project repository with parallelism enabled. See
+  [#5024](https://github.com/commercialhaskell/stack/issues/5024)
 
 ## v2.7.5
 
