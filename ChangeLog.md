@@ -21,6 +21,14 @@ Other enhancements:
 * Bump to `hpack-0.35.0`.
 * On Windows, the installer now sets `DisplayVersion` in the registry, enabling
   tools like `winget` to properly read the version number.
+* Adds flag `--script-no-run-compile` (disabled by default) that uses the
+  `--no-run` option with `stack script` (and forces the `--compile` option).
+  This enables a command like `stack --script-no-run-compile Script.hs` to
+  behave like `stack script <arguments> --no-run --compile -- Script.hs` but
+  without having to list all the `<arguments>` in the stack interpreter options
+  comment in `Script.hs` on the command line. That may help test that scripts
+  compile in CI (continuous integration). See
+  [#5755](https://github.com/commercialhaskell/stack/issues/5755)
 
 Bug fixes:
 

@@ -342,6 +342,7 @@ configFromConfigMonoid
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
          configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
          configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
+         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
