@@ -32,6 +32,9 @@ import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+#if MIN_VERSION_Cabal(3,6,0)
+import Distribution.Utils.Path (getSymbolicPath)
+#endif
 #if MIN_VERSION_Cabal(3,4,0)
 import           Distribution.CabalSpecVersion
 #endif

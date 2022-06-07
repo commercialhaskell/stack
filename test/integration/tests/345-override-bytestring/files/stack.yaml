@@ -1,6 +1,6 @@
-resolver: lts-14.27
+resolver: nightly-2022-06-06
 extra-deps:
-- bytestring-0.10.10.0@sha256:06b2e84f1bc9ab71a162c0ca9e88358dd6bbe5cb7fdda2d6d34b6863c367ec95,8944
-- binary-0.8.8.0@sha256:e9387a7ef2b34c6a23b09664c306e37cc01ae2cb4e4511a1c96ffb14008c24b0,6262
+- bytestring-0.11.3.1
+- binary-0.8.9.0
 packages:
 - .

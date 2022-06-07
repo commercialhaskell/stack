@@ -1,2 +1,2 @@
-resolver: lts-14.27
+resolver: nightly-2022-06-06
 packages: []

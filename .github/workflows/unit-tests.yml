@@ -59,25 +59,28 @@ jobs:
     steps:
     - name: Clone project
       uses: actions/checkout@v2
-    - name: Cache dependencies on Unix-like OS
-      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-      uses: actions/cache@v3
+    - name: Cache dependencies
+      uses: actions/cache@v1
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
-    - name: Cache dependencies on Windows
-      if: startsWith(runner.os, 'Windows')
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~\AppData\Roaming\stack
-          ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
     - shell: bash
       run: |
         set -ex
         stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
-        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror" --copy-bins --local-bin-path bin
+
+        if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
+        then
+            touch ~/.stack/config.yaml
+            cat > ~/.stack/config.yaml <<EOF
+            extra-include-dirs:
+            - /usr/include
+            extra-lib-dirs:
+            - /lib
+            - /usr/lib
+        EOF
+        fi
+        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
 
         # Get output about whether the exe is dynamically linked
         if [[ "${{ matrix.os }}" == "macos-latest" ]]

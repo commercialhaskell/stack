@@ -1,4 +1,4 @@
-resolver: lts-14.27
+resolver: nightly-2022-06-06
 name: foo
 packages:
 - acme-dont-1.1@sha256:8264ad3e5113d3e0417b46e71d5a9c0914a1f03b5b81319cc329f1dc0f49b96c,602

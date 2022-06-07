@@ -1,4 +1,4 @@
-resolver: ghc-8.6.5
+resolver: ghc-9.2.2
 name: snapshot
 packages:
 - acme-missiles-0.3@rev:0

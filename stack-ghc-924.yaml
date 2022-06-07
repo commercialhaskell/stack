@@ -6,7 +6,7 @@ packages:
 
 docker:
   enable: false
-  repo: fpco/alpine-haskell-stack:8.10.4
+  repo: psibi/alpine-haskell-stack:9.2.3v1
 
 nix:
   # --nix on the command-line to enable.

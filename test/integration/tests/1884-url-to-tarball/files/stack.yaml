@@ -2,4 +2,4 @@ extra-deps:
 - location: https://hackage.haskell.org/package/half-0.2.2.3/half-0.2.2.3.tar.gz
   sha256: 85c244c80d1c889a3d79073a6f5a99d9e769dbe3c574ca11d992b2b4f7599a5c
   size: 6050
-resolver: lts-14.27
+resolver: nightly-2022-06-06

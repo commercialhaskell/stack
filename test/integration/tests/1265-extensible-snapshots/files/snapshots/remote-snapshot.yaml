@@ -1,5 +1,5 @@
 ---
-resolver: lts-14.27
+resolver: nightly-2022-06-06
 name: remote-snapshot
 packages:
-- archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/ghc-prim-0.5.3.tar.gz
+- archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/ghc-prim-0.8.0.tar.gz

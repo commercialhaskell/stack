@@ -1,4 +1,4 @@
-resolver: ghc-8.6.5
+resolver: ghc-9.2.2
 name: test-snapshot-2
 packages:
 - stm-2.5.0.0

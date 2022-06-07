@@ -1,4 +1,4 @@
-resolver: ghc-8.6.5
+resolver: ghc-9.2.2
 
 extra-deps:
 - acme-dont-1.1@rev:0
