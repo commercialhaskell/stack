@@ -1,4 +1,4 @@
-resolver: ghc-9.2.2
+resolver: ghc-9.2.3
 extra-deps:
 - unliftio-core-0.2.0.1@sha256:f9abcdd3f3d28e4840563efb7b8760d2de9b5707bcd6f53a87f6a0d77bb5a9f7,1082
 # Force a unique snapshot

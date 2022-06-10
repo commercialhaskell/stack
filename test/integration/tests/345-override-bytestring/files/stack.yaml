@@ -1,4 +1,4 @@
-resolver: nightly-2022-06-06
+resolver: nightly-2022-06-10
 extra-deps:
 - bytestring-0.11.3.1
 - binary-0.8.9.0

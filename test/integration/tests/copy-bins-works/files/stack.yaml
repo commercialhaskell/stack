@@ -1,2 +1,2 @@
-resolver: ghc-9.2.2
+resolver: ghc-9.2.3
 copy-bins: true

@@ -1,6 +1,6 @@
 packages:
 - .
-resolver: nightly-2022-06-06
+resolver: nightly-2022-06-10
 extra-deps:
 - git: https://github.com/NorfairKing/validity.git
   commit: d128cc30bc886e31ea7f8161fb7708c08b162937

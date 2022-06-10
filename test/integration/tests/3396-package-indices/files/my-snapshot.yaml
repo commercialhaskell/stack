@@ -1,4 +1,4 @@
-compiler: ghc-9.2.2
+compiler: ghc-9.2.3
 name: my-snapshot
 
 packages:
