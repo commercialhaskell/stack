@@ -10,7 +10,7 @@ extra-deps:
 
 docker:
   enable: false
-  repo: psibi/alpine-haskell-stack:9.2.3v1
+  repo: psibi/alpine-haskell-stack:9.2.3v2
 
 nix:
   # --nix on the command-line to enable.

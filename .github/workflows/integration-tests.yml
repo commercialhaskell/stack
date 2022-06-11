@@ -21,31 +21,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - os: ubuntu-latest
-          release-args: "--alpine"
-          cache-bust: ""
-        - os: windows-latest
-          release-args: ""
-          cache-bust: ""
+        # - os: ubuntu-latest
+        #   release-args: "--alpine"
+        #   cache-bust: ""
+        # - os: windows-latest
+        #   release-args: ""
+        #   cache-bust: ""
         - os: macos-latest
           release-args: ""
           cache-bust: "1"
     steps:
     - name: Clone project
       uses: actions/checkout@v2
-    - name: Cache dependencies on Unix-like OS
-      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-      uses: actions/cache@v3
+    - name: Cache dependencies
+      uses: actions/cache@v1
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
-    - name: Cache dependencies on Windows
-      if: startsWith(runner.os, 'Windows')
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~\AppData\Roaming\stack
-          ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
     - shell: bash
       name: Install deps and run checks
@@ -83,17 +74,17 @@ jobs:
             extra-lib-dirs:
             - /lib
             - /usr/lib
-            - /nix/store/425yi10fqvdhzqpdhgvlf7ykh9422msq-ncurses-6.3/lib
         EOF
         fi
 
+        export RIO_VERBOSE=1
         # Do this in the same step as installing deps to get relevant env var modifications
         stack etc/scripts/release.hs check ${{ matrix.release-args }}
 
         set +ex
 
-    - name: Build bindist
-      shell: bash
+    - shell: bash
+      name: Build bindist
       run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist

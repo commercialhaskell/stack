@@ -7,6 +7,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Concurrent
 import Control.Exception
+import Data.Maybe (fromMaybe)
 import System.Environment
 import System.Directory
 import System.IO
