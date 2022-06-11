@@ -73,10 +73,19 @@ jobs:
     steps:
       - name: Clone project
         uses: actions/checkout@v2
-      - name: Cache dependencies
-        uses: actions/cache@v1
+      - name: Cache dependencies on Unix-like OS
+        if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
+        uses: actions/cache@v3
         with:
           path: ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
+      - name: Cache dependencies on Windows
+        if: startsWith(runner.os, 'Windows')
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~\AppData\Roaming\stack
+            ~\AppData\Local\Programs\stack
           key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
       - shell: bash
         run: |
