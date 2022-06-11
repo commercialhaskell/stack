@@ -381,6 +381,8 @@ data Config =
          -- ^ Enable GHC hiding source paths?
          ,configRecommendUpgrade    :: !Bool
          -- ^ Recommend a Stack upgrade?
+         ,configNoRunCompile   :: !Bool
+         -- ^ Use --no-run and --compile options when using `stack script`
          ,configStackDeveloperMode  :: !Bool
          -- ^ Turn on Stack developer mode for additional messages?
          }
@@ -867,6 +869,8 @@ data ConfigMonoid =
     , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
     , configMonoidSnapshotLocation :: !(First Text)
     -- ^ Custom location of LTS/Nightly snapshots
+    , configMonoidNoRunCompile  :: !FirstFalse
+    -- ^ See: 'configNoRunCompile'
     , configMonoidStackDeveloperMode :: !(First Bool)
     -- ^ See 'configStackDeveloperMode'
     }
@@ -991,6 +995,7 @@ parseConfigMonoidObject rootDir obj = do
 
     configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
     configMonoidSnapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
+    configMonoidNoRunCompile <- FirstFalse <$> obj ..:? configMonoidNoRunCompileName
 
     configMonoidStackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
 
@@ -1151,6 +1156,9 @@ configMonoidCasaRepoPrefixName = "casa-repo-prefix"
 
 configMonoidSnapshotLocationName :: Text
 configMonoidSnapshotLocationName = "snapshot-location-base"
+
+configMonoidNoRunCompileName :: Text
+configMonoidNoRunCompileName = "script-no-run-compile"
 
 configMonoidStackDeveloperModeName :: Text
 configMonoidStackDeveloperModeName = "stack-developer-mode"

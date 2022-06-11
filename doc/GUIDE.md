@@ -1278,7 +1278,6 @@ arguments, or by providing a comma or space separated list. For example:
   --package http-client,http-conduit
 -}
 ```
-
 ### Stack configuration for scripts
 
 With the `script` command, all Stack configuration files are ignored to provide
@@ -1314,6 +1313,33 @@ a multi line block comment with ghc options:
   +RTS -s -RTS
 -}
 ```
+
+### Testing scripts
+
+You can use the flag `--script-no-run-compile` on the command line to enable (it
+is disabled by default) the use of the `--no-run` option with `stack script`
+(and forcing the `--compile` option). The flag may help test that scripts
+compile in CI (continuous integration).
+
+For example, consider the following simple script, in a file named `Script.hs`,
+which makes use of the joke package
+[`acme-missiles`](https://hackage.haskell.org/package/acme-missiles):
+```
+{- stack script
+   --resolver lts-19.9
+   --package acme-missiles
+-}
+import Acme.Missiles (launchMissiles)
+
+main :: IO ()
+main = launchMissiles
+```
+The command `stack --script-no-run-compile Script.hs` then behaves as if the
+command
+`stack script --resolver lts-19.9 --package acme-missiles --no-run --compile -- Script.hs`
+had been given (see further below about the `stack script` command). `Script.hs`
+is compiled (without optimisation) and the resulting executable is not run: no
+missiles are launched in the process!
 
 ### Writing independent and reliable scripts
 
