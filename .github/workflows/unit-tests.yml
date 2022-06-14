@@ -1,7 +1,7 @@
 name: Unit tests
 
 on:
-  # pull_request:
+  pull_request:
   push:
     branches:
     - master
@@ -53,7 +53,7 @@ jobs:
           extra-suffix: ""
           stack-args: ""
         - os: macos-latest
-          stack-yaml: stack.yaml
+          stack-yaml: stack-macos.yaml
           extra-suffix: ""
           stack-args: ""
     steps:
@@ -80,7 +80,13 @@ jobs:
             - /usr/lib
         EOF
         fi
-        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
+
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+            stack exec pacman -- --sync --refresh --noconfirm autoconf
+        fi
+
+        stack test ${{ matrix.stack-args }} --stack-yaml ${{ matrix.stack-yaml }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
 
         # Get output about whether the exe is dynamically linked
         if [[ "${{ matrix.os }}" == "macos-latest" ]]

@@ -294,7 +294,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ]
             compilerPath <- getCompilerPath
-            withWorkingDir (toFilePath tmpdir) (proc (toFilePath compilerPath) args $ \pc0 -> do
+            withWorkingDir (toFilePath tmpdir) $ proc (toFilePath compilerPath) args (\pc0 -> do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece ->

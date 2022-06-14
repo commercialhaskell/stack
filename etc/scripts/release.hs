@@ -1,21 +1,14 @@
 {- stack script
     --resolver nightly-2022-06-10
-    --install-ghc
+    --system-ghc
     --ghc-options -Wall
     --package Cabal
     --package aeson
     --package bytestring
-    --package case-insensitive
-    --package conduit
-    --package conduit-combinators
-    --package cryptohash
-    --package directory
     --package extra
-    --package http-conduit
+    --package directory
     --package http-types
-    --package mime-types
     --package process
-    --package resourcet
     --package shake
     --package tar
     --package text
@@ -52,6 +45,7 @@ import qualified Codec.Compression.GZip as GZip
 import Data.List.Extra
 import Development.Shake
 import Development.Shake.FilePath
+import qualified System.Info as Info
 import Prelude -- Silence AMP warning
 
 #if !MIN_VERSION_Cabal(3, 0, 0)
@@ -79,12 +73,16 @@ main =
             gHomeDir <- getHomeDirectory
 
             let gAllowDirty = False
+                platformArgs :: [String]
+                platformArgs = if Info.os == "darwin"
+                               then ["--stack-yaml", "stack-macos.yaml"]
+                               else []
                 Platform arch _ = buildPlatform
                 gArch = arch
                 gBinarySuffix = ""
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
-                gBuildArgs = ["--flag", "stack:-developer-mode"]
+                gBuildArgs = platformArgs <> ["--flag", "stack:-developer-mode"]
                 gStaticLinux = False
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags

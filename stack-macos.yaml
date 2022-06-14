@@ -1,0 +1,47 @@
+<<<<<<< HEAD:stack-ghc-923.yaml
+# GHC 9.2.3
+resolver: nightly-2022-07-29
+=======
+resolver: nightly-2022-06-10 # GHC 9.2.3
+>>>>>>> 3f6774fd (Fix MacOS specific issue):stack-macos.yaml
+
+packages:
+- .
+
+docker:
+  enable: false
+  repo: psibi/alpine-haskell-stack:9.2.3v2
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+<<<<<<< HEAD:stack-ghc-923.yaml
+  - zlib
+  - unzip
+
+=======
+    - zlib
+    - unzip
+>>>>>>> 3f6774fd (Fix MacOS specific issue):stack-macos.yaml
+flags:
+  stack:
+    developer-mode: true
+
+ghc-options:
+  "$locals": -fhide-source-paths
+
+<<<<<<< HEAD:stack-ghc-923.yaml
+extra-deps:
+# See https://github.com/commercialhaskell/pantry/pull/53
+- pantry-0.5.6@rev:0
+=======
+# Contains macos specific fix for https://github.com/haskell/process/issues/247
+extra-deps:
+- git: https://github.com/haskell/process.git
+  commit: b95e5fbdeb74e0cc36b6878b60f9807bd0001fa8
+- Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
+>>>>>>> 3f6774fd (Fix MacOS specific issue):stack-macos.yaml
+
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install

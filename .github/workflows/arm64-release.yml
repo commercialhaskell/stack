@@ -1,15 +1,16 @@
 name: ARM64 Release
 
-on:
-  pull_request:
-  push:
-    branches:
-    - master
-    - stable
-    - rc/**
-    tags:
-    - '**'
-  workflow_dispatch:
+# ARM64 tests disabled.
+# on:
+#   pull_request:
+#   push:
+#     branches:
+#     - master
+#     - stable
+#     - rc/**
+#     tags:
+#     - '**'
+#   workflow_dispatch:
 
 jobs:
   arm64:
