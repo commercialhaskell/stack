@@ -29,7 +29,7 @@ jobs:
           cache-bust: "1"
         - os: macos-latest
           release-args: ""
-          cache-bust: ""
+          cache-bust: "23"
     steps:
     - name: Clone project
       uses: actions/checkout@v2
