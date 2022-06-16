@@ -223,7 +223,7 @@ test testDir = withDir $ \dir -> withHome $ do
           logError "Failure, dumping log\n\n"
           withSourceFile logfp $ \src ->
             runConduit $ src .| stderrC
-          logInfo $ "\n\nEnd of log for " <> fromString name
+          logError $ "\n\nEnd of log for " <> fromString name
       pure $ Map.singleton (fromString name) ec
   where
     name = takeFileName testDir

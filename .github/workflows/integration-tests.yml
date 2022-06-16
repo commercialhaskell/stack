@@ -77,11 +77,6 @@ jobs:
         EOF
         fi
 
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]
-        then
-            stack exec pacman -- --sync --refresh --noconfirm autoconf
-        fi
-
         # Do this in the same step as installing deps to get relevant env var modifications
         stack etc/scripts/release.hs check ${{ matrix.release-args }}
 
