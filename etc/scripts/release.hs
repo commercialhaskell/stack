@@ -1,5 +1,5 @@
 {- stack script
-    --resolver nightly-2022-06-10
+    --resolver nightly-2022-08-02
     --system-ghc
     --ghc-options -Wall
     --package Cabal

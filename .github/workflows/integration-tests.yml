@@ -38,8 +38,8 @@ jobs:
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
-    - shell: bash
-      name: Install deps and run checks
+    - name: Install deps and run checks
+      shell: bash
       run: |
         set -ex
 
@@ -82,8 +82,8 @@ jobs:
 
         set +ex
 
-    - shell: bash
-      name: Build bindist
+    - name: Build bindist
+      shell: bash
       run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
