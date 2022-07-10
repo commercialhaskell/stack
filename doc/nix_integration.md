@@ -272,7 +272,7 @@ Nix derivations ("packages"), for instance to change some build options of the
 libraries you use, or to set additional environment variables. See the
 [Nix manual][nix-manual-exprs] for more. The `buildStackProject` utility
 function is documented in the [Nixpkgs manual][nixpkgs-manual-haskell].  In such
-case, stack expect this file to define a function of exactly one argument that
+case, stack expects this file to define a function of exactly one argument that
 should be called `ghc` (as arguments within a set are non-positional), which you
 should give to `buildStackProject`. This is a GHC Nix package in the version as
 defined in the resolver you set in the `stack.yaml` file.
