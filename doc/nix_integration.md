@@ -4,16 +4,18 @@
 
 (since 0.1.10.0)
 
-When using the Nix integration, Haskell dependencies are handled as usual: They
-are downloaded from Stackage and built locally by Stack. Nix is used by Stack to
-provide the _non-Haskell_ dependencies needed by these Haskell packages.
-
-`stack` can automatically create a build environment (the equivalent
-of a "container" in Docker parlance) using `nix-shell`, provided Nix
-is already installed on your system. To do so, please visit the
+When using the Nix integration, Stack handles Haskell dependencies as usual
+while Nix handles _non-Haskell_ dependencies needed by these Haskell packages.
+That is, Stack downloads Haskell packages from [Stackage](https://www.stackage.org/lts)
+and builds them locally but uses Nix to download 
+[Nix packages](https://search.nixos.org/packages) that provide the GHC compiler and 
+external C libraries like zlib that you would normally install manually.
+You can install Nix with all the necessary commandline tools from the 
 [Nix download page](http://nixos.org/nix/download.html).
 
-There are two ways to create a build environment:
+`stack` can automatically create a build environment similar to building
+inside an isolated [Docker](https://www.docker.com/) container using `nix-shell`. 
+There are two ways to create such a build environment:
 
 - providing a list of packages (by "attribute name") from
   [Nixpkgs](http://nixos.org/nixos/packages.html), or
