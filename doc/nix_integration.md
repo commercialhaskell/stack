@@ -5,13 +5,13 @@
 (since 0.1.10.0)
 
 When using the Nix integration, Stack handles Haskell dependencies as usual
-while Nix handles _non-Haskell_ dependencies needed by these Haskell packages.
+while the Nix handles _non-Haskell_ dependencies needed by these Haskell packages.
 So Stack downloads Haskell packages from [Stackage](https://www.stackage.org/lts)
 and builds them locally but uses Nix to download 
 [Nix packages][nix-search-packages] that provide the GHC compiler and 
 external C libraries that you would normally install manually.
-You can install Nix with all the necessary commandline tools from the 
-[Nix download page](http://nixos.org/nix/download.html).
+You can install the Nix package manager with all the necessary commandline tools 
+from the [Nix download page](http://nixos.org/nix/download.html).
 
 `stack` can automatically create a Nix build environment in the background
 using `nix-shell`, similar to building inside an isolated 
@@ -288,6 +288,79 @@ nix:
 The `stack build` command will behave exactly the same as above. Note
 that specifying both `packages:` and a `shell-file:` results in an
 error. (Comment one out before adding the other.)
+
+## Stack on NixOS
+
+When using Stack on NixOS, you have no choice but to use Stack's Nix integration to 
+install GHC, because external C libraries in NixOS are not installed in the usual 
+distro folders. So a GHC compiler installed through Stack (without Nix) can't find
+those libraries and therefore can't build most projects. GHC provided through Nix 
+is patched in a way that it finds the external C libraries listed and provided through Nix.
+A detailed tutorial on how to configure Stack so that it supports NixOS and non-Nix users
+can be found [here](https://www.tweag.io/blog/2022-06-02-haskell-stack-nix-shell/). A corresponding
+example project can be found [here](https://github.com/tweag/haskell-stack-nix-example).
+
+If you're already using Nix flakes, here's an adaption of that example:
+Add the following `flake.nix` file to your project.
+
+```nix
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.flake-utils.url = "github:numtide/flake-utils";
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        # Wrap Stack to configure Nix integration and target the correct Stack-Nix file
+        #
+        # - nix: Enable Nix support
+        # - no-nix-pure: Pass environment variables, like `NIX_PATH`
+        # - nix-shell-file: Specify the Nix file to use (otherwise it uses `shell.nix` by default)
+        stack-wrapped = pkgs.symlinkJoin {
+          name = "stack";
+          paths = [ pkgs.stack ];
+          buildInputs = [ pkgs.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/stack \
+              --add-flags "\
+                --nix \
+                --no-nix-pure \
+                --nix-shell-file=flake-stack-integration.nix \
+              "
+          '';
+        };
+      in {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ stack-wrapped ];
+
+          # Configure the Nix path to our own pinned package set, to ensure Stack uses the same one rather than another global <nixpkgs> when looking for the right `ghc` argument to pass in `flake-stack-integration.nix`
+          # See https://nixos.org/nixos/nix-pills/nix-search-paths.html for more information
+          NIX_PATH = "nixpkgs=" + pkgs.path;
+        };
+      });
+}
+
+```
+
+Then also add the following `flake-stack-integration.nix` file to your project:
+
+```nix
+{ ghc }:
+with (import <nixpkgs> { });
+
+haskell.lib.buildStackProject {
+  inherit ghc;
+  name = "haskell-stack-flake-nix";
+  buildInputs = [ zlib glpk pcre ];
+}
+
+```
+
+Commit both files to Git, run `nix develop` (it searches for `flake.nix` by default),
+and you'll find a new `flake.lock` file that pins the precise nixpkgs package set. 
+Commit this file to Git as well so that every developer of your project will use precisely
+the same package set.
 
 [nix-manual-exprs]: http://nixos.org/nix/manual/#chap-writing-nix-expressions
 [nixpkgs-manual-haskell]: https://nixos.org/nixpkgs/manual/#users-guide-to-the-haskell-infrastructure
