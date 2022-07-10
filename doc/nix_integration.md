@@ -40,9 +40,10 @@ You should either run `source ~/.nix-profile/etc/profile.d/nix.sh` manually
 every time you open a terminal and need Nix or add this command to your
 `~/.bashrc` or `~/.bash_profile`.
 
-### Option 1: External C libraries through a list of Nix packages
+### External C libraries through Nix packages
 
-Add a section to your `stack.yaml` as follows:
+To let Nix manage external C libraries by default
+add the following section to your `stack.yaml` file:
 ```yaml
 nix:
   enable: true
@@ -60,9 +61,15 @@ a [GHC Nix package](https://search.nixos.org/packages?query=haskell.compiler.ghc
 matching the required version of the configured 
 [Stack resolver](https://docs.haskellstack.org/en/stable/GUIDE/#resolvers-and-changing-your-compiler-version). 
 So, enabling Nix support means that packages will always be built using the 
-local GHC inside your shell, rather than your globally installed one if any.
+local GHC from Nix inside your shell, rather than your 
+globally installed system GHC if any.
 
-Note that in this mode `stack` can use only GHC versions that have
+Note that *in this mode every developer of your project needs to have Nix installed*, 
+but also gets all external libraries automatically*. Quite convenient.
+If some developers don't have or want Nix, there's a nice tutorial on 
+[how to add Nix integration optionally](https://www.tweag.io/blog/2022-06-02-haskell-stack-nix-shell/).
+
+Also note that `stack` can use only GHC versions that have
 already been mirrored into the Nix package repository.
 The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
 usually picks up new versions quickly, but it takes two or three
@@ -118,7 +125,7 @@ the `include/` folder. If you're dealing with a package that doesn't
 follow this standard layout, you'll have to deal with that using
 a custom shell file (see below).
 
-### Use stack as normal
+### Using Stack with Nix enabled
 
 With Nix enabled, `stack build` and `stack exec` will automatically
 launch themselves in a local build environment (using `nix-shell`
@@ -139,7 +146,7 @@ Passing any `--nix*` option to the command line will do the same.
 macOS, due to a bug in GHCi when working with external shared
 libraries.
 
-### The Nix shell
+### Pure and impure Nix shell
 
 By default, stack will run the build in a *pure* Nix build environment (or
 *shell*), which means two important things:
@@ -160,12 +167,20 @@ due soon to be resolved locale issues. So on macOS you'll need to be
 a bit more careful to check that you really have listed all
 dependencies.
 
-### Package sources
+### Nix package sources
 
-By default, `nix-shell` will look for the nixpkgs package set located
-by your `NIX_PATH` environment variable.
+Nix organizes its packages in snapshots of packages (each snapshot being
+a  "package set")
+similar to how Stackage organizes Haskell packages. 
+By default, `nix-shell` will look for the "nixpkgs" package set located
+by your `NIX_PATH` environment variable. This package set can be different
+depending on when you installed Nix and which nixpkgs channel you're using 
+(similar to the LTS channel for stable packages and the nightly channel for bleeding
+edge packages in [Stackage](https://www.stackage.org/)).
+This is bad for reproducibilty so that nixpkgs should be pinned, i.e.,
+set to the same package set for every developer of your project.
 
-You can override this by passing
+You can set or override the Nix package set by passing
 `--nix-path="nixpkgs=/my/own/nixpkgs/clone"` to ask Nix to use your
 own local checkout of the nixpkgs repository. You could in this way
 use a bleeding edge nixpkgs, cloned from the
@@ -177,19 +192,21 @@ nix:
   path: [nixpkgs=/my/own/nixpkgs/clone]
 ```
 
-in your `stack.yaml` will do the same.
+in your `stack.yaml` will do the same. 
+[This example repository](https://github.com/tweag/haskell-stack-nix-example)
+shows how you can pin a package set.
 
 ## Command-line options
 
 The configuration present in your `stack.yaml` can be overridden on the
 command-line. See `stack --nix-help` for a list of all Nix options.
 
-## Configuration
+## Configuration options
 
-`stack.yaml` contains a `nix:` section with Nix settings.
-Without this section, Nix will not be used.
+`stack.yaml` contains a `nix:` section for Nix settings.
+Without this section, Nix won't be used.
 
-Here is a commented configuration file, showing the default values:
+Here's a working configuration file with all settings, mentioning default values:
 
 ```yaml
 nix:
@@ -198,7 +215,7 @@ nix:
   # NixOS where it is enabled by default (see #3938).  You can set set it in your
   # `$HOME/.stack/config.yaml` to enable Nix for all your projects without having
   # to repeat it
-  # enable: true
+  enable: true
 
   # true by default. Tells Nix whether to run in a pure shell or not.
   pure: true
@@ -230,12 +247,12 @@ nix:
   add-gc-roots: false
 ```
 
-## Option 2: External C libraries through a custom shell.nix file
+## External C libraries through shell.nix
 
 There's also the [Nix programming language][nix-language]
 to provide a fully customized derivation as an environment to use. 
 Here's the equivalent of the configuration used in the 
-[previous example](#option-1-external-c-libraries-through-a-list-of-nix-packages), 
+[previous example](#external-c-libraries-through-nix-packages), 
 but with an explicit `shell.nix` file 
 (make sure you're using a nixpkgs version later than 2015-03-05):
 
@@ -250,7 +267,7 @@ haskell.lib.buildStackProject {
 }
 ```
 
-Defining manually a `shell.nix` file gives you the possibility to override some
+Defining a `shell.nix` file manually gives you the possibility to override some
 Nix derivations ("packages"), for instance to change some build options of the
 libraries you use, or to set additional environment variables. See the
 [Nix manual][nix-manual-exprs] for more. The `buildStackProject` utility
