@@ -23,7 +23,7 @@ There are two options to create such a build environment:
   of what libraries and tools are available inside the shell. 
 
 The second requires writing code in 
-[Nix's custom language](https://nixos.wiki/wiki/Nix_Expression_Language). 
+[Nix's custom language][nix-language]. 
 So use this option only if you already know Nix and have special requirements,
 such as using custom Nix packages that override the standard ones or
 using system libraries with special requirements.
@@ -232,13 +232,12 @@ nix:
 
 ## Option 2: External C libraries through a custom shell.nix file
 
-Nix is also a programming language, and as specified
-[here](#nix-integration) if you know it you can provide to the shell
-a fully customized derivation as an environment to use. Here is the
-equivalent of the configuration used in
-[this section](#additions-to-your-stackyaml), but with an explicit
-`shell.nix` file (make sure you're using a nixpkgs version later than
-2015-03-05):
+There's also the [Nix programming language][nix-language]
+to provide a fully customized derivation as an environment to use. 
+Here's the equivalent of the configuration used in the 
+[previous example](#option-1-external-c-libraries-through-a-list-of-nix-packages), 
+but with an explicit `shell.nix` file 
+(make sure you're using a nixpkgs version later than 2015-03-05):
 
 ```nix
 {ghc}:
@@ -275,4 +274,6 @@ error. (Comment one out before adding the other.)
 
 [nix-manual-exprs]: http://nixos.org/nix/manual/#chap-writing-nix-expressions
 [nixpkgs-manual-haskell]: https://nixos.org/nixpkgs/manual/#users-guide-to-the-haskell-infrastructure
-[nix-search-packages](https://nixos.org/nixos/packages.html)
+[nix-search-packages]: https://nixos.org/nixos/packages.html
+[nix-language]: https://nixos.wiki/wiki/Nix_Expression_Language
+
