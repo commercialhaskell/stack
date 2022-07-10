@@ -6,25 +6,25 @@
 
 When using the Nix integration, Stack handles Haskell dependencies as usual
 while Nix handles _non-Haskell_ dependencies needed by these Haskell packages.
-That is, Stack downloads Haskell packages from [Stackage](https://www.stackage.org/lts)
+So Stack downloads Haskell packages from [Stackage](https://www.stackage.org/lts)
 and builds them locally but uses Nix to download 
-[Nix packages](https://search.nixos.org/packages) that provide the GHC compiler and 
-external C libraries like zlib that you would normally install manually.
+[Nix packages][nix-search-packages] that provide the GHC compiler and 
+external C libraries that you would normally install manually.
 You can install Nix with all the necessary commandline tools from the 
 [Nix download page](http://nixos.org/nix/download.html).
 
-`stack` can automatically create a build environment similar to building
-inside an isolated [Docker](https://www.docker.com/) container using `nix-shell`. 
-There are two ways to create such a build environment:
+`stack` can automatically create a Nix build environment in the background
+using `nix-shell`, similar to building inside an isolated 
+[Docker](https://www.docker.com/) container. 
+There are two options to create such a build environment:
 
-- providing a list of packages (by "attribute name") from
-  [Nixpkgs](http://nixos.org/nixos/packages.html), or
-- providing a custom `shell.nix` file containing a Nix expression that
-  determines a *derivation*, i.e. a specification of what resources
-  are available inside the shell.
+- provide a list of [Nix packages][nix-search-packages]
+- provide a custom `shell.nix` file that gives you more control 
+  of what libraries and tools are available inside the shell. 
 
-The second requires writing code in Nix's custom language. So use this
-option only if you already know Nix and have special requirements,
+The second requires writing code in 
+[Nix's custom language](https://nixos.wiki/wiki/Nix_Expression_Language). 
+So use this option only if you already know Nix and have special requirements,
 such as using custom Nix packages that override the standard ones or
 using system libraries with special requirements.
 
@@ -40,34 +40,40 @@ You should either run `source ~/.nix-profile/etc/profile.d/nix.sh` manually
 every time you open a terminal and need Nix or add this command to your
 `~/.bashrc` or `~/.bash_profile`.
 
-### Additions to your `stack.yaml`
+### Option 1: External C libraries through a list of Nix packages
 
 Add a section to your `stack.yaml` as follows:
 ```yaml
 nix:
   enable: true
-  packages: [glpk, pcre]
+  packages: [zlib, glpk, pcre]
 ```
 
 This will instruct `stack` to build inside a local build environment
-that will have the `glpk` and `pcre` libraries installed and
-available. Further, the build environment will implicitly also include
-a version of GHC matching the configured resolver. Enabling Nix
-support means packages will always be built using a GHC available
-inside the shell, rather than your globally installed one if any.
+that will have the Nix packages 
+[zlib](https://search.nixos.org/packages?query=zlib),
+[glpk](https://search.nixos.org/packages?query=glpk) and
+[pcre](https://search.nixos.org/packages?query=pcre)
+installed, which provide the C libraries of the same names. 
+Further, the build environment will implicitly also download and use
+a [GHC Nix package](https://search.nixos.org/packages?query=haskell.compiler.ghc)
+matching the required version of the configured 
+[Stack resolver](https://docs.haskellstack.org/en/stable/GUIDE/#resolvers-and-changing-your-compiler-version). 
+So, enabling Nix support means that packages will always be built using the 
+local GHC inside your shell, rather than your globally installed one if any.
 
 Note that in this mode `stack` can use only GHC versions that have
 already been mirrored into the Nix package repository.
 The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
 usually picks up new versions quickly, but it takes two or three
 days before those updates arrive in the `unstable` channel. Release
-channels, like `nixos-15.09`, receive those updates only
+channels, like `nixos-22.05`, receive those updates only
 occasionally -- say, every two or three months --, so you should not
 expect them to have the latest compiler available. Fresh NixOS installs
 use a release version by default.
 
 To know for sure whether a given compiler is available on your system,
-you can use the command
+you can use the Nix command
 
 ```sh
 $ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc801
@@ -124,9 +130,10 @@ happen when running `stack build` if no setup has been performed
 before. Therefore it is no longer necessary to run `stack setup` unless you
 want to cache a GHC installation before running the build.
 
-If `enable:` is omitted or set to `false`, you can still build in a nix-shell by
-passing the `--nix` flag to stack, for instance `stack --nix build`.  Passing
-any `--nix*` option to the command line will do the same.
+If `enable:` is omitted or set to `false` in your `stack.yaml` file, 
+you can still build within a nix-shell by
+overriding Stack through the `--nix` flag, for instance `stack --nix build`.  
+Passing any `--nix*` option to the command line will do the same.
 
 **Known limitation on macOS:** currently, `stack --nix ghci` fails on
 macOS, due to a bug in GHCi when working with external shared
@@ -223,7 +230,7 @@ nix:
   add-gc-roots: false
 ```
 
-## Using a custom shell.nix file
+## Option 2: External C libraries through a custom shell.nix file
 
 Nix is also a programming language, and as specified
 [here](#nix-integration) if you know it you can provide to the shell
@@ -240,7 +247,7 @@ with (import <nixpkgs> {});
 haskell.lib.buildStackProject {
   inherit ghc;
   name = "myEnv";
-  buildInputs = [ glpk pcre ];
+  buildInputs = [ zlib glpk pcre ];
 }
 ```
 
@@ -251,8 +258,8 @@ libraries you use, or to set additional environment variables. See the
 function is documented in the [Nixpkgs manual][nixpkgs-manual-haskell].  In such
 case, stack expect this file to define a function of exactly one argument that
 should be called `ghc` (as arguments within a set are non-positional), which you
-should give to `buildStackProject`. This is the ghc from the resolver you set in
-the `stack.yaml`.
+should give to `buildStackProject`. This is a GHC Nix package in the version as
+defined in the resolver you set in the `stack.yaml` file.
 
 And now for the `stack.yaml` file:
 
@@ -268,3 +275,4 @@ error. (Comment one out before adding the other.)
 
 [nix-manual-exprs]: http://nixos.org/nix/manual/#chap-writing-nix-expressions
 [nixpkgs-manual-haskell]: https://nixos.org/nixpkgs/manual/#users-guide-to-the-haskell-infrastructure
+[nix-search-packages](https://nixos.org/nixos/packages.html)
