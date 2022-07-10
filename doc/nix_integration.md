@@ -19,7 +19,7 @@ using `nix-shell`, similar to building inside an isolated
 There are two options to create such a build environment:
 
 - provide a list of [Nix packages][nix-search-packages]
-- provide a custom `shell.nix` file that gives you more control 
+- provide a `shell.nix` file that gives you more control 
   of what libraries and tools are available inside the shell. 
 
 The second requires writing code in 
