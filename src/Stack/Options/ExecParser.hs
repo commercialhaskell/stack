@@ -62,7 +62,7 @@ execOptsExtraParser = ExecOptsExtra
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many
                        (strOption (long "package"
-                                  <> help "Additional package(s) that must be installed"
+                                  <> help "Each --package adds (installs) one package"
                                   <> metavar "PACKAGE(S)"))
 
     eoRtsOptionsParser :: Parser [String]

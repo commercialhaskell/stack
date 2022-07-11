@@ -964,7 +964,7 @@ packagesParser :: Parser [String]
 packagesParser = many (strOption
                    (long "package" <>
                      metavar "PACKAGE(S)" <>
-                     help "Additional package(s) that must be installed"))
+                     help "Each --package adds (installs) one package"))
 
 defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
