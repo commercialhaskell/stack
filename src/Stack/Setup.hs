@@ -993,13 +993,6 @@ getGhcBuilds = do
                         [] -> CompilerBuildStandard
                         _ -> CompilerBuildSpecialized (intercalate "-" c))
                     libComponents
-            Platform _ Cabal.FreeBSD -> do
-                let getMajorVer = readMaybe <=< headMaybe . (splitOn ".")
-                majorVer <- getMajorVer <$> sysRelease
-                if majorVer >= Just (12 :: Int) then
-                  useBuilds [CompilerBuildSpecialized "ino64"]
-                else
-                  useBuilds [CompilerBuildStandard]
             Platform _ Cabal.OpenBSD -> do
                 releaseStr <- mungeRelease <$> sysRelease
                 useBuilds [CompilerBuildSpecialized releaseStr]
