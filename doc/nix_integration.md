@@ -289,22 +289,25 @@ The `stack build` command will behave exactly the same as above. Note
 that specifying both `packages:` and a `shell-file:` results in an
 error. (Comment one out before adding the other.)
 
-## Stack on NixOS
+## Stack and developer tools on NixOS
 
 When using Stack on NixOS, you have no choice but to use Stack's Nix integration to 
 install GHC, because external C libraries in NixOS are not installed in the usual 
 distro folders. So a GHC compiler installed through Stack (without Nix) can't find
-those libraries and therefore can't build most projects. GHC provided through Nix 
-is patched in a way that it finds the external C libraries listed and provided through Nix.
+those libraries and therefore can't build most projects. However, GHC provided through Nix 
+can be modified to find the external C libraries provided through Nix.
+
 A detailed tutorial on how to configure Stack so that it supports NixOS and non-Nix users
 can be found [here](https://www.tweag.io/blog/2022-06-02-haskell-stack-nix-shell/). A corresponding
 example project can be found [here](https://github.com/tweag/haskell-stack-nix-example).
 
-If you're already using Nix flakes, here's an adaption of that example:
+If you're already using Nix flakes, here's an adaptation of that example extended with typical developer
+tools like the [Haskell Language Server](https://haskell-language-server.readthedocs.io/en/latest/what-is-hls.html):
 Add the following `flake.nix` file to your project.
 
 ```nix
 {
+  description = "my project description";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
@@ -312,52 +315,54 @@ Add the following `flake.nix` file to your project.
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        # Wrap Stack to configure Nix integration and target the correct Stack-Nix file
-        #
-        # - nix: Enable Nix support
-        # - no-nix-pure: Pass environment variables, like `NIX_PATH`
-        # - nix-shell-file: Specify the Nix file to use (otherwise it uses `shell.nix` by default)
+
+        hPkgs =
+          pkgs.haskell.packages."ghc8107"; # need to match Stackage LTS version from stack.yaml resolver
+
+        myDevTools = [
+          hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
+          hPkgs.ghcid # Continous terminal Haskell compile checker
+          hPkgs.ormolu # Haskell formatter
+          hPkgs.hlint # Haskell codestyle checker
+          hPkgs.hoogle # Lookup Haskell documentation
+          hPkgs.haskell-language-server # LSP server for editor
+          hPkgs.implicit-hie # auto generate LSP hie.yaml file from cabal
+          hPkgs.retrie # Haskell refactoring tool
+          # hPkgs.cabal-install
+          stack-wrapped
+          pkgs.zlib # External C library needed by some Haskell packages
+        ];
+
+        # Wrap Stack to work with our Nix integration. We don't want to modify stack.yaml so non-Nix users don't notice anything.
+        # - no-nix: We don't want Stack's way of integrating Nix.
+        # --system-ghc    # Use the existing GHC on PATH (will come from this Nix file)
+        # --no-install-ghc  # Don't try to install GHC if no matching GHC found on PATH
         stack-wrapped = pkgs.symlinkJoin {
-          name = "stack";
+          name = "stack"; # will be available as the usual `stack` in terminal
           paths = [ pkgs.stack ];
           buildInputs = [ pkgs.makeWrapper ];
           postBuild = ''
             wrapProgram $out/bin/stack \
               --add-flags "\
-                --nix \
-                --no-nix-pure \
-                --nix-shell-file=flake-stack-integration.nix \
+                --no-nix \
+                --system-ghc \
+                --no-install-ghc \
               "
           '';
         };
       in {
         devShells.default = pkgs.mkShell {
-          buildInputs = [ stack-wrapped ];
+          buildInputs = myDevTools;
 
-          # Configure the Nix path to our own pinned package set, to ensure Stack uses the same one rather than another global <nixpkgs> when looking for the right `ghc` argument to pass in `flake-stack-integration.nix`
-          # See https://nixos.org/nixos/nix-pills/nix-search-paths.html for more information
-          NIX_PATH = "nixpkgs=" + pkgs.path;
+          # Make external Nix c libraries like zlib known to GHC, like pkgs.haskell.lib.buildStackProject does
+          # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath myDevTools;
         };
       });
 }
-
 ```
 
-Then also add the following `flake-stack-integration.nix` file to your project:
-
-```nix
-{ ghc }:
-with (import <nixpkgs> { });
-
-haskell.lib.buildStackProject {
-  inherit ghc;
-  name = "haskell-stack-flake-nix";
-  buildInputs = [ zlib glpk pcre ];
-}
-
-```
-
-Commit both files to Git, run `nix develop` (it searches for `flake.nix` by default),
+Commit this file to Git, run `nix develop` (it searches for `flake.nix` by default),
 and you'll find a new `flake.lock` file that pins the precise nixpkgs package set. 
 Commit this file to Git as well so that every developer of your project will use precisely
 the same package set.
