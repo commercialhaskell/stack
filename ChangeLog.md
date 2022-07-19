@@ -36,6 +36,7 @@ Bug fixes:
   [#5714](https://github.com/commercialhaskell/stack/issues/5714)
 * Fix an inconsistency in the pretty formatting of the output of
   `stack build --coverage`
+* Fix repeated warning about missing parameters when using `stack new`
 
 ## v2.7.5
 

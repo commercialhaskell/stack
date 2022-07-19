@@ -271,8 +271,7 @@ applyTemplate project template nonceParams dir templateText = do
          throwM (InvalidTemplate template
            "Template does not contain a .cabal or package.yaml file")
 
-    -- Apply Mustache templating to a single file within the project
-    -- template.
+    -- Apply Mustache templating to a single file within the project template.
     let applyMustache bytes
           -- Workaround for performance problems with mustache and
           -- large files, applies to Yesod templates with large
@@ -286,28 +285,39 @@ applyTemplate project template nonceParams dir templateText = do
                 Right t -> return t
               let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
                   missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
-              unless (S.null missingKeys)
-                (logInfo ("\n" <> displayShow (MissingParameters project template missingKeys (configUserConfigPath config)) <> "\n"))
-              pure $ LB.fromStrict $ encodeUtf8 applied
+              pure (LB.fromStrict $ encodeUtf8 applied, missingKeys)
 
           -- Too large or too binary
-          | otherwise = pure bytes
+          | otherwise = pure (bytes, S.empty)
 
-    liftM
-        M.fromList
-        (mapM
-             (\(fpOrig,bytes) ->
-                   do -- Apply the mustache template to the filenames
-                      -- as well, so that we can have file names
-                      -- depend on the project name.
-                      fp <- applyMustache $ TLE.encodeUtf8 $ TL.pack fpOrig
-                      path <- parseRelFile $ TL.unpack $ TLE.decodeUtf8 fp
-                      bytes' <- applyMustache bytes
-                      return (dir </> path, bytes'))
-             (M.toList files))
+        -- Accumulate any missing keys as the file is processed
+        processFile mks (fpOrig, bytes) = do
+          -- Apply the mustache template to the filenames as well, so that we
+          -- can have file names depend on the project name.
+          (fp, mks1) <- applyMustache $ TLE.encodeUtf8 $ TL.pack fpOrig
+          path <- parseRelFile $ TL.unpack $ TLE.decodeUtf8 fp
+          (bytes', mks2) <- applyMustache bytes
+          return (mks <> mks1 <> mks2, (dir </> path, bytes'))
+
+    (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
+    unless (S.null missingKeys) $ do
+      let missingParamters = MissingParameters
+                               project
+                               template
+                               missingKeys
+                               (configUserConfigPath config)
+      logInfo ("\n" <> displayShow missingParamters <> "\n")
+    return $ M.fromList results
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
     onlyMissingKeys _ = []
+
+    mapAccumLM :: Monad m => (a -> b -> m(a, c)) -> a -> [b] -> m(a, [c])
+    mapAccumLM _ a [] = return (a, [])
+    mapAccumLM f a (x:xs) = do
+      (a', c) <- f a x
+      (a'', cs) <- mapAccumLM f a' xs
+      return (a'', c:cs)
 
 -- | Check if we're going to overwrite any existing files.
 checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
