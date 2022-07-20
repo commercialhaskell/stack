@@ -48,8 +48,8 @@ complicatedOptions
   -> IO (a,b)
 complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
   do args <- getArgs
-     (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
-       Failure _ | null args -> withArgs ["--help"] (execParser parser)
+     (a,(b,c)) <- let parserPrefs = prefs $ noBacktrack <> showHelpOnEmpty
+                  in  case execParserPure parserPrefs parser args of
        -- call onFailure handler if it's present and parsing options failed
        Failure f | Just onFailure <- mOnFailure -> onFailure f args
        parseResult -> handleParseResult parseResult
