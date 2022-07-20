@@ -37,6 +37,8 @@ Bug fixes:
 * Fix an inconsistency in the pretty formatting of the output of
   `stack build --coverage`
 * Fix repeated warning about missing parameters when using `stack new`
+* Include `pantry-0.5.6`: Remove operational and mirror keys from bootstrap key
+  set [#53](https://github.com/commercialhaskell/pantry/pull/53)
 
 ## v2.7.5
 
