@@ -1,5 +1,106 @@
 # Contributors Guide
 
+Thank you for considering contributing to the maintenance or development of
+Stack, or otherwise supporting users of Stack! We hope that the following
+information will encourage and assist you. We start with some advice about
+Stack's goals and governance, and approach to supporting users.
+
+## Stack's goals
+
+Stack's current goals are:
+
+* To provide easy to use tooling for Haskell development
+* To provide complete support for at least the following three development
+  environments: Linux, macOS, and Windows
+* To address the needs of industrial users, open source maintainers, and other
+  people
+* To focus on the 'curated package set' use case
+* To prioritize reproducible build plans
+
+The goals above are not set in stone. However, any major changes to them
+should involve significant public discussion and a public vote by the Stack
+maintainer team.
+
+## Stack's governance
+
+People involved in maintaining or developing Stack with rights to make commits
+to the repository can be classified into two groups: 'committers' and
+'maintainers'.
+
+### Stack's committers
+
+We encourages a wide range of people to be granted rights to make commits to the
+repository.
+
+People are encouraged to take initiative to make non-controversial
+changes, such as documentation improvements, bug fixes, performance
+improvements, and feature enhancements.
+
+Maintainers should be included in discussions of controversial changes and
+tricky code changes.
+
+Our general approach is **"it's easier to ask forgiveness than permission"**. If
+there is ever a bad change, it can always be rolled back.
+
+### Stack's maintainers
+
+Stack's maintainers are long-term contributors to the project. Michael Snoyman
+(@snoyberg) was the founder of Stack, and its initial maintainer - and he has
+added others. Michael's current interests and priorties mean that he is no
+longer actively involved in adding new features to Stack.
+
+Maintainers are recognized for their contributions including:
+
+* Direct code contribution
+* Review of pull requests
+* Interactions on the GitHub issue tracker
+* Documentation management
+* External support - for example, hosting or training
+
+The maintainer team make certain decisions when that is necessary, specifically:
+
+* How to proceed, if there is disagreement on how to do so on a specific topic
+* Whether to add or remove (see further below) a maintainer
+
+Generally, maintainers are only removed due to non-participation or actions
+unhealthy to the project. Removal due to non-participation is not a punishment,
+simply a recognition that maintainership is for active participants only.
+
+We hope that removal due to unhealthy actions will never be necessary, but would
+include protection for cases of:
+
+* Disruptive behavior in public channels related to Stack
+* Impairing the codebase through bad commits/merges
+
+Like committers, maintainers are broadly encouraged to make autonomous
+decisions. Each maintainer is empowered to make a unilateral decision. However,
+maintainers should favor getting consensus first if:
+
+* They are uncertain what is the best course of action
+* They anticipate that other maintainers or users of Stack will disagree on the
+  decision
+
+## Stack's support
+
+A large part of the general discussion around Stack is on support-related
+topics, and that is reflected in the current issue tracker content. Assistance
+in responding to such matters is greatly appreciated.
+
+While support-related matters can be posted here as an 'issue', we encourage the
+use of other forums, in particular
+[Haskell's Discourse](https://discourse.haskell.org/). We also recommend
+Haskell's Discourse for general discussions about Stack's current or desired
+features. Stack is also discussed on Reddit's
+[Haskell community](https://www.reddit.com/r/haskell/).
+
+We encourage use of those other forums because support-related discussions can
+clog up the issue tracker and make it more difficult to maintain the project.
+People needing support may also get a faster and fuller response on other
+forums.
+
+Additions to the issue tracker are better suited to concrete feature proposals,
+bug reports, and other code base discussions (for example, refactorings).
+
 ## Bug Reports
 
 Please [open an issue](https://github.com/commercialhaskell/stack/issues/new)
@@ -19,7 +120,8 @@ If you would like to help with documentation, please note that for most cases
 the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
 subdirectory of the repository itself. Please submit a
 [pull request](https://help.github.com/articles/using-pull-requests/) with your
-changes/additions based off the [the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
+changes/additions based off the
+[the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
 readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
@@ -61,16 +163,18 @@ quality tool.
 
 Note that stack contributors need not dogmatically follow the suggested hints
 but are encouraged to debate their usefulness. If you find a hint is not useful
-and detracts from readability, consider marking it in the [configuration
-file](https://github.com/commercialhaskell/stack/blob/master/.hlint.yaml) to
-be ignored. Please refer to the [HLint manual](https://github.com/ndmitchell/hlint#readme)
+and detracts from readability, consider marking it in the
+[configuration file](https://github.com/commercialhaskell/stack/blob/master/.hlint.yaml)
+to be ignored. Please refer to the
+[HLint manual](https://github.com/ndmitchell/hlint#readme)
 for configuration syntax.
 
-Quoting [@mgsloan](https://github.com/commercialhaskell/stack/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Amgsloan):
+Quoting
+[@mgsloan](https://github.com/commercialhaskell/stack/pulls?utf8=%E2%9C%93&q=is%3Apr%20author%3Amgsloan):
 
 > We are optimizing for code clarity, not code concision or what HLint thinks.
 
-You can install HLint with stack. You might want to install it in the global
+You can install HLint with Stack. You might want to install it in the global
 project in case you run into dependency conflicts. HLint can report hints in
 your favourite text editor. Refer to the HLint repository for more details.
 
@@ -89,10 +193,12 @@ $ ./etc/scripts/hlint.sh
 ## Testing
 
 The Stack code has both unit tests and integration tests. Integration tests can
-be found in the [test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
-folder and unit tests, in the [src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
-folder. Tests are written using the [Hspec](https://hspec.github.io/) framework. In
-order to run the full test suite, you can simply do:
+be found in the
+[test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
+folder and unit tests, in the
+[src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
+folder. Tests are written using the [Hspec](https://hspec.github.io/) framework.
+In order to run the full test suite, you can simply do:
 
 ```bash
 $ stack test
@@ -186,13 +292,12 @@ if you have the appropriate permissions. If you'd specifically like a
 branch or PR to run integration tests, add a comment in the PR and we
 can queue one up.
 
-
 ### Skipping build
 
 There are times (like a minor type fix) where you don't want the CI to
 run. For those cases, you can add `[skip ci]` or `[ci skip]` in your
-commit message to skip the builds. For more details, [refer
-here](https://github.com/Microsoft/azure-pipelines-agent/issues/858#issuecomment-475768046).
+commit message to skip the builds. For more details,
+[refer here](https://github.com/Microsoft/azure-pipelines-agent/issues/858#issuecomment-475768046).
 
 ## Slack channel
 
