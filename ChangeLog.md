@@ -32,6 +32,9 @@ Other enhancements:
 * Fuller help is provided at the command line if a subcommand is missing (for
   example, `stack ls` now yields the equivalent of `stack ls --help`). See
   [#809](https://github.com/commercialhaskell/stack/issues/809)
+* Add build option `--cabal-verbosity=VERBOSITY` to specify the Cabal verbosity
+  level (the option accepts Cabal's numerical and extended syntax).
+  See [#1369](https://github.com/commercialhaskell/stack/issues/809)
 
 Bug fixes:
 

@@ -864,6 +864,7 @@ build:
     no-run-benchmarks: false
   force-dirty: false
   reconfigure: false
+  cabal-verbosity: normal
   cabal-verbose: false
   split-objs: false
 
