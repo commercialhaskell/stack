@@ -128,7 +128,8 @@ module Stack.Types.Config
   ,shaPath
   ,shaPathForBytes
   ,workDirL
-  -- * Command-specific types
+  -- * Command-related types
+  ,AddCommand
   -- ** Eval
   ,EvalOpts(..)
   -- ** Exec
@@ -176,7 +177,8 @@ module Stack.Types.Config
   ,to
   ) where
 
-import           Control.Monad.Writer (tell)
+import           Control.Monad.Writer (Writer, tell)
+import           Control.Monad.Trans.Except (ExceptT)
 import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
@@ -474,6 +476,11 @@ data EnvSettings = EnvSettings
     -- ^ if True, keep GHCRTS variable in environment
     }
     deriving (Show, Eq, Ord)
+
+type AddCommand =
+  ExceptT (RIO Runner ())
+          (Writer (OA.Mod OA.CommandFields (RIO Runner (), GlobalOptsMonoid)))
+          ()
 
 data ExecOpts = ExecOpts
     { eoCmd :: !SpecialExecCmd

@@ -413,24 +413,24 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
       where
         -- addCommand hiding global options
         addCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                    -> AddCommand Runner
+                    -> AddCommand
         addCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
 
-        addSubCommands' :: String -> String -> AddCommand Runner
-                        -> AddCommand Runner
+        addSubCommands' :: String -> String -> AddCommand
+                        -> AddCommand
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows build options
         addBuildCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand Runner
+                         -> AddCommand
         addBuildCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts BuildCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows some ghci options
         addGhciCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand Runner
+                         -> AddCommand
         addGhciCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts GhciCmdGlobalOpts)
 
