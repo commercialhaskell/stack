@@ -5,7 +5,6 @@ module Stack.Options.ExecParser where
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Args
-import           Options.Applicative.Help.Pretty (brackets)
 import           Stack.Options.Completion
 import           Stack.Prelude
 import           Stack.Types.Config

@@ -4,7 +4,6 @@ module Stack.Options.ScriptParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Help.Pretty (brackets)
 import           Stack.Options.Completion
 import           Stack.Prelude
 

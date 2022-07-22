@@ -54,8 +54,7 @@ import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange, mkVersion')
 import           GHC.Conc (getNumProcessors)
 import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
-import           Options.Applicative (Parser, help, long, metavar, strOption, style)
-import           Options.Applicative.Help.Pretty (brackets)
+import           Options.Applicative (Parser, help, long, metavar, strOption)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
