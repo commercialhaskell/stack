@@ -170,7 +170,7 @@ buildOptsMonoidParser hide0 =
             T.pack
             (strOption
                 (long "skip" <>
-                 help "Skip given component, can be specified multiple times" <>
+                 help "Skip given component (can be specified multiple times)" <>
                  hide)))
     interleavedOutput =
         firstBoolFlagsTrue

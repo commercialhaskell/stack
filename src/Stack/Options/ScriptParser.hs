@@ -4,6 +4,7 @@ module Stack.Options.ScriptParser where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
+import           Options.Applicative.Help.Pretty (brackets)
 import           Stack.Options.Completion
 import           Stack.Prelude
 
@@ -31,8 +32,8 @@ scriptOptsParser :: Parser ScriptOpts
 scriptOptsParser = ScriptOpts
     <$> many (strOption
           (long "package" <>
-            metavar "PACKAGE(S)" <>
-            help "Additional package(s) that must be installed"))
+            metavar "PACKAGE" <>
+            help "Add a package (can be specified multiple times)"))
     <*> strArgument (metavar "FILE" <> completer (fileExtCompleter [".hs", ".lhs"]))
     <*> many (strArgument (metavar "-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program)"))
     <*> (flag' SECompile
