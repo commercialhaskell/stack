@@ -64,8 +64,7 @@ execOptsExtraParser = ExecOptsExtra
     eoPackagesParser = many
                        (strOption (long "package"
                                   <> metavar "PACKAGE"
-                                  <> help "Add a package"
-                                  <> style brackets))
+                                  <> help "Add a package (can be specified multiple times)"))
 
     eoRtsOptionsParser :: Parser [String]
     eoRtsOptionsParser = concat <$> many (argsOption

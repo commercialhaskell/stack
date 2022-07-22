@@ -33,8 +33,7 @@ scriptOptsParser = ScriptOpts
     <$> many (strOption
           (long "package" <>
             metavar "PACKAGE" <>
-            help "Add a package" <>
-            style brackets))
+            help "Add a package (can be specified multiple times)"))
     <*> strArgument (metavar "FILE" <> completer (fileExtCompleter [".hs", ".lhs"]))
     <*> many (strArgument (metavar "-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program)"))
     <*> (flag' SECompile
