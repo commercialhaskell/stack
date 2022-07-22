@@ -5,7 +5,7 @@ packages:
 
 extra-deps:
 - hpack-0.35.0@rev:0
-- pantry-0.5.3@rev:0
+- pantry-0.5.6@rev:0 # https://github.com/commercialhaskell/pantry/pull/53
 - rio-0.1.21.0@rev:0
 
 
