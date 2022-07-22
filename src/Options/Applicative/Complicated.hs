@@ -8,7 +8,8 @@
 -- pushing upstream to optparse-applicative.
 
 module Options.Applicative.Complicated
-  ( addCommand
+  ( AddCommand
+  , addCommand
   , addSubCommands
   , complicatedOptions
   , complicatedParser
@@ -21,12 +22,15 @@ import           Options.Applicative.Types
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Builder.Internal
 import           Stack.Prelude
+import           Stack.Types.Config
 import           System.Environment
+
+type AddCommand env =
+    ExceptT (RIO env ()) (Writer (Mod CommandFields (RIO env (), GlobalOptsMonoid))) ()
 
 -- | Generate and execute a complicated options parser.
 complicatedOptions
-  :: Monoid a
-  => Version
+  :: Version
   -- ^ numeric version
   -> Maybe String
   -- ^ version string
@@ -38,14 +42,14 @@ complicatedOptions
   -- ^ program description (displayed between usage and options listing in the help output)
   -> String
   -- ^ footer
-  -> Parser a
+  -> Parser GlobalOptsMonoid
   -- ^ common settings
-  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (a,(b,a)))
+  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (GlobalOptsMonoid,(RIO env (),GlobalOptsMonoid)))
   -- ^ optional handler for parser failure; 'handleParseResult' is called by
   -- default
-  -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
+  -> AddCommand env
   -- ^ commands (use 'addCommand')
-  -> IO (a,b)
+  -> IO (GlobalOptsMonoid, RIO env ())
 complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- let parserPrefs = prefs $ noBacktrack <> showHelpOnEmpty
@@ -80,28 +84,27 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerS
 addCommand :: String   -- ^ command string
            -> String   -- ^ title of command
            -> String   -- ^ footer of command help
-           -> (a -> b) -- ^ constructor to wrap up command in common data type
-           -> (a -> c -> c) -- ^ extend common settings from local settings
-           -> Parser c -- ^ common parser
-           -> Parser a -- ^ command parser
-           -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
+           -> (opts -> RIO env ()) -- ^ constructor to wrap up command in common data type
+           -> (opts -> GlobalOptsMonoid -> GlobalOptsMonoid) -- ^ extend common settings from local settings
+           -> Parser GlobalOptsMonoid -- ^ common parser
+           -> Parser opts -- ^ command parser
+           -> AddCommand env
 addCommand cmd title footerStr constr extendCommon =
   addCommand' cmd title footerStr (\a c -> (constr a,extendCommon a c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands
-  :: Monoid c
-  => String
+  :: String
   -- ^ command string
   -> String
   -- ^ title of command
   -> String
   -- ^ footer of command help
-  -> Parser c
+  -> Parser GlobalOptsMonoid
   -- ^ common parser
-  -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
+  -> AddCommand env
   -- ^ sub-commands (use 'addCommand')
-  -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
+  -> AddCommand env
 addSubCommands cmd title footerStr commonParser commandParser =
   addCommand' cmd
               title
@@ -114,10 +117,10 @@ addSubCommands cmd title footerStr commonParser commandParser =
 addCommand' :: String   -- ^ command string
             -> String   -- ^ title of command
             -> String   -- ^ footer of command help
-            -> (a -> c -> (b,c)) -- ^ constructor to wrap up command in common data type
-            -> Parser c -- ^ common parser
-            -> Parser a -- ^ command parser
-            -> ExceptT b (Writer (Mod CommandFields (b,c))) ()
+            -> (opts -> GlobalOptsMonoid -> (RIO env (),GlobalOptsMonoid)) -- ^ constructor to wrap up command in common data type
+            -> Parser GlobalOptsMonoid -- ^ common parser
+            -> Parser opts -- ^ command parser
+            -> AddCommand env
 addCommand' cmd title footerStr constr commonParser inner =
   lift (tell (command cmd
                       (info (constr <$> inner <*> commonParser)
@@ -125,14 +128,13 @@ addCommand' cmd title footerStr constr commonParser inner =
 
 -- | Generate a complicated options parser.
 complicatedParser
-  :: Monoid a
-  => String
+  :: String
   -- ^ metavar for the sub-command
-  -> Parser a
+  -> Parser GlobalOptsMonoid
   -- ^ common settings
-  -> ExceptT b (Writer (Mod CommandFields (b,a))) ()
+  -> AddCommand env
   -- ^ commands (use 'addCommand')
-  -> Parser (a,(b,a))
+  -> Parser (GlobalOptsMonoid,(RIO env (),GlobalOptsMonoid))
 complicatedParser commandMetavar commonParser commandParser =
    (,) <$>
    commonParser <*>

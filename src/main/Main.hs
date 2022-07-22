@@ -13,8 +13,6 @@ module Main (main) where
 import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
-import           Control.Monad.Trans.Except (ExceptT)
-import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import           Data.List
@@ -415,24 +413,24 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
       where
         -- addCommand hiding global options
         addCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                    -> AddCommand
+                    -> AddCommand Runner
         addCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
 
-        addSubCommands' :: String -> String -> AddCommand
-                        -> AddCommand
+        addSubCommands' :: String -> String -> AddCommand Runner
+                        -> AddCommand Runner
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows build options
         addBuildCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand
+                         -> AddCommand Runner
         addBuildCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts BuildCmdGlobalOpts)
 
         -- Additional helper that hides global options and shows some ghci options
         addGhciCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand
+                         -> AddCommand Runner
         addGhciCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts GhciCmdGlobalOpts)
 
@@ -448,9 +446,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         where hide = kind /= OuterGlobalOpts
 
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
-
-type AddCommand =
-    ExceptT (RIO Runner ()) (Writer (Mod CommandFields (RIO Runner (), GlobalOptsMonoid))) ()
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
