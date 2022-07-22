@@ -5,6 +5,7 @@ module Stack.Options.ExecParser where
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Args
+import           Options.Applicative.Help.Pretty (brackets)
 import           Stack.Options.Completion
 import           Stack.Prelude
 import           Stack.Types.Config
@@ -62,8 +63,9 @@ execOptsExtraParser = ExecOptsExtra
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many
                        (strOption (long "package"
-                                  <> help "Additional package(s) that must be installed"
-                                  <> metavar "PACKAGE(S)"))
+                                  <> metavar "PACKAGE"
+                                  <> help "Add a package"
+                                  <> style brackets))
 
     eoRtsOptionsParser :: Parser [String]
     eoRtsOptionsParser = concat <$> many (argsOption
