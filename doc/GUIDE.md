@@ -447,14 +447,17 @@ Remember above when `stack new` selected some
 our build plan and available packages. When we tried using the `text` package,
 it just worked, because it was part of the LTS *package set*.
 
-But `acme-missiles` is not part of that package set, so building failed.
+We've specified the `acme-missiles` package in the `package.yaml` file (see
+above), but `acme-missiles` is not part of that LTS package set, so building
+failed.
 
-To add this new dependency, we'll use the `extra-deps` field in `stack.yaml` to
-define extra dependencies not present in the resolver. You can add this like so:
+To add `acme-missles` to the available packages, we'll use the `extra-deps`
+field in the `stack.yaml` file. That field defines extra packages, not present
+in the resolver, that will be needed as dependencies. You can add this like so:
 
 ```yaml
 extra-deps:
-- acme-missiles-0.3 # not in the LTS
+- acme-missiles-0.3 # not in the LTS resolver
 ```
 
 Now `stack build` will succeed.
