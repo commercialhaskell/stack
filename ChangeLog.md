@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## Unreleased changes
 
 Release notes:
@@ -21,6 +20,19 @@ Other enhancements:
 * Bump to `hpack-0.35.0`.
 * On Windows, the installer now sets `DisplayVersion` in the registry, enabling
   tools like `winget` to properly read the version number.
+* Adds flag `--script-no-run-compile` (disabled by default) that uses the
+  `--no-run` option with `stack script` (and forces the `--compile` option).
+  This enables a command like `stack --script-no-run-compile Script.hs` to
+  behave like `stack script <arguments> --no-run --compile -- Script.hs` but
+  without having to list all the `<arguments>` in the stack interpreter options
+  comment in `Script.hs` on the command line. That may help test that scripts
+  compile in CI (continuous integration). See
+  [#5755](https://github.com/commercialhaskell/stack/issues/5755)
+* Fuller help is provided at the command line if a subcommand is missing (for
+  example, `stack ls` now yields the equivalent of `stack ls --help`). See
+  [#809](https://github.com/commercialhaskell/stack/issues/809)
+* Add the possibility of a `sh` script to customise fully GHC installation. See
+  [#5585](https://github.com/commercialhaskell/stack/pull/5585)
 * `tools` subcommand added to `stack ls`, to list stack's installed tools.
 
 Bug fixes:
@@ -29,6 +41,9 @@ Bug fixes:
   [#5714](https://github.com/commercialhaskell/stack/issues/5714)
 * Fix an inconsistency in the pretty formatting of the output of
   `stack build --coverage`
+* Fix repeated warning about missing parameters when using `stack new`
+* Include `pantry-0.5.6`: Remove operational and mirror keys from bootstrap key
+  set [#53](https://github.com/commercialhaskell/pantry/pull/53)
 
 ## v2.7.5
 

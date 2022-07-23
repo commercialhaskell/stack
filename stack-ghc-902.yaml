@@ -1,5 +1,5 @@
 # GHC 9.0.2
-resolver: lts-19.6
+resolver: lts-19.11
 
 packages:
 - .
@@ -22,10 +22,11 @@ ghc-options:
   "$locals": -fhide-source-paths
 
 extra-deps:
-# mustache absent from lts-19.5
+# mustache absent from lts-19.11
 - mustache-2.4.1@sha256:dc92ddbf90e3a64c3f2ec7785cf2937d6dcf6ffcebbc38ad9c8b33b6a70bb298,3180
-# lts-19.6 is limited to hpack-0.34.7
+# lts-19.11 is limited to hpack-0.34.7
 - hpack-0.35.0@sha256:8cd6146fae269390f41dc7237ebd2c479074d4163806d349a41f5a7751d6cea5,4726
+- pantry-0.5.6@rev:0 # https://github.com/commercialhaskell/pantry/pull/53
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

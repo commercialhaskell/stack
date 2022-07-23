@@ -1,4 +1,6 @@
+{-# LANGUAGE CApiFFI                  #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+
 module System.Terminal
 ( fixCodePage
 , getTerminalWidth
@@ -23,7 +25,9 @@ instance Storable WindowWidth where
   poke p (WindowWidth w) = do
     (#poke struct winsize, ws_col) p w
 
-foreign import ccall "sys/ioctl.h ioctl"
+-- `ioctl` is variadic, so `capi` is needed, see:
+-- https://www.haskell.org/ghc/blog/20210709-capi-usage.html
+foreign import capi "sys/ioctl.h ioctl"
   ioctl :: CInt -> CInt -> Ptr WindowWidth -> IO CInt
 
 getTerminalWidth :: IO (Maybe Int)

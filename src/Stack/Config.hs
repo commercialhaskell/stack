@@ -342,6 +342,7 @@ configFromConfigMonoid
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
          configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
          configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
+         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
@@ -962,8 +963,8 @@ getDefaultUserConfigPath stackRoot = do
 packagesParser :: Parser [String]
 packagesParser = many (strOption
                    (long "package" <>
-                     metavar "PACKAGE(S)" <>
-                     help "Additional package(s) that must be installed"))
+                     metavar "PACKAGE" <>
+                     help "Add a package (can be specified multiple times)"))
 
 defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
