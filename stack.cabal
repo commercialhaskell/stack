@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.34.6.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -271,7 +271,7 @@ library
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
     , persistent
@@ -306,6 +306,7 @@ library
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -331,7 +332,6 @@ library
         src/unix/
     c-sources:
         src/unix/cbits/uname.c
-  default-language: Haskell2010
 
 executable stack
   main-is: Main.hs
@@ -394,7 +394,7 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
     , persistent
@@ -430,6 +430,7 @@ executable stack
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -454,7 +455,6 @@ executable stack
     cpp-options: -DHIDE_DEP_VERSIONS
   if flag(supported-build)
     cpp-options: -DSUPPORTED_BUILD
-  default-language: Haskell2010
 
 executable stack-integration-test
   main-is: IntegrationSpec.hs
@@ -518,7 +518,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.14.3.0
     , optparse-generic
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
     , persistent
@@ -553,6 +553,7 @@ executable stack-integration-test
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -570,7 +571,6 @@ executable stack-integration-test
     buildable: False
   if flag(static)
     ld-options: -static -pthread
-  default-language: Haskell2010
 
 test-suite stack-test
   type: exitcode-stdio-1.0
@@ -647,7 +647,7 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
     , persistent
@@ -685,6 +685,7 @@ test-suite stack-test
     , yaml
     , zip-archive
     , zlib
+  default-language: Haskell2010
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -698,6 +699,5 @@ test-suite stack-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
-  default-language: Haskell2010
   build-tool-depends:
       hspec-discover:hspec-discover
