@@ -33,6 +33,7 @@ Other enhancements:
   [#809](https://github.com/commercialhaskell/stack/issues/809)
 * Add the possibility of a `sh` script to customise fully GHC installation. See
   [#5585](https://github.com/commercialhaskell/stack/pull/5585)
+* `tools` subcommand added to `stack ls`, to list stack's installed tools.
 
 Bug fixes:
 
