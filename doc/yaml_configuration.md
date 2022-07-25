@@ -1198,5 +1198,69 @@ has the following effect:
 
 This field is convenient in setups that restrict access to GitHub, for instance closed corporate setups. In this setting, it is common for the development environment to have general access to the internet, but not for testing/building environments. To avoid the firewall, one can run a local snapshots mirror and then use a custom `snapshot-location-base` in the closed environments only.
 
-
 Since 2.5.0
+
+## Customisation
+
+### GHC installation customisation (experimental)
+
+On Unix-like operating systems and Windows, Stack's installation procedure can
+be fully customised by placing a `sh` shell script (a 'hook') in the Stack root
+directory at `hooks/ghc-install.sh`. On Unix-like operating systems, the script
+file must be made executable. The script is run by the `sh` application (which
+is provided by MSYS2 on Windows).
+
+The script **must** return an exit code of `0` and the standard output **must**
+be the absolute path to the GHC binary that was installed. Otherwise Stack will
+ignore the script and possibly fall back to its own installation procedure.
+
+The script is not run when `system-ghc: true`.
+
+When `install-ghc: false`, the script is still run, which allows you to ensure
+that only your script will install GHC and Stack won't default to its own
+installation logic, even when the script fails.
+
+An example script is:
+
+```sh
+#!/bin/sh
+
+set -eu
+
+case $HOOK_GHC_TYPE in
+	bindist)
+		# install GHC here, not printing to stdout, e.g.:
+		#   command install $HOOK_GHC_VERSION >/dev/null
+		;;
+	git)
+		>&2 echo "Hook doesn't support installing from source"
+		exit 1
+		;;
+	*)
+		>&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
+		exit 2
+		;;
+esac
+		
+echo "location/to/ghc/executable"
+```
+
+The following environment variables are always available to the script:
+
+* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
+
+For "bindist", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+
+For "git", additional variables are:
+
+* `HOOK_GHC_COMMIT = <commit>`
+* `HOOK_GHC_FLAVOR = <flavor>`
+
+For "ghcjs", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+* `HOOK_GHCJS_VERSION = <ver>`
+
+Since 2.7.X

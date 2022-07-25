@@ -74,7 +74,7 @@ dockerOptsParser hide0 =
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
                            completer dirCompleter <>
                            help ("Mount volumes from host in container " ++
-                                 "(may specify multiple times)")))
+                                 "(can be specified multiple times)")))
     <*> firstStrOption (long (dockerOptName dockerMountModeArgName) <>
                         hide <>
                         metavar "SUFFIX" <>
@@ -83,7 +83,7 @@ dockerOptsParser hide0 =
                                 hide <>
                                 metavar "NAME=VALUE" <>
                                 help ("Set environment variable in container " ++
-                                      "(may specify multiple times)")))
+                                      "(can be specified multiple times)")))
     <*> optionalFirst (option (eitherReader' parseDockerStackExe)
             (let specialOpts =
                      [ dockerStackExeDownloadVal

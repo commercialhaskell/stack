@@ -271,10 +271,10 @@ library
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
-    , persistent
+    , persistent <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -394,10 +394,10 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
-    , persistent
+    , persistent <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -518,10 +518,10 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.14.3.0
     , optparse-generic
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
-    , persistent
+    , persistent <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -647,10 +647,10 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative >=0.14.3.0
-    , pantry >=0.5.3
+    , pantry >=0.5.6
     , path
     , path-io
-    , persistent
+    , persistent <2.14
     , persistent-sqlite
     , persistent-template
     , pretty

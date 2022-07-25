@@ -13,8 +13,6 @@ module Main (main) where
 import           BuildInfo
 import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
-import           Control.Monad.Trans.Except (ExceptT)
-import           Control.Monad.Writer.Lazy (Writer)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import           Data.List
@@ -244,7 +242,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     Stack.Path.path
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots, dependencies and stack's styles)"
+                    "List command. (Supports snapshots, dependencies, stack's styles and installed tools)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
@@ -448,9 +446,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
         where hide = kind /= OuterGlobalOpts
 
     globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
-
-type AddCommand =
-    ExceptT (RIO Runner ()) (Writer (Mod CommandFields (RIO Runner (), GlobalOptsMonoid))) ()
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before

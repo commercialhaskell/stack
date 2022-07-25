@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## Unreleased changes
 
 Release notes:
@@ -35,6 +34,9 @@ Other enhancements:
 * Add build option `--cabal-verbosity=VERBOSITY` to specify the Cabal verbosity
   level (the option accepts Cabal's numerical and extended syntax).
   See [#1369](https://github.com/commercialhaskell/stack/issues/809)
+* Add the possibility of a `sh` script to customise fully GHC installation. See
+  [#5585](https://github.com/commercialhaskell/stack/pull/5585)
+* `tools` subcommand added to `stack ls`, to list stack's installed tools.
 
 Bug fixes:
 
@@ -43,6 +45,11 @@ Bug fixes:
 * Fix an inconsistency in the pretty formatting of the output of
   `stack build --coverage`
 * Fix repeated warning about missing parameters when using `stack new`
+* Include `pantry-0.5.6`: Remove operational and mirror keys from bootstrap key
+  set [#53](https://github.com/commercialhaskell/pantry/pull/53)
+* Pass any CPP options specified via `cpp-options:` in the `.cabal` file to GHCi
+  using GHC's `-optP` flag. See
+  [#5608](https://github.com/commercialhaskell/stack/pull/5608) 
 
 ## v2.7.5
 
