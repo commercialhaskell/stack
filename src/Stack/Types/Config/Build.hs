@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -27,12 +28,27 @@ module Stack.Types.Config.Build
     , BuildSubset(..)
     , ApplyCLIFlag (..)
     , boptsCLIFlagsByName
+    , CabalVerbosity (..)
+    , toFirstCabalVerbosity
     )
     where
 
-import           Pantry.Internal.AesonExtended
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
+#if MIN_VERSION_Cabal(3,4,0)
+import           Distribution.Parsec (Parsec (..), simpleParsec)
+import           Distribution.Verbosity (Verbosity, normal, verbose)
+#else
+import qualified Distribution.Compat.CharParsing as P
+import           Distribution.Parsec (CabalParsing(..), Parsec (..)
+                   , simpleParsec)
+import           Distribution.Utils.Generic (isAsciiAlpha)
+import           Distribution.Verbosity (Verbosity, deafening, intToVerbosity
+                   , normal, silent, verbose, verboseCallSite, verboseCallStack
+                   , verboseMarkOutput, verboseNoWrap, verboseTimestamp)
+#endif
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
 
 -- | Build options that is interpreted by the build command.
@@ -82,7 +98,7 @@ data BuildOpts =
             -- ^ Only perform the configure step when building
             ,boptsReconfigure :: !Bool
             -- ^ Perform the configure step even if already configured
-            ,boptsCabalVerbose :: !Bool
+            ,boptsCabalVerbose :: !CabalVerbosity
             -- ^ Ask Cabal to be verbose in its builds
             ,boptsSplitObjs :: !Bool
             -- ^ Whether to enable split-objs.
@@ -118,7 +134,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarks = defaultFirstFalse buildMonoidBenchmarks
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsReconfigure = defaultFirstFalse buildMonoidReconfigure
-    , boptsCabalVerbose = defaultFirstFalse buildMonoidCabalVerbose
+    , boptsCabalVerbose = CabalVerbosity normal
     , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = []
     , boptsInterleavedOutput = defaultFirstTrue buildMonoidInterleavedOutput
@@ -209,7 +225,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidBenchmarks :: !FirstFalse
     , buildMonoidBenchmarkOpts :: !BenchmarkOptsMonoid
     , buildMonoidReconfigure :: !FirstFalse
-    , buildMonoidCabalVerbose :: !FirstFalse
+    , buildMonoidCabalVerbose :: !(First CabalVerbosity)
     , buildMonoidSplitObjs :: !FirstFalse
     , buildMonoidSkipComponents :: ![Text]
     , buildMonoidInterleavedOutput :: !FirstTrue
@@ -242,7 +258,9 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidBenchmarks <- FirstFalse <$> o ..:? buildMonoidBenchmarksArgName
               buildMonoidBenchmarkOpts <- jsonSubWarnings (o ..:? buildMonoidBenchmarkOptsArgName ..!= mempty)
               buildMonoidReconfigure <- FirstFalse <$> o ..:? buildMonoidReconfigureArgName
-              buildMonoidCabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
+              cabalVerbosity <- First <$> o ..:? buildMonoidCabalVerbosityArgName
+              cabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
+              let buildMonoidCabalVerbose = cabalVerbosity <> toFirstCabalVerbosity cabalVerbose
               buildMonoidSplitObjs <- FirstFalse <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               buildMonoidInterleavedOutput <- FirstTrue <$> o ..:? buildMonoidInterleavedOutputName
@@ -311,6 +329,9 @@ buildMonoidBenchmarkOptsArgName = "benchmark-opts"
 
 buildMonoidReconfigureArgName :: Text
 buildMonoidReconfigureArgName = "reconfigure"
+
+buildMonoidCabalVerbosityArgName :: Text
+buildMonoidCabalVerbosityArgName = "cabal-verbosity"
 
 buildMonoidCabalVerboseArgName :: Text
 buildMonoidCabalVerboseArgName = "cabal-verbose"
@@ -477,3 +498,71 @@ data FileWatchOpts
   | FileWatch
   | FileWatchPoll
   deriving (Show,Eq)
+
+newtype CabalVerbosity = CabalVerbosity Verbosity
+  deriving (Eq, Show)
+
+toFirstCabalVerbosity :: FirstFalse -> First CabalVerbosity
+toFirstCabalVerbosity vf = First $ getFirstFalse vf <&> \p ->
+  if p then verboseLevel else normalLevel
+ where
+  verboseLevel = CabalVerbosity verbose
+  normalLevel  = CabalVerbosity normal
+
+instance FromJSON CabalVerbosity where
+
+  parseJSON = withText "CabalVerbosity" $ \t ->
+    let s = T.unpack t
+        errMsg = fail $ "Unrecognised Cabal verbosity: " ++ s
+    in  maybe errMsg pure (simpleParsec s)
+
+instance Parsec CabalVerbosity where
+
+-- The Cabal package does not provide a Verbosity instance of Parsec before
+-- Cabal-3.4.0.0. The code below is adapted from the instance provided in
+-- Cabal-3.4.0.0.
+#if MIN_VERSION_Cabal(3,4,0)
+
+  parsec = CabalVerbosity <$> parsec
+
+#else
+
+  parsec = CabalVerbosity <$> parsecVerbosity
+
+parsecVerbosity :: CabalParsing m => m Verbosity
+parsecVerbosity = parseIntVerbosity <|> parseStringVerbosity
+ where
+  parseIntVerbosity = do
+    i <- P.integral
+    case intToVerbosity i of
+      Just v  -> return v
+      Nothing -> P.unexpected $ "Bad integral verbosity: " ++ show i ++
+                   ". Valid values are 0..3"
+
+  parseStringVerbosity = do
+    level <- parseVerbosityLevel
+    _ <- P.spaces
+    flags <- many (parseFlag <* P.spaces)
+    return $ foldl' (flip ($)) level flags
+
+  parseVerbosityLevel = do
+    token <- P.munch1 isAsciiAlpha
+    case token of
+      "silent"    -> return silent
+      "normal"    -> return normal
+      "verbose"   -> return verbose
+      "debug"     -> return deafening
+      "deafening" -> return deafening
+      _           -> P.unexpected $ "Bad verbosity level: " ++ token
+
+  parseFlag = do
+    _ <- P.char '+'
+    token <- P.munch1 isAsciiAlpha
+    case token of
+      "callsite"   -> return verboseCallSite
+      "callstack"  -> return verboseCallStack
+      "nowrap"     -> return verboseNoWrap
+      "markoutput" -> return verboseMarkOutput
+      "timestamp"  -> return verboseTimestamp
+      _            -> P.unexpected $ "Bad verbosity flag: " ++ token
+#endif
