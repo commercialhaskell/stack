@@ -44,6 +44,9 @@ Bug fixes:
 * Fix repeated warning about missing parameters when using `stack new`
 * Include `pantry-0.5.6`: Remove operational and mirror keys from bootstrap key
   set [#53](https://github.com/commercialhaskell/pantry/pull/53)
+* Pass any CPP options specified via `cpp-options:` in the `.cabal` file to GHCi
+  using GHC's `-optP` flag. See
+  [#5608](https://github.com/commercialhaskell/stack/pull/5608) 
 
 ## v2.7.5
 
