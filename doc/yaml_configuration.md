@@ -618,7 +618,7 @@ configure-options:
 
 (Since 0.1.5)
 
-Specify a variant binary distribution of GHC to use.  Known values:
+Specify a variant binary distribution of GHC to use. Known values:
 
 * `standard`: This is the default, uses the standard GHC binary distribution
 * `integersimple`: Use a GHC bindist that uses
@@ -636,26 +636,105 @@ This option is incompatible with `system-ghc: true`.
 
 Specify a specialized architecture bindist to use.  Normally this is
 determined automatically, but you can override the autodetected value here.
-Possible arguments include `standard`, `gmp4`, `tinfo6`, and `nopie`.
+Possible arguments include `standard`, `gmp4`, `nopie`, `tinfo6`,
+`tinfo6-nopie`, `ncurses6`, and `integersimple`.
 
+### setup-info
+
+(Since 0.1.5)
+
+The `setup-info` dictionary specifies download locations for tools to be
+installed during set-up, such as GHC or, on Windows, 7z and MSYS2. The
+dictionary maps `('Tool', 'Platform', 'Version')` to the location where it can
+be obtained. For example, mapping `(GHC, 64-bit Windows, 9.2.3)` to the URL
+hosting the archive file for GHC's installation.
+
+Possible usages of this configuration option are:
+
+1. Using Stack offline or behind a firewall.
+2. Extending the tools known to Stack, such as cutting-edge versions of GHC or
+   builds for custom Linux distributions (for use with the
+   [ghc-variant](#ghc-variant) option).
+
+By default, Stack obtains the dictionary from
+[stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
+
+The `setup-info` dictionary is constructed in the following order:
+1. `setup-info` in the YAML configuration - inline configuration
+2. `--setup-info-yaml` command line arguments - URLs or paths. Multiple
+   locations may be specified.
+3. `setup-info-locations` in the YAML configuration - URLs or paths. See further
+   below.
+
+The format of this field is the same as in the default
+[stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
+For example, GHC 9.2.3 of custom variant `myvariant` (see further below) on
+64-bit Windows:
+
+```yaml
+setup-info:
+  ghc:
+    windows64-custom-myvariant:
+      9.2.3:
+        url: "https://example.com/ghc-9.2.3-x86_64-unknown-mingw32-myvariant.tar.xz"
+```
+
+'Platforms' are pairs of an operating system and a machine architecture (for
+example, 32-bit i386 or 64-bit x86-64) (represented by the
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.7.5)
+supports the following pairs in the format of the `setup-info` field:
+
+|Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |
+|----------------|---------|-----------|------------------------------------------------------------|
+|Linux           |linux32  |linux64    |AArch64: linux-aarch64, Arm: linux-armv7, Sparc: linux-sparc|
+|OSX             |macos    |macos      |                                                            |
+|Windows         |windows32|windows64  |                                                            |
+|FreeBSD         |freebsd32|freebsd64  |AArch64: freebsd-aarch64                                    |
+|OpenBSD         |openbsd32|openbsd64  |                                                            |
+
+For GHC, the distinguishing 'Version' in the field format includes a 'tag' for
+any (optional) GHC variant (see [ghc-variant](#ghc-variant)) and a further 'tag'
+for any (optional) specialised GHC build (see [ghc-build](#ghc-build)).
+
+The optional variant 'tag' is either `-integersimple` or
+`-custom-<custom_variant_name>`.
+
+For example, for GHC 9.0.2 of specialised GHC build `tinfo6` on x86_64 Linux:
+~~~yaml
+setup-info:
+  ghc:
+    linux64-tinfo6:
+      9.0.2:
+        url: "http://downloads.haskell.org/~ghc/9.0.2/ghc-9.0.2a-x86_64-fedora27-linux.tar.xz"
+        content-length: 237286244
+        sha1: affc2aaa3e6a1c446698a884f56a0a13e57f00b4
+        sha256: b2670e9f278e10355b0475c2cc3b8842490f1bca3c70c306f104aa60caff37b0
+~~~
+
+On Windows, the required 7z executable and DLL tools are represented in the
+format of the `setup-info` field simply by `sevenzexe-info` and
+`sevenzdll-info`.
+
+This configuration **adds** the specified setup information metadata to the
+default. Specifying this configuration **does not** prevent the default
+[stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml)
+from being consulted as a fallback. If, however, you need to **replace** the
+default `setup-info` dictionary, use the following:
+
+```yaml
+setup-info-locations: []
+```
 ### setup-info-locations
 
 (Since 2.3)
 
-Possible usages of this config are:
-1. Using `stack` offline or behind a firewall
-2. Extending the tools known to `stack` such as cutting-edge versions of `ghc` or builds for custom linux distributions.
+By way of introduction, see the [`setup-info`](#setup-info) option. This option
+specifies the location(s) of `setup-info` dictionaries.
 
-The `setup-info` dictionary specifies locations for installation of Haskell-related tooling - it maps `(Tool, Platform, Version)` to the location where it can be obtained, such as `(GHC, Windows64, 8.6.5)` to the url hosting the `*.tar.xz` for GHC's installation.
-
-By default, it's obtained from [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
-
-The `setup-info` dictionary is constructed in the following order:
-1. `setup-info` yaml configuration - inline config
-2. `--setup-info-yaml` command line arguments - urls or paths, multiple locations may be specified.
-3. `setup-info-locations` yaml configuration - urls or paths
-
-The first location which specifies the location of a tool `(Tool, Platform, Version)` takes precedence, so one can extend the default tools with a fallback to the default `setup-info` location:
+The first location which provides a dictionary that specifies the location of a
+tool - `('Tool', 'Platform', 'Version')` - takes precedence. For example, you
+can extend the default tools, with a fallback to the default `setup-info`
+location, as follows:
 
 ```yaml
 setup-info-locations:
@@ -663,25 +742,33 @@ setup-info-locations:
 - relative/inside/my/project/setup-info.yaml
 - \\smbShare\stack\my-stack-setup.yaml
 - http://stack-mirror.com/stack-setup.yaml
+# Fallback to the default location
 - https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml
 ```
 
-The default `setup-info` location is included only if no locations in the `setup-info-locations` config or the  `--setup-info-yaml` command line argument were specified.
+Stack only refers to the default `setup-info` location if no locations are
+specified in the `setup-info-locations` configuration or on the command line
+using the `--setup-info-yaml` option.
 
-Thus the following will cause `stack setup` not to consult github for the `setup-info`:
+For example, both of the following will cause `stack setup` not to consult the
+default `setup-info` location:
+
 ```yaml
 setup-info-locations:
 - C:/stack-offline/my-stack-setup.yaml
 ```
+and
 
 ```yaml
 setup-info-locations: []
 ```
 
-Relative paths are resolved relative to the `stack.yaml` file - either in the local project or the global `stack.yaml` in the stack directory.
+Relative paths are resolved relative to the `stack.yaml` file (either the one in
+the local project or the global `stack.yaml`).
 
-Relative paths may also be used inside paths to tool installs - such as for ghc or 7z, which allows vendoring the tools inside a monorepo.
-For example:
+Relative paths may also be used for the installation paths to tools (such as GHC
+or 7z). This allows vendoring the tools inside a monorepo (a single respository
+storing many projects). For example:
 
 Directory structure:
 ```
@@ -690,7 +777,7 @@ Directory structure:
   - my-stack-setup.yaml
   - 7z.exe
   - 7z.dll
-  - ghc-8.2.2.tar.xz
+  - ghc-9.2.3.tar.xz
 - stack.yaml
 ```
 
@@ -703,42 +790,15 @@ setup-info-locations:
 In `installs/my-stack-setup.yaml`:
 ```yaml
 sevenzexe-info:
-    url: "installs/7z.exe"
+  url: "installs/7z.exe"
 
 sevenzdll-info:
-    url: "installs/7z.dll"
+  url: "installs/7z.dll"
 
 ghc:
-    windows64:
-        8.2.2:
-            url: "installs/ghc-8.2.2.tar.xz"
-```
-
-### setup-info
-
-(Since 0.1.5)
-
-Allows augmenting from where tools like GHC and MSYS2 (on Windows) are
-downloaded. Most useful for specifying locations of custom GHC binary
-distributions (for use with the [ghc-variant](#ghc-variant) option).
-
-The format of this field is the same as in the default [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml):
-
-```yaml
-setup-info:
-  ghc:
-    windows32-custom-foo:
-      7.10.2:
-        url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
-```
-
-This configuration **adds** the specified setup info metadata to the default;
-Specifying this config **does not** prevent the default `stack-setup-2.yaml` from being consulted as a fallback.
-
-If you need to **replace** the default setup-info, add the following:
-
-```yaml
-setup-info-locations: []
+  windows64:
+    9.2.3:
+      url: "installs/ghc-9.2.3.tar.xz"
 ```
 
 ### pvp-bounds
@@ -1196,6 +1256,5 @@ has the following effect:
 * `nightly-YYYY-MM-DD` expands to `https://example.com/snapshots/location/nightly/YYYY/M/D.yaml`
 
 This field is convenient in setups that restrict access to GitHub, for instance closed corporate setups. In this setting, it is common for the development environment to have general access to the internet, but not for testing/building environments. To avoid the firewall, one can run a local snapshots mirror and then use a custom `snapshot-location-base` in the closed environments only.
-
 
 Since 2.5.0
