@@ -660,6 +660,7 @@ By default, Stack obtains the dictionary from
 [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
 
 The `setup-info` dictionary is constructed in the following order:
+
 1. `setup-info` in the YAML configuration - inline configuration
 2. `--setup-info-yaml` command line arguments - URLs or paths. Multiple
    locations may be specified.
@@ -687,7 +688,7 @@ supports the following pairs in the format of the `setup-info` field:
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |
 |----------------|---------|-----------|------------------------------------------------------------|
 |Linux           |linux32  |linux64    |AArch64: linux-aarch64, Arm: linux-armv7, Sparc: linux-sparc|
-|OSX             |macos    |macos      |                                                            |
+|OSX             |macosx   |macosx     |                                                            |
 |Windows         |windows32|windows64  |                                                            |
 |FreeBSD         |freebsd32|freebsd64  |AArch64: freebsd-aarch64                                    |
 |OpenBSD         |openbsd32|openbsd64  |                                                            |
@@ -721,9 +722,10 @@ default. Specifying this configuration **does not** prevent the default
 from being consulted as a fallback. If, however, you need to **replace** the
 default `setup-info` dictionary, use the following:
 
-```yaml
+~~~yaml
 setup-info-locations: []
-```
+~~~
+
 ### setup-info-locations
 
 (Since 2.3)
@@ -736,7 +738,7 @@ tool - `('Tool', 'Platform', 'Version')` - takes precedence. For example, you
 can extend the default tools, with a fallback to the default `setup-info`
 location, as follows:
 
-```yaml
+~~~yaml
 setup-info-locations:
 - C:/stack-offline/my-stack-setup.yaml
 - relative/inside/my/project/setup-info.yaml
@@ -744,7 +746,7 @@ setup-info-locations:
 - http://stack-mirror.com/stack-setup.yaml
 # Fallback to the default location
 - https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml
-```
+~~~
 
 Stack only refers to the default `setup-info` location if no locations are
 specified in the `setup-info-locations` configuration or on the command line
@@ -753,15 +755,16 @@ using the `--setup-info-yaml` option.
 For example, both of the following will cause `stack setup` not to consult the
 default `setup-info` location:
 
-```yaml
+~~~yaml
 setup-info-locations:
 - C:/stack-offline/my-stack-setup.yaml
-```
+~~~
+
 and
 
-```yaml
+~~~yaml
 setup-info-locations: []
-```
+~~~
 
 Relative paths are resolved relative to the `stack.yaml` file (either the one in
 the local project or the global `stack.yaml`).
@@ -771,7 +774,8 @@ or 7z). This allows vendoring the tools inside a monorepo (a single respository
 storing many projects). For example:
 
 Directory structure:
-```
+
+~~~
 - src/
 - installs/
   - my-stack-setup.yaml
@@ -779,16 +783,18 @@ Directory structure:
   - 7z.dll
   - ghc-9.2.3.tar.xz
 - stack.yaml
-```
+~~~
 
 In the project's `stack.yaml`:
-```yaml
+
+~~~yaml
 setup-info-locations:
 - installs/my-stack-setup.yaml
-```
+~~~
 
 In `installs/my-stack-setup.yaml`:
-```yaml
+
+~~~yaml
 sevenzexe-info:
   url: "installs/7z.exe"
 
@@ -799,7 +805,7 @@ ghc:
   windows64:
     9.2.3:
       url: "installs/ghc-9.2.3.tar.xz"
-```
+~~~
 
 ### pvp-bounds
 
