@@ -128,23 +128,21 @@ of `package.yaml`.
 
 To manage your library:
 
-1. Edit source files in the `src` directory.
-
-   The `app` directory should preferably contain only files related to
-   executables.
+1. Edit source files in the `src` directory. The `app` directory should
+   preferably contain only files related to executables.
 
 2. Your developing project may need to depend on a library provided by another
    Haskell package.
 
-   - Add the name of that new package to the file `package.yaml`, in its
-     `dependencies:` section.
-   - Run `stack build` again. Stack will use `package.yaml` to create an
-     updated `my-project.cabal` for you.
+    - Add the name of that new package to the file `package.yaml`, in its
+      `dependencies:` section.
+    - Run `stack build` again. Stack will use `package.yaml` to create an
+      updated `my-project.cabal` for you.
 
-   If desired, you can delete the `package.yaml` file and update the
+3. If desired, you can delete the `package.yaml` file and update the
    `my-project.cabal` file directly. Stack will then use that file.
 
-3. If you get an error message that tells you that the Stack configuration has
+4. If you get an error message that tells you that the Stack configuration has
    no specified version of your added package, follow Stack's likely
    recommandation to add a specific version of that package in the `stack.yaml`
    file, in its `extra-deps:` section.
