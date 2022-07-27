@@ -2,25 +2,28 @@
 
 # The Haskell Tool Stack
 
-Stack is a cross-platform program for developing Haskell
-projects. It is aimed at Haskellers both new and experienced.
+Stack is a cross-platform program for developing
+[Haskell](https://www.haskell.org/) projects. It is aimed at Haskellers both new
+and experienced. It aims to support fully users on Linux, macOS and Windows.
 
 <img src="https://i.imgur.com/WW69oTj.gif" width="50%" align="right">
 
-It features:
+Stack features:
 
-* Installing GHC automatically, in an isolated location.
+* Installing the [Glasgow Haskell Compiler (GHC)](https://www.haskell.org/ghc/)
+  automatically, in an isolated location.
 * Installing packages needed for your project.
 * Building your project.
 * Testing your project.
 * Benchmarking your project.
 
-#### How to install
+## How to install Stack
 
-Stack can be installed on most Unix-like (Un*x) operating systems, including
-macOS, and on Windows.
+Stack can be installed on most Unix-like operating systems, including macOS, and
+on Windows.
 
-For most Un*x operating systems, the easiest way to install is to run:
+For most Unix-like operating systems, the easiest way to install Stack is to
+run:
 
     curl -sSL https://get.haskellstack.org/ | sh
 
@@ -28,193 +31,214 @@ or:
 
     wget -qO- https://get.haskellstack.org/ | sh
 
-On Windows, you can download and install the
-[Windows 64-bit Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
-Note that systems with antivirus software may need `stack` added to the list of "trusted" applications.
+On 64-bit Windows, you can download and install the
+[Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
+Note that systems with antivirus software may need to add Stack to the list of
+'trusted' applications.
 
 For other operating systems and direct downloads, check out the
 [install and upgrade guide](install_and_upgrade.md).
 
-Note that the [get.haskellstack.org](https://get.haskellstack.org/)
-script will ask for root access using `sudo` in order to use your
-platform's package manager to install dependencies and to install to
-`/usr/local/bin`.  If you prefer more control, follow the manual
-installation instructions in the
-[install and upgrade guide](install_and_upgrade.md).
+The [get.haskellstack.org](https://get.haskellstack.org/) script referred to
+above will ask for root access using `sudo`. It needs such access in order to
+use your platform's package manager to install dependencies and to install to
+`/usr/local/bin`. If you prefer more control, follow the manual installation
+instructions in the [install and upgrade guide](install_and_upgrade.md).
 
-#### How to upgrade
+## How to upgrade Stack
 
-If you already have `stack` installed, upgrade it to the latest version
-by running:
+If you already have Stack installed, you can upgrade it to the latest version
+by the command:
 
     stack upgrade
 
+## Quick Start guide
 
-#### Quick Start Guide
+For an immediate experience of using Stack to build an executable with Haskell,
+first you need to follow the [guide to install Stack](#how-to-install-Stack).
 
-First you need to [install it (see previous section)](#how-to-install).
+### Start your new project
 
-##### Start your new project:
+To start a new project named `my-project`, issue these four commands in a
+terminal:
 
-```bash
-stack new my-project
-cd my-project
-stack setup
-stack build
-stack exec my-project-exe
-```
+    stack new my-project
+    cd my-project
+    stack build
+    stack exec my-project-exe
 
-- The `stack new` command will create a new directory containing all
-  the needed files to start a project correctly.
-- The `stack setup` will download the compiler if necessary in an isolated
-  location (default `~/.stack`) that won't interfere with any system-level
-  installations. (For information on installation paths, please use the
-  `stack path` command.).
-- The `stack build` command will build the minimal project.
-- `stack exec my-project-exe` will execute the command.
-- If you just want to install an executable using stack, then all you have to do
-  is `stack install <package-name>`.
 
-If you want to launch a REPL:
+- The `stack new my-project` command will create a new directory, named
+  `my-project`, that contains all the files needed to start a project correctly,
+  using a default template.
+- The `cd my-project` command will change to that directory.
+- The `stack build` command will build the template project and create an
+  executable named `my-project-exe`. First, if necessary, Stack will download
+  the necessary GHC compiler in an isolated location. That won't interfere with
+  any system-level installations of GHC.
+- The `stack exec my-project-exe` command will run (execute) the built
+  executable, in Stack's environment.
 
-```bash
-stack ghci
-```
+For a complete list of Stack's commands and options, simply command:
 
-Run `stack` for a complete list of commands.
+    stack
 
-##### Workflow
+For help on a particular Stack command, for example `stack build`, command:
 
-The `stack new` command should have created the following files:
+    stack build --help
 
-```
+If you want to launch a run-eval-print loop (REPL), then command:
+
+    stack ghci
+
+If you want to use Stack to install an executable provided by a Haskell package,
+then all you have to do is command:
+
+    stack install <package-name>
+
+### Workflow
+
+The `stack new my-project` command above should have created the following files
+and directories:
+
+~~~
 .
 ├── app
 │   └── Main.hs
-├── ChangeLog.md
-├── LICENSE
-├── my-project.cabal
-├── package.yaml
-├── README.md
-├── Setup.hs
 ├── src
 │   └── Lib.hs
+├── test
+│   └── Spec.hs
+├── Setup.hs
+├── package.yaml
+├── my-project.cabal
 ├── stack.yaml
-└── test
-    └── Spec.hs
+├── README.md
+├── ChangeLog.md
+├── LICENSE
+└── .gitignore
+~~~
 
-    3 directories, 10 files
-```
+(The `stack build` command will have created other directories and files.)
 
-So to manage your library:
+The Haskell code for the executable/application is in `Main.hs`. The
+source code for the library that it uses is in `Lib.hs`. The contents of
+`my-project.cabal` describes the project. That file is generated by the contents
+of `package.yaml`.
 
-1. Edit files in the `src/` directory.
+To manage your library:
 
-   The `app` directory should preferably contain only files related to
-   executables.
+1. Edit source files in the `src` directory. The `app` directory should
+   preferably contain only files related to executables.
 
-2. If you need to include another library (for example the package
-   [`text`](https://hackage.haskell.org/package/text)):
+2. Your developing project may need to depend on a library provided by another
+   Haskell package.
 
-   - Add the package `text` to the file `package.yaml`
-     in the section `dependencies: ...`.
-   - Run `stack build` another time.
-   - `stack build` will update my-project.cabal for you.
-     If desired you can update the .cabal file manually
-     and stack will use .cabal instead of package.yaml.
+    - Add the name of that new package to the file `package.yaml`, in its
+      `dependencies:` section.
+    - Run `stack build` again. Stack will use `package.yaml` to create an
+      updated `my-project.cabal` for you.
 
-3. If you get an error that tells you your package isn't in the LTS.
-   Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
+3. If desired, you can delete the `package.yaml` file and update the
+   `my-project.cabal` file directly. Stack will then use that file.
 
-That was a really fast introduction on how to start to code in Haskell using `stack`.
-If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.md).
+4. If you get an error message that tells you that the Stack configuration has
+   no specified version of your added package, follow Stack's likely
+   recommandation to add a specific version of that package in the `stack.yaml`
+   file, in its `extra-deps:` section.
 
-#### How to contribute
+That was a really fast introduction on how to start to code in Haskell using
+Stack. If you want to go further, we highly recommend you read the
+[Stack User Guide](GUIDE.md).
 
-This assumes that you have already installed a version of stack, and have `git`
-installed.
+## Complete guide to Stack
 
-1. Clone `stack` from git with
+A complete [user guide to Stack](GUIDE.md) is available, covering all of
+the most common ways to use Stack.
+
+## Why Stack?
+
+Stack is a build tool for Haskell designed to answer the needs of Haskell users
+new and experienced alike. It has a strong focus on reproducible build plans,
+multi-package projects, and a consistent, easy-to-learn interface, while
+providing the customizability and power experienced developers need.
+
+As a build tool, Stack does not stand alone. It is built on the great work
+provided by:
+
+* The __Glasgow Haskell Compiler__ ([GHC](https://www.haskell.org/ghc/)), the
+  premier Haskell compiler. Stack will manage your GHC installations and
+  automatically select the appropriate compiler version for your project.
+* The __Cabal build system__, a specification for defining Haskell packages,
+  together with a [library](https://hackage.haskell.org/package/Cabal) for
+  performing builds.
+* The __Hackage Haskell Package Repository__, a
+  [repository](https://hackage.haskell.org/) providing thousands of open source
+  libraries and applications to help you get your work done.
+* The __Stackage package collection__, a
+  [curated set of packages](https://www.stackage.org/) from Hackage which are
+  regularly tested for compatibility. Stack defaults to using Stackage
+  package sets to avoid dependency problems.
+
+Stack is provided by a team of volunteers and companies under the auspices of
+the [Commercial Haskell](http://commercialhaskell.com/) group. The project was
+spearheaded by [FP Complete](https://www.fpcomplete.com/) to answer the needs of
+commercial Haskell users, and has since become a thriving open source project
+meeting the needs of Haskell users of all stripes.
+
+If you'd like to get involved with Stack, check out the
+[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
+label on the GitHub issue tracker.
+
+## Questions, feedback, and discussion
+
+* For answers to frequently asked questions about Stack, please see the
+  [FAQ](faq.md).
+* For general questions, comments, feedback and support, please post to the
+  [Haskell Community](https://discourse.haskell.org/about).
+* For bugs, issues, or requests, please
+  [open an issue](https://github.com/commercialhaskell/stack/issues/new).
+* When using Stack Overflow, please use the
+  [haskell-stack](http://stackoverflow.com/questions/tagged/haskell-stack) tag.
+
+## How to contribute to the maintenance or development of Stack
+
+The following assumes that you already have installed a version of Stack and the
+[Git application](https://git-scm.com/).
+
+1. Clone the `stack` repository from GitHub with the command:
    `git clone https://github.com/commercialhaskell/stack.git`.
-2. Enter into the stack folder with `cd stack`.
-3. Build `stack` using a pre-existing `stack` install with
-   `stack setup && stack build`.
-4. Once `stack` finishes building, check the stack version with
-   `stack exec stack -- --version`. Make sure the version is the latest.
-5. Look for issues tagged with
+2. Enter into the cloned `stack` directory with command `cd stack`.
+3. Build the `stack` executable using a pre-existing installation of Stack with
+   command `stack build`.
+4. Once the `stack` executable has been built, check its version with the
+   command `stack exec -- stack --version`. Make sure the version is the latest.
+5. In the GitHub respository's issue tracker, look for issues tagged with
    [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
    and
    [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
    labels.
 
-Build from source as a one-liner:
+If you need to check your changes quickly run `stack ghci` and then this command
+at the REPL's prompt:
 
-```bash
-git clone https://github.com/commercialhaskell/stack.git && \
-cd stack && \
-stack setup && \
-stack build
-```
+    :main --stack-root=<path_to_root> --stack-yaml=<path_to_stack.yaml> <COMMAND>
 
-If you need to check your changes quickly run:
+This allows you to set a special Stack root (instead of the default Stack root)
+and to target your commands at a particular `stack.yaml` file instead of the one
+found in the current directory.
 
-```bash
-stack ghci
-λ: :main --stack-root /path/to/root/ --stack-yaml /path/to/stack.yaml COMMAND
-```
+## How to uninstall
 
-This allows you to set a special stack root (instead of `~/.stack/` or, on
-Windows, `%LOCALAPPDATA%\Programs\stack`) and to target your commands at a
-particular `stack.yaml` instead of the one found in the current directory.
+To uninstall Stack, it should be sufficient to:
 
-#### Complete guide to stack
+1. Delete the Stack root folder (see `stack path --stack-root`, before you
+   uninstall).
+2. On Windows, delete the folder containing Stack's tools (see
+   `stack path --programs`, before you uninstall), which is located outside of
+   the Stack root folder
+3. Delete the `stack` executable (see `which stack`, on Unix-like operating
+   systems, or `where.exe stack`, on Windows).
 
-This repository also contains a complete [user guide to using
-stack](GUIDE.md), covering all of the most common use cases.
-
-
-#### Questions, Feedback, Discussion
-
-* For frequently asked questions about detailed or specific use-cases, please
-  see [the FAQ](faq.md).
-* For general questions, comments, feedback and support, please write
-  to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
-* For bugs, issues, or requests, please
-  [open an issue](https://github.com/commercialhaskell/stack/issues/new).
-* When using Stack Overflow, please use [the haskell-stack
-  tag](http://stackoverflow.com/questions/tagged/haskell-stack).
-
-#### Why Stack?
-
-Stack is a build tool for Haskell designed to answer the needs of
-Haskell users new and experienced alike. It has a strong focus on
-reproducible build plans, multi-package projects, and a consistent,
-easy-to-learn interface, while providing the customizability and
-power experienced developers need.  As a build tool, Stack does not
-stand alone. It is built on the great work provided by:
-
-* The __Glasgow Haskell Compiler__ (GHC), the premier Haskell
-  compiler. Stack will manage your GHC installations and automatically
-  select the appropriate compiler version for your project.
-* The __Cabal build system__, a specification for defining Haskell
-  packages, together with a library for performing builds.
-* The __Hackage package repository__, providing more than ten thousand
-  open source libraries and applications to help you get your work
-  done.
-* The __Stackage package collection__, a curated set of packages from
-  Hackage which are regularly tested for compatibility. Stack defaults
-  to using Stackage package sets to avoid dependency problems.
-
-Stack is provided by a team of volunteers and companies under the
-auspices of the [Commercial Haskell](http://commercialhaskell.com/)
-group. The project was spearheaded by
-[FP Complete](https://www.fpcomplete.com/) to answer the needs of
-commercial Haskell users, and has since become a thriving open source
-project meeting the needs of Haskell users of all stripes.
-
-If you'd like to get involved with Stack, check out the
-[newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
-label on the Github issue tracker.
-
-#### How to uninstall
-Removing ``~/.stack`` and ``/usr/local/bin/stack`` should be sufficient. You may want to delete ``.stack-work`` folders in any Haskell projects that you have built.
+You may also want to delete ``.stack-work`` folders in any Haskell projects that
+you have built using Stack.
