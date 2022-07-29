@@ -22,6 +22,7 @@ pages:
   - Configuration (project and global): yaml_configuration.md
   - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
+  - Stack and Visual Studio Code: Stack_and_VS_Code.md
   - Developing on Windows: developing_on_windows.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
