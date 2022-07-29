@@ -2,65 +2,64 @@
 
 # User guide
 
-stack is a modern, cross-platform build tool for Haskell code.
+Stack is a modern, cross-platform build tool for Haskell code.
 
-This guide takes a new stack user through the typical workflows. This guide
-will not teach Haskell or involve much code, and it requires no prior experience
-with the Haskell packaging system or other build tools.
+This guide takes a new Stack user through the typical workflows. This guide will
+not teach Haskell or involve much code, and it requires no prior experience with
+the Haskell packaging system or other build tools.
 
-__NOTE__ This document is probably out of date in some places and
-deserves a refresh. If you find this document helpful, please drop a
-note on [issue #4252](https://github.com/commercialhaskell/stack/issues/4252).
+__NOTE__ This document is probably out of date in some places and deserves a
+refresh. If you find this document helpful, please drop a note on
+[issue #4252](https://github.com/commercialhaskell/stack/issues/4252).
 
 ## Stack's functions
 
-stack handles the management of your toolchain (including GHC — the Glasgow
+Stack handles the management of your toolchain (including GHC — the Glasgow
 Haskell Compiler — and, for Windows users, MSYS2), building and registering
 libraries, building build tool dependencies, and more. While it can use existing
-tools on your system, stack has the capacity to be your one-stop shop for all
-Haskell tooling you need. This guide will follow that stack-centric approach.
+tools on your system, Stack has the capacity to be your one-stop shop for all
+Haskell tooling you need. This guide will follow that Stack-centric approach.
 
-### What makes stack special?
+### What makes Stack special?
 
-The primary stack design point is __reproducible builds__. If you run
+The primary Stack design point is __reproducible builds__. If you run
 `stack build` today, you should get the same result running `stack build`
 tomorrow. There are some cases that can break that rule (changes in your
-operating system configuration, for example), but, overall, stack follows this
-design philosophy closely. To make this a simple process, stack uses curated
+operating system configuration, for example), but, overall, Stack follows this
+design philosophy closely. To make this a simple process, Stack uses curated
 package sets called __snapshots__.
 
-stack has also been designed from the ground up to be user friendly, with an
+Stack has also been designed from the ground up to be user friendly, with an
 intuitive, discoverable command line interface. For many users, simply
-downloading stack and reading `stack --help` will be enough to get up and
+downloading Stack and reading `stack --help` will be enough to get up and
 running. This guide provides a more gradual tour for users who prefer that
 learning style.
 
-To build your project, stack uses a `stack.yaml` file in the root directory of
+To build your project, Stack uses a `stack.yaml` file in the root directory of
 your project as a sort of blueprint. That file contains a reference, called a
 __resolver__, to the snapshot which your package will be built against.
 
-Finally, stack is __isolated__: it will not make changes outside of specific
-stack directories. stack-built files generally go in either the stack root
+Finally, Stack is __isolated__: it will not make changes outside of specific
+Stack directories. Stack-built files generally go in either the Stack root
 directory (default `~/.stack` or, on Windows, `%LOCALAPPDATA%\Programs\stack`)
-or `./.stack-work` directories local to each project. The stack root directory
-holds packages belonging to snapshots and any stack-installed versions of GHC.
+or `./.stack-work` directories local to each project. The Stack root directory
+holds packages belonging to snapshots and any Stack-installed versions of GHC.
 Stack will not tamper with any system version of GHC or interfere with packages
 installed by `cabal` or any other build tools.
 
 _NOTE_ In this guide, we'll use commands as run on a GNU/Linux system
 (specifically Ubuntu 14.04, 64-bit) and share output from that. Output on other
-systems — or with different versions of stack — will be slightly different, but
+systems — or with different versions of Stack — will be slightly different, but
 all commands work cross-platform, unless explicitly stated otherwise.
 
 ## Downloading and Installation
 
-The [documentation dedicated to downloading
-stack](install_and_upgrade.md) has the most
-up-to-date information for a variety of operating systems, including multiple
-GNU/Linux flavors. Instead of repeating that content here, please go check out
-that page and come back here when you can successfully run `stack --version`.
-The rest of this session will demonstrate the installation procedure on a
-vanilla Ubuntu 14.04 machine.
+The [documentation dedicated to downloading Stack](install_and_upgrade.md) has
+the most up-to-date information for a variety of operating systems, including
+multiple GNU/Linux flavors. Instead of repeating that content here, please go
+check out that page and come back here when you can successfully run
+`stack --version`. The rest of this session will demonstrate the installation
+procedure on a vanilla Ubuntu 14.04 machine.
 
 ```
 michael@d30748af6d3d:~$ sudo apt-get install wget
@@ -71,7 +70,7 @@ michael@d30748af6d3d:~$ stack --help
 # help output ...
 ```
 
-With stack now up and running, you're good to go. Though not required, we
+With Stack now up and running, you're good to go. Though not required, we
 recommend setting your PATH environment variable to include `$HOME/.local/bin`:
 
 ```
@@ -80,8 +79,8 @@ michael@d30748af6d3d:~$ echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 
 ## Hello World Example
 
-With stack installed, let's create a new project from a template and walk
-through the most common stack commands.
+With Stack installed, let's create a new project from a template and walk
+through the most common Stack commands.
 
 ### stack new
 
@@ -102,7 +101,7 @@ template:
 michael@d30748af6d3d:~$ stack new helloworld new-template
 ```
 
-For this first stack command, there's quite a bit of initial setup it needs to
+For this first Stack command, there's quite a bit of initial setup it needs to
 do (such as downloading the list of packages available upstream), so you'll see
 a lot of output. Over the course of this guide a lot of the content will begin
 to make more sense.
@@ -111,7 +110,7 @@ We now have a project in the `helloworld` directory!
 
 ### stack build
 
-Next, we'll run the most important stack command: `stack build`.
+Next, we'll run the most important Stack command: `stack build`.
 
 ```
 michael@d30748af6d3d:~$ cd helloworld
@@ -119,18 +118,18 @@ michael@d30748af6d3d:~/helloworld$ stack build
 # installing ... building ...
 ```
 
-stack needs a GHC in order to build your project. stack will discover that you
+Stack needs a GHC in order to build your project. Stack will discover that you
 are missing it and will install it for you. You can do this manually by using
 the `stack setup` command.
 
 You'll get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
 
-__NOTE__: GHC will be installed to your global stack root directory, so
-calling `ghc` on the command line won't work. See the `stack exec`,
-`stack ghc`, and `stack runghc` commands below for more information.
+__NOTE__: GHC will be installed to your global Stack root directory, so calling
+`ghc` on the command line won't work. See the `stack exec`, `stack ghc`, and
+`stack runghc` commands below for more information.
 
-Once a GHC is installed, stack will then build your project.
+Once a GHC is installed, Stack will then build your project.
 
 ### stack exec
 
@@ -163,7 +162,7 @@ michael@d30748af6d3d:~/helloworld$ stack test
 # build output ...
 ```
 
-Reading the output, you'll see that stack first builds the test suite and then
+Reading the output, you'll see that Stack first builds the test suite and then
 automatically runs it for us. For both the `build` and `test` command, already
 built components are not built again. You can see this by running `stack build`
 and `stack test` a second time:
@@ -174,13 +173,13 @@ michael@d30748af6d3d:~/helloworld$ stack test
 # build output ...
 ```
 
-## Inner Workings of stack
+## Inner Workings of Stack
 
 In this subsection, we'll dissect the helloworld example in more detail.
 
 ### Files in helloworld
 
-Before studying stack more, let's understand our project a bit better.
+Before studying Stack more, let's understand our project a bit better.
 
 ```
 michael@d30748af6d3d:~/helloworld$ find * -type f
@@ -199,16 +198,15 @@ The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
 source files that compose the actual functionality of our project (we won't
 dwell on them here).
 
-The `LICENSE` file and `README.md` have no impact on the
-build.
+The `LICENSE` file and `README.md` have no impact on the build.
 
 The `helloworld.cabal` file is updated automatically as part of the
 `stack build` process and should not be modified.
 
 The files of interest here are `Setup.hs`, `stack.yaml`, and `package.yaml`.
 
-The `Setup.hs` file is a component of the Cabal build system which stack uses.
-It's technically not needed by stack, but it is still considered good practice
+The `Setup.hs` file is a component of the Cabal build system which Stack uses.
+It's technically not needed by Stack, but it is still considered good practice
 in the Haskell world to include it. The file we're using is straight
 boilerplate:
 
@@ -222,18 +220,18 @@ settings.
 
 If you're familiar with YAML, you may recognize that the `flags` and
 `extra-deps` keys have empty values. We'll see more interesting usages for these
-fields later.  Let's focus on the other two fields. `packages` tells stack which
+fields later. Let's focus on the other two fields. `packages` tells Stack which
 local packages to build. In our simple example, we have only a single package in
-our project, located in the same directory, so `'.'` suffices. However, stack
+our project, located in the same directory, so `'.'` suffices. However, Stack
 has powerful support for multi-package projects, which we'll elaborate on as
 this guide progresses.
 
-The final field is `resolver`. This tells stack *how* to build your package:
+The final field is `resolver`. This tells Stack *how* to build your package:
 which GHC version to use, versions of package dependencies, and so on. Our
-value here says to use [LTS Haskell version
-3.2](https://www.stackage.org/lts-3.2), which implies GHC 7.10.2 (which is why
-`stack setup` installs that version of GHC). There are a number of values you
-can use for `resolver`, which we'll cover later.
+value here says to use
+[LTS Haskell version 3.2](https://www.stackage.org/lts-3.2), which implies
+GHC 7.10.2 (which is why `stack setup` installs that version of GHC). There are
+a number of values you can use for `resolver`, which we'll cover later.
 
 Another file important to the build is `package.yaml`.
 
@@ -243,10 +241,10 @@ provided built-in by stack through
 generate the `.cabal` file from this `package.yaml`, and accordingly you should
 **not** modify the `.cabal` file.
 
-It is also important to remember that stack is built on top of the Cabal build
+It is also important to remember that Stack is built on top of the Cabal build
 system. Therefore, an understanding of the moving parts in Cabal are necessary.
 In Cabal, we have individual *packages*, each of which contains a single
-`.cabal` file. The `.cabal` file can define 1 or more *components*: a library,
+`.cabal` file. The `.cabal` file can define one or more *components*: a library,
 executables, test suites, and benchmarks. It also specifies additional
 information such as library dependencies, default language pragmas, and so on.
 
@@ -282,7 +280,7 @@ michael@d30748af6d3d:~/helloworld$ stack exec -- which ghc
 
 As you can see from that path (and as emphasized earlier), the installation is
 placed to not interfere with any other GHC installation, whether system-wide or
-even different GHC versions installed by stack.
+even different GHC versions installed by Stack.
 
 ## Cleaning your project
 
@@ -308,16 +306,16 @@ never been built. `stack purge` is just a shortcut for `stack clean --full`
 
 ### The build command
 
-The build command is the heart and soul of stack. It is the engine that powers
+The build command is the heart and soul of Stack. It is the engine that powers
 building your code, testing it, getting dependencies, and more. Quite a bit of
 the remainder of this guide will cover more advanced `build` functions and
 features, such as building test and Haddocks at the same time, or constantly
 rebuilding blocking on file changes.
 
-*On a philosophical note:* Running the build command twice with the same
-options and arguments should generally be a no-op (besides things like
-rerunning test suites), and should, in general, produce a reproducible result
-between different runs.
+*On a philosophical note:* Running the build command twice with the same options
+and arguments should generally be a no-op (besides things like rerunning test
+suites), and should, in general, produce a reproducible result between different
+runs.
 
 ## Adding dependencies
 
@@ -351,7 +349,7 @@ michael@d30748af6d3d:~/helloworld$ stack build
 ```
 
 This means that the package containing the module in question is not available.
-To tell stack to use [text](https://hackage.haskell.org/package/text), you need
+To tell Stack to use [text](https://hackage.haskell.org/package/text), you need
 to add it to your `package.yaml` file — specifically in your `dependencies`
 section, like this:
 
@@ -370,12 +368,12 @@ michael@d30748af6d3d:~/helloworld$ stack build
 
 This output means that the text package was downloaded, configured, built, and
 locally installed. Once that was done, we moved on to building our local package
-(helloworld). At no point did we need to ask stack to build dependencies — it
+(helloworld). At no point did we need to ask Stack to build dependencies — it
 does so automatically.
 
 ### Listing Dependencies
 
-Let's have stack add a few more dependencies to our project. First, we'll
+Let's have Stack add a few more dependencies to our project. First, we'll
 include two new packages in the `dependencies` section for our library in our
 `package.yaml`:
 
@@ -393,8 +391,8 @@ michael@d30748af6d3d:~/helloworld$ stack build
 # build output ...
 ```
 
-Finally, to find out which versions of these libraries stack installed, we can
-ask stack to `ls dependencies`:
+Finally, to find out which versions of these libraries Stack installed, we can
+ask Stack to `ls dependencies`:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack ls dependencies
@@ -438,7 +436,7 @@ michael@d30748af6d3d:~/helloworld$ stack build
 
 It says that it was unable to construct the build plan.
 
-This brings us to the next major topic in using stack.
+This brings us to the next major topic in using Stack.
 
 ## Curated package sets
 
@@ -476,11 +474,12 @@ a bit of information about it at
   which can be useful when trying to determine which package to add to your
   `package.yaml` file.
 
-You can also see a [list of all available
-snapshots](https://www.stackage.org/snapshots). You'll notice two flavors: LTS
-(for "Long Term Support") and Nightly. You can read more about them on the
+You can also see a
+[list of all available snapshots](https://www.stackage.org/snapshots). You'll
+notice two flavors: LTS (for "Long Term Support") and Nightly. You can read more
+about them on the
 [LTS Haskell Github page](https://github.com/fpco/lts-haskell#readme). If you're
-not sure which to use, start with LTS Haskell (which stack will lean towards by
+not sure which to use, start with LTS Haskell (which Stack will lean towards by
 default as well).
 
 ## Resolvers and changing your compiler version
@@ -513,7 +512,7 @@ available, `--resolver lts` will use the newest LTS, and `--resolver lts-2` will
 use the newest LTS in the 2.X series. The reason these are only available on the
 command line and not in your `stack.yaml` file is that using them:
 
-1. Will slow down your build (since stack then needs to download information on
+1. Will slow down your build (since Stack then needs to download information on
    the latest available LTS each time it builds)
 2. Produces unreliable results (since a build run today may proceed differently
    tomorrow because of changes outside of your control)
@@ -528,9 +527,9 @@ michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 build
 # build output ...
 ```
 
-This succeeds, automatically installing the necessary GHC along the way. So,
-we see that different LTS versions use different GHC versions and stack can
-handle that.
+This succeeds, automatically installing the necessary GHC along the way. So, we
+see that different LTS versions use different GHC versions and Stack can handle
+that.
 
 ### Other resolver values
 
@@ -568,6 +567,7 @@ cueball:~$ stack unpack yackage-0.8.0 --to ~/work
 This will create a `yackage-0.8.0` directory inside `~/work`
 
 ### stack init
+
 This new directory does not have a `stack.yaml` file, so we need to make one
 first. We could do it by hand, but let's be lazy instead with the `stack init`
 command:
@@ -577,7 +577,7 @@ cueball:~/yackage-0.8.0$ stack init
 # init output ...
 ```
 
-stack init does quite a few things for you behind the scenes:
+`stack init` does quite a few things for you behind the scenes:
 
 * Finds all of the `.cabal` files in your current directory and subdirectories
   (unless you use `--ignore-subdirs`) and determines the packages and versions
@@ -590,8 +590,8 @@ stack init does quite a few things for you behind the scenes:
 Assuming it finds a match, it will write your `stack.yaml` file, and everything
 will work.
 
-(Note: yackage does not currently support hpack, but you can also hpack-convert
-should you need to generate a package.yaml).
+(Note: yackage does not currently support Hpack, but you can also hpack-convert
+should you need to generate a `package.yaml`).
 
 #### Excluded Packages
 
@@ -603,10 +603,10 @@ conflict. Alternatively you can ask `stack init` to do that for you by
 specifying `--omit-packages` flag on the command line. Let's see how that
 works.
 
-To simulate a conflict we will use acme-missiles-0.3 in yackage and we will
+To simulate a conflict we will use `acme-missiles-0.3` in yackage and we will
 also copy `yackage.cabal` to another directory and change the name of the file
-and package to yackage-test. In this new package we will use acme-missiles-0.2
-instead. Let's see what happens when we re-run stack init:
+and package to yackage-test. In this new package we will use `acme-missiles-0.2`
+instead. Let's see what happens when we re-run `stack init`:
 
 ```
 cueball:~/yackage-0.8.0$ stack init --force --omit-packages
@@ -638,7 +638,7 @@ under the `extra-deps` section.
 
 #### Installing the compiler
 
-stack will automatically install the compiler when you run `stack build` but you
+Stack will automatically install the compiler when you run `stack build` but you
 can manually specify the compiler by running `stack setup <GHC-VERSION>`.
 
 #### Miscellaneous and diagnostics
@@ -648,26 +648,26 @@ project directory you can do so by explicitly specifying the package directories
 on the command line.
 
 _Duplicate package names_: If multiple packages under the directory tree have
-same name, stack init will report those and automatically ignore one of them.
+same name, `stack init` will report those and automatically ignore one of them.
 
-_Ignore subdirectories_: By default stack init searches all the subdirectories
+_Ignore subdirectories_: By default `stack init` searches all the subdirectories
 for `.cabal` files. If you do not want that then you can use `--ignore-subdirs`
 command line switch.
 
-_Cabal warnings_: stack init will show warnings if there were issues in reading
-a cabal package file. You may want to pay attention to the warnings as
+_Cabal warnings_: `stack init` will show warnings if there were issues in
+reading a Cabal package file. You may want to pay attention to the warnings as
 sometimes they may result in incomprehensible errors later on during dependency
 solving.
 
-_Package naming_: If the `Name` field defined in a cabal file does not match
-with the cabal file name then `stack init` will refuse to continue.
+_Package naming_: If the `Name` field defined in a Cabal file does not match
+with the Cabal file name then `stack init` will refuse to continue.
 
-_Cabal install errors_: stack init uses `cabal-install` to determine external
-dependencies. When cabal-install encounters errors, cabal errors are displayed
-as is by stack init for diagnostics.
+_Cabal install errors_: `stack init` uses `cabal-install` to determine external
+dependencies. When `cabal-install` encounters errors, Cabal errors are displayed
+as is by `stack init` for diagnostics.
 
 _User warnings_: When packages are excluded or external dependencies added
-stack will show warnings every time configuration file is loaded. You can
+Stack will show warnings every time configuration file is loaded. You can
 suppress the warnings by editing the config file and removing the warnings from
 it. You may see something like this:
 
@@ -680,7 +680,7 @@ You can suppress this message by removing it from stack.yaml
 ## Different databases
 
 Time to take a short break from hands-on examples and discuss a little
-architecture. stack has the concept of multiple *databases*. A database
+architecture. Stack has the concept of multiple *databases*. A database
 consists of a GHC package database (which contains the compiled version of a
 library), executables, and a few other things as well. To give you an idea:
 
@@ -689,7 +689,7 @@ michael@d30748af6d3d:~/helloworld$ ls .stack-work/install/x86_64-linux/lts-3.2/7
 bin  doc  flag-cache  lib  pkgdb
 ```
 
-Databases in stack are *layered*. For example, the database listing we just gave
+Databases in Stack are *layered*. For example, the database listing we just gave
 is called a *local* database. That is layered on top of a *snapshot* database,
 which contains the libraries and executables specified in the snapshot itself.
 Finally, GHC itself ships with a number of libraries and executables, which
@@ -730,7 +730,7 @@ output of the `stack exec -- ghc-pkg list` command in our helloworld project:
    helloworld-0.1.0.0
 ```
 
-Notice that acme-missiles ends up in the *local* database. Anything which is
+Notice that `acme-missiles` ends up in the *local* database. Anything which is
 not installed from a snapshot ends up in the local database. This includes:
 your own code, extra-deps, and in some cases even snapshot packages, if you
 modify them in some way. The reason we have this structure is that:
@@ -825,42 +825,42 @@ environment variable. This feature is convenient, because now you can simply
 run `executable-name` in your shell instead of having to run
 `stack exec executable-name` from inside your project directory.
 
-Since it's such a point of confusion, let me list a number of things stack does
+Since it's such a point of confusion, let me list a number of things Stack does
 *not* do specially for the install command:
 
-* stack will always build any necessary dependencies for your code. The install
+* Stack will always build any necessary dependencies for your code. The install
   command is not necessary to trigger this behavior. If you just want to build a
   project, run `stack build`.
-* stack will *not* track which files it's copied to your local bin path nor
+* Stack will *not* track which files it's copied to your local bin path nor
   provide a way to automatically delete them. There are many great tools out
-  there for managing installation of binaries, and stack does not attempt to
+  there for managing installation of binaries, and Stack does not attempt to
   replace those.
-* stack will not necessarily be creating a relocatable executable. If your
+* Stack will not necessarily be creating a relocatable executable. If your
   executables hard-codes paths, copying the executable will not change those
   hard-coded paths.
     * At the time of writing, there's no way to change those kinds of paths with
-      stack, but see [issue #848 about
-      --prefix](https://github.com/commercialhaskell/stack/issues/848) for
-      future plans.
+      Stack, but see
+      [issue #848 about --prefix](https://github.com/commercialhaskell/stack/issues/848)
+      for future plans.
 
-That's really all there is to the install command: for the simplicity of what
+That's really all there is to the `install` command: for the simplicity of what
 it does, it occupies a much larger mental space than is warranted.
 
 ## Targets, locals, and extra-deps
 
 We haven't discussed this too much yet, but, in addition to having a number of
-synonyms *and* taking a number of options on the command line, the build command
-*also* takes many arguments. These are parsed in different ways, and can be used
-to achieve a high level of flexibility in telling stack exactly what you want
-to build.
+synonyms *and* taking a number of options on the command line, the `build`
+command *also* takes many arguments. These are parsed in different ways, and can
+be used to achieve a high level of flexibility in telling Stack exactly what you
+want to build.
 
 We're not going to cover the full generality of these arguments here; instead,
-there's [documentation covering the full build command
-syntax](build_command.md).
-Here, we'll just point out a few different types of arguments:
+there's
+[documentation covering the full build command syntax](build_command.md). Here,
+we'll just point out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
-    * This will attempt to build the vector package, whether it's a local
+    * This will attempt to build the `vector` package, whether it's a local
       package, in your extra-deps, in your snapshot, or just available upstream.
       If it's just available upstream but not included in your locals,
       extra-deps, or snapshot, the newest version is automatically promoted to
@@ -916,7 +916,7 @@ helloworld-0.1.0.0: test (suite: helloworld-test)
 Test suite not yet implemented
 ```
 
-We first cleaned our project to clear old results so we know exactly what stack
+We first cleaned our project to clear old results so we know exactly what Stack
 is trying to do. Notice that it builds the helloworld-test test suite, and the
 helloworld library (since it's used by the test suite), but it does not build
 the helloworld-exe executable.
@@ -937,20 +937,20 @@ and on) flags to disable running of these components. You can also use
 `--no-rerun-tests` to prevent running a test suite which has already passed and
 has not changed.
 
-NOTE: stack doesn't build or run test suites and benchmarks for non-local
+NOTE: Stack doesn't build or run test suites and benchmarks for non-local
 packages. This is done so that running a command like `stack test` doesn't need
 to run 200 test suites!
 
 ## Multi-package projects
 
-Until now, everything we've done with stack has used a single-package project.
-However, stack's power truly shines when you're working on multi-package
+Until now, everything we've done with Stack has used a single-package project.
+However, Stack's power truly shines when you're working on multi-package
 projects. All the functionality you'd expect to work just does: dependencies
 between packages are detected and respected, dependencies of all packages are
 just as one cohesive whole, and if anything fails to build, the build commands
 exits appropriately.
 
-Let's demonstrate this with the wai-app-static and yackage packages:
+Let's demonstrate this with the `wai-app-static` and `yackage` packages:
 
 ```
 michael@d30748af6d3d:~$ mkdir multi
@@ -1006,16 +1006,16 @@ and with GHC options.
 ### Cabal flag management
 
 In the `stack.yaml` file above, you can see that `stack init` has detected that
-— for the yackage package — the upload flag can be set to true, and for
-wai-app-static, the print flag to false (it's chosen those values because
+— for the `yackage` package — the upload flag can be set to true, and for
+`wai-app-static`, the print flag to false (it's chosen those values because
 they're the default flag values, and their dependencies are compatible with the
-snapshot we're using.) To change a flag setting, we can use the command
-line `--flag` option:
+snapshot we're using.) To change a flag setting, we can use the command line
+`--flag` option:
 
     stack build --flag yackage:-upload
 
-This means: when compiling the yackage package, turn off the upload flag (thus
-the `-`). Unlike other tools, stack is explicit about which package's flag you
+This means: when compiling the `yackage` package, turn off the upload flag (thus
+the `-`). Unlike other tools, Stack is explicit about which package's flag you
 want to change. It does this for two reasons:
 
 1. There's no global meaning for Cabal flags, and therefore two packages can
@@ -1044,19 +1044,19 @@ provides us with reproducible and fast builds.
 
 There's one extra nuance about command line GHC options: Since they only apply
 to local targets, if you change your local targets, they will no longer apply
-to other packages. Let's play around with an example from the wai repository,
-which includes the wai and warp packages, the latter depending on the former.
-If we run:
+to other packages. Let's play around with an example from the `wai` repository,
+which includes the `wai` and `warp` packages, the latter depending on the
+former. If we run:
 
     stack build --ghc-options=-O0 wai
 
-It will build all of the dependencies of wai, and then build wai with all
-optimizations disabled. Now let's add in warp as well:
+It will build all of the dependencies of `wai`, and then build `wai` with all
+optimizations disabled. Now let's add in `warp` as well:
 
     stack build --ghc-options=-O0 wai warp
 
-This builds the additional dependencies for warp, and then builds warp with
-optimizations disabled. Importantly: it does not rebuild wai, since wai's
+This builds the additional dependencies for `warp`, and then builds `warp` with
+optimizations disabled. Importantly: it does not rebuild `wai`, since `wai`'s
 configuration has not been altered. Now the surprising case:
 
 ```
@@ -1066,25 +1066,25 @@ warp-3.1.3-a91c7c3108f63376877cb3cd5dbe8a7a: unregistering (missing dependencies
 wai-3.0.3.0: configure
 ```
 
-You may expect this to be a no-op: neither wai nor warp has changed. However,
-stack will instead recompile wai with optimizations enabled again, and then
-rebuild warp (with optimizations disabled) against this newly built wai. The
-reason: reproducible builds. If we'd never built wai or warp before, trying to
-build warp would necessitate building all of its dependencies, and it would do
-so with default GHC options (optimizations enabled). This dependency would
-include wai. So when we run:
+You may expect this to be a no-op: neither `wai` nor `warp` has changed.
+However, Stack will instead recompile `wai` with optimizations enabled again,
+and then rebuild `warp` (with optimizations disabled) against this newly built
+`wai`. The reason: reproducible builds. If we'd never built `wai` or `warp`
+before, trying to build `warp` would necessitate building all of its
+dependencies, and it would do so with default GHC options (optimizations
+enabled). This dependency would include `wai`. So when we run:
 
     stack build --ghc-options=-O0 warp
 
 We want its behavior to be unaffected by any previous build steps we took.
 While this specific corner case does catch people by surprise, the overall goal
-of reproducible builds is- in the stack maintainers' views- worth the
+of reproducible builds is - in the Stack maintainers' views - worth the
 confusion.
 
 Final point: if you have GHC options that you'll be regularly passing to your
 packages, you can add them to your `stack.yaml` file (starting with
-stack-0.1.4.0). See [the documentation section on
-ghc-options](yaml_configuration.md#ghc-options)
+`stack-0.1.4.0`). See the
+[documentation section on ghc-options](yaml_configuration.md#ghc-options)
 for more information.
 
 ## path
@@ -1092,7 +1092,7 @@ for more information.
 NOTE: That's it, the heavy content of this guide is done! Everything from here
 on out is simple explanations of commands. Congratulations!
 
-Generally, you don't need to worry about where stack stores various files. But
+Generally, you don't need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is
 useful.
 
@@ -1123,7 +1123,7 @@ local-hpc-root: /home/michael/wai/.stack-work/install/x86_64-linux/lts-2.17/7.8.
 
 In addition, `stack path` accepts command line arguments to state which of
 these keys you're interested in, which can be convenient for scripting. As a
-simple example, let's find out the sandboxed versions of GHC that stack
+simple example, let's find out the sandboxed versions of GHC that Stack
 installed:
 
 ```
@@ -1134,11 +1134,11 @@ michael@d30748af6d3d:~/wai$ ls $(stack path --programs)/*.installed
 
 (Yes, that command requires a \*nix shell, and likely won't run on Windows.)
 
-While we're talking about paths, to wipe our stack install completely, here's
+While we're talking about paths, to wipe our Stack install completely, here's
 what needs to be removed:
 
-1. The stack executable itself
-2. The stack root, e.g. `$HOME/.stack` on non-Windows systems or, on Windows,
+1. The Stack executable itself
+2. The Stack root, e.g. `$HOME/.stack` on non-Windows systems or, on Windows,
    `%LOCALAPPDATA%\Programs\stack`.
     * See `stack path --stack-root`
     * On Windows, you will also need to delete `stack path --programs`
@@ -1146,19 +1146,19 @@ what needs to be removed:
 
 ## exec
 
-We've already used `stack exec` multiple times in this guide. As you've
-likely already guessed, it allows you to run executables, but with a slightly
-modified environment. In particular: `stack exec` looks for executables on
-stack's bin paths, and sets a few additional environment variables (like adding
-those paths to `PATH`, and setting `GHC_PACKAGE_PATH`, which tells GHC which
-package databases to use).
+We've already used `stack exec` multiple times in this guide. As you've likely
+already guessed, it allows you to run executables, but with a slightly modified
+environment. In particular: `stack exec` looks for executables on Stack's bin
+paths, and sets a few additional environment variables (like adding those paths
+to `PATH`, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
+databases to use).
 
 If you want to see exactly what the modified environment looks like, try:
 
     stack exec env
 
-The only issue is how to distinguish flags to be passed to stack versus those
-for the underlying program. Thanks to the optparse-applicative library, stack
+The only issue is how to distinguish flags to be passed to Stack versus those
+for the underlying program. Thanks to the `optparse-applicative` library, Stack
 follows the Unix convention of `--` to separate these, e.g.:
 
 ```
@@ -1211,14 +1211,14 @@ or `stack exec runghc` for that. As simple helpers, we also provide the
 
 ## script interpreter
 
-stack also offers a very useful feature for running files: a script
-interpreter. For too long have Haskellers felt shackled to bash or Python
-because it's just too hard to create reusable source-only Haskell scripts.
-stack attempts to solve that.
+Stack also offers a very useful feature for running files: a script interpreter.
+For too long have Haskellers felt shackled to bash or Python because it's just
+too hard to create reusable source-only Haskell scripts. Stack attempts to solve
+that.
 
 You can use `stack <file name>` to execute a Haskell source file or specify
-`stack` as the interpreter using a shebang line on a Unix like operating systems.
-Additional stack options can be specified using a special Haskell comment in
+Stack as the interpreter using a shebang line on a Unix like operating systems.
+Additional Stack options can be specified using a special Haskell comment in
 the source file to specify dependencies and automatically install them before
 running the file.
 
@@ -1243,28 +1243,28 @@ The first run can take a while (as it has to download GHC if necessary and build
 dependencies), but subsequent runs are able to reuse everything already built,
 and are therefore quite fast.
 
-The first line in the source file is the usual "shebang" to use stack as a
+The first line in the source file is the usual "shebang" to use Stack as a
 script interpreter. The second line, is a Haskell comment providing additional
-options to stack (due to the common limitation of the "shebang" line only being
-allowed a single argument). In this case, the options tell stack to use the
-lts-3.2 resolver, automatically install GHC if it is not already installed, and
-ensure the turtle package is available.
+options to Stack (due to the common limitation of the "shebang" line only being
+allowed a single argument). In this case, the options tell Stack to use the
+`lts-3.2` resolver, automatically install GHC if it is not already installed,
+and ensure the `turtle` package is available.
 
 If you're on Windows: you can run `stack turtle.hs` instead of `./turtle.hs`.
 The shebang line is not required in that case.
 
 ### Just-in-time compilation
 
-You can add the `--compile` flag to make stack compile the script,
-and then run the compiled executable. Compilation is done quickly,
-without optimization. To compile with optimization, use the `--optimize` flag
-instead. Compilation is done only if needed; if the executable already exists,
-and is newer than the script, stack just runs the executable directly.
+You can add the `--compile` flag to make Stack compile the script, and then run
+the compiled executable. Compilation is done quickly, without optimization. To
+compile with optimization, use the `--optimize` flag instead. Compilation is
+done only if needed; if the executable already exists, and is newer than the
+script, Stack just runs the executable directly.
 
-This feature can be good for speed (your script runs faster) and also
-for durability (the executable remains runnable even if the script is
-disturbed, eg due to changes in your installed ghc/snapshots, changes
-to source files during git bisect, etc.)
+This feature can be good for speed (your script runs faster) and also for
+durability (the executable remains runnable even if the script is disturbed, eg
+due to changes in your installed GHC/snapshots, changes to source files during
+git bisect, etc.)
 
 ### Using multiple packages
 
@@ -1287,15 +1287,15 @@ arguments, or by providing a comma or space separated list. For example:
 With the `script` command, all Stack configuration files are ignored to provide
 a completely reliable script running experience. However, see the example below
 with `runghc` for an approach to scripts which will respect your configuration
-files. When using `runghc`, if the current working directory is inside a
-project then that project's stack configuration is effective when running the
-script. Otherwise the script uses the global project configuration specified in
+files. When using `runghc`, if the current working directory is inside a project
+then that project's Stack configuration is effective when running the script.
+Otherwise the script uses the global project configuration specified in
 `~/.stack/global-project/stack.yaml`.
 
 ### Specifying interpreter options
 
-The stack interpreter options comment must specify a single valid stack command
-line, starting with `stack` as the command followed by the stack options to use
+The Stack interpreter options comment must specify a single valid Stack command
+line, starting with `stack` as the command followed by the Stack options to use
 for executing this file. The comment must always be on the line immediately
 following the shebang line when the shebang line is present otherwise it must
 be the first line in the file. The comment must always start in the first
@@ -1303,9 +1303,9 @@ column of the line.
 
 When many options are needed a block style comment may be more convenient to
 split the command on multiple lines for better readability. You can also
-specify ghc options the same way as you would on command line i.e. by
-separating the stack options and ghc options with a `--`. Here is an example of
-a multi line block comment with ghc options:
+specify GHC options the same way as you would on command line i.e. by
+separating the Stack options and GHC options with a `--`. Here is an example of
+a multi line block comment with GHC options:
 
 ```
 #!/usr/bin/env stack
@@ -1336,15 +1336,15 @@ instead. In order to achieve the same effect with the `runghc` command, you can
 do the following:
 
 1. Use the `--install-ghc` option to install the compiler automatically
-2. Explicitly specify all packages required by the script using the
-`--package` option. Use `-hide-all-packages` ghc option to force
-explicit specification of all packages.
+2. Explicitly specify all packages required by the script using the `--package`
+   option. Use `-hide-all-packages` GHC option to force explicit specification
+   of all packages.
 3. Use the `--resolver` Stack option to ensure a specific GHC version and
    package set is used.
 
-Even with this configuration, it is still possible for configuration
-files to impact `stack runghc`, which is why `stack script` is strongly
-recommended in general. For those curious, here is an example with `runghc`:
+Even with this configuration, it is still possible for configuration files to
+affect `stack runghc`, which is why `stack script` is strongly recommended in
+general. For those curious, here is an example with `runghc`:
 
 ```
 #!/usr/bin/env stack
@@ -1367,16 +1367,16 @@ that project. See the next section for more information on configuration files.
 
 On Mac OSX:
 
-- Avoid `{-# LANGUAGE CPP #-}` in stack scripts; it breaks the hashbang line
+- Avoid `{-# LANGUAGE CPP #-}` in Stack scripts; it breaks the hashbang line
   ([GHC #6132](https://gitlab.haskell.org/ghc/ghc/issues/6132))
 
 - Use a compiled executable, not another script, in the hashbang line.
   Eg `#!/usr/bin/env runhaskell` will work but `#!/usr/local/bin/runhaskell`
   would not.
 
-### Loading scripts in ghci
+### Loading scripts in GHCi
 
-Sometimes you want to load your script in ghci REPL to play around with your
+Sometimes you want to load your script in GHCi REPL to play around with your
 program. In those cases, you can use `exec ghci` option in the script to achieve
 it. Here is an example:
 
@@ -1392,8 +1392,8 @@ it. Here is an example:
 
 ## Finding project configs, and the implicit global project
 
-Whenever you run something with stack, it needs a `stack.yaml` project file. The
-algorithm stack uses to find this is:
+Whenever you run something with Stack, it needs a `stack.yaml` project file. The
+algorithm Stack uses to find this is:
 
 1. Check for a `--stack-yaml` option on the command line
 2. Check for a `STACK_YAML` environment variable
@@ -1406,11 +1406,11 @@ variable can be convenient if you're going to be running commands like
 `stack ghc` in other directories, but you want to use the configuration you
 defined in a specific project.
 
-If stack does not find a `stack.yaml` in any of the three specified locations,
+If Stack does not find a `stack.yaml` in any of the three specified locations,
 the *implicit global* logic kicks in. You've probably noticed that phrase a few
 times in the output from commands above. Implicit global is essentially a hack
 to allow stack to be useful in a non-project setting. When no implicit global
-config file exists, stack creates one for you with the latest LTS snapshot as
+config file exists, Stack creates one for you with the latest LTS snapshot as
 the resolver. This allows you to do things like:
 
 * compile individual files easily with `stack ghc`
@@ -1419,18 +1419,18 @@ the resolver. This allows you to do things like:
 Keep in mind that there's nothing magical about this implicit global
 configuration. It has no impact on projects at all. Every package you install
 with it is put into isolated databases just like everywhere else. The only magic
-is that it's the catch-all project whenever you're running stack somewhere else.
+is that it's the catch-all project whenever you're running Stack somewhere else.
 
-## Setting stack root location
+## Setting Stack root location
 
-`stack path --stack-root` will tell you the location of the 'stack root'. This
-is where stack stores snapshot packages, among other things. On operating
-systems other than Windows, it is also where stack stores tools such as ghc and
+`stack path --stack-root` will tell you the location of the 'Stack root'. This
+is where Stack stores snapshot packages, among other things. On operating
+systems other than Windows, it is also where Stack stores tools such as GHC and
 MSYS2 by default, in a `programs` folder. (On Windows, the default location for
 such tools is `%LOCALAPPDATA%\Programs\stack`.)
 
-The location of the stack root can be configured by setting the `STACK_ROOT`
-environment variable or using stack's `--stack-root` option on the command line.
+The location of the Stack root can be configured by setting the `STACK_ROOT`
+environment variable or using Stack's `--stack-root` option on the command line.
 It is particularly useful to do this on Windows, where the length of filepaths
 may be limited (to
 [MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
@@ -1438,9 +1438,9 @@ and things can break when this limit is exceeded.
 
 ## `stack.yaml` vs `.cabal` files
 
-Now that we've covered a lot of stack use cases, this quick summary of
+Now that we've covered a lot of Stack use cases, this quick summary of
 `stack.yaml` vs `.cabal` files will hopefully make sense and be a good reminder
-for future uses of stack:
+for future uses of Stack:
 
 * A project can have multiple packages.
 * Each project has a `stack.yaml`.
@@ -1454,58 +1454,58 @@ for future uses of stack:
 
 ## Comparison to other tools
 
-stack is not the only tool around for building Haskell code. stack came into
+Stack is not the only tool around for building Haskell code. Stack came into
 existence due to limitations with some of the existing tools. If you're
 unaffected by those limitations and are happily building Haskell code, you may
-not need stack. If you're suffering from some of the common problems in other
-tools, give stack a try instead.
+not need Stack. If you're suffering from some of the common problems in other
+tools, give Stack a try instead.
 
 If you're a new user who has no experience with other tools, we recommend going
-with stack. The defaults match modern best practices in Haskell development, and
+with Stack. The defaults match modern best practices in Haskell development, and
 there are less corner cases you need to be aware of. You *can* develop Haskell
 code with other tools, but you probably want to spend your time writing code,
 not convincing a tool to do what you want.
 
 Before jumping into the differences, let me clarify an important similarity:
 
-__Same package format.__ stack, cabal-install, and presumably all other tools
+__Same package format.__ Stack, cabal-install, and presumably all other tools
 share the same underlying Cabal package format, consisting of a `.cabal` file,
 modules, etc. This is a Good Thing: we can share the same set of upstream
-libraries, and collaboratively work on the same project with stack,
+libraries, and collaboratively work on the same project with Stack,
 cabal-install, and NixOS. In that sense, we're sharing the same ecosystem.
 
 Now the differences:
 
 * __Curation vs dependency solving as a default__.
-    * stack defaults to using curation (Stackage snapshots, LTS Haskell,
+    * Stack defaults to using curation (Stackage snapshots, LTS Haskell,
       Nightly, etc) as a default instead of defaulting to dependency solving, as
-      cabal-install does. This is just a default: as described above, stack can
+      cabal-install does. This is just a default: as described above, Stack can
       use dependency solving if desired, and cabal-install can use curation.
-      However, most users will stick to the defaults. The stack team firmly
+      However, most users will stick to the defaults. The Stack team firmly
       believes that the majority of users want to simply ignore dependency
       resolution nightmares and get a valid build plan from day 1, which is why
       we've made this selection of default behavior.
 * __Reproducible__.
-    * stack goes to great lengths to ensure that `stack build` today does the
+    * Stack goes to great lengths to ensure that `stack build` today does the
       same thing tomorrow. cabal-install does not: build plans can be affected
       by the presence of preinstalled packages, and running `cabal update` can
-      cause a previously successful build to fail. With stack, changing the
+      cause a previously successful build to fail. With Stack, changing the
       build plan is always an explicit decision.
 * __Automatically building dependencies__.
     * In cabal-install, you need to use `cabal install` to trigger dependency
       building. This is somewhat necessary due to the previous point, since
       building dependencies can, in some cases, break existing installed
-      packages. So for example, in stack, `stack test` does the same job as
+      packages. So for example, in Stack, `stack test` does the same job as
       `cabal install --run-tests`, though the latter *additionally* performs an
       installation that you may not want. The closer command equivalent is
       `cabal install --enable-tests --only-dependencies && cabal configure --enable-tests && cabal build && cabal test`
       (newer versions of cabal-install may make this command shorter).
 * __Isolated by default__.
-    * This has been a pain point for new stack users. In cabal, the
-      default behavior is a non-isolated build where working on two projects can
-      cause the user package database to become corrupted. The cabal solution to
-      this is sandboxes. stack, however, provides this behavior by default via
-      its databases. In other words: when you use stack, there's __no need for
+    * This has been a pain point for new Stack users. In Cabal, the default
+      behavior is a non-isolated build where working on two projects can
+      cause the user package database to become corrupted. The Cabal solution to
+      this is sandboxes. Stack, however, provides this behavior by default via
+      its databases. In other words: when you use Stack, there's __no need for
       sandboxes__, everything is (essentially) sandboxed by default.
 
 __Other tools for comparison (including active and historical)__
@@ -1514,27 +1514,26 @@ __Other tools for comparison (including active and historical)__
   favor of cabal-install)
 * [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of
   the multi-package functionality of stack. If you're still using cabal-install,
-  cabal-meta is relevant. For stack work, the feature set is fully subsumed by
-  stack.
+  cabal-meta is relevant. For Stack work, the feature set is fully subsumed by
+  Stack.
 * [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly
-  irrelevant in the presence of both stack and cabal sandboxes, both of which
+  irrelevant in the presence of both Stack and Cabal sandboxes, both of which
   make it easier to add additional package sources easily. The mega-sdist
   executable that ships with cabal-src is, however, still relevant. Its
-  functionality may some day be folded into stack
+  functionality may some day be folded into Stack
 * [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an
   initial attempt to make cabal-install work more easily with curated snapshots,
   but due to a slight impedance mismatch between cabal.config constraints and
   snapshots, it did not work as well as hoped. It is deprecated in favor of
-  stack.
-
+  Stack.
 
 ## Fun features
 
-This is just a quick collection of fun and useful feature stack supports.
+This is just a quick collection of fun and useful feature Stack supports.
 
 ### Templates
 
-We started off using the `new` command to create a project. stack provides
+We started off using the `new` command to create a project. Stack provides
 multiple templates to start a new project from:
 
 ```
@@ -1589,54 +1588,46 @@ The default `stack-templates` repository is on
 account `commercialstack`. You can download templates from a different Github
 user by prefixing the username and a slash:
 
-```
-stack new my-yesod-project yesodweb/simple
-```
+    stack new my-yesod-project yesodweb/simple
 
-Then it would be downloaded from Github, user account `yesodweb`,
-repo `stack-templates`, and file `yesod-simple.hsfiles`.
+Then it would be downloaded from Github, user account `yesodweb`, repo
+`stack-templates`, and file `yesod-simple.hsfiles`.
 
 You can even download templates from a service other that Github, such as
 [Gitlab](https://gitlab.com) or [Bitbucket](https://bitbucket.com):
 
-```
-stack new my-project gitlab:user29/foo
-```
+    stack new my-project gitlab:user29/foo
 
 That template would be downloaded from Gitlab, user account `user29`,
 repo `stack-templates`, and file `foo.hsfiles`.
 
 If you need more flexibility, you can specify the full URL of the template:
 
-```
-stack new my-project https://my-site.com/content/template9.hsfiles
-```
+    stack new my-project https://my-site.com/content/template9.hsfiles
 
 (The `.hsfiles` extension is optional; it will be added if it's not specified.)
 
 Alternatively you can use a local template by specifying the path:
 
-```
-stack new project ~/location/of/your/template.hsfiles
-```
+    stack new project ~/location/of/your/template.hsfiles
 
-As a starting point for creating your own templates, you can use
-[the "simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
-An introduction into template-writing and a place for submitting official templates,
-you will find at
-[the stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
+As a starting point for creating your own templates, you can use the
+["simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
+An introduction into template-writing and a place for submitting official
+templates, you will find at the
+[stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme).
 
 ### Editor integration
 
-For editor integration, stack has a related project called
-[intero](https://github.com/commercialhaskell/intero).  It is particularly well
-supported by emacs, but some other editors have integration for it as well.
+For editor integration, Stack has a related project called
+[intero](https://github.com/commercialhaskell/intero). It is particularly well
+supported by Emacs, but some other editors have integration for it as well.
 
 ### Visualizing dependencies
 
 If you'd like to get some insight into the dependency tree of your packages, you
-can use the `stack dot` command and Graphviz. More information is
-[available in the Dependency visualization documentation](dependency_visualization.md).
+can use the `stack dot` command and Graphviz. More information is available in
+the [Dependency visualization documentation](dependency_visualization.md).
 
 ### Travis with caching
 
@@ -1650,45 +1641,42 @@ the following (or add it to `.bashrc`):
 
     eval "$(stack --bash-completion-script stack)"
 
-For more information and other shells, see [the Shell auto-completion wiki
-page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
+For more information and other shells, see the
+[Shell auto-completion wiki page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
 
 ### Docker
 
-Stack is able to build your code inside a Docker image, which means
-even more reproducibility to your builds, since you and the rest of
-your team will always have the same system libraries.
+Stack is able to build your code inside a Docker image, which means even more
+reproducibility to your builds, since you and the rest of your team will always
+have the same system libraries.
 
 ### Nix
 
-stack provides an integration with [Nix](http://nixos.org/nix),
-providing you with the same two benefits as the first Docker
-integration discussed above:
+Stack provides an integration with [Nix](http://nixos.org/nix), providing you
+with the same two benefits as the first Docker integration discussed above:
 
-* more reproducible builds, since fixed versions of any system
-  libraries and commands required to build the project are
-  automatically built using Nix and managed locally per-project. These
-  system packages never conflict with any existing versions of these
-  libraries on your system. That they are managed locally to the
-  project means that you don't need to alter your system in any way to
-  build any odd project pulled from the Internet.
-* implicit sharing of system packages between projects, so you don't
-  have more copies on-disk than you need to.
+* more reproducible builds, since fixed versions of any system libraries and
+  commands required to build the project are automatically built using Nix and
+  managed locally per-project. These system packages never conflict with any
+  existing versions of these libraries on your system. That they are managed
+  locally to the project means that you don't need to alter your system in any
+  way to build any odd project pulled from the Internet.
+* implicit sharing of system packages between projects, so you don't have more
+  copies on-disk than you need to.
 
 When using the Nix integration, Stack downloads and builds Haskell dependencies
 as usual, but resorts on Nix to provide non-Haskell dependencies that exist in
 the Nixpkgs.
 
-Both Docker and Nix are methods to *isolate* builds and thereby make
-them more reproducible. They just differ in the means of achieving
-this isolation. Nix provides slightly weaker isolation guarantees than
-Docker, but is more lightweight and more portable (Linux and OS
-X mainly, but also Windows). For more on Nix, its command-line
-interface and its package description language, read the
-[Nix manual](http://nixos.org/nix/manual). But keep in mind that the
-point of stack's support is to obviate the need to write any Nix code
-in the common case or even to learn how to use the Nix tools (they're
-called under the hood).
+Both Docker and Nix are methods to *isolate* builds and thereby make them more
+reproducible. They just differ in the means of achieving this isolation. Nix
+provides slightly weaker isolation guarantees than Docker, but is more
+lightweight and more portable (Linux and OS X mainly, but also Windows). For
+more on Nix, its command-line interface and its package description language,
+read the [Nix manual](http://nixos.org/nix/manual). But keep in mind that the
+point of Stack's support is to obviate the need to write any Nix code in the
+common case or even to learn how to use the Nix tools (they're called under the
+hood).
 
 For more information, see
 [the Nix-integration documentation](nix_integration.md).
@@ -1699,7 +1687,7 @@ The following commands are a little more powerful, and won't be needed by all
 users. Here's a quick rundown:
 
 * `stack update` will download the most recent set of packages from your package
-  indices (e.g. Hackage). Generally, stack runs this for you automatically
+  indices (e.g. Hackage). Generally, Stack runs this for you automatically
   when necessary, but it can be useful to do this manually sometimes.
 * `stack unpack` is a command we've already used quite a bit for examples, but
   most users won't use it regularly. It does what you'd expect: downloads a
@@ -1707,7 +1695,7 @@ users. Here's a quick rundown:
   the destination directory.
 * `stack sdist` generates an uploading tarball containing your package code
 * `stack upload` uploads an sdist to Hackage. As of version
-  [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) stack will also
+  [1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) Stack will also
   attempt to GPG sign your packages as per
   [our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
     * `--no-signature` disables signing of packages
@@ -1727,13 +1715,12 @@ users. Here's a quick rundown:
     export $HACKAGE_PASSWORD="<password>"
     ```
 
-* `stack upgrade` will build a new version of stack from source.
-    * `--git` is a convenient way to get the most recent version from master for
-      those testing and living on the bleeding edge.
-* `stack ls snapshots` will list all the local snapshots by
-  default. You can also view the remote snapshots using `stack ls
-  snapshots remote`. It also supports option for viewing only lts
-  (`-l`) and nightly (`-n`) snapshots.
+* `stack upgrade` will build a new version of Stack from source.
+    * `--git` is a convenient way to get the most recent version from the
+      `master` branch, for those testing and living on the bleeding edge.
+* `stack ls snapshots` will list all the local snapshots by default. You can
+  also view the remote snapshots using `stack ls snapshots remote`. It also
+  supports option for viewing only lts (`-l`) and nightly (`-n`) snapshots.
 * `stack ls dependencies` lists all of the packages and versions used for a
   project
 * `stack list [PACKAGE]...` list the version of the specified package(s) in a
@@ -1759,16 +1746,15 @@ as a result of the test run.
 
 The `my-tests.prof` file now contains time and allocation info for the test run.
 
-To create a profiling report for an executable, e.g. `my-exe`, you can
-run
+To create a profiling report for an executable, e.g. `my-exe`, you can run
 
      stack exec --profile -- my-exe +RTS -p
 
 For more fine-grained control of compilation options there are the
 `--library-profiling` and `--executable-profiling` flags which will turn on the
 `--enable-library-profiling` and `--enable-executable-profiling` Cabal
-options respectively.
-Custom GHC options can be passed in with `--ghc-options "more options here"`.
+options respectively. Custom GHC options can be passed in with
+`--ghc-options "more options here"`.
 
 To enable compilation with profiling options by default you can add the
 following snippet to your `stack.yaml` or `~/.stack/config.yaml`:
@@ -1781,11 +1767,11 @@ build:
 
 ### Further reading
 
-For more commands and uses, see
-[the official GHC chapter on profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
-[the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
-and
-[the chapter on profiling in Real World Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
+For more commands and uses, see the
+[official GHC chapter on profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
+the [Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
+and the
+[chapter on profiling in Real World Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
 
 ### Tracing
 
@@ -1797,14 +1783,14 @@ but adds the `+RTS -xc` runtime option.
 
 Building with debugging symbols in the
 [DWARF information](https://ghc.haskell.org/trac/ghc/wiki/DWARF) is supported by
-`stack`. This can be done by passing the flag `--ghc-options="-g"` and also to
+Stack. This can be done by passing the flag `--ghc-options="-g"` and also to
 override the default behaviour of stripping executables of debugging symbols by
 passing either one of the following flags: `--no-strip`,
 `--no-library-stripping` or `--no-executable-stripping`.
 
-In Windows GDB can be installed to debug an executable with
-`stack exec -- pacman -S gdb`. Windows visual studio compiler's debugging format
-PDB is not supported at the moment. This might be possible by
+In Windows, GDB can be installed to debug an executable with
+`stack exec -- pacman -S gdb`. Windows' Visual Studio compiler's debugging
+format PDB is not supported at the moment. This might be possible by
 [separating](https://stackoverflow.com/questions/866721/how-to-generate-gcc-debug-symbol-outside-the-build-target) debugging symbols and
 [converting](https://github.com/rainers/cv2pdb) their format. Or as an option
 when
@@ -1812,16 +1798,16 @@ when
 
 ## More resources
 
-There are lots of resources available for learning more about stack:
+There are lots of resources available for learning more about Stack:
 
 * `stack --help`
-* `stack --version` — identify the version and Git hash of the stack executable
+* `stack --version` — identify the version and Git hash of the Stack executable
 * `--verbose` (or `-v`) — much more info about internal operations (useful for
   bug reports)
 * The [home page](http://haskellstack.org)
-* The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
+* The [Stack mailing list](https://groups.google.com/d/forum/haskell-stack)
 * The [FAQ](faq.md)
-* The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
+* The [Stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
-* [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
-* [Why is stack not cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)
+* [Another getting started with Stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
+* [Why is Stack not Cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)
