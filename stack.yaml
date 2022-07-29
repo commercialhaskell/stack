@@ -1,17 +1,16 @@
 resolver: lts-17.15
 
 packages:
-- .
+  - .
 
 extra-deps:
-- hpack-0.35.0@rev:0
-- pantry-0.5.6@rev:0 # https://github.com/commercialhaskell/pantry/pull/53
-- rio-0.1.21.0@rev:0
-
+  - hpack-0.35.0@rev:0
+  - pantry-0.5.6@rev:0  # https://github.com/commercialhaskell/pantry/pull/53
+  - rio-0.1.21.0@rev:0
 
 docker:
   enable: false
-  #repo: fpco/alpine-haskell-stack:8.10.4
+  # repo: fpco/alpine-haskell-stack:8.10.4
   repo: fpco/alpine-haskell-stack@sha256:1024fe4b3b082a8df64d00e8563b3151220ed90af09604a8f7e1d44040500c30
 
 nix:
@@ -24,8 +23,8 @@ flags:
     developer-mode: true
 
 ghc-options:
-   "$locals": -fhide-source-paths
+  "$locals": -fhide-source-paths
 
 drop-packages:
-# See https://github.com/commercialhaskell/stack/pull/4712
-- cabal-install
+  # See https://github.com/commercialhaskell/stack/pull/4712
+  - cabal-install

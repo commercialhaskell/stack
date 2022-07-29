@@ -8,45 +8,45 @@ docs_dir: doc
 site_dir: _site
 theme: readthedocs
 extra_css:
-- css/extra.css
+  - css/extra.css
 extra_javascript:
-- js/searchhack.js
+  - js/searchhack.js
 
 pages:
-- Home: README.md
-- Changelog: ChangeLog.md
-- Tool documentation:
-  - Install/upgrade: install_and_upgrade.md
-  - User guide: GUIDE.md
-  - FAQ: faq.md
-  - Configuration (project and global): yaml_configuration.md
-  - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
-  - Build command: build_command.md
-  - Developing on Windows: developing_on_windows.md
-  - Dependency visualization: dependency_visualization.md
-  - Docker integration: docker_integration.md
-  - Nix integration: nix_integration.md
-  - Non-standard project initialization: nonstandard_project_init.md
-  - Shell auto-completion: shell_autocompletion.md
-  - Travis CI: travis_ci.md
-  - Azure CI: azure_ci.md
-  - Custom snapshots: custom_snapshot.md
-  - Code coverage: coverage.md
-  - GHCi: ghci.md
-  - Pantry: pantry.md
-  - Lock files: lock_files.md
-- Advanced documentation:
-  - Build overview: build_overview.md
-- Project documentation:
-  - Contributors guide: CONTRIBUTING.md
-  - Maintainer guide:
-    - Releases: maintainers/releases.md
-    - Maintainer team process: maintainers/team_process.md
-    - Add GHC version: maintainers/ghc.md
-    - Docker images: maintainers/docker.md
-    - Upgrading MSYS2: maintainers/msys.md
-  - Signing key: SIGNING_KEY.md
+  - Home: README.md
+  - Changelog: ChangeLog.md
+  - Tool documentation:
+      - Install/upgrade: install_and_upgrade.md
+      - User guide: GUIDE.md
+      - FAQ: faq.md
+      - Configuration (project and global): yaml_configuration.md
+      - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
+      - Build command: build_command.md
+      - Developing on Windows: developing_on_windows.md
+      - Dependency visualization: dependency_visualization.md
+      - Docker integration: docker_integration.md
+      - Nix integration: nix_integration.md
+      - Non-standard project initialization: nonstandard_project_init.md
+      - Shell auto-completion: shell_autocompletion.md
+      - Travis CI: travis_ci.md
+      - Azure CI: azure_ci.md
+      - Custom snapshots: custom_snapshot.md
+      - Code coverage: coverage.md
+      - GHCi: ghci.md
+      - Pantry: pantry.md
+      - Lock files: lock_files.md
+  - Advanced documentation:
+      - Build overview: build_overview.md
+  - Project documentation:
+      - Contributors guide: CONTRIBUTING.md
+      - Maintainer guide:
+          - Releases: maintainers/releases.md
+          - Maintainer team process: maintainers/team_process.md
+          - Add GHC version: maintainers/ghc.md
+          - Docker images: maintainers/docker.md
+          - Upgrading MSYS2: maintainers/msys.md
+      - Signing key: SIGNING_KEY.md
 
 markdown_extensions:
-- toc:
-    permalink: true
+  - toc:
+      permalink: true

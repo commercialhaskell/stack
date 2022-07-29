@@ -2,7 +2,7 @@
 resolver: nightly-2022-04-09
 
 packages:
-- .
+  - .
 
 docker:
   enable: false
@@ -19,11 +19,11 @@ flags:
     developer-mode: true
 
 ghc-options:
-   "$locals": -fhide-source-paths
+  "$locals": -fhide-source-paths
 
 extra-deps:
-- pantry-0.5.6@rev:0 # https://github.com/commercialhaskell/pantry/pull/53
+  - pantry-0.5.6@rev:0  # https://github.com/commercialhaskell/pantry/pull/53
 
 drop-packages:
-# See https://github.com/commercialhaskell/stack/pull/4712
-- cabal-install
+  # See https://github.com/commercialhaskell/stack/pull/4712
+  - cabal-install
