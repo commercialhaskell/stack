@@ -1,0 +1,27 @@
+name: hlint
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  style:
+    name: hlint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - uses: haskell/actions/hlint-setup@v2
+        name: Set up HLint
+        with:
+          version: "3.4"
+
+      - name: hlint
+        run: |
+          set -ex
+          hlint src/
+          hlint src/ --cpp-define=WINDOWS=1
+          hlint test/ --cpp-simple
