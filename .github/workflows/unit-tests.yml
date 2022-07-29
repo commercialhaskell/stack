@@ -10,20 +10,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  style:
-    name: Style
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone project
-        uses: actions/checkout@v2
-      - name: hlint
-        run: |
-          set -ex
-          ./etc/scripts/get-hlint.sh
-          export PATH="$(pwd)"/hlint:$PATH
-          hlint src/
-          hlint src/ --cpp-define=WINDOWS=1
-          hlint test/ --cpp-simple
   pedantic:
     name: Pedantic
     runs-on: ubuntu-latest
