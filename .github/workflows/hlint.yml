@@ -1,8 +1,7 @@
 name: hlint
 
-on:
-  pull_request:
-  push:
+# yamllint disable-line rule:truthy
+on: [pull_request, push]
 
 jobs:
   style:

@@ -1,6 +1,7 @@
 ---
-name: Yaml Lint
-on: [push]  # yamllint disable-line rule:truthy
+name: yamllint
+# yamllint disable-line rule:truthy
+on: [pull_request, push]
 jobs:
   lint:
     runs-on: ubuntu-latest

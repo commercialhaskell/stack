@@ -1,0 +1,10 @@
+extends: default
+rules:
+  document-start: disable
+  line-length: disable
+ignore: |
+  .github/workflows/arm64-release.yml
+  .github/workflows/integration-tests.yml
+  .github/workflows/unit-tests.yml
+  doc
+  test
