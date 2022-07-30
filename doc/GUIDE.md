@@ -1366,7 +1366,7 @@ that project. See the next section for more information on configuration files.
 
 ### Platform-specific script issues
 
-On Mac OSX:
+On macOS:
 
 - Avoid `{-# LANGUAGE CPP #-}` in Stack scripts; it breaks the hashbang line
   ([GHC #6132](https://gitlab.haskell.org/ghc/ghc/issues/6132))
@@ -1672,7 +1672,7 @@ the Nixpkgs.
 Both Docker and Nix are methods to *isolate* builds and thereby make them more
 reproducible. They just differ in the means of achieving this isolation. Nix
 provides slightly weaker isolation guarantees than Docker, but is more
-lightweight and more portable (Linux and OS X mainly, but also Windows). For
+lightweight and more portable (Linux and macOS mainly, but also Windows). For
 more on Nix, its command-line interface and its package description language,
 read the [Nix manual](http://nixos.org/nix/manual). But keep in mind that the
 point of Stack's support is to obviate the need to write any Nix code in the
