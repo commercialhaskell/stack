@@ -54,6 +54,7 @@ extra-source-files:
     doc/README.md
     doc/shell_autocompletion.md
     doc/SIGNING_KEY.md
+    doc/Stack_and_VS_Code.md
     doc/stack_yaml_vs_cabal_package_file.md
     doc/travis_ci.md
     doc/yaml_configuration.md
