@@ -1,0 +1,44 @@
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
+
+# Glossary
+
+The following terms are used in Stack's documentation.
+
+|Term               |Meaning                                                   |
+|-------------------|----------------------------------------------------------|
+|Cabal              |The Haskell Common Architecture for Building Applications and Libraries, provided by the [`Cabal` package](https://hackage.haskell.org/package/Cabal). Also referred to as Cabal (the library) to distinguish it from Cabal (the tool).|
+|Cabal file|A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package.html) used by Cabal, named `<package_name>.cabal`.|
+|Cabal (the tool)|The Haskell build tool provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
+|`config.yaml`      |A non-project-specific configuration file used by Stack.  |
+|Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
+|Emacs              |[GNU Emacs](https://www.gnu.org/software/emacs/), an extensible, customisable text editor.|
+|extra-deps         |Packages in addition to those in a snapshot, named after a key used in `stack.yaml` files.|
+|FreeBSD            |A Unix-like operating system.                             |
+|GCC                |The [GNU Compiler Collection](https://gcc.gnu.org/) or its executable `gcc`.|
+|GHC                |The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/).|
+|GHCi               |GHC's [interactive environment](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/ghci.html).|
+|GHCJS              |A Haskell to JavaScript [compiler](https://github.com/ghcjs/ghcjs).|
+|GHCup              |An [installer](https://www.haskell.org/ghcup/) for Haskell.
+|Git                |A [distributed version control system](https://git-scm.com/).|
+|Hackage            |The [Haskell Package Repository](https://hackage.haskell.org/).
+|'Haskell' extension|The ['Haskell' extension]() for VS Code.                  |
+|HLS                |[Haskell Language Server](https://haskell-language-server.readthedocs.io/en/latest/), an implementation of the Language Server Protocol for Haskell.|
+|Hpack              |A [format](https://github.com/sol/hpack) for Haskell packages or the executable `hpack` that produces a Cabal file from `package.yaml`.|
+|Linux              |A family of operating systems based on the Linux kernal.  |
+|macOS              |The primary operating system for Apple's Mac computers. Previously known as Mac OS X or OS X.|
+|MSYS2              |The [MSYS2](https://www.msys2.org/) software distribution and building platform for Windows.|
+|Nix                |A purely functional [package manager](https://nixos.org/), available for Linux and macOS.|
+|`package.yaml`     |A file that describes a package in the Hpack format.      |
+|Pantry             |A library for content-addressable Haskell package management, provided by the [`pantry` package](https://hackage.haskell.org/package/pantry). A dependency of Stack.|
+|REPL               | An interactive (run-eval-print loop) programming environment.|
+|resolver           |A synonym for snapshot.                                   |
+|`Setup.hs`         |A project-specific file used by Cabal to perform setup tasks.|
+|snapshot           |A snapshot defines a GHC version, a set of packages, and build flags or other settings.|
+|Stack              |The Haskell Tool Stack project or its executable `stack`. |
+|`stack.yaml`       |A project-specific configuration file used by Stack.      |
+|Stackage           |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
+|Stack root         |A directory in which Stack stores important files. See `stack path --stack-root`. On Windows, Stack also stores important files outside of the Stack root.|
+|Unix-like operating systems|Linux, FreeBSD and macOS.                         |
+|VS Code            |[Visual Studio Code](https://code.visualstudio.com/), a source code editor.|
+|Windows            |A group of operating systems developed by Microsoft.      |
+|WSL                |[Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/). Provides a Linux environment on Windows.|
