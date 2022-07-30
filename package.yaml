@@ -40,6 +40,8 @@ extra-source-files:
 - src/test/Stack/Untar/test1.tar.gz
 - src/test/Stack/Untar/test2.tar.gz
 ghc-options:
+- -fwrite-ide-info
+- -hiedir=.hie
 - -Wall
 - -fwarn-tabs
 - -fwarn-incomplete-uni-patterns

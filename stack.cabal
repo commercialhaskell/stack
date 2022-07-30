@@ -223,7 +223,7 @@ library
       Paths_stack
   hs-source-dirs:
       src/
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
   build-depends:
       Cabal
     , aeson
@@ -346,7 +346,7 @@ executable stack
       Paths_stack
   hs-source-dirs:
       src/main
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
       Cabal
     , aeson
@@ -468,7 +468,7 @@ executable stack-integration-test
   hs-source-dirs:
       test/integration
       test/integration/lib
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal
     , aeson
@@ -597,7 +597,7 @@ test-suite stack-test
       Paths_stack
   hs-source-dirs:
       src/test
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
   build-depends:
       Cabal
     , QuickCheck

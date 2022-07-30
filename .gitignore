@@ -29,3 +29,5 @@ tags
 better-cache/
 stack*.yaml.lock
 dist-newstyle/
+.hie
+stan.html
