@@ -19,27 +19,30 @@ commands](https://github.com/msys2/msys2/wiki/Using-packages) that work with
 tools &mdash; should be started with `stack exec -- pacman`.
 
 The Stack-supplied MSYS2 can itself be updated with the Stack-supplied `pacman`.
-See the MSYS2 guide ['III. Updating packages'](https://www.msys2.org/wiki/MSYS2-installation/). If the Stack-supplied `pacman` has a version that is
-5.0.1.6403 or greater (see `stack exec -- pacman --version`) then the command to
-update is simply:
+See the MSYS2 guide
+['III. Updating packages'](https://www.msys2.org/wiki/MSYS2-installation/). If
+the Stack-supplied `pacman` has a version that is 5.0.1.6403 or greater (see
+`stack exec -- pacman --version`) then the command to update is simply:
 
     stack exec -- pacman -Syuu
 
-This command may need to be run more than once, until everything is reported by `pacman` as 'up to date' and 'nothing to do'.
+This command may need to be run more than once, until everything is reported by
+`pacman` as 'up to date' and 'nothing to do'.
 
 ## Setup.hs ##
 
-`Setup.hs` is automatically run inside the stack environment. So when
-you need to launch another tool you don't need to prefix the command
-with `stack exec --` within the custom `Setup.hs` file.
+`Setup.hs` is automatically run inside the Stack environment. So when you need
+to launch another tool you don't need to prefix the command with `stack exec --`
+within the custom `Setup.hs` file.
 
 ## Pacman packages to install for common Haskell packages ##
 
-The following lists MSYS2 packages known to allow the installation of
-some common Haskell packages on Windows. Feel free to submit
-additional entries via a pull request.
+The following lists MSYS2 packages known to allow the installation of some
+common Haskell packages on Windows. Feel free to submit additional entries via a
+pull request.
 
-* For [text-icu](https://github.com/bos/text-icu) install `mingw64/mingw-w64-x86_64-icu`
+* For [text-icu](https://github.com/bos/text-icu) install
+  `mingw64/mingw-w64-x86_64-icu`
 
 ## CMake ##
 
@@ -58,9 +61,9 @@ commands:
     stack exec -- pacman -S mingw-w64-x86_64-make
     stack exec -- pacman -S mingw-w64-x86_64-cmake
 
-Even though Make and CMake are then both installed into the same
-environment, CMake still seems to have trouble to find Make. To help CMake
-find GCC and Make supply the following flags:
+Even though Make and CMake are then both installed into the same environment,
+CMake still seems to have trouble to find Make. To help CMake find GCC and Make
+supply the following flags:
 
     -DCMAKE_C_COMPILER=path
     -DCMAKE_MAKE_PROGRAM=path
