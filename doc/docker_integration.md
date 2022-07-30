@@ -199,7 +199,7 @@ otherwise noted.
       # What to name the Docker container.  Only useful with `detach` or
       # `persist` true.  (default none)
       container-name: "example-name"
-      
+
       # Sets the network used by docker. Gets directly passed to dockers `net`
       # argument (default: host)
       network: host
@@ -263,8 +263,8 @@ Image Repositories
 FP Complete provides the following public image repositories on Docker Hub:
 
 - [fpco/stack-build](https://registry.hub.docker.com/u/fpco/stack-build/) (the
-  default) - GHC (patched), tools (stack, cabal-install, happy, alex, etc.), and
-  system developer libraries required to build all Stackage packages.
+  default) - GHC (patched), tools (Stack, Cabal (the tool), happy, alex, etc.),
+  and system developer libraries required to build all Stackage packages.
 
 FP Complete also builds custom variants of these images for their clients.
 
