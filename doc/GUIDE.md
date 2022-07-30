@@ -6,7 +6,8 @@ Stack is a modern, cross-platform build tool for Haskell code.
 
 This guide takes a new Stack user through the typical workflows. This guide will
 not teach Haskell or involve much code, and it requires no prior experience with
-the Haskell packaging system or other build tools.
+the Haskell packaging system or other build tools. Terms used in the guide are
+defined in the [glossary](glossary.md).
 
 __NOTE__ This document is probably out of date in some places and deserves a
 refresh. If you find this document helpful, please drop a note on
@@ -651,20 +652,15 @@ _Duplicate package names_: If multiple packages under the directory tree have
 same name, `stack init` will report those and automatically ignore one of them.
 
 _Ignore subdirectories_: By default `stack init` searches all the subdirectories
-for `.cabal` files. If you do not want that then you can use `--ignore-subdirs`
+for Cabal files. If you do not want that then you can use `--ignore-subdirs`
 command line switch.
 
 _Cabal warnings_: `stack init` will show warnings if there were issues in
-reading a Cabal package file. You may want to pay attention to the warnings as
-sometimes they may result in incomprehensible errors later on during dependency
-solving.
+reading a Cabal file. You may want to pay attention to the warnings as sometimes
+they may result in incomprehensible errors later on during dependency solving.
 
 _Package naming_: If the `Name` field defined in a Cabal file does not match
 with the Cabal file name then `stack init` will refuse to continue.
-
-_Cabal install errors_: `stack init` uses `cabal-install` to determine external
-dependencies. When `cabal-install` encounters errors, Cabal errors are displayed
-as is by `stack init` for diagnostics.
 
 _User warnings_: When packages are excluded or external dependencies added
 Stack will show warnings every time configuration file is loaded. You can
@@ -808,9 +804,9 @@ This will:
 
 ### install and copy-bins
 
-It's worth calling out the behavior of the install command and `--copy-bins`
+It's worth calling out the behavior of the `install` command and `--copy-bins`
 option, since this has confused a number of users (especially when compared to
-behavior of other tools like cabal-install). The `install` command does
+behavior of other tools like Cabal (the tool)). The `install` command does
 precisely one thing in addition to the build command: it copies any generated
 executables to the local bin path. You may recognize the default value for that
 path:
@@ -820,13 +816,13 @@ michael@d30748af6d3d:~/helloworld$ stack path --local-bin
 /home/michael/.local/bin
 ```
 
-That's why the download page recommends adding that directory to your `PATH`
-environment variable. This feature is convenient, because now you can simply
-run `executable-name` in your shell instead of having to run
-`stack exec executable-name` from inside your project directory.
+That's why the download page recommends adding that directory to your PATH. This
+feature is convenient, because now you can simply run `executable-name` in your
+shell instead of having to run `stack exec executable-name` from inside your
+project directory.
 
 Since it's such a point of confusion, let me list a number of things Stack does
-*not* do specially for the install command:
+*not* do specially for the `install` command:
 
 * Stack will always build any necessary dependencies for your code. The install
   command is not necessary to trigger this behavior. If you just want to build a
@@ -1175,12 +1171,12 @@ Flags worth mentioning:
 * `--package foo` can be used to force a package to be installed before running
   the given command.
 * `--no-ghc-package-path` can be used to stop the `GHC_PACKAGE_PATH` environment
-  variable from being set. Some tools — notably cabal-install — do not behave
+  variable from being set. Some tools — notably Cabal (the tool) — do not behave
   well with that variable set.
 
 You may also find it convenient to use `stack exec` to launch a subshell
 (substitute `bash` with your preferred shell) where your compiled executable is
-available at the front of your `PATH`:
+available at the front of your PATH:
 
     stack exec bash
 
@@ -1391,7 +1387,7 @@ that project. See the next section for more information on configuration files.
 
 ### Platform-specific script issues
 
-On Mac OSX:
+On macOS:
 
 - Avoid `{-# LANGUAGE CPP #-}` in Stack scripts; it breaks the hashbang line
   ([GHC #6132](https://gitlab.haskell.org/ghc/ghc/issues/6132))
@@ -1494,38 +1490,39 @@ not convincing a tool to do what you want.
 
 Before jumping into the differences, let me clarify an important similarity:
 
-__Same package format.__ Stack, cabal-install, and presumably all other tools
-share the same underlying Cabal package format, consisting of a `.cabal` file,
+__Same package format.__ Stack, Cabal (the tool), and presumably all other tools
+share the same underlying Cabal package format, consisting of a Cabal file,
 modules, etc. This is a Good Thing: we can share the same set of upstream
-libraries, and collaboratively work on the same project with Stack,
-cabal-install, and NixOS. In that sense, we're sharing the same ecosystem.
+libraries, and collaboratively work on the same project with Stack, Cabal (the
+tool), and NixOS. In that sense, we're sharing the same ecosystem.
 
 Now the differences:
 
 * __Curation vs dependency solving as a default__.
     * Stack defaults to using curation (Stackage snapshots, LTS Haskell,
       Nightly, etc) as a default instead of defaulting to dependency solving, as
-      cabal-install does. This is just a default: as described above, Stack can
-      use dependency solving if desired, and cabal-install can use curation.
-      However, most users will stick to the defaults. The Stack team firmly
-      believes that the majority of users want to simply ignore dependency
-      resolution nightmares and get a valid build plan from day 1, which is why
-      we've made this selection of default behavior.
+      Cabal (the tool) does. This is just a default: as described above, Stack
+      can use dependency solving if desired, and Cabal (the tool) can use
+      curation. However, most users will stick to the defaults. The Stack team
+      firmly believes that the majority of users want to simply ignore
+      dependency resolution nightmares and get a valid build plan from day one,
+      which is why we've made this selection of default behavior.
 * __Reproducible__.
     * Stack goes to great lengths to ensure that `stack build` today does the
-      same thing tomorrow. cabal-install does not: build plans can be affected
-      by the presence of preinstalled packages, and running `cabal update` can
-      cause a previously successful build to fail. With Stack, changing the
-      build plan is always an explicit decision.
+      same thing tomorrow. Cabal (the tool) does not: build plans can be
+      affected by the presence of pre-installed packages, and running
+      `cabal update` can cause a previously successful build to fail. With
+      Stack, changing the build plan is always an explicit decision.
 * __Automatically building dependencies__.
-    * In cabal-install, you need to use `cabal install` to trigger dependency
-      building. This is somewhat necessary due to the previous point, since
-      building dependencies can, in some cases, break existing installed
+    * With Cabal (the tool), you need to use `cabal install` to trigger
+      dependency building. This is somewhat necessary due to the previous point,
+      since building dependencies can, in some cases, break existing installed
       packages. So for example, in Stack, `stack test` does the same job as
       `cabal install --run-tests`, though the latter *additionally* performs an
-      installation that you may not want. The closer command equivalent is
-      `cabal install --enable-tests --only-dependencies && cabal configure --enable-tests && cabal build && cabal test`
-      (newer versions of cabal-install may make this command shorter).
+      installation that you may not want. The closer equivalent command sequence
+      is: `cabal install --enable-tests --only-dependencies`,
+      `cabal configure --enable-tests`, `cabal build && cabal test` (newer
+      versions of Cabal (the tool) may make this command sequence shorter).
 * __Isolated by default__.
     * This has been a pain point for new Stack users. In Cabal, the default
       behavior is a non-isolated build where working on two projects can
@@ -1536,22 +1533,22 @@ Now the differences:
 
 __Other tools for comparison (including active and historical)__
 
-* [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in
-  favor of cabal-install)
+* [cabal-dev](https://hackage.haskell.org/package/cabal-dev). This is deprecated
+  in favor of Cabal (the tool).
 * [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of
-  the multi-package functionality of stack. If you're still using cabal-install,
-  cabal-meta is relevant. For Stack work, the feature set is fully subsumed by
-  Stack.
+  the multi-package functionality of Stack. If you're still using Cabal (the
+  tool), `cabal-meta` is relevant. For Stack work, the feature set is fully
+  subsumed by Stack.
 * [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly
   irrelevant in the presence of both Stack and Cabal sandboxes, both of which
   make it easier to add additional package sources easily. The mega-sdist
   executable that ships with cabal-src is, however, still relevant. Its
   functionality may some day be folded into Stack
 * [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an
-  initial attempt to make cabal-install work more easily with curated snapshots,
-  but due to a slight impedance mismatch between cabal.config constraints and
-  snapshots, it did not work as well as hoped. It is deprecated in favor of
-  Stack.
+  initial attempt to make Cabal (the tool) work more easily with curated
+  snapshots, but due to a slight impedance mismatch between cabal.config
+  constraints and snapshots, it did not work as well as hoped. It is deprecated
+  in favor of Stack.
 
 ## Fun features
 
@@ -1697,7 +1694,7 @@ the Nixpkgs.
 Both Docker and Nix are methods to *isolate* builds and thereby make them more
 reproducible. They just differ in the means of achieving this isolation. Nix
 provides slightly weaker isolation guarantees than Docker, but is more
-lightweight and more portable (Linux and OS X mainly, but also Windows). For
+lightweight and more portable (Linux and macOS mainly, but also Windows). For
 more on Nix, its command-line interface and its package description language,
 read the [Nix manual](http://nixos.org/nix/manual). But keep in mind that the
 point of Stack's support is to obviate the need to write any Nix code in the

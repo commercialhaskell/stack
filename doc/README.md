@@ -154,7 +154,8 @@ Stack. If you want to go further, we highly recommend you read the
 ## Complete guide to Stack
 
 A complete [user guide to Stack](GUIDE.md) is available, covering all of
-the most common ways to use Stack.
+the most common ways to use Stack. Terms used in Stack's documentation are also
+explained in the [glossary](glossary.md).
 
 ## Why Stack?
 
