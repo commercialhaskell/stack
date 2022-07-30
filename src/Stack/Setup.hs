@@ -1460,9 +1460,21 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
 
     dir <- expectSingleUnpackedDir archiveFile tempDir
 
+    mOverrideGccPath <- view $ configL.to configOverrideGccPath
+
+    -- The make application uses the CC environment variable to configure the
+    -- program for compiling C programs
+    let mGccEnv = let gccEnvFromPath p =
+                        Map.singleton "CC" $ T.pack (toFilePath p)
+                  in  gccEnvFromPath <$> mOverrideGccPath
+
+    -- Data.Map.union provides a left-biased union, so mGccEnv will prevail
+    let ghcConfigureEnv =
+          fromMaybe Map.empty mGccEnv `Map.union` gdiConfigureEnv downloadInfo
+    
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
-        (gdiConfigureEnv downloadInfo)
+        ghcConfigureEnv
         (toFilePath $ dir </> relFileConfigure)
         (("--prefix=" ++ toFilePath destDir) : map T.unpack (gdiConfigureOpts downloadInfo))
 

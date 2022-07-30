@@ -49,7 +49,9 @@ Bug fixes:
   set [#53](https://github.com/commercialhaskell/pantry/pull/53)
 * Pass any CPP options specified via `cpp-options:` in the `.cabal` file to GHCi
   using GHC's `-optP` flag. See
-  [#5608](https://github.com/commercialhaskell/stack/pull/5608) 
+  [#5608](https://github.com/commercialhaskell/stack/pull/5608)
+* On Unix-like operating systems, respect the `with-gcc` option when installing
+  GHC. See [#5609](https://github.com/commercialhaskell/stack/pull/5609)
 
 ## v2.7.5
 
