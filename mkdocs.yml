@@ -47,6 +47,7 @@ pages:
     - Docker images: maintainers/docker.md
     - Upgrading MSYS2: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
+- Glossary: glossary.md
 
 markdown_extensions:
 - toc:
