@@ -41,31 +41,26 @@ additional entries via a pull request.
 
 * For [text-icu](https://github.com/bos/text-icu) install `mingw64/mingw-w64-x86_64-icu`
 
-## Cmake ##
+## CMake ##
 
-Cmake has trouble finding other tools even if they are available on
-the `PATH`. Likely this is not a cmake problem but one of the
-environment not fully integrating. For example GHC comes with a copy
-of GCC which is not installed by MSYS2 itself. If you want to use this
-GCC you can provide a full path to it, or find it first with
-`System.Directory.findExecutable` if you want to launch GCC from a
-Haskell file such as `Setup.hs`.
+CMake has trouble finding other tools even if they are available on the PATH.
+Likely this is not a CMake problem but one of the environment not fully
+integrating. For example GHC comes with a copy of GCC which is not installed by
+MSYS2 itself. If you want to use this GCC you can provide a full path to it, or
+find it first with `System.Directory.findExecutable` if you want to launch GCC
+from a Haskell file such as `Setup.hs`.
 
-Experience tells that the `mingw-w64` versions of make and cmake are
-most likely to work. Though there are other versions available through
-pacman, so have a look to see what works for you. Both tools can be
-installed with the commands:
+Experience tells that the `mingw-w64` versions of Make and CMake are most
+likely to work. Though there are other versions available through `pacman`, so
+have a look to see what works for you. Both tools can be installed with the
+commands:
 
-```
-stack exec -- pacman -S mingw-w64-x86_64-make
-stack exec -- pacman -S mingw-w64-x86_64-cmake
-```
+    stack exec -- pacman -S mingw-w64-x86_64-make
+    stack exec -- pacman -S mingw-w64-x86_64-cmake
 
-Even though make and cmake are then both installed into the same
-environment. Cmake still seems to have trouble to find make. To help
-cmake find GCC and make supply the following flags:
+Even though Make and CMake are then both installed into the same
+environment, CMake still seems to have trouble to find Make. To help CMake
+find GCC and Make supply the following flags:
 
-```
--DCMAKE_C_COMPILER=path
--DCMAKE_MAKE_PROGRAM=path
-```
+    -DCMAKE_C_COMPILER=path
+    -DCMAKE_MAKE_PROGRAM=path

@@ -154,8 +154,8 @@ By default, Stack will run the build in a *pure* Nix build environment (or
   installed elsewhere on your system. This behaviour enforces a complete
   description of the build environment to facilitate reproducibility.
 
-To override this behaviour, add `pure: false` to your `stack.yaml` or pass the
-`--no-nix-pure` option to the command line.
+To override this behaviour, add `pure: false` to your `stack.yaml` file or pass
+the `--no-nix-pure` option to the command line.
 
 **Note:** On macOS shells are non-pure by default currently. This is due soon to
 be resolved locale issues. So on macOS you'll need to be a bit more careful to

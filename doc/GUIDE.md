@@ -1146,7 +1146,7 @@ We've already used `stack exec` multiple times in this guide. As you've likely
 already guessed, it allows you to run executables, but with a slightly modified
 environment. In particular: `stack exec` looks for executables on Stack's bin
 paths, and sets a few additional environment variables (like adding those paths
-to `PATH`, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
+to the PATH, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
 databases to use).
 
 If you want to see exactly what the modified environment looks like, try:

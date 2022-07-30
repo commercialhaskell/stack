@@ -319,7 +319,7 @@ If you're attempting to install stack from within China:
 
 ```
 ###ADD THIS IF YOU LIVE IN CHINA
-setup-info-locations: 
+setup-info-locations:
 - "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
 urls:
   latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
@@ -341,26 +341,42 @@ package-indices:
         ignore-expiry: no
 ```
 
-## Using an http proxy
+## Using an HTTP proxy
 
-To use `stack` behind a http proxy with ip address *IP* and port *PORT*, first set up an environment variable `http_proxy` and then run the stack command. _e.g._
+To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first set
+up an environment variable `http_proxy` and then run the Stack command. _eg_
 
-```
-$ export http_proxy=IP:PORT
-$ stack install
-```
+    $ export http_proxy=IP:PORT
+    $ stack install
 
-Note that on most operating systems, it is not mandatory for programs to follow the "system-wide" http proxy. Some programs, such as browsers, do honor this "system-wide" http proxy setting, while other programs, including bash, do not. That means configuring "http proxy setting" in your Control Panel (Windows) or System Preferences (Mac) would not result in `stack` traffic going through the proxy. 
+On most operating systems, it is not mandatory for programs to follow the
+"system-wide" HTTP proxy. Some programs, such as browsers, do honor this
+"system-wide" HTTP proxy setting, while other programs, including bash, do not.
+That means configuring "http proxy setting" in your Control Panel (Windows) or
+System Preferences (Mac) would not result in Stack traffic going through the
+proxy.
 
 ## Upgrade
 
 There are essentially four different approaches to upgrade:
 
-* The `stack` tool itself ships with an `upgrade` command, which download a `stack` binary or build it from source and install it to the default install path (e.g. `~/.local/bin` or `%APPDATA%\local\bin`; see the [Path](#Path) section above). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and live on the bleeding edge. Make sure the default install directory is on your `PATH` and takes precedence over the system installed `stack`, or copy `stack` from that directory to the system location afterward. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+* Stack itself ships with an `upgrade` command, which downloads a `stack` binary
+  or builds it from source and install it to the default `install` directory (eg
+  `stack path --local-bin`; see the [Path](#Path) section above). You can use
+  `stack upgrade` to get the latest official release, and `stack upgrade --git`
+  to install from Git and live on the bleeding edge. Make sure the default
+  `install` directory is on your PATH and takes precedence over the system
+  installed `stack`, or copy `stack` from that directory to the system location
+  afterward. For more information, see
+  [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
 
-* If you're using a package manager and are happy with sticking with the officially released binaries from the distribution (which may the lag behind latest version of Stack significantly), simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
+* If you're using a package manager and are happy with sticking with the
+  officially released binaries from the distribution (which may the lag behind
+  latest version of Stack significantly), simply follow your normal package
+  manager strategies for upgrading (eg `apt-get update && apt-get upgrade`).
 
-* The get.haskellstack.org script supports the `-f` argument to over-write the current stack executable.  For example:
+* The `get.haskellstack.org` script supports the `-f` argument to over-write the
+  current Stack executable. For example:
 
       curl -sSL https://get.haskellstack.org/ | sh -s - -f
 
@@ -368,20 +384,21 @@ There are essentially four different approaches to upgrade:
 
       wget -qO- https://get.haskellstack.org/ | sh -s - -f
 
-* Manually follow the steps above to download the newest binaries from the release page and replace the old binary.
+* Manually follow the steps above to download the newest binaries from the
+  release page and replace the old binary.
 
 ## Install Older Versions
 
-To install a specific version of stack, navigate to the desired version on 
+To install a specific version of stack, navigate to the desired version on
 [the GitHub release page](https://github.com/fpco/stack/releases),
 and click the appropriate link under its "Assets" drop-down menu.
 
-Alternatively, use the URL 
+Alternatively, use the URL
 `https://github.com/commercialhaskell/stack/releases/download/vVERSION/stack-VERSION-PLATFORM.EXTENSION`.
 For example, the tarball for stack 2.1.0.1, osx-x86_64 is at
 `https://github.com/commercialhaskell/stack/releases/download/v2.1.0.1/stack-2.1.0.1-osx-x86_64.tar.gz`.
 
-Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s 
+Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s
 [`appveyor.yml`](https://github.com/dhall-lang/dhall-haskell/blob/1079b7a3a7a6922f72a373e47daf6f1b74f128b1/appveyor.yml).
 Change the values of PATH and VERSION as needed.
 
