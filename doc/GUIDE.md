@@ -6,7 +6,8 @@ Stack is a modern, cross-platform build tool for Haskell code.
 
 This guide takes a new Stack user through the typical workflows. This guide will
 not teach Haskell or involve much code, and it requires no prior experience with
-the Haskell packaging system or other build tools.
+the Haskell packaging system or other build tools. Terms used in the guide are
+defined in the [glossary](glossary.md).
 
 __NOTE__ This document is probably out of date in some places and deserves a
 refresh. If you find this document helpful, please drop a note on
