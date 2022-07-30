@@ -22,8 +22,10 @@ The following terms are used in Stack's documentation.
 |GHCup              |An [installer](https://www.haskell.org/ghcup/) for Haskell.
 |Git                |A [distributed version control system](https://git-scm.com/).|
 |Hackage            |The [Haskell Package Repository](https://hackage.haskell.org/).
+|Haddock            |The [document generation tool](https://hackage.haskell.org/package/haddock) for Haskell libraries.|
 |'Haskell' extension|The ['Haskell' extension]() for VS Code.                  |
 |HLS                |[Haskell Language Server](https://haskell-language-server.readthedocs.io/en/latest/), an implementation of the Language Server Protocol for Haskell.|
+|Homebrew           |A [package manager](https://brew.sh/) for macOS or Linux, or its executable `brew`.|
 |Hpack              |A [format](https://github.com/sol/hpack) for Haskell packages or the executable `hpack` that produces a Cabal file from `package.yaml`.|
 |Linux              |A family of operating systems based on the Linux kernal.  |
 |macOS              |The primary operating system for Apple's Mac computers. Previously known as Mac OS X or OS X.|
