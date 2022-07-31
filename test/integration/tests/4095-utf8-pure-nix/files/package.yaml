@@ -1,4 +1,4 @@
 executables:
- ShowUnicode:
-  dependencies: [base]
-  main: ShowUnicode.hs
+  ShowUnicode:
+    dependencies: [base]
+    main: ShowUnicode.hs

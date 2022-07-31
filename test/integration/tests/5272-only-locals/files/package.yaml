@@ -6,4 +6,4 @@ dependencies:
 - unliftio-core
 
 library:
-    source-dirs: src/
+  source-dirs: src/

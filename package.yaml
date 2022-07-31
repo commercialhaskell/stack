@@ -99,7 +99,7 @@ dependencies:
 - path-io
 # In order for Cabal (the tool) to build Stack, it needs to be told of the
 # upper bound on persistent. See
-# https://github.com/commercialhaskell/stack/pull/5677#issuecomment-1193318542 
+# https://github.com/commercialhaskell/stack/pull/5677#issuecomment-1193318542
 - persistent < 2.14
 - persistent-sqlite
 - persistent-template

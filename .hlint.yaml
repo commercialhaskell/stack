@@ -1,47 +1,6 @@
 # HLint configuration file
 # https://github.com/ndmitchell/hlint
 
-# Not considered useful hints
-- ignore: {name: "Redundant do"}
-- ignore: {name: "Use section"}
-- ignore: {name: "Use camelCase"}
-- ignore: {name: "Use list comprehension"}
-- ignore: {name: "Redundant if"}
-- ignore: {name: "Avoid lambda"}
-- ignore: {name: "Eta reduce"}
-- ignore: {name: "Use fmap"}  # specific for GHC 7.8 compat
-- ignore: {name: "Parse error"}  # we trust the compiler over HLint
-- ignore: {name: "Use =="}  # Creates infinite loops in `EQ` using expressions
-- ignore: {name: "Evaluate"}
-- ignore: {name: "Use &&&"}
-- ignore: {name: "Redundant compare"}
-- ignore: {name: "Use Just"}
-- ignore: {name: "Avoid lambda using `infix`"}
-
-# Added in hlint-2.0.10, ignoring for now
-- ignore: {name: "Unnecessary hiding"}
-- ignore: {name: "Use lambda-case"}
-
-- ignore: {name: "Use fewer imports", within: [
-  "System.Process.Read",  # Related to 'Hide post-AMP warnings' comment
-  "Stack.Exec"  # ifdef for System.Process.Read
-  ]
-}
-
-- ignore: {name: "Use fromMaybe", within: [
-    "Stack.Types.Config.explicitSetupDeps"  # Related to 'explicit pattern matching is clearer' comment
-  ]
-}
-
-# For clarity (related to do syntax)
-- ignore: {name: "Reduce duplication", within: [
-    "Network.HTTP.Download.VerifiedSpec",
-    "Stack.PackageDumpSpec",
-    "Stack.Types.StackT",
-    "Stack.Docker"
-  ]
-}
-
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.formDataBody", rhs: "Network.HTTP.StackClient.formDataBody"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partBS", rhs: "Network.HTTP.StackClient.partBS"}
 - error: {lhs: "Network.HTTP.Client.MultipartFormData.partFileRequestBody", rhs: "Network.HTTP.StackClient.partFileRequestBody"}
@@ -83,8 +42,59 @@
 - error: {lhs: "Network.HTTP.Types.hContentLength", rhs: "Network.HTTP.StackClient.hContentLength"}
 - error: {lhs: "Network.HTTP.Types.hContentMD5", rhs: "Network.HTTP.StackClient.hContentMD5"}
 - error: {lhs: "Network.HTTP.Types.methodPut", rhs: "Network.HTTP.StackClient.methodPut"}
-- ignore: {name: "Use alternative", within: "Network.HTTP.StackClient"}
+
+# We define the above alternatives but then must ignore these with
+# ignore "Use alternative" within Network.HTTP.StackClient.
+- ignore:
+    name: "Use alternative"
+    within:
+    - Network.HTTP.StackClient
+
+# Not considered useful hints
+- ignore: {name: "Redundant do"}
+- ignore: {name: "Use section"}
+- ignore: {name: "Use camelCase"}
+- ignore: {name: "Use list comprehension"}
+- ignore: {name: "Redundant if"}
+- ignore: {name: "Avoid lambda"}
+- ignore: {name: "Eta reduce"}
+- ignore: {name: "Use fmap"}  # specific for GHC 7.8 compat
+- ignore: {name: "Parse error"}  # we trust the compiler over HLint
+- ignore: {name: "Use =="}  # Creates infinite loops in `EQ` using expressions
+- ignore: {name: "Evaluate"}
+- ignore: {name: "Use &&&"}
+- ignore: {name: "Redundant compare"}
+- ignore: {name: "Use Just"}
+- ignore: {name: "Avoid lambda using `infix`"}
+
+# Added in hlint-2.0.10, ignoring for now
+- ignore: {name: "Unnecessary hiding"}
+- ignore: {name: "Use lambda-case"}
+
+- ignore:
+    name: "Use fewer imports"
+    within:
+    - System.Process.Read  # Related to 'Hide post-AMP warnings' comment
+    - Stack.Exec  # ifdef for System.Process.Read
+
+# Related to 'explicit pattern matching is clearer' comment
+- ignore:
+    name: "Use fromMaybe"
+    within:
+    - Stack.Types.Config.explicitSetupDeps
+
+# For clarity (related to do syntax)
+- ignore:
+    name: "Reduce duplication"
+    within:
+    - Network.HTTP.Download.VerifiedSpec
+    - Stack.PackageDumpSpec
+    - Stack.Types.StackT
+    - Stack.Docker
 
 # Gives an incorrect hint that breaks type checking due to mismatched types
-- ignore: {name: "Too strict maybe", within: "Stack.Package" }
-- ignore: {name: "Too strict maybe", within: "Stack.Config" }
+- ignore:
+    name: "Too strict maybe"
+    within:
+    - Stack.Config
+    - Stack.Package

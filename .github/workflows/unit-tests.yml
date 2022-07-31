@@ -4,41 +4,27 @@ on:
   pull_request:
   push:
     branches:
-      - master
-      - stable
-      - rc/**
+    - master
+    - stable
+    - rc/**
   workflow_dispatch:
 
 jobs:
-  style:
-    name: Style
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone project
-        uses: actions/checkout@v2
-      - name: hlint
-        run: |
-          set -ex
-          ./etc/scripts/get-hlint.sh
-          export PATH="$(pwd)"/hlint:$PATH
-          hlint src/
-          hlint src/ --cpp-define=WINDOWS=1
-          hlint test/ --cpp-simple
   pedantic:
     name: Pedantic
     runs-on: ubuntu-latest
     steps:
-      - name: Clone project
-        uses: actions/checkout@v2
-      - name: Cache dependencies
-        uses: actions/cache@v1
-        with:
-          path: ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-
-      - name: Pedantic build
-        run: stack --system-ghc build --pedantic
+    - name: Clone project
+      uses: actions/checkout@v3
+    - name: Cache dependencies
+      uses: actions/cache@v1
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-
+    - name: Pedantic build
+      run: stack --system-ghc build --pedantic
   unit-tests:
     name: Unit tests
     runs-on: ${{ matrix.os }}
@@ -71,41 +57,41 @@ jobs:
           extra-suffix: ""
           stack-args: ""
     steps:
-      - name: Clone project
-        uses: actions/checkout@v2
-      - name: Cache dependencies on Unix-like OS
-        if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-        uses: actions/cache@v3
-        with:
-          path: ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
-      - name: Cache dependencies on Windows
-        if: startsWith(runner.os, 'Windows')
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~\AppData\Roaming\stack
-            ~\AppData\Local\Programs\stack
-          key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
-      - shell: bash
-        run: |
-          set -ex
-          stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
-          stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror" --copy-bins --local-bin-path bin
+    - name: Clone project
+      uses: actions/checkout@v2
+    - name: Cache dependencies on Unix-like OS
+      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
+    - name: Cache dependencies on Windows
+      if: startsWith(runner.os, 'Windows')
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~\AppData\Roaming\stack
+          ~\AppData\Local\Programs\stack
+        key: ${{ runner.os }}-${{ hashFiles( matrix.stack-yaml ) }}-${{ matrix.extra-suffix }}
+    - shell: bash
+      run: |
+        set -ex
+        stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
+        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror" --copy-bins --local-bin-path bin
 
-          # Get output about whether the exe is dynamically linked
-          if [[ "${{ matrix.os }}" == "macos-latest" ]]
-          then
-              echo "Skipping ldd check on Mac"
-          elif [[ "${{ matrix.os }}" == "windows-latest" ]]
-          then
-              echo "Skipping ldd check on Windows"
-          elif [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
-          then
-              # ldd returns exit code 1 if it's static, so failure is success
-              (ldd ./bin/stack && exit 1) || true
-          else
-              ldd ./bin/stack
-          fi
+        # Get output about whether the exe is dynamically linked
+        if [[ "${{ matrix.os }}" == "macos-latest" ]]
+        then
+            echo "Skipping ldd check on Mac"
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+            echo "Skipping ldd check on Windows"
+        elif [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
+        then
+            # ldd returns exit code 1 if it's static, so failure is success
+            (ldd ./bin/stack && exit 1) || true
+        else
+            ldd ./bin/stack
+        fi
 
-          ./bin/stack --version
+        ./bin/stack --version

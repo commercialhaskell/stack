@@ -25,6 +25,6 @@ jobs:
 
 - template: azure-windows-template.yml
   parameters:
-   name: Windows
-   vmImage: windows-latest
-   os: windows
+    name: Windows
+    vmImage: windows-latest
+    os: windows

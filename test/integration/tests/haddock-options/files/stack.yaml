@@ -6,4 +6,4 @@ resolver: lts-14.27
 build:
   haddock-arguments:
     haddock-args:
-      - --optghc=-DFOO
+    - --optghc=-DFOO
