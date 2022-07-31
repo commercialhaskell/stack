@@ -1,7 +1,7 @@
 resolver: ghc-8.6.5
 flags:
-    text:
-        integer-simple: false
+  text:
+    integer-simple: false
 extra-deps:
 - text-1.2.0.3
 packages: []

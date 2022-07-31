@@ -11,8 +11,8 @@ docker:
 nix:
   # --nix on the command-line to enable.
   packages:
-    - zlib
-    - unzip
+  - zlib
+  - unzip
 
 flags:
   stack:

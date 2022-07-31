@@ -17,14 +17,15 @@ docker:
 nix:
   # --nix on the command-line to enable.
   packages:
-    - zlib
-    - unzip
+  - zlib
+  - unzip
+
 flags:
   stack:
     developer-mode: true
 
 ghc-options:
-   "$locals": -fhide-source-paths
+  "$locals": -fhide-source-paths
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

@@ -8,7 +8,7 @@ category: Development
 extra-source-files: []
 
 dependencies:
-  - base
+- base
 
 library:
   source-dirs: '.'
