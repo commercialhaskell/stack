@@ -75,8 +75,10 @@ get_isa() {
     echo arm
   elif uname -m | grep -q aarch64 ; then
     echo aarch64
-  else
+  elif uname -m | grep -q x86 ; then
     echo x86
+  else
+    die "$(uname -m) is not a supported instruction set"
   fi
 }
 

@@ -52,6 +52,9 @@ Bug fixes:
   [#5608](https://github.com/commercialhaskell/stack/pull/5608)
 * On Unix-like operating systems, respect the `with-gcc` option when installing
   GHC. See [#5609](https://github.com/commercialhaskell/stack/pull/5609)
+* Fixed logic in `get_isa()` in `get-stack.sh` to exclude systems that don't
+  have x86 in their `uname -m` output. See
+  [5792](https://github.com/commercialhaskell/stack/issues/5792).
 
 ## v2.7.5
 
