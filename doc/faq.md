@@ -196,41 +196,40 @@ the following line to your .cabal file:
 
 You could also use the [`--custom-preprocessor-extensions` flag](yaml_configuration.md#custom-preprocessor-extensions)
 
-## I already have GHC installed, can I still use stack?
+## I already have GHC installed, can I still use Stack?
 
-Yes. In its default configuration, stack will simply ignore any system GHC
-installation and use a sandboxed GHC that it has installed itself (typically
-via the `stack setup` command). You can find these sandboxed GHC installations
-in `~/.stack/programs/$platform/ghc-$version/`.
+Yes. In its default configuration, Stack will simply ignore any system GHC
+installation and use a sandboxed GHC that it has installed itself. You can find
+these sandboxed GHC installations in the `ghc-*` directories in the
+`stack path --programs` directory.
 
-If you would like stack to use your system GHC installation, use the
+If you would like Stack to use your system GHC installation, use the
 [`--system-ghc` flag](yaml_configuration.md#system-ghc) or run
-`stack config set system-ghc --global true` to make stack check your
-`PATH` for a suitable GHC by default.
+`stack config set system-ghc --global true` to make Stack check your PATH for a
+suitable GHC by default.
 
-Note that stack can only use a system GHC installation if its version is
-compatible with the configuration of the current project, particularly the
-[`resolver` setting](yaml_configuration.md#resolver).
+Stack can only use a system GHC installation if its version is compatible with
+the configuration of the current project, particularly the
+[`resolver` or `snapshot` setting](yaml_configuration.md#resolver).
 
-Note that GHC installation doesn't work for all OSes, so in some cases you
+GHC installation doesn't work for all operating systems, so in some cases you
 will need to use `system-ghc` and install GHC yourself.
 
-## How does stack determine what GHC to use?
+## How does Stack determine what GHC to use?
 
-In its default configuration, stack determines from the current project which
-GHC version, architecture etc. it needs. It then looks in
-`~/.stack/programs/$platform/ghc-$version/` for a compatible GHC, requesting
-to install one via `stack setup` if none is found.
+In its default configuration, Stack determines from the current project which
+GHC version, architecture etc it needs. It then looks in the `ghc-<version>`
+subdirectory of the `stack path --programs` directory for a compatible GHC,
+requesting to install one via `stack setup` if none is found.
 
 If you are using the [`--system-ghc` flag](yaml_configuration.md/#system-ghc) or
-have configured `system-ghc: true` either in the project `stack.yaml`
-or the global `~/.stack/config.yaml`, stack will use the first GHC that it finds
-on your `PATH`, falling back on its sandboxed installations only if the found GHC
-doesn't comply with the various requirements (version, architecture) that your
-project needs.
+have configured `system-ghc: true` either in the project `stack.yaml` or the
+global `config.yaml`, Stack will use the first GHC that it finds on your PATH,
+falling back on its sandboxed installations only if the found GHC doesn't comply
+with the various requirements (version, architecture) that your project needs.
 
 See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a
-detailed discussion of stack's behavior when `system-ghc` is enabled.
+detailed discussion of Stack's behavior when `system-ghc` is enabled.
 
 ## How do I upgrade to GHC 7.10.2 with stack?
 
@@ -563,12 +562,12 @@ Yes:
 
 ## How do I resolve linker errors when running `stack setup` or `stack build` on macOS?
 
-This is likely to be caused by having a LLVM installation and default Apple
-Clang compiler both under the `PATH`. The symptom of this issue is a linker
-error "bad relocation (Invalid pointer diff)". The compiler picks up
-inconsistent versions of binaries and the mysterious error occurs.
+This is likely to be caused by having both a LLVM installation and default Apple
+Clang compiler on the PATH. The symptom of this issue is a linker error "bad
+relocation (Invalid pointer diff)". The compiler picks up inconsistent versions
+of binaries and the mysterious error occurs.
 
-The workaround is to remove LLVM binaries from the `PATH`.
+The workaround is to remove LLVM binaries from the PATH.
 
 ## How do I suppress `'-nopie'` warnings with `stack build` on macOS?
 

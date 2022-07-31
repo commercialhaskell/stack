@@ -1146,7 +1146,7 @@ We've already used `stack exec` multiple times in this guide. As you've likely
 already guessed, it allows you to run executables, but with a slightly modified
 environment. In particular: `stack exec` looks for executables on Stack's bin
 paths, and sets a few additional environment variables (like adding those paths
-to `PATH`, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
+to the PATH, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
 databases to use).
 
 If you want to see exactly what the modified environment looks like, try:
@@ -1830,7 +1830,6 @@ There are lots of resources available for learning more about Stack:
 * The [home page](http://haskellstack.org)
 * The [Stack mailing list](https://groups.google.com/d/forum/haskell-stack)
 * The [FAQ](faq.md)
-* The [Stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with Stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
 * [Why is Stack not Cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)

@@ -9,6 +9,7 @@ The following terms are used in Stack's documentation.
 |Cabal              |The Haskell Common Architecture for Building Applications and Libraries, provided by the [`Cabal` package](https://hackage.haskell.org/package/Cabal). Also referred to as Cabal (the library) to distinguish it from Cabal (the tool).|
 |Cabal file|A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package.html) used by Cabal, named `<package_name>.cabal`.|
 |Cabal (the tool)|The Haskell build tool provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
+|CMake              |A [system](https://cmake.org/) for managing build processes.|
 |`config.yaml`      |A non-project-specific configuration file used by Stack.  |
 |Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
 |Emacs              |[GNU Emacs](https://www.gnu.org/software/emacs/), an extensible, customisable text editor.|
@@ -21,11 +22,14 @@ The following terms are used in Stack's documentation.
 |GHCup              |An [installer](https://www.haskell.org/ghcup/) for Haskell.
 |Git                |A [distributed version control system](https://git-scm.com/).|
 |Hackage            |The [Haskell Package Repository](https://hackage.haskell.org/).
+|Haddock            |The [document generation tool](https://hackage.haskell.org/package/haddock) for Haskell libraries.|
 |'Haskell' extension|The ['Haskell' extension]() for VS Code.                  |
 |HLS                |[Haskell Language Server](https://haskell-language-server.readthedocs.io/en/latest/), an implementation of the Language Server Protocol for Haskell.|
+|Homebrew           |A [package manager](https://brew.sh/) for macOS or Linux, or its executable `brew`.|
 |Hpack              |A [format](https://github.com/sol/hpack) for Haskell packages or the executable `hpack` that produces a Cabal file from `package.yaml`.|
 |Linux              |A family of operating systems based on the Linux kernal.  |
 |macOS              |The primary operating system for Apple's Mac computers. Previously known as Mac OS X or OS X.|
+|Make               |A [build automation tool](https://www.gnu.org/software/make/).|
 |MSYS2              |The [MSYS2](https://www.msys2.org/) software distribution and building platform for Windows.|
 |Nix                |A purely functional [package manager](https://nixos.org/), available for Linux and macOS.|
 |`package.yaml`     |A file that describes a package in the Hpack format.      |

@@ -1108,9 +1108,9 @@ Since 0.1.2.0
 
 ### extra-path
 
-This option specifies additional directories to prepend to the PATH environment
-variable.  These will be used when resolving the location of executables, and
-will also be visible in the `PATH` variable of processes run by stack.
+This option specifies additional directories to prepend to the PATH. These will
+be used when resolving the location of executables, and will also be visible in
+the PATH of processes run by Stack.
 
 For example, to prepend `/path-to-some-dep/bin` to your PATH:
 
@@ -1119,9 +1119,9 @@ extra-path:
 - /path-to-some-dep/bin
 ```
 
-One thing to note is that other paths added by stack - things like the project's
-bin dir and the compiler's bin dir - will take precedence over those specified
-here (the automatic paths get prepended).
+Other paths added by Stack - things like the project's binary directory and the
+compiler's binary directory - will take precedence over those specified here
+(the automatic paths get prepended).
 
 Since 0.1.4.0
 
