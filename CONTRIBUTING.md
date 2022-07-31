@@ -156,14 +156,36 @@ entry and
 [documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
 updates with your pull request.
 
+## Backwards Compatability
+
+The `stack` executable does not need to, and does not, strive for the same broad
+compatability with versions of GHC that a library package (such as `pantry`)
+would seek. Instead, the `stack` executable aims to define a well-known
+combination of dependencies on which it relies. That is applies in particular to
+the `Cabal` package, where the `stack` executable aims to support one, and only
+one, version of `Cabal` with each release of the executable. At the time of
+writing (April 2022) that combination is defined by resolver `lts-17.5` (for
+GHC 8.10.4, and including `Cabal-3.2.1.0`) - see `stack.yaml`.
+
 ## Code Quality
 
-The Stack projects uses [HLint](https://github.com/ndmitchell/hlint) as a code
-quality tool.
+The Stack project uses [yamllint](https://github.com/adrienverge/yamllint) as a
+YAML file quality tool and [HLint](https://github.com/ndmitchell/hlint) as a
+code quality tool.
 
-Note that stack contributors need not dogmatically follow the suggested hints
-but are encouraged to debate their usefulness. If you find a hint is not useful
-and detracts from readability, consider marking it in the
+### Linting of YAML files
+
+The yamllint configuration extends the tools default and is set out in
+`.yamllint.yaml`. In particular, indentation is set at 2 spaces and `- ` in
+sequences is treated as part of the indentation.
+
+### Linting of Haskell source code
+
+The HLint configurations is set out in `.hlint.yaml`.
+
+Stack contributors need not follow dogmatically the suggested HLint hints but
+are encouraged to debate their usefulness. If you find a HLint hint is not
+useful and detracts from readability of code, consider marking it in the
 [configuration file](https://github.com/commercialhaskell/stack/blob/master/.hlint.yaml)
 to be ignored. Please refer to the
 [HLint manual](https://github.com/ndmitchell/hlint#readme)
@@ -180,15 +202,11 @@ your favourite text editor. Refer to the HLint repository for more details.
 
 To install:
 
-```
-stack install hlint
-```
+    stack install hlint
 
 Once installed, you can check your changes with:
 
-```
-$ ./etc/scripts/hlint.sh
-```
+    $ ./etc/scripts/hlint.sh
 
 ## Testing
 
