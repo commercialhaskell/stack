@@ -11,7 +11,7 @@ extra-deps:
 
 docker:
   enable: false
-  #repo: fpco/alpine-haskell-stack:8.10.4
+  # repo: fpco/alpine-haskell-stack:8.10.4
   repo: fpco/alpine-haskell-stack@sha256:1024fe4b3b082a8df64d00e8563b3151220ed90af09604a8f7e1d44040500c30
 
 nix:

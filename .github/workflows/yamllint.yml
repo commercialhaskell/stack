@@ -1,0 +1,13 @@
+---
+name: yamllint
+# yamllint disable-line rule:truthy
+on: [pull_request, push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: yaml-lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          format: github

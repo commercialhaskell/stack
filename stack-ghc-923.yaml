@@ -19,7 +19,7 @@ flags:
     developer-mode: true
 
 ghc-options:
-   "$locals": -fhide-source-paths
+  "$locals": -fhide-source-paths
 
 extra-deps:
 # See https://github.com/commercialhaskell/pantry/pull/53
