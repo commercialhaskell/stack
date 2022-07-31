@@ -1804,7 +1804,6 @@ There are lots of resources available for learning more about Stack:
 * The [home page](http://haskellstack.org)
 * The [Stack mailing list](https://groups.google.com/d/forum/haskell-stack)
 * The [FAQ](faq.md)
-* The [Stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with Stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
 * [Why is Stack not Cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)

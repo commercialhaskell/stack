@@ -116,24 +116,36 @@ confirmation and we will close it.
 
 ## Documentation
 
-If you would like to help with documentation, please note that for most cases
-the Wiki has been deprecated in favor of markdown files placed in a new `/doc`
-subdirectory of the repository itself. Please submit a
+The files which make up Stack's documentation are located in the `doc`
+directory of the repository. They are formatted in the
+[Markdown syntax](https://daringfireball.net/projects/markdown/), with some
+extensions.
+
+Those files are rendered on [haskellstack.org](http://haskellstack.org) by
+[Read the Docs](https://readthedocs.org/) using
+[MkDocs](https://www.mkdocs.org/). The `stable` branch of the repository
+provides the 'stable' version of the online documentation. The `master` branch
+provides the 'latest' version of the documentation.
+
+The 'stable' version of the online documentation is intended to be applicable to
+the latest released version of Stack. If you would like to help with that
+documentation, please submit a
 [pull request](https://help.github.com/articles/using-pull-requests/) with your
 changes/additions based off the
-[the stable branch](https://github.com/commercialhaskell/stack/tree/stable).
+[stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
-The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
-readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
-from GFM, please check the documentation there before submitting a PR to fix
-those.
+The specific versions of the online documentation (eg `v: v2.7.5`) are generated
+from the content of files at the point in the responsitory's history specified
+by the corresponding release tag. Consequently, that content is fixed once
+released.
 
-If your changes move or rename files, or subsume Wiki content, please continue
-to leave a file/page in the old location temporarily, in addition to the new
-location. This will allow users time to update any shared links to the old
-location. Please also update any links in other files, or on the Wiki, to point
-to the new file location.
+The Markdown syntax supported by MkDocs can differ from the GitHub Flavored
+Markdown ([GFM](https://github.github.com/gfm/)) supported for content on
+GitHub.com. Please refer to the
+[MkDocs documentation](https://www.mkdocs.org/user-guide/writing-your-docs/#writing-with-markdown) 
+to ensure your pull request will achieve the desired rendering.
 
+The configuration file for MkDocs is `mkdocs.yml`.
 
 ## Code
 
