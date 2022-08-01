@@ -6,6 +6,7 @@
 module Stack.ConfigSpec where
 
 import Control.Arrow
+import Distribution.Verbosity (verbose)
 import Pantry.Internal.AesonExtended
 import Data.Yaml
 import Pantry.Internal (pcHpackExecutable)
@@ -182,7 +183,7 @@ spec = beforeAll setup $ do
       boptsBenchmarkOpts `shouldBe` BenchmarkOpts {beoAdditionalArgs = Just "-O2"
                                                    ,beoDisableRun = True}
       boptsReconfigure `shouldBe` True
-      boptsCabalVerbose `shouldBe` True
+      boptsCabalVerbose `shouldBe` CabalVerbosity verbose
 
     it "finds the config file in a parent directory" $ inTempDir $ do
       writeFile "package.yaml" "name: foo"

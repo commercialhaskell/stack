@@ -1,0 +1,18 @@
+# Configuration file for yamllint
+extends: default
+rules:
+  comments:
+    min-spaces-from-content: 1
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: false
+  line-length: disable
+  new-lines:
+    type: platform
+  truthy:
+    check-keys: false
+
+#  .github/workflows/arm64-release.yml
+#  .github/workflows/integration-tests.yml
+#  .github/workflows/unit-tests.yml

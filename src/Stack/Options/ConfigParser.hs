@@ -23,7 +23,7 @@ configOptsParser currentDir hide0 =
     (\stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
         ghcVariant ghcBuild jobs includes libs preprocs overrideGccPath overrideHpack
         skipGHCCheck skipMsys localBin setupInfoLocations modifyCodePage
-        allowDifferentUser dumpLogs colorWhen snapLoc -> mempty
+        allowDifferentUser dumpLogs colorWhen snapLoc noRunCompile -> mempty
             { configMonoidStackRoot = stackRoot
             , configMonoidWorkDir = workDir
             , configMonoidBuildOpts = buildOpts
@@ -49,6 +49,7 @@ configOptsParser currentDir hide0 =
             , configMonoidDumpLogs = dumpLogs
             , configMonoidColorWhen = colorWhen
             , configMonoidSnapshotLocation = snapLoc
+            , configMonoidNoRunCompile = noRunCompile
             })
     <$> optionalFirst (absDirOption
             ( long stackRootOptionName
@@ -175,6 +176,10 @@ configOptsParser currentDir hide0 =
            <> help "The base location of LTS/Nightly snapshots"
            <> metavar "URL"
             ))
+    <*> firstBoolFlagsFalse
+            "script-no-run-compile"
+            "the use of options `--no-run --compile` with `stack script`"
+            hide
   where
     hide = hideMods (hide0 /= OuterGlobalOpts)
     toDumpLogs (First (Just True)) = First (Just DumpAllLogs)

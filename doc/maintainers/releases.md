@@ -439,7 +439,7 @@ Now continue to the **General Windows setup** subsection below.
     Binary: get an [existing `stack` binary](https://github.com/commercialhaskell/stack/releases)
 and put it in `~/.local/bin`.
 
-    From source (using cabal-install):
+    From source, using Cabal (the tool):
 
     ```
     wget http://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-armv7-deb8-linux.tar.xz && \

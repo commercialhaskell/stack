@@ -1,4 +1,4 @@
 resolver: ghc-8.6.5
 flags:
-    does-not-exist:
-        foo: false
+  does-not-exist:
+    foo: false

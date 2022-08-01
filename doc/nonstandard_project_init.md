@@ -4,18 +4,17 @@
 
 ## Introduction
 The purpose of this page is to collect information about issues that arise when
-users either have an existing cabal project or another nonstandard setup such
-as a private hackage database.
+users either have an existing Cabal project or another nonstandard setup such
+as a private Hackage database.
 
-## Using a Cabal File
+## Using a Cabal file
 
-New users may be confused by the fact that you must add
-dependencies to the package's cabal file, even in the case when you have
-already listed the package in the `stack.yaml`. In most cases, dependencies for
-your package that are in the Stackage snapshot need *only* be added to the
-cabal file. stack makes heavy use of Cabal the library under the hood. In
-general, your stack packages should also end up being valid cabal-install
-packages.
+New users may be confused by the fact that you must add dependencies to the
+package's Cabal file, even in the case when you have already listed the package
+in the `stack.yaml` file. In most cases, dependencies for your package that are
+in the Stackage snapshot need *only* be added to the Cabal file. Stack makes
+heavy use of Cabal under the hood. In general, your Stack packages should also
+end up being valid packages for Cabal (the tool).
 
 ### Issues Referenced
   - <https://github.com/commercialhaskell/stack/issues/105>
@@ -44,7 +43,7 @@ It is also possible to pass the same flag to multiple packages, i.e.
 `stack build --flag *:necessary`
 
 Currently one needs to list all of your modules that interpret flags in the
-`other-modules` section of a cabal file. `cabal-install` has a different
+`other-modules` section of a cabal file. Cabal (the tool) has a different
 behavior currently and doesn't require that the modules be listed. This may
 change in a future release.
 

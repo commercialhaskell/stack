@@ -3,9 +3,10 @@
 module Stack.Options.BuildMonoidParser where
 
 import qualified Data.Text as T
+import           Distribution.Parsec (eitherParsec)
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build                       (splitObjsWarning)
+import           Stack.Build (splitObjsWarning)
 import           Stack.Prelude
 import           Stack.Options.BenchParser
 import           Stack.Options.TestParser
@@ -155,11 +156,7 @@ buildOptsMonoidParser hide0 =
              "reconfigure"
              "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files"
             hide
-    cabalVerbose =
-        firstBoolFlagsFalse
-            "cabal-verbose"
-            "Ask Cabal to be verbose in its output"
-            hide
+    cabalVerbose = cabalVerbosityOptsParser hideBool
     splitObjs =
         firstBoolFlagsFalse
             "split-objs"
@@ -170,7 +167,7 @@ buildOptsMonoidParser hide0 =
             T.pack
             (strOption
                 (long "skip" <>
-                 help "Skip given component, can be specified multiple times" <>
+                 help "Skip given component (can be specified multiple times)" <>
                  hide)))
     interleavedOutput =
         firstBoolFlagsTrue
@@ -183,3 +180,27 @@ buildOptsMonoidParser hide0 =
                 (long "ddump-dir" <>
                  help "Specify output ddump-files" <>
                  hide))
+
+-- | Parser for Cabal verbosity options
+cabalVerbosityOptsParser :: Bool -> Parser (First CabalVerbosity)
+cabalVerbosityOptsParser hide =
+  cabalVerbosityParser hide <|> cabalVerboseParser hide
+
+-- | Parser for Cabal verbosity option
+cabalVerbosityParser :: Bool -> Parser (First CabalVerbosity)
+cabalVerbosityParser hide =
+  let pCabalVerbosity = option (eitherReader eitherParsec)
+         (  long "cabal-verbosity"
+         <> metavar "VERBOSITY"
+         <> help "Cabal verbosity (accepts Cabal's numerical and extended syntax)"
+         <> hideMods hide)
+  in  First . Just <$> pCabalVerbosity
+
+-- | Parser for the Cabal verbose flag, retained for backward compatibility
+cabalVerboseParser :: Bool -> Parser (First CabalVerbosity)
+cabalVerboseParser hide =
+  let pVerboseFlag = firstBoolFlagsFalse
+                       "cabal-verbose"
+                       "Ask Cabal to be verbose in its output"
+                       (hideMods hide)
+  in  toFirstCabalVerbosity <$> pVerboseFlag

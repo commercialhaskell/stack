@@ -2,7 +2,7 @@ site_name: The Haskell Tool Stack
 site_description: The Haskell Tool Stack
 site_author: Stack contributors
 repo_url: https://github.com/commercialhaskell/stack/
-edit_uri: edit/stable/doc/
+edit_uri: tree/stable/doc/
 copyright: Copyright (c) 2015-2022, Stack contributors
 docs_dir: doc
 site_dir: _site
@@ -22,6 +22,7 @@ pages:
   - Configuration (project and global): yaml_configuration.md
   - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
+  - Stack and Visual Studio Code: Stack_and_VS_Code.md
   - Developing on Windows: developing_on_windows.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
@@ -46,6 +47,7 @@ pages:
     - Docker images: maintainers/docker.md
     - Upgrading MSYS2: maintainers/msys.md
   - Signing key: SIGNING_KEY.md
+- Glossary: glossary.md
 
 markdown_extensions:
 - toc:

@@ -60,6 +60,7 @@ import           Distribution.System            (OS (Windows),
 import qualified Distribution.Text as C
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
+import           Distribution.Verbosity (showForCabal)
 import           Distribution.Version (mkVersion)
 import           Path
 import           Path.CheckInstall
@@ -1356,7 +1357,10 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                             liftIO $ atomicModifyIORef' eeCustomBuilt $
                                 \oldCustomBuilt -> (Set.insert (packageName package) oldCustomBuilt, ())
                             return outputFile
-            runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) setupArgs
+            let cabalVerboseArg =
+                  let CabalVerbosity cv = boptsCabalVerbose eeBuildOpts
+                  in  "--verbose=" <> showForCabal cv
+            runExe exeName $ cabalVerboseArg:setupArgs
 
 -- Implements running a package's build, used to implement 'ATBuild' and
 -- 'ATBuildFinal' tasks.  In particular this does the following:

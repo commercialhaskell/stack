@@ -1,4 +1,4 @@
-build: off
+build: false
 
 before_test:
 # http://help.appveyor.com/discussions/problems/6312-curl-command-not-found
@@ -18,19 +18,9 @@ environment:
 
   matrix:
   - ARGS: ""
-  #- ARGS: "--resolver lts-2"
-  #- ARGS: "--resolver lts-3"
-  #- ARGS: "--resolver lts-6"
-  #- ARGS: "--resolver lts-7"
-  #- ARGS: "--resolver lts-9"
-  #- ARGS: "--resolver lts-11"
-  #- ARGS: "--resolver lts-12"
-  #- ARGS: "--resolver lts-13"
   - ARGS: "--resolver lts-14"
-  #- ARGS: "--resolver lts-15"
   - ARGS: "--resolver lts-16"
   - ARGS: "--resolver lts-17"
-  #- ARGS: "--resolver nightly"
 
 test_script:
 

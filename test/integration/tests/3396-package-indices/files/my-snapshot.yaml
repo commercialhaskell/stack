@@ -2,10 +2,9 @@ compiler: ghc-8.6.5
 name: my-snapshot
 
 packages:
-  - base-4.10.0.0
-  - dinamo-0.1.0.0
+- base-4.10.0.0
+- dinamo-0.1.0.0
 
 flags:
   dinamo:
     debug: true
-

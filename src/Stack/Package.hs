@@ -56,6 +56,9 @@ import           Distribution.Types.LibraryName (libraryNameString, maybeToLibra
 #endif
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
+#if MIN_VERSION_Cabal(3,6,0)
+import           Distribution.Utils.Path (getSymbolicPath)
+#endif
 import           Distribution.Verbosity (silent)
 import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
 import qualified HiFileParser as Iface
@@ -367,7 +370,7 @@ data BioInput = BioInput
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts BioInput {..} =
     BuildInfoOpts
-        { bioOpts = ghcOpts ++ cppOptions biBuildInfo
+        { bioOpts = ghcOpts ++ fmap ("-optP" <>) (cppOptions biBuildInfo)
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -411,7 +414,11 @@ generateBuildInfoOpts BioInput {..} =
               , [ biCabalDir
                 | null (hsSourceDirs biBuildInfo)
                 ]
+#if MIN_VERSION_Cabal(3,6,0)
+              , mapMaybe (toIncludeDir . getSymbolicPath) (hsSourceDirs biBuildInfo)
+#else
               , mapMaybe toIncludeDir (hsSourceDirs biBuildInfo)
+#endif
               , [ componentAutogen ]
               , maybeToList (packageAutogenDir biCabalVersion biDistDir)
               , [ componentOutputDir biComponentName biDistDir ]
@@ -808,7 +815,11 @@ resolveComponentFiles
     -> [DotCabalDescriptor]
     -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 resolveComponentFiles component build names = do
+#if MIN_VERSION_Cabal(3,6,0)
+    dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) (hsSourceDirs build)
+#else
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+#endif
     dir <- asks (parent . ctxFile)
     agdirs <- autogenDirs
     (modules,files,warnings) <-

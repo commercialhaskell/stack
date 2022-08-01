@@ -12,10 +12,11 @@ module Stack.Ls
 import Control.Exception (throw)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
+import Distribution.Package (mkPackageName)
 import Stack.Prelude hiding (Snapshot (..), SnapName (..))
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
-import Data.Text hiding (pack, intercalate)
+import Data.Text hiding (filter, intercalate, pack, reverse)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
@@ -24,6 +25,7 @@ import qualified Options.Applicative as OA
 import Options.Applicative (idm)
 import Options.Applicative.Builder.Extra (boolFlags)
 import Path
+import RIO.List (sort)
 import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
@@ -31,10 +33,12 @@ import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
 import Stack.Dot
 import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
+import Stack.Setup.Installed (Tool (..), filterTools, listInstalled, toolString)
 import Stack.Types.Config
 import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
 import System.Process.Pager (pageText)
 import System.Directory (listDirectory)
+import System.IO (putStrLn)
 
 data LsView
     = Local
@@ -50,6 +54,7 @@ data LsCmds
     = LsSnapshot SnapshotOpts
     | LsDependencies ListDepsOpts
     | LsStyles ListStylesOpts
+    | LsTools ListToolsOpts
 
 data SnapshotOpts = SnapshotOpts
     { soptViewType :: LsView
@@ -63,12 +68,17 @@ data ListStylesOpts = ListStylesOpts
     , coptExample :: Bool
     } deriving (Eq, Ord, Show)
 
+newtype ListToolsOpts = ListToolsOpts
+    { toptFilter  :: String
+    }
+
 newtype LsCmdOpts = LsCmdOpts
     { lsView :: LsCmds
     }
 
 lsParser :: OA.Parser LsCmdOpts
-lsParser = LsCmdOpts <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd <> lsStylesCmd)
+lsParser = LsCmdOpts
+    <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd <> lsStylesCmd <> lsToolsCmd)
 
 lsCmdOptsParser :: OA.Parser LsCmds
 lsCmdOptsParser = LsSnapshot <$> lsViewSnapCmd
@@ -78,6 +88,9 @@ lsDepOptsParser = LsDependencies <$> listDepsOptsParser
 
 lsStylesOptsParser :: OA.Parser LsCmds
 lsStylesOptsParser = LsStyles <$> listStylesOptsParser
+
+lsToolsOptsParser :: OA.Parser LsCmds
+lsToolsOptsParser = LsTools <$> listToolsOptsParser
 
 listStylesOptsParser :: OA.Parser ListStylesOpts
 listStylesOptsParser = ListStylesOpts
@@ -97,6 +110,16 @@ listStylesOptsParser = ListStylesOpts
                   \by default for colored output). Flag ignored for a basic \
                   \report"
                   idm
+
+listToolsOptsParser :: OA.Parser ListToolsOpts
+listToolsOptsParser = ListToolsOpts
+    <$> OA.strOption
+            ( OA.long "filter"
+           <> OA.metavar "TOOL_NAME"
+           <> OA.value ""
+           <> OA.help "Filter by a tool name (eg 'ghc', 'ghc-git' or 'msys2') \
+                      \- case sensitive. The default is no filter"
+            )
 
 lsViewSnapCmd :: OA.Parser SnapshotOpts
 lsViewSnapCmd =
@@ -134,6 +157,12 @@ lsStylesCmd =
         (OA.info lsStylesOptsParser
                  (OA.progDesc "View stack's output styles (alias for \
                               \'stack-colors')"))
+
+lsToolsCmd :: OA.Mod OA.CommandFields LsCmds
+lsToolsCmd =
+    OA.command
+        "tools"
+        (OA.info lsToolsOptsParser (OA.progDesc "View stack's installed tools"))
 
 data Snapshot = Snapshot
     { snapId :: Text
@@ -242,6 +271,7 @@ handleLocal lsOpts = do
                 _ -> liftIO $ displayLocalSnapshot isStdoutTerminal snapData
         LsDependencies _ -> return ()
         LsStyles _ -> return ()
+        LsTools _ -> return ()
 
 handleRemote
     :: HasRunner env
@@ -266,6 +296,7 @@ handleRemote lsOpts = do
                 _ -> liftIO $ displaySnapshotData isStdoutTerminal snapData
         LsDependencies _ -> return ()
         LsStyles _ -> return ()
+        LsTools _ -> return ()
   where
     urlInfo = "https://www.stackage.org/snapshots"
 
@@ -278,6 +309,7 @@ lsCmd lsOpts =
                 Remote -> handleRemote lsOpts
         LsDependencies depOpts -> listDependenciesCmd False depOpts
         LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts
+        LsTools toolsOpts -> withConfig NoReexec $ listToolsCmd toolsOpts
 
 -- | List the dependencies
 listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Runner ()
@@ -325,3 +357,17 @@ listStylesCmd opts = do
         example = " " <> ansi <> "Example" <> reset
         ansi = fromString $ setSGRCode sgrs
         reset = fromString $ setSGRCode [Reset]
+
+-- | List stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
+listToolsCmd :: ListToolsOpts -> RIO Config ()
+listToolsCmd opts = do
+    localPrograms <- view $ configL.to configLocalPrograms
+    installed <- sort <$> listInstalled localPrograms
+    let wanted = case toptFilter opts of
+            [] -> installed
+            "ghc-git" -> [t | t@(ToolGhcGit _ _) <- installed]
+            pkgName -> filtered pkgName installed
+    liftIO $ mapM_ (putStrLn . toolString) wanted
+  where
+    filtered pkgName installed = Tool <$>
+        filterTools (mkPackageName pkgName) (const True) installed
