@@ -27,5 +27,4 @@ tags
 /etc/scripts/stack-scripts.cabal
 .hspec-failures
 better-cache/
-stack*.yaml.lock
 dist-newstyle/

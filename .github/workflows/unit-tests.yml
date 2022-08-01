@@ -10,21 +10,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  pedantic:
-    name: Pedantic
-    runs-on: ubuntu-latest
-    steps:
-    - name: Clone project
-      uses: actions/checkout@v3
-    - name: Cache dependencies
-      uses: actions/cache@v1
-      with:
-        path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-
-    - name: Pedantic build
-      run: stack --system-ghc build --pedantic
   unit-tests:
     name: Unit tests
     runs-on: ${{ matrix.os }}
@@ -34,22 +19,14 @@ jobs:
         include:
         - os: ubuntu-latest
           stack-yaml: stack.yaml
-          extra-suffix: ""
-          stack-args: ""
-        - os: ubuntu-latest
-          stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
-        - os: ubuntu-latest
-          stack-yaml: stack-ghc-902.yaml
-          extra-suffix: ""
-          stack-args: ""
         - os: windows-latest
           stack-yaml: stack.yaml
           extra-suffix: ""
           stack-args: ""
         - os: windows-latest
-          stack-yaml: stack-ghc-902.yaml
+          stack-yaml: stack/ghc-9.0.2.yaml
           extra-suffix: ""
           stack-args: ""
         - os: macos-latest

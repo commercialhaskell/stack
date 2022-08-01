@@ -1,8 +1,4 @@
-# GHC 9.2.3
-resolver: nightly-2022-07-29
-
-packages:
-- .
+resolver: nightly-2022-07-31
 
 docker:
   enable: false
@@ -20,6 +16,9 @@ flags:
 
 ghc-options:
   "$locals": -fhide-source-paths
+
+packages:
+- ..
 
 extra-deps:
 # See https://github.com/commercialhaskell/pantry/pull/53

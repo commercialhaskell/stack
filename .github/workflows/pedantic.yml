@@ -1,0 +1,41 @@
+name: Pedantic
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ghc ${{ matrix.ghc }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cabal: ["3.6"]
+        ghc:
+        - "8.10.7"
+        - "9.0.2"
+        - "9.2.3"
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Setup Stack
+      uses: haskell/actions/setup@v2
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: ${{ matrix.cabal }}
+        enable-stack: true
+        stack-version: "latest"
+
+    - name: Cache ~/.stack and .stack-work
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.stack
+          .stack-work
+        key: ${{ runner.os }}-${{ matrix.ghc }}-stack-${{ hashFiles('**/*.cabal', './stack/ghc-${{ matrix.ghc }}.yaml', './stack/ghc-${{ matrix.ghc }}.yaml.lock') }}
+
+    - name: Pedantic Build
+      run: stack build --system-ghc --pedantic --stack-yaml=./stack/ghc-${{ matrix.ghc }}.yaml
