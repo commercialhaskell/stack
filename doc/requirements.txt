@@ -9,5 +9,6 @@
 # The pip guide to its requirements file format:
 # https://pip.pypa.io/en/stable/reference/requirements-file-format/
 #
-# Version used in the stable branch
-mkdocs==0.17.3
+# Last version before the major changes in mkdocs==1.0. See:
+# https://www.mkdocs.org/about/release-notes/#version-0175-2018-07-06
+mkdocs==0.17.5
