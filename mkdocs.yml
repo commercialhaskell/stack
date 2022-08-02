@@ -13,7 +13,7 @@ extra_javascript:
 - js/searchhack.js
 
 nav:
-- Home: README.md
+- Home: index.md
 - Changelog: ChangeLog.md
 - Tool documentation:
   - Install/upgrade: install_and_upgrade.md
