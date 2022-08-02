@@ -9,5 +9,5 @@
 # The pip guide to its requirements file format:
 # https://pip.pypa.io/en/stable/reference/requirements-file-format/
 #
-# Latest version of MkDocs as at 2 August 2022
-mkdocs==1.3.1
+# Version used in the stable branch
+mkdocs==0.17.3
