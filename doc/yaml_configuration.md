@@ -1,39 +1,47 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# YAML Configuration
+# YAML configuration
 
-This page is intended to fully document all configuration options available in
-the stack.yaml file. Note that this page is likely to be both *incomplete* and
-sometimes *inaccurate*. If you see such cases, please update the page, and if
+Stack is configured by the content of YAML files. Stack's YAML configuration
+options break down into [project-specific](#project-specific-configuration)
+options and [non-project-specific](#non-project-specific-configuration) options. They are configured at the project-level or globally.
+
+The **project-level** configuration file (`stack.yaml`) contains
+project-specific options and may contain non-project-specific options.
+
+Stack obtains project-level configuration from one of the following (in order of
+preference):
+
+1. A file specified by the `--stack-yaml` command line option.
+2. A file specified by the `STACK_YAML` environment variable.
+3. A file named `stack.yaml` in the current directory or an ancestor directory.
+4. A file name `stack.yaml` in the `global-project` directory in the Stack root.
+
+The **global** configuration file (`config.yaml`) contains only
+non-project-specific options.
+
+Stack obtains global configuration from a file named `config.yaml`:
+
+1. on Unix-like operating systems only, located in `/etc/stack` (for system-wide
+   options); and/or
+2. located in the Stack root (for user-specific options).
+
+This page is intended to document fully all YAML configuration options. If you
+identify any inaccuracies or incompleteness, please update the page, and if
 you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into [project-specific](#project-specific-config) options in:
+If you wish to understand the difference between a `stack.yaml` files and a
+Cabal file (named `<package_name>.cabal`), see
+[stack.yaml vs cabal package file](stack_yaml_vs_cabal_package_file.md).
 
-- `<project dir>/stack.yaml`
+## Project-specific configuration
 
-and [non-project-specific](#non-project-specific-config) options in:
-
-- `/etc/stack/config.yaml` -- for system global non-project default options
--  `~/.stack/config.yaml` -- for user non-project default options
-- The project file itself may also contain non-project specific options
-
-*Note:* When stack is invoked outside a stack project it will source project
-specific options from `~/.stack/global-project/stack.yaml`. When stack is
-invoked inside a stack project, only options from `<project dir>/stack.yaml` are
-used, and `~/.stack/global-project/stack.yaml` is ignored.
-
-*Note 2:* A common source of confusion is the distinction between configuration
-in a `stack.yaml` file versus a cabal file. If you're trying to understand this
-breakdown, see [stack vs cabal config](stack_yaml_vs_cabal_package_file.md).
-
-## Project-specific config
-
-Project-specific options are only valid in the `stack.yaml` file local to a
-project, not in the user or global config files.
+Project-specific configuration options are valid only in a project-level
+configuration file (`stack.yaml`).
 
 > Note: We define **project** to mean a directory that contains a `stack.yaml`
 > file, which specifies how to build a set of packages. We define **package** to
-> be a package with a `.cabal` file or Hpack `package.yaml` file.
+> be a package with a Cabal file or an Hpack `package.yaml` file.
 
 In your project-specific options, you specify both **which local packages** to
 build and **which dependencies to use** when building these packages. Unlike the
@@ -47,40 +55,48 @@ it will be used even if you're using a snapshot that specifies a particular
 version. Similarly, `extra-deps` will shadow the version specified in the
 resolver.
 
-### resolver
+### resolver or snapshot
 
-> Note: Starting with **Stack 2.0**, `snapshot` is accepted as a synonym for `resolver`. Only one of these fields is permitted, not both.
+`resolver` and `snapshot` are synonyms. Only one of these keys is permitted, not
+both.
 
-Specifies which snapshot is to be used for this project. A snapshot
-defines a GHC version, a number of packages available for
-installation, and various settings like build flags. It is called a
-resolver since a snapshot states how dependencies are resolved. There
-are currently four resolver types:
+The `resolver` or `snapshot` key specifies which snapshot is to be used for this
+project. A snapshot defines a GHC version, a number of packages available for
+installation, and various settings like build flags. It is called a resolver
+since a snapshot states how dependencies are resolved. There are currently
+four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-2.14`
-* Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
-* No snapshot, just use packages shipped with the compiler
-    * For GHC this looks like `resolver: ghc-7.10.2`
-* Custom snapshot, via a URL or relative file path. (See [pantry docs](pantry.md) for more information.)
+* LTS Haskell snapshots, e.g. `resolver: lts-19.17`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2002-08-04`
+* No snapshot, just use packages shipped with the compiler. For GHC this looks
+  like `resolver: ghc-9.2.4`
+* Custom snapshot, via a URL or relative file path. (See
+  [pantry docs](pantry.md) for more information.)
 
 Each of these resolvers will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
 
-Since Stack 1.11, the resolver field corresponds to a Pantry snapshot
-location. See [the docs on pantry](pantry.md) for more information.
+The `resolver` key corresponds to a Pantry snapshot location. See the
+[pantry documentation](pantry.md) for more information.
 
 ### packages
 
-_NOTE_ Beginning with Stack 1.11, Stack has moved over to Pantry for
-managing extra-deps, and has removed some legacy syntax for specifying
-dependencies in `packages`. See some conversion notes below.
+Default:
 
-A list of packages that are part of your local project. These are
-specified via paths to local directories. The paths are considered
-relative to the directory containing the `stack.yaml` file. For
-example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and
-you have:
+```yaml
+packages:
+- .
+```
+
+_NOTE_ From Stack 1.11, Stack moved over to Pantry for managing extra-deps, and
+removed some legacy syntax for specifying dependencies in `packages`. Some
+conversion notes are provided below.
+
+The `packages` key specifies a list of packages that are part of your local
+project. These are specified via paths to local directories. The paths are
+considered relative to the directory containing the `stack.yaml` file. For
+example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and you have:
 
 ```yaml
 packages:
@@ -91,38 +107,29 @@ packages:
 Your configuration means "I have packages in `/foo/bar/hello` and
 `/foo/bar/there/world`.
 
-If these packages should be treated as dependencies instead, specify
-them in `extra-deps`, described below.
+If these packages should be treated as dependencies instead, specify them in
+`extra-deps` key, described below.
 
-The `packages` field is _optional_. If omitted, it is treated as:
+The `packages` key is _optional_. The default item, '`.`', means that your
+project has exactly one package, and it is located in the current directory.
 
-```yaml
-packages:
-- .
-```
-Meaning that your project has exactly one package, and it is located
-in the current directory.
+Each package directory specified must have a valid Cabal file or Hpack
+`package.yaml` file present. The subdirectories of the directory are not
+searched for Cabal files. Subdirectories will have to be specified as
+independent items in the list of packages.
 
-Each package directory specified must have a valid cabal file or hpack
-`package.yaml` file present. Note that the subdirectories of the
-directory are not searched for cabal files. Subdirectories will have
-to be specified as independent items in the list of packages.
+Project packages are different from snapshot dependencies (via `resolver`) and
+extra dependencies (via `extra-deps`) in multiple ways, e.g.:
 
-Project packages are different from snapshot dependencies (via
-`resolver`) and extra dependencies (via `extra-deps`) in multiple
-ways, e.g.:
+* Project packages will be built by default with a `stack build` without
+  specific targets. Dependencies will only be built if they are depended upon.
+* Test suites and benchmarks may be run for project packages. They are never run
+  for extra dependencies.
 
-* Project packages will be built by default with a `stack build`
-  without specific targets. Dependencies will only be built if
-  they are depended upon.
-* Test suites and benchmarks may be run for project packages. They are
-  never run for extra dependencies.
-
-__Legacy syntax__ Prior to Stack 1.11, it was possible to specify
-dependencies in your `packages` configuration value as well. This
-support has been removed to simplify the file format. Instead, these
-values should be moved to `extra-deps`. As a concrete example, you
-would convert:
+__Legacy syntax__ Prior to Stack 1.11, it was possible to specify dependencies
+in your `packages` configuration value as well. This support was removed to
+simplify the file format. Instead, these values should be moved to `extra-deps`.
+As a concrete example, you would convert:
 
 ```yaml
 packages:
@@ -164,24 +171,26 @@ extra-deps:
       - wai-extra
 ```
 
-And, in fact, the `packages` value could be left off entirely since
-it's using the default value.
+And, in fact, the `packages` value could be left off entirely since it's using
+the default value.
 
 ### extra-deps
 
-This field allows you to specify extra dependencies on top of what is
-defined in your snapshot (specified in the `resolver` field mentioned
-above). These dependencies may either come from a local file path or a
-Pantry package location.
+Default: `[]`
+
+This key allows you to specify extra dependencies on top of what is defined in
+your snapshot (specified by the `resolver` key mentioned above). These
+dependencies may either come from a local file path or a Pantry package
+location.
 
 For the local file path case, the same relative path rules as apply to
 `packages` apply.
 
-Pantry package locations allow you to include dependencies from three
-different kinds of sources:
+Pantry package locations allow you to include dependencies from three different
+kinds of sources:
 
 * Hackage
-* Archives (tarballs or zip files, either local or over HTTP(S))
+* Archives (tarballs or zip files, either local or over HTTP or HTTPS)
 * Git or Mercurial repositories
 
 Here's an example using all of the above:
@@ -204,17 +213,12 @@ extra-deps:
     - network-conduit-tls
 ```
 
-If no `extra-deps` value is provided, it defaults to an empty list,
-e.g.:
-
-```yaml
-extra-deps: []
-```
-
-For more information on the format for specifying dependencies, please
-see [the Pantry docs](pantry.md).
+For more information on the format for specifying dependencies, please see the
+[Pantry docs](pantry.md).
 
 ### flags
+
+Default: `{}`
 
 Flags can be set for each package separately, e.g.
 
@@ -229,18 +233,19 @@ then the snapshot package will automatically be promoted to be an extra-dep.
 
 ### drop-packages
 
-Packages which, when present in the snapshot specified in `resolver`,
-should not be included in our package. This can be used for a few
-different purposes, e.g.:
+(Since 2.0)
 
-* Ensure that packages you don't want used in your project cannot be
-  used in a `package.yaml` file (e.g., for license reasons)
-* Prevent overriding of a global package like `Cabal`. For more
-  information, see
+Default: `[]`
+
+Packages which, when present in the snapshot specified in `resolver`, should not
+be included in our package. This can be used for a few different purposes, e.g.:
+
+* Ensure that packages you don't want used in your project cannot be used in a
+  `package.yaml` file (e.g., for license reasons)
+* Prevent overriding of a global package like `Cabal`. For more information, see
   [stackage#4425](https://github.com/commercialhaskell/stackage/issues/4425)
-* When using a custom GHC build, avoid incompatible packages (see
-  [this
-  comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
+* When using a custom GHC build, avoid incompatible packages (see this
+  [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
 
 ```yaml
 drop-packages:
@@ -249,12 +254,15 @@ drop-packages:
 - package-with-unacceptable-license
 ```
 
-Since Stack 2.0
-
 ### user-message
 
-A user-message is inserted by `stack init` when it omits packages or adds
-external dependencies. For example:
+If present, specifies a message to be displayed every time the configuration is
+loaded by Stack. It can serve as a reminder for the user to review the
+configuration and make any changes if needed. The user can delete this message
+if the generated configuration is acceptable.
+
+For example, a user-message is inserted by `stack init` when it omits packages
+or adds external dependencies, namely:
 
 ```yaml
 user-message: ! 'Warning: Some packages were found to be incompatible with the resolver
@@ -268,14 +276,12 @@ user-message: ! 'Warning: Some packages were found to be incompatible with the r
 '
 ```
 
-This messages is displayed every time the config is loaded by stack and serves
-as a reminder for the user to review the configuration and make any changes if
-needed. The user can delete this message if the generated configuration is
-acceptable.
-
 ### custom-preprocessor-extensions
 
-In order for stack to be aware of any custom preprocessors you are using, add their extensions here
+Default: `[]`
+
+In order for Stack to be aware of any custom preprocessors you are using, add
+their extensions here
 
 ```yaml
 custom-preprocessor-extensions:
@@ -284,167 +290,146 @@ custom-preprocessor-extensions:
 
 TODO: Add a simple example of how to use custom preprocessors.
 
-## Non-project-specific config
+## Non-project-specific configuration
 
-Non-project config options may go in the global config (`/etc/stack/config.yaml`) or the user config (`~/.stack/config.yaml`).
+Non-project configuration options are valid in a project-level configuration
+file (`stack.yaml`) or in global configuration files (`config.yaml`). The
+options below are listed in alphabetic order.
 
-### docker
+### allow-different-user
 
-See [Docker integration](docker_integration.md#configuration).
+(Since 1.0.1)
 
-### nix
+Default: `false`
 
-(since 0.1.10.0)
+Restrictions: POSIX systems only.
 
-See [Nix integration](nix_integration.md#configuration).
-
-### connection-count
-
-Integer indicating how many simultaneous downloads are allowed to happen
-
-Default: `8`
-
-### hide-th-loading
-
-Strip out the "Loading ..." lines from GHC build output, produced when using Template Haskell
-
-Default: `true`
-
-### local-bin-path
-
-Target directory for `stack install` and `stack build --copy-bins`.
-
-Default: `~/.local/bin`
-
-### package-indices
-
-Since Stack 1.11, this field may only be used to specify a single
-package index, which must use the Hackage Security format. For the
-motivation for this change, please see [issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
-Therefore, this field is most useful for providing an alternate
-Hackage mirror either for:
-
-* Bypassing a firewall
-* Faster download speeds
-
-The following is the default setting for this field:
+Allow users other than the owner of the Stack root to use the Stack
+installation.
 
 ```yaml
-package-indices:
-- download-prefix: https://hackage.haskell.org/
-  hackage-security:
-    keyids:
-    - 0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
-    - 1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
-    - 280b10153a522681163658cb49f632cde3f38d768b736ddbc901d99a1a772833
-    - 2a96b1889dc221c17296fcc2bb34b908ca9734376f0f361660200935916ef201
-    - 2c6c3627bd6c982990239487f1abd02e08a02e6cf16edb105a8012d444d870c3
-    - 51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
-    - 772e9f4c7db33d251d5c6e357199c819e569d130857dc225549b40845ff0890d
-    - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
-    - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
-    key-threshold: 3 # number of keys required
-
-    # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
-    ignore-expiry: true
+allow-different-user: true
 ```
 
-If you provide a replacement index which does not mirror Hackage, it
-is likely that you'll end up with significant breakage, such as most
-snapshots failing to work.
+The intention of this option is to prevent file permission problems, for example
+as the result of a Stack command executed under `sudo`.
 
-Note: since Stack v2.1.3, `ignore-expiry` was changed to `true` by
-default. For more information on this change, see
-[issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
+The option is automatically enabled when Stack is re-spawned in a Docker
+process.
 
-### system-ghc
+### allow-newer
 
-Enables or disables using the GHC available on the PATH. (Make sure PATH is explicit, i.e., don't use ~.)
-Useful to enable if you want to save the time, bandwidth or storage space needed to setup an isolated GHC.
-Default is `false` unless the [Docker](docker_integration.md) or [Nix](nix_integration.md) integration is enabled.
-In a Nix-enabled configuration, stack is incompatible with `system-ghc: false`.
+(Since 0.1.7)
+
+Default: `false`
+
+Whether to ignore version bounds in Cabal files. This also ignores lower bounds.
+The name `allow-newer` is chosen to match the commonly-used Cabal option.
+
 
 ```yaml
-# Turn on system GHC
-system-ghc: true
+allow-newer: true
 ```
 
-### install-ghc
+### apply-ghc-options
 
-Whether or not to automatically install GHC when necessary. Since
-Stack 1.5.0, the default is `true`, which means Stack will not ask you
-before downloading and installing GHC.
+(Since 0.1.6)
 
-### skip-ghc-check
+Default: `locals`
 
-Should we skip the check to confirm that your system GHC version (on the PATH)
-matches what your project expects? Default is `false`.
+Which packages do ghc-options on the command line get applied to? Before Stack
+0.1.6, the default value was `targets`
 
-### require-stack-version
+```yaml
+apply-ghc-options: locals # all local packages
+# apply-ghc-options: targets # all local packages that are targets
+# apply-ghc-options: everything # applied even to snapshot and extra-deps
+```
 
-Require a version of stack within the specified range
-([cabal-style](https://www.haskell.org/cabal/users-guide/developing-packages.html#build-information))
-to be used for this project. Example: `require-stack-version: "== 0.1.*"`
+Note that `everything` is a slightly dangerous value, as it can break invariants
+about your snapshot database.
 
-Default: `"-any"`
+### arch
 
-### arch/os
-
-Set the architecture and operating system for GHC, build directories, etc. Values are those recognized by Cabal, e.g.:
+Set the architecture for GHC, build directories, etc. Values are those
+recognized by Cabal, e.g.:
 
     arch: i386, x86_64
-    os: windows, linux
 
-You likely only ever want to change the arch value. This can also be set via the command line.
+This can also be set via the command line.
 
-### extra-include-dirs/extra-lib-dirs
+### build
 
-A list of extra paths to be searched for header files and libraries, respectively. Paths should be absolute
+(Since 1.1.0)
 
-```yaml
-extra-include-dirs:
-- /opt/foo/include
-extra-lib-dirs:
-- /opt/foo/lib
-```
-
-Since these are system-dependent absolute paths, it is recommended that you
-specify these in your `config.yaml` within the stack root (usually, `~/.stack`
-or, on Windows, `%LOCALAPPDATA%\Programs\stack`). If you control the build
-environment in your project's ``stack.yaml``, perhaps through docker or other
-means, then it may well make sense to include these there as well.
-
-
-### with-gcc
-
-Specify a path to gcc explicitly, rather than relying on the normal path resolution.
+Default:
 
 ```yaml
-with-gcc: /usr/local/bin/gcc-5
+build:
+  library-profiling: false
+  executable-profiling: false
+  copy-bins: false
+  prefetch: false
+  keep-going: false
+  keep-tmp-files: false
+
+  # NOTE: global usage of haddock can cause build failures when documentation is
+  # incorrectly formatted.  This could also affect scripts which use Stack.
+  haddock: false
+  haddock-arguments:
+    haddock-args: []      # Additional arguments passed to haddock, --haddock-arguments
+    # haddock-args:
+    # - "--css=/home/user/my-css"
+  open-haddocks: false    # --open
+  haddock-deps: false     # if unspecified, defaults to true if haddock is set
+  haddock-internal: false
+
+  # These are inadvisable to use in your global configuration, as they make the
+  # Stack build command line behave quite differently.
+  test: false
+  test-arguments:
+    rerun-tests: true   # Rerun successful tests
+    additional-args: [] # --test-arguments
+    # additional-args:
+    # - "--fail-fast"
+    coverage: false
+    no-run-tests: false
+  bench: false
+  benchmark-opts:
+    benchmark-arguments: ""
+    # benchmark-arguments: "--csv bench.csv"
+    no-run-benchmarks: false
+  force-dirty: false
+  reconfigure: false
+  cabal-verbose: false
+  split-objs: false
+
+  # Since 1.8. Starting with 2.0, the default is true
+  interleaved-output: true
+
+  # Since 1.10
+  ddump-dir: ""
 ```
 
-### with-hpack
+Allows setting build options which are usually specified on the command line.
 
-Use an Hpack executable, rather than using the bundled Hpack.
+The meanings of these settings correspond directly with the command line flags
+of the same name. See the [build command docs](build_command.md) and the
+[users guide](GUIDE.md#the-build-command) for more info.
 
-```yaml
-with-hpack: /usr/local/bin/hpack
-```
+### color
 
-### compiler-check
+This option specifies when to use color in output. The option is used as
+`color: <WHEN>`, where `<WHEN>` is 'always', 'never', or 'auto'. On Windows
+versions before Windows 10, for terminals that do not support color codes, the
+default is 'never'; color may work on terminals that support color codes.
 
-(Since 0.1.4)
+The color use can also be set at the command line using the equivalent
+`--color=<WHEN>` global option. Color use set at the command line takes
+precedence over that set in a yaml configuration file.
 
-Specifies how the compiler version in the resolver is matched against concrete versions. Valid values:
-
-* `match-minor`: make sure that the first three components match, but allow
-  patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match
-  7.8.4. This is useful to allow for custom patch levels of a compiler. This is
-  the default
-* `match-exact`: the entire version number must match precisely
-* `newer-minor`: the third component can be increased, e.g. if your resolver is
-  `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up
-  through stack 0.1.3
+(The British English spelling (colour) is also accepted. In yaml configuration
+files, the American spelling is the alternative that has priority.)
 
 ### compiler
 
@@ -452,7 +437,7 @@ Specifies how the compiler version in the resolver is matched against concrete v
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-8.6.5`. This can be used to override the
+resolvers like `ghc-9.2.4`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ```yaml
@@ -534,6 +519,154 @@ compiler). As we use a Stack based version of Hadrian (`hadrian/build-stack` in
 GHC sources), the bootstrap compiler is configured into `hadrian/stack.yaml` and
 fully managed by Stack.
 
+### compiler-check
+
+(Since 0.1.4)
+
+Default: `match-minor`
+
+Specifies how the compiler version in the resolver is matched against concrete
+versions. Valid values:
+
+* `match-minor`: make sure that the first three components match, but allow
+  patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match
+  7.8.4. This is useful to allow for custom patch levels of a compiler.
+* `match-exact`: the entire version number must match precisely
+* `newer-minor`: the third component can be increased, e.g. if your resolver is
+  `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up
+  through Stack 0.1.3
+
+### concurrent-tests
+
+(Since 0.1.2.0)
+
+Default: `true`
+
+This option specifies whether test suites should be executed concurrently with
+each other. The default is `true` since this is usually fine and it often means
+that tests can complete earlier. However, if some test suites require exclusive
+access to some resource, or require a great deal of CPU or memory resources,
+then it makes sense to set this to `false`.
+
+```yaml
+concurrent-tests: false
+```
+
+### configure-options
+
+(Since 2.0)
+
+Options which are passed to the configure step of the Cabal build process.
+These can either be set by package name, or using the `$everything`,
+`$targets`, and `$locals` special keys. These special keys have the same
+meaning as in `ghc-options`.
+
+```yaml
+configure-options:
+  $everything:
+  - --with-gcc
+  - /some/path
+  my-package:
+  - --another-flag
+```
+
+### connection-count
+
+Default: `8`
+
+Integer indicating how many simultaneous downloads are allowed to happen.
+
+### default-template
+
+Default: `new-template` in the
+[stack-templates](https://github.com/commercialhaskell/stack-templates/)
+repository.
+
+This option specifies which template to use with `stack new`, when none is
+specified. Other templates are listed in the
+[stack-templates](https://github.com/commercialhaskell/stack-templates/)
+repository. See the output of `stack templates`.
+
+### docker
+
+See [Docker integration](docker_integration.md#configuration).
+
+### dump-logs
+
+(Since 1.3.0)
+
+Default: `warning`
+
+Control which log output from local non-dependency packages to print to the
+console. By default, Stack will only do this when building a single target
+package or if the log contains warnings, to avoid generating unnecessarily
+verbose output.
+
+```yaml
+dump-logs: none      # don't dump logs even if they contain warnings
+dump-logs: warning   # dump logs that contain warnings
+dump-logs: all       # dump all logs for local non-dependency packages
+```
+
+### extra-include-dirs
+
+Default: `[]`
+
+A list of extra paths to be searched for header files. Paths should be absolute
+
+```yaml
+extra-include-dirs:
+- /opt/foo/include
+```
+
+Since these are system-dependent absolute paths, it is recommended that you
+specify these in your `config.yaml` file. If you control the build environment
+in your project's ``stack.yaml``, perhaps through docker or other means, then it
+may well make sense to include these there as well.
+
+### extra-lib-dirs
+
+Default: `[]`
+
+A list of extra paths to be searched for libraries. Paths should be absolute
+
+```yaml
+extra-lib-dirs:
+- /opt/foo/lib
+```
+
+Since these are system-dependent absolute paths, it is recommended that you
+specify these in your `config.yaml` file. If you control the build environment
+in your project's ``stack.yaml``, perhaps through docker or other means, then it
+may well make sense to include these there as well.
+
+### extra-path
+
+(Since 0.1.4.0)
+
+This option specifies additional directories to prepend to the PATH. These will
+be used when resolving the location of executables, and will also be visible in
+the PATH of processes run by Stack.
+
+For example, to prepend `/path-to-some-dep/bin` to your PATH:
+
+```yaml
+extra-path:
+- /path-to-some-dep/bin
+```
+
+Other paths added by Stack - things like the project's binary directory and the
+compiler's binary directory - will take precedence over those specified here
+(the automatic paths get prepended).
+
+### ghc-build
+
+(Since 1.3.0)
+
+Specify a specialized architecture bindist to use.  Normally this is
+determined automatically, but you can override the autodetected value here.
+Possible arguments include `standard`, `gmp4`, `nopie`, `tinfo6`,
+`tinfo6-nopie`, `ncurses6`, and `integersimple`.
 
 ### ghc-options
 
@@ -550,77 +683,33 @@ ghc-options:
     some-package: -DSOME_CPP_FLAG
 ```
 
-Since 1.6.0, setting a GHC options for a specific package will
-automatically promote it to a local package (much like setting a
-custom package flag). However, setting options via `$everything` on all flags
-will not do so (see
+Since Stack 1.6.0, setting a GHC options for a specific package will
+automatically promote it to a local package (much like setting a custom package
+flag). However, setting options via `$everything` on all flags will not do so
+(see
 [Github discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
-for reasoning). This can lead to unpredictable behavior by affecting
-your snapshot packages.
+for reasoning). This can lead to unpredictable behavior by affecting your
+snapshot packages.
 
-The behavior of the `$locals`, `$targets`, and `$everything` special
-keys mirrors the behavior for the
-[`apply-ghc-options` setting](#apply-ghc-options), which affects
-command line parameters.
+The behavior of the `$locals`, `$targets`, and `$everything` special keys
+mirrors the behavior for the
+[`apply-ghc-options` setting](#apply-ghc-options), which affects command line
+parameters.
 
-NOTE: Prior to version 1.6.0, the `$locals`, `$targets`, and
-`$everything` keys were not supported. Instead, you could use `"*"` for
-the behavior represented now by `$everything`. It is highly
-recommended to switch to the new, more expressive, keys.
-
-### apply-ghc-options
-
-(Since 0.1.6)
-
-Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
-
-```yaml
-apply-ghc-options: locals # all local packages, the default
-# apply-ghc-options: targets # all local packages that are targets
-# apply-ghc-options: everything # applied even to snapshot and extra-deps
-```
-
-Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
-
-### rebuild-ghc-options
-
-(Since 0.1.6)
-
-Should we rebuild a package when its GHC options change? Before 0.1.6, this was
-a non-configurable true. However, in most cases, the flag is used to affect
-optimization levels and warning behavior, for which GHC itself doesn't actually
-recompile the modules anyway. Therefore, the new behavior is to not recompile
-on an options change, but this behavior can be changed back with the following:
-
-```yaml
-rebuild-ghc-options: true
-```
-
-### configure-options
-
-Options which are passed to the configure step of the Cabal build process.
-These can either be set by package name, or using the `$everything`,
-`$targets`, and `$locals` special keys. These special keys have the same
-meaning as in `ghc-options`.
-
-```yaml
-configure-options:
-  $everything:
-  - --with-gcc
-  - /some/path
-  my-package:
-  - --another-flag
-```
-
-(Since 2.0)
+NOTE: Prior to Stack 1.6.0, the `$locals`, `$targets`, and `$everything` keys
+were not supported. Instead, you could use `"*"` for the behavior represented
+now by `$everything`. It is highly recommended to switch to the new, more
+expressive, keys.
 
 ### ghc-variant
 
 (Since 0.1.5)
 
+Default: `standard`
+
 Specify a variant binary distribution of GHC to use. Known values:
 
-* `standard`: This is the default, uses the standard GHC binary distribution
+* `standard`: Use the standard GHC binary distribution
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
@@ -630,14 +719,265 @@ Specify a variant binary distribution of GHC to use. Known values:
 
 This option is incompatible with `system-ghc: true`.
 
-### ghc-build
+### hackage-base-url
+
+(Since 1.9.1)
+
+Default: `https://hackage.haskell.org/`
+
+Sets the address of the Hackage server to upload the package to.
+
+```yaml
+hackage-base-url: https://hackage.example.com/
+```
+
+### hide-source-paths
+
+Default: `true` (since 2.0)
+
+Whether to use the `-fhide-source-paths` option by default for GHC >= 8.2:
+
+```yaml
+hide-source-paths: false
+```
+
+Build output when enabled:
+
+```
+...
+[1 of 2] Compiling Lib
+[2 of 2] Compiling Paths_test_pr
+...
+```
+
+Build output when disabled:
+
+```
+...
+[1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
+...
+```
+
+### hide-th-loading
+
+Default: `true`
+
+Strip out the "Loading ..." lines from GHC build output, produced when using
+Template Haskell.
+
+### ignore-revision-mismatch
+
+(Removed 1.11)
+
+This flag was introduced in Stack 1.6, and removed on the move to Pantry. You
+will receive a warning if this configuration value is set.
+
+### install-ghc
+
+Default: `true` (since 1.5.0)
+
+Whether or not to automatically install GHC when necessary.
+
+### jobs
+
+Default: the number of processors reported by your CPU.
+
+Specifies how many build tasks should be run in parallel. This can be overloaded
+on the command line via `-jN`, for example `-j2`. One usage for this might be to
+avoid running out of memory by setting it to 1, like this:
+
+```yaml
+jobs: 1
+```
+
+### local-bin-path
+
+Default (on Unix-like operating systems): `~/.local/bin`
+
+Default (on Windows): `%APPDATA%\local\bin`
+
+Target directory for `stack install` and `stack build --copy-bins`.
+
+### local-programs-path
 
 (Since 1.3.0)
 
-Specify a specialized architecture bindist to use.  Normally this is
-determined automatically, but you can override the autodetected value here.
-Possible arguments include `standard`, `gmp4`, `nopie`, `tinfo6`,
-`tinfo6-nopie`, `ncurses6`, and `integersimple`.
+Default (on Unix-like operating systems): `programs` directory in the Stack
+root.
+
+Default (on Windows): `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
+environment variable exists.
+
+This overrides the location of the Stack 'programs' directory, where tools like
+GHC and (on Windows) MSYS2 get installed.
+
+__NOTE__: On Windows, if there is a space character in the `%LOCALAPPDATA%` path
+(which may be the case if the relevant user account name and its corresponding
+user profie path have a space) this may cause problems with building packages
+that make use of the GNU project's `autoconf` package and `configure` shell
+script files. That may be the case particularly if there is no corresponding
+short name ('8 dot 3' name) for the directory in the path with the space (which
+may be the case if '8 dot 3' names have been stripped or their creation not
+enabled by default). If there are problems building, it will be necessary to
+override the default location of Stack's 'programs' directory to specify an
+alternative path that does not contain space characters. Examples of packages on
+Hackage that make use of `configure` are `network` and `process`.
+
+### modify-code-page
+
+(Since 0.1.6)
+
+Default: `true`
+
+Whether to modify the code page for UTF-8 output when running on Windows.
+
+```yaml
+modify-code-page: false
+```
+
+### nix
+
+(since 0.1.10.0)
+
+See [Nix integration](nix_integration.md#configuration).
+
+### os
+
+Set the operating system for GHC, build directories, etc. Values are those
+recognized by Cabal, e.g.:
+
+    os: windows, linux
+
+You are unlikely to want to change the `os` value.
+
+### package-indices
+
+Default:
+
+```yaml
+package-indices:
+- download-prefix: https://hackage.haskell.org/
+  hackage-security:
+    keyids:
+    - 0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
+    - 1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+    - 280b10153a522681163658cb49f632cde3f38d768b736ddbc901d99a1a772833
+    - 2a96b1889dc221c17296fcc2bb34b908ca9734376f0f361660200935916ef201
+    - 2c6c3627bd6c982990239487f1abd02e08a02e6cf16edb105a8012d444d870c3
+    - 51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
+    - 772e9f4c7db33d251d5c6e357199c819e569d130857dc225549b40845ff0890d
+    - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
+    - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
+    key-threshold: 3 # number of keys required
+
+    # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
+    ignore-expiry: true
+```
+
+Since Stack 1.11, this key may only be used to specify a single package index,
+which must use the Hackage Security format. For the motivation for this change,
+please see
+[issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
+Therefore, this key is most useful for providing an alternate Hackage mirror
+either for:
+
+* Bypassing a firewall
+* Faster download speeds
+
+If you provide a replacement index which does not mirror Hackage, it is likely
+that you'll end up with significant breakage, such as most snapshots failing to
+work.
+
+Note: since Stack v2.1.3, `ignore-expiry` was changed to `true` by
+default. For more information on this change, see
+[issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
+
+### pvp-bounds
+
+(Since 0.1.5)
+
+__NOTE__ As of Stack 1.6.0, this feature does not reliably work, due to issues
+with the Cabal library's printer. Stack will generate a warning when a lossy
+conversion occurs, in which case you may need to disable this setting. See
+[#3550](https://github.com/commercialhaskell/stack/issues/3550) for more
+information.
+
+When using the `sdist` and `upload` commands, this setting determines whether
+the Cabal file's dependencies should be modified to reflect PVP lower and upper
+bounds. Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
+lower bounds), and both (and upper and lower bounds). The algorithm it follows
+is:
+
+* If an upper or lower bound already exists on a dependency, it's left alone
+* When adding a lower bound, we look at the current version specified by
+  `stack.yaml`, and set it as the lower bound (e.g., `foo >= 1.2.3`)
+* When adding an upper bound, we require less than the next major version
+  (e.g., `foo < 1.3`)
+
+```yaml
+pvp-bounds: none
+```
+
+For more information, see
+[the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
+
+__NOTE__ Since Stack 1.5.0, each of the values listed above supports adding
+`-revision` to the end of each value, e.g. `pvp-bounds: both-revision`. This
+means that, when uploading to Hackage, Stack will first upload your tarball with
+an unmodified Cabal file, and then upload a Cabal file revision with the PVP
+bounds added. This can be useful - especially combined with the
+[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field) -
+as a method to ensure PVP compliance without having to proactively fix bounds
+issues for Stackage maintenance.
+
+### recommend-stack-upgrade
+
+(Since 2.0)
+
+When Stack notices that a new version of Stack is available, should it notify
+the user?
+
+```yaml
+recommend-stack-upgrade: true
+```
+
+### rebuild-ghc-options
+
+(Since 0.1.6)
+
+Default: `false`
+
+Should we rebuild a package when its GHC options change? Before Stack 0.1.6,
+this was a non-configurable `true`. However, in most cases, the flag is used to
+affect optimization levels and warning behavior, for which GHC itself doesn't
+actually recompile the modules anyway. Therefore, the new behavior is to not
+recompile on an options change, but this behavior can be changed back with the
+following:
+
+```yaml
+rebuild-ghc-options: true
+```
+
+### require-stack-version
+
+Default: `"-any"`
+
+Require a version of Stack within the specified range
+([cabal-style](https://www.haskell.org/cabal/users-guide/developing-packages.html#build-information))
+to be used for this project. Example: `require-stack-version: "== 0.1.*"`
+
+### save-hackage-creds
+
+(Since 1.5.0)
+
+Default: `true`
+
+Controls whether, when using `stack upload`, the user's Hackage username and
+password are stored in a local file.
+
+```yaml
+save-hackage-creds: true
+```
 
 ### setup-info
 
@@ -667,7 +1007,7 @@ The `setup-info` dictionary is constructed in the following order:
 3. `setup-info-locations` in the YAML configuration - URLs or paths. See further
    below.
 
-The format of this field is the same as in the default
+The format of this key is the same as in the default
 [stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/raw/master/stack/stack-setup-2.yaml).
 For example, GHC 9.2.3 of custom variant `myvariant` (see further below) on
 64-bit Windows:
@@ -683,7 +1023,7 @@ setup-info:
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
 `Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.7.5)
-supports the following pairs in the format of the `setup-info` field:
+supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |
 |----------------|---------|-----------|------------------------------------------------------------|
@@ -693,7 +1033,7 @@ supports the following pairs in the format of the `setup-info` field:
 |FreeBSD         |freebsd32|freebsd64  |AArch64: freebsd-aarch64                                    |
 |OpenBSD         |openbsd32|openbsd64  |                                                            |
 
-For GHC, the distinguishing 'Version' in the field format includes a 'tag' for
+For GHC, the distinguishing 'Version' in the key format includes a 'tag' for
 any (optional) GHC variant (see [ghc-variant](#ghc-variant)) and a further 'tag'
 for any (optional) specialised GHC build (see [ghc-build](#ghc-build)).
 
@@ -713,8 +1053,7 @@ setup-info:
 ~~~
 
 On Windows, the required 7z executable and DLL tools are represented in the
-format of the `setup-info` field simply by `sevenzexe-info` and
-`sevenzdll-info`.
+format of the `setup-info` key simply by `sevenzexe-info` and `sevenzdll-info`.
 
 This configuration **adds** the specified setup information metadata to the
 default. Specifying this configuration **does not** prevent the default
@@ -807,371 +1146,60 @@ ghc:
       url: "installs/ghc-9.2.3.tar.xz"
 ~~~
 
-### pvp-bounds
+### skip-ghc-check
 
-(Since 0.1.5)
+Default: `false`
 
-__NOTE__ As of Stack 1.6.0, this feature does not reliably work, due
-to issues with the Cabal library's printer. Stack will generate a
-warning when a lossy conversion occurs, in which case you may need to
-disable this setting. See
-[#3550](https://github.com/commercialhaskell/stack/issues/3550) for
-more information.
-
-When using the `sdist` and `upload` commands, this setting determines whether
-the cabal file's dependencies should be modified to reflect PVP lower and upper
-bounds. Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
-lower bounds), and both (and upper and lower bounds). The algorithm it follows
-is:
-
-* If an upper or lower bound already exists on a dependency, it's left alone
-* When adding a lower bound, we look at the current version specified by
-  stack.yaml, and set it as the lower bound (e.g., `foo >= 1.2.3`)
-* When adding an upper bound, we require less than the next major version
-  (e.g., `foo < 1.3`)
-
-```yaml
-pvp-bounds: none
-```
-
-For more information, see [the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
-
-__NOTE__ Since Stack 1.5.0, each of the values listed above supports
-adding `-revision` to the end of each value, e.g. `pvp-bounds:
-both-revision`. This means that, when uploading to Hackage, Stack will
-first upload your tarball with an unmodified `.cabal` file, and then
-upload a cabal file revision with the PVP bounds added. This can be
-useful&mdash;especially combined with the
-[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field)&mdash;as
-a method to ensure PVP compliance without having to proactively fix
-bounds issues for Stackage maintenance.
-
-### modify-code-page
-
-(Since 0.1.6)
-
-Modify the code page for UTF-8 output when running on Windows. Default behavior
-is to modify.
-
-```yaml
-modify-code-page: false
-```
-
-### allow-newer
-
-(Since 0.1.7)
-
-Ignore version bounds in .cabal files. Default is false.
-
-```yaml
-allow-newer: true
-```
-
-Note that this also ignores lower bounds. The name "allow-newer" is chosen to
-match the commonly used cabal option.
-
-### allow-different-user
-
-(Since 1.0.1)
-
-Allow users other than the owner of the stack root directory (typically `~/.stack`)
-to use the stack installation. The default is `false`. POSIX systems only.
-
-```yaml
-allow-different-user: true
-```
-
-The intention of this option is to prevent file permission problems, for example
-as the result of a `stack` command executed under `sudo`.
-
-The option is automatically enabled when `stack` is re-spawned in a Docker process.
-
-### build
-
-(Since 1.1.0)
-
-Allows setting build options which are usually specified on the CLI.  Here are
-the settings with their defaults:
-
-```yaml
-build:
-  library-profiling: false
-  executable-profiling: false
-  copy-bins: false
-  prefetch: false
-  keep-going: false
-  keep-tmp-files: false
-
-  # NOTE: global usage of haddock can cause build failures when documentation is
-  # incorrectly formatted.  This could also affect scripts which use stack.
-  haddock: false
-  haddock-arguments:
-    haddock-args: []      # Additional arguments passed to haddock, --haddock-arguments
-    # haddock-args:
-    # - "--css=/home/user/my-css"
-  open-haddocks: false    # --open
-  haddock-deps: false     # if unspecified, defaults to true if haddock is set
-  haddock-internal: false
-
-  # These are inadvisable to use in your global configuration, as they make the
-  # stack build CLI behave quite differently.
-  test: false
-  test-arguments:
-    rerun-tests: true   # Rerun successful tests
-    additional-args: [] # --test-arguments
-    # additional-args:
-    # - "--fail-fast"
-    coverage: false
-    no-run-tests: false
-  bench: false
-  benchmark-opts:
-    benchmark-arguments: ""
-    # benchmark-arguments: "--csv bench.csv"
-    no-run-benchmarks: false
-  force-dirty: false
-  reconfigure: false
-  cabal-verbose: false
-  split-objs: false
-
-  # Since 1.8. Starting with 2.0, the default is true
-  interleaved-output: true
-
-  # Since 1.10
-  ddump-dir: ""
-```
-
-The meanings of these settings correspond directly with the CLI flags of the
-same name. See the [build command docs](build_command.md) and the
-[users guide](GUIDE.md#the-build-command) for more info.
-
-### dump-logs
-
-(Since 1.3.0)
-
-Control which log output from local non-dependency packages to print to the
-console. By default, Stack will only do this when building a single target
-package or if the log contains warnings, to avoid generating unnecessarily
-verbose output.
-
-```yaml
-dump-logs: none      # don't dump logs even if they contain warnings
-dump-logs: warning   # default: dump logs that contain warnings
-dump-logs: all       # dump all logs for local non-dependency packages
-```
-
-### templates
-
-Templates used with `stack new` have a number of parameters that affect the
-generated code. These can be set for all new projects you create. The result of
-them can be observed in the generated LICENSE and cabal files. The value for all
-of these parameters must be strings.
-
-The parameters are: `author-email`, `author-name`, `category`, `copyright`, `year` and `github-username`.
-
-* _author-email_ - sets the `maintainer` property in cabal
-* _author-name_ - sets the `author` property in cabal and the name used in
-  LICENSE
-* _category_ - sets the `category` property in cabal. This is used in Hackage.
-  For examples of categories see [Packages by
-  category](https://hackage.haskell.org/packages/). It makes sense for
-  `category` to be set on a per project basis because it is uncommon for all
-  projects a user creates to belong to the same category. The category can be
-  set per project by passing `-p "category:value"` to the `stack new` command.
-* _copyright_ - sets the `copyright` property in cabal. It is typically the
-  name of the holder of the copyright on the package and the year(s) from which
-  copyright is claimed. For example: `Copyright (c) 2006-2007 Joe Bloggs`
-* _year_ - if `copyright` is not specified, `year` and `author-name` are used
-  to generate the copyright property in cabal. If `year` is not specified, it
-  defaults to the current year.
-* _github-username_ - used to generate `homepage` and `source-repository` in
-  cabal. For instance `github-username: myusername` and `stack new my-project new-template`
-  would result:
-
-```yaml
-homepage: http://github.com/myusername/my-project#readme
-
-source-repository head
-  type: git
-  location: https://github.com/myusername/my-project
-```
-
-These properties can be set in `config.yaml` as follows:
-```yaml
-templates:
-  params:
-    author-name: Your Name
-    author-email: youremail@example.com
-    category: Your Projects Category
-    copyright: 'Copyright (c) 2022 Your Name'
-    github-username: yourusername
-```
-
-Additionally, `stack new` can automatically initialize source control repositories
-in the directories it creates.  Source control tools can be specified with the
-`scm-init` option.  At the moment, only `git` is supported.
-
-```yaml
-templates:
-  scm-init: git
-```
-
-### save-hackage-creds
-
-Controls whether, when using `stack upload`, the user's Hackage
-username and password are stored in a local file. Default: true.
-
-```yaml
-save-hackage-creds: true
-```
-
-Since 1.5.0
-
-### hackage-base-url
-
-Sets the address of the Hackage server to upload the package to. Default is
-`https://hackage.haskell.org/`.
-
-```yaml
-hackage-base-url: https://hackage.example.com/
-```
-
-Since 1.9.1
-
-### ignore-revision-mismatch
-
-This flag was introduced in Stack 1.6, and removed in Stack 1.11 with
-the move to Pantry. You will receive a warning if this configuration
-value is set.
-
-### urls
-
-Customize the URLs where `stack` looks for snapshot build plans.
-
-The default configuration is
-
-```yaml
-urls:
-  latest-snapshot: https://www.stackage.org/download/snapshots.json
-```
-
-### jobs
-
-Specifies how many build tasks should be run in parallel. This can be overloaded
-on the commandline via `-jN`, for example `-j2`.  The default is to use the
-number of processors reported by your CPU.  One usage for this might be to avoid
-running out of memory by setting it to 1, like this:
-
-```yaml
-jobs: 1
-```
-
-### work-dir
-
-Specifies relative path of work directory (default is `.stack-work`. This can
-also be specified by env var or cli flag, in particular, the earlier items in
-this list take precedence:
-
-1. `--work-dir DIR` passed on the commandline
-2. `work-dir` in stack.yaml
-3. `STACK_WORK` environment variable
-
-Since 0.1.10.0
+Should we skip the check to confirm that your system GHC version (on the PATH)
+matches what your project expects?
 
 ### skip-msys
 
-Skips checking for and installing MSYS2 when stack is setting up the
-environment.  This is only useful on Windows machines, and usually doesn't make
-sense in project configurations, just in `config.yaml`.  Defaults to `false`, so
-if this is used, it only really makes sense to use it like this:
+(Since 0.1.2.0)
+
+Default: `false`
+
+Restrictions: Windows systems only
+
+Skips checking for and installing MSYS2 when stack is Setting up the
+environment. This usually doesn't make sense in project-level configurations,
+just in `config.yaml`.
 
 ```yaml
 skip-msys: true
 ```
 
-Since 0.1.2.0
+### snapshot-location-base
 
-### concurrent-tests
+(Since 2.5.0)
 
-This option specifies whether test-suites should be executed concurrently with
-each-other. The default for this is true, since this is usually fine and it
-often means that tests can complete earlier. However, if some test-suites
-require exclusive access to some resource, or require a great deal of CPU or
-memory resources, then it makes sense to set this to `false` (the default is
-`true`).
+Default: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/
+(as set in the `pantry` library)
 
-```yaml
-concurrent-tests: false
-```
+Sets the base location of the LTS Haskell or Stackage Nightly snapshots.
 
-Since 0.1.2.0
-
-### extra-path
-
-This option specifies additional directories to prepend to the PATH. These will
-be used when resolving the location of executables, and will also be visible in
-the PATH of processes run by Stack.
-
-For example, to prepend `/path-to-some-dep/bin` to your PATH:
+For example:
 
 ```yaml
-extra-path:
-- /path-to-some-dep/bin
+snapshot-location-base: https://example.com/snapshots/location/
 ```
 
-Other paths added by Stack - things like the project's binary directory and the
-compiler's binary directory - will take precedence over those specified here
-(the automatic paths get prepended).
+has the following effect:
 
-Since 0.1.4.0
+* `lts-X.Y` expands to `https://example.com/snapshots/location/lts/X/Y.yaml`
+* `nightly-YYYY-MM-DD` expands to
+  `https://example.com/snapshots/location/nightly/YYYY/M/D.yaml`
 
-### local-programs-path
-
-This overrides the location of the programs directory, where tools like ghc and
-MSYS2 get installed.
-
-On most systems, this defaults to a folder called `programs`
-within the stack root directory. On Windows, if the `LOCALAPPDATA` environment
-variable exists, then it defaults to `%LOCALAPPDATA%\Programs\stack`, which
-follows Windows' conventions.
-
-__NOTE__: On Windows, if there is a space character in the `%LOCALAPPDATA%` path
-(which may be the case if the relevant user account name and its corresponding
-user profie path have a space) this may cause problems with building packages
-that make use of the GNU project's `autoconf` package and `configure` shell
-script files. That may be the case particularly if there is no corresponding
-short name ('8 dot 3' name) for the folder in the path with the space (which may
-be the case if '8 dot 3' names have been stripped or their creation not enabled
-by default). If there are problems building, it will be necessary to override
-the default location of stack's programs directory to specify an alternative
-path that does not contain space characters. Examples of packages on Hackage
-that make use of `configure` are `network` and `process`.
-
-Since 1.3.0
-
-### default-template
-
-This option specifies which template to use with `stack new`, when none is
-specified. The default is called `new-template`. The other templates are listed
-in [the stack-templates repo](https://github.com/commercialhaskell/stack-templates/).
-
-### color
-
-This option specifies when to use color in output. The option is used as
-`color: <WHEN>`, where `<WHEN>` is 'always', 'never', or 'auto'. On Windows
-versions before Windows 10, for terminals that do not support color codes, the
-default is 'never'; color may work on terminals that support color codes.
-
-The color use can also be set at the command line using the equivalent
-`--color=<WHEN>` global option. Color use set at the command line takes
-precedence over that set in a yaml configuration file.
-
-(The British English spelling (colour) is also accepted. In yaml configuration
-files, the American spelling is the alternative that has priority.)
+This key is convenient in setups that restrict access to GitHub, for instance
+closed corporate setups. In this setting, it is common for the development
+environment to have general access to the internet, but not for testing/building
+environments. To avoid the firewall, one can run a local snapshots mirror and
+then use a custom `snapshot-location-base` in the closed environments only.
 
 ### stack-colors
 
 Stack uses styles to format some of its output. The default styles do not work
-well with every terminal theme. This option specifies stack's output styles,
+well with every terminal theme. This option specifies Stack's output styles,
 allowing new styles to replace the defaults. The option is used as
 `stack-colors: <STYLES>`, where `<STYLES>` is a colon-delimited sequence of
 key=value, 'key' is a style name and 'value' is a semicolon-delimited list of
@@ -1196,71 +1224,143 @@ terminal theme might wish to set the styles as follows:
 ```yaml
 stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95:secondary=92:highlight=32
 ```
-The styles can also be set at the command line using the equivalent `--stack-colors=<STYLES>`
-global option. Styles set at the command line take precedence over those set in
-a yaml configuration file. (In respect of styles used in verbose output, some of
-that output occurs before the configuration file is processed.)
+The styles can also be set at the command line using the equivalent
+`--stack-colors=<STYLES>` global option. Styles set at the command line take
+precedence over those set in a YAML configuration file. (In respect of styles
+used in verbose output, some of that output occurs before the configuration file
+is processed.)
 
-(The British English spelling (colour) is also accepted. In yaml configuration
+(The British English spelling (colour) is also accepted. In YAML configuration
 files, the American spelling is the alternative that has priority.)
-
-### hide-source-paths
-
-Stack will use the `-fhide-source-paths` option by default for GHC >= 8.2, unless this
-option is set to `false` as in the following example:
-
-```yaml
-hide-source-paths: false
-```
-
-Build output when enabled:
-
-```
-...
-[1 of 2] Compiling Lib
-[2 of 2] Compiling Paths_test_pr
-...
-```
-
-Build output when disabled:
-
-```
-...
-[1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
-...
-```
-
-### recommend-stack-upgrade
-
-When Stack notices that a new version of Stack is available, should it notify the user?
-
-```yaml
-recommend-stack-upgrade: true
-```
-
-Since 2.0
 
 ### stack-developer-mode
 
-Turns on a mode where some messages are printed at WARN level instead of DEBUG level, especially useful for developers of Stack itself. For official distributed binaries, this is set to `false` by default. When you build from source, it is set to `true` by default.
+(Since 2.3.3)
+
+Default (official distributed binaries): `false`
+
+Default (built from source): `true`
+
+Turns on a mode where some messages are printed at WARN level instead of DEBUG
+level, especially useful for developers of Stack itself.
 
 ```yaml
 stack-developer-mode: false
 ```
 
-Since 2.3.3
+### system-ghc
 
-### snapshot-location-base
-Sets the base location of LTS Haskell/Stackage Nightly snapshots. Default is https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/ (as set in the `pantry` library).
+Default: `false`, unless the [Docker](docker_integration.md) or
+[Nix](nix_integration.md) integration is enabled.
 
-For example:
+Enables or disables using the GHC available on the PATH. (Make sure PATH is
+explicit, i.e., don't use ~.) Useful to enable if you want to save the time,
+bandwidth or storage space needed to setup an isolated GHC.
+
+In a Nix-enabled configuration, Stack is incompatible with `system-ghc: false`.
+
 ```yaml
-snapshot-location-base: https://example.com/snapshots/location/
+# Turn on system GHC
+system-ghc: true
 ```
-has the following effect:
-* `lts-X.Y` expands to `https://example.com/snapshots/location/lts/X/Y.yaml`
-* `nightly-YYYY-MM-DD` expands to `https://example.com/snapshots/location/nightly/YYYY/M/D.yaml`
 
-This field is convenient in setups that restrict access to GitHub, for instance closed corporate setups. In this setting, it is common for the development environment to have general access to the internet, but not for testing/building environments. To avoid the firewall, one can run a local snapshots mirror and then use a custom `snapshot-location-base` in the closed environments only.
+### templates
 
-Since 2.5.0
+Templates used with `stack new` have a number of parameters that affect the
+generated code. These can be set for all new projects you create. The result of
+them can be observed in the generated LICENSE and Cabal files. The value for all
+of these parameters must be strings.
+
+The parameters are: `author-email`, `author-name`, `category`, `copyright`,
+`year` and `github-username`.
+
+* _author-email_ - sets the `maintainer` property in Cabal
+* _author-name_ - sets the `author` property in Cabal and the name used in
+  LICENSE
+* _category_ - sets the `category` property in Cabal. This is used in Hackage.
+  For examples of categories see
+  [Packages by category](https://hackage.haskell.org/packages/). It makes sense
+  for `category` to be set on a per project basis because it is uncommon for all
+  projects a user creates to belong to the same category. The category can be
+  set per project by passing `-p "category:value"` to the `stack new` command.
+* _copyright_ - sets the `copyright` property in Cabal. It is typically the
+  name of the holder of the copyright on the package and the year(s) from which
+  copyright is claimed. For example: `Copyright (c) 2006-2007 Joe Bloggs`
+* _year_ - if `copyright` is not specified, `year` and `author-name` are used
+  to generate the copyright property in Cabal. If `year` is not specified, it
+  defaults to the current year.
+* _github-username_ - used to generate `homepage` and `source-repository` in
+  Cabal. For instance `github-username: myusername` and
+  `stack new my-project new-template` would result:
+
+```yaml
+homepage: http://github.com/myusername/my-project#readme
+
+source-repository head
+  type: git
+  location: https://github.com/myusername/my-project
+```
+
+These properties can be set in `config.yaml` as follows:
+```yaml
+templates:
+  params:
+    author-name: Your Name
+    author-email: youremail@example.com
+    category: Your Projects Category
+    copyright: 'Copyright (c) 2022 Your Name'
+    github-username: yourusername
+```
+
+Additionally, `stack new` can automatically initialize source control
+repositories in the directories it creates.  Source control tools can be
+specified with the `scm-init` option. At the moment, only `git` is supported.
+
+```yaml
+templates:
+  scm-init: git
+```
+
+### urls
+
+Default:
+
+
+```yaml
+urls:
+  latest-snapshot: https://www.stackage.org/download/snapshots.json
+```
+
+Customize the URLs where Stack looks for snapshot build plans.
+
+### with-gcc
+
+Specify a path to GCC explicitly, rather than relying on the normal path
+resolution.
+
+```yaml
+with-gcc: /usr/local/bin/gcc-5
+```
+
+### with-hpack
+
+Use an Hpack executable, rather than the version the Hpack library built into
+Stack.
+
+```yaml
+with-hpack: /usr/local/bin/hpack
+```
+
+### work-dir
+
+(Since 0.1.10.0)
+
+Default: `.stack-work`
+
+This key specifies the relative path of Stack's 'work' directory. This can also
+be specified by an environment variable or on the command line. The earlier
+items in the list below take precedence:
+
+1. `--work-dir DIR` passed on the command line
+2. `work-dir` in a YAML configuration file
+3. `STACK_WORK` environment variable
