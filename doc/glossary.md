@@ -48,3 +48,4 @@ The following terms are used in Stack's documentation.
 |VS Code            |[Visual Studio Code](https://code.visualstudio.com/), a source code editor.|
 |Windows            |A group of operating systems developed by Microsoft.      |
 |WSL                |[Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/). Provides a Linux environment on Windows.|
+|YAML               |A human-friendly [data serialization language](https://yaml.org/).|
