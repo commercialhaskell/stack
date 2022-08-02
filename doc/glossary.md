@@ -9,6 +9,7 @@ The following terms are used in Stack's documentation.
 |Cabal              |The Haskell Common Architecture for Building Applications and Libraries, provided by the [`Cabal` package](https://hackage.haskell.org/package/Cabal). Also referred to as Cabal (the library) to distinguish it from Cabal (the tool).|
 |Cabal file|A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package.html) used by Cabal, named `<package_name>.cabal`.|
 |Cabal (the tool)|The Haskell build tool provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
+|CI                 |Continuous integration.                                   |
 |CMake              |A [system](https://cmake.org/) for managing build processes.|
 |`config.yaml`      |A non-project-specific configuration file used by Stack.  |
 |Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
@@ -47,3 +48,4 @@ The following terms are used in Stack's documentation.
 |VS Code            |[Visual Studio Code](https://code.visualstudio.com/), a source code editor.|
 |Windows            |A group of operating systems developed by Microsoft.      |
 |WSL                |[Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/). Provides a Linux environment on Windows.|
+|YAML               |A human-friendly [data serialization language](https://yaml.org/).|
