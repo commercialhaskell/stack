@@ -12,7 +12,7 @@ extra_css:
 extra_javascript:
 - js/searchhack.js
 
-pages:
+nav:
 - Home: README.md
 - Changelog: ChangeLog.md
 - Tool documentation:
