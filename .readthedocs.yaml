@@ -15,6 +15,6 @@ mkdocs:
   configuration: mkdocs.yml
 
 # Optionally declare the Python requirements required to build your docs
- python:
-    install:
-    - requirements: doc/requirements.txt
+python:
+  install:
+  - requirements: doc/requirements.txt
