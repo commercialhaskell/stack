@@ -1068,7 +1068,7 @@ jobs: 1
 
 ### work-dir
 
-Specifies relative path of work directory (default is `.stack-work`. This can
+Specifies relative path of work directory (default is `.stack-work`). This can
 also be specified by env var or cli flag, in particular, the earlier items in
 this list take precedence:
 
