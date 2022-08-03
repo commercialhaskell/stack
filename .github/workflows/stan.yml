@@ -12,33 +12,33 @@ jobs:
       matrix:
         cabal: ["3.6"]
         ghc:
-          - "8.10.7"
+        - "8.10.7"
 
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
 
-      - uses: haskell/actions/setup@v1
-        name: Setup GHC and cabal-install
-        with:
-          ghc-version: ${{ matrix.ghc }}
-          cabal-version: ${{ matrix.cabal }}
+    - uses: haskell/actions/setup@v1
+      name: Setup GHC and cabal-install
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: ${{ matrix.cabal }}
 
-      - uses: actions/cache@v2
-        name: cache ~/.cabal/store
-        with:
-          path: ~/.cabal/store
-          key: ${{ runner.os }}-${{ matrix.ghc }}-cabal
+    - uses: actions/cache@v2
+      name: cache ~/.cabal/store
+      with:
+        path: ~/.cabal/store
+        key: ${{ runner.os }}-${{ matrix.ghc }}-cabal
 
-      - name: update
-        run: cabal update
+    - name: update
+      run: cabal update
 
-      - name: install stan
-        run: cabal install stan --installdir=.bin --install-method=copy --overwrite-policy=always
+    - name: install stan
+      run: cabal install stan --installdir=.bin --install-method=copy --overwrite-policy=always
 
-      - name: generate .hie for analysis
-        run: cabal build stack:lib:stack
+    - name: generate .hie for analysis
+      run: cabal build stack:lib:stack
 
-      - name: stan
-        run: .bin/stan report
+    - name: stan
+      run: .bin/stan report
