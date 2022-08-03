@@ -18,6 +18,7 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Stack.Prelude
+import           Data.Coerce (coerce)
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -41,6 +42,7 @@ import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
+import           Stack.YamlUpdate
 
 data ConfigCmdSet
     = ConfigCmdSetResolver (Unresolved AbstractResolver)
@@ -77,22 +79,32 @@ cfgCmdSet cmd = do
                          PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> return (configUserConfigPath conf)
     -- We don't need to worry about checking for a valid yaml here
-    (config :: Yaml.Object) <-
-        liftIO (Yaml.decodeFileEither (toFilePath configFilePath)) >>= either throwM return
+    rawConfig <- mkRaw <$> liftIO (readFileUtf8 (toFilePath configFilePath))
+    (config :: Yaml.Object) <- either throwM return (Yaml.decodeEither' . encodeUtf8 $ coerce rawConfig)
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let cmdKey = cfgCmdSetOptionName cmd
 #if MIN_VERSION_aeson(2,0,0)
         config' = KeyMap.insert (Key.fromText cmdKey) newValue config
+        yamlKeys = Key.toText <$> KeyMap.keys config
 #else
         config' = HMap.insert cmdKey newValue config
+        yamlKeys = HMap.keys config
 #endif
     if config' == config
         then logInfo
                  (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains unchanged.")
         else do
-            writeBinaryFileAtomic configFilePath (byteString (Yaml.encode config'))
-            logInfo (fromString (toFilePath configFilePath) <> " has been updated.")
+            let configLines = yamlLines rawConfig
+            either
+                throwM
+                (\updated -> do
+                    let redressed = unmkRaw $ redress configLines updated
+                    writeBinaryFileAtomic configFilePath . byteString $ encodeUtf8 redressed
+
+                    let file = fromString $ toFilePath configFilePath
+                    logInfo (file <> " has been updated."))
+                (encodeInOrder configLines (coerce yamlKeys) (coerce cmdKey) config')
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)
