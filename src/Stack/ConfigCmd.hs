@@ -1,23 +1,53 @@
+{-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 -- | Make changes to project or global configuration.
 module Stack.ConfigCmd
-       (ConfigCmdSet(..)
+       (cfgCmdName
+
+       -- * config dump project
+       ,ConfigCmdDumpProject(..)
+       ,configCmdDumpProjectParser
+       ,cfgCmdDumpProject
+       ,cfgCmdDumpProjectName
+
+       -- * config dump stack
+       ,ConfigCmdDumpStack(..)
+       ,configCmdDumpStackParser
+       ,cfgCmdDumpStack
+       ,cfgCmdDumpStackName
+
+       -- * config get
+       ,ConfigCmdGet(..)
+       ,configCmdGetParser
+       ,cfgCmdGet
+       ,cfgCmdGetName
+
+       -- * config set
+       ,ConfigCmdSet(..)
        ,configCmdSetParser
        ,cfgCmdSet
        ,cfgCmdSetName
+
+       -- * config env
        ,configCmdEnvParser
        ,cfgCmdEnv
        ,cfgCmdEnvName
-       ,cfgCmdName) where
+       ) where
 
 import           Stack.Prelude
 import           Data.Coerce (coerce)
+import           Pantry.Internal.AesonExtended
+                 (ToJSON(..), FromJSON, (.=), WithJSONWarnings (WithJSONWarnings), object)
+import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.ByteString.Builder (byteString)
@@ -39,40 +69,190 @@ import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
 import           Stack.YamlUpdate
 
+data ConfigDumpFormat = ConfigDumpYaml | ConfigDumpJson
+
+-- | Dump project configuration settings.
+newtype ConfigCmdDumpProject = ConfigCmdDumpProject ConfigDumpFormat
+
+-- | Dump stack's own settings. Configuration related to its own opertion. This
+-- can be defaulted or stored in a global location or project location or both,
+-- in @~\/.stack\/config.yaml@ or @stack.yaml@.
+data ConfigCmdDumpStack = ConfigCmdDumpStack DumpStackScope ConfigDumpFormat
+
+-- | Get configuration items that can be individually set by `stack config set`.
+data ConfigCmdGet
+    = ConfigCmdGetResolver
+    | ConfigCmdGetSystemGhc CommandScope
+    | ConfigCmdGetInstallGhc CommandScope
+
+-- | Set the resolver for the project or set compiler-related configuration at
+-- project or global scope.
 data ConfigCmdSet
     = ConfigCmdSetResolver (Unresolved AbstractResolver)
-    | ConfigCmdSetSystemGhc CommandScope
-                            Bool
-    | ConfigCmdSetInstallGhc CommandScope
-                             Bool
+    | ConfigCmdSetSystemGhc CommandScope Bool
+    | ConfigCmdSetInstallGhc CommandScope Bool
 
+-- | Where to get the configuration settings from.
 data CommandScope
     = CommandScopeGlobal
-      -- ^ Apply changes to the global configuration,
-      --   typically at @~/.stack/config.yaml@.
+      -- ^ Apply changes to or get settings from the global configuration,
+      -- typically at @~\/.stack\/config.yaml@.
     | CommandScopeProject
-      -- ^ Apply changes to the project @stack.yaml@.
+      -- ^ Apply changes to or get settings from the project @stack.yaml@.
+
+-- | Where to get the configuration settings from.
+data DumpStackScope
+    = DumpStackScopeEffective
+      -- ^ A view of settings where those settings in the project but related to
+      -- stack's own operation override settings in the global location.
+    | DumpStackScopeGlobal
+      -- ^ Apply changes to or get settings from the global configuration,
+      -- typically at @~\/.stack\/config.yaml@.
+    | DumpStackScopeProject
+      -- ^ Apply changes to or get settings from the project @stack.yaml@.
+
+instance Display CommandScope where
+    display CommandScopeProject = "project"
+    display CommandScopeGlobal = "global"
+
+configCmdGetScope :: ConfigCmdGet -> CommandScope
+configCmdGetScope ConfigCmdGetResolver = CommandScopeProject
+configCmdGetScope (ConfigCmdGetSystemGhc scope) = scope
+configCmdGetScope (ConfigCmdGetInstallGhc scope) = scope
 
 configCmdSetScope :: ConfigCmdSet -> CommandScope
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
-cfgCmdSet
-    :: (HasConfig env, HasGHCVariant env)
-    => ConfigCmdSet -> RIO env ()
-cfgCmdSet cmd = do
+encodeDumpProject :: ConfigDumpFormat -> (Project -> ByteString)
+encodeDumpProject ConfigDumpYaml = Yaml.encode
+encodeDumpProject ConfigDumpJson = toStrictBytes . Aeson.encode
+
+encodeDumpStackBy :: ToJSON a => (Config -> a) -> ConfigCmdDumpStack -> (Config -> ByteString)
+encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpYaml) = Yaml.encode . f
+encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpJson) = toStrictBytes . Aeson.encode . f
+
+encodeDumpStack :: ConfigDumpFormat -> (DumpStack -> ByteString)
+encodeDumpStack ConfigDumpYaml = Yaml.encode
+encodeDumpStack ConfigDumpJson = toStrictBytes . Aeson.encode
+
+cfgReadProject :: (HasConfig env, HasLogFunc env) => CommandScope -> RIO env (Maybe Project)
+cfgReadProject scope = do
+    (configFilePath, yamlConfig) <- cfgRead scope
+    let parser = parseProjectAndConfigMonoid (parent configFilePath)
+    case Yaml.parseEither parser yamlConfig of
+        Left err -> do
+            logError . display $ T.pack err
+            return Nothing
+        Right (WithJSONWarnings res _warnings) -> do
+            ProjectAndConfigMonoid project _ <- liftIO res
+            return $ Just project
+
+cfgCmdDumpProject :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpProject -> RIO env ()
+cfgCmdDumpProject (ConfigCmdDumpProject dumpFormat) = do
+    project <- cfgReadProject CommandScopeProject
+    project & maybe (logError "Couldn't find project") (\p ->
+        encodeDumpProject dumpFormat p
+        & decodeUtf8'
+        & either throwM (logInfo . display))
+
+data DumpStack =
+    DumpStack
+        { dsInstallGHC :: !(Maybe Bool)
+        , dsSystemGHC  :: !(Maybe Bool)
+        }
+
+instance ToJSON DumpStack where
+    toJSON DumpStack{..} = object
+        [ "install-GHC" .= toJSON dsInstallGHC
+        , "system-GHC" .= toJSON dsSystemGHC
+        ]
+
+cfgCmdDumpStack :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpStack -> RIO env ()
+cfgCmdDumpStack cmd@(ConfigCmdDumpStack scope dumpFormat)
+    | DumpStackScopeEffective <- scope = cfgCmdDumpStackEffective cmd
+    | DumpStackScopeProject <- scope = cfgDumpStack CommandScopeProject dumpFormat
+    | DumpStackScopeGlobal <- scope = cfgDumpStack CommandScopeGlobal dumpFormat
+
+cfgDumpStack
+    :: (HasConfig env, HasLogFunc env)
+    => CommandScope -> ConfigDumpFormat -> RIO env ()
+cfgDumpStack scope dumpFormat = do
+    (configFilePath, yamlConfig) <- cfgRead scope
+    let parser = parseConfigMonoid (parent configFilePath)
+    case Yaml.parseEither parser yamlConfig of
+        Left err -> logError . display $ T.pack err
+        Right (WithJSONWarnings config _warnings) -> do
+            let dsSystemGHC = getFirst $ configMonoidSystemGHC config
+            let dsInstallGHC = getFirstTrue $ configMonoidInstallGHC config
+            
+            DumpStack{..}
+                & encodeDumpStack dumpFormat
+                & decodeUtf8'
+                & either throwM (logInfo . display)
+
+cfgCmdDumpStackEffective :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpStack -> RIO env ()
+cfgCmdDumpStackEffective cmd = do
     conf <- view configL
-    configFilePath <-
-             case configCmdSetScope cmd of
-                 CommandScopeProject -> do
-                     mstackYamlOption <- view $ globalOptsL.to globalStackYaml
-                     mstackYaml <- getProjectConfig mstackYamlOption
-                     case mstackYaml of
-                         PCProject stackYaml -> return stackYaml
-                         PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
-                 CommandScopeGlobal -> return (configUserConfigPath conf)
+    let f Config{..} =
+            DumpStack
+                { dsInstallGHC = Just configInstallGHC
+                , dsSystemGHC = Just configSystemGHC
+                }
+    conf
+        & encodeDumpStackBy f cmd
+        & decodeUtf8'
+        & either throwM (logInfo . display)
+
+cfgCmdGet :: (HasConfig env, HasLogFunc env) => ConfigCmdGet -> RIO env ()
+cfgCmdGet cmd = do
+    let logBool maybeValue = logInfo $
+            maybe "default" (display . T.toLower . T.pack . show) maybeValue
+
+    (configFilePath, yamlConfig) <- cfgRead (configCmdGetScope cmd)
+    let parser = parseProjectAndConfigMonoid (parent configFilePath)
+    case Yaml.parseEither parser yamlConfig of
+        Left err -> logError . display $ T.pack err
+        Right (WithJSONWarnings res _warnings) -> do
+            ProjectAndConfigMonoid project config <- liftIO res
+            cmd & \case
+                ConfigCmdGetResolver ->
+                    logInfo . display $ projectResolver project
+                ConfigCmdGetSystemGhc{} ->
+                    logBool (getFirst $ configMonoidSystemGHC config)
+                ConfigCmdGetInstallGhc{} ->
+                    logBool (getFirstTrue $ configMonoidInstallGHC config)
+
+-- | Configuration location for a scope. Typically:
+-- * at @~\/.stack\/config.yaml@ for global scope.
+-- * at @.\/stack.yaml@ by default or from the @--stack-yaml@ option for project scope.
+cfgLocation :: HasConfig s => CommandScope -> RIO s (Path Abs File)
+cfgLocation scope = do
+    conf <- view configL
+    case scope of
+        CommandScopeProject -> do
+            mstackYamlOption <- view $ globalOptsL.to globalStackYaml
+            mstackYaml <- getProjectConfig mstackYamlOption
+            case mstackYaml of
+                PCProject stackYaml -> return stackYaml
+                PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+                PCNoProject _extraDeps ->
+                    -- REVIEW: Maybe modify the ~/.stack/config.yaml file instead?
+                    throwString "config command used when no project configuration available"
+        CommandScopeGlobal -> return (configUserConfigPath conf)
+
+cfgRead :: (HasConfig s, FromJSON a) => CommandScope -> RIO s (Path Abs File, a)
+cfgRead scope = do
+    configFilePath <- cfgLocation scope
+
+    -- We don't need to worry about checking for a valid yaml here
+    liftIO (Yaml.decodeFileEither (toFilePath configFilePath)) >>=
+        either throwM (return . (configFilePath,))
+
+cfgCmdSet :: (HasConfig env, HasGHCVariant env) => ConfigCmdSet -> RIO env ()
+cfgCmdSet cmd = do
+    configFilePath <- cfgLocation $ configCmdSetScope cmd
     -- We don't need to worry about checking for a valid yaml here
     rawConfig <- mkRaw <$> liftIO (readFileUtf8 (toFilePath configFilePath))
     (config :: Yaml.Object) <- either throwM return (Yaml.decodeEither' . encodeUtf8 $ coerce rawConfig)
@@ -117,14 +297,50 @@ cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"
 cfgCmdSetOptionName (ConfigCmdSetSystemGhc _ _) = configMonoidSystemGHCName
 cfgCmdSetOptionName (ConfigCmdSetInstallGhc _ _) = configMonoidInstallGHCName
 
-cfgCmdName :: String
+cfgCmdName, cfgCmdGetName, cfgCmdSetName, cfgCmdEnvName :: String
+cfgCmdDumpProjectName, cfgCmdDumpStackName :: String
 cfgCmdName = "config"
-
-cfgCmdSetName :: String
+cfgCmdDumpProjectName = "dump-project"
+cfgCmdDumpStackName = "dump-stack"
+cfgCmdGetName = "get"
 cfgCmdSetName = "set"
-
-cfgCmdEnvName :: String
 cfgCmdEnvName = "env"
+
+configCmdDumpProjectParser :: OA.Parser ConfigCmdDumpProject
+configCmdDumpProjectParser = ConfigCmdDumpProject <$> dumpFormatFlag
+
+configCmdDumpStackParser :: OA.Parser ConfigCmdDumpStack
+configCmdDumpStackParser = ConfigCmdDumpStack <$> getDumpStackScope <*> dumpFormatFlag
+
+dumpFormatFlag :: OA.Parser ConfigDumpFormat
+dumpFormatFlag =
+    OA.flag
+        ConfigDumpYaml
+        ConfigDumpJson
+            (OA.long "json" <> OA.help "Dump the configuration as JSON instead of as YAML")
+
+configCmdGetParser :: OA.Parser ConfigCmdGet
+configCmdGetParser =
+    OA.hsubparser $
+    mconcat
+        [ OA.command
+              "resolver"
+              (OA.info
+                   (OA.pure ConfigCmdGetResolver)
+                   (OA.progDesc "Gets the configured resolver."))
+        , OA.command
+              (T.unpack configMonoidSystemGHCName)
+              (OA.info
+                   (ConfigCmdGetSystemGhc <$> getScopeFlag)
+                   (OA.progDesc
+                        "Gets whether stack should use a system GHC installation or not."))
+        , OA.command
+              (T.unpack configMonoidInstallGHCName)
+              (OA.info
+                   (ConfigCmdGetInstallGhc <$> getScopeFlag)
+                   (OA.progDesc
+                        "Gets whether stack should automatically install GHC when necessary."))
+        ]
 
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser = OA.hsubparser $
@@ -140,36 +356,51 @@ configCmdSetParser = OA.hsubparser $
                "Change the resolver of the current project."))
     , OA.command (T.unpack configMonoidSystemGHCName)
         ( OA.info
-            (ConfigCmdSetSystemGhc <$> scopeFlag <*> boolArgument)
+            (ConfigCmdSetSystemGhc <$> setScopeFlag <*> boolArgument)
             (OA.progDesc
                "Configure whether Stack should use a system GHC installation \
                \or not."))
     , OA.command (T.unpack configMonoidInstallGHCName)
         ( OA.info
-            (ConfigCmdSetInstallGhc <$> scopeFlag <*> boolArgument)
+            (ConfigCmdSetInstallGhc <$> setScopeFlag <*> boolArgument)
             (OA.progDesc
                "Configure whether Stack should automatically install GHC when \
                \necessary."))
     ]
 
-scopeFlag :: OA.Parser CommandScope
-scopeFlag = OA.flag
-  CommandScopeProject
-  CommandScopeGlobal
-  (  OA.long "global"
-  <> OA.help
-       "Modify the user-specific global configuration file ('config.yaml') \
-       \instead of the project-level configuration file ('stack.yaml')."
-  )
+getScopeFlag, setScopeFlag :: OA.Parser CommandScope
+getScopeFlag = scopeFlag "From"
+setScopeFlag = scopeFlag "Modify"
+
+getDumpStackScope :: OA.Parser DumpStackScope
+getDumpStackScope = OA.option readDumpStackScope
+    $ OA.long "lens"
+    <> OA.help "Which configuration to look at, project or global or effective (global with project overrides)."
+    <> OA.metavar "[project|global|effective]"
+
+scopeFlag :: String -> OA.Parser CommandScope
+scopeFlag action =
+    OA.flag
+        CommandScopeProject
+        CommandScopeGlobal
+        (OA.long "global" <>
+         OA.help
+             (action <>
+                " the user-specific global configuration file ('config.yaml') \
+                \instead of the project-level configuration file ('stack.yaml')."))
+
+readDumpStackScope :: OA.ReadM DumpStackScope
+readDumpStackScope = OA.str >>= \case
+    ("effective" :: String) -> return DumpStackScopeEffective
+    "project" -> return DumpStackScopeProject
+    "global" -> return DumpStackScopeGlobal
+    _ -> OA.readerError "Accepted scopes are 'effective', 'project' and 'global'."
 
 readBool :: OA.ReadM Bool
-readBool = do
-  s <- OA.readerAsk
-  case s of
+readBool = OA.readerAsk >>= \case
     "true" -> return True
     "false" -> return False
-    _ -> OA.readerError ("Invalid value " ++ show s ++
-           ": Expected \"true\" or \"false\"")
+    s -> OA.readerError ("Invalid value " ++ show s ++ ": Expected \"true\" or \"false\"")
 
 boolArgument :: OA.Parser Bool
 boolArgument = OA.argument
