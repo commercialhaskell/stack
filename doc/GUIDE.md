@@ -217,11 +217,11 @@ multi-package projects, which we'll elaborate on as this guide progresses.
 
 Another file important to the build is `package.yaml`.
 
-The `package.yaml` file is the preferred package format that is provided
-built-in by Stack through the [hpack tool](https://github.com/sol/hpack). The
-default behaviour is to generate the Cabal file (here named `helloworld.cabal`)
-from this `package.yaml` file, and accordingly you should **not** modify the
-Cabal file.
+The `package.yaml` file describes the package in the
+[Hpack](https://github.com/sol/hpack) format. Stack has in-built Hpack
+functionality and this is its preferred package format. The default behaviour is
+to generate the Cabal file (here named `helloworld.cabal`) from this
+`package.yaml` file, and accordingly you should **not** modify the Cabal file.
 
 It is also important to remember that Stack is built on top of the Cabal build
 system. Therefore, an understanding of the moving parts in Cabal are necessary.
@@ -233,7 +233,7 @@ language pragmas, and so on.
 
 In this guide, we'll discuss the bare minimum necessary to understand how to
 modify a `package.yaml` file. You can see a full list of the available options
-at the [hpack documentation](https://github.com/sol/hpack#quick-reference). The
+at the [Hpack documentation](https://github.com/sol/hpack#quick-reference). The
 Cabal User Guide the definitive reference for the
 [Cabal file format](https://cabal.readthedocs.io/en/stable/cabal-package.html).
 
