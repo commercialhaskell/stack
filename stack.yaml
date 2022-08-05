@@ -24,3 +24,11 @@ ghc-options:
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install
+
+user-message: |
+  If building Stack on macOS, you are advised to use stack-macos.yaml as the
+  project-level configuration file, and command:
+
+  stack --stack-yaml stack-macos.yaml build
+
+  See that configuration file for further information.
