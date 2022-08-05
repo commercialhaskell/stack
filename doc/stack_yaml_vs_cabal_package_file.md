@@ -1,18 +1,18 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# stack.yaml vs cabal package file
+# stack.yaml vs Cabal package file
 
 Due to their apparent overlap, the purpose of the following three files can be
 unclear:
 
 * `stack.yaml`
-* A cabal package file, e.g. `my-package.cabal`
+* A Cabal package file, e.g. `my-package.cabal`
 * `package.yaml`
 
 The last two are easy to explain: `package.yaml` is a file format supported by
-[hpack](https://github.com/sol/hpack#readme). It adds some niceties on top of
-cabal. For example, hpack has YAML syntax support and will automatically
-generate of `exposed-modules` lists. However, it's just a frontend to cabal
+[Hpack](https://github.com/sol/hpack#readme). It adds some niceties on top of
+Cabal. For example, Hpack has YAML syntax support and will automatically
+generate of `exposed-modules` lists. However, it's just a frontend to Cabal
 package files. So for this document, we're instead going to focus on the first
 two and try to answer:
 
@@ -26,12 +26,12 @@ _package_. A package has:
 * A name and version
 * 0 or 1 libraries
 * 0 or more executables
-* A cabal file (or, as mentioned above, an hpack `package.yaml` that
-  generates a cabal file)
+* A Cabal file (or, as mentioned above, an [Hpack](https://github.com/sol/hpack)
+  `package.yaml` file that generates a Cabal file)
 * And a bunch more
 
 The second to last bullet bears repeating: there's a 1-to-1 correspondence between
-packages and cabal files. 
+packages and cabal files.
 
 Stack is a build tool that works on top of the Cabal build system, and defines
 a new concept called a _project_. A project has:

@@ -1344,8 +1344,8 @@ with-gcc: /usr/local/bin/gcc-5
 
 ### with-hpack
 
-Use an Hpack executable, rather than the version the Hpack library built into
-Stack.
+Use an [Hpack](https://github.com/sol/hpack) executable, rather than Stack's
+in-built version of the Hpack functionality.
 
 ```yaml
 with-hpack: /usr/local/bin/hpack

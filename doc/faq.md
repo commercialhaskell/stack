@@ -556,9 +556,15 @@ Unfortunately `stack build` does not have an obvious equivalent to `cabal build 
 
 Yes:
 
-* If a package directory contains an Hpack `package.yaml` file, then Stack will use it to generate a `.cabal` file when building the package.
-* You can run `stack init` to initialize a `stack.yaml` file regardless of whether your packages are declared with `.cabal` files or with Hpack `package.yaml` files.
-* You can use the `with-hpack` configuration option to specify an Hpack executable to use instead of the Hpack bundled with Stack.
+* If a package directory contains an [Hpack](https://github.com/sol/hpack)
+  `package.yaml` file, then Stack will use it to generate a Cabal file when
+  building the package.
+* You can run `stack init` to initialize a `stack.yaml` file regardless of
+  whether your packages are declared with Cabal files or with Hpack
+  `package.yaml` files.
+* You can use the `with-hpack` YAML configuration or command line option to
+  specify an Hpack executable to use instead of Stack's in-built Hpack
+  functionality.
 
 ## How do I resolve linker errors when running `stack setup` or `stack build` on macOS?
 
