@@ -50,7 +50,5 @@ pages:
 - Glossary: glossary.md
 
 markdown_extensions:
-- codehilite:
-    guess_lang: false
 - toc:
     permalink: true
