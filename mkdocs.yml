@@ -20,7 +20,7 @@ pages:
   - User guide: GUIDE.md
   - FAQ: faq.md
   - Configuration (project and global): yaml_configuration.md
-  - stack.yaml vs cabal package files: stack_yaml_vs_cabal_package_file.md
+  - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
   - Stack and Visual Studio Code: Stack_and_VS_Code.md
   - Developing on Windows: developing_on_windows.md
