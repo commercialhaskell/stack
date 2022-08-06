@@ -32,7 +32,7 @@ you're not sure how, open an issue labeled "question".
 
 If you wish to understand the difference between a `stack.yaml` files and a
 Cabal file (named `<package_name>.cabal`), see
-[stack.yaml vs cabal package file](stack_yaml_vs_cabal_package_file.md).
+[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md).
 
 ## Project-specific configuration
 

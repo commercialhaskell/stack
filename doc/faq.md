@@ -67,7 +67,7 @@ directory. None of this should affect any existing Haskell tools at all.
   Stack will use Cabal via `setup`.
 
 For detail on the differences between a `stack.yaml` file and a Cabal file, see
-[stack.yaml vs Cabal package file](stack_yaml_vs_cabal_package_file.md).
+[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md).
 
 ## I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?
 
