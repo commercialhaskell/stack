@@ -5,6 +5,7 @@
     --package Cabal
     --package aeson
     --package bytestring
+    --package extra
     --package directory
     --package http-types
     --package process
@@ -13,7 +14,6 @@
     --package text
     --package zip-archive
     --package zlib
-    --package filepattern
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
