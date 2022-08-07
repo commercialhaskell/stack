@@ -5,7 +5,6 @@
     --package Cabal
     --package aeson
     --package bytestring
-    --package extra
     --package directory
     --package http-types
     --package process
@@ -43,7 +42,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as TarEntry
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
-import Data.List.Extra
 import Development.Shake
 import Development.Shake.FilePath
 import qualified System.Info as Info
