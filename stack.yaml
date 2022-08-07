@@ -4,6 +4,10 @@ resolver: nightly-2022-08-02
 packages:
 - .
 
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
+
 docker:
   enable: false
   repo: psibi/alpine-haskell-stack:9.2.4
@@ -20,10 +24,6 @@ flags:
 
 ghc-options:
   "$locals": -fhide-source-paths
-
-drop-packages:
-# See https://github.com/commercialhaskell/stack/pull/4712
-- cabal-install
 
 user-message: |
   If building Stack on macOS, you are advised to use stack-macos.yaml as the

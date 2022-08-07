@@ -9,9 +9,11 @@ on:
     - rc/**
     tags:
     - '**'
-  schedule:
-  - cron: "0 0 * * *"
   workflow_dispatch:
+
+# As of 11 August 2022, ubuntu-latest, windows-latest and macos-latest come with
+# Stack 2.7.5. windows-latest comes with NSIS 3.08, for which the default value
+# of the 'Unicode' installer attribute is 'true'.
 
 jobs:
   integration-tests:
@@ -26,28 +28,31 @@ jobs:
           cache-bust: ""
         - os: windows-latest
           release-args: ""
-          cache-bust: "12"
+          cache-bust: "13"
         - os: macos-latest
           release-args: ""
           cache-bust: "23"
     steps:
     - name: Clone project
-      uses: actions/checkout@v2
-    - name: Cache dependencies
-      uses: actions/cache@v1
+      uses: actions/checkout@v3
+    - name: Cache dependencies on Unix-like OS
+      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
+      uses: actions/cache@v3
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
+    - name: Cache dependencies on Windows
+      if: startsWith(runner.os, 'Windows')
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~\AppData\Roaming\stack
+          ~\AppData\Local\Programs\stack
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
     - name: Install deps and run checks
       shell: bash
       run: |
         set -ex
-
-        # Work around 'git status' always showing symlinks modified on Windows; see
-        # https://github.com/git-for-windows/git/issues/2653#issuecomment-640234081
-        git config --global core.fscache false
-
-        stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
@@ -60,9 +65,6 @@ jobs:
           . ~/.nix-profile/etc/profile.d/nix.sh
           nix-channel --add https://nixos.org/channels/nixos-22.05 nixpkgs
           nix-channel --update # Get GHC 8.2.2
-        elif [[ "${{ matrix.os }}" == "windows-latest" ]]
-        then
-          choco install nsis-unicode -y
         fi
 
         if [[ "${{ matrix.release-args }}" == "--alpine" ]]
