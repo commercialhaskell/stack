@@ -26,7 +26,7 @@ jobs:
           cache-bust: ""
         - os: windows-latest
           release-args: ""
-          cache-bust: "1"
+          cache-bust: "12"
         - os: macos-latest
           release-args: ""
           cache-bust: "23"
