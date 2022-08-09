@@ -47,10 +47,7 @@ extra-deps:
 - casa-client-0.0.1@sha256:7c254d0f21fa96c1e64fff027a479ba2e93b2d53bb1938b62dc63dc6018f12a1,892
 - casa-types-0.0.2@sha256:8257f0031665d0f132d9dceb28aed104e67a69448dddc2b9288ba9c9d49ab4f4,715
 - case-insensitive-1.2.1.0@sha256:9dfd3171fc7698cf8d931727d3af3a7b389135b583e46b5adac1f9d2026fff61,2244
-# A fork of cereal that builds on GHC 9.4.1
-- git: https://github.com/parsonsmatt/cereal.git
-  commit: b4acf0b778a1d5da305f4de013ce7f32b53d8282
-# - cereal-0.5.8.2@sha256:fe7d9a6426eacbe12351afe9642daedcb64fa29eda56118a65915f1c14df0d9a,2863
+- cereal-0.5.8.3@sha256:87a227c7b510217ea059db3dd59d9665edd8f0d1d3d8de39458e371a1d9402fb,2767
 - clock-0.8.3@sha256:a692159828c2cd278eaec317b3a7e9fb6d7b787c8a19f086004d15d9fa1fd72c,4601
 - cmdargs-0.10.21@sha256:a347cf8a16af30b9d8378209de0d1b7ac2b7b39e3af5d384383d8ef82315b37f,4241
 - colour-2.3.6@sha256:ebdcbf15023958838a527e381ab3c3b1e99ed12d1b25efeb7feaa4ad8c37664a,2378
