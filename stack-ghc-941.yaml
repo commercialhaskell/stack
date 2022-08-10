@@ -33,8 +33,8 @@ extra-deps:
 - base16-bytestring-1.0.2.0@sha256:64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a,2541
 - base64-bytestring-1.2.1.0@sha256:50ec0e229255d4c45cbdd568da011311b8887f304b931564886016f4984334d8,2396
 # A fork of basement that builds on GHC 9.4.1
-- git: https://github.com/mpilgrem/foundation.git
-  commit: def46ffe24fd2d1eb42bb0d5aa60d63577fa4d27
+- git: https://github.com/parsonsmatt/foundation.git
+  commit: 8166c31a115521f2ce5fabfba8247982979eeebf
   subdirs:
   - basement
 # - basement-0.0.14@sha256:d28a94225234a9895abbf88cdbf171fdea8cb478d718479f06522238b2cc7e74,5403
