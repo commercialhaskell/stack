@@ -730,6 +730,16 @@ The reason we have this structure is that:
 As you probably guessed, there can be multiple snapshot databases available. See
 the contents of the `snapshots` directory in the Stack root.
 
+* On Unix-like operating systems, each snapshot is in the last of a sequence of
+  three subdirectories named after the platform, a 256-bit hash of the source
+  map (how the package should be built -- including the compiler, options, and
+  immutable dependencies), and the GHC version.
+
+* On Windows, each snapshot is in a subdirectory that is a shorter hash (eight
+  characters) of the sequence of three directories used on Unix-like operating
+  systems. This is done to avoid problems created by default limits on file
+  path lengths on Windows systems.
+
 These snapshot databases don't get layered on top of each other; they are each
 used separately.
 
