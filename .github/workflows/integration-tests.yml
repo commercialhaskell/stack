@@ -69,6 +69,7 @@ jobs:
 
         if [[ "${{ matrix.release-args }}" == "--alpine" ]]
         then
+            mkdir -p ~/.stack
             touch ~/.stack/config.yaml
             cat > ~/.stack/config.yaml <<EOF
             extra-include-dirs:
