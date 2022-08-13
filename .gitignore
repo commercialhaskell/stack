@@ -1,33 +1,47 @@
+# Cabal and GHC build artefacts
+dist/
+dist-newstyle/
 *.hi
 *.o
-*.swp
-*.tag
-*~
-*_flymake.hs
-.hsenv
+
+# Haskell Tool Stack-related
 .stack-work/
-.stack-root/
-/.cabal-sandbox/
-TAGS
-/Setup
-cabal-dev/
-cabal.sandbox.config
-dist/
-tags
-/_release/
-.vagrant/
-*.imports
-/.idea/
-/*.iml
-/src/highlight.js
-/src/style.css
-/_site/
-/.dir-locals.el
-/.git/
-/etc/scripts/stack-scripts.cabal
-.hspec-failures
-better-cache/
-stack*.yaml.lock
-dist-newstyle/
+
+# Stack's GitHub workflow-related
+_release/
+
+# MkDocs-related
+_site/
+
+# Stan-related
 .hie
 stan.html
+
+# Emacs-related
+.dir-locals.el
+*_flymake.hs
+
+# Vim-related
+*.swp
+*.tag
+
+# IntelliJ IDE-related
+.idea/
+*.iml
+
+# hsenv-related
+.hsenv
+
+# Vagrant-related
+.vagrant/
+
+# HSpec-related
+.hspec-failures
+
+# Unexplained
+*~
+*.imports
+src/highlight.js
+src/style.css
+etc/scripts/stack-scripts.cabal
+better-cache/
