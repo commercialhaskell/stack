@@ -1,12 +1,15 @@
 name: stan
 
-on:
-  pull_request:
-  push:
-    branches:
-    - master
-    - stable
-    - rc/**
+# Disabled because Stan does not yet support GHC >= 9.0. See:
+# https://github.com/kowainik/stan/issues/423
+
+# on:
+#   pull_request:
+#   push:
+#     branches:
+#     - master
+#     - stable
+#     - rc/**
 
 jobs:
   build:
