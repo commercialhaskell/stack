@@ -6,6 +6,7 @@ dist-newstyle/
 
 # Haskell Tool Stack-related
 .stack-work/
+test/integration/tests/**/*.yaml.lock
 
 # Stack's GitHub workflow-related
 _release/
