@@ -101,6 +101,8 @@ runApp options inner = do
   stack <- canonicalizePath $ takeDirectory myPath </> "stack" ++ exeExt
   logInfo $ "Using stack located at " <> fromString stack
   proc stack ["--version"] runProcess_
+  logInfo $ "Using runghc located at " <> fromString runghc
+  proc runghc ["--version"] runProcess_
 
   let matchTest = case optMatch options of
         Nothing -> const True

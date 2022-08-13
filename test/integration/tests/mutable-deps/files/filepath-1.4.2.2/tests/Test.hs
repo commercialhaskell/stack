@@ -1,5 +1,5 @@
 
-module Test(main) where
+module Main where
 
 import System.Environment
 import TestGen
@@ -19,8 +19,8 @@ main = do
         putStrLn $ "Test " ++ show i ++ " of " ++ show total ++ ": " ++ msg
         res <- quickCheckWithResult stdArgs{chatty=False, maxSuccess=count} prop
         case res of
-            Success{} -> return Nothing
-            bad -> do putStrLn $ showOutput bad; putStrLn "TEST FAILURE!"; return $ Just (msg,bad)
+            Success{} -> pure Nothing
+            bad -> do putStrLn $ showOutput bad; putStrLn "TEST FAILURE!"; pure $ Just (msg,bad)
     if null bad then
         putStrLn $ "Success, " ++ show total ++ " tests passed"
      else do

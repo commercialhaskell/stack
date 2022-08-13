@@ -1,28 +1,8 @@
 {- stack script
-    --resolver lts-14.27
-    --install-ghc
+    --resolver nightly-2022-08-02
+    --extra-dep Cabal-3.6.3.0
     --ghc-options -Wall
-    --package Cabal
-    --package aeson
-    --package bytestring
-    --package case-insensitive
-    --package conduit
-    --package conduit-combinators
-    --package cryptohash
-    --package directory
-    --package extra
-    --package http-conduit
-    --package http-types
-    --package mime-types
-    --package process
-    --package resourcet
-    --package shake
-    --package tar
-    --package text
-    --package zip-archive
-    --package zlib
 -}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
@@ -30,15 +10,14 @@ import Control.Exception
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
+import Data.List.Extra
 import Data.Maybe
 import Distribution.PackageDescription.Parsec
 import Distribution.Text
 import Distribution.System
 import Distribution.Package
 import Distribution.PackageDescription hiding (options)
-#if MIN_VERSION_Cabal(3, 0, 0)
 import Distribution.Utils.ShortText (fromShortText)
-#endif
 import Distribution.Verbosity
 import System.Console.GetOpt
 import System.Directory
@@ -49,15 +28,10 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as TarEntry
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
-import Data.List.Extra
 import Development.Shake
 import Development.Shake.FilePath
+import qualified System.Info as Info
 import Prelude -- Silence AMP warning
-
-#if !MIN_VERSION_Cabal(3, 0, 0)
-fromShortText :: String -> String
-fromShortText = id
-#endif
 
 -- | Entrypoint.
 main :: IO ()
@@ -79,12 +53,16 @@ main =
             gHomeDir <- getHomeDirectory
 
             let gAllowDirty = False
+                platformArgs :: [String]
+                platformArgs = if Info.os == "darwin"
+                               then ["--stack-yaml", "stack-macos.yaml"]
+                               else []
                 Platform arch _ = buildPlatform
                 gArch = arch
                 gBinarySuffix = ""
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
-                gBuildArgs = ["--flag", "stack:-developer-mode"]
+                gBuildArgs = platformArgs <> ["--flag", "stack:-developer-mode"]
                 gStaticLinux = False
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags
@@ -185,11 +163,7 @@ rules global@Global{..} args = do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
-#if MIN_VERSION_zip_archive(0,3,0)
                         (dropFileName (dropDirectoryPrefix (releaseStageDir </> binaryName) stageFile))
-#else
-                        (dropDirectoryPrefix (releaseStageDir </> binaryName) stageFile)
-#endif
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
@@ -249,7 +223,7 @@ rules global@Global{..} args = do
         need [releaseDir </> binaryExeFileName]
         need [releaseDir </> binaryInstallerNSIFileName]
 
-        command_ [Cwd releaseDir] "c:\\Program Files (x86)\\NSIS\\Unicode\\makensis.exe"
+        command_ [Cwd releaseDir] "makensis.exe"
             [ "-V3"
             , binaryInstallerNSIFileName]
 
@@ -418,12 +392,6 @@ stackArgs Global{..} = ["--arch=" ++ display gArch, "--interleaved-output"]
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
 stackProgName = "stack"
-
--- | Linux distribution/version combination.
-data DistroVersion = DistroVersion
-    { dvDistro :: !String
-    , dvVersion :: !String
-    , dvCodeName :: !String }
 
 -- | Global values and options.
 data Global = Global

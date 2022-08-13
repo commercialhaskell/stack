@@ -9,9 +9,11 @@ on:
     - rc/**
     tags:
     - '**'
-  schedule:
-  - cron: "0 0 * * *"
   workflow_dispatch:
+
+# As of 11 August 2022, ubuntu-latest, windows-latest and macos-latest come with
+# Stack 2.7.5. windows-latest comes with NSIS 3.08, for which the default value
+# of the 'Unicode' installer attribute is 'true'.
 
 jobs:
   integration-tests:
@@ -26,19 +28,19 @@ jobs:
           cache-bust: ""
         - os: windows-latest
           release-args: ""
-          cache-bust: ""
+          cache-bust: "13"
         - os: macos-latest
           release-args: ""
-          cache-bust: "1"
+          cache-bust: "23"
     steps:
     - name: Clone project
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Cache dependencies on Unix-like OS
       if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
       uses: actions/cache@v3
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
     - name: Cache dependencies on Windows
       if: startsWith(runner.os, 'Windows')
       uses: actions/cache@v3
@@ -46,17 +48,11 @@ jobs:
         path: |
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
-        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}${{ matrix.cache-bust }}
-    - shell: bash
-      name: Install deps and run checks
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
+    - name: Install deps and run checks
+      shell: bash
       run: |
         set -ex
-
-        # Work around 'git status' always showing symlinks modified on Windows; see
-        # https://github.com/git-for-windows/git/issues/2653#issuecomment-640234081
-        git config --global core.fscache false
-
-        stack upgrade || curl -sSL https://get.haskellstack.org/ | sh -s - -f
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
@@ -65,13 +61,22 @@ jobs:
           # See:
           #   https://github.com/nh2/static-haskell-nix/pull/27#issuecomment-502652181
           #   https://github.com/NixOS/nix/issues/2733
-          (for i in {1..5}; do bash <(curl -sSL https://nixos.org/nix/install) && exit 0; done; exit 1)
+          (for i in {1..5}; do bash <(curl -sSL https://nixos.org/nix/install) --no-daemon && exit 0; done; exit 1)
           . ~/.nix-profile/etc/profile.d/nix.sh
-          nix-channel --add https://nixos.org/channels/nixos-19.09 nixpkgs
+          nix-channel --add https://nixos.org/channels/nixos-22.05 nixpkgs
           nix-channel --update # Get GHC 8.2.2
-        elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+        fi
+
+        if [[ "${{ matrix.release-args }}" == "--alpine" ]]
         then
-          choco install nsis-unicode -y
+            touch ~/.stack/config.yaml
+            cat > ~/.stack/config.yaml <<EOF
+            extra-include-dirs:
+            - /usr/include
+            extra-lib-dirs:
+            - /lib
+            - /usr/lib
+        EOF
         fi
 
         # Do this in the same step as installing deps to get relevant env var modifications
@@ -84,7 +89,7 @@ jobs:
       run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ runner.os }}
         path: _release/stack-*
@@ -96,17 +101,17 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
     - name: Download Linux artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: Linux
         path: _release
     - name: Download macOS artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: macOS
         path: _release
     - name: Download Windows artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: Windows
         path: _release

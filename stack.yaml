@@ -1,18 +1,16 @@
-resolver: lts-17.15
+# GHC 9.2.4
+resolver: nightly-2022-08-02
 
 packages:
 - .
 
-extra-deps:
-- hpack-0.35.0@rev:0
-- pantry-0.5.6@rev:0 # https://github.com/commercialhaskell/pantry/pull/53
-- rio-0.1.21.0@rev:0
-
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
 
 docker:
   enable: false
-  # repo: fpco/alpine-haskell-stack:8.10.4
-  repo: fpco/alpine-haskell-stack@sha256:1024fe4b3b082a8df64d00e8563b3151220ed90af09604a8f7e1d44040500c30
+  repo: psibi/alpine-haskell-stack:9.2.4
 
 nix:
   # --nix on the command-line to enable.
@@ -27,6 +25,10 @@ flags:
 ghc-options:
   "$locals": -fhide-source-paths
 
-drop-packages:
-# See https://github.com/commercialhaskell/stack/pull/4712
-- cabal-install
+user-message: |
+  If building Stack on macOS, you are advised to use stack-macos.yaml as the
+  project-level configuration file, and command:
+
+  stack --stack-yaml stack-macos.yaml build
+
+  See that configuration file for further information.

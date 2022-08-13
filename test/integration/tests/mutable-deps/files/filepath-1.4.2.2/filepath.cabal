@@ -1,19 +1,18 @@
-cabal-version:  >= 1.18
+cabal-version:  1.18
 name:           filepath
-version:        1.4.2.1
-x-revision: 1
+version:        1.4.2.2
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
 author:         Neil Mitchell <ndmitchell@gmail.com>
-maintainer:     Neil Mitchell <ndmitchell@gmail.com>
-copyright:      Neil Mitchell 2005-2018
+maintainer:     Julian Ospald <hasufell@posteo.de>
+copyright:      Neil Mitchell 2005-2020
 bug-reports:    https://github.com/haskell/filepath/issues
 homepage:       https://github.com/haskell/filepath#readme
 category:       System
 build-type:     Simple
 synopsis:       Library for manipulating FilePaths in a cross platform way.
-tested-with:    GHC==8.6.3, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2
+tested-with:    GHC==9.2.1, GHC==9.0.1, GHC==8.10.7, GHC==8.8.4, GHC==8.6.5, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2
 description:
     This package provides functionality for manipulating @FilePath@ values, and is shipped with both <https://www.haskell.org/ghc/ GHC> and the <https://www.haskell.org/platform/ Haskell Platform>. It provides three modules:
     .
@@ -27,8 +26,10 @@ description:
 
 extra-source-files:
     System/FilePath/Internal.hs
+    Makefile
 extra-doc-files:
     README.md
+    HACKING.md
     changelog.md
 
 source-repository head
@@ -49,7 +50,7 @@ library
         System.FilePath.Windows
 
     build-depends:
-        base >= 4 && < 4.14
+        base >= 4.9 && < 4.17
 
     ghc-options: -Wall
 
@@ -57,7 +58,6 @@ test-suite filepath-tests
     type: exitcode-stdio-1.0
     default-language: Haskell2010
     main-is: Test.hs
-    ghc-options: -main-is Test
     hs-source-dirs: tests
     other-modules:
         TestGen
@@ -65,4 +65,4 @@ test-suite filepath-tests
     build-depends:
         filepath,
         base,
-        QuickCheck >= 2.7 && < 2.13
+        QuickCheck >= 2.7 && < 2.15

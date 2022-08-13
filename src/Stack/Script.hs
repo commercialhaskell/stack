@@ -146,8 +146,9 @@ scriptCmd opts = do
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
             GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
-            bss <- sinkProcessStdout (toFilePath pkg)
-                ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+            -- https://github.com/haskell/process/issues/251
+            bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
+                ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
                           $ words

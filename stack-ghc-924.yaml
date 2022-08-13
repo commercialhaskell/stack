@@ -4,9 +4,13 @@ resolver: nightly-2022-08-02
 packages:
 - .
 
+drop-packages:
+# See https://github.com/commercialhaskell/stack/pull/4712
+- cabal-install
+
 docker:
   enable: false
-  repo: fpco/alpine-haskell-stack:8.10.4
+  repo: psibi/alpine-haskell-stack:9.2.4
 
 nix:
   # --nix on the command-line to enable.
@@ -20,7 +24,3 @@ flags:
 
 ghc-options:
   "$locals": -fhide-source-paths
-
-drop-packages:
-# See https://github.com/commercialhaskell/stack/pull/4712
-- cabal-install
