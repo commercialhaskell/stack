@@ -3,6 +3,12 @@
     --extra-dep Cabal-3.6.3.0
     --ghc-options -Wall
 -}
+
+-- The GitHub workflow `integration-tests.yml` works on all operating systems
+-- other than Windows without the `--extra-dep Cabal-3.6.3.0` above. However, on
+-- Windows, if it is omitted, then `stack release.hs` somehow calls on
+-- Cabal-3.8.1.0, which causes an error.
+
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
