@@ -89,7 +89,7 @@ jobs:
       run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ runner.os }}
         path: _release/stack-*
@@ -101,17 +101,17 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
     - name: Download Linux artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: Linux
         path: _release
     - name: Download macOS artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: macOS
         path: _release
     - name: Download Windows artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: Windows
         path: _release
