@@ -74,7 +74,7 @@ source-repository head
 custom-setup
   setup-depends:
       Cabal
-    , base >=4.13 && <5
+    , base >=4.16.3.0 && <5
     , filepath
 
 flag developer-mode
@@ -225,14 +225,14 @@ library
       src/
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -272,19 +272,19 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -348,14 +348,14 @@ executable stack
       src/main
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -395,19 +395,19 @@ executable stack
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -470,14 +470,14 @@ executable stack-integration-test
       test/integration/lib
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -518,20 +518,20 @@ executable stack-integration-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , optparse-generic
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -599,15 +599,15 @@ test-suite stack-test
       src/test
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
   build-depends:
-      Cabal
+      Cabal >=3.6.3.0
     , QuickCheck
-    , aeson
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -648,20 +648,20 @@ test-suite stack-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , raw-strings-qq
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , smallcheck
