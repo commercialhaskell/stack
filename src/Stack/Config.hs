@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -154,9 +153,6 @@ makeConcreteResolver (ARResolver r) = pure r
 makeConcreteResolver ar = do
     r <-
         case ar of
-#if !MIN_VERSION_GLASGOW_HASKELL(9,0,1,0)
-            ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
-#endif
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config

@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -18,15 +17,10 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Stack.Prelude
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
-#endif
 import           Data.ByteString.Builder (byteString)
 import qualified Data.Map.Merge.Strict as Map
-#if !MIN_VERSION_aeson(2,0,0)
-import qualified Data.HashMap.Strict as HMap
-#endif
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
@@ -81,11 +75,7 @@ cfgCmdSet cmd = do
         liftIO (Yaml.decodeFileEither (toFilePath configFilePath)) >>= either throwM return
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let cmdKey = cfgCmdSetOptionName cmd
-#if MIN_VERSION_aeson(2,0,0)
         config' = KeyMap.insert (Key.fromText cmdKey) newValue config
-#else
-        config' = HMap.insert cmdKey newValue config
-#endif
     if config' == config
         then logInfo
                  (fromString (toFilePath configFilePath) <>
