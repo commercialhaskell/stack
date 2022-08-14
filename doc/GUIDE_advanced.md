@@ -75,7 +75,17 @@ options for viewing only lts (`-l`) and nightly (`-n`) snapshots.
 
 ## The `stack sdist` command
 
-`stack sdist` generates an uploading tarball containing your package code.
+Hackage only accepts packages for uploading in a standard form, a compressed
+archive ('tarball') in the format produced by Cabal's `sdist` action.
+
+`stack sdist` generates an file for your package, in the format accepted by
+Hackage for uploads.
+
+By default, the command will check the package for common mistakes. This can be
+disabled with the flag `--ignore-check`.
+
+Setting the flag `--test-tarball` will cause Stack to attempt to build the
+resulting package, to test it.
 
 ## The `stack templates` command
 
