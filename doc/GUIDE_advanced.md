@@ -79,13 +79,15 @@ Hackage only accepts packages for uploading in a standard form, a compressed
 archive ('tarball') in the format produced by Cabal's `sdist` action.
 
 `stack sdist` generates an file for your package, in the format accepted by
-Hackage for uploads.
+Hackage for uploads. The command will report the location of the generated file.
+The location can be changed from the default using the
+`--tar-dir <path_to_directory` option.
 
 By default, the command will check the package for common mistakes. This can be
 disabled with the flag `--ignore-check`.
 
 Setting the flag `--test-tarball` will cause Stack to attempt to build the
-resulting package, to test it.
+resulting package archive, to test it.
 
 ## The `stack templates` command
 
