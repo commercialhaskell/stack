@@ -55,6 +55,8 @@ Bug fixes:
 * Fixed logic in `get_isa()` in `get-stack.sh` to exclude systems that don't
   have x86 in their `uname -m` output. See
   [5792](https://github.com/commercialhaskell/stack/issues/5792).
+* Fixed output of `stack ls snapshots local` on Windows, to behave like that on
+  Unix-like operating systems.
 
 ## v2.7.5
 
