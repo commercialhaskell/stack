@@ -73,6 +73,22 @@ project.
 view the remote snapshots using `stack ls snapshots remote`. It also supports
 options for viewing only lts (`-l`) and nightly (`-n`) snapshots.
 
+## The `stack ls stack-colors` command
+
+The British English spelling is also accepted (`stack ls stack-colours`).
+
+`stack ls stack-colors` will list all of Stack's output styles. A number of
+different formats for the output are available, see
+`stack ls stack-colors --help`.
+
+The default is a full report, with the equivalent SGR instructions and an
+example of the applied style. The latter can be disabled with flags `--no-sgr`
+and `--no-example`.
+
+The flag `--basic` specifies a more basic report, in the format that is accepted
+by Stack's command line option `--stack-colors` and the YAML configuration key
+`stack-colors`.
+
 ## The `stack sdist` command
 
 Hackage only accepts packages for uploading in a standard form, a compressed
@@ -81,7 +97,7 @@ archive ('tarball') in the format produced by Cabal's `sdist` action.
 `stack sdist` generates an file for your package, in the format accepted by
 Hackage for uploads. The command will report the location of the generated file.
 The location can be changed from the default using the
-`--tar-dir <path_to_directory` option.
+`--tar-dir <path_to_directory>` option.
 
 By default, the command will check the package for common mistakes. This can be
 disabled with the flag `--ignore-check`.
