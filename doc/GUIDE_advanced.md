@@ -6,6 +6,12 @@ Some of Stack's features will not be needed regularly or by all users. This part
 of the guide provides information about those features. Some of the features are
 complex and separate pages are dedicated to them.
 
+## The `stack build` command
+
+The `stack build` command is introduced in the first part of
+[Stack's user guide](GUIDE.md#the-stack-build-command). For further information
+about the command, see the [build command](build_command.md) documentation.
+
 ## The `stack dot` command
 
 If you'd like to get some insight into the dependency tree of your packages, you
