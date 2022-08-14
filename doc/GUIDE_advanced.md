@@ -18,6 +18,39 @@ If you'd like to get some insight into the dependency tree of your packages, you
 can use the `stack dot` command and Graphviz. More information is available in
 the [Dependency visualization](dependency_visualization.md) documentation.
 
+## The `stack ide` commands
+
+The `stack ide` commands provide information that may be of use in an
+integrated development environment (IDE). See `stack ide` for the available
+commands.
+
+## The `stack ide packages` command
+
+`stack ide packages` lists all available local packages that are loadable. By
+default, its output is sent to the standard error channel. This can be changed
+to the standard output channel with the `--stdout` flag.
+
+By default, the output is the package name (without its version). This can be
+changed to the full path to the package's Cabal file with the `--cabal-files`
+flag.
+
+## The `stack ide targets` command
+
+`stack ide targets` lists all available Stack targets. By default, its output is
+sent to the standard error channel. This can be changed to the standard output
+channel with the `--stdout` flag.
+
+For example, for the Stack project itself:
+
+~~~
+$ cd stack
+$ stack ide targets
+stack:lib
+stack:exe:stack
+stack:exe:stack-integration-test
+stack:test:stack-test
+~~~
+
 ## The `stack list` command
 
 `stack list [PACKAGE]...` list the version of the specified package(s) in a
