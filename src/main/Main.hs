@@ -197,9 +197,11 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          buildCmd
                          (buildOptsParser Install)
         addCommand' "uninstall"
-                    "DEPRECATED: This command performs no actions, and is present for documentation only"
+         (unwords [ "Show how to uninstall Stack. This command does not"
+                  , "itself uninstall Stack."
+                  ] )
                     uninstallCmd
-                    (many $ strArgument $ metavar "IGNORED")
+                    (pure())
         addBuildCommand' "test"
                          "Shortcut for 'build --test'"
                          buildCmd
@@ -575,15 +577,33 @@ buildCmd opts = do
         Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
         Build -> id -- Default case is just Build
 
-uninstallCmd :: [String] -> RIO Runner ()
-uninstallCmd _ = do
-    prettyErrorL
-      [ flow "stack does not manage installations in global locations."
-      , flow "The only global mutation stack performs is executable copying."
-      , flow "For the default executable destination, please run"
-      , PP.style Shell "stack path --local-bin"
-      ]
-    liftIO exitFailure
+-- | Display help for the uninstall command.
+uninstallCmd :: () -> RIO Runner ()
+uninstallCmd () = withConfig NoReexec $ do
+  stackRoot <- view stackRootL
+  programsDir <- view $ configL.to configLocalProgramsBase
+  localBinDir <- view $ configL.to configLocalBin
+  let toStyleDoc = PP.style Dir . fromString . toFilePath
+      stackRoot' = toStyleDoc stackRoot
+      programsDir' = toStyleDoc programsDir
+      localBinDir' = toStyleDoc localBinDir
+  prettyInfo $ vsep
+    [ flow "To uninstall Stack, it should be sufficient to delete:"
+    , hang 4 $ fillSep [flow "(1) the directory containing Stack's tools",
+      "(" <> softbreak <> programsDir' <> softbreak <> ");"]
+    , hang 4 $ fillSep [flow "(2) the Stack root directory",
+      "(" <> softbreak <> stackRoot' <> softbreak <> ");", "and"]
+    , hang 4 $ fillSep [flow "(3) the 'stack' executable file (see the output",
+      flow "of command", howToFindStack <> ",", flow "if Stack is on the PATH;",
+      flow "Stack is often installed in", localBinDir' <> softbreak <> ")."]
+    , fillSep [flow "You may also want to delete", PP.style File ".stack-work",
+      flow "directories in any Haskell projects that you have built."]
+    ]
+ where
+  styleShell = PP.style Shell
+  howToFindStack
+    | osIsWindows = styleShell "where.exe stack"
+    | otherwise   = styleShell "which stack"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
