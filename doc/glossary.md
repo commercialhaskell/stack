@@ -36,6 +36,7 @@ The following terms are used in Stack's documentation.
 |`package.yaml`     |A file that describes a package in the Hpack format.      |
 |Pantry             |A library for content-addressable Haskell package management, provided by the [`pantry` package](https://hackage.haskell.org/package/pantry). A dependency of Stack.|
 |PATH               |The `PATH` environment variable, specifying a list of directories searched for executable files.|
+|PVP                |The Haskell [Package Versioning Policy](https://pvp.haskell.org/), which tells developers of libraries how to set their version numbers.|
 |REPL               |An interactive (run-eval-print loop) programming environment.|
 |resolver           |A synonym for snapshot.                                   |
 |`Setup.hs`         |A project-specific file used by Cabal to perform setup tasks.|

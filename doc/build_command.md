@@ -4,11 +4,13 @@
 
 ## Overview
 
-The primary command you use in stack is build. This page describes the build
+The primary command you use in Stack is `build`. This page describes the `build`
 command's interface. The goal of the interface is to do the right thing for
-simple input, and allow a lot of flexibility for more complicated goals. See the
-[build command section of the user guide](GUIDE.md#the-build-command) for info
-beyond the CLI aspects of the build command.
+simple input, and allow a lot of flexibility for more complicated goals.
+
+See the introductory part of
+[Stack's user guide](GUIDE.md#the-stack-build-command) for an introduction to
+the command.
 
 ## Synonyms
 
@@ -24,17 +26,17 @@ synonyms in the `--help` output. These commands are:
 * `stack install` is the same as `stack build --copy-bins`
 
 The advantage of the synonym commands is that they're convenient and short. The
-advantage of the options is that they compose. For example, `stack build --test --copy-bins`
-will build libraries, executables, and test suites, run the test
-suites, and then copy the executables to your local bin path (more on this
-below).
+advantage of the options is that they compose. For example,
+`stack build --test --copy-bins` will build libraries, executables, and test
+suites, run the test suites, and then copy the executables to your local bin
+path (more on this below).
 
 ## Components
 
 Components are a subtle yet important point to how build operates under the
 surface. Every cabal package is made up of one or more components. It can have
 0 or 1 libraries, and then 0 or more of executable, test, and benchmark
-components. stack allows you to call out a specific component to be built, e.g.
+components. Stack allows you to call out a specific component to be built, e.g.
 `stack build mypackage:test:mytests` will build the `mytests` component of the
 `mypackage` package. `mytests` must be a test suite component.
 
@@ -46,21 +48,21 @@ the previous command will in fact build the `mytests` test suite *and* run it,
 even though you haven't used the `stack test` command or the `--test` option.
 (We'll get to what exactly `--test` does below.)
 
-This gives you a lot of flexibility in choosing what you want stack to do. You
+This gives you a lot of flexibility in choosing what you want Stack to do. You
 can run a single test component from a package, run a test component from one
 package and a benchmark from another package, etc.
 
 One final note on components: you can only control components for local
-packages, not dependencies. With dependencies, stack will *always* build the
+packages, not dependencies. With dependencies, Stack will *always* build the
 library (if present) and all executables, and ignore test suites and
 benchmarks. If you want more control over a package, you must add it to your
-`packages` setting in your stack.yaml file.
+`packages` setting in your project-level configuration file (`stack.yaml`).
 
 ## Target syntax
 
-In addition to a number of options (like the aforementioned `--test`), `stack build`
-takes a list of zero or more *targets* to be built. There are a number
-of different syntaxes supported for this list:
+In addition to a number of options (like the aforementioned `--test`),
+`stack build` takes a list of zero or more *targets* to be built. There are a
+number of different syntaxes supported for this list:
 
 *   *package*, e.g. `stack build foobar`, is the most commonly used target. It
     will try to find the package in the following locations: local packages,
@@ -80,7 +82,7 @@ of different syntaxes supported for this list:
     except instead of using the latest version from the index, the version
     specified is used.
 
-*   *component*. Instead of referring to an entire package and letting stack
+*   *component*. Instead of referring to an entire package and letting Stack
     decide which components to build, you select individual components from
     inside a package. This can be done for more fine-grained control over which
     test suites to run, or to have a faster compilation cycle. There are
@@ -88,7 +90,10 @@ of different syntaxes supported for this list:
 
     * `packagename:comptype:compname` is the most explicit. The available
       comptypes are `exe`, `test`, and `bench`.
-        * Side note: When any `exe` component is specified, all of the package's executable components will be built.  This is due to limitations in all currently released versions of Cabal.  See [issue#1046](https://github.com/commercialhaskell/stack/issues/1406)
+        * Side note: When any `exe` component is specified, all of the package's
+          executable components will be built. This is due to limitations in all
+          currently released versions of Cabal. See
+          [issue#1046](https://github.com/commercialhaskell/stack/issues/1406)
     * `packagename:compname` allows you to leave off the component type, as
       that will (almost?) always be redundant with the component name. For
       example, `stack build mypackage:mytestsuite`.
@@ -104,18 +109,18 @@ of different syntaxes supported for this list:
   will be treated as that. Explicitly starting your target with `./` can be a
   good way to avoid that, e.g. `stack build ./foo`
 
-Finally: if you provide no targets (e.g., running `stack build`), stack will
+Finally: if you provide no targets (e.g., running `stack build`), Stack will
 implicitly pass in all of your local packages. If you only want to target
-packages in the current directory or deeper, you can pass in `.`, e.g. `stack build .`.
+packages in the current directory or deeper, you can pass in `.`, e.g.
+`stack build .`.
 
 To get a list of the available targets in your project, use `stack ide targets`.
 
 ## Controlling what gets built
 
-Stack will automatically build the necessary
-dependencies. See the
-[build command section of the user guide](GUIDE.md#the-build-command) for
-details of how these dependencies get specified.
+Stack will automatically build the necessary dependencies. See the introductory
+part of [Stack's user guide](GUIDE.md#the-stack-build-command) for information
+about how these dependencies get specified.
 
 In addition to specifying targets, you can also control what gets built, or
 retained, with the following flags:
@@ -127,8 +132,8 @@ retained, with the following flags:
   necessary based on file dirtiness.
 
 * `--reconfigure`, to force reconfiguration even when it doesn't seem necessary
-  based on file dirtiness. This is sometimes useful with custom Setup.hs files,
-  in particular when they depend on external data files.
+  based on file dirtiness. This is sometimes useful with custom `Setup.hs`
+  files, in particular when they depend on external data files.
 
 * `--dry-run`, to build nothing and output information about the build plan.
 
@@ -172,11 +177,10 @@ example (which uses the [wai repository](https://github.com/yesodweb/wai/)):
 stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
 ```
 
-This command will:
+This command will start Stack up in file watch mode, waiting for files in your
+project to change. When first starting, and each time a file changes, it will do
+all of the following.
 
-* Start stack up in file watch mode, waiting for files in your project to
-  change. When first starting, and each time a file changes, it will do all of
-  the following.
 * Build the wai-extra package and its test suites
 * Build the `warp` executable
 * Build the warp package's doctest component (which, as you may guess, is a
@@ -207,4 +211,4 @@ To disable this behaviour, you can pass `--no-interleaved-output`, or add
     errors or warnings, to avoid problems of interleaved output and decrease
     console noise. If you would like to see this content instead, you can use
     the `--dump-logs` command line option, or add `dump-logs: all` to your
-    `stack.yaml` file.
+    YAML configuration file (`stack.yaml` or `config.yaml`).
