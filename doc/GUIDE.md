@@ -1175,18 +1175,17 @@ On Windows (with PowerShell):
     -a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
 
 While we're talking about paths, to wipe our Stack install completely, here's
-what needs to be removed:
+what typically needs to be removed:
 
-1. Delete the Stack root folder (see `stack path --stack-root`, before you
-   uninstall).
-2. On Windows, delete the folder containing Stack's tools (see
-   `stack path --programs`, before you uninstall), which is located outside of
-   the Stack root folder
-3. Delete the `stack` executable (see `which stack`, on Unix-like operating
+1. the Stack root folder (see `stack path --stack-root`, before you uninstall);
+2. on Windows, the folder containing Stack's tools (see `stack path --programs`,
+   before you uninstall), which is located outside of the Stack root folder; and
+3. the `stack` executable file (see `which stack`, on Unix-like operating
    systems, or `where.exe stack`, on Windows).
 
-You may also want to delete ``.stack-work`` folders in any Haskell projects that
-you have built using Stack.
+You may also want to delete `.stack-work` folders in any Haskell projects that
+you have built using Stack. The `stack uninstall` command provides information
+about how to uninstall Stack.
 
 ## The `stack exec` command
 

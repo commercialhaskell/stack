@@ -37,6 +37,7 @@ Other enhancements:
 * Add the possibility of a `sh` script to customise fully GHC installation. See
   [#5585](https://github.com/commercialhaskell/stack/pull/5585)
 * `tools` subcommand added to `stack ls`, to list stack's installed tools.
+* `stack uninstall` shows how to uninstall Stack.
 
 Bug fixes:
 
