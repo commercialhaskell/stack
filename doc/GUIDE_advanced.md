@@ -21,6 +21,7 @@ Stack's configuration. See `stack config` for the available commands.
 
 `stack config env` outputs a script that sets or unsets environment variables
 for a Stack environment. Flags modify the script that is output:
+
 * `--[no-]locals` (enabled by default) include/exclude local package information
 * `--[no-]ghc-package-path` (enabled by default) set `GHC_PACKAGE_PATH`
   environment variable or not
@@ -44,6 +45,7 @@ configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
 
 Known bug:
+
 * The command does not respect the order of the existing YAML configuration
   file.
 
@@ -57,6 +59,7 @@ available. A snapshot of `lts-19` will be translated into the most recent
 available in the `lts-19` sequence.
 
 Known bugs:
+
 * The command does not respect the presence of a `snapshot` key.
 * The command does not respect the order of the existing YAML configuration
   file.
@@ -69,6 +72,7 @@ configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
 
 Known bug:
+
 * The command does not respect the order of the existing YAML configuration
   file.
 
