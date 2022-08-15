@@ -11,7 +11,7 @@ The following terms are used in Stack's documentation.
 |Cabal (the tool)|The Haskell build tool provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
 |CI                 |Continuous integration.                                   |
 |CMake              |A [system](https://cmake.org/) for managing build processes.|
-|`config.yaml`      |A non-project-specific configuration file used by Stack.  |
+|`config.yaml`      |A global and non-project-specific configuration file used by Stack.|
 |Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
 |Emacs              |[GNU Emacs](https://www.gnu.org/software/emacs/), an extensible, customisable text editor.|
 |extra-deps         |Packages in addition to those in a snapshot, named after a key used in `stack.yaml` files.|
@@ -43,7 +43,7 @@ The following terms are used in Stack's documentation.
 |`Setup.hs`         |A project-specific file used by Cabal to perform setup tasks.|
 |snapshot           |A snapshot defines a GHC version, a set of packages, and build flags or other settings.|
 |Stack              |The Haskell Tool Stack project or its executable `stack`. |
-|`stack.yaml`       |A project-specific configuration file used by Stack.      |
+|`stack.yaml`       |A project-level configuration file used by Stack, which may also contain non-project-specific options.|
 |Stackage           |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
 |Stack root         |A directory in which Stack stores important files. See `stack path --stack-root`. On Windows, Stack also stores important files outside of the Stack root.|
 |Unix-like operating systems|Linux, FreeBSD and macOS.                         |
