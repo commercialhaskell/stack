@@ -32,6 +32,7 @@ extra-source-files:
     ChangeLog.md
     README.md
     stack.yaml
+    stack-macos.yaml
     doc/azure_ci.md
     doc/build_command.md
     doc/build_overview.md
@@ -47,6 +48,7 @@ extra-source-files:
     doc/ghcjs.md
     doc/glossary.md
     doc/GUIDE.md
+    doc/GUIDE_advanced.md
     doc/install_and_upgrade.md
     doc/lock_files.md
     doc/nix_integration.md
@@ -74,7 +76,7 @@ source-repository head
 custom-setup
   setup-depends:
       Cabal
-    , base >=4.13 && <5
+    , base >=4.16.3.0 && <5
     , filepath
 
 flag developer-mode
@@ -211,6 +213,7 @@ library
       Stack.Unpack
       Stack.Upgrade
       Stack.Upload
+      Stack.YamlUpdate
       System.Info.ShortPathName
       System.Permissions
       System.Process.Pager
@@ -223,16 +226,16 @@ library
       Paths_stack
   hs-source-dirs:
       src/
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -272,20 +275,20 @@ library
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , random
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -347,16 +350,16 @@ executable stack
       Paths_stack
   hs-source-dirs:
       src/main
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -396,20 +399,20 @@ executable stack
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , random
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -470,16 +473,16 @@ executable stack-integration-test
   hs-source-dirs:
       test/integration
       test/integration/lib
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Cabal
-    , aeson
+      Cabal >=3.6.3.0
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -520,21 +523,21 @@ executable stack-integration-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , optparse-generic
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , random
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , split
@@ -600,17 +603,17 @@ test-suite stack-test
       Paths_stack
   hs-source-dirs:
       src/test
-  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
   build-depends:
-      Cabal
+      Cabal >=3.6.3.0
     , QuickCheck
-    , aeson
+    , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
     , array
     , async
     , attoparsec
-    , base >=4.10 && <5
+    , base >=4.16.3.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client
@@ -651,21 +654,21 @@ test-suite stack-test
     , neat-interpolation
     , network-uri
     , open-browser
-    , optparse-applicative >=0.14.3.0
+    , optparse-applicative >=0.17.0.0
     , pantry >=0.5.6
     , path
     , path-io
-    , persistent <2.14
+    , persistent >=2.13.3.5 && <2.14
     , persistent-sqlite
     , persistent-template
     , pretty
     , primitive
-    , process
+    , process >=1.6.13.2
     , project-template
     , random
     , raw-strings-qq
     , retry
-    , rio >=0.1.21.0
+    , rio >=0.1.22.0
     , rio-prettyprint >=0.1.1.0
     , semigroups
     , smallcheck

@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-14.27
+    --resolver nightly-2022-08-02
     --install-ghc
     --package nsis
 -}
@@ -53,7 +53,7 @@ main = do
       [ Description "Add installation directory to user %PATH% to allow running Stack in the console."
       ] $ do
         setEnvVarPrepend HKCU "PATH" "$INSTDIR"
-        
+
     section "Set %STACK_ROOT% to recommended default"
       [ Description "Set %STACK_ROOT% to C:\\sr to workaround issues with long paths."
       ] $ do
@@ -80,7 +80,7 @@ main = do
       [ Description "Remove setting of %STACK_ROOT% to C:\\sr."
       ] $ do
         deleteEnvVar HKCU "STACK_ROOT"
-        
+
     section "un.Compilers installed by stack"
       [ Unselected
       , Description "Remove %LOCALAPPDATA%/Programs/stack, which contains compilers that have been installed by Stack."

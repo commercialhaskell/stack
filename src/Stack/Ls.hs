@@ -6,7 +6,6 @@
 module Stack.Ls
   ( lsCmd
   , lsParser
-  , listDependenciesCmd
   ) where
 
 import Control.Exception (throw)
@@ -30,6 +29,7 @@ import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
 import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
+import Stack.Constants (osIsWindows)
 import Stack.Dot
 import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
@@ -132,12 +132,10 @@ lsViewSnapCmd =
          OA.help "Only show nightly snapshots")
 
 lsSnapCmd :: OA.Mod OA.CommandFields LsCmds
-lsSnapCmd =
-    OA.command
-        "snapshots"
-        (OA.info
-             lsCmdOptsParser
-             (OA.progDesc "View local snapshot (default option)"))
+lsSnapCmd = OA.command "snapshots" $
+  OA.info lsCmdOptsParser $
+       OA.progDesc "View snapshots (local by default)"
+    <> OA.footer localSnapshotMsg
 
 lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
 lsDepsCmd =
@@ -254,7 +252,10 @@ handleLocal :: LsCmdOpts -> RIO Runner ()
 handleLocal lsOpts = do
     (instRoot :: Path Abs Dir) <- withConfig YesReexec $ withDefaultEnvConfig installationRootDeps
     isStdoutTerminal <- view terminalL
-    let snapRootDir = parent $ parent instRoot
+    let parentInstRoot = parent instRoot
+        snapRootDir
+          | osIsWindows = parentInstRoot
+          | otherwise   = parent parentInstRoot
     snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
     let snapData = L.sort snapData'
     case lsView lsOpts of
@@ -307,30 +308,30 @@ lsCmd lsOpts =
             case soptViewType of
                 Local -> handleLocal lsOpts
                 Remote -> handleRemote lsOpts
-        LsDependencies depOpts -> listDependenciesCmd False depOpts
+        LsDependencies depOpts -> listDependencies depOpts
         LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts
         LsTools toolsOpts -> withConfig NoReexec $ listToolsCmd toolsOpts
 
--- | List the dependencies
-listDependenciesCmd :: Bool -> ListDepsOpts -> RIO Runner ()
-listDependenciesCmd deprecated opts = do
-    when
-        deprecated
-        (logWarn
-             "DEPRECATED: Use ls dependencies instead. Will be removed in next major version.")
-    listDependencies opts
-
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
-lsViewLocalCmd =
-    OA.command
-        "local"
-        (OA.info (pure Local) (OA.progDesc "View local snapshot"))
+lsViewLocalCmd = OA.command "local" $
+  OA.info (pure Local) $
+       OA.progDesc "View local snapshots"
+    <> OA.footer localSnapshotMsg
 
 lsViewRemoteCmd :: OA.Mod OA.CommandFields LsView
-lsViewRemoteCmd =
-    OA.command
-        "remote"
-        (OA.info (pure Remote) (OA.progDesc "View remote snapshot"))
+lsViewRemoteCmd = OA.command "remote" $
+  OA.info (pure Remote) $
+       OA.progDesc "View remote snapshots"
+    <> OA.footer pagerMsg
+
+pagerMsg :: String
+pagerMsg =
+  "On a terminal, uses a pager, if one is available. Respects the PAGER \
+  \environment variable (subject to that, prefers pager 'less' to 'more')."
+
+localSnapshotMsg :: String
+localSnapshotMsg =
+  "A local snapshot is identified by a hash code. " <> pagerMsg
 
 -- | List stack's output styles
 listStylesCmd :: ListStylesOpts -> RIO Config ()

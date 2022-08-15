@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -18,9 +17,7 @@ import           Distribution.Compiler      (CompilerFlavor (..))
 import           Distribution.ModuleName    (ModuleName)
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
-#if MIN_VERSION_Cabal(3,4,0)
 import           Distribution.Types.ModuleReexport
-#endif
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.VersionRange (withinRange)
 import           Distribution.System        (Platform (..))
@@ -113,7 +110,7 @@ scriptCmd opts = do
     case shouldRun of
       YesRun -> exec exeName (soArgs opts)
       NoRun -> logInfo $ "Compilation finished, executable available at " <> fromString exeName
-  
+
   shortCut shouldRun shouldCompile file scriptDir =
     handleIO (const $ longWay shouldRun shouldCompile file scriptDir) $ do
       srcMod <- getModificationTime file
@@ -146,8 +143,9 @@ scriptCmd opts = do
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
             GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
-            bss <- sinkProcessStdout (toFilePath pkg)
-                ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+            -- https://github.com/haskell/process/issues/251
+            bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
+                ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
                           $ words
@@ -288,11 +286,7 @@ allExposedModules gpd = do
       mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
   pure $ case mlibrary  of
     Just lib -> PD.exposedModules lib ++
-#if MIN_VERSION_Cabal(3,4,0)
                 map moduleReexportName (PD.reexportedModules lib)
-#else
-                map PD.moduleReexportName (PD.reexportedModules lib)
-#endif
     Nothing  -> mempty
 
 -- | The Stackage project introduced the concept of hidden packages,

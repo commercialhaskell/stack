@@ -1,11 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Stack.Init
     ( initProject
@@ -13,15 +13,10 @@ module Stack.Init
     ) where
 
 import           Stack.Prelude
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap               as KeyMap
-#endif
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.Foldable                   as F
-#if !MIN_VERSION_aeson(2,0,0)
-import qualified Data.HashMap.Strict             as HM
-#endif
 import qualified Data.IntMap                     as IntMap
 import           Data.List.Extra                 (groupSortOn)
 import qualified Data.List.NonEmpty              as NonEmpty
@@ -184,20 +179,12 @@ renderStackYaml p ignoredPackages dupPackages =
            B.byteString headerHelp
         <> B.byteString "\n\n"
         <> F.foldMap (goComment o) comments
-#if MIN_VERSION_aeson(2,0,0)
         <> goOthers (o `KeyMap.difference` KeyMap.fromList comments)
-#else
-        <> goOthers (o `HM.difference` HM.fromList comments)
-#endif
         <> B.byteString footerHelp
         <> "\n"
 
     goComment o (name, comment) =
-#if MIN_VERSION_aeson(2,0,0)
         case (convert <$> KeyMap.lookup name o) <|> nonPresentValue name of
-#else
-        case (convert <$> HM.lookup name o) <|> nonPresentValue name of
-#endif
             Nothing -> assert (name == "user-message") mempty
             Just v ->
                 B.byteString comment <>
@@ -241,11 +228,7 @@ renderStackYaml p ignoredPackages dupPackages =
         | otherwise = ""
 
     goOthers o
-#if MIN_VERSION_aeson(2,0,0)
         | KeyMap.null o = mempty
-#else
-        | HM.null o = mempty
-#endif
         | otherwise = assert False $ B.byteString $ Yaml.encode o
 
     -- Per Section Help

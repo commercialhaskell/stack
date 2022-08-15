@@ -2,6 +2,28 @@
 
 _Note: below all `FilePath` values are unquoted, so `\\` really means two backslashes._
 
+## 1.4.2.2 *Dec 2021*
+
+This release is purely a documentation release, fixing the broken haddock links.
+
+### Affected users
+
+This release affects users who apply downstream patches to `System.FilePath.Internal`,
+since `System.FilePath.Posix` and `System.FilePath.Windows` are now generated via `make cpp`
+during development.
+
+To make your patch apply, either apply it to `System.FilePath.Posix` and `System.FilePath.Windows`
+instead or run `make cpp` after applying your patch.
+
+### Changes
+
+* Document relation between `joinPath` and `(</>)` wrt [#82](https://github.com/haskell/filepath/issues/82), [#82](https://github.com/haskell/filepath/issues/86)
+* Clarify that `normalise` does not remove `..` wrt [#86](https://github.com/haskell/filepath/issues/86)
+* Make clear that `equalFilePath` does not expand `..` wrt [#87](https://github.com/haskell/filepath/issues/87)
+* Fix haddock source links by manually cpping wrt [#81](https://github.com/haskell/filepath/issues/81)
+* Make export list in `System.FilePath` explicit to get haddocks on the landing module
+
+
 ## 1.4.2.1 *Jul 2018*
 
  * Bundled with GHC 8.6.1

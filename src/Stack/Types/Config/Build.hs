@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -35,18 +34,8 @@ module Stack.Types.Config.Build
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
-#if MIN_VERSION_Cabal(3,4,0)
 import           Distribution.Parsec (Parsec (..), simpleParsec)
 import           Distribution.Verbosity (Verbosity, normal, verbose)
-#else
-import qualified Distribution.Compat.CharParsing as P
-import           Distribution.Parsec (CabalParsing(..), Parsec (..)
-                   , simpleParsec)
-import           Distribution.Utils.Generic (isAsciiAlpha)
-import           Distribution.Verbosity (Verbosity, deafening, intToVerbosity
-                   , normal, silent, verbose, verboseCallSite, verboseCallStack
-                   , verboseMarkOutput, verboseNoWrap, verboseTimestamp)
-#endif
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
@@ -517,52 +506,4 @@ instance FromJSON CabalVerbosity where
     in  maybe errMsg pure (simpleParsec s)
 
 instance Parsec CabalVerbosity where
-
--- The Cabal package does not provide a Verbosity instance of Parsec before
--- Cabal-3.4.0.0. The code below is adapted from the instance provided in
--- Cabal-3.4.0.0.
-#if MIN_VERSION_Cabal(3,4,0)
-
   parsec = CabalVerbosity <$> parsec
-
-#else
-
-  parsec = CabalVerbosity <$> parsecVerbosity
-
-parsecVerbosity :: CabalParsing m => m Verbosity
-parsecVerbosity = parseIntVerbosity <|> parseStringVerbosity
- where
-  parseIntVerbosity = do
-    i <- P.integral
-    case intToVerbosity i of
-      Just v  -> return v
-      Nothing -> P.unexpected $ "Bad integral verbosity: " ++ show i ++
-                   ". Valid values are 0..3"
-
-  parseStringVerbosity = do
-    level <- parseVerbosityLevel
-    _ <- P.spaces
-    flags <- many (parseFlag <* P.spaces)
-    return $ foldl' (flip ($)) level flags
-
-  parseVerbosityLevel = do
-    token <- P.munch1 isAsciiAlpha
-    case token of
-      "silent"    -> return silent
-      "normal"    -> return normal
-      "verbose"   -> return verbose
-      "debug"     -> return deafening
-      "deafening" -> return deafening
-      _           -> P.unexpected $ "Bad verbosity level: " ++ token
-
-  parseFlag = do
-    _ <- P.char '+'
-    token <- P.munch1 isAsciiAlpha
-    case token of
-      "callsite"   -> return verboseCallSite
-      "callstack"  -> return verboseCallStack
-      "nowrap"     -> return verboseNoWrap
-      "markoutput" -> return verboseMarkOutput
-      "timestamp"  -> return verboseTimestamp
-      _            -> P.unexpected $ "Bad verbosity flag: " ++ token
-#endif

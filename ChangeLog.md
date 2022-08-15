@@ -37,6 +37,7 @@ Other enhancements:
 * Add the possibility of a `sh` script to customise fully GHC installation. See
   [#5585](https://github.com/commercialhaskell/stack/pull/5585)
 * `tools` subcommand added to `stack ls`, to list stack's installed tools.
+* `stack uninstall` shows how to uninstall Stack.
 
 Bug fixes:
 
@@ -55,6 +56,8 @@ Bug fixes:
 * Fixed logic in `get_isa()` in `get-stack.sh` to exclude systems that don't
   have x86 in their `uname -m` output. See
   [5792](https://github.com/commercialhaskell/stack/issues/5792).
+* Fixed output of `stack ls snapshots local` on Windows, to behave like that on
+  Unix-like operating systems.
 * Fix non-deterministic test failures when executing a test suite for a
   multi-project repository with parallelism enabled. See
   [#5024](https://github.com/commercialhaskell/stack/issues/5024)

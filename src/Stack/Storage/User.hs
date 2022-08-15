@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -13,6 +12,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
@@ -53,9 +53,6 @@ import System.Posix.Types (COff (..))
 import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
 
 share [ mkPersist sqlSettings
-#if !MIN_VERSION_persistent(2,13,0)
-      , mkDeleteCascade sqlSettings
-#endif
       , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
@@ -71,21 +68,13 @@ PrecompiledCacheParent sql="precompiled_cache"
   deriving Show
 
 PrecompiledCacheSubLib
-#if MIN_VERSION_persistent(2,13,0)
   parent PrecompiledCacheParentId sql="precompiled_cache_id" OnDeleteCascade
-#else
-  parent PrecompiledCacheParentId sql="precompiled_cache_id"
-#endif
   value FilePath sql="sub_lib"
   UniquePrecompiledCacheSubLib parent value
   deriving Show
 
 PrecompiledCacheExe
-#if MIN_VERSION_persistent(2,13,0)
   parent PrecompiledCacheParentId sql="precompiled_cache_id" OnDeleteCaseCascade
-#else
-  parent PrecompiledCacheParentId sql="precompiled_cache_id"
-#endif
   value FilePath sql="exe"
   UniquePrecompiledCacheExe parent value
   deriving Show

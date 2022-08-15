@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -41,9 +40,6 @@ import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
-#if !MIN_VERSION_Cabal(3,4,0)
-import qualified Distribution.Types.UnqualComponentName as Cabal
-#endif
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)

@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -19,9 +18,7 @@ module Stack.New
 import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson as A
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as KeyMap
-#endif
 import qualified Data.ByteString.Base64 as B64
 import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
@@ -44,9 +41,6 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
-#if !MIN_VERSION_aeson(2,0,0)
-import qualified RIO.HashMap as HM
-#endif
 import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
@@ -215,11 +209,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
     , tplExtract = \bs -> do
         decodedJson <- eitherDecode (LB.fromStrict bs)
         case decodedJson of
-#if MIN_VERSION_aeson(2,0,0)
           Object o | Just (String content) <- KeyMap.lookup "content" o -> do
-#else
-          Object o | Just (String content) <- HM.lookup "content" o -> do
-#endif
                        let noNewlines = T.filter (/= '\n')
                        bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)
                        mapLeft show $ decodeUtf8' bsContent

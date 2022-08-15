@@ -3,6 +3,10 @@ name: Linting
 on:
   pull_request:
   push:
+    branches:
+    - master
+    - stable
+    - rc/**
 
 jobs:
   style:
