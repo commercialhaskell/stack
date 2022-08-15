@@ -12,6 +12,66 @@ The `stack build` command is introduced in the first part of
 [Stack's user guide](GUIDE.md#the-stack-build-command). For further information
 about the command, see the [build command](build_command.md) documentation.
 
+## The `stack config` commands
+
+The `stack config` commands provide assistence with accessing or modifying
+Stack's configuration. See `stack config` for the available commands.
+
+## The `stack config env` command
+
+`stack config env` outputs a script that sets or unsets environment variables
+for a Stack environment. Flags modify the script that is output:
+* `--[no-]locals` (enabled by default) include/exclude local package information
+* `--[no-]ghc-package-path` (enabled by default) set `GHC_PACKAGE_PATH`
+  environment variable or not
+* `--[no-]stack-exe` (enabled by default) set `STACK_EXE` environment variable
+  or not
+* `--[no-]locale-utf8` (disabled by default) set the `GHC_CHARENC`
+  environment variable to `UTF-8` or not
+* `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
+  environment variable
+
+## The `stack config set` commands
+
+The `stack config set` commands allow the values of keys in YAML configuration
+files to be set. See `stack config set` for the available keys.
+
+## The `stack config set install-ghc` command
+
+`stack config set install-ghc true` or `false` sets the `install-ghc` key in a
+YAML configuration file, accordingly. By default, the project-level
+configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
+user-specific global configuration file (`config.yaml`).
+
+Known bug:
+* The command does not respect the order of the existing YAML configuration
+  file.
+
+## The `stack config set resolver` command
+
+`stack config set resolver <snapshot>` sets the `resolver` key in the
+project-level configuration file (`stack.yaml`).
+
+A snapshot of `lts` or `nightly` will be translated into the most recent
+available. A snapshot of `lts-19` will be translated into the most recent
+available in the `lts-19` sequence.
+
+Known bugs:
+* The command does not respect the presence of a `snapshot` key.
+* The command does not respect the order of the existing YAML configuration
+  file.
+
+## The `stack config set system-ghc` command
+
+`stack config set system-ghc true` or `false` sets the `system-ghc` key in a
+YAML configuration file, accordingly. By default, the project-level
+configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
+user-specific global configuration file (`config.yaml`).
+
+Known bug:
+* The command does not respect the order of the existing YAML configuration
+  file.
+
 ## The `stack dot` command
 
 If you'd like to get some insight into the dependency tree of your packages, you
