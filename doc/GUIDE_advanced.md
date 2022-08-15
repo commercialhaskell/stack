@@ -89,6 +89,30 @@ The flag `--basic` specifies a more basic report, in the format that is accepted
 by Stack's command line option `--stack-colors` and the YAML configuration key
 `stack-colors`.
 
+## The `stack ls tools` command
+
+`stack ls tools` will list Stack's installed tools. On Unix-like operating
+systems, they will be one or more versions of GHC. On Windows, they will include
+MSYS2. For example, on Windows:
+
+~~~
+$ stack ls tools
+ghc-9.4.1
+ghc-9.2.4
+ghc-9.0.2
+msys2-20210604
+~~~
+
+The `--filter <tool_name>` option will filter the output by a tool name (e.g.
+'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example:
+
+~~~
+$ stack ls tools --filter ghc
+ghc-9.4.1
+ghc-9.2.4
+ghc-9.0.2
+~~~
+
 ## The `stack sdist` command
 
 Hackage only accepts packages for uploading in a standard form, a compressed
