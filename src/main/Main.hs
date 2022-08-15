@@ -397,7 +397,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
             "Subcommands for accessing and modifying configuration values"
             (do
                addCommand' ConfigCmd.cfgCmdSetName
-                          "Sets a field in the project's stack.yaml to value"
+                          "Sets a key in YAML configuration file to value"
                           (withConfig NoReexec . cfgCmdSet)
                           configCmdSetParser
                addCommand' ConfigCmd.cfgCmdEnvName
