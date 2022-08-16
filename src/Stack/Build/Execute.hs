@@ -1935,7 +1935,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 -- Add a random suffix to avoid conflicts between parallel jobs
                 -- See https://github.com/commercialhaskell/stack/issues/5024
                 randomInt <- liftIO (randomIO :: IO Int)
-                let randomSuffix = "." <> (show $ abs randomInt)
+                let randomSuffix = "." <> show (abs randomInt)
                 fp <- toFilePath <$> addExtension randomSuffix fp'
                 let snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
                     localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
