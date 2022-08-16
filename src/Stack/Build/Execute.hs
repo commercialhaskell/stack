@@ -95,6 +95,7 @@ import           System.PosixCompat.Files (createLink, modificationTime, getFile
 import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
+import           System.Random (randomIO)
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -1930,8 +1931,13 @@ singleTest topts testsToRun ac ee task installedMap = do
                 let setEnv f pc = modifyEnvVars pc $ \envVars ->
                       Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePath buildDir) $
                       Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
-                    fp = toFilePath $ eeTempDir ee </> testGhcEnvRelFile
-                    snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
+                    fp' = eeTempDir ee </> testGhcEnvRelFile
+                -- Add a random suffix to avoid conflicts between parallel jobs
+                -- See https://github.com/commercialhaskell/stack/issues/5024
+                randomInt <- liftIO (randomIO :: IO Int)
+                let randomSuffix = "." <> show (abs randomInt)
+                fp <- toFilePath <$> addExtension randomSuffix fp'
+                let snapDBPath = toFilePathNoTrailingSep (bcoSnapDB $ eeBaseConfigOpts ee)
                     localDBPath = toFilePathNoTrailingSep (bcoLocalDB $ eeBaseConfigOpts ee)
                     ghcEnv =
                         "clear-package-db\n" <>

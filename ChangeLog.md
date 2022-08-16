@@ -58,6 +58,9 @@ Bug fixes:
   [5792](https://github.com/commercialhaskell/stack/issues/5792).
 * Fixed output of `stack ls snapshots local` on Windows, to behave like that on
   Unix-like operating systems.
+* Fix non-deterministic test failures when executing a test suite for a
+  multi-project repository with parallelism enabled. See
+  [#5024](https://github.com/commercialhaskell/stack/issues/5024)
 
 ## v2.7.5
 
