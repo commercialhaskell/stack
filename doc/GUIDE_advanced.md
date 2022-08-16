@@ -44,11 +44,6 @@ YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
 
-Known bug:
-
-* The command does not respect the order of the existing YAML configuration
-  file.
-
 ## The `stack config set resolver` command
 
 `stack config set resolver <snapshot>` sets the `resolver` key in the
@@ -58,11 +53,9 @@ A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-19` will be translated into the most recent
 available in the `lts-19` sequence.
 
-Known bugs:
+Known bug:
 
 * The command does not respect the presence of a `snapshot` key.
-* The command does not respect the order of the existing YAML configuration
-  file.
 
 ## The `stack config set system-ghc` command
 
@@ -70,11 +63,6 @@ Known bugs:
 YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
-
-Known bug:
-
-* The command does not respect the order of the existing YAML configuration
-  file.
 
 ## The `stack dot` command
 
