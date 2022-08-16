@@ -331,29 +331,17 @@ do_alpine_install() {
 }
 
 # KaOS distro install
-
 do_kaos_install() {
+  install_dependencies() {
+    kcp_install_pkgs libtinfo
+  }
+  install_dependencies
+  if is_x86_64 ; then
+    print_bindist_notice
     install_x86_64_linux_binary
-    while true; do
-     printf "For stack to work in KaOS is it fundamental to install libtinfo.\nDo you like to do that?" 
-     read -p " y or n: " yn
-    case $yn in
-        [Yy]*)  printf "\e[1;31m Do not edit the PKGBUILD\e[0m " && kcp -u && kcp -i libtinfo; break;;
-        [Nn]*)  break;;
-        *) printf "Please answer with y or n. ";;
-      esac
-    done
-
-    while true; do
-      echo
-      printf  "To be detectable by IDEs and other applications is it recommended to symlink \e[34mGHC\e[0m to the PATH.\nDo you like to do that?" 
-      read -p " y or n: " yn
-    case $yn in
-        [Yy]*)  sudo ln -s /home/$USER/.stack/programs/x86_64-linux/ghc-tinfo6-8.8.4/bin/ghc /usr/bin; break;;
-        [Nn]*)  exit;;
-        *) printf "Please answer with y or n. ";;
-      esac
-    done
+  else
+    die "The impossible happened. Non-x86_64 system detected for KaOS."
+  fi
 }
 
 # Attempts to install on unsupported Linux distribution by downloading
@@ -435,8 +423,8 @@ distro_info() {
         echo "arch;" # n.b. Version is not available in /etc/issue on Arch
         ;;
       "KaOS"*)
-        echo "kaos;" # no version used, rolling release. 
-        ;;  
+        echo "kaos;" # no version used, rolling release.
+        ;;
       "Ubuntu"*)
         echo "ubuntu;$(perl -ne 'if(/Ubuntu (\d+\.\d+)/) { print $1; }' < /etc/issue)"
         ;;
@@ -679,6 +667,13 @@ pkg_install_pkgs() {
     if ! sudocmd "install required system dependencies" pkg install -y "$@"; then
         die "\nInstalling pkg packages failed.  Please run 'pkg update' and try again."
     fi
+}
+
+# Install packages using kcp
+kcp_install_pkgs() {
+  if ! sudocmd "install required system dependency" kcp -i $@; then
+    die "\nInstalling kcp package failed.  Please run 'kcp --update-database' and try again."
+  fi
 }
 
 # Get installed Stack version, if any
