@@ -113,7 +113,6 @@ you. Once you have tested and confirmed that the issue is resolved, close the
 issue. If you are not a member of the project, you will be asked for
 confirmation and we will close it.
 
-
 ## Documentation
 
 The files which make up Stack's documentation are located in the `doc`
@@ -142,10 +141,19 @@ released.
 The Markdown syntax supported by MkDocs can differ from the GitHub Flavored
 Markdown ([GFM](https://github.github.com/gfm/)) supported for content on
 GitHub.com. Please refer to the
-[MkDocs documentation](https://www.mkdocs.org/user-guide/writing-your-docs/#writing-with-markdown) 
+[MkDocs documentation](https://www.mkdocs.org/user-guide/writing-your-docs/#writing-with-markdown)
 to ensure your pull request will achieve the desired rendering.
 
 The configuration file for MkDocs is `mkdocs.yml`.
+
+The files in the `doc` directory of the repository include two symbolic links
+(symlinks), `ChangeLog.md` and `CONTRIBUTING.md`. Users of Git on Windows should
+be aware of its approach to symbolic links. See the
+[Git for Windows Wiki](https://github.com/git-for-windows/git/wiki/Symbolic-Links).
+If `git config --show-scope --show-origin core.symlinks` is `false` in a local
+repository on Windows, then the files will be checked out as small plain files
+that contain the link text  See the
+[Git documentation](https://git-scm.com/docs/git-config#Documentation/git-config.txt-coresymlinks).
 
 ## Code
 
