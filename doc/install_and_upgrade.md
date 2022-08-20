@@ -114,6 +114,27 @@ see the linked FAQ entries:
 If you are on macOS 10.12 (Sierra) and encounter GHC panic while building, see
 this [issue](https://github.com/commercialhaskell/stack/issues/2577)
 
+
+On Apple silicon chip (`aarch64`/`arm64` architectures), the installation for stack itself or some packages (e.g. `network`) requiring C source compilation might fail with
+`configure: error: C compiler cannot build executables.` in which case you should pass `-arch arm64` as part of
+the `CFLAGS` environment variable, which will be then picked up by the c compiler of your choice.
+
+```bash
+# Assuming BASH below
+
+# passing CFLAGS in-line with the command involving the error
+CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
+CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
+
+# -- OR --
+
+# ~/.bash_profile
+# NOTE: only do this if you do not have to cross-compile or remember to unset CFLAGS when needed
+export CFLAGS="-arch arm64 ${CFLAGS:-}"
+```
+
+This instructs the C compiler to compile objects for `arm64`, which would be then successfully linked with the libraries built for `arm64`, otherwise the c compiler, invoked by `cabal` running in `x86_64`, would compile x86_64 objects and attempt to link them with existing arm64 libraries and resulting in the error above.
+
 ## Ubuntu
 
 Use the [generic Linux option](#linux).
