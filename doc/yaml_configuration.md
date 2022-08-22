@@ -666,7 +666,7 @@ compiler's binary directory - will take precedence over those specified here
 Specify a specialized architecture bindist to use.  Normally this is
 determined automatically, but you can override the autodetected value here.
 Possible arguments include `standard`, `gmp4`, `nopie`, `tinfo6`,
-`tinfo6-nopie`, `ncurses6`, and `integersimple`.
+`tinfo6-nopie`, `ncurses6`, `int-native` and `integersimple`.
 
 ### ghc-options
 
@@ -710,6 +710,10 @@ Default: `standard`
 Specify a variant binary distribution of GHC to use. Known values:
 
 * `standard`: Use the standard GHC binary distribution
+* `int-native`: From GHC 9.4.1, use a GHC bindist that uses the Haskell-native
+   big-integer
+  [backend](https://downloads.haskell.org/~ghc/9.0.2/docs/html/users_guide/9.0.1-notes.html#highlights).
+  For further information, see this [article](https://iohk.io/en/blog/posts/2020/07/28/improving-haskells-big-numbers-support/).
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
