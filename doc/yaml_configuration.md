@@ -31,8 +31,8 @@ identify any inaccuracies or incompleteness, please update the page, and if
 you're not sure how, open an issue labeled "question".
 
 If you wish to understand the difference between a `stack.yaml` files and a
-Cabal file (named `<package_name>.cabal`), see
-[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md).
+Cabal file (named `<package_name>.cabal`), see the
+[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md) documentation.
 
 ## Project-specific configuration
 
@@ -70,15 +70,15 @@ four resolver types:
 * Stackage Nightly snapshots, e.g. `resolver: nightly-2002-08-04`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `resolver: ghc-9.2.4`
-* Custom snapshot, via a URL or relative file path. (See
-  [pantry docs](pantry.md) for more information.)
+* Custom snapshot, via a URL or relative file path. For further information, see
+  the [Pantry](pantry.md) documentation.
 
 Each of these resolvers will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
 
-The `resolver` key corresponds to a Pantry snapshot location. See the
-[pantry documentation](pantry.md) for more information.
+The `resolver` key corresponds to a Pantry snapshot location. For further
+information, see the [Pantry](pantry.md) documentation.
 
 ### packages
 
@@ -213,8 +213,8 @@ extra-deps:
     - network-conduit-tls
 ```
 
-For more information on the format for specifying dependencies, please see the
-[Pantry docs](pantry.md).
+For further information on the format for specifying dependencies, see the
+[Pantry](pantry.md) documentation.
 
 ### flags
 
@@ -243,7 +243,8 @@ be included in our package. This can be used for a few different purposes, e.g.:
 * Ensure that packages you don't want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
 * Prevent overriding of a global package like `Cabal`. For more information, see
-  [stackage#4425](https://github.com/commercialhaskell/stackage/issues/4425)
+  Stackage issue
+  [#4425](https://github.com/commercialhaskell/stackage/issues/4425)
 * When using a custom GHC build, avoid incompatible packages (see this
   [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
 
@@ -414,8 +415,9 @@ build:
 Allows setting build options which are usually specified on the command line.
 
 The meanings of these settings correspond directly with the command line flags
-of the same name. See the [build command docs](build_command.md) and the
-[users guide](GUIDE.md#the-build-command) for more info.
+of the same name. For further information, see the
+[`stack build` command](build_command.md) documentation and the
+[users guide](GUIDE.md#the-build-command).
 
 ### color
 
@@ -589,7 +591,8 @@ repository. See the output of `stack templates`.
 
 ### docker
 
-See [Docker integration](docker_integration.md#configuration).
+For further information, see the
+[Docker integration](docker_integration.md#configuration) documentation.
 
 ### dump-logs
 
@@ -839,7 +842,21 @@ modify-code-page: false
 
 (since 0.1.10.0)
 
-See [Nix integration](nix_integration.md#configuration).
+Default:
+
+~~~yaml
+nix:
+  add-gc-roots: false
+  enable: false
+  nix-shell-options: []
+  packages: []
+  path: []
+  pure: true
+  shell-file:
+~~~
+
+For further information, see the
+[Nix integration](nix_integration.md#configuration) documentation.
 
 ### os
 
@@ -898,9 +915,10 @@ default. For more information on this change, see
 
 __NOTE__ As of Stack 1.6.0, this feature does not reliably work, due to issues
 with the Cabal library's printer. Stack will generate a warning when a lossy
-conversion occurs, in which case you may need to disable this setting. See
-[#3550](https://github.com/commercialhaskell/stack/issues/3550) for more
-information.
+conversion occurs, in which case you may need to disable this setting. For
+further information, see issue
+[#3550](https://github.com/commercialhaskell/stack/issues/3550).
+
 When using the `sdist` and `upload` commands, this setting determines whether
 the Cabal file's dependencies should be modified to reflect PVP lower and upper
 bounds. Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
@@ -917,8 +935,8 @@ is:
 pvp-bounds: none
 ```
 
-For more information, see
-[the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
+For further information, see the announcement
+[blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
 __NOTE__ Since Stack 1.5.0, each of the values listed above supports adding
 `-revision` to the end of each value, e.g. `pvp-bounds: both-revision`. This
