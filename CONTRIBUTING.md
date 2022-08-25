@@ -340,7 +340,6 @@ commit message to skip the builds. For more details,
 ## Slack channel
 
 If you're making deep changes and real-time communcation with the Stack team
-would be helpful, we have a `#stack-collaborators` Slack channel.  Please
-contact [@borsboom](https://github.com/borsboom) (manny@fpcomplete.com) or
-[@snoyberg](https://github.com/snoyberg) (michael@fpcomplete.com) for an
-invite.
+would be helpful, we have a `#stack-collaborators` Slack channel in the
+Haskell Foundation workspace. To join the workspace, follow this
+[link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).
