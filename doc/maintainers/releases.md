@@ -46,15 +46,19 @@ Examples:
 * `1.7.0.3`: second release candidate for first release of v1.7.x series (`v1.7`
   branch)
 
+
 * `1.7.1`: first release of the 1.7.x series (`release` branch)
+
 
 * `1.7.2.0`: development for second release of 1.7.x series (`stable` branch)
 * `1.7.2.1`: release candidate for second release of 1.7.x series (`stable`
   branch)
 
+
 * `1.7.3`: second release of 1.7.x series (`release` branch)
 * `1.7.3.1`: first hackage-only patch of 1.7.3 (`release` branch)
 * `1.7.3.2`: second hackage-only patch of 1.7.3 (`release` branch)
+
 
 * `1.8.0`: unstable development code (`master` branch)
 * `1.8.0.20181004`: pre-release snapshot of unstable version (`master` branch)
@@ -72,9 +76,9 @@ Examples:
    nightly (go over the extra-deps too) and ensure the project builds and tests
    pass. For example:
 
-   ~~~
-   $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
-   ~~~
+     ~~~
+     $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+     ~~~
 7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
    checking that the latest nightly build for the `master` branch succeeded in
    Azure DevOps (or kick one off manually if any significant changes were made
@@ -107,21 +111,21 @@ branch.
       will be the next final (non-RC) release (e.g. `v2.1.1`).
     * add new "Unreleased changes" section:
 
-      ```
-      ## Unreleased changes
+        ~~~
+        ## Unreleased changes
 
-      Release notes:
+        Release notes:
 
-      **Changes since vX.Y.Z:**
+        **Changes since vX.Y.Z:**
 
-      Major changes:
+        Major changes:
 
-      Behavior changes:
+        Behavior changes:
 
-      Other enhancements:
+        Other enhancements:
 
-      Bug fixes:
-      ```
+        Bug fixes:
+        ~~~
 
 ### D: In the release candidate branch
 
@@ -229,9 +233,9 @@ Edit the draft
 * For final releases (**not** release candidates) get the list of contributors
   to the release and add it to the description. For example, use:
 
-  ~~~
-  $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
-  ~~~
+    ~~~
+    $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+    ~~~
 
 Publish the GitHub release.
 
@@ -304,21 +308,21 @@ In either the `stable` branch or, in the case of a release candidate, the
 * `ChangeLog.md`: Add an “Unreleased changes” section (update the “changes
   since” version):
 
-  ~~~
-  ## Unreleased changes
+    ~~~
+    ## Unreleased changes
 
-  Release notes:
+    Release notes:
 
-  **Changes since vX.Y.Z:**
+    **Changes since vX.Y.Z:**
 
-  Major changes:
+    Major changes:
 
-  Behavior changes:
+    Behavior changes:
 
-  Other enhancements:
+    Other enhancements:
 
-  Bug fixes:
-  ~~~
+    Bug fixes:
+    ~~~
 
 ### G: Update the repository's issue and pull request templates
 
@@ -353,22 +357,22 @@ Update the fpco/stack-build Docker images with new version:
   containing (where `X.Z` is the previous LTS version, and `X.Y.Z` is the newly
   released Stack version):
 
-  ~~~
-  FROM $DOCKER_REPO:lts-X.Z
-  ARG STACK_VERSION=X.Y.Z
-  RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
-  ~~~
+    ~~~
+    FROM $DOCKER_REPO:lts-X.Z
+    ARG STACK_VERSION=X.Y.Z
+    RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ~~~
 
 * Run `./build.sh lts-X.Y` and then test that the new image has the new version
   of Stack. For example:
 
-  ~~~
-  $ docker run --rm fpco/stack-build:lts stack --version
-  ~~~
+    ~~~
+    $ docker run --rm fpco/stack-build:lts stack --version
+    ~~~
 
 * Run the following command to push the new image to the registry:
 
-  ~~~
-  $ ./build.sh --push lts-X.Y
-  $ ./build.sh --push --small lts-X.Y
-  ~~~
+    ~~~
+    $ ./build.sh --push lts-X.Y
+    $ ./build.sh --push --small lts-X.Y
+    ~~~
