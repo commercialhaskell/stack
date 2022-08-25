@@ -81,9 +81,9 @@ Examples:
    pass. For example:
 
 
-     ~~~
-     $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
-     ~~~
+       ~~~
+       $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+       ~~~
 
 7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
    checking that the latest nightly build for the `master` branch succeeded in
@@ -118,21 +118,21 @@ branch.
     * add new "Unreleased changes" section:
 
 
-        ~~~
-        ## Unreleased changes
+            ~~~
+            ## Unreleased changes
 
-        Release notes:
+            Release notes:
 
-        **Changes since vX.Y.Z:**
+            **Changes since vX.Y.Z:**
 
-        Major changes:
+            Major changes:
 
-        Behavior changes:
+            Behavior changes:
 
-        Other enhancements:
+            Other enhancements:
 
-        Bug fixes:
-        ~~~
+            Bug fixes:
+            ~~~
 
 ### D: In the release candidate branch
 
@@ -241,9 +241,9 @@ Edit the draft
   to the release and add it to the description. For example, use:
 
 
-    ~~~
-    $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
-    ~~~
+        ~~~
+        $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+        ~~~
 
 Publish the GitHub release.
 
@@ -317,21 +317,21 @@ In either the `stable` branch or, in the case of a release candidate, the
   since” version):
 
 
-    ~~~
-    ## Unreleased changes
+        ~~~
+        ## Unreleased changes
 
-    Release notes:
+        Release notes:
 
-    **Changes since vX.Y.Z:**
+        **Changes since vX.Y.Z:**
 
-    Major changes:
+        Major changes:
 
-    Behavior changes:
+        Behavior changes:
 
-    Other enhancements:
+        Other enhancements:
 
-    Bug fixes:
-    ~~~
+        Bug fixes:
+        ~~~
 
 ### G: Update the repository's issue and pull request templates
 
@@ -367,24 +367,24 @@ Update the fpco/stack-build Docker images with new version:
   released Stack version):
 
 
-    ~~~
-    FROM $DOCKER_REPO:lts-X.Z
-    ARG STACK_VERSION=X.Y.Z
-    RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
-    ~~~
+        ~~~
+        FROM $DOCKER_REPO:lts-X.Z
+        ARG STACK_VERSION=X.Y.Z
+        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+        ~~~
 
 * Run `./build.sh lts-X.Y` and then test that the new image has the new version
   of Stack. For example:
 
 
-    ~~~
-    $ docker run --rm fpco/stack-build:lts stack --version
-    ~~~
+        ~~~
+        $ docker run --rm fpco/stack-build:lts stack --version
+        ~~~
 
 * Run the following command to push the new image to the registry:
 
 
-    ~~~
-    $ ./build.sh --push lts-X.Y
-    $ ./build.sh --push --small lts-X.Y
-    ~~~
+        ~~~
+        $ ./build.sh --push lts-X.Y
+        $ ./build.sh --push --small lts-X.Y
+        ~~~
