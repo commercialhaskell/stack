@@ -2,12 +2,14 @@
 
 # Signing key
 
-Releases are signed with the GPG key of the individual who builds
-them.  Authorized keys will always be signed by key ID 0x575159689BEFB442,
-with the key and signature uploaded to the
-[SKS keyserver pool](https://sks-keyservers.net/).
+Each release of Stack is signed with the GPG key of the person who makes the
+release.
 
-This is the public key block for 0x575159689BEFB442:
+Authorized keys are themselves signed by the GPG key with ID 0x575159689BEFB442.
+That key, and keys it has signed, have been uploaded to the
+[Ubuntu Keyserver](https://keyserver.ubuntu.com/pks/lookup?search=0x575159689BEFB442&fingerprint=on&op=index).
+
+This is the public key block for GPG key ID 0x575159689BEFB442:
 
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----

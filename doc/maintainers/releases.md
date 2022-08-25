@@ -4,31 +4,50 @@
 
 ## Upcoming release tasks:
 
-* Simplify branch/version structure -- just release from `master` (but will keep `stable` tracking latest stable release plus doc updates)
+* Simplify branch/version structure -- just release from `master` (but will keep
+  `stable` tracking latest stable release plus doc updates)
 
-* At some point (a couple of major releases after 2.3), remove the `-static` version from https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.  People still using that will get an error, and we'll add a release note to switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz instead (and note that www.stackage.org/stack is deprecated)
+* At some point (a couple of major releases after 2.3), remove the `-static`
+  version from
+  https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.
+  People still using that will get an error, and we'll add a release note to
+  switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz instead
+  (and note that www.stackage.org/stack is deprecated)
 
 ## Version scheme
 
-* Versions with an _even_ second component are development versions (the `master` branch)
-* Versions with an _odd_ second component are stable versions (the `stable` branch, or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
-* Versions with an _even_ third component (e.g. 1.6.2 and 1.7.0) are unreleased versions
-* Versions with an _odd_ third component (e.g. 1.6.1 or 1.7.3) and released versions
-* Pre-release unstable binaries will be released with the date as the fourth component (e.g. 1.6.0.20171129)
-* Release candidate binaries will be released with an even third component and and odd number as the fourth component (e.g. 1.7.0.1)
-* Hackage-only dependency compatibility patch releases add a fourth patchlevel component (e.g. v1.7.3.1, in the `release` branch)
-* All branches _except_ `release` (which matches exactly the most recent release) must have an even third component (development)
-* Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate will always have a `0` third component (e.g. 1.7.0).
+* Versions with an _even_ second component are development versions (the
+  `master` branch)
+* Versions with an _odd_ second component are stable versions (the `stable`
+  branch, or in a `rc/vX.Y` release candidate branch for not-yet-released
+  versions)
+* Versions with an _even_ third component (e.g. 1.6.2 and 1.7.0) are unreleased
+  versions
+* Versions with an _odd_ third component (e.g. 1.6.1 or 1.7.3) are released
+  versions
+* Pre-release unstable binaries will be released with the date as the fourth
+  component (e.g. 1.6.0.20171129)
+* Release candidate binaries will be released with an even third component and
+  and odd number as the fourth component (e.g. 1.7.0.1)
+* Hackage-only dependency compatibility patch releases add a fourth patchlevel
+  component (e.g. v1.7.3.1, in the `release` branch)
+* All branches _except_ `release` (which matches exactly the most recent
+  release) must have an even third component (development)
+* Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate
+  will always have a `0` third component (e.g. 1.7.0).
 
 Examples:
 
 * `1.7.0.0`: v1.7.x series pre-release branch (`v1.7` branch)
-* `1.7.0.1`: release candidate for first release of v1.7.x series (`v1.7` branch)
+* `1.7.0.1`: release candidate for first release of v1.7.x series (`v1.7`
+  branch)
 * `1.7.0.2`: continuing development on pre-release branch
-* `1.7.0.3`: second release candidate for first release of v1.7.x series (`v1.7` branch)
+* `1.7.0.3`: second release candidate for first release of v1.7.x series (`v1.7`
+  branch)
 * `1.7.1`: first release of the 1.7.x series (`release` branch)
 * `1.7.2.0`: development for second release of 1.7.x series (`stable` branch)
-* `1.7.2.1`: release candidate for second release of 1.7.x series (`stable` branch)
+* `1.7.2.1`: release candidate for second release of 1.7.x series (`stable`
+  branch)
 * `1.7.3`: second release of 1.7.x series (`release` branch)
 * `1.7.3.1`: first hackage-only patch of 1.7.3 (`release` branch)
 * `1.7.3.2`: second hackage-only patch of 1.7.3 (`release` branch)
@@ -39,18 +58,25 @@ Examples:
 
 * Check for any P0 and P1 issues that should be dealt with before release
 * Check for un-merged pull requests that should be merged before release
-* Ensure `release` and `stable` branches merged to `master`
+* Ensure the `release` and `stable` branches are merged to the `master` branch
 * Check copyright dates, and update if needed
-* Ensure CI matrices in docs (travis-complex, appveyor, azure) have current stackage snapshots and GHC versions (e.g. https://github.com/commercialhaskell/stack/pull/4565/files)
-* Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest nightly (go over the extra-deps too) and ensure the project builds and tests pass (e.g. `stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks`)
-* Ensure integration tests pass on a Windows, macOS, and Linux.  Do so by checking that the latest nightly build for the `master` branch succeeded in Azure DevOps (or kick one off manually if any significant changes were made since the last automated build).
+* Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
+  stackage snapshots and GHC versions (e.g.
+  https://github.com/commercialhaskell/stack/pull/4565/files)
+* Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest nightly
+  (go over the extra-deps too) and ensure the project builds and tests pass
+  (e.g. `stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks`)
+* Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
+  checking that the latest nightly build for the `master` branch succeeded in
+  Azure DevOps (or kick one off manually if any significant changes were made
+  since the last automated build).
 
 ## Release preparation
 
 * In master branch:
     * `package.yaml`: bump to next release candidate version (bump second
       component to next odd number, ensure third component is `0`, and add
-      patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`).  Be sure to also update
+      patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`). Be sure to also update
       `stack.cabal` (e.g. by running `stack build`).
     * `ChangeLog.md`
         * Check for any entries that snuck into the previous version's changes
@@ -60,10 +86,11 @@ Examples:
 
 * In master branch:
     * `package.yaml`: bump version to next unstable version (next even second
-      component with `.0` third component (e.g. from 1.9.0 to 1.10.0).  Be sure
+      component with `.0` third component (e.g. from 1.9.0 to 1.10.0). Be sure
       to also update `stack.cabal` (e.g. by running `stack build`).
     * `Changelog.md`:
-      * Change the title of the existing **Unreleased changes** section to what will be the next final (non-RC) release (e.g. `v2.1.1`).
+      * Change the title of the existing **Unreleased changes** section to what
+        will be the next final (non-RC) release (e.g. `v2.1.1`).
       * add new "Unreleased changes" section:
         ```
         ## Unreleased changes
@@ -90,58 +117,88 @@ Examples:
           the released version of Stack" warning at the top.
         * Search for old Stack version, unstable stack version, and the next
           "obvious" possible versions in sequence, and
-          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y is odd).
-            * Do **NOT** update the Dockerfiles in [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/) yet; that will come later)
-            * Do **NOT** update templates in `.github` to point at the new release version yet!
-        * Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where it references the "currently the latest LTS")
-        * Look for any links to "latest" (`latest/`) documentation, replace with version tag
-    * Check that for any platform entries that need to be added to (or removed from)
+          `UNRELEASED` and replace with next release version (`X.Y.1`, where Y
+          is odd).
+            * Do **NOT** update the Dockerfiles in
+              [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/)
+              yet; that will come later)
+            * Do **NOT** update templates in `.github` to point at the new
+              release version yet!
+        * Search for old resolvers, set to latest resolver (e.g. in
+          `doc/GUIDE.md` where it references the "currently the latest LTS")
+        * Look for any links to "latest" (`latest/`) documentation, replace with
+          version tag
+    * Check that for any platform entries that need to be added to (or removed
+      from)
       [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
-      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md), [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh), and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md), and get.haskellstack.org redirects.
+      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
+      [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh),
+      and [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md),
+      and get.haskellstack.org redirects.
 
 * For first release candidate:
     * Re-do the pre-release checks (above section)
-    * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`). Be sure to also update `stack.cabal` (e.g. by running `stack build`).
+    * `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`). Be
+      sure to also update `stack.cabal` (e.g. by running `stack build`).
     * `ChangeLog.md`
         - Rename the “Unreleased changes” section to the same version as
-          package.yaml, and mark it clearly as a release candidate (e.g.
-          `vX.Y.0.1 (release candidate)`).  Remove any empty sections.
-    * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
+          `package.yaml`, and mark it clearly as a release candidate (e.g.
+          `vX.Y.0.1 (release candidate)`). Remove any empty sections.
+    * Follow steps in *Release process* below tagged with `[RC]` to make a
+      release candidate
 
 * For subsequent release candidates:
     * Re-do the pre-release checks (above section)
-    * `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`).  Be
+    * `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`). Be
       sure to also update `stack.cabal` (e.g. by running `stack build`).
-    * `ChangeLog.md`: Rename the "Unreleased changes" section to the new version, clearly marked as a release candidate (e.g. `vX.Y.0.3 (release candidate)`).  Remove any empty sections.
-    * Follow steps in *Release process* below tagged with `[RC]` to make a release candidate
+    * `ChangeLog.md`: Rename the "Unreleased changes" section to the new
+      version, clearly marked as a release candidate (e.g.
+      `vX.Y.0.3 (release candidate)`). Remove any empty sections.
+    * Follow steps in *Release process* below tagged with `[RC]` to make a
+      release candidate
 
 * For final release:
     * Re-do the pre-release checks (above section)
     * `package.yaml`: bump version to odd last component and no patchlevel
-      (e.g. from `X.Y.0.2` to `X.Y.1`).  Be sure to also update `stack.cabal`
+      (e.g. from `X.Y.0.2` to `X.Y.1`). Be sure to also update `stack.cabal`
       (e.g. by running `stack build`).
-    * `ChangeLog.md`: consolidate all the RC changes into a single section for the release version
+    * `ChangeLog.md`: consolidate all the RC changes into a single section for
+      the release version
     * Follow all steps in the *Release process* section below.
-
 
 ## Release process
 
-* Ensure that the [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22) passes the branch you are releasing. This will run automatically for `master`, `stable`, and `rc/*` branches (if another branch, you can run it manually). `[RC]`
+* Ensure that the
+  [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
+  passes the branch you are releasing. This will run automatically for `master`,
+  `stable`, and `rc/*` branches (if another branch, you can run it manually). `[RC]`
 
-* Push signed Git tag.  For final releases the tag should be `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the previous step); for release candidates it should be `rc/vX.Y.Z.A`.  e.g.: `git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z && git push origin vX.Y.Z`.  `[RC]`
+* Push a signed Git tag. For further information, see the
+  [signing key][SIGNING_KEY.md] documentation. For final releases the tag should
+  be `vX.Y.Z` (where X.Y.Z matches the version in `package.yaml` from the
+  previous step); for release candidates it should be `rc/vX.Y.Z.A`. e.g.:
+  `git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z && git push origin vX.Y.Z`.  `[RC]`
 
-* Wait for [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22) to complete for the branch you just created.  This will create a draft Github release and upload the bindists (plus signatures and hashes) to it.
+* Wait for
+  [Integration Tests workflow on Github Actions](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
+  to complete for the branch you just created. This will create a draft GitHub
+  release and upload the bindists (plus signatures and hashes) to it.
 
 * Edit the draft
-  [Github release](https://github.com/commercialhaskell/stack/releases/), and `[RC]`
-    * In the case of a release candidate, add `(release candidate)` to the name field and ensure that *This is a pre-release* is checked.
-    * Add the Changelog to the description.
-    * For final releases (**not** release candidates), use e.g. `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f` to get the list of contributors and add it to the description.
-    * Publish the Github release. `[RC]`
+  [GitHub release](https://github.com/commercialhaskell/stack/releases/),
+  and `[RC]`
+    * In the case of a release candidate, add `(release candidate)` to the name
+      field and ensure that *This is a pre-release* is checked.
+    * Add the ChangeLog to the description.
+    * For final releases (**not** release candidates), use e.g.
+      `git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f`
+      to get the list of contributors and add it to the description.
+    * Publish the GitHub release. `[RC]`
 
 * Upload `stack` package to Hackage: `stack upload . --pvp-bounds=lower`.
 
-* Reset the `release` branch to the released commit, e.g.: `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
+* Reset the `release` branch to the released commit, e.g.:
+  `git checkout release && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Update the `stable` branch similarly
 
@@ -149,17 +206,23 @@ Examples:
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated.
 
-* Update [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml) with the new version and [sync the application in ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
+* Update
+  [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml)
+  with the new version and
+  [sync the application in ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
 
-    * Test with `curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null`, make sure it redirects to the new version
+    * Test with
+      `curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null`,
+      make sure it redirects to the new version
 
 * In the `stable` or, in the case of a release candidate, `rc/vX.Y` branch:
     - `package.yaml`: bump the version number even third component (e.g. from
       1.6.1 to 1.6.2) or, in the case of a release candidate even _fourth_
-      component (e.g. from 1.7.0.1 to 1.7.0.2).  Be sure to also update
+      component (e.g. from 1.7.0.1 to 1.7.0.2). Be sure to also update
       `stack.cabal` (e.g. by running `stack build`). `[RC]`
 
-    - `ChangeLog.md`: Add an “Unreleased changes” section (update “changes since” version):`[RC]`
+    - `ChangeLog.md`: Add an “Unreleased changes” section (update “changes
+      since” version):`[RC]`
 
       ```
       ## Unreleased changes
@@ -178,19 +241,34 @@ Examples:
 
       ```
 
-    - Update templates in `.github` to point at the new release version (`X.Y.1`).
+    - Update templates in `.github` to point at the new release version
+      (`X.Y.1`).
 
-* Delete the RC branch (locally and on origin).  E.g. `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
+* Delete the RC branch (locally and on origin). E.g.
+  `git branch -d rc/vX.Y; git push origin :rc/vX.Y`.
 
-* Merge any changes made in the RC/release/stable branches to master (be careful about version and changelog).   It is best to do this by making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then merging.  If anything is complicated to merge, consider making it a PR and getting it reviewed rather than merging immediately.
+* Merge any changes made in the RC/release/stable branches to master (be careful
+  about version and changelog). It is best to do this by making a
+  `ci/merge-stable-to-master` branch and waiting for CI to pass, then merging.
+  If anything is complicated to merge, consider making it a PR and getting it
+  reviewed rather than merging immediately.
 
-* Announce to haskell-cafe@haskell.org; haskell-stack@googlegroups.com; commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z` (or `ANN: first release candidate for stack-X.Y.x`), containing the release description from Github. `[RC]`
+* Announce to haskell-cafe@haskell.org; haskell-stack@googlegroups.com;
+  commercialhaskell@googlegroups.com mailing lists, subject `ANN: stack-X.Y.Z`
+  (or `ANN: first release candidate for stack-X.Y.x`), containing the release
+  description from Github. `[RC]`
 
-    * For release candidates, also include a link to the Github Release (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download it. `[RC]`
+    * For release candidates, also include a link to the Github Release
+      (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to
+      download it. `[RC]`
 
 * Update fpco/stack-build Docker images with new version
 
-  * Under [commercialhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/), add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version), containing (note where X.Z is the previous LTS version, and X.Y.Z is the newly released stack version)
+  * Under
+    [commercialhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/),
+    add `lts-X.Y/Dockerfile` (where `X.Y` is the latest stackage LTS version),
+    containing (note where X.Z is the previous LTS version, and X.Y.Z is the
+    newly released stack version)
 
     ```
     FROM $DOCKER_REPO:lts-X.Z
@@ -198,16 +276,18 @@ Examples:
     RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
     ```
 
-  * Run `./build.sh lts-X.Y` and test that the new image has the new version of Stack (e.g. `docker run --rm fpco/stack-build:lts stack --version`).
+  * Run `./build.sh lts-X.Y` and test that the new image has the new version of
+    Stack (e.g. `docker run --rm fpco/stack-build:lts stack --version`).
 
-  * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push the new image to the registry.
-
+  * Run `./build.sh --push lts-X.Y && ./build.sh --push --small lts-X.Y` to push
+    the new image to the registry.
 
 ## Build Linux static binary distribution with Nix
 
 **NOTE: We have switched back to Alpine Linux for building static binaries, done by CI.  Leaving this section for future reference.**
 
-These instructions are tested on Ubuntu 16.04, but theoretically should work on any Linux distribution.
+These instructions are tested on Ubuntu 16.04, but theoretically should work on
+any Linux distribution.
 
 - Install nix (tested with v2.0.4 and v2.1.2, but should work with any)
 
@@ -215,7 +295,8 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
   curl https://nixos.org/nix/install | sh
   ```
 
-- Install and authenticate cachix (first two steps at https://cachix.org/ after signing up)
+- Install and authenticate cachix (first two steps at https://cachix.org/ after
+  signing up)
 
 
 - Add nh2's cache:
@@ -224,13 +305,18 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
   cachix use static-haskell-nix
   ```
 
-  NOTE: to clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*` (useful if someone else uploads new stuff to the cache and you want to use it right away).  The recent `narinfo-cache-positive`/`negative-ttl` options might also help.
+  NOTE: to clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*`
+  (useful if someone else uploads new stuff to the cache and you want to use it
+  right away). The recent `narinfo-cache-positive`/`negative-ttl` options might
+  also help.
 
-- Check out stack commit to be released to `~/stack-release` (or elsewhere, in which case adjust following instructions)
+- Check out Stack commit to be released to `~/stack-release` (or elsewhere, in
+  which case adjust following instructions)
 
 - `rm -f ~/stack-release/*.cabal`, to ensure it's regenerated
 
-- clone https://github.com/nh2/static-haskell-nix recursively (last known to work with commit 725ceb2479637b3b3ab29298a1bc0e48c54984c9)
+- clone https://github.com/nh2/static-haskell-nix recursively (last known to
+  work with commit 725ceb2479637b3b3ab29298a1bc0e48c54984c9)
 
 - in `static-stack` directory, run (from `static-stack/README.md`):
 
@@ -238,15 +324,25 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
   $(nix-build --no-link -A run-stack2nix-and-static-build-script --argstr stackDir ~/stack-release)
   ```
 
-- Run integration tests against the static binary [TODO: improve this process by adding full support in `release.hs` or the integration tests for testing a binary built elsewhere]
+- Run integration tests against the static binary [TODO: improve this process by
+  adding full support in `release.hs` or the integration tests for testing a
+  binary built elsewhere]
 
-    - In `~/stack-release`, run `stack build --flag stack:integration-tests stack:stack-integration-test`
-    - Copy binary built above to place where `stack build` normally puts the `stack binary` (e.g. `cp  /nix/store/7vl1xvlbbqjvf864inz5vw7z2z1k4nmw-stack-2.1.0.1/bin/stack /home/vagrant/stack-release/.stack-work/install/x86_64-linux/custom-snapshot-for-building-stack-with-ghc-8.2.2-PyNP5UoO8Ott/8.2.2/bin/stack`; figure it out using `stack exec which stack`)
+    - In `~/stack-release`, run
+      `stack build --flag stack:integration-tests stack:stack-integration-test`
+    - Copy binary built above to place where `stack build` normally puts the
+      `stack binary` (e.g.
+      `cp  /nix/store/7vl1xvlbbqjvf864inz5vw7z2z1k4nmw-stack-2.1.0.1/bin/stack /home/vagrant/stack-release/.stack-work/install/x86_64-linux/custom-snapshot-for-building-stack-with-ghc-8.2.2-PyNP5UoO8Ott/8.2.2/bin/stack`;
+      figure it out using `stack exec which stack`)
     - Run `stack exec stack-integration-test`
 
-- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to `~/stack-release/_release/bin/stack-X.Y.Z-linux-x86_64/stack` (replace `X.Y.Z` with the version, and the `/nix/store/*` path with that output at the end of the previous command)
+- Copy the binary built above (in `/nix/store/XXX-stack-X.Y.Z/bin/stack`) to
+  `~/stack-release/_release/bin/stack-X.Y.Z-linux-x86_64/stack` (replace `X.Y.Z`
+  with the version, and the `/nix/store/*` path with that output at the end of
+  the previous command)
 
-- Package, sign, and upload to Github using stack's release script in the stack directory:
+- Package, sign, and upload to GitHub using Stack's release script in the stack
+  directory:
 
   ```
   cd ~/stack-release
@@ -255,8 +351,9 @@ These instructions are tested on Ubuntu 16.04, but theoretically should work on 
 
   (adding `--build-args=--dry-run` ensures the binary you copied will be used rather than building a new one)
 
-- Download the bindist from github and double check that the `stack` in it is actually static (use `ldd /path/to/stack`) and that `--version` reports correctly (and not dirty).
-
+- Download the bindist from GitHub and double check that the `stack` in it is
+  actually static (use `ldd /path/to/stack`) and that `--version` reports
+  correctly (and not dirty).
 
 ## Setting up a Windows VM for releases
 
@@ -274,8 +371,10 @@ set up.
     * Number of CPUs: at least half the host's
     * Memory: at least 3 GB
     * Video RAM: the minimum recommended by Virtualbox
-    * Enable 3D and 2D accelerated mode (this makes programs with lots of console output much faster)
-    * Enabled shared clipboard (in VM window, Devices->Shared Clipboard->Both Directions)
+    * Enable 3D and 2D accelerated mode (this makes programs with lots of
+      console output much faster)
+    * Enabled shared clipboard (in VM window, Devices->Shared
+      Clipboard->Both Directions)
 
 Now continue to the **General Windows setup** subsection below.
 
@@ -285,8 +384,13 @@ Now continue to the **General Windows setup** subsection below.
 2. Unzip the file downloaded file
 3. Upload the VMDK file to the ESXi datastore
 4. SSH into ESXi CLI and run:
-    - `vmkfstools -i /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1-ORIG.vmdk /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1.vmdk -d thin`.  This converts the disk to a format that is compatible with ESXi.  You may have to run `esxcli system module load -m multiextent` first (see https://www.virtuallyghetto.com/2012/09/2gbsparse-disk-format-no-longer-working.html).
-    - `vmkfstools -X 80G /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1.vmdk`.  This makes the disk twice as large, which helps avoid running out of disk space.
+    - `vmkfstools -i /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1-ORIG.vmdk /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1.vmdk -d thin`.
+      This converts the disk to a format that is compatible with ESXi. You may
+      have to run `esxcli system module load -m multiextent` first (see
+      https://www.virtuallyghetto.com/2012/09/2gbsparse-disk-format-no-longer-working.html).
+    - `vmkfstools -X 80G /vmfs/volumes/datastore1/win10-msedge/MSEdge-Win10-VMWare-disk1.vmdk`.
+      This makes the disk twice as large, which helps avoid running out of disk
+      space.
 5. In the ESXi web UI:
 	- Create a new VM
 		- Give is 8192 MB of memory
@@ -298,7 +402,9 @@ Now continue to the **General Windows setup** subsection below.
 	- In Windows settings:
 		- Search for "disk management"
 			- Extend the partition to take the whole disk.
-		- In all likelihood, you will want to search for "remote desktop" and enable remote desktop.  Then you can connect to the VM using Microsoft Remote Desktop instead of using it from within the ESXi web UI.
+		- In all likelihood, you will want to search for "remote desktop" and enable
+      remote desktop. Then you can connect to the VM using Microsoft Remote
+      Desktop instead of using it from within the ESXi web UI.
 
 Now continue to the **General Windows setup** subsection below.
 
@@ -306,7 +412,8 @@ Now continue to the **General Windows setup** subsection below.
 
  5. In **Settings**->**Update & Security**->**Windows Update**->**Advanced options**:
      * Change **Choose how updates are installed** to **Notify to schedule restart**
-     * Check **Defer upgrades** (this avoids rebooting in the middle of the stack build)
+     * Check **Defer upgrades** (this avoids rebooting in the middle of the stack
+       build)
 
  6. In **Settings**->**System**->**Power & sleep**
 
@@ -362,9 +469,11 @@ Now continue to the **General Windows setup** subsection below.
 
 2. Select Ubuntu Xenial as the operating system
 
-3. Install the correct version of LLVM: `sudo apt-get install -y llvm-3.9` (appropriate for GHC 8.2, might need different version for other GHCs)
+3. Install the correct version of LLVM: `sudo apt-get install -y llvm-3.9`
+   (appropriate for GHC 8.2, might need different version for other GHCs)
 
-4. Symlink opt-3.X to `opt`: `sudo ln -s opt-3.9 /usr/bin/opt` (adjust the version if you installed a different one above)
+4. Symlink opt-3.X to `opt`: `sudo ln -s opt-3.9 /usr/bin/opt` (adjust the
+   version if you installed a different one above)
 
 5. Switch to gold linker:
 
@@ -403,8 +512,8 @@ Now continue to the **General Windows setup** subsection below.
 
 11. Install clang+llvm
 
-    NOTE: the Debian jessie `llvm` package does not work (executables built with it
-    just exit with "schedule: re-entered unsafely.").
+    NOTE: the Debian jessie `llvm` package does not work (executables built with
+    it just exit with "schedule: re-entered unsafely.").
 
     The version of LLVM needed depends on the version of GHC you need.
 
@@ -436,8 +545,9 @@ Now continue to the **General Windows setup** subsection below.
 
 12. Install Stack
 
-    Binary: get an [existing `stack` binary](https://github.com/commercialhaskell/stack/releases)
-and put it in `~/.local/bin`.
+    Binary: get an
+    [existing `stack` binary](https://github.com/commercialhaskell/stack/releases)
+    and put it in `~/.local/bin`.
 
     From source, using Cabal (the tool):
 
@@ -458,7 +568,8 @@ and put it in `~/.local/bin`.
     cabal update
     ```
 
-    Edit `~/.cabal/config`, and set `executable-stripping: False` and `library-stripping: False`.
+    Edit `~/.cabal/config`, and set `executable-stripping: False` and
+    `library-stripping: False`.
 
     ```
     cabal unpack stack && \

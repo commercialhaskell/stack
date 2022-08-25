@@ -22,6 +22,7 @@ The following terms are used in Stack's documentation.
 |GHCJS              |A Haskell to JavaScript [compiler](https://github.com/ghcjs/ghcjs).|
 |GHCup              |An [installer](https://www.haskell.org/ghcup/) for Haskell.
 |Git                |A [distributed version control system](https://git-scm.com/).|
+|GPG                |The [GNU Privacy Guard](https://gnupg.org/) or GnuPG, software that allows you to encrypt or sign your data and communications.|
 |Hackage            |The [Haskell Package Repository](https://hackage.haskell.org/).
 |Haddock            |The [document generation tool](https://hackage.haskell.org/package/haddock) for Haskell libraries.|
 |'Haskell' extension|The ['Haskell' extension]() for VS Code.                  |
