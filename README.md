@@ -13,7 +13,7 @@ information.
 
 You can participate with the Stack community in the following areas:
 
-* [Haskell Foundation Slack](https://join.slack.com/t/haskell-foundation/shared_invite/zt-mjh76fw0-CEjg2NbyVE8rVQDvR~0F4A)
+* [Haskell Foundation Slack](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email)
     * `#stack-users` for general Stack discussion
     * `#stack-collaborators` for working on the Stack code base
 * [Stack Google Group mailing list](https://groups.google.com/g/haskell-stack)
