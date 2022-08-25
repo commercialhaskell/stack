@@ -47,7 +47,9 @@ Examples:
   branch)
 
 
+
 * `1.7.1`: first release of the 1.7.x series (`release` branch)
+
 
 
 * `1.7.2.0`: development for second release of 1.7.x series (`stable` branch)
@@ -55,9 +57,11 @@ Examples:
   branch)
 
 
+
 * `1.7.3`: second release of 1.7.x series (`release` branch)
 * `1.7.3.1`: first hackage-only patch of 1.7.3 (`release` branch)
 * `1.7.3.2`: second hackage-only patch of 1.7.3 (`release` branch)
+
 
 
 * `1.8.0`: unstable development code (`master` branch)
@@ -76,9 +80,11 @@ Examples:
    nightly (go over the extra-deps too) and ensure the project builds and tests
    pass. For example:
 
+
      ~~~
      $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
      ~~~
+
 7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
    checking that the latest nightly build for the `master` branch succeeded in
    Azure DevOps (or kick one off manually if any significant changes were made
@@ -110,6 +116,7 @@ branch.
     * Change the title of the existing **Unreleased changes** section to what
       will be the next final (non-RC) release (e.g. `v2.1.1`).
     * add new "Unreleased changes" section:
+
 
         ~~~
         ## Unreleased changes
@@ -233,6 +240,7 @@ Edit the draft
 * For final releases (**not** release candidates) get the list of contributors
   to the release and add it to the description. For example, use:
 
+
     ~~~
     $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
     ~~~
@@ -308,6 +316,7 @@ In either the `stable` branch or, in the case of a release candidate, the
 * `ChangeLog.md`: Add an “Unreleased changes” section (update the “changes
   since” version):
 
+
     ~~~
     ## Unreleased changes
 
@@ -357,6 +366,7 @@ Update the fpco/stack-build Docker images with new version:
   containing (where `X.Z` is the previous LTS version, and `X.Y.Z` is the newly
   released Stack version):
 
+
     ~~~
     FROM $DOCKER_REPO:lts-X.Z
     ARG STACK_VERSION=X.Y.Z
@@ -366,11 +376,13 @@ Update the fpco/stack-build Docker images with new version:
 * Run `./build.sh lts-X.Y` and then test that the new image has the new version
   of Stack. For example:
 
+
     ~~~
     $ docker run --rm fpco/stack-build:lts stack --version
     ~~~
 
 * Run the following command to push the new image to the registry:
+
 
     ~~~
     $ ./build.sh --push lts-X.Y
