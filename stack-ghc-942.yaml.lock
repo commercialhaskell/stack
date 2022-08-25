@@ -1024,16 +1024,12 @@ packages:
   original:
     hackage: th-lift-0.8.2@sha256:f135f67b018c22889e68b094773273dcf8f9e16fcfa330bf4778f84fce8925e9,2677
 - completed:
-    commit: bd768ec924d7c812bcc86e6f24fd31ba7e310f5a
-    git: https://github.com/TeofilC/th-lift-instances.git
-    name: th-lift-instances
+    hackage: th-lift-instances-0.1.20@sha256:c7886eb39760825b8861c68e48b2b5efb5eff8d2cb76201fdd0fb04bcbeff78e,2608
     pantry-tree:
-      sha256: 690500539fdfac7f57fe43e941af723289207bfb21190f1cbc4f836c25d69e14
-      size: 926
-    version: 0.1.20
+      sha256: 0498495a69ca395d95b12a67b6884adaec4ca9ab76b9a62ca76ba064e35a08ff
+      size: 526
   original:
-    commit: bd768ec924d7c812bcc86e6f24fd31ba7e310f5a
-    git: https://github.com/TeofilC/th-lift-instances.git
+    hackage: th-lift-instances-0.1.20
 - completed:
     hackage: th-reify-many-0.1.10@sha256:1827dcffb0c9f214e9739053fc808683336ea65c3749ff2d6148db189cbbd2a4,1753
     pantry-tree:

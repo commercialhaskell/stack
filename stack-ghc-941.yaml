@@ -32,12 +32,7 @@ extra-deps:
 - base-orphans-0.8.6@sha256:eb6758d0160d607e0c45dbd6b196f515b9a589fd4f6d2f926929dd5d56282d37,3175
 - base16-bytestring-1.0.2.0@sha256:64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a,2541
 - base64-bytestring-1.2.1.0@sha256:50ec0e229255d4c45cbdd568da011311b8887f304b931564886016f4984334d8,2396
-# A fork of basement that builds on GHC 9.4.1
-- git: https://github.com/parsonsmatt/foundation.git
-  commit: 8166c31a115521f2ce5fabfba8247982979eeebf
-  subdirs:
-  - basement
-# - basement-0.0.14@sha256:d28a94225234a9895abbf88cdbf171fdea8cb478d718479f06522238b2cc7e74,5403
+- basement-0.0.15@sha256:2bf8ea6a351fb049399ccf1fa2c2513ddb0d8274b87bd9146ed7603fa06cd8a8,5404
 - bifunctors-5.5.12@sha256:be0f858c893274deab8aa21f9e43b2f5931d9419604f23f82bb5c8a5d9b2c3e9,3948
 - bitvec-1.1.3.0@sha256:54fea850c9e3d3f8f771d569c0c2b339f2dea1085b6cb9da108bce6594dc9682,4188
 - blaze-builder-0.4.2.2@sha256:f0017df374c330de0ebe0eb15eae8c48427bddefa1d81a3cb31c0a4812ecdb08,3685
@@ -163,10 +158,7 @@ extra-deps:
 - th-compat-0.1.4@sha256:6ca77c4e80b4e4109e30549c269631a9cc295c8fc2431ce4123972a5f80f7bfc,3135
 - th-expand-syns-0.4.10.0@sha256:4f0ae7278cf7b4485a37d550463bf8507e7550b93abcb085dc7bf41c3852def8,2130
 - th-lift-0.8.2@sha256:f135f67b018c22889e68b094773273dcf8f9e16fcfa330bf4778f84fce8925e9,2677
-# containers now has its own Lift instances
-- git: https://github.com/TeofilC/th-lift-instances.git
-  commit: bd768ec924d7c812bcc86e6f24fd31ba7e310f5a
-# - th-lift-instances-0.1.19@sha256:38900532d68993cba8e2e84984755a0d9e94df0f84b4e9d23819e0dc495c22d1,2608
+- th-lift-instances-0.1.20
 - th-reify-many-0.1.10@sha256:1827dcffb0c9f214e9739053fc808683336ea65c3749ff2d6148db189cbbd2a4,1753
 - these-1.1.1.1@sha256:f069e766b8fed73d457fca20cc197f5c539bcdd03d7636e478ddf14dbb67684a,2748
 - time-compat-1.9.6.1@sha256:42d8f2e08e965e1718917d54ad69e1d06bd4b87d66c41dc7410f59313dba4ed1,5033
