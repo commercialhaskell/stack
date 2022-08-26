@@ -1,5 +1,5 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.2 on Windows.
+# built with GHC 9.4.2.
 
 # GHC 9.4.2
 resolver: ghc-9.4.2
@@ -192,16 +192,6 @@ drop-packages:
 
 # The upper bounds of some dependencies are inconsistent with GHC 9.4.2's base
 allow-newer: true
-
-# Stack's default setup-info location does not yet include GHC 9.4.2
-setup-info:
-  ghc:
-    windows64:
-      9.4.2:
-        url: https://downloads.haskell.org/~ghc/9.4.2/ghc-9.4.2-x86_64-unknown-mingw32.tar.xz
-        content-length: 283597028
-        sha1: 6cbeb26f942d2c0af6645caba984fe18366ff2e7
-        sha256: 3acbe3fc0faa68fa4bf0cc324212956c234c21d7ffd80221cf6caf28726f8227
 
 docker:
   enable: false
