@@ -310,12 +310,12 @@ In either the `stable` branch or, in the case of a release candidate, the
 
         Bug fixes:
 
-### G: Update the repository's issue and pull request templates
+### H: Update the repository's issue and pull request templates
 
 Update the repository's issue and pull request templates in the `.github`
 directory to point at the new release version (`X.Y.1`).
 
-### H: Announce the release `[RC]`
+### I: Announce the release `[RC]`
 
 Announce the release to the following mailing lists
 
@@ -333,7 +333,7 @@ For release candidates, also include a link to the Github Release
 (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download
 it.
 
-### I: Update Docker images
+### J: Update Docker images
 
 Update the fpco/stack-build Docker images with new version:
 
