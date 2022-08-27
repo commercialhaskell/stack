@@ -104,7 +104,7 @@ import              Data.List.Split (splitOn)
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
 defaultSetupInfoYaml =
-    "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
+    "https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -305,7 +305,8 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                             (True, Just ghcRts) -> Map.insert "GHCRTS" (T.pack ghcRts)
                             _ -> id
 
-                        -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
+                        -- For reasoning and duplication, see:
+                        -- https://github.com/commercialhaskell/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es

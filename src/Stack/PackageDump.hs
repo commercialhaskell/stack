@@ -164,7 +164,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                 Just [v] -> return v
                 _ -> throwM $ MissingSingleField k m
         -- Can't fail: if not found, same as an empty list. See:
-        -- https://github.com/fpco/stack/issues/182
+        -- https://github.com/commercialhaskell/stack/issues/182
         parseM k = Map.findWithDefault [] k m
 
         parseDepend :: MonadThrow m => Text -> m (Maybe GhcPkgId)
