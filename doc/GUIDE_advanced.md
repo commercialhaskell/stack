@@ -6,6 +6,60 @@ Some of Stack's features will not be needed regularly or by all users. This part
 of the guide provides information about those features. Some of the features are
 complex and separate pages are dedicated to them.
 
+## The `stack --hpack-numeric-version` flag
+
+Stack will report the numeric version of its built-in Hpack library to standard
+output (e.g. `0.35.0`) and quit.
+
+## The `stack --numeric-version` flag
+
+Stack will report its numeric version to standard output (e.g. `2.7.5`) and
+quit.
+
+## The `stack --silent` flag
+
+Equivalent to the `stack --verbosity silent` option.
+
+## The `stack --stack-root` option
+
+`stack --stack-root <absolute_path_to_the_Stack_root>` specifies the path to the
+Stack root directory. The path must be an absolute one. The option will override
+the contents of any `STACK_ROOT` environment variable.
+
+## The `stack --[no-]time-in-logs` flag
+
+Default: Enabled
+
+Enables/disables the inclusion of time stamps against logging entries when the
+verbosity level is 'debug'.
+
+## The `stack -v, --verbose` flags
+
+Equivalent to the `stack --verbosity debug` option.
+
+## The `stack --verbosity` option
+
+Default: info
+
+`stack --verbosity <log_level>` will set the level for logging. Possible levels
+are `silent`, `error`, `warn`, `info` and `debug`, in order of increasing
+amounts of information provided by logging.
+
+## The `stack --version` flag
+
+Stack will report its version to standard output and quit. For versions that are
+release candidates, the report will list the dependencies that Stack has been
+compiled with.
+
+## The `stack --work-dir` option
+
+Default: `.stack-work`
+
+`stack --work-dir <relative_path_to_the_Stack_root>` specifies the path to
+Stack's work directory for the project. The path must be a relative one,
+relative to the project's root directory. The option will override the contents
+of any `STACK_WORK` environment variable.
+
 ## The `stack build` command
 
 The `stack build` command is introduced in the first part of
