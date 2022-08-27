@@ -348,10 +348,10 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         inner ExecuteEnv
             { eeBuildOpts = bopts
             , eeBuildOptsCLI = boptsCli
-             -- Uncertain as to why we cannot run configures in parallel. This appears
-             -- to be a Cabal library bug. Original issue:
-             -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
-             -- this.
+             -- Uncertain as to why we cannot run configures in parallel. This
+             -- appears to be a Cabal library bug. Original issue:
+             -- https://github.com/commercialhaskell/stack/issues/84. Ideally
+             -- we'd be able to remove this.
             , eeConfigureLock = configLock
             , eeInstallLock = installLock
             , eeBaseConfigOpts = baseConfigOpts
@@ -1090,7 +1090,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                 let dir = eeTempDir </> suffix
                 unpackPackageLocation dir pkgloc
 
-                -- See: https://github.com/fpco/stack/issues/157
+                -- See: https://github.com/commercialhaskell/stack/issues/157
                 distDir <- distRelativeDir
                 let oldDist = dir </> relDirDist
                     newDist = dir </> distDir
