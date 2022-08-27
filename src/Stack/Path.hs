@@ -45,9 +45,8 @@ path keys =
            toEither (_, k, UseHaddocks p) = Left (k, p)
            toEither (_, k, WithoutHaddocks p) = Right (k, p)
            (with, without) = partitionEithers $ map toEither goodPaths
-       withConfig YesReexec $ withDefaultEnvConfig $ do
-         runHaddock True $ printKeys with singlePath
-         runHaddock False $ printKeys without singlePath
+       runHaddock True $ printKeys with singlePath
+       runHaddock False $ printKeys without singlePath
 
 printKeys
   :: HasEnvConfig env
@@ -60,9 +59,13 @@ printKeys extractors single = do
        let prefix = if single then "" else key <> ": "
        T.putStrLn $ prefix <> extractPath pathInfo
 
-runHaddock :: Bool -> RIO EnvConfig a -> RIO EnvConfig a
-runHaddock x =
-    local (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x))
+runHaddock :: Bool -> RIO EnvConfig () -> RIO Runner ()
+runHaddock x action = local modifyConfig $
+  withConfig YesReexec $
+    withDefaultEnvConfig action
+ where
+  modifyConfig = set
+    (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
