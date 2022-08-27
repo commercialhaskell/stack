@@ -27,7 +27,6 @@ import Data.ByteString.Builder (byteString)
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import Distribution.System (Platform(..))
-import Pantry
 import qualified Pantry.SHA256 as SHA256
 import qualified RIO
 import qualified RIO.Map as Map
@@ -263,7 +262,8 @@ loadProjectSnapshotCandidate ::
     -> Bool
     -> RIO env (SnapshotCandidate env)
 loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
-    (snapshot, _, _) <- loadAndCompleteSnapshotRaw loc Map.empty Map.empty
+    debugRSL <- view rslInLogL
+    (snapshot, _, _) <- loadAndCompleteSnapshotRaw' debugRSL loc Map.empty Map.empty
     deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
     let wc = snapshotCompiler snapshot
     globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc

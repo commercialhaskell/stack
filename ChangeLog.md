@@ -14,6 +14,9 @@ Behavior changes:
   there is only one `*.tix` file, in case a package has tested the library of
   another package that has not tested its own library. See
   [#5713](https://github.com/commercialhaskell/stack/issues/5713)
+* `stack --verbose` no longer includes the lengthy raw snapshot layer (rsl) in
+  the debug output by default. The new `stack --[no-]rsl-in-log` flag enables or
+  disables the inclusion of the rsl in the debug output.
 
 Other enhancements:
 

@@ -84,6 +84,7 @@ module Stack.Types.Config
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
+  ,rslInLogL
   ,StackYamlLoc(..)
   ,stackYamlLocL
   ,LockFileBehavior(..)
@@ -513,6 +514,7 @@ data GlobalOpts = GlobalOpts
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
+    , globalRSLInLog     :: !Bool -- ^ Whether to include raw snapshot layer (RSL) in logs.
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
@@ -522,6 +524,9 @@ data GlobalOpts = GlobalOpts
     , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
     , globalLockFileBehavior :: !LockFileBehavior
     } deriving (Show)
+
+rslInLogL :: HasRunner env => SimpleGetter env Bool
+rslInLogL = globalOptsL.to globalRSLInLog
 
 -- | Location for the project's stack.yaml file.
 data StackYamlLoc
@@ -590,6 +595,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
+    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snaphot layer (RSL) in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
@@ -1879,7 +1885,7 @@ globalOptsL :: HasRunner env => Lens' env GlobalOpts
 globalOptsL = runnerL.lens runnerGlobalOpts (\x y -> x { runnerGlobalOpts = y })
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasGHCVariant env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
+class ( HasPlatform env, HasGHCVariant env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
