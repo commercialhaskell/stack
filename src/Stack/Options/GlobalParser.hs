@@ -27,6 +27,10 @@ globalOptsParser currentDir kind defLogLevel =
         "time-in-log"
         "inclusion of timings in logs, for the purposes of using diff with logs"
         hide <*>
+    firstBoolFlagsFalse
+        "rsl-in-log"
+        "inclusion of raw snapshot layer (rsl) in logs"
+        hide <*>
     configOptsParser currentDir kind <*>
     optionalFirst (abstractResolverOptsParser hide0) <*>
     pure (First Nothing) <*> -- resolver root is only set via the script command
@@ -87,6 +91,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
     , globalTimeInLog = fromFirstTrue globalMonoidTimeInLog
+    , globalRSLInLog = fromFirstFalse globalMonoidRSLInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler

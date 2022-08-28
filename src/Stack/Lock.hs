@@ -15,7 +15,6 @@ import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
-import Pantry
 import Path (parent)
 import Path.Extended (addExtension)
 import Path.IO (doesFileExist)
@@ -117,8 +116,9 @@ lockCachedWanted stackFile resolver fillWanted = do
         toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
         slocCache = toMap $ lckSnapshotLocations locked
         pkgLocCache = toMap $ lckPkgImmutableLocations locked
+    debugRSL <- view rslInLogL
     (snap, slocCompleted, pliCompleted) <-
-        loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
+        loadAndCompleteSnapshotRaw' debugRSL resolver slocCache pkgLocCache
     let compiler = snapshotCompiler snap
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted pkgLocCache compiler snPkgs

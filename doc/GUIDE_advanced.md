@@ -16,6 +16,16 @@ output (e.g. `0.35.0`) and quit.
 Stack will report its numeric version to standard output (e.g. `2.7.5`) and
 quit.
 
+## The `stack --[no-]rsl-in-log` flag
+
+(Since 2.7.6)
+
+Default: Disabled
+
+Enables/disables the logging of the raw snapshot layer (rsl) in debug output.
+Information about the raw snapshot layer can be lengthy. If you do not need it,
+it is best omitted from the debug output.
+
 ## The `stack --silent` flag
 
 Equivalent to the `stack --verbosity silent` option.

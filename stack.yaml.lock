@@ -11,6 +11,13 @@ packages:
       size: 1929
   original:
     hackage: hi-file-parser-0.1.3.0@sha256:b868e1bcb73fffe5963de6879f0a0a4c5ced97e08fc09c2c9428af884cdcaa74,2488
+- completed:
+    hackage: pantry-0.5.7@sha256:f96119ad2cc3771fe0891939d8a29c7f089fb333a70646e8deb2ec60532ea948,3914
+    pantry-tree:
+      sha256: c96fe10d96d1b1a9439c473bf27eeb2d94ad2fdbb93ccc4d9f0c69643b868c6d
+      size: 2524
+  original:
+    hackage: pantry-0.5.7@sha256:f96119ad2cc3771fe0891939d8a29c7f089fb333a70646e8deb2ec60532ea948,3914
 snapshots:
 - completed:
     sha256: ce4257dd36ba3b96eeee64cfb08884ddb46dd73f81f8b25a71658834edc607e2
