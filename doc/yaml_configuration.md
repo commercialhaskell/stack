@@ -858,15 +858,6 @@ nix:
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
 
-### os
-
-Set the operating system for GHC, build directories, etc. Values are those
-recognized by Cabal, e.g.:
-
-    os: windows, linux
-
-You are unlikely to want to change the `os` value.
-
 ### package-indices
 
 Default:
