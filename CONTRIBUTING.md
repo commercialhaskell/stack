@@ -304,38 +304,93 @@ Where again, `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 folder.
 
-## CI Build rules
+## Continuous integration (CI)
 
-We use [Azure](https://dev.azure.com/commercialhaskell/stack/_build)
-to do CI builds on Stack. There are two types of build which happens
-there:
+We use [GitHub Actions](https://docs.github.com/en/actions) to do CI on Stack.
+The configuration of the workflows is in the YAML files in `.github/workflows`.
+The current active workflows are:
 
-### Test suite build
+### Linting - `lint.yml`
 
-This builds the code with `--pedantic`, performs hlint checks and it
-runs all test suites on multiple GHC/OS configuration. These are the
-rules for triggering it:
+This workflow will run if:
+* there is a pull request
+* commits are pushed to these branches: `master`, `stable` and `rc/**`
 
-* CI will run this if commits are pushed to stable, master branch
-* CI will run this for any branches starting with `ci/`
-* CI will run this for all new PR's.
+The workflow has one job (`style`). It runs on `ubuntu` only and applies
+yamllint and Hlint.
 
-### Integration based build
+### Test suite - `unit-tests.yml`
 
-This build runs the integration tests in the Stack codebase. This is
-scheduled to run daily once for both the stable and master branches.
+This workflow will run if:
+* there is a pull request
+* commits are pushed to these branches: `master`, `stable` and `rc/**`.
+* requested
 
-Also, you can manually run this on a specific branch from the Azure UI
-if you have the appropriate permissions. If you'd specifically like a
-branch or PR to run integration tests, add a comment in the PR and we
-can queue one up.
+The workflow has two jobs: `pendantic` and `unit-tests`.
 
-### Skipping build
+The `pendantic` job runs on `ubuntu` only and builds Stack with the
+`--pedantic` flag.
 
-There are times (like a minor type fix) where you don't want the CI to
-run. For those cases, you can add `[skip ci]` or `[ci skip]` in your
-commit message to skip the builds. For more details,
-[refer here](https://github.com/Microsoft/azure-pipelines-agent/issues/858#issuecomment-475768046).
+The `unit-tests` job runs on a matrix of operating systems and Stack
+project-level YAML configuration files (`stack.yaml`). It builds and tests Stack
+with the following flags: `--haddock --no-haddock-deps`.
+
+### Integration-based - `intergration-tests.yml`
+
+This workflow will run if:
+* there is a pull request
+* commits are pushed to these branches: `master`, `stable` and `rc/**`
+* any tag is created
+* requested
+
+The workflow has two jobs: `integration-tests` and `github-release`.
+
+The `integration-tests` job runs on a matrix of operating systems (`ubuntu`,
+`windows` and `macos`) and makes use of the `release.hs` script at
+`etc/scripts`.
+
+Its 'Install deps and run checks' step uses `release.hs check`.
+
+Its 'Build bindist' step uses `release.hs build`.
+
+Its 'Upload bindist' step uploads artifacts using the name of the runner's
+operating system (`Linux`, `Windows` or `macOS`) as the name for the artifacts.
+
+The `github-release` job needs `integration-tests` and only takes effect if the
+trigger for the workflow was the creation of a tag.
+
+Its steps `Download Linux/Windows/macOS artifact` download the named artifacts
+to path `_release`.
+
+Its step 'Hash and sign assets' makes use of a 'secret' environment variable
+`RELEASE_SIGNING_KEY` established by the owner of the Stack repository. The
+variable contains the private key for the GPG key with ID 0x575159689BEFB442.
+That key is imported into GPG and then used by GPG to create a detached signture
+for each file.
+
+### ARM64 (AArch64) release - `arm64-release.yml`
+
+This workflow will run if:
+* there is a pull request
+* commits are pushed to these branches: `master`, `stable` and `rc/**`
+* any tag is created
+* requested
+
+The workflow has one job (`arm64`). It runs on a self-hosted runner for Linux
+and ARM64. It makes use of Docker and a Docker file at
+`etc/dockerfiles/arm64.Dockerfile`.
+
+Its 'Build bindist' step makes use of a compiled version of `release.hs` script
+at `etc/scripts` to command `release build`.
+
+Its 'Upload bindist' step uploads artifacts using `Linux-ARM64` as the name for
+the artifacts.
+
+### Inactive - `stan.yml`
+
+Stan is a Haskell static analysis tool. As of 29 August 2022, it does not
+support GHC >= 9.0.1 and Stack is built with GHC >= 9.2.4. Consequently, this
+workflow does not run. Its intent is to apply Stan to Stack.
 
 ## Slack channel
 
