@@ -335,6 +335,12 @@ The `unit-tests` job runs on a matrix of operating systems and Stack
 project-level YAML configuration files (`stack.yaml`). It builds and tests Stack
 with the following flags: `--haddock --no-haddock-deps`.
 
+Its approach to creating a cache depends on the operating system. Its 'Cache
+dependencies on Unix-like OS' step caches the Stack root on Unix-like operating
+systems. Its 'Cache dependencies on Windows' step caches the same information
+on Windows, but takes into account that a relevant directory is located outside
+of the Stack root.
+
 ### Integration-based - `intergration-tests.yml`
 
 This workflow will run if:
@@ -347,7 +353,8 @@ The workflow has two jobs: `integration-tests` and `github-release`.
 
 The `integration-tests` job runs on a matrix of operating systems (`ubuntu`,
 `windows` and `macos`) and makes use of the `release.hs` script at
-`etc/scripts`.
+`etc/scripts`. Its approach to creating a cache is the same as for
+`unit-tests.yml`, described above.
 
 Its 'Install deps and run checks' step uses `release.hs check`.
 
