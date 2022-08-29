@@ -2,11 +2,44 @@
 
 # Signing key
 
-Each release of Stack is signed with the GPG key of the person who makes the
-release.
+Each released Stack executable is signed with either:
 
-Authorized keys are themselves signed by the GPG key with ID 0x575159689BEFB442.
-That key, and keys it has signed, have been uploaded to the
+* the GPG key with ID 0x575159689BEFB442; or
+* the GPG key of a person that has been authorised by the GPG key with ID
+  0x575159689BEFB442.
+
+The signature is in an `*.asc` file. For example:
+
+~~~
+stack-2.7.5-linux-x86_64-bin
+stack-2.7.5-linux-x86_64-bin.asc
+~~~
+
+The signature can be verified with GPG, as follows:
+
+~~~
+$ # Receive the public key from a keyserver
+$ gpg --keyserver keyserver.ubuntu.com --recv-keys 0x575159689BEFB442
+$ # Get information about the key
+$ gpg --keyid-format long --list-keys 0x575159689BEFB442
+pub   rsa2048/575159689BEFB442 2015-06-02 [SC]
+      C5705533DA4F78D8664B5DC0575159689BEFB442
+uid                 [ unknown] FPComplete <dev@fpcomplete.com>
+sub   rsa2048/85A738994664AB89 2015-06-02 [E]
+
+$ # Attempt to verify the file using the signature file. The public key has not
+$ # yet been certified with a trusted signature.
+$ gpg --verify stack-2.7.5-linux-x86_64-bin.asc stack-2.7.5-linux-x86_64-bin
+gpg: Signature made 06/03/2022 15:15:21 GMT Standard Time
+gpg:                using RSA key C5705533DA4F78D8664B5DC0575159689BEFB442
+gpg: Good signature from "FPComplete <dev@fpcomplete.com>" [unknown]
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: C570 5533 DA4F 78D8 664B  5DC0 5751 5968 9BEF B442
+~~~
+
+The GPG key with ID 0x575159689BEFB442, and keys it has signed, have been
+uploaded to the
 [Ubuntu Keyserver](https://keyserver.ubuntu.com/pks/lookup?search=0x575159689BEFB442&fingerprint=on&op=index).
 
 This is the public key block for GPG key ID 0x575159689BEFB442:
