@@ -386,10 +386,19 @@ documentation.
 
 ## Continuous integration (CI)
 
-### Travis with caching
+### GitHub Actions
 
-This content has been moved to a dedicated
-[Travis CI document](https://docs.haskellstack.org/en/stable/travis_ci/).
+The Stack repository uses GitHub Actions for its own CI. For further
+information, see the guide to
+[contributing](CONTRIBUTING.md#continuous-integration-ci).
+
+### Azure
+
+For further information, see the [Azure CI](azure_ci.md) documentation.
+
+### Travis
+
+For futher information, see the [Travis CI](travis_ci.md) documentation.
 
 ## Editor integration
 
