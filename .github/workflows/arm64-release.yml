@@ -1,15 +1,17 @@
 name: ARM64 (AArch64) Release
 
-on:
-  pull_request:
-  push:
-    branches:
-    - master
-    - stable
-    - rc/**
-    tags:
-    - '**'
-  workflow_dispatch:
+# Disabled because integrated into integration-tests.yml.
+
+# on:
+#   pull_request:
+#   push:
+#     branches:
+#     - master
+#     - stable
+#     - rc/**
+#     tags:
+#     - '**'
+#   workflow_dispatch:
 
 jobs:
   arm64:
