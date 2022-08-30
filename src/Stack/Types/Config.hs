@@ -1623,9 +1623,14 @@ platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
-    = GHCStandard -- ^ Standard bindist
-    | GHCIntegerSimple -- ^ Bindist that uses integer-simple
-    | GHCCustom String -- ^ Other bindists
+    = GHCStandard
+    -- ^ Standard bindist
+    | GHCIntegerSimple
+    -- ^ Bindist that uses integer-simple
+    | GHCNativeBignum
+    -- ^ Bindist that uses the Haskell-native big-integer backend
+    | GHCCustom String
+    -- ^ Other bindists
     deriving (Show)
 
 instance FromJSON GHCVariant where
@@ -1639,6 +1644,7 @@ instance FromJSON GHCVariant where
 ghcVariantName :: GHCVariant -> String
 ghcVariantName GHCStandard = "standard"
 ghcVariantName GHCIntegerSimple = "integersimple"
+ghcVariantName GHCNativeBignum = "int-native"
 ghcVariantName (GHCCustom name) = "custom-" ++ name
 
 -- | Render a GHC variant to a String suffix.
@@ -1655,6 +1661,7 @@ parseGHCVariant s =
           | s == "" -> return GHCStandard
           | s == "standard" -> return GHCStandard
           | s == "integersimple" -> return GHCIntegerSimple
+          | s == "int-native" -> return GHCNativeBignum
           | otherwise -> return (GHCCustom s)
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)

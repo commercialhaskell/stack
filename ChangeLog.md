@@ -41,6 +41,7 @@ Other enhancements:
   [#5585](https://github.com/commercialhaskell/stack/pull/5585)
 * `tools` subcommand added to `stack ls`, to list stack's installed tools.
 * `stack uninstall` shows how to uninstall Stack.
+* `--ghc-variant` accepts `int-native` as a variant.
 
 Bug fixes:
 
