@@ -349,7 +349,8 @@ This workflow will run if:
 * any tag is created
 * requested
 
-The workflow has two jobs: `integration-tests` and `github-release`.
+The workflow has three jobs: `integration-tests`, `linux-arm64` and
+`github-release`.
 
 The `integration-tests` job runs on a matrix of operating systems (`ubuntu`,
 `windows` and `macos`) and makes use of the `release.hs` script at
@@ -363,35 +364,26 @@ Its 'Build bindist' step uses `release.hs build`.
 Its 'Upload bindist' step uploads artifacts using the name of the runner's
 operating system (`Linux`, `Windows` or `macOS`) as the name for the artifacts.
 
-The `github-release` job needs `integration-tests` and only takes effect if the
-trigger for the workflow was the creation of a tag.
-
-Its steps `Download Linux/Windows/macOS artifact` download the named artifacts
-to path `_release`.
-
-Its step 'Hash and sign assets' makes use of a 'secret' environment variable
-`RELEASE_SIGNING_KEY` established by the owner of the Stack repository. The
-variable contains the private key for the GPG key with ID 0x575159689BEFB442.
-That key is imported into GPG and then used by GPG to create a detached signture
-for each file.
-
-### ARM64 (AArch64) release - `arm64-release.yml`
-
-This workflow will run if:
-* there is a pull request
-* commits are pushed to these branches: `master`, `stable` and `rc/**`
-* any tag is created
-* requested
-
-The workflow has one job (`arm64`). It runs on a self-hosted runner for Linux
-and ARM64. It makes use of Docker and a Docker file at
-`etc/dockerfiles/arm64.Dockerfile`.
+The `linux-arm64` job runs on a self-hosted runner for Linux and ARM64. It makes
+use of Docker and a Docker file at `etc/dockerfiles/arm64.Dockerfile`.
 
 Its 'Build bindist' step makes use of a compiled version of `release.hs` script
 at `etc/scripts` to command `release build`.
 
 Its 'Upload bindist' step uploads artifacts using `Linux-ARM64` as the name for
 the artifacts.
+
+The `github-release` job needs `integration-tests` and `linux-arm64`. It only
+takes effect if the trigger for the workflow was the creation of a tag.
+
+Its four steps `Download Linux/Windows/macOS/Linux-ARM64 artifact` download the
+named artifacts to path `_release`.
+
+Its step 'Hash and sign assets' makes use of a 'secret' environment variable
+`RELEASE_SIGNING_KEY` established by the owner of the Stack repository. The
+variable contains the private key for the GPG key with ID 0x575159689BEFB442.
+That key is imported into GPG and then used by GPG to create a detached signture
+for each file.
 
 ### Inactive - `stan.yml`
 
