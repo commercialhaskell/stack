@@ -4,7 +4,8 @@
 
 Stack is configured by the content of YAML files. Stack's YAML configuration
 options break down into [project-specific](#project-specific-configuration)
-options and [non-project-specific](#non-project-specific-configuration) options. They are configured at the project-level or globally.
+options and [non-project-specific](#non-project-specific-configuration) options.
+They are configured at the project-level or globally.
 
 The **project-level** configuration file (`stack.yaml`) contains
 project-specific options and may contain non-project-specific options.
@@ -56,6 +57,8 @@ version. Similarly, `extra-deps` will shadow the version specified in the
 resolver.
 
 ### resolver or snapshot
+
+Command line equivalent (takes precedence): `--resolver` option
 
 `resolver` and `snapshot` are synonyms. Only one of these keys is permitted, not
 both.
@@ -220,6 +223,8 @@ For further information on the format for specifying dependencies, see the
 
 Default: `{}`
 
+Command line equivalent (takes precedence): `stack build --flag` option
+
 Flags can be set for each package separately, e.g.
 
 ```yaml
@@ -281,6 +286,8 @@ user-message: ! 'Warning: Some packages were found to be incompatible with the r
 
 Default: `[]`
 
+Command line equivalent: `--customer-preprocessor-extensions` option
+
 In order for Stack to be aware of any custom preprocessors you are using, add
 their extensions here
 
@@ -301,9 +308,11 @@ options below are listed in alphabetic order.
 
 (Since 1.0.1)
 
+Restrictions: POSIX systems only.
+
 Default: `false`
 
-Restrictions: POSIX systems only.
+Command line equivalent (takes precedence): `--[no-]allow-different-user` flag
 
 Allow users other than the owner of the Stack root to use the Stack
 installation.
@@ -352,12 +361,16 @@ about your snapshot database.
 
 ### arch
 
-Set the architecture for GHC, build directories, etc. Values are those
-recognized by Cabal, e.g.:
+Default: The machine architecture on which Stack is running.
 
-    arch: i386, x86_64
+Command line equivalent (takes precedence): `--arch` option
 
-This can also be set via the command line.
+Stack identifies different GHC executables by platform (operating system and
+machine architecture), (optional) GHC variant and (optional) GHC build.
+See [`setup-info`](#setup-info).
+
+`arch` sets the machine architecture. Values are those recognized by Cabal,
+including `x86_64`, `i386` and `aarch64`.
 
 ### build
 
@@ -412,6 +425,8 @@ build:
   ddump-dir: ""
 ```
 
+Command line equivalents (take precedence): Yes, see below.
+
 Allows setting build options which are usually specified on the command line.
 
 The meanings of these settings correspond directly with the command line flags
@@ -421,14 +436,12 @@ of the same name. For further information, see the
 
 ### color
 
+Command line equivalent (takes precedence): `--color` option
+
 This option specifies when to use color in output. The option is used as
 `color: <WHEN>`, where `<WHEN>` is 'always', 'never', or 'auto'. On Windows
 versions before Windows 10, for terminals that do not support color codes, the
 default is 'never'; color may work on terminals that support color codes.
-
-The color use can also be set at the command line using the equivalent
-`--color=<WHEN>` global option. Color use set at the command line takes
-precedence over that set in a yaml configuration file.
 
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
@@ -436,6 +449,8 @@ files, the American spelling is the alternative that has priority.)
 ### compiler
 
 (Since 0.1.7)
+
+Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
@@ -591,6 +606,9 @@ repository. See the output of `stack templates`.
 
 ### docker
 
+Command line equivalents: `--docker-*` flags and options (see
+`stack --docker-help` for details).
+
 For further information, see the
 [Docker integration](docker_integration.md#configuration) documentation.
 
@@ -599,6 +617,8 @@ For further information, see the
 (Since 1.3.0)
 
 Default: `warning`
+
+Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 
 Control which log output from local non-dependency packages to print to the
 console. By default, Stack will only do this when building a single target
@@ -614,6 +634,9 @@ dump-logs: all       # dump all logs for local non-dependency packages
 ### extra-include-dirs
 
 Default: `[]`
+
+Command line equivalent: `--extra-include-dirs` option (repeat for each
+directory)
 
 A list of extra paths to be searched for header files. Paths should be absolute
 
@@ -631,6 +654,8 @@ may well make sense to include these there as well.
 
 Default: `[]`
 
+Command line equivalent: `--extra-lib-dirs` option (repeat for each directory)
+
 A list of extra paths to be searched for libraries. Paths should be absolute
 
 ```yaml
@@ -640,7 +665,7 @@ extra-lib-dirs:
 
 Since these are system-dependent absolute paths, it is recommended that you
 specify these in your `config.yaml` file. If you control the build environment
-in your project's ``stack.yaml``, perhaps through docker or other means, then it
+in your project's ``stack.yaml``, perhaps through Docker or other means, then it
 may well make sense to include these there as well.
 
 ### extra-path
@@ -666,10 +691,18 @@ compiler's binary directory - will take precedence over those specified here
 
 (Since 1.3.0)
 
-Specify a specialized architecture bindist to use.  Normally this is
-determined automatically, but you can override the autodetected value here.
-Possible arguments include `standard`, `gmp4`, `nopie`, `tinfo6`,
-`tinfo6-nopie`, `ncurses6`, `int-native` and `integersimple`.
+Default: `standard`
+
+Command line equivalent (takes precedence): `--ghc-build` option
+
+Stack identifies different GHC executables by platform (operating system and
+machine architecture), (optional) GHC variant and (optional) GHC build.
+See [`setup-info`](#setup-info).
+
+`ghc-build` specifies a specialized architecture for the GHC executable.
+Normally this is determined automatically, but it can be overriden. Possible
+arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
+`ncurses6`, `int-native` and `integersimple`.
 
 ### ghc-options
 
@@ -710,7 +743,13 @@ expressive, keys.
 
 Default: `standard`
 
-Specify a variant binary distribution of GHC to use. Known values:
+Command line equivalent (takes precedence): `--ghc-variant` option
+
+Stack identifies different GHC executables by platform (operating system and
+machine architecture), (optional) GHC variant and (optional) GHC build.
+See [`setup-info`](#setup-info).
+
+`ghc-variant` specifies a variant of the GHC executable. Known values are:
 
 * `standard`: Use the standard GHC binary distribution
 * `int-native`: From GHC 9.4.1, use a GHC bindist that uses the Haskell-native
@@ -783,15 +822,18 @@ will receive a warning if this configuration value is set.
 
 Default: `true` (since 1.5.0)
 
+Command line equivalent (takes precedence): `--[no-]install-ghc` flag
+
 Whether or not to automatically install GHC when necessary.
 
 ### jobs
 
 Default: the number of processors reported by your CPU.
 
-Specifies how many build tasks should be run in parallel. This can be overloaded
-on the command line via `-jN`, for example `-j2`. One usage for this might be to
-avoid running out of memory by setting it to 1, like this:
+Command line equivalent (takes precedence): `-j`, `--jobs` option
+
+Specifies how many build tasks should be run in parallel. One usage for this
+might be to avoid running out of memory by setting it to 1, like this:
 
 ```yaml
 jobs: 1
@@ -802,6 +844,8 @@ jobs: 1
 Default (on Unix-like operating systems): `~/.local/bin`
 
 Default (on Windows): `%APPDATA%\local\bin`
+
+Command line equivalent (takes precedence): `--local-bin-path` option
 
 Target directory for `stack install` and `stack build --copy-bins`.
 
@@ -834,9 +878,13 @@ Hackage that make use of `configure` are `network` and `process`.
 
 (Since 0.1.6)
 
+Restrictions: Windows systems only.
+
 Default: `true`
 
-Whether to modify the code page for UTF-8 output when running on Windows.
+Command line equivalent (takes precedence): `--[no-]modify-code-page` flag
+
+Whether to modify the code page for UTF-8 output.
 
 ```yaml
 modify-code-page: false
@@ -859,17 +907,11 @@ nix:
   shell-file:
 ~~~
 
+Command line equivalents: `--nix-*` flags and options (see `stack --nix-help`
+for details).
+
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
-
-### os
-
-Set the operating system for GHC, build directories, etc. Values are those
-recognized by Cabal, e.g.:
-
-    os: windows, linux
-
-You are unlikely to want to change the `os` value.
 
 ### package-indices
 
@@ -1090,6 +1132,8 @@ setup-info-locations: []
 
 (Since 2.3)
 
+Command line equivalent (takes precedence): `--setup-info-yaml` option
+
 By way of introduction, see the [`setup-info`](#setup-info) option. This option
 specifies the location(s) of `setup-info` dictionaries.
 
@@ -1171,6 +1215,8 @@ ghc:
 
 Default: `false`
 
+Command line equivalent (takes precedence): `--[no-]skip-ghc-check` flag
+
 Should we skip the check to confirm that your system GHC version (on the PATH)
 matches what your project expects?
 
@@ -1178,9 +1224,11 @@ matches what your project expects?
 
 (Since 0.1.2.0)
 
+Restrictions: Windows systems only
+
 Default: `false`
 
-Restrictions: Windows systems only
+Command line equivalent (takes precedence): `--[no-]skip-msys` flag
 
 Skips checking for and installing MSYS2 when stack is Setting up the
 environment. This usually doesn't make sense in project-level configurations,
@@ -1196,6 +1244,8 @@ skip-msys: true
 
 Default: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/
 (as set in the `pantry` library)
+
+Command line equivalent (takes precedence): `--snapshot-location-base` option
 
 Sets the base location of the LTS Haskell or Stackage Nightly snapshots.
 
@@ -1218,6 +1268,8 @@ environments. To avoid the firewall, one can run a local snapshots mirror and
 then use a custom `snapshot-location-base` in the closed environments only.
 
 ### stack-colors
+
+Command line equivalent (takes precedence): `--stack-colors` option
 
 Stack uses styles to format some of its output. The default styles do not work
 well with every terminal theme. This option specifies Stack's output styles,
@@ -1245,11 +1297,8 @@ terminal theme might wish to set the styles as follows:
 ```yaml
 stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95:secondary=92:highlight=32
 ```
-The styles can also be set at the command line using the equivalent
-`--stack-colors=<STYLES>` global option. Styles set at the command line take
-precedence over those set in a YAML configuration file. (In respect of styles
-used in verbose output, some of that output occurs before the configuration file
-is processed.)
+In respect of styles used in verbose output, some of that output occurs before
+the configuration file is processed.
 
 (The British English spelling (colour) is also accepted. In YAML configuration
 files, the American spelling is the alternative that has priority.)
@@ -1273,6 +1322,8 @@ stack-developer-mode: false
 
 Default: `false`, unless the [Docker](docker_integration.md) or
 [Nix](nix_integration.md) integration is enabled.
+
+Command line equivalent (takes precedence): `--[no-]system-ghc` flag
 
 Enables or disables using the GHC available on the PATH. (Make sure PATH is
 explicit, i.e., don't use ~.) Useful to enable if you want to save the time,
@@ -1356,6 +1407,8 @@ Customize the URLs where Stack looks for snapshot build plans.
 
 ### with-gcc
 
+Command line equivalent (takes precedence): `--with-gcc` option
+
 Specify a path to GCC explicitly, rather than relying on the normal path
 resolution.
 
@@ -1364,6 +1417,8 @@ with-gcc: /usr/local/bin/gcc-5
 ```
 
 ### with-hpack
+
+Command line equivalent (takes precedence): `--with-hpack` option
 
 Use an [Hpack](https://github.com/sol/hpack) executable, rather than Stack's
 in-built version of the Hpack functionality.
@@ -1378,13 +1433,12 @@ with-hpack: /usr/local/bin/hpack
 
 Default: `.stack-work`
 
-This key specifies the relative path of Stack's 'work' directory. This can also
-be specified by an environment variable or on the command line. The earlier
-items in the list below take precedence:
+Command line equivalent (takes precedence): `--work-dir` option
 
-1. `--work-dir DIR` passed on the command line
-2. `work-dir` in a YAML configuration file
-3. `STACK_WORK` environment variable
+Environment variable alternative (lowest precedence): `STACK_WORK`
+
+`work-dir` (or the contents of `STACK_WORK`) specifies the relative path of
+Stack's 'work' directory.
 
 ## Customisation
 
