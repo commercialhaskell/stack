@@ -2,7 +2,7 @@
     display: none
 }
 
-.codehilite code, .codehilite pre{color:#3F3F3F;background-color:#F7F7F7;
+.codehilite div {color:#3F3F3F;background-color:#F7F7F7;
 overflow: auto;
 box-sizing: border-box;
 
@@ -55,7 +55,8 @@ border: 1px solid #CCC !important;
     border-image-slice: 100% 100% 100% 100%;
     border-image-width: 1 1 1 1;
     border-image-outset: 0 0 0 0;
-    border-image-repeat: stretch stretch;}
+    border-image-repeat: stretch stretch;
+}
 .codehilite .hll { background-color: #ffffcc }
 .codehilite .c { color: #999988; font-style: italic } /* Comment */
 .codehilite .err { color: #a61717; background-color: #e3d2d2 } /* Error */
