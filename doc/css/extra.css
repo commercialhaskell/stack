@@ -2,7 +2,7 @@
     display: none
 }
 
-.codehilite pre {color:#3F3F3F;background-color:#F7F7F7;
+.codehilite code {color:#3F3F3F;background-color:#F7F7F7;
 overflow: auto;
 box-sizing: border-box;
 
