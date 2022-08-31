@@ -47,6 +47,7 @@ pages:
     - Add GHC version: maintainers/ghc.md
     - Docker images: maintainers/docker.md
     - Upgrading MSYS2: maintainers/msys.md
+    - HaskellStack.org: maintainers/haskellstack.org.md
   - Signing key: SIGNING_KEY.md
 - Glossary: glossary.md
 
