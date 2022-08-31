@@ -17,8 +17,7 @@ are HTTP 404 Not Found errors:
     / -> /README/
     /README/ -> /
 
-The 'Home' MkDocs page is `doc/README.md`, which is a symbolic link to
-`/README.md`.
+The 'Home' MkDocs page is `doc/README.md`.
 
 The `/ -> /README/` redirect ensures that
 https://docs.haskellstack.org/en/stable/ (for example) will, if not found,
@@ -55,6 +54,3 @@ directory. See https://www.mkdocs.org/user-guide/configuration/.
 are created. This directory is added to the `.gitignore` file.
 
 MkDocs 1.3.0 replaced the `pages:` key with the `nav:` key.
-
-The 'Home' MkDocs page is `doc/README.md`, which is a symbolic link to
-`/README.md`.
