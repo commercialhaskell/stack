@@ -10,8 +10,8 @@ here is to be as helpful and concise as possible.
 
 The version of GHC, as well as which packages can be installed, are specified by
 the _resolver_. This may be something like `lts-19.19`, which is from
-[Stackage](https://www.stackage.org/). The [user guide](GUIDE.md) discusses the
-resolver in more detail.
+[Stackage](https://www.stackage.org/). The [user's guide](GUIDE.md) discusses
+the resolver in more detail.
 
 The resolver is determined by finding the relevant project-level configuration
 file (`stack.yaml`) for the directory you're running the command from. This

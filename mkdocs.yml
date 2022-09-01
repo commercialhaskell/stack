@@ -17,8 +17,8 @@ pages:
 - Changelog: ChangeLog.md
 - Tool documentation:
   - Install/upgrade: install_and_upgrade.md
-  - User guide (introductory): GUIDE.md
-  - User guide (advanced): GUIDE_advanced.md
+  - User's guide (introductory): GUIDE.md
+  - User's guide (advanced): GUIDE_advanced.md
   - FAQ: faq.md
   - Configuration (project and global): yaml_configuration.md
   - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
@@ -40,9 +40,8 @@ pages:
 - Advanced documentation:
   - Build overview: build_overview.md
 - Project documentation:
-- For Contributors:
-  - Contributors guide: CONTRIBUTING.md
-- For Maintainers:
+  - Contributor's guide: CONTRIBUTING.md
+- Maintainer's guide:
   - Releases: maintainers/releases.md
   - Maintainer team process: maintainers/team_process.md
   - Add GHC version: maintainers/ghc.md

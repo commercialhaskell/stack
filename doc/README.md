@@ -148,12 +148,12 @@ To manage your library:
    file, in its `extra-deps:` section.
 
 That was a really fast introduction on how to start to code in Haskell using
-Stack. If you want to go further, we highly recommend you read the
-[Stack User Guide](GUIDE.md).
+Stack. If you want to go further, we highly recommend you read Stack's
+[user's guide](GUIDE.md).
 
 ## Complete guide to Stack
 
-A complete [user guide to Stack](GUIDE.md) is available, covering all of
+A complete [user's guide](GUIDE.md) to Stack is available, covering all of
 the most common ways to use Stack. Terms used in Stack's documentation are also
 explained in the [glossary](glossary.md).
 
