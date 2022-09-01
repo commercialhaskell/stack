@@ -72,9 +72,9 @@ of any `STACK_WORK` environment variable.
 
 ## The `stack build` command
 
-The `stack build` command is introduced in the first part of
-[Stack's user guide](GUIDE.md#the-stack-build-command). For further information
-about the command, see the [build command](build_command.md) documentation.
+The `stack build` command is introduced in the first part of Stack's
+[user's guide](GUIDE.md#the-stack-build-command). For further information about
+the command, see the [build command](build_command.md) documentation.
 
 ## The `stack config` commands
 

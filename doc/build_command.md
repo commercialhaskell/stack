@@ -8,9 +8,9 @@ The primary command you use in Stack is `build`. This page describes the `build`
 command's interface. The goal of the interface is to do the right thing for
 simple input, and allow a lot of flexibility for more complicated goals.
 
-See the introductory part of
-[Stack's user guide](GUIDE.md#the-stack-build-command) for an introduction to
-the command.
+See the introductory part of Stack's
+[user's guide](GUIDE.md#the-stack-build-command) for an introduction to the
+command.
 
 ## Synonyms
 
@@ -119,7 +119,7 @@ To get a list of the available targets in your project, use `stack ide targets`.
 ## Controlling what gets built
 
 Stack will automatically build the necessary dependencies. See the introductory
-part of [Stack's user guide](GUIDE.md#the-stack-build-command) for information
+part of Stack's [user's guide](GUIDE.md#the-stack-build-command) for information
 about how these dependencies get specified.
 
 In addition to specifying targets, you can also control what gets built, or
