@@ -23,7 +23,7 @@ cache:
 addons:
   apt:
     packages:
-      - libgmp-dev
+    - libgmp-dev
 
 before_install:
 # Download and unpack the stack executable

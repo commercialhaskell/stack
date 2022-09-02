@@ -1,5 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards, DeriveDataTypeable, OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
 
 -- | Nix configuration
 module Stack.Config.Nix

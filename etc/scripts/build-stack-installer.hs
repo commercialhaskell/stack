@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-14.27
+    --resolver nightly-2022-08-02
     --install-ghc
     --package nsis
 -}
@@ -16,7 +16,7 @@ import Development.NSIS.Plugins.EnvVarUpdate
 
 main :: IO ()
 main = do
-  [srcPath, execPath, nsiPath] <- getArgs
+  [srcPath, execPath, nsiPath, stackVersionStr] <- getArgs
 
   writeFile (fromString nsiPath) $ nsis $ do
     _ <- constantStr "Name" "Haskell Stack"
@@ -43,6 +43,7 @@ main = do
 
       -- Write the uninstall keys for Windows
       writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayName" "$Name"
+      writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "DisplayVersion" (str stackVersionStr)
       writeRegStr HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "UninstallString" "\"$INSTDIR/uninstall-stack.exe\""
       writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoModify" 1
       writeRegDWORD HKCU "Software/Microsoft/Windows/CurrentVersion/Uninstall/$Name" "NoRepair" 1
@@ -52,7 +53,7 @@ main = do
       [ Description "Add installation directory to user %PATH% to allow running Stack in the console."
       ] $ do
         setEnvVarPrepend HKCU "PATH" "$INSTDIR"
-        
+
     section "Set %STACK_ROOT% to recommended default"
       [ Description "Set %STACK_ROOT% to C:\\sr to workaround issues with long paths."
       ] $ do
@@ -79,7 +80,7 @@ main = do
       [ Description "Remove setting of %STACK_ROOT% to C:\\sr."
       ] $ do
         deleteEnvVar HKCU "STACK_ROOT"
-        
+
     section "un.Compilers installed by stack"
       [ Unselected
       , Description "Remove %LOCALAPPDATA%/Programs/stack, which contains compilers that have been installed by Stack."

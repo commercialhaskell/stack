@@ -231,15 +231,14 @@ found in the current directory.
 
 ## How to uninstall
 
-To uninstall Stack, it should be sufficient to:
+To uninstall Stack, it should be sufficient to delete:
 
-1. Delete the Stack root folder (see `stack path --stack-root`, before you
-   uninstall).
-2. On Windows, delete the folder containing Stack's tools (see
-   `stack path --programs`, before you uninstall), which is located outside of
-   the Stack root folder
-3. Delete the `stack` executable (see `which stack`, on Unix-like operating
+1. the Stack root folder (see `stack path --stack-root`, before you uninstall);
+2. on Windows, the folder containing Stack's tools (see `stack path --programs`,
+   before you uninstall), which is located outside of the Stack root folder; and
+3. the `stack` executable file (see `which stack`, on Unix-like operating
    systems, or `where.exe stack`, on Windows).
 
 You may also want to delete ``.stack-work`` folders in any Haskell projects that
-you have built using Stack.
+you have built using Stack. The `stack uninstall` command provides information
+about how to uninstall Stack.

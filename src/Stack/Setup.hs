@@ -1,15 +1,15 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PackageImports      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Stack.Setup
   ( setupEnv
@@ -33,6 +33,7 @@ import              Conduit
 import              Control.Applicative (empty)
 import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
 import              Pantry.Internal.AesonExtended
+import qualified    Data.Aeson.KeyMap as KeyMap
 import qualified    Data.ByteString as S
 import qualified    Data.ByteString.Lazy as LBS
 import qualified    Data.Conduit.Binary as CB
@@ -40,13 +41,13 @@ import              Data.Conduit.Lazy (lazyConsume)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
-import              Data.Foldable (maximumBy)
-import qualified    Data.HashMap.Strict as HashMap
 import              Data.List hiding (concat, elem, maximumBy, any)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T
+import qualified    Data.Text.Lazy as TL
 import qualified    Data.Text.Encoding as T
+import qualified    Data.Text.Lazy.Encoding as TL
 import qualified    Data.Text.Encoding.Error as T
 import qualified    Data.Yaml as Yaml
 import              Distribution.System (OS, Arch (..), Platform (..))
@@ -79,7 +80,10 @@ import              Stack.Constants.Config (distRelativeDir)
 import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
 import              Stack.Prelude hiding (Display (..))
 import              Stack.SourceMap
-import              Stack.Setup.Installed
+import              Stack.Setup.Installed (Tool (..), extraDirs, filterTools,
+                                          installDir, getCompilerVersion,
+                                          listInstalled, markInstalled, tempInstallDir,
+                                          toolString, unmarkInstalled)
 import              Stack.Storage.User (loadCompilerPaths, saveCompilerPaths)
 import              Stack.Types.Build
 import              Stack.Types.Compiler
@@ -100,7 +104,7 @@ import              Data.List.Split (splitOn)
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
 defaultSetupInfoYaml =
-    "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
+    "https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -301,7 +305,8 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                             (True, Just ghcRts) -> Map.insert "GHCRTS" (T.pack ghcRts)
                             _ -> id
 
-                        -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
+                        -- For reasoning and duplication, see:
+                        -- https://github.com/commercialhaskell/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es
@@ -439,21 +444,18 @@ ensureCompilerAndMsys
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
+  getSetupInfo' <- memoizeRef getSetupInfo
+  mmsys2Tool <- ensureMsys sopts getSetupInfo'
+  msysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
+
   actual <- either throwIO pure $ wantedToActual $ soptsWantedCompiler sopts
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
 
-  getSetupInfo' <- memoizeRef getSetupInfo
   (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
 
   warnUnsupportedCompilerCabal cp didWarn
 
-  mmsys2Tool <- ensureMsys sopts getSetupInfo'
-  paths <-
-    case mmsys2Tool of
-      Nothing -> pure ghcPaths
-      Just msys2Tool -> do
-        msys2Paths <- extraDirs msys2Tool
-        pure $ ghcPaths <> msys2Paths
+  let paths = maybe ghcPaths (ghcPaths <>) msysPaths
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
@@ -468,9 +470,9 @@ warnUnsupportedCompiler ghcVersion = do
         logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
         logWarn ""
         pure True
-    | ghcVersion >= mkVersion [9, 1] -> do
+    | ghcVersion >= mkVersion [9, 5] -> do
         logWarn $
-          "Stack has not been tested with GHC versions above 9.0, and using " <>
+          "Stack has not been tested with GHC versions above 9.4, and using " <>
           fromString (versionString ghcVersion) <>
           ", this may fail"
         pure True
@@ -495,9 +497,9 @@ warnUnsupportedCompilerCabal cp didWarn = do
         logWarn "This invocation will most likely fail."
         logWarn "To fix this, either use an older version of Stack or a newer resolver"
         logWarn "Acceptable resolvers: lts-3.0/nightly-2015-05-05 or later"
-    | cabalVersion >= mkVersion [3, 5] ->
+    | cabalVersion >= mkVersion [3, 9] ->
         logWarn $
-          "Stack has not been tested with Cabal versions above 3.4, but version " <>
+          "Stack has not been tested with Cabal versions above 3.8, but version " <>
           fromString (versionString cabalVersion) <>
           " was found, this may fail"
     | otherwise -> pure ()
@@ -596,13 +598,18 @@ installGhcBindist sopts getSetupInfo' installed = do
 
 -- | Ensure compiler is installed, without worrying about msys
 ensureCompiler
-  :: forall env. (HasBuildConfig env, HasGHCVariant env)
+  :: forall env. (HasConfig env, HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
     let wanted = soptsWantedCompiler sopts
     wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
+
+    hook <- ghcInstallHook
+    hookIsExecutable <- handleIO (\_ -> pure False) $ if osIsWindows
+      then doesFileExist hook  -- can't really detect executable on windows, only file extension
+      else executable <$> getPermissions hook
 
     Platform expectedArch _ <- view platformL
 
@@ -623,19 +630,77 @@ ensureCompiler sopts getSetupInfo' = do
             Right cp -> pure $ Just cp
 
     mcp <-
-        if soptsUseSystem sopts
-            then do
-                logDebug "Getting system compiler version"
-                runConduit $
-                  sourceSystemCompilers wanted .|
-                  concatMapMC checkCompiler .|
-                  await
-            else return Nothing
+      if | soptsUseSystem sopts -> do
+            logDebug "Getting system compiler version"
+            runConduit $
+              sourceSystemCompilers wanted .|
+              concatMapMC checkCompiler .|
+              await
+         | hookIsExecutable -> do
+          -- if the hook fails, we fall through to stacks sandboxed installation
+            hookGHC <- runGHCInstallHook sopts hook
+            maybe (pure Nothing) checkCompiler hookGHC
+         | otherwise -> return Nothing
     case mcp of
       Nothing -> ensureSandboxedCompiler sopts getSetupInfo'
       Just cp -> do
         let paths = ExtraDirs { edBins = [parent $ cpCompiler cp], edInclude = [], edLib = [] }
         pure (cp, paths)
+
+
+-- | Runs @STACK_ROOT\/hooks\/ghc-install.sh@.
+--
+-- Reads and possibly validates the output of the process as the GHC
+-- binary and returns it.
+runGHCInstallHook
+  :: HasBuildConfig env
+  => SetupOpts
+  -> Path Abs File
+  -> RIO env (Maybe (Path Abs File))
+runGHCInstallHook sopts hook = do
+    logDebug "Getting hook installed compiler version"
+    let wanted = soptsWantedCompiler sopts
+    menv0 <- view processContextL
+    menv <- mkProcessContext (Map.union (wantedCompilerToEnv wanted) $
+      removeHaskellEnvVars (view envVarsL menv0))
+    (exit, out) <- withProcessContext menv $ proc "sh" [toFilePath hook] readProcessStdout
+    case exit of
+      ExitSuccess -> do
+        let ghcPath = stripNewline . TL.unpack . TL.decodeUtf8With T.lenientDecode $ out
+        case parseAbsFile ghcPath of
+          Just compiler -> do
+            when (soptsSanityCheck sopts) $ sanityCheck compiler
+            logDebug ("Using GHC compiler at: " <> fromString (toFilePath compiler))
+            pure (Just compiler)
+          Nothing -> do
+            logWarn ("Path to GHC binary is not a valid path: " <> fromString ghcPath)
+            pure Nothing
+      ExitFailure i -> do
+        logWarn ("GHC install hook exited with code: " <> fromString (show i))
+        pure Nothing
+ where
+    wantedCompilerToEnv :: WantedCompiler -> EnvVars
+    wantedCompilerToEnv (WCGhc ver) =
+      Map.fromList [("HOOK_GHC_TYPE", "bindist")
+                   ,("HOOK_GHC_VERSION", T.pack (versionString ver))
+                   ]
+    wantedCompilerToEnv (WCGhcGit commit flavor) =
+      Map.fromList [("HOOK_GHC_TYPE", "git")
+                   ,("HOOK_GHC_COMMIT", commit)
+                   ,("HOOK_GHC_FLAVOR", flavor)
+                   ,("HOOK_GHC_FLAVOUR", flavor)
+                   ]
+    wantedCompilerToEnv (WCGhcjs ghcjs_ver ghc_ver) =
+      Map.fromList [("HOOK_GHC_TYPE", "ghcjs")
+                   ,("HOOK_GHC_VERSION", T.pack (versionString ghc_ver))
+                   ,("HOOK_GHCJS_VERSION", T.pack (versionString ghcjs_ver))
+                   ]
+    newlines :: [Char]
+    newlines = ['\n', '\r']
+
+    stripNewline :: String -> String
+    stripNewline str = filter (flip notElem newlines) str
+
 
 ensureSandboxedCompiler
   :: HasBuildConfig env
@@ -1093,18 +1158,8 @@ getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find
                  -> (Version -> Bool) -- ^ which versions are acceptable
                  -> Maybe Tool
-getInstalledTool installed name goodVersion =
-    if null available
-        then Nothing
-        else Just $ Tool $ maximumBy (comparing pkgVersion) available
-  where
-    available = mapMaybe goodPackage installed
-    goodPackage (Tool pi') =
-        if pkgName pi' == name &&
-           goodVersion (pkgVersion pi')
-            then Just pi'
-            else Nothing
-    goodPackage _ = Nothing
+getInstalledTool installed name goodVersion = Tool <$>
+  maximumByMaybe (comparing pkgVersion) (filterTools name goodVersion installed)
 
 downloadAndInstallTool :: (HasTerm env, HasBuildConfig env)
                        => Path Abs Dir
@@ -1400,9 +1455,21 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
 
     dir <- expectSingleUnpackedDir archiveFile tempDir
 
+    mOverrideGccPath <- view $ configL.to configOverrideGccPath
+
+    -- The make application uses the CC environment variable to configure the
+    -- program for compiling C programs
+    let mGccEnv = let gccEnvFromPath p =
+                        Map.singleton "CC" $ T.pack (toFilePath p)
+                  in  gccEnvFromPath <$> mOverrideGccPath
+
+    -- Data.Map.union provides a left-biased union, so mGccEnv will prevail
+    let ghcConfigureEnv =
+          fromMaybe Map.empty mGccEnv `Map.union` gdiConfigureEnv downloadInfo
+
     logSticky "Configuring GHC ..."
     runStep "configuring" dir
-        (gdiConfigureEnv downloadInfo)
+        ghcConfigureEnv
         (toFilePath $ dir </> relFileConfigure)
         (("--prefix=" ++ toFilePath destDir) : map T.unpack (gdiConfigureOpts downloadInfo))
 
@@ -1988,16 +2055,16 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     findArchive (SRIGithub val) pattern = do
         Object top <- return val
-        Array assets <- HashMap.lookup "assets" top
+        Array assets <- KeyMap.lookup "assets" top
         getFirst $ fold $ fmap (First . findMatch pattern') assets
       where
         pattern' = mconcat ["-", pattern, "."]
 
         findMatch pattern'' (Object o) = do
-            String name <- HashMap.lookup "name" o
+            String name <- KeyMap.lookup "name" o
             guard $ not $ ".asc" `T.isSuffixOf` name
             guard $ pattern'' `T.isInfixOf` name
-            String url <- HashMap.lookup "browser_download_url" o
+            String url <- KeyMap.lookup "browser_download_url" o
             Just url
         findMatch _ _ = Nothing
     findArchive (SRIHaskellStackOrg hso) _ = pure $ hsoUrl hso
@@ -2095,7 +2162,7 @@ performPathChecking newFile executablePath = do
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (SRIGithub val) = do
     Object o <- Just val
-    String rawName <- HashMap.lookup "name" o
+    String rawName <- KeyMap.lookup "name" o
     -- drop the "v" at the beginning of the name
     parseVersion $ T.unpack (T.drop 1 rawName)
 getDownloadVersion (SRIHaskellStackOrg hso) = Just $ hsoVersion hso

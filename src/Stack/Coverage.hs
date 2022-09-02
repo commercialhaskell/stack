@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TupleSections         #-}
 
 -- | Generate HPC (Haskell Program Coverage) reports
@@ -50,7 +50,7 @@ newtype CoverageException = NonTestSuiteTarget PackageName deriving Typeable
 
 instance Exception CoverageException
 instance Show CoverageException where
-    show (NonTestSuiteTarget name) = 
+    show (NonTestSuiteTarget name) =
         "Can't specify anything except test-suites as hpc report targets (" ++
         packageNameString name ++
         " is used with a non test-suite target)"
@@ -144,7 +144,7 @@ generateHpcReport pkgDir package tests = do
                         Just includeNames -> "--include" : intersperse "--include" (map (\n -> n ++ ":") includeNames)
                         Nothing -> []
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
-                forM_ mreportPath (displayReportPath report . pretty)
+                forM_ mreportPath (displayReportPath "The" report . pretty)
 
 generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
@@ -245,7 +245,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                                  CTest testName ->
                                      liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
                                  _ -> throwIO $ NonTestSuiteTarget name
-                                     
+
                      TargetAll PTProject -> do
                          pkgPath <- hpcPkgPath name
                          exists <- doesDirExist pkgPath
@@ -273,7 +273,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
             then do
                 prettyInfo $ "Opening" <+> pretty reportPath <+> "in the browser."
                 void $ liftIO $ openBrowser (toFilePath reportPath)
-            else displayReportPath report (pretty reportPath)
+            else displayReportPath "The" report (pretty reportPath)
 
 generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
@@ -288,16 +288,31 @@ generateHpcUnifiedReport = do
     extraTixFiles <- findExtraTixFiles
     let tixFiles = tixFiles0  ++ extraTixFiles
         reportDir = outputDir </> relDirCombined </> relDirAll
-    if length tixFiles < 2
-        then logInfo $
-            (if null tixFiles then "No tix files" else "Only one tix file") <>
-            " found in " <>
+-- Previously, the test below was:
+--
+--  if length tixFiles < 2
+--      then logInfo $
+--          (if null tixFiles then "No tix files" else "Only one tix file") <>
+--          " found in " <>
+--          fromString (toFilePath outputDir) <>
+--          ", so not generating a unified coverage report."
+--      else ...
+--
+-- However, a single *.tix file does not necessarily mean that a unified
+-- coverage report is redundant. For example, one package may test the library
+-- of another package that does not test its own library. See
+-- https://github.com/commercialhaskell/stack/issues/5713
+--
+-- As an interim solution, a unified coverage report will always be produced
+-- even if may be redundant in some circumstances.
+    if null tixFiles
+        then logInfo $ "No tix files found in " <>
             fromString (toFilePath outputDir) <>
             ", so not generating a unified coverage report."
         else do
             let report = "unified report"
             mreportPath <- generateUnionReport report reportDir tixFiles
-            forM_ mreportPath (displayReportPath report . pretty)
+            forM_ mreportPath (displayReportPath "The" report . pretty)
 
 generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]
@@ -386,8 +401,8 @@ generateHpcMarkupIndex = do
                 "</tbody></table>") <>
         "</body></html>"
     unless (null rows) $
-        logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
-            fromString (toFilePath outputFile)
+        displayReportPath "\nAn" "index of the generated HTML coverage reports"
+            (pretty outputFile)
 
 generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Utf8Builder -> m ()
 generateHpcErrorReport dir err = do
@@ -478,9 +493,10 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
                     T.pack (toFilePath inplaceDir) <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath :: (HasTerm env)
-                  => Text -> StyleDoc -> RIO env ()
-displayReportPath report reportPath =
-     prettyInfo $ "The" <+> fromString (T.unpack report) <+> "is available at" <+> reportPath
+                  => StyleDoc -> Text -> StyleDoc -> RIO env ()
+displayReportPath prefix report reportPath =
+     prettyInfo $ prefix <+> fromString (T.unpack report) <+>
+                  "is available at" <+> reportPath
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do

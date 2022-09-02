@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 -- |
 -- Wrapper functions of 'Network.HTTP.Simple' and 'Network.HTTP.Client' to
 -- add the 'User-Agent' HTTP request header to each request.

@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Stack.Setup.Installed
     ( getCompilerVersion
@@ -15,6 +15,7 @@ module Stack.Setup.Installed
     , toolString
     , toolNameString
     , parseToolText
+    , filterTools
     , extraDirs
     , installDir
     , tempInstallDir
@@ -39,6 +40,22 @@ data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
     | ToolGhcGit !Text !Text   -- ^ e.g. ghc-git-COMMIT_ID-FLAVOUR
     deriving (Eq)
+
+-- | 'Tool' values are ordered by name (being @ghc-git@, for @ToolGhcGit _ _@)
+-- alphabetically and then by version (later versions are ordered before
+-- earlier versions, where applicable).
+instance Ord Tool where
+  compare (Tool pkgId1) (Tool pkgId2) = if pkgName1 == pkgName2
+      then compare pkgVersion2 pkgVersion1 -- Later versions ordered first
+      else compare pkgName1 pkgName2
+    where
+      PackageIdentifier pkgName1 pkgVersion1 = pkgId1
+      PackageIdentifier pkgName2 pkgVersion2 = pkgId2
+  compare (Tool pkgId) (ToolGhcGit _ _) = compare (pkgName pkgId) "ghc-git"
+  compare (ToolGhcGit _ _) (Tool pkgId) = compare "ghc-git" (pkgName pkgId)
+  compare (ToolGhcGit c1 f1) (ToolGhcGit c2 f2) = if f1 == f2
+      then compare c1 c2
+      else compare f1 f2
 
 toolString :: Tool -> String
 toolString (Tool ident) = packageIdentifierString ident
@@ -82,6 +99,15 @@ listInstalled programsPath = do
     toTool fp = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parseToolText x
+
+filterTools :: PackageName       -- ^ package to find
+            -> (Version -> Bool) -- ^ which versions are acceptable
+            -> [Tool]            -- ^ tools to filter
+            -> [PackageIdentifier]
+filterTools name goodVersion installed =
+    [ pkgId | Tool pkgId <- installed
+            , pkgName pkgId == name
+            , goodVersion (pkgVersion pkgId) ]
 
 getCompilerVersion
   :: (HasProcessContext env, HasLogFunc env)

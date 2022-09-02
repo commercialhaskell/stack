@@ -1,14 +1,14 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections       #-}
 
 -- | Dealing with Cabal.
 
@@ -32,33 +32,32 @@ import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import           Distribution.CabalSpecVersion
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
-import qualified Distribution.Package as D
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
-import qualified Distribution.PackageDescription as D
+import           Distribution.Package hiding (Package, packageName, packageVersion, PackageIdentifier)
 import           Distribution.PackageDescription hiding (FlagName)
+#if !MIN_VERSION_Cabal(3,8,1)
 import           Distribution.PackageDescription.Parsec
+#endif
 import           Distribution.Pretty (prettyShow)
 import           Distribution.Simple.Glob (matchDirFileGlob)
+#if MIN_VERSION_Cabal(3,8,1)
+import           Distribution.Simple.PackageDescription (readHookedBuildInfo)
+#endif
 import           Distribution.System (OS (..), Arch, Platform (..))
-import qualified Distribution.Text as D
+import           Distribution.Text (display)
 import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
-import           Distribution.Types.ForeignLib
 import qualified Distribution.Types.LegacyExeDependency as Cabal
-import           Distribution.Types.LibraryName (libraryNameString, maybeToLibraryName)
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import qualified Distribution.Verbosity as D
+import           Distribution.Utils.Path (getSymbolicPath)
+import           Distribution.Verbosity (silent)
 import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
 import qualified HiFileParser as Iface
-#if MIN_VERSION_path(0,7,0)
 import           Path as FL hiding (replaceExtension)
-#else
-import           Path as FL
-#endif
 import           Path.Extra
 import           Path.IO hiding (findFiles)
 import           Stack.Build.Installed
@@ -71,7 +70,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
-import qualified System.Directory as D
+import qualified System.Directory as D (doesFileExist)
 import           System.FilePath (replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
@@ -113,7 +112,7 @@ readDotBuildinfo :: MonadIO m
                  => Path Abs File
                  -> m HookedBuildInfo
 readDotBuildinfo buildinfofp =
-    liftIO $ readHookedBuildInfo D.silent (toFilePath buildinfofp)
+    liftIO $ readHookedBuildInfo silent (toFilePath buildinfofp)
 
 -- | Resolve a parsed cabal file into a 'Package', which contains all of
 -- the info needed for stack to build the 'Package' given the current
@@ -128,7 +127,7 @@ resolvePackage packageConfig gpkg =
         (resolvePackageDescription packageConfig gpkg)
 
 packageFromPackageDescription :: PackageConfig
-                              -> [D.Flag]
+                              -> [PackageFlag]
                               -> PackageDescriptionPair
                               -> Package
 packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
@@ -190,7 +189,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           (library pkg)
     , packageBuildType = buildType pkg
     , packageSetupDeps = msetupDeps
-    , packageCabalSpec = either orLaterVersion id $ specVersionRaw pkg
+    , packageCabalSpec = specVersion pkg
     }
   where
     extraLibNames = S.union subLibNames foreignLibNames
@@ -358,7 +357,7 @@ data BioInput = BioInput
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts BioInput {..} =
     BuildInfoOpts
-        { bioOpts = ghcOpts ++ cppOptions biBuildInfo
+        { bioOpts = ghcOpts ++ fmap ("-optP" <>) (cppOptions biBuildInfo)
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -394,7 +393,7 @@ generateBuildInfoOpts BioInput {..} =
         | Dependency name _ _ <- targetBuildDepends biBuildInfo -- TODO: cabal 3 introduced multiple public libraries in a single dependency
         , name `notElem` biOmitPackages]
     PerCompilerFlavor ghcOpts _ = options biBuildInfo
-    extOpts = map (("-X" ++) . D.display) (usedExtensions biBuildInfo)
+    extOpts = map (("-X" ++) . display) (usedExtensions biBuildInfo)
     srcOpts =
         map (("-i" <>) . toFilePathNoTrailingSep)
             (concat
@@ -402,7 +401,7 @@ generateBuildInfoOpts BioInput {..} =
               , [ biCabalDir
                 | null (hsSourceDirs biBuildInfo)
                 ]
-              , mapMaybe toIncludeDir (hsSourceDirs biBuildInfo)
+              , mapMaybe (toIncludeDir . getSymbolicPath) (hsSourceDirs biBuildInfo)
               , [ componentAutogen ]
               , maybeToList (packageAutogenDir biCabalVersion biDistDir)
               , [ componentOutputDir biComponentName biDistDir ]
@@ -598,7 +597,7 @@ packageDescTools pd =
               )
 
 -- | A hard-coded map for tool dependencies
-hardCodedMap :: Map String D.PackageName
+hardCodedMap :: Map String PackageName
 hardCodedMap = M.fromList
   [ ("alex", Distribution.Package.mkPackageName "alex")
   , ("happy", Distribution.Package.mkPackageName "happy")
@@ -617,10 +616,10 @@ hardCodedMap = M.fromList
 -- not need to be built. Without this exception, we would either end
 -- up unnecessarily rebuilding these packages, or failing because the
 -- packages do not appear in the Stackage snapshot.
-preInstalledPackages :: Set D.PackageName
+preInstalledPackages :: Set PackageName
 preInstalledPackages = S.fromList
-  [ D.mkPackageName "hsc2hs"
-  , D.mkPackageName "haddock"
+  [ mkPackageName "hsc2hs"
+  , mkPackageName "haddock"
   ]
 
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before
@@ -696,7 +695,7 @@ packageDescModulesAndFiles pkg = do
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles
-  :: Version -- ^ cabal file version
+  :: CabalSpecVersion -- ^ cabal file version
   -> [String]
   -> RIO Ctx (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
@@ -795,7 +794,7 @@ resolveComponentFiles
     -> [DotCabalDescriptor]
     -> RIO Ctx (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 resolveComponentFiles component build names = do
-    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+    dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) (hsSourceDirs build)
     dir <- asks (parent . ctxFile)
     agdirs <- autogenDirs
     (modules,files,warnings) <-
@@ -862,7 +861,7 @@ data PackageDescriptionPair = PackageDescriptionPair
 resolvePackageDescription :: PackageConfig
                           -> GenericPackageDescription
                           -> PackageDescriptionPair
-resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib subLibs foreignLibs' exes tests benches) =
+resolvePackageDescription packageConfig (GenericPackageDescription desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches) =
     PackageDescriptionPair
       { pdpOrigBuildable = go False
       , pdpModifiedBuildable = go True
@@ -935,9 +934,9 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
 -- | Make a map from a list of flag specifications.
 --
 -- What is @flagManual@ for?
-flagMap :: [Flag] -> Map FlagName Bool
+flagMap :: [PackageFlag] -> Map FlagName Bool
 flagMap = M.fromList . map pair
-  where pair :: Flag -> (FlagName, Bool)
+  where pair :: PackageFlag -> (FlagName, Bool)
         pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
@@ -986,7 +985,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                   case v of
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
-                    Flag flag ->
+                    PackageFlag flag ->
                       fromMaybe False $ M.lookup flag (rcFlags rc)
                       -- NOTE:  ^^^^^ This should never happen, as all flags
                       -- which are used must be declared. Defaulting to
@@ -1181,7 +1180,7 @@ findCandidate dirs name = do
         [] -> do
             case name of
                 DotCabalModule mn
-                  | D.display mn /= paths_pkg pkg -> logPossibilities dirs mn
+                  | display mn /= paths_pkg pkg -> logPossibilities dirs mn
                 _ -> return ()
             return Nothing
         (candidate:rest) -> do
@@ -1247,7 +1246,7 @@ warnMultiple name candidate rest =
         , line <> flow "picking:"
         , dispOne candidate
         ]
-  where showName (DotCabalModule name') = D.display name'
+  where showName (DotCabalModule name') = display name'
         showName (DotCabalMain fp) = fp
         showName (DotCabalFile fp) = fp
         showName (DotCabalCFile fp) = fp
@@ -1267,7 +1266,7 @@ logPossibilities dirs mn = do
     possibilities <- liftM concat (makePossibilities mn)
     unless (null possibilities) $ prettyWarnL
         [ flow "Unable to find a known candidate for the Cabal entry"
-        , (style PP.Module . fromString $ D.display mn) <> ","
+        , (style PP.Module . fromString $ display mn) <> ","
         , flow "but did find:"
         , line <> bulletedList (map pretty possibilities)
         , flow "If you are using a custom preprocessor for this module"
@@ -1283,7 +1282,7 @@ logPossibilities dirs mn = do
                          (map
                               filename
                               (filter
-                                   (isPrefixOf (D.display name) .
+                                   (isPrefixOf (display name) .
                                     toFilePath . filename)
                                    files)))
             dirs
@@ -1394,7 +1393,9 @@ applyForceCustomBuild cabalVersion package
           }
     | otherwise = package
   where
-    cabalVersionRange = packageCabalSpec package
+    cabalVersionRange =
+      orLaterVersion $ mkVersion $ cabalSpecToVersionDigits $
+        packageCabalSpec package
     forceCustomBuild =
       packageBuildType package == Simple &&
       not (cabalVersion `withinRange` cabalVersionRange)

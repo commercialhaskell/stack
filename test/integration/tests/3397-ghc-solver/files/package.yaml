@@ -6,4 +6,3 @@ library:
   - stm
   exposed-modules:
   - Lib
-

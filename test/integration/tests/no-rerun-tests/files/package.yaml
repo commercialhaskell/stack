@@ -1,4 +1,4 @@
-name:                files
+name: files
 
 dependencies:
 - base >= 4.7 && < 5
@@ -8,5 +8,5 @@ library:
 
 tests:
   test:
-    main:                Spec.hs
-    source-dirs:         test
+    main: Spec.hs
+    source-dirs: test

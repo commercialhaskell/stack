@@ -1,7 +1,7 @@
 The test case here is weird enough to warrant an explanation. What we
 _really_ want to test is whether building the lts-3.12 snapshot's
 semigroupoids package with rev-1 works. See
-https://github.com/fpco/stackage/issues/3185. However, that test
+https://github.com/commercialhaskell/stackage/issues/3185. However, that test
 requires that we use an older GHC, and as Manny commented:
 
 > Having integration tests with old resolvers will cause them to fail

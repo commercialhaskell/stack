@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- | Handy path information.
 module Stack.Path
@@ -45,21 +45,27 @@ path keys =
            toEither (_, k, UseHaddocks p) = Left (k, p)
            toEither (_, k, WithoutHaddocks p) = Right (k, p)
            (with, without) = partitionEithers $ map toEither goodPaths
-           printKeys extractors single = do
-             pathInfo <- fillPathInfo
-             liftIO $ forM_ extractors $ \(key, extractPath) -> do
-               let prefix = if single then "" else key <> ": "
-               T.putStrLn $ prefix <> extractPath pathInfo
-           runHaddock x = local
-             (set (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)) .
-             withConfig YesReexec . -- FIXME this matches previous behavior, but doesn't make a lot of sense
-             withDefaultEnvConfig
-       -- MSS 2019-03-17 Not a huge fan of rerunning withConfig and
-       -- withDefaultEnvConfig each time, need to figure out what
-       -- purpose is served and whether we can achieve it without two
-       -- completely separate Config setups
        runHaddock True $ printKeys with singlePath
        runHaddock False $ printKeys without singlePath
+
+printKeys
+  :: HasEnvConfig env
+  => [(Text, PathInfo -> Text)]
+  -> Bool
+  -> RIO env ()
+printKeys extractors single = do
+    pathInfo <- fillPathInfo
+    liftIO $ forM_ extractors $ \(key, extractPath) -> do
+       let prefix = if single then "" else key <> ": "
+       T.putStrLn $ prefix <> extractPath pathInfo
+
+runHaddock :: Bool -> RIO EnvConfig () -> RIO Runner ()
+runHaddock x action = local modifyConfig $
+  withConfig YesReexec $
+    withDefaultEnvConfig action
+ where
+  modifyConfig = set
+    (globalOptsL.globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just x)
 
 fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
@@ -155,7 +161,7 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , WithoutHaddocks $ T.pack . intercalate [FP.searchPathSeparator] . view exeSearchPathL)
-    , ( "Install location for GHC and other core tools"
+    , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
       , "programs"
       , WithoutHaddocks $ view (configL.to configLocalPrograms.to toFilePathNoTrailingSep.to T.pack))
     , ( "Compiler binary (e.g. ghc)"

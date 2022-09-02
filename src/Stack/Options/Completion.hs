@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections     #-}
 
 module Stack.Options.Completion
     ( ghcOptsCompleter
@@ -16,7 +16,6 @@ import           Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Types.UnqualComponentName as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Constants (ghcShowOptionsOutput)

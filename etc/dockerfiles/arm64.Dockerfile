@@ -16,18 +16,27 @@ RUN curl -sSL https://github.com/commercialhaskell/stack/releases/download/v2.7.
 ARG USERID
 ARG GROUPID
 
-RUN useradd --uid $USERID stack && mkdir -p /home/stack && chown -R stack /home/stack && usermod -aG $GROUPID stack
+RUN useradd --uid $USERID stack
+RUN mkdir -p /home/stack
+RUN chown -R stack /home/stack
+RUN usermod -aG $GROUPID stack
+
 USER stack
 WORKDIR /home/stack
 
-RUN stack setup ghc-8.10.4
-RUN stack update
-
 COPY stack.yaml package.yaml /src/
+
 USER root
+
 RUN chown -R stack /src
+
 USER stack
-RUN cd /src && stack build --only-snapshot --test && stack build shake
+WORKDIR /src
+
+RUN stack build --only-snapshot --test
+RUN stack build shake
 
 COPY etc/scripts/release.hs /src
-RUN stack script --resolver lts-17.15 --compile /src/release.hs -- --version && cp /src/release /home/stack
+
+RUN stack script --resolver nightly-2022-08-02 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
+RUN cp /src/release /home/stack

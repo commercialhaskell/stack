@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Options.GlobalParser where
 
@@ -26,6 +26,10 @@ globalOptsParser currentDir kind defLogLevel =
     firstBoolFlagsTrue
         "time-in-log"
         "inclusion of timings in logs, for the purposes of using diff with logs"
+        hide <*>
+    firstBoolFlagsFalse
+        "rsl-in-log"
+        "inclusion of raw snapshot layer (rsl) in logs"
         hide <*>
     configOptsParser currentDir kind <*>
     optionalFirst (abstractResolverOptsParser hide0) <*>
@@ -87,6 +91,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
     , globalTimeInLog = fromFirstTrue globalMonoidTimeInLog
+    , globalRSLInLog = fromFirstFalse globalMonoidRSLInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler
@@ -110,12 +115,17 @@ initOptsParser =
   where
     searchDirs =
       many (textArgument
-              (metavar "DIR" <>
+              (metavar "DIR(S)" <>
                completer dirCompleter <>
-               help "Directories to include, default is current directory."))
+               help "Directory, or directories, to include in the search for \
+                    \.cabal files, when initialising. The default is the \
+                    \current directory."))
     ignoreSubDirs = switch (long "ignore-subdirs" <>
-                           help "Do not search for .cabal files in sub directories")
+                           help "Do not search for .cabal files in \
+                                \subdirectories, when initialising.")
     overwrite = switch (long "force" <>
-                       help "Force overwriting an existing stack.yaml")
+                       help "Force an initialisation that overwrites any \
+                            \existing stack.yaml file.")
     omitPackages = switch (long "omit-packages" <>
-                           help "Exclude conflicting or incompatible user packages")
+                           help "Exclude conflicting or incompatible user \
+                                \packages, when initialising.")

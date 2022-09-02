@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.PackageParser where
 
 import qualified Data.Map                          as Map

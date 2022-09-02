@@ -51,13 +51,13 @@ nav:
 - Project documentation:
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
-- Maintainers:
-  - Releases: maintainers/releases.md
-  - Maintainer team process: maintainers/team_process.md
-  - Add GHC version: maintainers/ghc.md
-  - Docker images: maintainers/docker.md
-  - Upgrading MSYS2: maintainers/msys.md
-  - HaskellStack.org: maintainers/haskellstack.org.md
+  - Maintainers:
+    - Releases: maintainers/releases.md
+    - Maintainer team process: maintainers/team_process.md
+    - Add GHC version: maintainers/ghc.md
+    - Docker images: maintainers/docker.md
+    - Upgrading MSYS2: maintainers/msys.md
+    - HaskellStack.org: maintainers/haskellstack.org.md
 - Signing key: SIGNING_KEY.md
 - Glossary: glossary.md
 

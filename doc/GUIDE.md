@@ -1175,18 +1175,17 @@ On Windows (with PowerShell):
     -a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
 
 While we're talking about paths, to wipe our Stack install completely, here's
-what needs to be removed:
+what typically needs to be removed:
 
-1. Delete the Stack root folder (see `stack path --stack-root`, before you
-   uninstall).
-2. On Windows, delete the folder containing Stack's tools (see
-   `stack path --programs`, before you uninstall), which is located outside of
-   the Stack root folder
-3. Delete the `stack` executable (see `which stack`, on Unix-like operating
+1. the Stack root folder (see `stack path --stack-root`, before you uninstall);
+2. on Windows, the folder containing Stack's tools (see `stack path --programs`,
+   before you uninstall), which is located outside of the Stack root folder; and
+3. the `stack` executable file (see `which stack`, on Unix-like operating
    systems, or `where.exe stack`, on Windows).
 
-You may also want to delete ``.stack-work`` folders in any Haskell projects that
-you have built using Stack.
+You may also want to delete `.stack-work` folders in any Haskell projects that
+you have built using Stack. The `stack uninstall` command provides information
+about how to uninstall Stack.
 
 ## The `stack exec` command
 
@@ -1371,6 +1370,33 @@ a multi line block comment with GHC options:
   +RTS -s -RTS
 -}
 ~~~
+
+### Testing scripts
+
+You can use the flag `--script-no-run-compile` on the command line to enable (it
+is disabled by default) the use of the `--no-run` option with `stack script`
+(and forcing the `--compile` option). The flag may help test that scripts
+compile in CI (continuous integration).
+
+For example, consider the following simple script, in a file named `Script.hs`,
+which makes use of the joke package
+[`acme-missiles`](https://hackage.haskell.org/package/acme-missiles):
+```
+{- stack script
+   --resolver lts-19.9
+   --package acme-missiles
+-}
+import Acme.Missiles (launchMissiles)
+
+main :: IO ()
+main = launchMissiles
+```
+The command `stack --script-no-run-compile Script.hs` then behaves as if the
+command
+`stack script --resolver lts-19.9 --package acme-missiles --no-run --compile -- Script.hs`
+had been given (see further below about the `stack script` command). `Script.hs`
+is compiled (without optimisation) and the resulting executable is not run: no
+missiles are launched in the process!
 
 ### Writing independent and reliable scripts
 

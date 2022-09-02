@@ -1,8 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- | Configuration options for building.
 
@@ -27,12 +27,17 @@ module Stack.Types.Config.Build
     , BuildSubset(..)
     , ApplyCLIFlag (..)
     , boptsCLIFlagsByName
+    , CabalVerbosity (..)
+    , toFirstCabalVerbosity
     )
     where
 
-import           Pantry.Internal.AesonExtended
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
+import           Distribution.Parsec (Parsec (..), simpleParsec)
+import           Distribution.Verbosity (Verbosity, normal, verbose)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
 
 -- | Build options that is interpreted by the build command.
@@ -82,7 +87,7 @@ data BuildOpts =
             -- ^ Only perform the configure step when building
             ,boptsReconfigure :: !Bool
             -- ^ Perform the configure step even if already configured
-            ,boptsCabalVerbose :: !Bool
+            ,boptsCabalVerbose :: !CabalVerbosity
             -- ^ Ask Cabal to be verbose in its builds
             ,boptsSplitObjs :: !Bool
             -- ^ Whether to enable split-objs.
@@ -118,7 +123,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarks = defaultFirstFalse buildMonoidBenchmarks
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsReconfigure = defaultFirstFalse buildMonoidReconfigure
-    , boptsCabalVerbose = defaultFirstFalse buildMonoidCabalVerbose
+    , boptsCabalVerbose = CabalVerbosity normal
     , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = []
     , boptsInterleavedOutput = defaultFirstTrue buildMonoidInterleavedOutput
@@ -209,7 +214,7 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidBenchmarks :: !FirstFalse
     , buildMonoidBenchmarkOpts :: !BenchmarkOptsMonoid
     , buildMonoidReconfigure :: !FirstFalse
-    , buildMonoidCabalVerbose :: !FirstFalse
+    , buildMonoidCabalVerbose :: !(First CabalVerbosity)
     , buildMonoidSplitObjs :: !FirstFalse
     , buildMonoidSkipComponents :: ![Text]
     , buildMonoidInterleavedOutput :: !FirstTrue
@@ -242,7 +247,9 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidBenchmarks <- FirstFalse <$> o ..:? buildMonoidBenchmarksArgName
               buildMonoidBenchmarkOpts <- jsonSubWarnings (o ..:? buildMonoidBenchmarkOptsArgName ..!= mempty)
               buildMonoidReconfigure <- FirstFalse <$> o ..:? buildMonoidReconfigureArgName
-              buildMonoidCabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
+              cabalVerbosity <- First <$> o ..:? buildMonoidCabalVerbosityArgName
+              cabalVerbose <- FirstFalse <$> o ..:? buildMonoidCabalVerboseArgName
+              let buildMonoidCabalVerbose = cabalVerbosity <> toFirstCabalVerbosity cabalVerbose
               buildMonoidSplitObjs <- FirstFalse <$> o ..:? buildMonoidSplitObjsName
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               buildMonoidInterleavedOutput <- FirstTrue <$> o ..:? buildMonoidInterleavedOutputName
@@ -311,6 +318,9 @@ buildMonoidBenchmarkOptsArgName = "benchmark-opts"
 
 buildMonoidReconfigureArgName :: Text
 buildMonoidReconfigureArgName = "reconfigure"
+
+buildMonoidCabalVerbosityArgName :: Text
+buildMonoidCabalVerbosityArgName = "cabal-verbosity"
 
 buildMonoidCabalVerboseArgName :: Text
 buildMonoidCabalVerboseArgName = "cabal-verbose"
@@ -477,3 +487,23 @@ data FileWatchOpts
   | FileWatch
   | FileWatchPoll
   deriving (Show,Eq)
+
+newtype CabalVerbosity = CabalVerbosity Verbosity
+  deriving (Eq, Show)
+
+toFirstCabalVerbosity :: FirstFalse -> First CabalVerbosity
+toFirstCabalVerbosity vf = First $ getFirstFalse vf <&> \p ->
+  if p then verboseLevel else normalLevel
+ where
+  verboseLevel = CabalVerbosity verbose
+  normalLevel  = CabalVerbosity normal
+
+instance FromJSON CabalVerbosity where
+
+  parseJSON = withText "CabalVerbosity" $ \t ->
+    let s = T.unpack t
+        errMsg = fail $ "Unrecognised Cabal verbosity: " ++ s
+    in  maybe errMsg pure (simpleParsec s)
+
+instance Parsec CabalVerbosity where
+  parsec = CabalVerbosity <$> parsec

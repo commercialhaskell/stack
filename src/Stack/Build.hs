@@ -1,8 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Build the project.
@@ -19,7 +19,8 @@ module Stack.Build
 
 import           Stack.Prelude hiding (loadPackage)
 import           Data.Aeson (Value (Object, Array), (.=), object)
-import qualified Data.HashMap.Strict as HM
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.List ((\\), isPrefixOf)
 import           Data.List.Extra (groupSort)
 import qualified Data.List.NonEmpty as NE
@@ -293,7 +294,7 @@ queryBuildInfo selectors0 =
     select front (sel:sels) value =
         case value of
             Object o ->
-                case HM.lookup sel o of
+                case KeyMap.lookup (Key.fromText sel) o of
                     Nothing -> err "Selector not found"
                     Just value' -> cont value'
             Array v ->
@@ -328,7 +329,7 @@ rawBuildInfo = do
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
     return $ object
-        [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        [ "locals" .= Object (KeyMap.fromList $ map localToPair locals)
         , "compiler" .= object
             [ "wanted" .= wantedCompiler
             , "actual" .= actualCompiler
@@ -336,7 +337,7 @@ rawBuildInfo = do
         ]
   where
     localToPair lp =
-        (T.pack $ packageNameString $ packageName p, value)
+        (Key.fromText $ T.pack $ packageNameString $ packageName p, value)
       where
         p = lpPackage lp
         value = object
@@ -358,7 +359,7 @@ checkComponentsBuildable lps =
 checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies proj = do
   forM_ proj $ \p -> do
-    C.GenericPackageDescription _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
+    C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
 
     let dependencies = concatMap getDeps subLibs <>
                        concatMap getDeps foreignLibs <>
@@ -372,7 +373,7 @@ checkSubLibraryDependencies proj = do
       (logWarn "SubLibrary dependency is not supported, this will almost certainly fail")
   where
     getDeps (_, C.CondNode _ dep _) = dep
-    subLibDepExist lib = 
+    subLibDepExist lib =
       any (\x ->
         case x of
           C.LSubLibName _ -> True

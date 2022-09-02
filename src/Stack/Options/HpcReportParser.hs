@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module Stack.Options.HpcReportParser where
 
 import qualified Data.Text                         as T

@@ -1,11 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Run commands in Docker containers
@@ -154,14 +154,10 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         -- MSS 2020-04-21 previously used replaceExtension, but semantics changed in path 0.7
         -- In any event, I'm not even sure _why_ we need to drop a file extension here
         -- Originally introduced here: https://github.com/commercialhaskell/stack/commit/6218dadaf5fd7bf312bb1bd0db63b4784ba78cb2
-#if MIN_VERSION_path(0, 7, 0)
         let exeBase =
               case splitExtension exePath of
                 Left _ -> exePath
                 Right (x, _) -> x
-#else
-        exeBase <- exePath -<.> ""
-#endif
         let mountPath = hostBinDir FP.</> toFilePath (filename exeBase)
         return (mountPath, args, [], [Mount (toFilePath exePath) mountPath])
 

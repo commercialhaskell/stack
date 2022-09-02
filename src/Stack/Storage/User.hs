@@ -1,18 +1,19 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches across an entire user account.
@@ -52,7 +53,6 @@ import System.Posix.Types (COff (..))
 import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
 
 share [ mkPersist sqlSettings
-      , mkDeleteCascade sqlSettings
       , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
@@ -68,13 +68,13 @@ PrecompiledCacheParent sql="precompiled_cache"
   deriving Show
 
 PrecompiledCacheSubLib
-  parent PrecompiledCacheParentId sql="precompiled_cache_id"
+  parent PrecompiledCacheParentId sql="precompiled_cache_id" OnDeleteCascade
   value FilePath sql="sub_lib"
   UniquePrecompiledCacheSubLib parent value
   deriving Show
 
 PrecompiledCacheExe
-  parent PrecompiledCacheParentId sql="precompiled_cache_id"
+  parent PrecompiledCacheParentId sql="precompiled_cache_id" OnDeleteCaseCascade
   value FilePath sql="exe"
   UniquePrecompiledCacheExe parent value
   deriving Show

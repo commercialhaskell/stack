@@ -1,0 +1,89 @@
+# Partial: base/!!
+[[check]]
+  id = "STAN-0005"
+  scope = "all"
+  type = "Exclude"
+
+# Partial: base/minimum
+[[check]]
+  id = "STAN-0014"
+  scope = "all"
+  type = "Exclude"
+
+# Partial: base/minimumBy
+[[check]]
+  id = "STAN-0016"
+  scope = "all"
+  type = "Exclude"
+
+# Partial: base/fromList
+[[check]]
+  id = "STAN-0020"
+  scope = "all"
+  type = "Exclude"
+
+# Infinite: base/reverse
+[[check]]
+  id = "STAN-0101"
+  scope = "all"
+  type = "Exclude"
+
+# Infinite: base/isSuffixOf
+[[check]]
+  id = "STAN-0102"
+  scope = "all"
+  type = "Exclude"
+
+# Infinite: base/length
+[[check]]
+  id = "STAN-0103"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: foldl
+[[check]]
+  id = "STAN-0202"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: Data.ByteString.Char8.pack
+[[check]]
+  id = "STAN-0203"
+  scope = "all"
+  type = "Exclude"
+
+# Data types with non-strict fields
+[[check]]
+  id = "STAN-0206"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: Foldable methods on possibly error-prone structures
+[[check]]
+  id = "STAN-0207"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: Slow 'length' for Text
+[[check]]
+  id = "STAN-0208"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: unsafe functions
+[[check]]
+  id = "STAN-0212"
+  scope = "all"
+  type = "Exclude"
+
+# Anti-pattern: Pattern matching on '_'
+[[check]]
+  id = "STAN-0213"
+  scope = "all"
+  type = "Exclude"
+
+# Using tuples of big size (>= 4) can decrease code readability
+[[check]]
+  id = "STAN-0302"
+  scope = "all"
+  type = "Exclude"

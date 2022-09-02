@@ -1,10 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Resolving a build plan for a set of packages in a given Stackage
@@ -224,7 +224,7 @@ selectPackageBuildPlan platform compiler pool gpd =
     flagCombinations :: NonEmpty [(FlagName, Bool)]
     flagCombinations = mapM getOptions (genPackageFlags gpd)
       where
-        getOptions :: C.Flag -> NonEmpty (FlagName, Bool)
+        getOptions :: C.PackageFlag -> NonEmpty (FlagName, Bool)
         getOptions f
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]

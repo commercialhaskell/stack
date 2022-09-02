@@ -71,12 +71,14 @@ post_install_separator() {
 
 # determines the the CPU's instruction set
 get_isa() {
-  if arch | grep -Eq 'armv[78]l?' ; then
+  if uname -m | grep -Eq 'armv[78]l?' ; then
     echo arm
-  elif arch | grep -q aarch64 ; then
+  elif uname -m | grep -q aarch64 ; then
     echo aarch64
-  else
+  elif uname -m | grep -q x86 ; then
     echo x86
+  else
+    die "$(uname -m) is not a supported instruction set"
   fi
 }
 

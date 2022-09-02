@@ -1,19 +1,20 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE QuasiQuotes           #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | The Config type.
 
@@ -83,6 +84,7 @@ module Stack.Types.Config
   -- ** GlobalOpts & GlobalOptsMonoid
   ,GlobalOpts(..)
   ,GlobalOptsMonoid(..)
+  ,rslInLogL
   ,StackYamlLoc(..)
   ,stackYamlLocL
   ,LockFileBehavior(..)
@@ -127,7 +129,9 @@ module Stack.Types.Config
   ,shaPath
   ,shaPathForBytes
   ,workDirL
-  -- * Command-specific types
+  ,ghcInstallHook
+  -- * Command-related types
+  ,AddCommand
   -- ** Eval
   ,EvalOpts(..)
   -- ** Exec
@@ -175,7 +179,8 @@ module Stack.Types.Config
   ,to
   ) where
 
-import           Control.Monad.Writer (tell)
+import           Control.Monad.Writer (Writer, tell)
+import           Control.Monad.Trans.Except (ExceptT)
 import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
@@ -204,7 +209,6 @@ import           Distribution.PackageDescription (GenericPackageDescription)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System (Platform, Arch)
 import qualified Distribution.Text
-import qualified Distribution.Types.UnqualComponentName as C
 import           Distribution.Version (anyVersion, mkVersion', mkVersion)
 import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
 import           Lens.Micro
@@ -378,6 +382,8 @@ data Config =
          -- ^ Enable GHC hiding source paths?
          ,configRecommendUpgrade    :: !Bool
          -- ^ Recommend a Stack upgrade?
+         ,configNoRunCompile   :: !Bool
+         -- ^ Use --no-run and --compile options when using `stack script`
          ,configStackDeveloperMode  :: !Bool
          -- ^ Turn on Stack developer mode for additional messages?
          }
@@ -470,6 +476,11 @@ data EnvSettings = EnvSettings
     }
     deriving (Show, Eq, Ord)
 
+type AddCommand =
+  ExceptT (RIO Runner ())
+          (Writer (OA.Mod OA.CommandFields (RIO Runner (), GlobalOptsMonoid)))
+          ()
+
 data ExecOpts = ExecOpts
     { eoCmd :: !SpecialExecCmd
     , eoArgs :: ![String]
@@ -503,6 +514,7 @@ data GlobalOpts = GlobalOpts
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
+    , globalRSLInLog     :: !Bool -- ^ Whether to include raw snapshot layer (RSL) in logs.
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
@@ -512,6 +524,9 @@ data GlobalOpts = GlobalOpts
     , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
     , globalLockFileBehavior :: !LockFileBehavior
     } deriving (Show)
+
+rslInLogL :: HasRunner env => SimpleGetter env Bool
+rslInLogL = globalOptsL.to globalRSLInLog
 
 -- | Location for the project's stack.yaml file.
 data StackYamlLoc
@@ -580,6 +595,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
+    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snaphot layer (RSL) in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
@@ -864,6 +880,8 @@ data ConfigMonoid =
     , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
     , configMonoidSnapshotLocation :: !(First Text)
     -- ^ Custom location of LTS/Nightly snapshots
+    , configMonoidNoRunCompile  :: !FirstFalse
+    -- ^ See: 'configNoRunCompile'
     , configMonoidStackDeveloperMode :: !(First Bool)
     -- ^ See 'configStackDeveloperMode'
     }
@@ -988,6 +1006,7 @@ parseConfigMonoidObject rootDir obj = do
 
     configMonoidCasaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
     configMonoidSnapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
+    configMonoidNoRunCompile <- FirstFalse <$> obj ..:? configMonoidNoRunCompileName
 
     configMonoidStackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
 
@@ -1149,6 +1168,9 @@ configMonoidCasaRepoPrefixName = "casa-repo-prefix"
 configMonoidSnapshotLocationName :: Text
 configMonoidSnapshotLocationName = "snapshot-location-base"
 
+configMonoidNoRunCompileName :: Text
+configMonoidNoRunCompileName = "script-no-run-compile"
+
 configMonoidStackDeveloperModeName :: Text
 configMonoidStackDeveloperModeName = "stack-developer-mode"
 
@@ -1301,6 +1323,18 @@ askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
 workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
+
+-- | @STACK_ROOT\/hooks\/@
+hooksDir :: HasConfig env => RIO env (Path Abs Dir)
+hooksDir = do
+  sr <- view $ configL.to configStackRoot
+  pure (sr </> [reldir|hooks|])
+
+-- | @STACK_ROOT\/hooks\/ghc-install.sh@
+ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
+ghcInstallHook = do
+  hd <- hooksDir
+  pure (hd </> [relfile|ghc-install.sh|])
 
 -- | Per-project work dir
 getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
@@ -1589,9 +1623,14 @@ platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
-    = GHCStandard -- ^ Standard bindist
-    | GHCIntegerSimple -- ^ Bindist that uses integer-simple
-    | GHCCustom String -- ^ Other bindists
+    = GHCStandard
+    -- ^ Standard bindist
+    | GHCIntegerSimple
+    -- ^ Bindist that uses integer-simple
+    | GHCNativeBignum
+    -- ^ Bindist that uses the Haskell-native big-integer backend
+    | GHCCustom String
+    -- ^ Other bindists
     deriving (Show)
 
 instance FromJSON GHCVariant where
@@ -1605,6 +1644,7 @@ instance FromJSON GHCVariant where
 ghcVariantName :: GHCVariant -> String
 ghcVariantName GHCStandard = "standard"
 ghcVariantName GHCIntegerSimple = "integersimple"
+ghcVariantName GHCNativeBignum = "int-native"
 ghcVariantName (GHCCustom name) = "custom-" ++ name
 
 -- | Render a GHC variant to a String suffix.
@@ -1621,6 +1661,7 @@ parseGHCVariant s =
           | s == "" -> return GHCStandard
           | s == "standard" -> return GHCStandard
           | s == "integersimple" -> return GHCIntegerSimple
+          | s == "int-native" -> return GHCNativeBignum
           | otherwise -> return (GHCCustom s)
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
@@ -1851,7 +1892,7 @@ globalOptsL :: HasRunner env => Lens' env GlobalOpts
 globalOptsL = runnerL.lens runnerGlobalOpts (\x y -> x { runnerGlobalOpts = y })
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasPlatform env, HasGHCVariant env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
+class ( HasPlatform env, HasGHCVariant env, HasProcessContext env, HasPantryConfig env, HasTerm env, HasRunner env) => HasConfig env where
     configL :: Lens' env Config
     default configL :: HasBuildConfig env => Lens' env Config
     configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })

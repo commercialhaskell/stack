@@ -1,18 +1,19 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches across a single project.
@@ -39,7 +40,6 @@ import Stack.Types.Config (HasBuildConfig, buildConfigL, bcProjectStorage, Proje
 import Stack.Types.GhcPkgId
 
 share [ mkPersist sqlSettings
-      , mkDeleteCascade sqlSettings
       , mkMigrate "migrateAll"
     ]
     [persistLowerCase|
@@ -54,27 +54,27 @@ ConfigCacheParent sql="config_cache"
   deriving Show
 
 ConfigCacheDirOption
-  parent ConfigCacheParentId sql="config_cache_id"
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
   index Int
   value String sql="option"
   UniqueConfigCacheDirOption parent index
   deriving Show
 
 ConfigCacheNoDirOption
-  parent ConfigCacheParentId sql="config_cache_id"
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
   index Int
   value String sql="option"
   UniqueConfigCacheNoDirOption parent index
   deriving Show
 
 ConfigCacheDep
-  parent ConfigCacheParentId sql="config_cache_id"
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
   value GhcPkgId sql="ghc_pkg_id"
   UniqueConfigCacheDep parent value
   deriving Show
 
 ConfigCacheComponent
-  parent ConfigCacheParentId sql="config_cache_id"
+  parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
   value S.ByteString sql="component"
   UniqueConfigCacheComponent parent value
   deriving Show

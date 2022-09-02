@@ -1,5 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Run external pagers (@$PAGER@, @less@, @more@).
 module System.Process.Pager

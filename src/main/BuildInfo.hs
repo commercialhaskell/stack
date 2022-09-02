@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 #ifdef USE_GIT_INFO
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 #endif
 
 -- Extracted from Main so that the Main module does not use CPP or TH,

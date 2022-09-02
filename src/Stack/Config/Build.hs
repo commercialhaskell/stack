@@ -1,11 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- | Build configuration
 module Stack.Config.Build where
 
 import           Stack.Prelude
 import           Stack.Types.Config
+import           Distribution.Verbosity   (normal)
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
@@ -41,7 +42,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
     , boptsBenchmarkOpts =
           benchmarkOptsFromMonoid buildMonoidBenchmarkOpts additionalArgs
     , boptsReconfigure = fromFirstFalse buildMonoidReconfigure
-    , boptsCabalVerbose = fromFirstFalse buildMonoidCabalVerbose
+    , boptsCabalVerbose = fromFirst (CabalVerbosity normal) buildMonoidCabalVerbose
     , boptsSplitObjs = fromFirstFalse buildMonoidSplitObjs
     , boptsSkipComponents = buildMonoidSkipComponents
     , boptsInterleavedOutput = fromFirstTrue buildMonoidInterleavedOutput

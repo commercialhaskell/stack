@@ -1,6 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Extra functions for optparse-applicative.
@@ -287,8 +286,4 @@ unescapeBashArg input = go input
     go (x : xs) = x : go xs
 
 showHelpText :: ParseError
-#if MIN_VERSION_optparse_applicative(0,16,0)
 showHelpText = ShowHelpText Nothing
-#else
-showHelpText = ShowHelpText
-#endif

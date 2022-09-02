@@ -4,7 +4,8 @@
 
 Stack is configured by the content of YAML files. Stack's YAML configuration
 options break down into [project-specific](#project-specific-configuration)
-options and [non-project-specific](#non-project-specific-configuration) options. They are configured at the project-level or globally.
+options and [non-project-specific](#non-project-specific-configuration) options.
+They are configured at the project-level or globally.
 
 The **project-level** configuration file (`stack.yaml`) contains
 project-specific options and may contain non-project-specific options.
@@ -701,7 +702,7 @@ See [`setup-info`](#setup-info).
 `ghc-build` specifies a specialized architecture for the GHC executable.
 Normally this is determined automatically, but it can be overriden. Possible
 arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
-`ncurses6`, and `integersimple`.
+`ncurses6`, `int-native` and `integersimple`.
 
 ### ghc-options
 
@@ -751,6 +752,10 @@ See [`setup-info`](#setup-info).
 `ghc-variant` specifies a variant of the GHC executable. Known values are:
 
 * `standard`: Use the standard GHC binary distribution
+* `int-native`: From GHC 9.4.1, use a GHC bindist that uses the Haskell-native
+   big-integer
+  [backend](https://downloads.haskell.org/~ghc/9.0.2/docs/html/users_guide/9.0.1-notes.html#highlights).
+  For further information, see this [article](https://iohk.io/en/blog/posts/2020/07/28/improving-haskells-big-numbers-support/).
 * `integersimple`: Use a GHC bindist that uses
   [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
 * any other value: Use a custom GHC bindist. You should specify
@@ -1434,3 +1439,68 @@ Environment variable alternative (lowest precedence): `STACK_WORK`
 
 `work-dir` (or the contents of `STACK_WORK`) specifies the relative path of
 Stack's 'work' directory.
+
+## Customisation
+
+### GHC installation customisation (experimental)
+
+On Unix-like operating systems and Windows, Stack's installation procedure can
+be fully customised by placing a `sh` shell script (a 'hook') in the Stack root
+directory at `hooks/ghc-install.sh`. On Unix-like operating systems, the script
+file must be made executable. The script is run by the `sh` application (which
+is provided by MSYS2 on Windows).
+
+The script **must** return an exit code of `0` and the standard output **must**
+be the absolute path to the GHC binary that was installed. Otherwise Stack will
+ignore the script and possibly fall back to its own installation procedure.
+
+The script is not run when `system-ghc: true`.
+
+When `install-ghc: false`, the script is still run, which allows you to ensure
+that only your script will install GHC and Stack won't default to its own
+installation logic, even when the script fails.
+
+An example script is:
+
+```sh
+#!/bin/sh
+
+set -eu
+
+case $HOOK_GHC_TYPE in
+	bindist)
+		# install GHC here, not printing to stdout, e.g.:
+		#   command install $HOOK_GHC_VERSION >/dev/null
+		;;
+	git)
+		>&2 echo "Hook doesn't support installing from source"
+		exit 1
+		;;
+	*)
+		>&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
+		exit 2
+		;;
+esac
+
+echo "location/to/ghc/executable"
+```
+
+The following environment variables are always available to the script:
+
+* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
+
+For "bindist", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+
+For "git", additional variables are:
+
+* `HOOK_GHC_COMMIT = <commit>`
+* `HOOK_GHC_FLAVOR = <flavor>`
+
+For "ghcjs", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+* `HOOK_GHCJS_VERSION = <ver>`
+
+Since 2.7.x

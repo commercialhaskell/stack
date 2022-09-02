@@ -1,8 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Lock
     ( lockCachedWanted
@@ -15,7 +15,6 @@ import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
-import Pantry
 import Path (parent)
 import Path.Extended (addExtension)
 import Path.IO (doesFileExist)
@@ -78,12 +77,15 @@ loadYamlThrow
     :: HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
 loadYamlThrow parser path = do
-    val <- liftIO $ Yaml.decodeFileThrow (toFilePath path)
-    case Yaml.parseEither parser val of
-        Left err -> throwIO $ Yaml.AesonException err
-        Right (WithJSONWarnings res warnings) -> do
-            logJSONWarnings (toFilePath path) warnings
-            return res
+    eVal <- liftIO $ Yaml.decodeFileEither (toFilePath path)
+    case eVal of
+        Left parseException -> throwIO $
+            ParseConfigFileException path parseException
+        Right val -> case Yaml.parseEither parser val of
+            Left err -> throwIO $ Yaml.AesonException err
+            Right (WithJSONWarnings res warnings) -> do
+                logJSONWarnings (toFilePath path) warnings
+                return res
 
 lockCachedWanted ::
        (HasPantryConfig env, HasRunner env)
@@ -117,8 +119,9 @@ lockCachedWanted stackFile resolver fillWanted = do
         toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
         slocCache = toMap $ lckSnapshotLocations locked
         pkgLocCache = toMap $ lckPkgImmutableLocations locked
+    debugRSL <- view rslInLogL
     (snap, slocCompleted, pliCompleted) <-
-        loadAndCompleteSnapshotRaw resolver slocCache pkgLocCache
+        loadAndCompleteSnapshotRaw' debugRSL resolver slocCache pkgLocCache
     let compiler = snapshotCompiler snap
         snPkgs = Map.mapWithKey (\n p h -> snapToDepPackage h n p) (snapshotPackages snap)
     (wanted, prjCompleted) <- fillWanted pkgLocCache compiler snPkgs

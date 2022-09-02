@@ -6,3 +6,6 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options:
+  - -Werror
+  - -Winvalid-haddock

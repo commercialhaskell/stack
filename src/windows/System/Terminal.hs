@@ -1,6 +1,7 @@
+{-# LANGUAGE NoImplicitPrelude        #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings        #-}
+
 module System.Terminal
 ( fixCodePage
 , getTerminalWidth
@@ -45,7 +46,7 @@ getTerminalWidth = do
         b <- c_GetConsoleScreenBufferInfo hdl p
         if not b
             then do -- This could happen on Cygwin or MSYS
-                let stty = (shell "stty size") { 
+                let stty = (shell "stty size") {
                       std_in  = UseHandle stdin
                     , std_out = CreatePipe
                     , std_err = CreatePipe

@@ -1,4 +1,4 @@
-resolver: lts-17.15
+resolver: nightly-2022-08-02
 packages:
 - .
 - ../package-c

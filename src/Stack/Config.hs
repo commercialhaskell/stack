@@ -1,12 +1,12 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 -- | The general Stack configuration that starts everything off. This should
 -- be smart to falback if there is no stack.yaml, instead relying on
@@ -153,7 +153,6 @@ makeConcreteResolver (ARResolver r) = pure r
 makeConcreteResolver ar = do
     r <-
         case ar of
-            ARResolver r -> assert False $ makeConcreteResolver (ARResolver r)
             ARGlobal -> do
                 config <- view configL
                 implicitGlobalDir <- getImplicitGlobalProjectDir config
@@ -339,6 +338,7 @@ configFromConfigMonoid
          configHackageBaseUrl = fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
          configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
          configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
+         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
 
      configAllowDifferentUser <-
         case getFirst configMonoidAllowDifferentUser of
@@ -584,9 +584,10 @@ withBuildConfig inner = do
                            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
                            , "#\n"
                            , Yaml.encode p]
-                       writeBinaryFileAtomic (parent dest </> relFileReadmeTxt)
-                           "This is the implicit global project, which is used only when 'stack' is run\n\
-                           \outside of a real project.\n"
+                       writeBinaryFileAtomic (parent dest </> relFileReadmeTxt) $
+                           "This is the implicit global project, which is " <>
+                           "used only when 'stack' is run\noutside of a " <>
+                           "real project.\n"
                    return (p, dest)
     mcompiler <- view $ globalOptsL.to globalCompiler
     let project = project'
@@ -958,29 +959,29 @@ getDefaultUserConfigPath stackRoot = do
 packagesParser :: Parser [String]
 packagesParser = many (strOption
                    (long "package" <>
-                     metavar "PACKAGE(S)" <>
-                     help "Additional package(s) that must be installed"))
+                     metavar "PACKAGE" <>
+                     help "Add a package (can be specified multiple times)"))
 
-defaultConfigYaml :: IsString s => s
+defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
-  "# This file contains default non-project-specific settings for 'stack', used\n\
-  \# in all projects.  For more information about stack's configuration, see\n\
-  \# http://docs.haskellstack.org/en/stable/yaml_configuration/\n\
-  \\n\
-  \# The following parameters are used by \"stack new\" to automatically fill fields\n\
-  \# in the cabal config. We recommend uncommenting them and filling them out if\n\
-  \# you intend to use 'stack new'.\n\
-  \# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates\n\
-  \templates:\n\
-  \  params:\n\
-  \#    author-name:\n\
-  \#    author-email:\n\
-  \#    copyright:\n\
-  \#    github-username:\n\
-  \\n\
-  \# The following parameter specifies stack's output styles; STYLES is a\n\
-  \# colon-delimited sequence of key=value, where 'key' is a style name and\n\
-  \# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n\
-  \# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\"\n\
-  \# to see the current sequence.\n\
-  \# stack-colors: STYLES\n"
+  "# This file contains default non-project-specific settings for 'stack', used\n" <>
+  "# in all projects.  For more information about stack's configuration, see\n" <>
+  "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n" <>
+  "\n" <>
+  "# The following parameters are used by \"stack new\" to automatically fill fields\n" <>
+  "# in the cabal config. We recommend uncommenting them and filling them out if\n" <>
+  "# you intend to use 'stack new'.\n" <>
+  "# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates\n" <>
+  "templates:\n" <>
+  "  params:\n" <>
+  "#    author-name:\n" <>
+  "#    author-email:\n" <>
+  "#    copyright:\n" <>
+  "#    github-username:\n" <>
+  "\n" <>
+  "# The following parameter specifies stack's output styles; STYLES is a\n" <>
+  "# colon-delimited sequence of key=value, where 'key' is a style name and\n" <>
+  "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n" <>
+  "# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\"\n" <>
+  "# to see the current sequence.\n" <>
+  "# stack-colors: STYLES\n"

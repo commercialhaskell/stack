@@ -1,6 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Stack.Script
@@ -18,15 +17,12 @@ import           Distribution.Compiler      (CompilerFlavor (..))
 import           Distribution.ModuleName    (ModuleName)
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
+import           Distribution.Types.ModuleReexport
 import           Distribution.Types.PackageName (mkPackageName)
 import           Distribution.Types.VersionRange (withinRange)
 import           Distribution.System        (Platform (..))
 import qualified Pantry.SHA256 as SHA256
-#if MIN_VERSION_path(0,7,0)
 import           Path hiding (replaceExtension)
-#else
-import           Path
-#endif
 import           Path.IO
 import qualified Stack.Build
 import           Stack.Build.Installed
@@ -76,6 +72,10 @@ scriptCmd opts = do
       SYLNoProject _ -> assert False (return ())
 
     file <- resolveFile' $ soFile opts
+
+    isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
+                             view (globalOptsL.to globalConfigMonoid)
+
     let scriptDir = parent file
         modifyGO go = go
             { globalConfigMonoid = (globalConfigMonoid go)
@@ -83,12 +83,15 @@ scriptCmd opts = do
                 }
             , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
             }
+        (shouldRun, shouldCompile) = if isNoRunCompile
+          then (NoRun, SECompile)
+          else (soShouldRun opts, soCompile opts)
 
-    case soShouldRun opts of
+    case shouldRun of
       YesRun -> pure ()
       NoRun -> do
         unless (null $ soArgs opts) $ throwString "--no-run incompatible with arguments"
-        case soCompile opts of
+        case shouldCompile of
           SEInterpret -> throwString "--no-run requires either --compile or --optimize"
           SECompile -> pure ()
           SEOptimize -> pure ()
@@ -96,25 +99,27 @@ scriptCmd opts = do
     -- Optimization: if we're compiling, and the executable is newer
     -- than the source file, run it immediately.
     local (over globalOptsL modifyGO) $
-      case soCompile opts of
-        SEInterpret -> longWay file scriptDir
-        SECompile -> shortCut file scriptDir
-        SEOptimize -> shortCut file scriptDir
+      case shouldCompile of
+        SEInterpret -> longWay shouldRun shouldCompile file scriptDir
+        SECompile -> shortCut shouldRun shouldCompile file scriptDir
+        SEOptimize -> shortCut shouldRun shouldCompile file scriptDir
 
   where
-  runCompiled file = do
+  runCompiled shouldRun file = do
     let exeName = toExeName $ toFilePath file
-    case soShouldRun opts of
+    case shouldRun of
       YesRun -> exec exeName (soArgs opts)
       NoRun -> logInfo $ "Compilation finished, executable available at " <> fromString exeName
-  shortCut file scriptDir = handleIO (const $ longWay file scriptDir) $ do
-    srcMod <- getModificationTime file
-    exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
-    if srcMod < exeMod
-      then runCompiled file
-      else longWay file scriptDir
 
-  longWay file scriptDir =
+  shortCut shouldRun shouldCompile file scriptDir =
+    handleIO (const $ longWay shouldRun shouldCompile file scriptDir) $ do
+      srcMod <- getModificationTime file
+      exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
+      if srcMod < exeMod
+        then runCompiled shouldRun file
+        else longWay shouldRun shouldCompile file scriptDir
+
+  longWay shouldRun shouldCompile file scriptDir =
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
@@ -138,8 +143,9 @@ scriptCmd opts = do
             -- already. If all needed packages are available, we can
             -- skip the (rather expensive) build call below.
             GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
-            bss <- sinkProcessStdout (toFilePath pkg)
-                ["list", "--simple-output"] CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+            -- https://github.com/haskell/process/issues/251
+            bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
+                ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
             let installed = Set.fromList
                           $ map toPackageName
                           $ words
@@ -160,13 +166,13 @@ scriptCmd opts = do
                     $ Set.toList
                     $ Set.insert "base"
                     $ Set.map packageNameString targetsSet
-                , case soCompile opts of
+                , case shouldCompile of
                     SEInterpret -> []
                     SECompile -> []
                     SEOptimize -> ["-O2"]
                 , soGhcOptions opts
                 ]
-        case soCompile opts of
+        case shouldCompile of
           SEInterpret -> do
             interpret <- view $ compilerPathsL.to cpInterpreter
             exec (toFilePath interpret)
@@ -182,7 +188,7 @@ scriptCmd opts = do
               compilerExeName
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
-            runCompiled file
+            runCompiled shouldRun file
 
   toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
@@ -280,7 +286,7 @@ allExposedModules gpd = do
       mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
   pure $ case mlibrary  of
     Just lib -> PD.exposedModules lib ++
-                map PD.moduleReexportName (PD.reexportedModules lib)
+                map moduleReexportName (PD.reexportedModules lib)
     Nothing  -> mempty
 
 -- | The Stackage project introduced the concept of hidden packages,

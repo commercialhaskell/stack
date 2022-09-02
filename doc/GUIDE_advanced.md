@@ -16,6 +16,16 @@ output (e.g. `0.35.0`) and quit.
 Stack will report its numeric version to standard output (e.g. `2.7.5`) and
 quit.
 
+## The `stack --[no-]rsl-in-log` flag
+
+(Since 2.7.6)
+
+Default: Disabled
+
+Enables/disables the logging of the raw snapshot layer (rsl) in debug output.
+Information about the raw snapshot layer can be lengthy. If you do not need it,
+it is best omitted from the debug output.
+
 ## The `stack --silent` flag
 
 Equivalent to the `stack --verbosity silent` option.
@@ -98,11 +108,6 @@ YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
 
-Known bug:
-
-* The command does not respect the order of the existing YAML configuration
-  file.
-
 ## The `stack config set resolver` command
 
 `stack config set resolver <snapshot>` sets the `resolver` key in the
@@ -112,11 +117,9 @@ A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-19` will be translated into the most recent
 available in the `lts-19` sequence.
 
-Known bugs:
+Known bug:
 
 * The command does not respect the presence of a `snapshot` key.
-* The command does not respect the order of the existing YAML configuration
-  file.
 
 ## The `stack config set system-ghc` command
 
@@ -124,11 +127,6 @@ Known bugs:
 YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
-
-Known bug:
-
-* The command does not respect the order of the existing YAML configuration
-  file.
 
 ## The `stack dot` command
 
@@ -206,6 +204,30 @@ and `--no-example`.
 The flag `--basic` specifies a more basic report, in the format that is accepted
 by Stack's command line option `--stack-colors` and the YAML configuration key
 `stack-colors`.
+
+## The `stack ls tools` command
+
+`stack ls tools` will list Stack's installed tools. On Unix-like operating
+systems, they will be one or more versions of GHC. On Windows, they will include
+MSYS2. For example, on Windows:
+
+~~~
+$ stack ls tools
+ghc-9.4.1
+ghc-9.2.4
+ghc-9.0.2
+msys2-20210604
+~~~
+
+The `--filter <tool_name>` option will filter the output by a tool name (e.g.
+'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example:
+
+~~~
+$ stack ls tools --filter ghc
+ghc-9.4.1
+ghc-9.2.4
+ghc-9.0.2
+~~~
 
 ## The `stack sdist` command
 

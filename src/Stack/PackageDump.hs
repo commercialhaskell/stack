@@ -1,9 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TupleSections      #-}
+
 module Stack.PackageDump
     ( Line
     , eachSection
@@ -63,7 +64,8 @@ ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = do
     case reverse mpkgDbs of
         (pkgDb:_) -> createDatabase pkgexe pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    sinkProcessStdout (toFilePath pkgPath) args sink'
+    -- https://github.com/haskell/process/issues/251
+    snd <$> sinkProcessStderrStdout (toFilePath pkgPath) args CL.sinkNull sink'
   where
     args = concat
         [ case mpkgDbs of
@@ -162,7 +164,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
                 Just [v] -> return v
                 _ -> throwM $ MissingSingleField k m
         -- Can't fail: if not found, same as an empty list. See:
-        -- https://github.com/fpco/stack/issues/182
+        -- https://github.com/commercialhaskell/stack/issues/182
         parseM k = Map.findWithDefault [] k m
 
         parseDepend :: MonadThrow m => Text -> m (Maybe GhcPkgId)

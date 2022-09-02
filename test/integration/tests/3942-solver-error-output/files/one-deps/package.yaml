@@ -8,8 +8,8 @@ category: Development
 extra-source-files: []
 
 dependencies:
-  - base
-  - no-deps
+- base
+- no-deps
 
 library:
   source-dirs: '.'

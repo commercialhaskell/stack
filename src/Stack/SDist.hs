@@ -1,10 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE ConstraintKinds    #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TypeFamilies       #-}
+
 -- Create a source distribution tarball
 module Stack.SDist
     ( getSDistTarball
@@ -39,7 +40,6 @@ import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
-import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
 import           Path
 import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)

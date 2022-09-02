@@ -1,20 +1,22 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+
 module Stack.Init
     ( initProject
     , InitOpts (..)
     ) where
 
 import           Stack.Prelude
+import qualified Data.Aeson.KeyMap               as KeyMap
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.Foldable                   as F
-import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import           Data.List.Extra                 (groupSortOn)
 import qualified Data.List.NonEmpty              as NonEmpty
@@ -83,29 +85,29 @@ initProject currDir initOpts mresolver = do
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
             | dupPkgs /= [] =
-                "Warning (added by new or init): Some packages were found to \
-                \have names conflicting with others and have been commented \
-                \out in the packages section.\n"
+                "Warning (added by new or init): Some packages were found to " <>
+                "have names conflicting with others and have been commented " <>
+                "out in the packages section.\n"
             | otherwise = ""
 
         missingPkgMsg
             | Map.size ignored > 0 =
-                "Warning (added by new or init): Some packages were found to \
-                \be incompatible with the resolver and have been left commented \
-                \out in the packages section.\n"
+                "Warning (added by new or init): Some packages were found to " <>
+                "be incompatible with the resolver and have been left commented " <>
+                "out in the packages section.\n"
             | otherwise = ""
 
         extraDepMsg
             | Map.size extraDeps > 0 =
-                "Warning (added by new or init): Specified resolver could not \
-                \satisfy all dependencies. Some external packages have been \
-                \added as dependencies.\n"
+                "Warning (added by new or init): Specified resolver could not " <>
+                "satisfy all dependencies. Some external packages have been " <>
+                "added as dependencies.\n"
             | otherwise = ""
         makeUserMsg msgs =
             let msg = concat msgs
             in if msg /= "" then
-                  msg <> "You can omit this message by removing it from \
-                         \stack.yaml\n"
+                  msg <> "You can omit this message by removing it from " <>
+                         "stack.yaml\n"
                  else ""
 
         userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
@@ -177,12 +179,12 @@ renderStackYaml p ignoredPackages dupPackages =
            B.byteString headerHelp
         <> B.byteString "\n\n"
         <> F.foldMap (goComment o) comments
-        <> goOthers (o `HM.difference` HM.fromList comments)
+        <> goOthers (o `KeyMap.difference` KeyMap.fromList comments)
         <> B.byteString footerHelp
         <> "\n"
 
     goComment o (name, comment) =
-        case (convert <$> HM.lookup name o) <|> nonPresentValue name of
+        case (convert <$> KeyMap.lookup name o) <|> nonPresentValue name of
             Nothing -> assert (name == "user-message") mempty
             Just v ->
                 B.byteString comment <>
@@ -226,7 +228,7 @@ renderStackYaml p ignoredPackages dupPackages =
         | otherwise = ""
 
     goOthers o
-        | HM.null o = mempty
+        | KeyMap.null o = mempty
         | otherwise = assert False $ B.byteString $ Yaml.encode o
 
     -- Per Section Help
@@ -394,9 +396,9 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                 Right (f, edeps)-> return (snapLoc, f, edeps, pkgDirs)
                 Left ignored
                     | Map.null available -> do
-                        logWarn "*** Could not find a working plan for any of \
-                                 \the user packages.\nProceeding to create a \
-                                 \config anyway."
+                        logWarn $ "*** Could not find a working plan for any of " <>
+                                "the user packages.\nProceeding to create a " <>
+                                "config anyway."
                         return (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         when (Map.size available == Map.size pkgDirs) $
@@ -458,14 +460,20 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
     -- in order - Latest LTS, Latest Nightly, all LTS most recent first
-    case NonEmpty.nonEmpty ltss of
+    case NonEmpty.nonEmpty supportedLtss of
         Just (mostRecent :| older)
             -> mostRecent :| (nightly : older)
         Nothing
             -> nightly :| []
   where
     ltss = map (uncurry LTS) (IntMap.toDescList $ snapshotsLts snapshots)
+    supportedLtss = filter (>= minSupportedLts) ltss
     nightly = Nightly (snapshotsNightly snapshots)
+
+-- |Yields the minimum LTS supported by stack.
+minSupportedLts :: SnapName
+minSupportedLts = LTS 3 0 -- See https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md
+                          -- under stack version 2.1.1.
 
 data InitOpts = InitOpts
     { searchDirs     :: ![T.Text]
@@ -537,9 +545,9 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
 
     when (nameMismatchPkgs /= []) $ do
         rels <- mapM prettyPath nameMismatchPkgs
-        error $ "Package name as defined in the .cabal file must match the \
-                \.cabal file name.\n\
-                \Please fix the following packages and try again:\n"
+        error $ "Package name as defined in the .cabal file must match the " <>
+                ".cabal file name.\n" <>
+                "Please fix the following packages and try again:\n"
                 <> T.unpack (utf8BuilderToText (formatGroup rels))
 
     let dupGroups = filter ((> 1) . length)

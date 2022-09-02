@@ -2,8 +2,8 @@ flags: {}
 packages:
 - '.'
 extra-deps: []
-resolver: lts-14.27
+resolver: nightly-2022-08-02
 build:
   haddock-arguments:
     haddock-args:
-      - --optghc=-DFOO
+    - --optghc=-DFOO
