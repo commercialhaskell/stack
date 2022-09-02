@@ -64,7 +64,7 @@ documentation and features that the default theme lacked.
 
 The Material for MkDocs theme is loaded in the `doc/requirements.txt` file:
 
-   mkdocs-material
+    mkdocs-material
 
 The theme is specified in the `mkdocs.yml` file:
 
