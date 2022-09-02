@@ -17,6 +17,9 @@ extra_css:
 - css/extra.css
 extra_javascript:
 - js/searchhack.js
+# Read the Docs requires JQuery for its JavaScript code to inject the flyout
+# menu. Material for MkDocs does not come with JQuery.
+- 'https://code.jquery.com/jquery-3.6.1.min.js'
 
 nav:
 - Home: README.md
