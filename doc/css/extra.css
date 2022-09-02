@@ -1,3 +1,12 @@
 .hidden-warning {
     display: none
 }
+
+/* The Read the Docs flyout is formatted with a font-size that is 90% of the
+body's. Material for MkDocs has a body font-size that is 0.5rem. This body
+font-size will result in the flyout having a font-size of 0.7rem, consistent
+with the font-size of other elements in the theme.
+*/
+body {
+    font-size: 0.777778rem;
+}

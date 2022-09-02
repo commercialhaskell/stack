@@ -6,13 +6,22 @@ edit_uri: tree/stable/doc/
 copyright: Copyright (c) 2015-2022, Stack contributors
 docs_dir: doc
 site_dir: _site
-theme: readthedocs
+theme:
+  name: material
+    palette:
+    primary: 'deep purple'
+    accent: 'deep purple'
+  icon:
+    logo: material/language-haskell
 extra_css:
 - css/extra.css
 extra_javascript:
 - js/searchhack.js
+# Read the Docs requires JQuery for its JavaScript code to inject the flyout
+# menu. Material for MkDocs does not come with JQuery.
+- 'https://code.jquery.com/jquery-3.6.1.min.js'
 
-pages:
+nav:
 - Home: README.md
 - Changelog: ChangeLog.md
 - Tool documentation:
@@ -40,8 +49,9 @@ pages:
 - Advanced documentation:
   - Build overview: build_overview.md
 - Project documentation:
-  - Contributor's guide: CONTRIBUTING.md
-- Maintainer's guide:
+  - Contributors:
+    - Contributor's guide: CONTRIBUTING.md
+- Maintainers:
   - Releases: maintainers/releases.md
   - Maintainer team process: maintainers/team_process.md
   - Add GHC version: maintainers/ghc.md
@@ -54,3 +64,8 @@ pages:
 markdown_extensions:
 - toc:
     permalink: true
+- pymdownx.highlight:
+    anchor_linenums: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.superfences
