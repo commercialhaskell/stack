@@ -4,7 +4,8 @@
 
 The domain https://docs.haskellstack.org hosts online documentation for the
 Stack project, using [Read the Docs](https://readthedocs.org/) with
-[MkDocs](https://www.mkdocs.org/).
+[MkDocs](https://www.mkdocs.org/) and the Material for MkDocs
+[theme](https://squidfunk.github.io/mkdocs-material/).
 
 ## Read the Docs
 
@@ -42,8 +43,8 @@ It specifies a Python requirements file in `doc/requirements.txt`.
 
 ## MkDocs
 
-The `doc/requirements.txt` pins the version of MkDocs. As at 31 August 2021 it
-is set to:
+The `doc/requirements.txt` file pins the version of MkDocs. As at
+2 September 2021 it is set to:
 
     mkdocs==1.3.1
 
@@ -54,3 +55,65 @@ directory. See https://www.mkdocs.org/user-guide/configuration/.
 are created. This directory is added to the `.gitignore` file.
 
 MkDocs 1.3.0 replaced the `pages:` key with the `nav:` key.
+
+## Material for MkDocs
+
+Stack moved from the default `readthedocs` theme to Material for MkDocs after
+publishing the documentation for Stack 2.7.5. The new theme has extensive online
+documentation and features that the default theme lacked.
+
+The Material for MkDocs theme is loaded in the `doc/requirements.txt` file:
+
+    mkdocs-material
+
+The theme is specified in the `mkdocs.yml` file:
+
+~~~yaml
+theme:
+  name: material
+  palette:
+    primary: 'deep purple'
+    accent: 'deep purple'
+  icon:
+    logo: material/language-haskell
+~~~
+
+Read the Docs requires [JQuery](https://jquery.com/) for its JavaScript code to
+inject the flyout menu. Material for MkDocs does not come with JQuery. So, the
+following is required in the `mkdocs.yml` file:
+
+~~~yaml
+extra_javascript:
+- 'https://code.jquery.com/jquery-3.6.1.min.js'
+~~~
+
+The Read the Docs flyout is formatted with a `font-size` that is 90% of the
+`body` `font-size`. Material for MkDocs has a `body` `font-size` that is
+`0.5rem`, which is small. A little additional CSS is added to the `extra.css`
+file, to force the final `font-size` to be `0.7rem`. That size is consistent
+with that of other elements in the theme.
+
+~~~css
+body {
+    font-size: 0.777778rem;
+}
+~~~
+
+Material for MkDocs default suggestions for syntax highlighting in code blocks
+are applied. They are specified in the `mkdocs.yml` file as:
+
+~~~yaml
+markdown_extensions:
+- pymdownx.highlight:
+    anchor_linenums: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.superfences
+~~~
+
+## Testing
+
+Online documentation can be tested by establishing a branch on the respository
+that is then configured on the Read the Docs web site as 'Active' but
+'Hidden' - for example branch `mkdocs-test`. As the branch is 'Hidden' it does
+not appear in the Read the Docs flyout or search results.
