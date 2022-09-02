@@ -8,7 +8,7 @@ docs_dir: doc
 site_dir: _site
 theme:
   name: material
-    palette:
+  palette:
     primary: 'deep purple'
     accent: 'deep purple'
   icon:
