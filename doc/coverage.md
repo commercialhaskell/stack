@@ -32,11 +32,11 @@ When your project has these properties, you will get the following:
 The `stack hpc report` command generates a report for a selection of targets and
 `.tix` files.  For example, if we have 3 different packages with test-suites,
 packages `A`, `B`, and `C`, the default unified report will have coverage from
-all 3.  If we want a unified report with just two, we can instead run:
+all 3.  If we want a unified report with just two, we can instead command:
 
-```
-$ stack hpc report A B
-```
+~~~text
+stack hpc report A B
+~~~
 
 This will output a textual report for the combined coverage from `A` and `B`'s
 test-suites, along with a path to the HTML for the report.  To further
@@ -45,12 +45,12 @@ your browser.
 
 This command also supports taking extra `.tix` files.  If you've also built an
 executable, against exactly the same library versions of `A`, `B`, and `C`, then
-you could do the following:
+you could command the following:
 
-```
-$ stack exec -- an-exe
-$ stack hpc report A B C an-exe.tix
-```
+~~~text
+stack exec -- an-exe
+stack hpc report A B C an-exe.tix
+~~~
 
 This report will consider all test results as well as the newly generated
 `an-exe.tix` file.  Since this is a common use-case, there is a convenient flag

@@ -14,10 +14,10 @@ See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_an
 
 ### Stack version
 
-```
-$ stack --version
+~~~text
+stack --version
 Version 1.9.1, Git revision f9d0042c141660e1d38f797e1d426be4a99b2a3c (6168 commits) x86_64 hpack-0.31.0
-```
+~~~
 
 ### Method of installation
 

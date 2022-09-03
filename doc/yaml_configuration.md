@@ -87,10 +87,10 @@ information, see the [Pantry](pantry.md) documentation.
 
 Default:
 
-```yaml
+~~~yaml
 packages:
 - .
-```
+~~~
 
 _NOTE_ From Stack 1.11, Stack moved over to Pantry for managing extra-deps, and
 removed some legacy syntax for specifying dependencies in `packages`. Some
@@ -101,11 +101,11 @@ project. These are specified via paths to local directories. The paths are
 considered relative to the directory containing the `stack.yaml` file. For
 example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and you have:
 
-```yaml
+~~~yaml
 packages:
 - hello
 - there/world
-```
+~~~
 
 Your configuration means "I have packages in `/foo/bar/hello` and
 `/foo/bar/there/world`.
@@ -134,7 +134,7 @@ in your `packages` configuration value as well. This support was removed to
 simplify the file format. Instead, these values should be moved to `extra-deps`.
 As a concrete example, you would convert:
 
-```yaml
+~~~yaml
 packages:
 - .
 - location:
@@ -153,11 +153,11 @@ extra-deps:
   - time-1.9.1
   - yesod-colonnade-1.3.0.1
   - yesod-elements-1.1
-```
+~~~
 
 into
 
-```yaml
+~~~yaml
 packages:
 - .
 
@@ -172,7 +172,7 @@ extra-deps:
     commit: 6bf765e000c6fd14e09ebdea6c4c5b1510ff5376
     subdirs:
       - wai-extra
-```
+~~~
 
 And, in fact, the `packages` value could be left off entirely since it's using
 the default value.
@@ -198,7 +198,7 @@ kinds of sources:
 
 Here's an example using all of the above:
 
-```yaml
+~~~yaml
 extra-deps:
 - vendor/hashable
 - streaming-commons-0.2.0.0
@@ -214,7 +214,7 @@ extra-deps:
   commit: 2e3e41de93821bcfe8ec6210aeca21be3f2087bf
   subdirs:
     - network-conduit-tls
-```
+~~~
 
 For further information on the format for specifying dependencies, see the
 [Pantry](pantry.md) documentation.
@@ -227,11 +227,11 @@ Command line equivalent (takes precedence): `stack build --flag` option
 
 Flags can be set for each package separately, e.g.
 
-```yaml
+~~~yaml
 flags:
   package-name:
     flag-name: true
-```
+~~~
 
 If a specified flag is different than the one specified for a snapshot package,
 then the snapshot package will automatically be promoted to be an extra-dep.
@@ -253,12 +253,12 @@ be included in our package. This can be used for a few different purposes, e.g.:
 * When using a custom GHC build, avoid incompatible packages (see this
   [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
 
-```yaml
+~~~yaml
 drop-packages:
 - Cabal
 - buggy-package
 - package-with-unacceptable-license
-```
+~~~
 
 ### user-message
 
@@ -270,7 +270,7 @@ if the generated configuration is acceptable.
 For example, a user-message is inserted by `stack init` when it omits packages
 or adds external dependencies, namely:
 
-```yaml
+~~~yaml
 user-message: ! 'Warning: Some packages were found to be incompatible with the resolver
   and have been left commented out in the packages section.
 
@@ -280,7 +280,7 @@ user-message: ! 'Warning: Some packages were found to be incompatible with the r
   You can omit this message by removing it from stack.yaml
 
 '
-```
+~~~
 
 ### custom-preprocessor-extensions
 
@@ -291,10 +291,10 @@ Command line equivalent: `--customer-preprocessor-extensions` option
 In order for Stack to be aware of any custom preprocessors you are using, add
 their extensions here
 
-```yaml
+~~~yaml
 custom-preprocessor-extensions:
 - erb
-```
+~~~
 
 TODO: Add a simple example of how to use custom preprocessors.
 
@@ -317,9 +317,9 @@ Command line equivalent (takes precedence): `--[no-]allow-different-user` flag
 Allow users other than the owner of the Stack root to use the Stack
 installation.
 
-```yaml
+~~~yaml
 allow-different-user: true
-```
+~~~
 
 The intention of this option is to prevent file permission problems, for example
 as the result of a Stack command executed under `sudo`.
@@ -337,9 +337,9 @@ Whether to ignore version bounds in Cabal files. This also ignores lower bounds.
 The name `allow-newer` is chosen to match the commonly-used Cabal option.
 
 
-```yaml
+~~~yaml
 allow-newer: true
-```
+~~~
 
 ### apply-ghc-options
 
@@ -350,11 +350,11 @@ Default: `locals`
 Which packages do ghc-options on the command line get applied to? Before Stack
 0.1.6, the default value was `targets`
 
-```yaml
+~~~yaml
 apply-ghc-options: locals # all local packages
 # apply-ghc-options: targets # all local packages that are targets
 # apply-ghc-options: everything # applied even to snapshot and extra-deps
-```
+~~~
 
 Note that `everything` is a slightly dangerous value, as it can break invariants
 about your snapshot database.
@@ -378,7 +378,7 @@ including `x86_64`, `i386` and `aarch64`.
 
 Default:
 
-```yaml
+~~~yaml
 build:
   library-profiling: false
   executable-profiling: false
@@ -423,7 +423,7 @@ build:
 
   # Since 1.10
   ddump-dir: ""
-```
+~~~
 
 Command line equivalents (take precedence): Yes, see below.
 
@@ -457,11 +457,11 @@ flag also applies to the version numbers. This uses the same syntax as compiler
 resolvers like `ghc-9.2.4`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
-```yaml
+~~~yaml
 resolver: lts-14.20
 compiler: ghc-8.6.4
 compiler-check: match-exact
-```
+~~~
 
 #### Building GHC from source (experimental)
 
@@ -471,25 +471,25 @@ Stack supports building the GHC compiler from source. The version to build and
 to use is defined by a a Git commit ID and an Hadrian "flavour" (Hadrian is the
 build system of GHC) with the following syntax:
 
-```yaml
+~~~yaml
 compiler: ghc-git-COMMIT-FLAVOUR
-```
+~~~
 
 In the following example the commit ID is "5be7ad..." and the flavour is
 "quick":
 
-```yaml
+~~~yaml
 compiler: ghc-git-5be7ad7861c8d39f60b7101fd8d8e816ff50353a-quick
-```
+~~~
 
 By default the code is retrieved from the main GHC repository. If you want to
 select another repository, set the "compiler-repository" option:
 
-```yaml
+~~~yaml
 compiler-repository: git://my/ghc/repository
 # default
 # compiler-repository: https://gitlab.haskell.org/ghc/ghc.git
-```
+~~~
 
 Note that Stack doesn't check the compiler version when it uses a compiler built
 from source. Moreover it is assumed that the built compiler is recent enough as
@@ -510,24 +510,24 @@ The easiest way to deal with this issue is to drop the offending packages as
 follows. Instead of using the packages specified in the resolver, the global
 packages bundled with GHC will be used.
 
-```yaml
+~~~yaml
 drop-packages:
 - Cabal
 - ...
-```
+~~~
 
 Another way to deal with this issue is to add the relevant packages as
 `extra-deps` built from source. To avoid mismatching versions, you can use
 exactly the same commit id you used to build GHC as follows:
 
-```
+~~~
 extra-deps:
 - git: https://gitlab.haskell.org/ghc/ghc.git
   commit: 5be7ad7861c8d39f60b7101fd8d8e816ff50353a
   subdirs:
     - libraries/Cabal/Cabal
     - libraries/...
-```
+~~~
 
 #### Bootstrapping compiler
 
@@ -565,9 +565,9 @@ that tests can complete earlier. However, if some test suites require exclusive
 access to some resource, or require a great deal of CPU or memory resources,
 then it makes sense to set this to `false`.
 
-```yaml
+~~~yaml
 concurrent-tests: false
-```
+~~~
 
 ### configure-options
 
@@ -578,14 +578,14 @@ These can either be set by package name, or using the `$everything`,
 `$targets`, and `$locals` special keys. These special keys have the same
 meaning as in `ghc-options`.
 
-```yaml
+~~~yaml
 configure-options:
   $everything:
   - --with-gcc
   - /some/path
   my-package:
   - --another-flag
-```
+~~~
 
 ### connection-count
 
@@ -625,11 +625,11 @@ console. By default, Stack will only do this when building a single target
 package or if the log contains warnings, to avoid generating unnecessarily
 verbose output.
 
-```yaml
+~~~yaml
 dump-logs: none      # don't dump logs even if they contain warnings
 dump-logs: warning   # dump logs that contain warnings
 dump-logs: all       # dump all logs for local non-dependency packages
-```
+~~~
 
 ### extra-include-dirs
 
@@ -640,10 +640,10 @@ directory)
 
 A list of extra paths to be searched for header files. Paths should be absolute
 
-```yaml
+~~~yaml
 extra-include-dirs:
 - /opt/foo/include
-```
+~~~
 
 Since these are system-dependent absolute paths, it is recommended that you
 specify these in your `config.yaml` file. If you control the build environment
@@ -658,10 +658,10 @@ Command line equivalent: `--extra-lib-dirs` option (repeat for each directory)
 
 A list of extra paths to be searched for libraries. Paths should be absolute
 
-```yaml
+~~~yaml
 extra-lib-dirs:
 - /opt/foo/lib
-```
+~~~
 
 Since these are system-dependent absolute paths, it is recommended that you
 specify these in your `config.yaml` file. If you control the build environment
@@ -678,10 +678,10 @@ the PATH of processes run by Stack.
 
 For example, to prepend `/path-to-some-dep/bin` to your PATH:
 
-```yaml
+~~~yaml
 extra-path:
 - /path-to-some-dep/bin
-```
+~~~
 
 Other paths added by Stack - things like the project's binary directory and the
 compiler's binary directory - will take precedence over those specified here
@@ -710,14 +710,14 @@ arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
 
 Allows specifying per-package and global GHC options:
 
-```yaml
+~~~yaml
 ghc-options:
     # All packages
     "$locals": -Wall
     "$targets": -Werror
     "$everything": -O2
     some-package: -DSOME_CPP_FLAG
-```
+~~~
 
 Since Stack 1.6.0, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
@@ -773,9 +773,9 @@ Default: `https://hackage.haskell.org/`
 
 Sets the address of the Hackage server to upload the package to.
 
-```yaml
+~~~yaml
 hackage-base-url: https://hackage.example.com/
-```
+~~~
 
 ### hide-source-paths
 
@@ -783,26 +783,26 @@ Default: `true` (since 2.0)
 
 Whether to use the `-fhide-source-paths` option by default for GHC >= 8.2:
 
-```yaml
+~~~yaml
 hide-source-paths: false
-```
+~~~
 
 Build output when enabled:
 
-```
+~~~text
 ...
 [1 of 2] Compiling Lib
 [2 of 2] Compiling Paths_test_pr
 ...
-```
+~~~
 
 Build output when disabled:
 
-```
+~~~text
 ...
 [1 of 2] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux-tinfo6/Cabal-2.4.0.1/build/Lib.o )
 ...
-```
+~~~
 
 ### hide-th-loading
 
@@ -835,9 +835,9 @@ Command line equivalent (takes precedence): `-j`, `--jobs` option
 Specifies how many build tasks should be run in parallel. One usage for this
 might be to avoid running out of memory by setting it to 1, like this:
 
-```yaml
+~~~yaml
 jobs: 1
-```
+~~~
 
 ### local-bin-path
 
@@ -886,9 +886,9 @@ Command line equivalent (takes precedence): `--[no-]modify-code-page` flag
 
 Whether to modify the code page for UTF-8 output.
 
-```yaml
+~~~yaml
 modify-code-page: false
-```
+~~~
 
 ### nix
 
@@ -917,7 +917,7 @@ For further information, see the
 
 Default:
 
-```yaml
+~~~yaml
 package-indices:
 - download-prefix: https://hackage.haskell.org/
   hackage-security:
@@ -935,7 +935,7 @@ package-indices:
 
     # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
     ignore-expiry: true
-```
+~~~
 
 Since Stack 1.11, this key may only be used to specify a single package index,
 which must use the Hackage Security format. For the motivation for this change,
@@ -977,9 +977,9 @@ is:
 * When adding an upper bound, we require less than the next major version
   (e.g., `foo < 1.3`)
 
-```yaml
+~~~yaml
 pvp-bounds: none
-```
+~~~
 
 For further information, see the announcement
 [blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
@@ -1000,9 +1000,9 @@ issues for Stackage maintenance.
 When Stack notices that a new version of Stack is available, should it notify
 the user?
 
-```yaml
+~~~yaml
 recommend-stack-upgrade: true
-```
+~~~
 
 ### rebuild-ghc-options
 
@@ -1017,9 +1017,9 @@ actually recompile the modules anyway. Therefore, the new behavior is to not
 recompile on an options change, but this behavior can be changed back with the
 following:
 
-```yaml
+~~~yaml
 rebuild-ghc-options: true
-```
+~~~
 
 ### require-stack-version
 
@@ -1038,9 +1038,9 @@ Default: `true`
 Controls whether, when using `stack upload`, the user's Hackage username and
 password are stored in a local file.
 
-```yaml
+~~~yaml
 save-hackage-creds: true
-```
+~~~
 
 ### setup-info
 
@@ -1075,13 +1075,13 @@ The format of this key is the same as in the default
 For example, GHC 9.2.3 of custom variant `myvariant` (see further below) on
 64-bit Windows:
 
-```yaml
+~~~yaml
 setup-info:
   ghc:
     windows64-custom-myvariant:
       9.2.3:
         url: "https://example.com/ghc-9.2.3-x86_64-unknown-mingw32-myvariant.tar.xz"
-```
+~~~
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
@@ -1179,7 +1179,7 @@ storing many projects). For example:
 
 Directory structure:
 
-~~~
+~~~text
 - src/
 - installs/
   - my-stack-setup.yaml
@@ -1234,9 +1234,9 @@ Skips checking for and installing MSYS2 when stack is Setting up the
 environment. This usually doesn't make sense in project-level configurations,
 just in `config.yaml`.
 
-```yaml
+~~~yaml
 skip-msys: true
-```
+~~~
 
 ### snapshot-location-base
 
@@ -1251,9 +1251,9 @@ Sets the base location of the LTS Haskell or Stackage Nightly snapshots.
 
 For example:
 
-```yaml
+~~~yaml
 snapshot-location-base: https://example.com/snapshots/location/
-```
+~~~
 
 has the following effect:
 
@@ -1294,9 +1294,9 @@ For example, users of the popular
 [Solarized Dark](https://ethanschoonover.com/solarized/)
 terminal theme might wish to set the styles as follows:
 
-```yaml
+~~~yaml
 stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:module=35:package-component=95:secondary=92:highlight=32
-```
+~~~
 In respect of styles used in verbose output, some of that output occurs before
 the configuration file is processed.
 
@@ -1314,9 +1314,9 @@ Default (built from source): `true`
 Turns on a mode where some messages are printed at WARN level instead of DEBUG
 level, especially useful for developers of Stack itself.
 
-```yaml
+~~~yaml
 stack-developer-mode: false
-```
+~~~
 
 ### system-ghc
 
@@ -1331,10 +1331,10 @@ bandwidth or storage space needed to setup an isolated GHC.
 
 In a Nix-enabled configuration, Stack is incompatible with `system-ghc: false`.
 
-```yaml
+~~~yaml
 # Turn on system GHC
 system-ghc: true
-```
+~~~
 
 ### templates
 
@@ -1365,16 +1365,16 @@ The parameters are: `author-email`, `author-name`, `category`, `copyright`,
   Cabal. For instance `github-username: myusername` and
   `stack new my-project new-template` would result:
 
-```yaml
+~~~yaml
 homepage: http://github.com/myusername/my-project#readme
 
 source-repository head
   type: git
   location: https://github.com/myusername/my-project
-```
+~~~
 
 These properties can be set in `config.yaml` as follows:
-```yaml
+~~~yaml
 templates:
   params:
     author-name: Your Name
@@ -1382,26 +1382,26 @@ templates:
     category: Your Projects Category
     copyright: 'Copyright (c) 2022 Your Name'
     github-username: yourusername
-```
+~~~
 
 Additionally, `stack new` can automatically initialize source control
 repositories in the directories it creates.  Source control tools can be
 specified with the `scm-init` option. At the moment, only `git` is supported.
 
-```yaml
+~~~yaml
 templates:
   scm-init: git
-```
+~~~
 
 ### urls
 
 Default:
 
 
-```yaml
+~~~yaml
 urls:
   latest-snapshot: https://www.stackage.org/download/snapshots.json
-```
+~~~
 
 Customize the URLs where Stack looks for snapshot build plans.
 
@@ -1412,9 +1412,9 @@ Command line equivalent (takes precedence): `--with-gcc` option
 Specify a path to GCC explicitly, rather than relying on the normal path
 resolution.
 
-```yaml
+~~~yaml
 with-gcc: /usr/local/bin/gcc-5
-```
+~~~
 
 ### with-hpack
 
@@ -1423,9 +1423,9 @@ Command line equivalent (takes precedence): `--with-hpack` option
 Use an [Hpack](https://github.com/sol/hpack) executable, rather than Stack's
 in-built version of the Hpack functionality.
 
-```yaml
+~~~yaml
 with-hpack: /usr/local/bin/hpack
-```
+~~~
 
 ### work-dir
 
@@ -1462,7 +1462,7 @@ installation logic, even when the script fails.
 
 An example script is:
 
-```sh
+~~~sh
 #!/bin/sh
 
 set -eu
@@ -1483,7 +1483,7 @@ case $HOOK_GHC_TYPE in
 esac
 
 echo "location/to/ghc/executable"
-```
+~~~
 
 The following environment variables are always available to the script:
 

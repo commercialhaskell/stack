@@ -171,11 +171,12 @@ as described:
 * `--exec "cmd [args]"` will run a command after a successful build
 
 To come back to the composable approach described above, consider this final
-example (which uses the [wai repository](https://github.com/yesodweb/wai/)):
+example (which uses the [wai repository](https://github.com/yesodweb/wai/)). The
+command:
 
-```
+~~~text
 stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
-```
+~~~
 
 This command will start Stack up in file watch mode, waiting for files in your
 project to change. When first starting, and each time a file changes, it will do

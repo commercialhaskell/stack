@@ -86,7 +86,9 @@ it expressly. Other templates are available, see the `stack templates` command.
 
 From the root directory for all our Haskell projects, we command:
 
-    $ stack new helloworld new-template
+~~~text
+stack new helloworld new-template
+~~~
 
 For this first Stack command, there's quite a bit of initial setup it needs to
 do (such as downloading the list of packages available upstream), so you'll see
@@ -94,16 +96,20 @@ a lot of output. Over the course of this guide a lot of the content will begin
 to make more sense.
 
 We now have a project in the `helloworld` directory! We will change to that
-directory, with:
+directory, with command:
 
-    $ cd helloworld
+~~~text
+cd helloworld
+~~~
 
 ### The `stack build` command
 
-Next, we'll run the most important Stack command: `stack build`.
+Next, we'll run the most important Stack command, `stack build`:
 
-    $ stack build
-    # installing ... building ...
+~~~text
+stack build
+# installing ... building ...
+~~~
 
 Stack needs a version of GHC in order to build your project. Stack will discover
 that you are missing it and will install it for you. You can do this manually by
@@ -126,11 +132,13 @@ Windows, `helloworld-exe.exe`). We'll explain more in the next section, but, for
 now, just notice that the executables are installed in a location in our
 project's `.stack-work` directory.
 
-Now, Let's use `stack exec` to run our executable (which just outputs
-"someFunc"):
+Now, Let's use the `stack exec` command to run our executable (which just
+outputs "someFunc"):
 
-    $ stack exec helloworld-exe
-    someFunc
+~~~text
+stack exec helloworld-exe
+someFunc
+~~~
 
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where
@@ -141,19 +149,23 @@ directory.
 
 Finally, like all good software, `helloworld` actually has a test suite.
 
-Let's run it with `stack test`:
+Let's run it with the `stack test` command:
 
-    $ stack test
-    # build output ...
+~~~text
+stack test
+# build output ...
+~~~
 
 Reading the output, you'll see that Stack first builds the test suite and then
 automatically runs it for us. For both the `build` and `test` command, already
-built components are not built again. You can see this by running `stack build`
-and `stack test` a second time:
+built components are not built again. You can see this by using the
+`stack build` and `stack test` commands a second time:
 
-    $ stack build
-    $ stack test
-    # build output ...
+~~~text
+stack build
+stack test
+# build output ...
+~~~
 
 ## Inner Workings of Stack
 
@@ -164,17 +176,19 @@ In this subsection, we'll dissect the `helloworld` example in more detail.
 Before studying Stack more, let's understand our project a bit better. The files
 in the directory include:
 
-    app/Main.hs
-    src/Lib.hs
-    test/Spec.hs
-    ChangeLog.md
-    README.md
-    LICENSE
-    Setup.hs
-    helloworld.cabal
-    package.yaml
-    stack.yaml
-    .gitignore
+~~~text
+app/Main.hs
+src/Lib.hs
+test/Spec.hs
+ChangeLog.md
+README.md
+LICENSE
+Setup.hs
+helloworld.cabal
+package.yaml
+stack.yaml
+.gitignore
+~~~
 
 The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
 source files that compose the actual functionality of our project (we won't
@@ -193,10 +207,10 @@ It's technically not needed by Stack, but it is still considered good practice
 in the Haskell world to include it. The file we're using is straight
 boilerplate:
 
-```haskell
+~~~haskell
 import Distribution.Simple
 main = defaultMain
-```
+~~~
 
 Next, let's look at our `stack.yaml` file, which gives our project-level
 settings. Ignoring comments beginning `#`, the contents will look something like
@@ -247,11 +261,13 @@ Cabal User Guide the definitive reference for the
 As we saw above, the `build` command installed GHC for us. Just for kicks,
 let's manually run the `setup` command:
 
-    $ stack setup
-    stack will use a sandboxed GHC it installed
-    For more information on paths, see 'stack path' and 'stack exec env'
-    To use this GHC and packages outside of a project, consider using:
-    stack ghc, stack ghci, stack runghc, or stack exec
+~~~text
+stack setup
+stack will use a sandboxed GHC it installed
+For more information on paths, see 'stack path' and 'stack exec env'
+To use this GHC and packages outside of a project, consider using:
+stack ghc, stack ghci, stack runghc, or stack exec
+~~~
 
 Thankfully, the command is smart enough to know not to perform an installation
 twice. As the command output above indicates, you can use `stack path`
@@ -261,13 +277,17 @@ For now, we'll just look at where GHC is installed:
 
 On Unix-like operating systems, command:
 
-    $ stack exec -- which ghc
-    /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2/bin/ghc
+~~~text
+stack exec -- which ghc
+/home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2/bin/ghc
+~~~
 
 On Windows (with PowerShell), command:
 
-    $ stack exec -- where.exe ghc
-    C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.0.2\bin\ghc.exe
+~~~text
+stack exec -- where.exe ghc
+C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.0.2\bin\ghc.exe
+~~~
 
 As you can see from that path (and as emphasized earlier), the installation is
 placed to not interfere with any other GHC installation, whether system-wide or
@@ -314,7 +334,7 @@ Let's say we decide to modify our `helloworld` source a bit to use a new
 library, perhaps the ubiquitous `text` package. In `src/Lib.hs`, we can, for
 example add:
 
-```haskell
+~~~haskell
 {-# LANGUAGE OverloadedStrings #-}
 module Lib
     ( someFunc
@@ -324,36 +344,40 @@ import qualified Data.Text.IO as T
 
 someFunc :: IO ()
 someFunc = T.putStrLn "someFunc"
-```
+~~~
 
 When we try to build this, things don't go as expected:
 
-    $ stack build
-    # build failure output (abridged for clarity) ...
-    src\Lib.hs:6:1: error:
-        Could not load module ‘Data.Text.IO’
-        It is a member of the hidden package ‘text-1.2.5.0’.
-        Perhaps you need to add ‘text’ to the build-depends in your .cabal file.
-        Use -v (or `:set -v` in ghci) to see a list of the files searched for.
-      |
-    6 | import qualified Data.Text.IO as T
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~text
+stack build
+# build failure output (abridged for clarity) ...
+src\Lib.hs:6:1: error:
+    Could not load module ‘Data.Text.IO’
+    It is a member of the hidden package ‘text-1.2.5.0’.
+    Perhaps you need to add ‘text’ to the build-depends in your .cabal file.
+    Use -v (or `:set -v` in ghci) to see a list of the files searched for.
+  |
+6 | import qualified Data.Text.IO as T
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~
 
 This means that the package containing the module in question is not available.
 To tell Stack to use [text](https://hackage.haskell.org/package/text), you need
 to add it to your `package.yaml` file — specifically in your `dependencies`
 section, like this:
 
-```yaml
+~~~yaml
 dependencies:
 - base >= 4.7 && < 5
 - text # added here
-```
+~~~
 
-Now if we rerun `stack build`, we should get a successful result:
+Now if we rerun `stack build`, we should get a successful result. Command:
 
-    $ stack build
-    # build output ...
+~~~text
+stack build
+# build output ...
+~~~
 
 This output means that the `text` package was downloaded, configured, built, and
 locally installed. Once that was done, we moved on to building our local package
@@ -366,25 +390,29 @@ Let's have Stack add a few more dependencies to our project. First, we'll
 include two new packages in the `dependencies` section for our library in our
 `package.yaml`:
 
-```yaml
+~~~yaml
 dependencies:
 - base >= 4.7 && < 5
 - text
 - filepath
 - containers
-```
+~~~
 
 After adding these two dependencies, we can again run `stack build` to have them
-installed:
+installed. Command:
 
-    $ stack build
-    # build output ...
+~~~text
+stack build
+# build output ...
+~~~
 
 Finally, to find out which versions of these libraries Stack installed, we can
-ask Stack to `ls dependencies`:
+ask Stack to `ls dependencies`. Command:
 
-    $ stack ls dependencies
-    # dependency output ...
+~~~text
+stack ls dependencies
+# dependency output ...
+~~~
 
 ### extra-deps
 
@@ -392,7 +420,7 @@ Let's try a more off-the-beaten-track package: the joke
 [acme-missiles](http://www.stackage.org/package/acme-missiles) package. Our
 source code is simple:
 
-```haskell
+~~~haskell
 module Lib
     ( someFunc
     ) where
@@ -401,23 +429,25 @@ import Acme.Missiles
 
 someFunc :: IO ()
 someFunc = launchMissiles
-```
+~~~
 
 Again, we add this new dependency to the `package.yaml` file like this:
 
-```
+~~~yaml
 dependencies:
 - base >= 4.7 && < 5
 - text
 - filepath
 - containers
 - acme-missiles # added
-```
+~~~
 
-However, rerunning `stack build` shows us the following error message:
+However, rerunning `stack build` shows us the following error message. Command:
 
-    $ stack build
-    # build failure output ...
+~~~text
+stack build
+# build failure output ...
+~~~
 
 It says that it was unable to construct the build plan.
 
@@ -438,10 +468,10 @@ To add `acme-missles` to the available packages, we'll use the `extra-deps` key
 in the `stack.yaml` file. That key defines extra packages, not present in the
 resolver, that will be needed as dependencies. You can add this like so:
 
-```yaml
+~~~yaml
 extra-deps:
 - acme-missiles-0.3 # not in the LTS resolver
-```
+~~~
 
 Now `stack build` will succeed.
 
@@ -474,18 +504,21 @@ Let's explore package sets a bit further. Instead of lts-19.17, let's change our
 Right now, this is currently 2022-07-31 - please see the resolve from the link
 above to get the latest.
 
-Then, Rerunning `stack build` will produce:
+Then, commanding `stack build` again will produce:
 
-    $ stack build
-    # Downloaded nightly-2020-07-31 build plan.
-    # build output ...
+~~~text
+stack build
+# Downloaded nightly-2020-07-31 build plan.
+# build output ...
+~~~
 
 We can also change resolvers on the command line, which can be useful in a
-Continuous Integration (CI) setting, like on Travis. For example:
+Continuous Integration (CI) setting, like on Travis. For example, command:
 
-    $ stack --resolver lts-18.28 build
-    # Downloaded lts-18.28 build plan.
-    # build output ...
+~~~textstack --resolver lts-18.28 build
+# Downloaded lts-18.28 build plan.
+# build output ...
+~~~
 
 When passed on the command line, you also get some additional "short-cut"
 versions of resolvers: `--resolver nightly` will use the newest Nightly resolver
@@ -501,10 +534,12 @@ on the command line and not in your `stack.yaml` file is that using them:
 ### Changing GHC versions
 
 Finally, let's try using an older LTS snapshot. We'll use the newest 18.x
-snapshot:
+snapshot with the command:
 
-    $ stack --resolver lts-18 build
-    # build output ...
+~~~text
+stack --resolver lts-18 build
+# build output ...
+~~~
 
 This succeeds, automatically installing the necessary GHC along the way. So, we
 see that different LTS versions use different GHC versions and Stack can handle
@@ -530,19 +565,25 @@ package and try to build it. We'll be ambitious and use
 using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the
 `stack unpack` command from the root directory for all our Haskell projects:
 
-    $ stack unpack yackage
-    Unpacked yackage-0.8.1 to <root_directory>/yackage-0.8.1/
+~~~text
+stack unpack yackage
+Unpacked yackage-0.8.1 to <root_directory>/yackage-0.8.1/
+~~~
 
 You can also unpack to the directory of your liking instead of the current one
-by issuing:
+by issuing the command:
 
-    $ stack unpack yackage --to <desired_directory>
+~~~text
+stack unpack yackage --to <desired_directory>
+~~~
 
 This will create a `yackage-0.8.1` directory inside `<desired_directory>`.
 
-We will change to that directory, with:
+We will change to that directory, with the command:
 
-    $ cd yackage-0.8.1
+~~~text
+cd yackage-0.8.1
+~~~
 
 ### The `stack init` command
 
@@ -550,8 +591,10 @@ This new directory does not have a `stack.yaml` file, so we need to make one
 first. We could do it by hand, but let's be lazy instead with the `stack init`
 command:
 
-    $ stack init
-    # init output ...
+~~~text
+stack init
+# init output ...
+~~~
 
 `stack init` does quite a few things for you behind the scenes:
 
@@ -582,10 +625,13 @@ works.
 To simulate a conflict we will use `acme-missiles-0.3` in `yackage` and we will
 also copy `yackage.cabal` to another directory and change the name of the file
 and package to `yackage-test`. In this new package we will use
-`acme-missiles-0.2` instead. Let's see what happens when we re-run `stack init`:
+`acme-missiles-0.2` instead. Let's see what happens when we command `stack init`
+again:
 
-    $ stack init --force --omit-packages
-    # init failure output ...
+~~~text
+stack init --force --omit-packages
+# init failure output ...
+~~~
 
 Looking at `stack.yaml`, you will see that the excluded packages have been
 commented out under the `packages` field. In case wrong packages are excluded
@@ -636,15 +682,16 @@ _Package naming_: If the `Name` field defined in a Cabal file does not match
 with the Cabal file name then `stack init` will refuse to continue.
 
 _User warnings_: When packages are excluded or external dependencies added Stack
-will show warnings every time configuration file is loaded. You can suppress the
-warnings by editing the config file and removing the warnings from it. You may
-see something like this:
+will show warnings every time the configuration file is loaded. You can suppress
+the warnings by editing the configuration file and removing the warnings from
+it. You may see something like this:
 
-
-    $ stack build
-    Warning: Some packages were found to be incompatible with the resolver and have been left commented out in the packages section.
-    Warning: Specified resolver could not satisfy all dependencies. Some external packages have been added as dependencies.
-    You can suppress this message by removing it from stack.yaml
+~~~text
+stack build
+Warning: Some packages were found to be incompatible with the resolver and have been left commented out in the packages section.
+Warning: Specified resolver could not satisfy all dependencies. Some external packages have been added as dependencies.
+You can suppress this message by removing it from stack.yaml
+~~~
 
 ## Different databases
 
@@ -656,10 +703,12 @@ version of a library), executables, and a few other things as well. To give you
 an idea, the contents of the parent directory of the `stack path --local-pkg-db`
 directory are the directories:
 
-    bin
-    doc
-    lib
-    pkgdb
+~~~text
+bin
+doc
+lib
+pkgdb
+~~~
 
 Databases in Stack are *layered*. For example, the database listing we just gave
 is called a *local* database (also known as a *mutable* database). That is
@@ -671,7 +720,7 @@ executables, also considered to be immutable, which forms the *global* database.
 To get a quick idea of this, we can look at the output of the
 `stack exec -- ghc-pkg list` command in our `helloworld` project:
 
-```
+~~~text
 <stack path --global-pkg-db directory>
     Cabal-3.6.3.0
     Win32-2.12.0.1
@@ -713,7 +762,7 @@ To get a quick idea of this, we can look at the output of the
 
 <stack path --local-pkg-db directory>
     helloworld-0.1.0.0
-```
+~~~
 
 where `<stack path --global-pkg-db directory>` refers to the directory output by
 the command `stack path --global-pkg-db`, and so on.
@@ -756,11 +805,13 @@ understand why rebuilding may occur at different points.
 
 Let's look at a subset of the `stack --help` output:
 
-    build    Build the package(s) in this directory/configuration
-    install  Shortcut for 'build --copy-bins'
-    test     Shortcut for 'build --test'
-    bench    Shortcut for 'build --bench'
-    haddock  Shortcut for 'build --haddock'
+~~~text
+build    Build the package(s) in this directory/configuration
+install  Shortcut for 'build --copy-bins'
+test     Shortcut for 'build --test'
+bench    Shortcut for 'build --bench'
+haddock  Shortcut for 'build --haddock'
+~~~
 
 Four of these commands are just synonyms for the `build` command. They are
 provided for convenience for common cases (e.g., `stack test` instead of
@@ -889,36 +940,38 @@ and stating the components directly. For example, the following will not build
 the `helloworld-exe` executable once all executables have been sucessfully
 built:
 
-    $ stack clean
-    $ stack build :helloworld-test
-    Building all executables for `helloworld' once. After a successful build of all of them, only specified executables will be rebuilt.
-    helloworld> configure (lib + exe + test)
-    Configuring helloworld-0.1.0.0...
-    helloworld> build (lib + exe + test)
-    Preprocessing library for helloworld-0.1.0.0..
-    Building library for helloworld-0.1.0.0..
-    [1 of 2] Compiling Lib
-    [2 of 2] Compiling Paths_helloworld
-    Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
-    Building executable 'helloworld-exe' for helloworld-0.1.0.0..
-    [1 of 2] Compiling Main
-    [2 of 2] Compiling Paths_helloworld
-    Linking .stack-work\dist\<hash>\build\helloworld-exe\helloworld-exe.exe ...
-    Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
-    Building test suite 'helloworld-test' for helloworld-0.1.0.0..
-    [1 of 2] Compiling Main
-    [2 of 2] Compiling Paths_helloworld
-    Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
-    helloworld> copy/register
-    Installing library in ...\helloworld\.stack-work\install\...
-    Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
-    Registering library for helloworld-0.1.0.0..
-    helloworld> test (suite: helloworld-test)
+~~~text
+stack clean
+stack build :helloworld-test
+Building all executables for `helloworld' once. After a successful build of all of them, only specified executables will be rebuilt.
+helloworld> configure (lib + exe + test)
+Configuring helloworld-0.1.0.0...
+helloworld> build (lib + exe + test)
+Preprocessing library for helloworld-0.1.0.0..
+Building library for helloworld-0.1.0.0..
+[1 of 2] Compiling Lib
+[2 of 2] Compiling Paths_helloworld
+Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
+Building executable 'helloworld-exe' for helloworld-0.1.0.0..
+[1 of 2] Compiling Main
+[2 of 2] Compiling Paths_helloworld
+Linking .stack-work\dist\<hash>\build\helloworld-exe\helloworld-exe.exe ...
+Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
+Building test suite 'helloworld-test' for helloworld-0.1.0.0..
+[1 of 2] Compiling Main
+[2 of 2] Compiling Paths_helloworld
+Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
+helloworld> copy/register
+Installing library in ...\helloworld\.stack-work\install\...
+Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
+Registering library for helloworld-0.1.0.0..
+helloworld> test (suite: helloworld-test)
 
-    Test suite not yet implemented
+Test suite not yet implemented
 
-    helloworld> Test suite helloworld-test passed
-    Completed 2 action(s).```
+helloworld> Test suite helloworld-test passed
+Completed 2 action(s).
+~~~
 
 We first cleaned our project to clear old results so we know exactly what Stack
 is trying to do. Note that is says it is building all executables for
@@ -933,26 +986,28 @@ main = putStrLn "Test suite still not yet implemented"
 
 and command again:
 
-    $ stack build :helloworld-test
-    helloworld-0.1.0.0: unregistering (local file changes: test\Spec.hs)
-    helloworld> build (lib + test)
-    Preprocessing library for helloworld-0.1.0.0..
-    Building library for helloworld-0.1.0.0..
-    Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
-    Building test suite 'helloworld-test' for helloworld-0.1.0.0..
-    [2 of 2] Compiling Main
-    Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
-    helloworld> copy/register
-    Installing library in ...\helloworld\.stack-work\install\...
-    Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
-    Registering library for helloworld-0.1.0.0..
-    helloworld> blocking for directory lock on ...\helloworld\.stack-work\dist\<hash>\build-lock
-    helloworld> test (suite: helloworld-test)
+~~~text
+stack build :helloworld-test
+helloworld-0.1.0.0: unregistering (local file changes: test\Spec.hs)
+helloworld> build (lib + test)
+Preprocessing library for helloworld-0.1.0.0..
+Building library for helloworld-0.1.0.0..
+Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
+Building test suite 'helloworld-test' for helloworld-0.1.0.0..
+[2 of 2] Compiling Main
+Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
+helloworld> copy/register
+Installing library in ...\helloworld\.stack-work\install\...
+Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
+Registering library for helloworld-0.1.0.0..
+helloworld> blocking for directory lock on ...\helloworld\.stack-work\dist\<hash>\build-lock
+helloworld> test (suite: helloworld-test)
 
-    Test suite still not yet implemented
+Test suite still not yet implemented
 
-    helloworld> Test suite helloworld-test passed
-    Completed 2 action(s).
+helloworld> Test suite helloworld-test passed
+Completed 2 action(s).
+~~~
 
 Notice that this time it builds the `helloworld-test` test suite, and the
 `helloworld` library (since it's used by the test suite), but it does not build
@@ -988,31 +1043,33 @@ just as one cohesive whole, and if anything fails to build, the build commands
 exits appropriately.
 
 Let's demonstrate this with the `wai-app-static` and `yackage` packages,
-starting in the root directory for all our Haskell projects:
+starting in the root directory for all our Haskell projects. Command:
 
-    $ mkdir multi
-    $ cd multi
-    $ stack unpack wai-app-static yackage
-    Unpacked wai-app-static (from Hackage) to .../multi/wai-app-static-3.1.7.4/
-    Unpacked yackage (from Hackage) to .../multi/yackage-0.8.1/
-    $ stack init
-    Looking for .cabal or package.yaml files to use to init the project.
-    Using cabal packages:
-    - wai-app-static-3.1.7.4/
-    - yackage-0.8.1/
+~~~text
+mkdir multi
+cd multi
+stack unpack wai-app-static yackage
+Unpacked wai-app-static (from Hackage) to .../multi/wai-app-static-3.1.7.4/
+Unpacked yackage (from Hackage) to .../multi/yackage-0.8.1/
+stack init
+Looking for .cabal or package.yaml files to use to init the project.
+Using cabal packages:
+- wai-app-static-3.1.7.4/
+- yackage-0.8.1/
 
-    Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@47:40: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
-    Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@21:36: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
-    Selecting the best among 18 snapshots...
+Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@47:40: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
+Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@21:36: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
+Selecting the best among 18 snapshots...
 
-    * Matches ...
+* Matches ...
 
-    Selected resolver: ...
-    Initialising configuration using resolver: ...
-    Total number of user packages considered: 2
-    Writing configuration to file: stack.yaml
-    $ stack build --haddock --test
-    # Goes off to build a whole bunch of packages
+Selected resolver: ...
+Initialising configuration using resolver: ...
+Total number of user packages considered: 2
+Writing configuration to file: stack.yaml
+stack build --haddock --test
+# Goes off to build a whole bunch of packages
+~~~
 
 If you look at the `stack.yaml` file, you'll see exactly what you'd expect:
 
@@ -1046,7 +1103,9 @@ To change a Cabal flag setting, we can use the command line `--flag` option. The
 `yackage` package has an `upload` flag that is enabled by default. We can
 command:
 
-    $ stack build --flag yackage:-upload
+~~~text
+stack build --flag yackage:-upload
+~~~
 
 This means: when compiling the `yackage` package, turn off the `upload` flag
 (thus the `-` in `-upload`). Unlike other tools, Stack is explicit about which
@@ -1065,9 +1124,11 @@ definition would entail.
 ### GHC options
 
 GHC options follow a similar logic as in managing Cabal flags, with a few
-nuances to adjust for common use cases. Let's consider:
+nuances to adjust for common use cases. Let's consider the command:
 
-    $ stack build --ghc-options="-Wall -Werror"
+~~~text
+stack build --ghc-options="-Wall -Werror"
+~~~
 
 This will set the `-Wall -Werror` options for all *local targets*. Note that
 this will not affect extra-dep and snapshot packages at all. This design
@@ -1080,23 +1141,29 @@ There's one extra nuance about command line GHC options: Since they only apply
 to local targets, if you change your local targets, they will no longer apply
 to other packages. Let's play around with an example from the `wai` repository,
 which includes the `wai` and `warp` packages, the latter depending on the
-former. If we run:
+former. If we command again:
 
-    $ stack build --ghc-options=-O0 wai
+~~~text
+stack build --ghc-options=-O0 wai
+~~~
 
 It will build all of the dependencies of `wai`, and then build `wai` with all
-optimizations disabled. Now let's add in `warp` as well:
+optimizations disabled. Now let's add in `warp` as well. Command:
 
-    $ stack build --ghc-options=-O0 wai warp
+~~~text
+stack build --ghc-options=-O0 wai warp
+~~~
 
 This builds the additional dependencies for `warp`, and then builds `warp` with
 optimizations disabled. Importantly: it does not rebuild `wai`, since `wai`'s
-configuration has not been altered. Now the surprising case:
+configuration has not been altered. Now the surprising case. Command:
 
-    $ stack build --ghc-options=-O0 warp
-    wai-3.0.3.0-5a49351d03cba6cbaf906972d788e65d: unregistering (flags changed from ["--ghc-options","-O0"] to [])
-    warp-3.1.3-a91c7c3108f63376877cb3cd5dbe8a7a: unregistering (missing dependencies: wai)
-    wai-3.0.3.0: configure
+~~~text
+stack build --ghc-options=-O0 warp
+wai-3.0.3.0-5a49351d03cba6cbaf906972d788e65d: unregistering (flags changed from ["--ghc-options","-O0"] to [])
+warp-3.1.3-a91c7c3108f63376877cb3cd5dbe8a7a: unregistering (missing dependencies: wai)
+wai-3.0.3.0: configure
+~~~
 
 You may expect this to be a no-op: neither `wai` nor `warp` has changed.
 However, Stack will instead recompile `wai` with optimizations enabled again,
@@ -1104,9 +1171,11 @@ and then rebuild `warp` (with optimizations disabled) against this newly built
 `wai`. The reason: reproducible builds. If we'd never built `wai` or `warp`
 before, trying to build `warp` would necessitate building all of its
 dependencies, and it would do so with default GHC options (optimizations
-enabled). This dependency would include `wai`. So when we run:
+enabled). This dependency would include `wai`. So when we command:
 
-    $ stack build --ghc-options=-O0 warp
+~~~text
+stack build --ghc-options=-O0 warp
+~~~
 
 We want its behavior to be unaffected by any previous build steps we took.
 While this specific corner case does catch people by surprise, the overall goal
@@ -1125,54 +1194,60 @@ on out is simple explanations of commands. Congratulations!
 
 Generally, you don't need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is
-useful. For example:
+useful. For example, command:
 
-    $ stack path
-    snapshot-doc-root: ...
-    local-doc-root: ...
-    local-hoogle-root: ...
-    stack-root: ...
-    project-root: ...
-    config-location: ...
-    bin-path: ...
-    programs: ...
-    compiler-exe: ...
-    compiler-bin: ...
-    compiler-tools-bin: ...
-    local-bin: ...
-    extra-include-dirs: ...
-    extra-library-dirs: ...
-    snapshot-pkg-db: ...
-    local-pkg-db: ...
-    global-pkg-db: ...
-    ghc-package-path: ...
-    snapshot-install-root: ...
-    local-install-root: ...
-    dist-dir: ...
-    local-hpc-root: ...
-    local-bin-path: ...
-    ghc-paths: ...
+~~~text
+stack path
+snapshot-doc-root: ...
+local-doc-root: ...
+local-hoogle-root: ...
+stack-root: ...
+project-root: ...
+config-location: ...
+bin-path: ...
+programs: ...
+compiler-exe: ...
+compiler-bin: ...
+compiler-tools-bin: ...
+local-bin: ...
+extra-include-dirs: ...
+extra-library-dirs: ...
+snapshot-pkg-db: ...
+local-pkg-db: ...
+global-pkg-db: ...
+ghc-package-path: ...
+snapshot-install-root: ...
+local-install-root: ...
+dist-dir: ...
+local-hpc-root: ...
+local-bin-path: ...
+ghc-paths: ...
+~~~
 
 In addition, `stack path` accepts command line arguments to state which of
 these keys you're interested in, which can be convenient for scripting. As a
 simple example, let's find out the sandboxed versions of GHC that Stack
 installed:
 
-On Unix-like operating systems:
+On Unix-like operating systems, command:
 
-    $ ls $(stack path --programs)/*.installed
-    /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2.installed
+~~~text
+ls $(stack path --programs)/*.installed
+/home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2.installed
+~~~
 
-On Windows (with PowerShell):
+On Windows (with PowerShell), command:
 
-    $ dir "$(stack path --programs)/*.installed"
+~~~text
+dir "$(stack path --programs)/*.installed"
 
-        Directory: C:\Users\mikep\AppData\Local\Programs\stack\x86_64-windows
+Directory: C:\Users\mikep\AppData\Local\Programs\stack\x86_64-windows
 
-    Mode                 LastWriteTime         Length Name
-    ----                 -------------         ------ ----
-    -a---          27/07/2022  5:40 PM              9 ghc-9.0.2.installed
-    -a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a---          27/07/2022  5:40 PM              9 ghc-9.0.2.installed
+-a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
+~~~
 
 While we're talking about paths, to wipe our Stack install completely, here's
 what typically needs to be removed:
@@ -1196,20 +1271,25 @@ paths, and sets a few additional environment variables (like adding those paths
 to the PATH, and setting `GHC_PACKAGE_PATH`, which tells GHC which package
 databases to use).
 
-If you want to see exactly what the modified environment looks like, try:
+If you want to see exactly what the modified environment looks like, try
+command:
 
-    $ stack exec env
+~~~text
+stack exec env
+~~~
 
 The only issue is how to distinguish flags to be passed to Stack versus those
 for the underlying program. Thanks to the `optparse-applicative` library, Stack
-follows the Unix convention of `--` to separate these, e.g.:
+follows the Unix convention of `--` to separate these. For example, command:
 
-    stack exec --package stm -- echo I installed the stm package via --package stm
-    Run from outside a project, using implicit global project config
-    Using latest snapshot resolver: lts-18.3
-    Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
-    Note: You can change the snapshot via the resolver field there.
-    I installed the stm package via --package stm
+~~~text
+stack exec --package stm -- echo I installed the stm package via --package stm
+Run from outside a project, using implicit global project config
+Using latest snapshot resolver: lts-18.3
+Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
+Note: You can change the snapshot via the resolver field there.
+I installed the stm package via --package stm
+~~~
 
 Flags worth mentioning:
 
@@ -1221,16 +1301,20 @@ Flags worth mentioning:
 
 You may also find it convenient to use `stack exec` to launch a subshell
 (substitute `bash` with your preferred shell) where your compiled executable is
-available at the front of your PATH:
+available at the front of your PATH. Command:
 
-    $ stack exec bash
+~~~text
+stack exec bash
+~~~
 
 ## The `stack ghci` or `stack repl` command
 
 GHCi is the interactive GHC environment, a.k.a. the REPL. You *could* access it
-with:
+with command:
 
-    stack exec ghci
+~~~text
+stack exec ghci
+~~~
 
 But that won't load up locally written modules for access. For that, use the
 `stack ghci` command or its synonym `stack repl`. To then load modules from your
@@ -1277,8 +1361,10 @@ main = echo "Hello World!"
 On Unix-like operating systems the file's permissions can changed to mark it as
 executable, with command `chmod` and then it can be run:
 
-    $ chmod +x turtle-example.hs
-    $ ./turtle-example.hs
+~~~text
+chmod +x turtle-example.hs
+./turtle-example.hs
+~~~
 
 The first line in the source file beginning with the 'shebang' (`#!`) tells
 Unix to use Stack as a script interpreter.
@@ -1286,16 +1372,22 @@ Unix to use Stack as a script interpreter.
 On Windows, PowerShell will not recognise the shebang line, and so the line is
 not required on Windows. However, the script can be run with command:
 
-    $ stack turtle-example.hs
+~~~text
+stack turtle-example.hs
+~~~
 
 In both cases, the command yields (first time):
 
-    # Progress with building dependencies...
-    Hello World!
+~~~text
+# Progress with building dependencies...
+Hello World!
+~~~
 
 and (second and subsequent times):
 
-    Hello World!
+~~~text
+Hello World!
+~~~
 
 The first run can take a while (as it has to download GHC if necessary and build
 dependencies), but subsequent runs are able to reuse everything already built,
@@ -1381,7 +1473,8 @@ compile in CI (continuous integration).
 For example, consider the following simple script, in a file named `Script.hs`,
 which makes use of the joke package
 [`acme-missiles`](https://hackage.haskell.org/package/acme-missiles):
-```
+
+~~~haskell
 {- stack script
    --resolver lts-19.9
    --package acme-missiles
@@ -1390,7 +1483,8 @@ import Acme.Missiles (launchMissiles)
 
 main :: IO ()
 main = launchMissiles
-```
+~~~
+
 The command `stack --script-no-run-compile Script.hs` then behaves as if the
 command
 `stack script --resolver lts-19.9 --package acme-missiles --no-run --compile -- Script.hs`
@@ -1510,7 +1604,9 @@ operating systems, it is also where Stack stores tools such as GHC, in a
 the Stack root, in `%LOCALAPPDATA%\Programs\stack`. The location of the Stack
 root is reported by command:
 
-    $ stack path --stack-root
+~~~text
+stack path --stack-root
+~~~
 
 The location of the Stack root can be configured by setting the `STACK_ROOT`
 environment variable or using Stack's `--stack-root` option on the command line.

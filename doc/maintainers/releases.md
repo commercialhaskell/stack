@@ -199,11 +199,11 @@ in `package.yaml` from the previous step).
 
 For release candidates the tag should be `rc/vX.Y.Z.A`.
 
-For example:
+For example, command:
 
-~~~
-$ git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z
-$ git push origin vX.Y.Z`
+~~~text
+git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z
+git push origin vX.Y.Z`
 ~~~
 
 ### C: Edit the draft GitHub release, and publish it `[RC]`
@@ -229,18 +229,19 @@ Publish the GitHub release.
 
 ### D: Upload to Hackage and reset branches
 
-Upload the `stack` package to Hackage:
+Upload the `stack` package to Hackage with the command:
 
-~~~
-$ stack upload . --pvp-bounds=lower
+~~~text
+stack upload . --pvp-bounds=lower
 ~~~
 
-Reset the `release` branch to the released commit. For example:
+Reset the `release` branch to the released commit. For example, with the
+commands:
 
-~~~
-$ git checkout release
-$ git merge --ff-only vX.Y.Z
-$ git push origin release
+~~~text
+git checkout release
+git merge --ff-only vX.Y.Z
+git push origin release
 ~~~
 
 Update the `stable` branch similarly.
@@ -251,11 +252,12 @@ making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then
 merging. If anything is complicated to merge, consider making it a pull request
 and getting it reviewed rather than merging immediately.
 
-Delete the RC branch, both locally and on the remote. For example:
+Delete the RC branch, both locally and on the remote. For example with the
+commands:
 
-~~~
-$ git branch -d rc/vX.Y
-$ git push origin :rc/vX.Y`
+~~~text
+git branch -d rc/vX.Y
+git push origin :rc/vX.Y`
 ~~~
 
 ### E: Activate the version on Read The Docs
@@ -274,10 +276,10 @@ with the new version.
 Sync the application in
 [ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
 
-Test with:
+Test with the command:
 
-~~~
-$ curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
+~~~text
+curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
 ~~~
 
 and make sure it redirects to the new version.

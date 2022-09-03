@@ -101,7 +101,7 @@ then all you have to do is command:
 The `stack new my-project` command above should have created the following files
 and directories:
 
-~~~
+~~~text
 .
 ├── app
 │   └── Main.hs

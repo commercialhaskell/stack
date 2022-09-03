@@ -1997,7 +1997,8 @@ Other enhancements:
   [#1306](https://github.com/commercialhaskell/stack/issues/1306)
 * Retry when downloading snapshots and package indices
 * Many build options are configurable now in `stack.yaml`:
-```
+
+  ~~~yaml
   build:
     library-profiling: true
     executable-profiling: true
@@ -2019,7 +2020,8 @@ Other enhancements:
       no-run-benchmarks: true
     reconfigure: true
     cabal-verbose: true
-```
+  ~~~
+
 * A number of URLs are now configurable, useful for firewalls. See
   [#1794](https://github.com/commercialhaskell/stack/issues/1884).
 * Suggest causes when executables are missing.

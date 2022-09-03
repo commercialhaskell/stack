@@ -9,9 +9,9 @@ any Linux distribution.
 
 - Install nix (tested with v2.0.4 and v2.1.2, but should work with any)
 
-  ```
+  ~~~sh
   curl https://nixos.org/nix/install | sh
-  ```
+  ~~~
 
 - Install and authenticate cachix (first two steps at https://cachix.org/ after
   signing up)
@@ -19,9 +19,9 @@ any Linux distribution.
 
 - Add nh2's cache:
 
-  ```
+  ~~~sh
   cachix use static-haskell-nix
-  ```
+  ~~~
 
   NOTE: to clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*`
   (useful if someone else uploads new stuff to the cache and you want to use it
@@ -38,9 +38,9 @@ any Linux distribution.
 
 - in `static-stack` directory, run (from `static-stack/README.md`):
 
-  ```
+  ~~~sh
   $(nix-build --no-link -A run-stack2nix-and-static-build-script --argstr stackDir ~/stack-release)
-  ```
+  ~~~
 
 - Run integration tests against the static binary [TODO: improve this process by
   adding full support in `release.hs` or the integration tests for testing a
@@ -62,10 +62,10 @@ any Linux distribution.
 - Package, sign, and upload to GitHub using Stack's release script in the stack
   directory:
 
-  ```
+  ~~~sh
   cd ~/stack-release
   stack etc/scripts/release.hs --no-test-haddocks --binary-variant=static --build-args=--dry-run upload
-  ```
+  ~~~
 
   (adding `--build-args=--dry-run` ensures the binary you copied will be used rather than building a new one)
 
@@ -152,15 +152,19 @@ Now continue to the **General Windows setup** subsection below.
 
 13. Run in command prompt:
 
-        md C:\p
-        md C:\tmp
-        cd /d C:\p
+    ~~~text
+    md C:\p
+    md C:\tmp
+    cd /d C:\p
+    ~~~
 
 14. Create `C:\p\env.bat`:
 
-        SET TEMP=C:\tmp
-        SET TMP=C:\tmp
-        SET PATH=C:\Users\IEUser\AppData\Roaming\local\bin;"c:\Program Files\Git\usr\bin";"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin";%PATH%
+    ~~~text
+    SET TEMP=C:\tmp
+    SET TMP=C:\tmp
+    SET PATH=C:\Users\IEUser\AppData\Roaming\local\bin;"c:\Program Files\Git\usr\bin";"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin";%PATH%
+    ~~~
 
 15. Run `C:\p\env.bat` (do this every time you open a new command prompt)
 
@@ -171,15 +175,16 @@ Now continue to the **General Windows setup** subsection below.
 
 17. Run in command prompt (adjust the `user.email` and `user.name` settings):
 
-        git config --global user.email manny@fpcomplete.com
-        git config --global user.name "Emanuel Borsboom"
-        git config --global push.default simple
-        git config --global core.autocrlf true
-        git clone https://github.com/borsboom/stack-installer.git
-        git clone -b stable --reference C:\p\stack-release https://github.com/commercialhaskell/stack.git stack-release
-        cd stack-release
-        stack install cabal-install
-
+    ~~~text
+    git config --global user.email manny@fpcomplete.com
+    git config --global user.name "Emanuel Borsboom"
+    git config --global push.default simple
+    git config --global core.autocrlf true
+    git clone https://github.com/borsboom/stack-installer.git
+    git clone -b stable --reference C:\p\stack-release https://github.com/commercialhaskell/stack.git stack-release
+    cd stack-release
+    stack install cabal-install
+    ~~~
 
 ## Setting up an ARM VM for releases
 
@@ -195,38 +200,42 @@ Now continue to the **General Windows setup** subsection below.
 
 5. Switch to gold linker:
 
-    ```
+    ~~~sh
     update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
     update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.bfd" 10
     update-alternatives --config ld
-    ```
+    ~~~
 
 6. Add swap space:
 
-    ```
+    ~~~sh
     dd if=/dev/zero of=/swapfile1 bs=1024 count=4194304
     mkswap /swapfile1
     swapon /swapfile1
     echo '/swapfile1 none swap sw 0 0' >>/etc/fstab
-    ```
+    ~~~
 
 7. Install additional tools:
 
-    ```
+    ~~~Sh
     apt-get update && apt-get install -y unzip gpg
-    ```
+    ~~~
 
 8. Import your GPG key (`gpg --import` and paste the private key)
 
 9. Git settings (adjust for your preferences/email/name)
 
-    git config --global push.default simple
-    git config --global user.email "manny@fpcomplete.com"
-    git config --global user.name "Emanuel Borsboom"
+   ~~~text
+   git config --global push.default simple
+   git config --global user.email "manny@fpcomplete.com"
+   git config --global user.name "Emanuel Borsboom"
+   ~~~
 
 10. Install build tools and dependencies packages
 
+    ~~~text
     sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg
+    ~~~
 
 11. Install clang+llvm
 
@@ -237,29 +246,29 @@ Now continue to the **General Windows setup** subsection below.
 
     * GHC 8.2.2 (the standard for building Stack)
 
-      ```
+      ~~~sh
       wget http://llvm.org/releases/3.9.1/clang+llvm-3.9.1-armv7a-linux-gnueabihf.tar.xz && \
       sudo tar xvf clang+llvm-3.9.1-armv7a-linux-gnueabihf.tar.xz -C /opt
-      ```
+      ~~~
 
       Run this now and add it to the `.profile`:
 
-      ```
+      ~~~sh
       export PATH="$HOME/.local/bin:/opt/clang+llvm-3.9.1-armv7a-linux-gnueabihf/bin:$PATH"
-      ```
+      ~~~
 
     * GHC 7.10.3
 
-      ```
+      ~~~sh
       wget http://llvm.org/releases/3.5.2/clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz && \
       sudo tar xvf clang+llvm-3.5.2-armv7a-linux-gnueabihf.tar.xz -C /opt
-      ```
+      ~~~
 
       Run this now and add it to the `.profile`:
 
-      ```
+      ~~~sh
       export PATH="$HOME/.local/bin:/opt/clang+llvm-3.5.2-armv7a-linux-gnueabihf/bin:$PATH"
-      ```
+      ~~~
 
 12. Install Stack
 
@@ -269,7 +278,7 @@ Now continue to the **General Windows setup** subsection below.
 
     From source, using Cabal (the tool):
 
-    ```
+    ~~~sh
     wget http://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-armv7-deb8-linux.tar.xz && \
     tar xvf ghc-7.10.3-armv7-deb8-linux.tar.xz && \
     cd ghc-7.10.3 && \
@@ -284,14 +293,14 @@ Now continue to the **General Windows setup** subsection below.
     cd .. && \
     export PATH="$HOME/.cabal/bin:$PATH" && \
     cabal update
-    ```
+    ~~~
 
     Edit `~/.cabal/config`, and set `executable-stripping: False` and
     `library-stripping: False`.
 
-    ```
+    ~~~sh
     cabal unpack stack && \
     cd stack-* && \
     cabal install && \
     mv ~/.cabal/bin/stack ~/.local/bin
-    ```
+    ~~~

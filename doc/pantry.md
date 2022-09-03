@@ -33,12 +33,12 @@ By default, LTS Haskell/Stackage Nightly snapshot configurations are retrieved f
 For safer, more reproducible builds, you can optionally specify a URL
 together with a cryptographic hash of its content, e.g.:
 
-```yaml
+~~~yaml
 resolver:
   size: 499143
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/12/0.yaml
   sha256: 781ea577595dff08b9c8794761ba1321020e3e1ec3297fb833fe951cce1bee11
-```
+~~~
 
 Where the `size` is the number of bytes in the file, and `sha256` is its SHA256
 hash. If not provided, the information will automatically be generated and
@@ -61,55 +61,55 @@ information can automatically be generated in a lock file.
 Packages can be stated by a name/version combination. The basic syntax
 for this is:
 
-```yaml
+~~~yaml
 extra-deps:
 - acme-missiles-0.3
-```
+~~~
 
 Using this syntax, the most recent Cabal file revision available will
 be used. For more reproducibility of builds, it is recommended to
 state the SHA256 hash of the cabal file contents as well, like this:
 
-```yaml
+~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
-```
+~~~
 
 Or, better yet, including the cabal file size too:
 
-```yaml
+~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,631
-```
+~~~
 
 Or a specific revision number, with `0` being the original file:
 
-```yaml
+~~~yaml
 extra-deps:
 - acme-missiles-0.3@rev:0
-```
+~~~
 
-Note that specifying via SHA256 is slightly more resilient in that it
-does not rely on correct ordering in the package index, while revision
-number is likely simpler to use. In practice, both should guarantee
-equally reproducible build plans.
+Note that specifying via SHA256 is slightly more resilient in that it does not
+rely on correct ordering in the package index, while revision number is likely
+simpler to use. In practice, both should guarantee equally reproducible build
+plans.
 
-Finally, you can include the Pantry tree information. The following
-would be generated and stored in the lock file:
+Finally, you can include the Pantry tree information. The following would be
+generated and stored in the lock file:
 
-```yaml
+~~~yaml
 - hackage: acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
   pantry-tree:
     size: 226
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
-```
+~~~
 
 ### Git and Mercurial repos
 
-You can give a Git or Mercurial repo at a specific commit, and Stack
-will clone that repo.
+You can give a Git or Mercurial repository at a specific commit, and Stack will
+clone that repository.
 
-```yaml
+~~~yaml
 extra-deps:
 - git: git@github.com:commercialhaskell/stack.git
   commit: 6a86ee32e5b869a877151f74064572225e1a0398
@@ -117,44 +117,43 @@ extra-deps:
   commit: "a5f4f3"
 - hg: https://example.com/hg/repo
   commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
-```
+~~~
 
-__NOTE__ It is highly recommended that you only use SHA1 values for a
-Git or Mercurial commit. Other values may work, but they are not
-officially supported, and may result in unexpected behavior (namely,
-Stack will not automatically pull to update to new versions).
-Another problem with this is that your build will not be deterministic,
-because when someone else tries to build the project they can get a
-different checkout of the package.
+__NOTE__ It is highly recommended that you only use SHA1 values for a Git or
+Mercurial commit. Other values may work, but they are not officially supported,
+and may result in unexpected behavior (namely, Stack will not automatically pull
+to update to new versions). Another problem with this is that your build will
+not be deterministic, because when someone else tries to build the project they
+can get a different checkout of the package.
 
-A common practice in the Haskell world is to use "megarepos", or
-repositories with multiple packages in various subdirectories. Some
-common examples include [wai](https://github.com/yesodweb/wai/) and
+A common practice in the Haskell world is to use "megarepos", or repositories
+with multiple packages in various subdirectories. Some common examples include
+[wai](https://github.com/yesodweb/wai/) and
 [digestive-functors](https://github.com/jaspervdj/digestive-functors). To
 support this, you may also specify `subdirs` for repositories, e.g.:
 
-```yaml
+~~~yaml
 extra-deps:
 - git: git@github.com:yesodweb/wai
   commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
   subdirs:
   - auto-update
   - wai
-```
+~~~
 
-Since v1.7.1, you can specify packages from GitHub repository name using `github`:
+Since Stack 1.7.1, you can specify packages from GitHub repository name using
+`github`:
 
-```yaml
+~~~yaml
 extra-deps:
 - github: snoyberg/http-client
   commit: a5f4f30f01366738f913968163d856366d7e0342
-```
+~~~
 
-If unspecified, `subdirs` defaults to `['.']` meaning looking for a
-package in the root of the repo.  Note that if you specify a value of
-`subdirs`, then `'.'` is _not_ included by default and needs to be
-explicitly specified if a required package is found in the top-level
-directory of the repository.
+If unspecified, `subdirs` defaults to `['.']` meaning looking for a package in
+the root of the repo.  Note that if you specify a value of `subdirs`, then `'.'`
+is _not_ included by default and needs to be explicitly specified if a required
+package is found in the top-level directory of the repository.
 
 #### Limited [git-annex](https://git-annex.branchable.com) support
 
@@ -172,20 +171,20 @@ information.
 For example, if the directory `fonts/` is controlled by git-annex, use the
 following line.
 
-```gitattributes
+~~~gitattributes
 fonts export-ignore
-```
+~~~
 
 ### Archives (HTTP(S) or local filepath)
 
 You can use HTTP and HTTPS URLs and local filepaths referring to
 either tarballs or ZIP files.
 
-__NOTE__ Stack assumes that these files never change after downloading
-to avoid needing to make an HTTP request on each build. Use hashes to
-provide more security.
+__NOTE__ Stack assumes that these files never change after downloading to avoid
+needing to make an HTTP request on each build. Use hashes to provide more
+security.
 
-```yaml
+~~~yaml
 extra-deps:
 - https://example.com/foo/bar/baz-0.0.2.tar.gz
 - archive: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
@@ -194,7 +193,7 @@ extra-deps:
   - warp
 - archive: ../acme-missiles-0.3.tar.gz
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
-```
+~~~
 
 ## Snapshots
 
@@ -212,7 +211,7 @@ specified follow the same syntax mentioned above for
 dependencies. Unlike `extra-deps`, however, no support for local
 directories is available in snapshots to ensure reproducibility.
 
-```yaml
+~~~yaml
 resolver: lts-8.21 # Inherits GHC version and package set
 compiler: ghc-8.0.1 # Overwrites GHC version in the resolver, optional
 
@@ -241,14 +240,14 @@ hidden:
 ghc-options:
   warp:
   - -O2
-```
+~~~
 
 If you put this in a `snapshot.yaml` file in the same directory as your project,
 you can now use the custom snapshot like this:
 
-```yaml
+~~~yaml
 resolver: snapshot.yaml
-```
+~~~
 
 This is an example of a custom snapshot stored in the filesystem. They are
 assumed to be mutable, so you are free to modify it. We detect that the snapshot
@@ -261,10 +260,10 @@ custom snapshot, due to stack sharing snapshot packages whenever possible.
 The following snapshot specification will be identical to `lts-7.1`, but instead
 use `ghc-7.10.3` instead of `ghc-8.0.1`:
 
-```yaml
+~~~yaml
 resolver: lts-7.1
 compiler: ghc-7.10.3
-```
+~~~
 
 ### Dropping packages
 
@@ -273,11 +272,11 @@ the `text` package in our snapshot. Removing this package will cause all the
 packages that depend on `text` to be unbuildable, but they will still be present
 in the snapshot.
 
-```yaml
+~~~yaml
 resolver: lts-7.1
 drop-packages:
   - text
-```
+~~~
 
 ### Specifying ghc-options
 
@@ -286,13 +285,13 @@ In order to specify ghc-options for a package, you use the same syntax as the
 The following snapshot specification will be identical to `lts-7.1`, but
 provides `-O1` as a ghc-option for `text`:
 
-```yaml
+~~~yaml
 resolver: lts-7.1
 packages:
   - text-1.2.2.1
 ghc-options:
   text: -O1
-```
+~~~
 
 This works somewhat differently than the stack.yaml `ghc-options` field, in that
 options can only be specified for packages that are mentioned in the custom
@@ -309,11 +308,11 @@ In order to specify flags for a package, you use the same syntax as the
 following snapshot specification will be identical to `lts-7.1`, but
 it enables the `developer` cabal flag:
 
-```yaml
+~~~yaml
 resolver: lts-7.1
 packages:
   - text-1.2.2.1
 flags:
   text:
     developer: true
-```
+~~~

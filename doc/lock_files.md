@@ -52,18 +52,18 @@ above for a `stack.yaml`, with the following differences:
 
 Some information in these files can be incomplete. Consider:
 
-```yaml
+~~~yaml
 resolver: lts-13.9
 packages: []
 extra-deps:
 - https://hackage.haskell.org/package/acme-missiles-0.3.tar.gz
-```
+~~~
 
 This information is _incomplete_, since the contents of that URL may
 change in the future. Instead, you could specify enough information in
 the `stack.yaml` file to fully resolve that package. That looks like:
 
-```yaml
+~~~yaml
 extra-deps:
 - size: 1442
   url: https://hackage.haskell.org/package/acme-missiles-0.3.tar.gz
@@ -73,7 +73,7 @@ extra-deps:
   pantry-tree:
     size: 226
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
-```
+~~~
 
 Users don't particularly feel like writing all of that. Therefore,
 it's common to see _incomplete_ information in a `stack.yaml` file.
@@ -83,12 +83,12 @@ we assume in general that LTS snapshots never change, there's nothing
 that technically prohibits that from happening. Instead, the complete
 version of that field is:
 
-```yaml
+~~~yaml
 resolver:
   size: 496662
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/13/9.yaml
   sha256: 83de9017d911cf7795f19353dba4d04bd24cd40622b7567ff61fc3f7223aa3ea
-```
+~~~
 
 Also something people don't feel like writing by hand.
 
@@ -123,7 +123,7 @@ The lock file contains the following information:
 
 It looks like the following:
 
-```yaml
+~~~yaml
 # Lock file, some message about the file being auto-generated
 snapshots:
   # Starts with the snapshot specified in stack.yaml,
@@ -153,7 +153,7 @@ packages:
     pantry-tree:
       size: 226
       sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
-```
+~~~
 
 ## Creation
 

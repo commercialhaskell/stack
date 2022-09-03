@@ -20,11 +20,11 @@ One simple way to run a single test is:
 * Change into the `files` directory
 * Run the command `stack runghc -- -i../../../lib ../Main.hs`
 
-A more thorough way to run the tests is with
+A more thorough way to run the tests is with command:
 
-```shell
-$ stack build --flag stack:integration-tests stack --exec stack-integration-test
-```
+~~~text
+stack build --flag stack:integration-tests stack --exec stack-integration-test
+~~~
 
 Note that this command can take a _long_ time. It's also more thorough
 than the quick command given above, as it will run each test with a

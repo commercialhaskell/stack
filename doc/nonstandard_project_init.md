@@ -29,7 +29,7 @@ basis.
 As an example, in a `stack.yaml` for multi-package project with packages `foo`,
 `bar`, `baz`:
 
-```
+~~~yaml
 flags:
   foo:
     release: true
@@ -37,7 +37,7 @@ flags:
     default: true
   baz:
     manual: true
-```
+~~~
 
 It is also possible to pass the same flag to multiple packages, i.e.
 `stack build --flag *:necessary`
@@ -116,14 +116,16 @@ See [Custom Snapshots](custom_snapshot.md).
   - <https://github.com/commercialhaskell/stack/issues/137>
 
 ## Intra-package Targets
+
 Stack supports intra-package targets, similar to `cabal build COMPONENTS` for
 situations when you don't want to build every target inside your package.
 
-Example:
-```
+For example, command:
+
+~~~text
 stack build stack:lib:stack
 stack test stack:test:stack-integration-test
-```
+~~~
 
 Note: this does require prefixing the component name with the package name.
 

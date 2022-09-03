@@ -156,11 +156,16 @@ flag.
 sent to the standard error channel. This can be changed to the standard output
 channel with the `--stdout` flag.
 
-For example, for the Stack project itself:
+For example, for the Stack project itself, command:
 
+~~~text
+cd stack
+stack ide targets
 ~~~
-$ cd stack
-$ stack ide targets
+
+and the output from the second command is:
+
+~~~text
 stack:lib
 stack:exe:stack
 stack:exe:stack-integration-test
@@ -209,10 +214,15 @@ by Stack's command line option `--stack-colors` and the YAML configuration key
 
 `stack ls tools` will list Stack's installed tools. On Unix-like operating
 systems, they will be one or more versions of GHC. On Windows, they will include
-MSYS2. For example, on Windows:
+MSYS2. For example, on Windows the command:
 
+~~~text
+stack ls tools
 ~~~
-$ stack ls tools
+
+yields output like:
+
+~~~text
 ghc-9.4.1
 ghc-9.2.4
 ghc-9.0.2
@@ -220,10 +230,16 @@ msys2-20210604
 ~~~
 
 The `--filter <tool_name>` option will filter the output by a tool name (e.g.
-'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example:
+'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example the
+command:
 
+~~~text
+stack ls tools --filter ghc
 ~~~
-$ stack ls tools --filter ghc
+
+yields output like:
+
+~~~text
 ghc-9.4.1
 ghc-9.2.4
 ghc-9.0.2
@@ -330,19 +346,35 @@ attempt to GPG sign your packages as per
 * `--no-signature` disables signing of packages
 * `--candidate` upload a
   [package candidate](http://hackage.haskell.org/upload#candidates)
-* Hackage API key can be used instead of username and password. Usage
-  example:
+* Hackage API key can be used instead of username and password. For example, on
+  Unix-like operating systems command:
 
-  ```bash
-  HACKAGE_KEY=<api_key> stack upload .
-    ```
+  ~~~text
+  HACKAGE_KEY=<api_key>
+  stack upload .
+  ~~~
 
-* `username` and `password` can be read by environment
+  and on Windows (with PowerShell) command:
 
-  ```bash
+  ~~~text
+  $Env:HACKAGE_KEY=<api_key>
+  stack upload .
+  ~~~
+
+* `username` and `password` can be read by setting the following environment
+  variables. On Unix-like operating systems command:
+
+  ~~~text
   export $HACKAGE_USERNAME="<username>"
   export $HACKAGE_PASSWORD="<password>"
-  ```
+  ~~~
+
+  and on Windows (with PowerShell) command:
+
+  ~~~text
+  $Env:HACKAGE_USERNAME='<username>'
+  $Env:HACKAGE_PASSWORD='<password>'
+  ~~~
 
 ## Docker integration
 
@@ -350,7 +382,7 @@ Stack is able to build your code inside a Docker image, which means even more
 reproducibility to your builds, since you and the rest of your team will always
 have the same system libraries.
 
-For more information see the [Docker integration](docker_integration.md)
+For further information, see the [Docker integration](docker_integration.md)
 documentation.
 
 ## Nix integration
@@ -411,9 +443,11 @@ supported by Emacs, but some other editors have integration for it as well.
 ### Shell auto-completion
 
 Love tab-completion of commands? You're not alone. If you're on bash, just run
-the following (or add it to `.bashrc`):
+the following command (or add it to `.bashrc`):
 
-    eval "$(stack --bash-completion-script stack)"
+~~~text
+eval "$(stack --bash-completion-script stack)"
+~~~
 
 For more information and other shells, see the
 [Shell auto-completion wiki page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
@@ -429,13 +463,17 @@ For example the following command will build the `my-tests` testsuite with
 profiling options and create a `my-tests.prof` file in the current directory
 as a result of the test run.
 
-    $ stack test --profile my-tests
+~~~text
+stack test --profile my-tests
+~~~
 
 The `my-tests.prof` file now contains time and allocation info for the test run.
 
-To create a profiling report for an executable, e.g. `my-exe`, you can run
+To create a profiling report for an executable, e.g. `my-exe`, you can command:
 
-     $ stack exec --profile -- my-exe +RTS -p
+~~~text
+stack exec --profile -- my-exe +RTS -p
+~~~
 
 For more fine-grained control of compilation options there are the
 `--library-profiling` and `--executable-profiling` flags which will turn on the
@@ -446,11 +484,11 @@ options respectively. Custom GHC options can be passed in with
 To enable compilation with profiling options by default you can add the
 following snippet to your `stack.yaml` or `~/.stack/config.yaml`:
 
-```yaml
+~~~yaml
 build:
   library-profiling: true
   executable-profiling: true
-```
+~~~
 
 ### Further reading
 
