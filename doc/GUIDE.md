@@ -118,9 +118,11 @@ using the `stack setup` command.
 You'll get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
 
-__NOTE__: GHC will be installed to your Stack programs directory, so calling
-`ghc` on the command line won't work. See the `stack exec`, `stack ghc`, and
-`stack runghc` commands below for more information.
+!!! note
+
+    GHC will be installed to your Stack programs directory, so calling `ghc` on
+    the command line won't work. See the `stack exec`, `stack ghc`, and
+    `stack runghc` commands below for more information.
 
 Once a version of GHC is installed, Stack will then build your project.
 
@@ -323,10 +325,11 @@ the remainder of this guide will cover more advanced `build` functions and
 features, such as building test and Haddocks at the same time, or constantly
 rebuilding blocking on file changes.
 
-*On a philosophical note:* Running the `build` command twice with the same
-options and arguments should generally be a no-op (besides things like rerunning
-test suites), and should, in general, produce a reproducible result between
-different runs.
+!!! note
+
+    Using the `build` command twice with the same options and arguments should
+    generally do nothing (besides things like rerunning test suites), and
+    should, in general, produce a reproducible result between different runs.
 
 ## Adding dependencies
 
@@ -610,8 +613,10 @@ stack init
 Assuming it finds a match, it will write your `stack.yaml` file, and everything
 will work.
 
-(Note: `yackage` does not currently support Hpack, but you can also use
-`hpack-convert` should you need to generate a `package.yaml`.)
+!!! note
+
+    The `yackage` package does not currently support Hpack, but you can also use
+    `hpack-convert` should you need to generate a `package.yaml` file.
 
 #### Excluded Packages
 
@@ -984,7 +989,7 @@ Completed 2 action(s).
 ~~~
 
 We first cleaned our project to clear old results so we know exactly what Stack
-is trying to do. Note that is says it is building all executables for
+is trying to do. Note that it says it is building all executables for
 `helloworld` once, and that after a successful build of all of them, only
 specified executables will be rebuilt. If we change the source code of
 `test/Spec.hs`, say to:
@@ -1039,9 +1044,11 @@ You can use the `--no-run-tests` and `--no-run-benchmarks` flags to disable
 running of these components. You can also use `--no-rerun-tests` to prevent
 running a test suite which has already passed and has not changed.
 
-NOTE: Stack doesn't build or run test suites and benchmarks for non-local
-packages. This is done so that running a command like `stack test` doesn't need
-to run 200 test suites!
+!!! note
+
+    Stack doesn't build or run test suites and benchmarks for non-local
+    packages. This is done so that a command like `stack test` doesn't need to
+    run 200 test suites!
 
 ## Multi-package projects
 
@@ -1097,10 +1104,12 @@ In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
 modified version of a dependency that hasn't yet been released upstream.
 
-Please note that when adding upstream packages directly to your project it is
-important to distinguish _local packages_ from the upstream _dependency
-packages_. Otherwise you may have trouble running `stack ghci`. See
-[stack.yaml documentation](yaml_configuration.md#packages) for more details.
+!!! note
+
+    When adding upstream packages directly to your project it is important to
+    distinguish _local packages_ from the upstream _dependency packages_.
+    Otherwise you may have trouble running `stack ghci`. See
+    [stack.yaml documentation](yaml_configuration.md#packages) for more details.
 
 ## Flags and GHC options
 
@@ -1197,10 +1206,12 @@ packages, you can add them to your `stack.yaml` file. See the
 [documentation section on ghc-options](yaml_configuration.md#ghc-options)
 for more information.
 
-## The `stack path` command
+!!! note
 
-NOTE: That's it, the heavy content of this guide is done! Everything from here
-on out is simple explanations of commands. Congratulations!
+    That's it, the heavy content of this guide is done! Everything from here on
+    out is simple explanations of commands. Congratulations!
+
+## The `stack path` command
 
 Generally, you don't need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is
@@ -1294,6 +1305,11 @@ follows the Unix convention of `--` to separate these. For example, command:
 
 ~~~text
 stack exec --package stm -- echo I installed the stm package via --package stm
+~~~
+
+yields ouput like:
+
+~~~text
 Run from outside a project, using implicit global project config
 Using latest snapshot resolver: lts-18.3
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml

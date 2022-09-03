@@ -19,14 +19,16 @@ any Linux distribution.
 
 - Add nh2's cache:
 
-  ~~~sh
-  cachix use static-haskell-nix
-  ~~~
+    ~~~sh
+    cachix use static-haskell-nix
+    ~~~
 
-  NOTE: to clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*`
-  (useful if someone else uploads new stuff to the cache and you want to use it
-  right away). The recent `narinfo-cache-positive`/`negative-ttl` options might
-  also help.
+  !!! note
+
+      To clear cache index, use `rm $HOME/.cache/nix/binary-cache-v5.sqlite*`
+      (useful if someone else uploads new stuff to the cache and you want to use
+      it right away). The recent `narinfo-cache-positive`/`negative-ttl` options
+      might also help.
 
 - Check out Stack commit to be released to `~/stack-release` (or elsewhere, in
   which case adjust following instructions)
