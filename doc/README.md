@@ -2,9 +2,10 @@
 
 # The Haskell Tool Stack
 
-Stack is a cross-platform program for developing
-[Haskell](https://www.haskell.org/) projects. It is aimed at Haskellers both new
-and experienced. It aims to support fully users on Linux, macOS and Windows.
+Welcome to the [Haskell](https://www.haskell.org/) programming language and the
+Haskell Tool Stack (Stack)! Stack is a program for developing Haskell projects.
+It is aimed at Haskellers both new and experienced. It is cross-platform and
+aims to support fully users on Linux, macOS and Windows.
 
 <img src="https://i.imgur.com/WW69oTj.gif" width="50%" align="right">
 
@@ -19,35 +20,47 @@ Stack features:
 
 ## How to install Stack
 
-Stack can be installed on most Unix-like operating systems, including macOS, and
+Stack can be installed on most Unix-like operating systems (including macOS) and
 on Windows.
 
-For most Unix-like operating systems, the easiest way to install Stack is to
-command:
+=== "Unix-like"
 
-~~~text
-curl -sSL https://get.haskellstack.org/ | sh
-~~~
+    For most Unix-like operating systems, the easiest way to install Stack is to
+    command:
 
-or:
+    ~~~text
+    curl -sSL https://get.haskellstack.org/ | sh
+    ~~~
 
-~~~text
-wget -qO- https://get.haskellstack.org/ | sh
-~~~
+    or:
 
-On 64-bit Windows, you can download and install the
-[Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
-Note that systems with antivirus software may need to add Stack to the list of
-'trusted' applications.
+    ~~~text
+    wget -qO- https://get.haskellstack.org/ | sh
+    ~~~
 
-For other operating systems and direct downloads, check out the
-[install and upgrade guide](install_and_upgrade.md).
+    !!! note
 
-The [get.haskellstack.org](https://get.haskellstack.org/) script referred to
-above will ask for root access using `sudo`. It needs such access in order to
-use your platform's package manager to install dependencies and to install to
-`/usr/local/bin`. If you prefer more control, follow the manual installation
-instructions in the [install and upgrade guide](install_and_upgrade.md).
+        The script at [get.haskellstack.org](https://get.haskellstack.org/) will
+        ask for root access using `sudo`. It needs such access in order to use
+        your platform's package manager to install dependencies and to install
+        to `/usr/local/bin`. If you prefer more control, follow the manual
+        installation instructions in the
+        [install and upgrade guide](install_and_upgrade.md).
+
+=== "Windows"
+
+    On 64-bit Windows, you can download and install the
+    [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
+
+    !!! note
+
+        Systems with antivirus software may need to add Stack to the list of
+        'trusted' applications.
+
+=== "Other/direct downloads"
+
+    For other operating systems and direct downloads, see the
+    [install and upgrade guide](install_and_upgrade.md).
 
 ## How to upgrade Stack
 
