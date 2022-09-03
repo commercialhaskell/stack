@@ -1330,12 +1330,14 @@ But that won't load up locally written modules for access. For that, use the
 `stack ghci` command or its synonym `stack repl`. To then load modules from your
 project, use the `:m` command (for "module") followed by the module name.
 
-IMPORTANT NOTE: If you have added upstream packages to your project please make
-sure to mark them as *dependency package*s for faster and reliable usage of
-`stack ghci`. Otherwise GHCi may have trouble due to conflicts of compilation
-flags or having to unnecessarily interpret too many modules. See
-[stack.yaml documentation](yaml_configuration.md#packages) to learn how to mark
-a package as a *dependency package*.
+!!! note
+
+    If you have added upstream packages to your project please make sure to mark
+    them as *dependency package*s for faster and reliable usage of `stack ghci`.
+    Otherwise GHCi may have trouble due to conflicts of compilation flags or
+    having to unnecessarily interpret too many modules. See
+    [stack.yaml documentation](yaml_configuration.md#packages) to learn how to
+    mark a package as a *dependency package*.
 
 ## The `stack ghc` and `stack runghc` commands
 
