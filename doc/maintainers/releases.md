@@ -66,9 +66,11 @@ Examples:
    https://github.com/commercialhaskell/stack/pull/4565/files)
 6. Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
    nightly (go over the extra-deps too) and ensure the project builds and tests
-   pass. For example:
+   pass. For example, command:
 
-        $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+    ~~~text
+    stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+    ~~~
 
 7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
    checking that the latest nightly build for the `master` branch succeeded in
@@ -220,10 +222,11 @@ Edit the draft
   field and ensure that *This is a pre-release* is checked.
 * Add the ChangeLog to the description.
 * For final releases (**not** release candidates) get the list of contributors
-  to the release and add it to the description. For example, use:
+  to the release and add it to the description. For example, command:
 
-
-        $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+    ~~~text
+    git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+    ~~~
 
 Publish the GitHub release.
 
@@ -345,17 +348,22 @@ Update the fpco/stack-build Docker images with new version:
   containing (where `X.Z` is the previous LTS version, and `X.Y.Z` is the newly
   released Stack version):
 
-
-        FROM $DOCKER_REPO:lts-X.Z
-        ARG STACK_VERSION=X.Y.Z
-        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ~~~dockerfile
+    FROM $DOCKER_REPO:lts-X.Z
+    ARG STACK_VERSION=X.Y.Z
+    RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ~~~
 
 * Run `./build.sh lts-X.Y` and then test that the new image has the new version
-  of Stack. For example:
+  of Stack. For example, command:
 
-        $ docker run --rm fpco/stack-build:lts stack --version
+    ~~~text
+    docker run --rm fpco/stack-build:lts stack --version
+    ~~~
 
-* Run the following command to push the new image to the registry:
+* Use the following commands to push the new image to the registry:
 
-        $ ./build.sh --push lts-X.Y
-        $ ./build.sh --push --small lts-X.Y
+    ~~~text
+    ./build.sh --push lts-X.Y
+    ./build.sh --push --small lts-X.Y
+    ~~~

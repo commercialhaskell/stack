@@ -220,13 +220,17 @@ You can install HLint with Stack. You might want to install it in the global
 project in case you run into dependency conflicts. HLint can report hints in
 your favourite text editor. Refer to the HLint repository for more details.
 
-To install:
+To install, command:
 
-    stack install hlint
+~~~text
+stack install hlint
+~~~
 
-Once installed, you can check your changes with:
+Once installed, you can check your changes with command:
 
-    $ ./etc/scripts/hlint.sh
+~~~text
+stack exec -- sh ./etc/scripts/hlint.sh
+~~~
 
 ## Testing
 

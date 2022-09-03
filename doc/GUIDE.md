@@ -515,7 +515,8 @@ stack build
 We can also change resolvers on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example, command:
 
-~~~textstack --resolver lts-18.28 build
+~~~text
+stack --resolver lts-18.28 build
 # Downloaded lts-18.28 build plan.
 # build output ...
 ~~~
@@ -822,23 +823,27 @@ much more composable command lines. For example, we can have a command that
 builds executables, generates Haddock documentation (Haskell API-level docs),
 and builds and runs your test suites, with:
 
-
-    $ stack build --haddock --test
+~~~text
+stack build --haddock --test
+~~~
 
 You can even get more inventive as you learn about other flags. For example,
-take the following:
+take the following command:
 
-    $ stack build --pedantic --haddock --test --exec "echo Yay, it succeeded" --file-watch
+~~~text
+stack build --pedantic --haddock --test --exec "echo Yay, it succeeded" --file-watch
+~~~
 
-This will:
+This command will:
 
-* turn on all warnings and errors
+* turn on all warnings and errors (the `--pendantic` flag)
 * build your library and executables
-* generate Haddocks
-* build and run your test suite
-* run the command `echo Yay, it succeeded` when that completes
+* generate Haddocks (the `--haddock` flag)
+* build and run your test suite (the `--test` flag)
+* run the command `echo Yay, it succeeded` when that completes (the `--exec`
+  option)
 * after building, watch for changes in the files used to build the project, and
-  kick off a new build when done
+  kick off a new build when done (the `--file-watch` flag)
 
 ### The `stack install` command and `copy-bins` option
 
@@ -849,15 +854,19 @@ precisely one thing in addition to the build command: it copies any generated
 executables to the local binary directory. You may recognize the default value
 for that path:
 
-On Unix-like operating systems:
+On Unix-like operating systems, command:
 
-    $ stack path --local-bin
-    /home/<user_name>/.local/bin
+~~~text
+stack path --local-bin
+/home/<user_name>/.local/bin
+~~~
 
-On Windows:
+On Windows, command:
 
-    $ stack path --local-bin
-    C:\Users\<user_name>\AppData\Roaming\local\bin
+~~~text
+stack path --local-bin
+C:\Users\<user_name>\AppData\Roaming\local\bin
+~~~
 
 That's why the download page recommends adding that directory to your PATH. This
 feature is convenient, because now you can simply run `executable-name` in your
@@ -877,10 +886,11 @@ Since it's such a point of confusion, let me list a number of things Stack does
 * Stack will not necessarily be creating a relocatable executable. If your
   executables hard-codes paths, copying the executable will not change those
   hard-coded paths.
-    * At the time of writing, there's no way to change those kinds of paths with
-      Stack, but see
-      [issue #848 about --prefix](https://github.com/commercialhaskell/stack/issues/848)
-      for future plans.
+
+  * At the time of writing, there's no way to change those kinds of paths with
+    Stack, but see
+    [issue #848 about --prefix](https://github.com/commercialhaskell/stack/issues/848)
+    for future plans.
 
 That's really all there is to the `install` command: for the simplicity of what
 it does, it occupies a much larger mental space than is warranted.

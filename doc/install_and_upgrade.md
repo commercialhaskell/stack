@@ -319,44 +319,44 @@ wget -qO- https://get.haskellstack.org/ | sh
     <!-- * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz) -->
 
 * Extract the archive and place `stack` somewhere on your PATH (see the
-  [Path](#path) section below)
+  [Path](#path) section below).
 
 * Ensure you have required system dependencies installed. These include GCC, GNU
   Make, xz, perl, libgmp, libffi, and zlib. We also recommend Git and GPG. To
   install these using your package manager:
 
-    * Debian / Ubuntu, command:
+  * Debian / Ubuntu, command:
 
-      ~~~text
-      sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-      ~~~
+        ~~~text
+        sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+        ~~~
 
-    * Fedora / CentOS, command:
+  * Fedora / CentOS, command:
 
-      ~~~text
-      sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
-      ~~~
+        ~~~text
+        sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+        ~~~
 
-      (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+    (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
 
-        * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
-          need to run `sudo dnf install ncurses-compat-libs`. If this package is
-          not installed, Stack may not be able to install 32-bit GHC versions.
+    * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
+      need to run `sudo dnf install ncurses-compat-libs`. If this package is
+      not installed, Stack may not be able to install 32-bit GHC versions.
 
-    * Arch Linux, command:
+  * Arch Linux, command:
 
-      ~~~text
-      sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
-      ~~~
+        ~~~text
+        sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
+        ~~~
 
-        * In order to use `stack setup` with older versions of GHC or on a
-          32-bit system, you may need the
-          [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
-          AUR package installed. If this package is not installed, Stack may not
-          be able to install older (< 7.10.3) or 32-bit GHC versions.
+    * In order to use `stack setup` with older versions of GHC or on a
+      32-bit system, you may need the
+      [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
+      AUR package installed. If this package is not installed, Stack may
+      not be able to install older (< 7.10.3) or 32-bit GHC versions.
 
-    * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo`
-      (without it, Stack will not be able to install GHC).
+    * Gentoo users, make sure to have the `ncurses` package with
+      `USE=tinfo` (without it, Stack will not be able to install GHC).
 
 * Now you can run Stack from the command line in a terminal.
 
@@ -390,26 +390,32 @@ Run:
 
 You can install Stack by copying the executable file anywhere on your PATH. A
 good place to install is the same directory where Stack itself will install
-executables. On Windows, that directory is `%APPDATA%\local\bin`, e.g. `c:\Users\<user-name>\AppData\Roaming\local\bin`. For other systems, it's
-`$HOME/.local/bin`.
+executables. On Unix-like operating systems, that directory is:
 
-If you don't have that directory in your PATH, you may need to update your PATH
-(such as, on Unix-like operating systems, by editing `~/.bashrc`).
+~~~text
+$HOME/.local/bin
+~~~
+
+On Windows, that directory is:
+
+~~~text
+%APPDATA%\local\bin
+~~~
+
+For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+If you don't have that directory in your PATH, you may need to update your PATH.
+On Unix-like operating systems, that can be done by editing the `~/.bashrc`
+file.
 
 If you're curious about the choice of these directories, see
 [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
 ## Shell auto-completion
 
-To get tab-completion of commands on bash, just run the following (or add it to
-`.bashrc`):
-
-~~~text
-eval "$(stack --bash-completion-script stack)"
-~~~
-
-For more information and other shells, see the
-[shell auto-completion](shell_autocompletion.md) page.
+On Unix-like operating systems, it is possible to set up auto-completion of
+Stack commands. For further information, see the
+[shell auto-completion](shell_autocompletion.md) documentation.
 
 ## China-based users
 
