@@ -66,9 +66,11 @@ Examples:
    https://github.com/commercialhaskell/stack/pull/4565/files)
 6. Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
    nightly (go over the extra-deps too) and ensure the project builds and tests
-   pass. For example:
+   pass. For example, command:
 
-        $ stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+    ~~~text
+    stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
+    ~~~
 
 7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
    checking that the latest nightly build for the `master` branch succeeded in
@@ -199,11 +201,11 @@ in `package.yaml` from the previous step).
 
 For release candidates the tag should be `rc/vX.Y.Z.A`.
 
-For example:
+For example, command:
 
-~~~
-$ git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z
-$ git push origin vX.Y.Z`
+~~~text
+git tag -u <YOUR-GPG-KEY> -m vX.Y.Z vX.Y.Z
+git push origin vX.Y.Z`
 ~~~
 
 ### C: Edit the draft GitHub release, and publish it `[RC]`
@@ -220,27 +222,29 @@ Edit the draft
   field and ensure that *This is a pre-release* is checked.
 * Add the ChangeLog to the description.
 * For final releases (**not** release candidates) get the list of contributors
-  to the release and add it to the description. For example, use:
+  to the release and add it to the description. For example, command:
 
-
-        $ git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+    ~~~text
+    git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
+    ~~~
 
 Publish the GitHub release.
 
 ### D: Upload to Hackage and reset branches
 
-Upload the `stack` package to Hackage:
+Upload the `stack` package to Hackage with the command:
 
-~~~
-$ stack upload . --pvp-bounds=lower
+~~~text
+stack upload . --pvp-bounds=lower
 ~~~
 
-Reset the `release` branch to the released commit. For example:
+Reset the `release` branch to the released commit. For example, with the
+commands:
 
-~~~
-$ git checkout release
-$ git merge --ff-only vX.Y.Z
-$ git push origin release
+~~~text
+git checkout release
+git merge --ff-only vX.Y.Z
+git push origin release
 ~~~
 
 Update the `stable` branch similarly.
@@ -251,11 +255,12 @@ making a `ci/merge-stable-to-master` branch and waiting for CI to pass, then
 merging. If anything is complicated to merge, consider making it a pull request
 and getting it reviewed rather than merging immediately.
 
-Delete the RC branch, both locally and on the remote. For example:
+Delete the RC branch, both locally and on the remote. For example with the
+commands:
 
-~~~
-$ git branch -d rc/vX.Y
-$ git push origin :rc/vX.Y`
+~~~text
+git branch -d rc/vX.Y
+git push origin :rc/vX.Y`
 ~~~
 
 ### E: Activate the version on Read The Docs
@@ -274,10 +279,10 @@ with the new version.
 Sync the application in
 [ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
 
-Test with:
+Test with the command:
 
-~~~
-$ curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
+~~~text
+curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
 ~~~
 
 and make sure it redirects to the new version.
@@ -343,17 +348,22 @@ Update the fpco/stack-build Docker images with new version:
   containing (where `X.Z` is the previous LTS version, and `X.Y.Z` is the newly
   released Stack version):
 
-
-        FROM $DOCKER_REPO:lts-X.Z
-        ARG STACK_VERSION=X.Y.Z
-        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ~~~dockerfile
+    FROM $DOCKER_REPO:lts-X.Z
+    ARG STACK_VERSION=X.Y.Z
+    RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    ~~~
 
 * Run `./build.sh lts-X.Y` and then test that the new image has the new version
-  of Stack. For example:
+  of Stack. For example, command:
 
-        $ docker run --rm fpco/stack-build:lts stack --version
+    ~~~text
+    docker run --rm fpco/stack-build:lts stack --version
+    ~~~
 
-* Run the following command to push the new image to the registry:
+* Use the following commands to push the new image to the registry:
 
-        $ ./build.sh --push lts-X.Y
-        $ ./build.sh --push --small lts-X.Y
+    ~~~text
+    ./build.sh --push lts-X.Y
+    ./build.sh --push --small lts-X.Y
+    ~~~

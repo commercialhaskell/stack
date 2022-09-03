@@ -3,13 +3,17 @@
 # Install/upgrade
 
 For common Unix-like operating systems, including macOS, all you need to do is
-run:
+command:
 
-    curl -sSL https://get.haskellstack.org/ | sh
+~~~text
+curl -sSL https://get.haskellstack.org/ | sh
+~~~
 
 or:
 
-    wget -qO- https://get.haskellstack.org/ | sh
+~~~text
+wget -qO- https://get.haskellstack.org/ | sh
+~~~
 
 
 This script will ask for root access using `sudo`. It needs this access in order
@@ -59,9 +63,11 @@ older versions.
 
 ### Installer script
 
-Run:
+Command:
 
-    curl -sSL https://get.haskellstack.org/ | sh
+~~~text
+curl -sSL https://get.haskellstack.org/ | sh
+~~~
 
 ### Manual download
 
@@ -77,9 +83,11 @@ Run:
 ### Using Homebrew
 
 [Homebrew](https://brew.sh/) is a popular package manager for macOS. If you have
-its `brew` tool installed, you can just do:
+its `brew` tool installed, you can just command:
 
-    brew install haskell-stack
+~~~text
+brew install haskell-stack
+~~~
 
 * The Homebrew formula and bottles are **unofficial** and lag slightly behind
   new Stack releases, but tend to be updated within a day or two.
@@ -93,16 +101,20 @@ its `brew` tool installed, you can just do:
 
 After installation, running `stack setup` might fail with
 `configure: error: cannot run C compiled programs.` in which case you should
-run:
+command:
 
-    xcode-select --install
+~~~text
+xcode-select --install
+~~~
 
 Starting with macOs 10.14 (Mojave) running `xcode-select --install`
 [might not be enough](https://forums.developer.apple.com/thread/104296). You
-will need to install additional headers by running:
+will need to install additional headers with commands:
 
-    cd /Library/Developer/CommandLineTools/Packages/
-    open macOS_SDK_headers_for_macOS_10.14.pkg
+~~~text
+cd /Library/Developer/CommandLineTools/Packages/
+open macOS_SDK_headers_for_macOS_10.14.pkg
+~~~
 
 If you are on OS X 10.11 (El Capitan) and encounter either of these problems,
 see the linked FAQ entries:
@@ -121,7 +133,7 @@ or some packages (e.g. `network`) requiring C source compilation might fail with
 pass `-arch arm64` as part of the `CFLAGS` environment variable. This setting
 will be picked up by the C compiler of your choice.
 
-```bash
+~~~bash
 # Assuming BASH below
 
 # passing CFLAGS in-line with the command giving rise to the error
@@ -134,7 +146,7 @@ CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
 # NOTE: only do this if you do not have to cross-compile, or remember to unset
 # CFLAGS when needed
 export CFLAGS="-arch arm64 ${CFLAGS:-}"
-```
+~~~
 
 The setting instructs the C compiler to compile objects for ARM64. These can
 then be linked with libraries built for ARM64. Without the instruction, the C
@@ -197,22 +209,30 @@ we recommend running `stack upgrade` after installing it. To install it:
 
     * openSUSE Leap
 
-          sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+      ~~~text
+      sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+      ~~~
 
     * SUSE Linux Enterprise 12
 
-          sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
+      ~~~text
+      sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
+      ~~~
 
 2. Install:
 
-        sudo zypper in stack
+   ~~~text
+   sudo zypper in stack
+   ~~~
 
 ## Arch Linux
 
 There is an official package in the Arch community repository. So you can
-install it by simply doing:
+install it with the command:
 
-    sudo pacman -S stack
+~~~text
+sudo pacman -S stack
+~~~
 
 This version may slightly lag behind, but it should be updated within the day.
 The package is also always rebuilt and updated when one of its dependencies gets
@@ -234,26 +254,34 @@ can also get the `haskell-stack-tool` package from there.
 ## NixOS
 
 Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can
-install the latest Stack release into their profile by running:
+install the latest Stack release into their profile with the command:
 
-    nix-env -f "<nixpkgs>" -iA stack
+~~~text
+nix-env -f "<nixpkgs>" -iA stack
+~~~
 
 Alternatively, the package can be built from source as follows.
 
-1. Clone the git repo:
+1. Clone the git repo, with the command:
 
-        git clone https://github.com/commercialhaskell/stack.git
+   ~~~text
+   git clone https://github.com/commercialhaskell/stack.git
+   ~~~
 
-2. Create a `shell.nix` file:
+2. Create a `shell.nix` file with the command:
 
-        cabal2nix --shell ./. --no-check --no-haddock > shell.nix
+   ~~~text
+   cabal2nix --shell ./. --no-check --no-haddock > shell.nix
+   ~~~
 
-    Note that the tests fail on NixOS, so disable them with `--no-check`. Also,
-    Haddock currently doesn't work for Stack, so `--no-haddock` disables it.
+   Note that the tests fail on NixOS, so disable them with `--no-check`. Also,
+   Haddock currently doesn't work for Stack, so `--no-haddock` disables it.
 
-3. Install Stack to your user profile:
+3. Install Stack to your user profile with the command:
 
-        nix-env -i -f shell.nix
+   ~~~text
+   nix-env -i -f shell.nix
+   ~~~
 
 For more information on using Stack together with Nix, please see the
 [NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
@@ -262,13 +290,17 @@ For more information on using Stack together with Nix, please see the
 
 ### Installer script
 
-Run:
+Command:
 
-    curl -sSL https://get.haskellstack.org/ | sh
+~~~text
+curl -sSL https://get.haskellstack.org/ | sh
+~~~
 
 or:
 
-    wget -qO- https://get.haskellstack.org/ | sh
+~~~text
+wget -qO- https://get.haskellstack.org/ | sh
+~~~
 
 ### Manual download
 
@@ -287,34 +319,44 @@ or:
     <!-- * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz) -->
 
 * Extract the archive and place `stack` somewhere on your PATH (see the
-  [Path](#path) section below)
+  [Path](#path) section below).
 
 * Ensure you have required system dependencies installed. These include GCC, GNU
   Make, xz, perl, libgmp, libffi, and zlib. We also recommend Git and GPG. To
   install these using your package manager:
 
-    * Debian / Ubuntu:
-      `sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase`
+  * Debian / Ubuntu, command:
 
-    * Fedora / CentOS:
-      `sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg`
-      (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
+        ~~~text
+        sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+        ~~~
 
-        * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
-          need to run `sudo dnf install ncurses-compat-libs`. If this package is
-          not installed, Stack may not be able to install 32-bit GHC versions.
+  * Fedora / CentOS, command:
 
-    * Arch Linux:
-      `sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib`
+        ~~~text
+        sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+        ~~~
 
-        * In order to use `stack setup` with older versions of GHC or on a
-          32-bit system, you may need the
-          [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
-          AUR package installed. If this package is not installed, Stack may not
-          be able to install older (< 7.10.3) or 32-bit GHC versions.
+    (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
 
-    * Gentoo users, make sure to have the `ncurses` package with `USE=tinfo`
-      (without it, Stack will not be able to install GHC).
+    * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
+      need to run `sudo dnf install ncurses-compat-libs`. If this package is
+      not installed, Stack may not be able to install 32-bit GHC versions.
+
+  * Arch Linux, command:
+
+        ~~~text
+        sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
+        ~~~
+
+    * In order to use `stack setup` with older versions of GHC or on a
+      32-bit system, you may need the
+      [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
+      AUR package installed. If this package is not installed, Stack may
+      not be able to install older (< 7.10.3) or 32-bit GHC versions.
+
+    * Gentoo users, make sure to have the `ncurses` package with
+      `USE=tinfo` (without it, Stack will not be able to install GHC).
 
 * Now you can run Stack from the command line in a terminal.
 
@@ -348,24 +390,32 @@ Run:
 
 You can install Stack by copying the executable file anywhere on your PATH. A
 good place to install is the same directory where Stack itself will install
-executables. On Windows, that directory is `%APPDATA%\local\bin`, e.g. `c:\Users\<user-name>\AppData\Roaming\local\bin`. For other systems, it's
-`$HOME/.local/bin`.
+executables. On Unix-like operating systems, that directory is:
 
-If you don't have that directory in your PATH, you may need to update your PATH
-(such as, on Unix-like operating systems, by editing `~/.bashrc`).
+~~~text
+$HOME/.local/bin
+~~~
+
+On Windows, that directory is:
+
+~~~text
+%APPDATA%\local\bin
+~~~
+
+For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+If you don't have that directory in your PATH, you may need to update your PATH.
+On Unix-like operating systems, that can be done by editing the `~/.bashrc`
+file.
 
 If you're curious about the choice of these directories, see
 [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
 ## Shell auto-completion
 
-To get tab-completion of commands on bash, just run the following (or add it to
-`.bashrc`):
-
-    eval "$(stack --bash-completion-script stack)"
-
-For more information and other shells, see the
-[shell auto-completion](shell_autocompletion.md) page.
+On Unix-like operating systems, it is possible to set up auto-completion of
+Stack commands. For further information, see the
+[shell auto-completion](shell_autocompletion.md) documentation.
 
 ## China-based users
 
@@ -381,7 +431,7 @@ If you're attempting to install Stack from within China:
   reliance on a VPN). Please add the following to the bottom of the
   `config.yaml` file:
 
-```
+~~~yaml
 ###ADD THIS IF YOU LIVE IN CHINA
 setup-info-locations:
 - "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
@@ -403,16 +453,18 @@ package-indices:
         - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
         key-threshold: 3
         ignore-expiry: no
-```
+~~~
 
 ## Using an HTTP proxy
 
 To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first set
 up an environment variable `http_proxy` and then run the Stack command. For
-example:
+example, on Unix-like operating systems:
 
-    $ export http_proxy=IP:PORT
-    $ stack install
+~~~text
+export http_proxy=IP:PORT
+stack install
+~~~
 
 On most operating systems, it is not mandatory for programs to follow the
 "system-wide" HTTP proxy. Some programs, such as browsers, do honor this
@@ -441,13 +493,17 @@ There are essentially four different approaches to upgrade:
   manager strategies for upgrading (eg `apt-get update && apt-get upgrade`).
 
 * The `get.haskellstack.org` script supports the `-f` argument to over-write the
-  current Stack executable. For example:
+  current Stack executable. For example, command:
 
-      curl -sSL https://get.haskellstack.org/ | sh -s - -f
+  ~~~text
+  curl -sSL https://get.haskellstack.org/ | sh -s - -f
+  ~~~
 
   or:
 
-      wget -qO- https://get.haskellstack.org/ | sh -s - -f
+  ~~~text
+  wget -qO- https://get.haskellstack.org/ | sh -s - -f
+  ~~~
 
 * Manually follow the steps above to download the newest binaries from the
   release page and replace the old binary.
@@ -467,9 +523,11 @@ Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s
 [`appveyor.yml`](https://github.com/dhall-lang/dhall-haskell/blob/1079b7a3a7a6922f72a373e47daf6f1b74f128b1/appveyor.yml).
 Change the values of PATH and VERSION as needed.
 
-    install:
-      - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
-      - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
-      - 7z x stack.zip stack.exe
-      - stack setup > nul
-      - git submodule update --init --recursive
+~~~yaml
+install:
+  - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
+  - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
+  - 7z x stack.zip stack.exe
+  - stack setup > nul
+  - git submodule update --init --recursive
+~~~

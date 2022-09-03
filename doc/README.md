@@ -23,13 +23,17 @@ Stack can be installed on most Unix-like operating systems, including macOS, and
 on Windows.
 
 For most Unix-like operating systems, the easiest way to install Stack is to
-run:
+command:
 
-    curl -sSL https://get.haskellstack.org/ | sh
+~~~text
+curl -sSL https://get.haskellstack.org/ | sh
+~~~
 
 or:
 
-    wget -qO- https://get.haskellstack.org/ | sh
+~~~text
+wget -qO- https://get.haskellstack.org/ | sh
+~~~
 
 On 64-bit Windows, you can download and install the
 [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
@@ -50,7 +54,9 @@ instructions in the [install and upgrade guide](install_and_upgrade.md).
 If you already have Stack installed, you can upgrade it to the latest version
 by the command:
 
-    stack upgrade
+~~~text
+stack upgrade
+~~~
 
 ## Quick Start guide
 
@@ -62,11 +68,12 @@ first you need to follow the [guide to install Stack](#how-to-install-Stack).
 To start a new project named `my-project`, issue these four commands in a
 terminal:
 
-    stack new my-project
-    cd my-project
-    stack build
-    stack exec my-project-exe
-
+~~~text
+stack new my-project
+cd my-project
+stack build
+stack exec my-project-exe
+~~~
 
 - The `stack new my-project` command will create a new directory, named
   `my-project`, that contains all the files needed to start a project correctly,
@@ -81,27 +88,35 @@ terminal:
 
 For a complete list of Stack's commands and options, simply command:
 
-    stack
+~~~text
+stack
+~~~
 
 For help on a particular Stack command, for example `stack build`, command:
 
-    stack build --help
+~~~text
+stack build --help
+~~~
 
 If you want to launch a run-eval-print loop (REPL), then command:
 
-    stack ghci
+~~~text
+stack ghci
+~~~
 
 If you want to use Stack to install an executable provided by a Haskell package,
 then all you have to do is command:
 
-    stack install <package-name>
+~~~text
+stack install <package-name>
+~~~
 
 ### Workflow
 
 The `stack new my-project` command above should have created the following files
 and directories:
 
-~~~
+~~~text
 .
 ├── app
 │   └── Main.hs
@@ -223,7 +238,9 @@ The following assumes that you already have installed a version of Stack and the
 If you need to check your changes quickly run `stack ghci` and then this command
 at the REPL's prompt:
 
-    :main --stack-root=<path_to_root> --stack-yaml=<path_to_stack.yaml> <COMMAND>
+~~~text
+:main --stack-root=<path_to_root> --stack-yaml=<path_to_stack.yaml> <COMMAND>
+~~~
 
 This allows you to set a special Stack root (instead of the default Stack root)
 and to target your commands at a particular `stack.yaml` file instead of the one

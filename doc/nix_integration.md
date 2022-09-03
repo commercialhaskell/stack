@@ -87,7 +87,7 @@ package Nix-based projects, known as 'flakes'.
 The example below adapts and extends the example accompanying the blog post
 above to use Nix flakes. The `flake.nix` file is:
 
-```nix
+~~~nix
 {
   description = "my project description";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -145,7 +145,7 @@ above to use Nix flakes. The `flake.nix` file is:
         };
       });
 }
-```
+~~~
 
 Check-in this `flake.nix` to your project's repository. Run the `nix develop`
 command (it searches for `flake.nix` by default) and you'll find a new
@@ -176,36 +176,36 @@ available. Fresh NixOS installs use a release version by default.
 To identify whether a given compiler is available, you can use the following Nix
 command:
 
-```sh
-$ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc924
+~~~sh
+nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc924
 haskell.compiler.ghc924  ghc-9.2.4
-```
+~~~
 
 If Nix doesn't know that version of GHC, you'll see the following error message:
 
-```sh
-$ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc999
+~~~sh
+nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc999
 error: attribute ‘ghc999’ in selection path ‘haskell.compiler.ghc999’ not found
-```
+~~~
 
 You can list all known Haskell compilers in Nix with the following:
 
-```sh
-$ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
-```
+~~~sh
+nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
+~~~
 
 Alternatively, use `nix repl`, a convenient tool to explore nixpkgs:
 
-```sh
-$ nix repl
-```
+~~~sh
+nix repl
+~~~
 
 In the REPL, load nixpkgs and get the same information through autocomplete:
 
-```sh
+~~~sh
 nix-repl> :l <nixpkgs>
 nix-repl> haskell.compiler.ghc<Tab>
-```
+~~~
 
 You can type and evaluate any Nix expression in the Nix REPL, such as the one we
 gave to `nix-instantiate` earlier.
@@ -215,11 +215,11 @@ gave to `nix-instantiate` earlier.
 To let Nix manage external C libraries, add (for example) the following section
 to your Stack YAML configuration file:
 
-```yaml
+~~~yaml
 nix:
   enable: true
   packages: [zlib, glpk, pcre]
-```
+~~~
 
 The equivalent command line option is `--nix-packages "zlib glpk pcre"`.
 
@@ -245,11 +245,11 @@ Nix store object. Nix's [custom language][nix-language] can provide a fully
 customized derivation as an environment to use. To specify such a `shell.nix`
 file, add the following section to your Stack YAML configuration file:
 
-```yaml
+~~~yaml
 nix:
   enable: true
   shell-file: shell.nix
-```
+~~~
 
 The equivalent command line option (which will prevail) is
 `--nix-shell-file shell.nix`.
@@ -265,7 +265,7 @@ additional environment variables. For further information, see the
 The `shell.nix` file that is the equivalent of the
 `packages: [zlib, glpk, pcre]` example above is:
 
-```nix
+~~~nix
 {ghc}:
 with (import <nixpkgs> {});
 
@@ -274,7 +274,7 @@ haskell.lib.buildStackProject {
   name = "myEnv";
   buildInputs = [ zlib glpk pcre ];
 }
-```
+~~~
 
 The `buildStackProject` utility function is documented in the
 [Nixpkgs manual][nixpkgs-manual-haskell].
@@ -350,7 +350,7 @@ set.
 Below is a summary of the Stack YAML configuration file settings, identifying
 default values:
 
-```yaml
+~~~yaml
 nix:
 
   # false by default. Must be present and set to `true` to enable Nix, except on
@@ -387,7 +387,7 @@ nix:
   # This creates a `nix-gc-symlinks` directory in the project `.stack-work`.
   # To revert that, just delete this `nix-gc-symlinks` directory.
   add-gc-roots: false
-```
+~~~
 
 `stack --nix-help` will list the equivalent command line flags and options.
 

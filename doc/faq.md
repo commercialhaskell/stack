@@ -28,10 +28,12 @@ of another project. It's a sort of "mutable shared state" that you
 should be aware of when working with Stack.
 
 A frequent request when working with the implicit global is how to move to a
-more recent LTS snapshot. You can do this by running the following from outside
-of a project:
+more recent LTS snapshot. You can do this using the following command from
+outside of a project:
 
-    stack config set resolver lts
+~~~text
+stack config set resolver lts
+~~~
 
 ## Where is Stack installed and will it interfere with the GHC (etc) I already have installed?
 
@@ -73,13 +75,13 @@ For detail on the differences between a `stack.yaml` file and a Cabal file, see
 You can make tweaks to a snapshot by modifying the `extra-deps` configuration
 value in your `stack.yaml` file, e.g.:
 
-```yaml
+~~~yaml
 resolver: lts-19.19
 packages:
 - '.'
 extra-deps:
 - text-2.0.1
-```
+~~~
 
 ## I need to use a package (or version of a package) that is not available on Hackage, what should I do?
 
@@ -88,7 +90,7 @@ Add it to the
 `stack.yaml` file, specifying the package's source code location relative to the
 directory where your `stack.yaml` file lives, e.g.
 
-```yaml
+~~~yaml
 resolver: lts-19.19
 packages:
 - '.'
@@ -96,7 +98,7 @@ extra-deps:
 - third-party/proprietary-dep
 - github-version-of/conduit
 - patched/diagrams
-```
+~~~
 
 The above example specifies that the `proprietary-dep` package is found in the
 project's `third-party` directory, that the `conduit` package is found in the
@@ -106,11 +108,11 @@ reinstalls the package.
 
 To install packages directly from a Git repository, use e.g.:
 
-```yaml
+~~~yaml
 extra-deps:
   - git: https://github.com/githubuser/reponame.git
     commit: somecommitID
-```
+~~~
 
 ## What is the meaning of the arguments given to `stack build`, `test`, etc?
 
@@ -143,22 +145,27 @@ installed packages with actions taken in other projects.
 With a recent enough version of Cabal (the tool) (1.22 or later), you can. For
 earlier versions this does not work, due to Cabal issue
 [#1800](https://github.com/haskell/cabal/issues/1800). Note that
-even with recent versions, for some commands you may need this extra level of
-indirection:
+even with recent versions, for some commands you may need the following extra
+level of indirection. Command:
 
-    $ stack exec -- cabal exec -- cabal <command>
+~~~text
+stack exec -- cabal exec -- cabal <command>
+~~~
 
 However, virtually all `cabal` commands have an equivalent in Stack, so this
 should not be necessary. In particular, users of Cabal (the tool) may be
-accustomed to the `cabal run` command. In Stack:
+accustomed to the `cabal run` command. With Stack, command:
 
-    $ stack build
-    $ stack exec <program-name>
+~~~text
+stack build
+stack exec <program-name>
+~~~
 
-Or, if you want to install the binaries in a shared location:
+Or, if you want to install the binaries in a shared location, command:
 
-    $ stack install
-    $ <program-name>
+~~~text
+stack install <program-name>
+~~~
 
 assuming your PATH has been set appropriately.
 
@@ -168,24 +175,24 @@ If you have a custom preprocessor, for example, Ruby, you may have a file like:
 
 ***B.erb***
 
-``` haskell
+~~~haskell
 module B where
 
 <% (1..5).each do |i| %>
 test<%= i %> :: Int
 test<%= i %> = <%= i %>
 <% end %>
-```
+~~~
 
 To ensure that Stack picks up changes to this file for rebuilds, add the
 following lines to your `stack.yaml` file:
 
-```yaml
-    custom-preprocessor-extensions:
-    - erb
+~~~yaml
+custom-preprocessor-extensions:
+- erb
 
-    require-stack-version: ">= 2.6.0"
-```
+require-stack-version: ">= 2.6.0"
+~~~
 
 And for backwards compatability with older versions of Stack, also add the
 following line to your Cabal file:
@@ -302,7 +309,7 @@ See [YAML configuration](yaml_configuration.md).
 You can create multiple YAML configuration files for your project, one for each
 build plan. For example, you might set up your project directory like so:
 
-```
+~~~text
 myproject/
   stack-ghc-9.0.2.yaml
   stack-ghc-9.2.4.yaml
@@ -310,20 +317,22 @@ myproject/
   myproject.cabal
   src/
     ...
-```
+~~~
 
 When you run `stack build`, you can set the `STACK_YAML` environment variable to
-indicate which build plan to use. On Unix-like operating systems:
+indicate which build plan to use. On Unix-like operating systems command:
 
-```sh
-$ stack build                             # builds using the default stack.yaml
-$ STACK_YAML=stack-ghc-7.10.yaml stack build  # builds using the given yaml file
-```
+~~~bash
+stack build  # builds using the default stack.yaml
+STACK_YAML=stack-ghc-7.10.yaml
+stack build  # builds using the given yaml file
+~~~
 
-On Windows (with PowerShell):
+On Windows (with PowerShell) command:
 
 ~~~ps
-$ $Env:STACK_YAML='stack-ghc-9.0.2.yaml' && stack build
+$Env:STACK_YAML='stack-ghc-9.0.2.yaml'
+stack build
 ~~~
 
 ## I heard you can use this with Docker?
@@ -367,10 +376,12 @@ prompt because they're not in the PATH environment variable. `stack exec` works
 because it's modifying PATH to include extra things.
 
 Those libraries are shipped with GHC (and, theoretically in some cases, MSYS).
-The easiest way to find them is `stack exec which`. E.g.
+The easiest way to find them is `stack exec which`. For example, command:
 
-    >stack exec which libstdc++-6.dll
-    /c/Users/Michael/AppData/Local/Programs/stack/i386-windows/ghc-7.8.4/mingw/bin/libstdc++-6.dll
+~~~text
+stack exec -- which libstdc++-6.dll
+/c/Users/Michael/AppData/Local/Programs/stack/i386-windows/ghc-7.8.4/mingw/bin/libstdc++-6.dll
+~~~
 
 A quick workaround is adding this path to the PATH environment variable or
 copying the files somewhere Windows finds them (see
@@ -433,9 +444,11 @@ To change the set of packages that command line GHC options apply to, use the [`
 
 ## `stack setup` on a Windows system only tells me to add certain paths to the PATH variable instead of doing it
 
-If you are using a PowerShell session, it is easy to automate even that step:
+With PowerShell, it is easy to automate even that step. Command:
 
-    $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
+~~~ps
+$Env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $Env:Path -join ";"
+~~~
 
 ## How do I reset/remove Stack (such as to do a completely fresh build)?
 
@@ -532,9 +545,11 @@ to GHC 7.10.2, you can work around it by
 
 Some versions of Windows PowerShell don't pass the `--` to programs (see issue
 [#813](https://github.com/commercialhaskell/stack/issues/813)). The workaround
-is to quote the `"--"`, e.g.:
+is to quote the `"--"`. For example, command:
 
-    stack exec "--" cabal --version
+~~~ps
+stack exec "--" cabal --version
+~~~
 
 This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
 
@@ -563,7 +578,9 @@ install system libraries.
 In principle, you can use the following command to add a certificate to your
 system certificate keychain:
 
-    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
+~~~bash
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
+~~~
 
 Some users have reported issues with this approach, see issue
 [#907](https://github.com/commercialhaskell/stack/issues/907) for more
@@ -604,20 +621,20 @@ The workaround is to remove LLVM binaries from the PATH.
 
 ## How do I suppress `'-nopie'` warnings with `stack build` on macOS?
 
-```
+~~~bash
 clang: warning: argument unused during compilation: '-nopie'
  [-Wunused-command-line-argument]
-```
+~~~
 
 This warning is shown when compiler support of `-no-pie` is expected but
 unavailable. It's possible to bypass the warning for a specific version of GHC
 by modifying a global setting:
 
-```
+~~~bash
 # ~/.stack/programs/x86_64-osx/ghc-8.2.2/lib/ghc-8.2.2/settings
 -- ("C compiler supports -no-pie", "YES"),
 ++ ("C compiler supports -no-pie", "NO"),
-```
+~~~
 
 **Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.**
 You should apply this fix for the version of GHC that matches your resolver.
@@ -628,19 +645,20 @@ further detail.
 ## How do I install GHC in Stack when it fails with the error: Missing ghc bindist for "linux64-ncurses6"?
 
 Example Error:
-```
+
+~~~text
 No setup information found for ghc-8.6.4 on your platform.
 This probably means a GHC bindist has not yet been added for OS key 'linux64-ncurses6'.
 Supported versions: ghc-7.10.3, ghc-8.0.1, ghc-8.0.2, ghc-8.2.1, ghc-8.2.2
-```
+~~~
 
 Most Linux distributions have standardized on providing libtinfo.so.6 (either
 directly or as a symlink to libncursesw.so.6). As such, there aren't GHC 8.6.*
 bindists that link to libncursesw.so.6 available.
 
 So creating a symlink to libncursesw.so.6 as libtinfo.so.6 can prevent this
-error (root privileges might be required).
+error (root privileges might be required). Command:
 
-```
+~~~bash
 ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.6
-```
+~~~

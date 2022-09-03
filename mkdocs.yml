@@ -62,10 +62,12 @@ nav:
 - Glossary: glossary.md
 
 markdown_extensions:
-- toc:
-    permalink: true
+- admonition
+- pymdownx.details
 - pymdownx.highlight:
     anchor_linenums: true
 - pymdownx.inlinehilite
 - pymdownx.snippets
 - pymdownx.superfences
+- toc:
+    permalink: true

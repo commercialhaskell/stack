@@ -156,11 +156,16 @@ flag.
 sent to the standard error channel. This can be changed to the standard output
 channel with the `--stdout` flag.
 
-For example, for the Stack project itself:
+For example, for the Stack project itself, command:
 
+~~~text
+cd stack
+stack ide targets
 ~~~
-$ cd stack
-$ stack ide targets
+
+and the output from the second command is:
+
+~~~text
 stack:lib
 stack:exe:stack
 stack:exe:stack-integration-test
@@ -209,10 +214,15 @@ by Stack's command line option `--stack-colors` and the YAML configuration key
 
 `stack ls tools` will list Stack's installed tools. On Unix-like operating
 systems, they will be one or more versions of GHC. On Windows, they will include
-MSYS2. For example, on Windows:
+MSYS2. For example, on Windows the command:
 
+~~~text
+stack ls tools
 ~~~
-$ stack ls tools
+
+yields output like:
+
+~~~text
 ghc-9.4.1
 ghc-9.2.4
 ghc-9.0.2
@@ -220,10 +230,16 @@ msys2-20210604
 ~~~
 
 The `--filter <tool_name>` option will filter the output by a tool name (e.g.
-'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example:
+'ghc', 'ghc-git' or 'msys2'). The tool name is case sensitive. For example the
+command:
 
+~~~text
+stack ls tools --filter ghc
 ~~~
-$ stack ls tools --filter ghc
+
+yields output like:
+
+~~~text
 ghc-9.4.1
 ghc-9.2.4
 ghc-9.0.2
@@ -253,49 +269,61 @@ resulting package archive, to test it.
 Stack provides multiple templates to start a new project from. You can specify
 one of these templates following your project name in the `stack new` command:
 
-    $ stack new my-rio-project rio
-    Downloading template "rio" to create project "my-rio-project" in my-rio-project/ ...
-    Looking for .cabal or package.yaml files to use to init the project.
-    Using cabal packages:
-    - my-rio-project/
+~~~text
+stack new my-rio-project rio
+Downloading template "rio" to create project "my-rio-project" in my-rio-project/ ...
+Looking for .cabal or package.yaml files to use to init the project.
+Using cabal packages:
+- my-rio-project/
 
-    Selecting the best among 18 snapshots...
+Selecting the best among 18 snapshots...
 
-    * Matches ...
+* Matches ...
 
-    Selected resolver: ...
-    Initialising configuration using resolver: ...
-    Total number of user packages considered: 1
-    Writing configuration to file: my-rio-project/stack.yaml
-    All done.
-    <Stack root>\templates\rio.hsfiles:   10.10 KiB downloaded...
+Selected resolver: ...
+Initialising configuration using resolver: ...
+Total number of user packages considered: 1
+Writing configuration to file: my-rio-project/stack.yaml
+All done.
+<Stack root>\templates\rio.hsfiles:   10.10 KiB downloaded...
+~~~
 
 The default templates repository is
 https://github.com/commercialhaskell/stack-templates. You can download templates
-from a different Github user by prefixing the username and a slash:
+from a different Github user by prefixing the username and a slash. Command:
 
-    $ stack new my-yesod-project yesodweb/simple
+~~~text
+stack new my-yesod-project yesodweb/simple
+~~~
 
 Then template file `simple.hsfiles` would be downloaded from GitHub repository
 `yesodweb/stack-templates`.
 
 You can even download templates from a service other that GitHub, such as
-[GitLab](https://gitlab.com) or [Bitbucket](https://bitbucket.com). For example:
+[GitLab](https://gitlab.com) or [Bitbucket](https://bitbucket.com). For example,
+command:
 
-    $ stack new my-project gitlab:user29/foo
+~~~text
+stack new my-project gitlab:user29/foo
+~~~
 
 Template file `foo.hsfiles` would be downloaded from GitLab, user account
 `user29`, repository `stack-templates`.
 
-If you need more flexibility, you can specify the full URL of the template:
+If you need more flexibility, you can specify the full URL of the template.
+Command:
 
-    $ stack new my-project https://my-site.com/content/template9.hsfiles
+~~~text
+stack new my-project https://my-site.com/content/template9.hsfiles
+~~~
 
 (The `.hsfiles` extension is optional; it will be added if it's not specified.)
 
-Alternatively you can use a local template by specifying the path:
+Alternatively you can use a local template by specifying the path. Command:
 
-    $ stack new project <path_to_template>/template.hsfiles
+~~~text
+stack new project <path_to_template>/template.hsfiles
+~~~
 
 As a starting point for creating your own templates, you can use the
 ["simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
@@ -330,19 +358,35 @@ attempt to GPG sign your packages as per
 * `--no-signature` disables signing of packages
 * `--candidate` upload a
   [package candidate](http://hackage.haskell.org/upload#candidates)
-* Hackage API key can be used instead of username and password. Usage
-  example:
+* Hackage API key can be used instead of username and password. For example, on
+  Unix-like operating systems command:
 
-  ```bash
-  HACKAGE_KEY=<api_key> stack upload .
-    ```
+  ~~~text
+  HACKAGE_KEY=<api_key>
+  stack upload .
+  ~~~
 
-* `username` and `password` can be read by environment
+  and on Windows (with PowerShell) command:
 
-  ```bash
+  ~~~text
+  $Env:HACKAGE_KEY=<api_key>
+  stack upload .
+  ~~~
+
+* `username` and `password` can be read by setting the following environment
+  variables. On Unix-like operating systems command:
+
+  ~~~text
   export $HACKAGE_USERNAME="<username>"
   export $HACKAGE_PASSWORD="<password>"
-  ```
+  ~~~
+
+  and on Windows (with PowerShell) command:
+
+  ~~~text
+  $Env:HACKAGE_USERNAME='<username>'
+  $Env:HACKAGE_PASSWORD='<password>'
+  ~~~
 
 ## Docker integration
 
@@ -350,7 +394,7 @@ Stack is able to build your code inside a Docker image, which means even more
 reproducibility to your builds, since you and the rest of your team will always
 have the same system libraries.
 
-For more information see the [Docker integration](docker_integration.md)
+For further information, see the [Docker integration](docker_integration.md)
 documentation.
 
 ## Nix integration
@@ -411,9 +455,11 @@ supported by Emacs, but some other editors have integration for it as well.
 ### Shell auto-completion
 
 Love tab-completion of commands? You're not alone. If you're on bash, just run
-the following (or add it to `.bashrc`):
+the following command (or add it to `.bashrc`):
 
-    eval "$(stack --bash-completion-script stack)"
+~~~text
+eval "$(stack --bash-completion-script stack)"
+~~~
 
 For more information and other shells, see the
 [Shell auto-completion wiki page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
@@ -429,13 +475,17 @@ For example the following command will build the `my-tests` testsuite with
 profiling options and create a `my-tests.prof` file in the current directory
 as a result of the test run.
 
-    $ stack test --profile my-tests
+~~~text
+stack test --profile my-tests
+~~~
 
 The `my-tests.prof` file now contains time and allocation info for the test run.
 
-To create a profiling report for an executable, e.g. `my-exe`, you can run
+To create a profiling report for an executable, e.g. `my-exe`, you can command:
 
-     $ stack exec --profile -- my-exe +RTS -p
+~~~text
+stack exec --profile -- my-exe +RTS -p
+~~~
 
 For more fine-grained control of compilation options there are the
 `--library-profiling` and `--executable-profiling` flags which will turn on the
@@ -446,11 +496,11 @@ options respectively. Custom GHC options can be passed in with
 To enable compilation with profiling options by default you can add the
 following snippet to your `stack.yaml` or `~/.stack/config.yaml`:
 
-```yaml
+~~~yaml
 build:
   library-profiling: true
   executable-profiling: true
-```
+~~~
 
 ### Further reading
 

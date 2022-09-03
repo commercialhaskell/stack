@@ -5,8 +5,9 @@ about: Report a bug in Stack
 
 Please follow the steps below for reporting a bug:
 
-Make sure that you are using the latest release (currently stack-2.7.5).
-See the [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade) to upgrade.
+Make sure that you are using the latest release (currently stack-2.7.5). See the
+[upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade)
+to upgrade.
 
 Please use the following schema for your bug report:
 
@@ -31,20 +32,21 @@ What you expected to see and happen.
 
 What actually happened.
 
-If you suspect that a stack command misbehaved, please include the output of that command in `--verbose` mode.
-If the output is larger than a page please paste the output in a [Gist](https://gist.github.com/).
+If you suspect that a Stack command misbehaved, please include the output of
+that command in `--verbose` mode. If the output is larger than a page please
+paste the output in a [Gist](https://gist.github.com/).
 
-```
-$ stack <your command here> <args> --verbose
+~~~text
+stack <your command here> <args> --verbose
 <output>
-```
+~~~
 
 ### Stack version
 
-```
-$ stack --version
+~~~text
+stack --version
 Version 1.9.1, Git revision f9d0042c141660e1d38f797e1d426be4a99b2a3c (6168 commits) x86_64 hpack-0.31.0
-```
+~~~
 
 ### Method of installation
 

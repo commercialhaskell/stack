@@ -7,16 +7,18 @@ completion file was automatically installed (you may need the `bash-completion`
 package to have it take effect).
 
 The following adds support for shell tab completion for standard Stack
-arguments, although completion for filenames and executables etc. within stack
+arguments, although completion for filenames and executables etc. within Stack
 is still lacking (see [issue
 823](https://github.com/commercialhaskell/stack/issues/832)).
 
 ## for bash users
 
-you need to run following command
-```
+You need to run following command:
+
+~~~bash
 eval "$(stack --bash-completion-script stack)"
-```
+~~~
+
 You can also add it to your `.bashrc` file if you want.
 
 ## for ZSH users
@@ -34,11 +36,11 @@ You must so:
   2. launch bashcompinit
   3. eval stack bash completion script
 
-```shell
+~~~shell
 autoload -U +X compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
 eval "$(stack --bash-completion-script stack)"
-```
+~~~
 
 :information_source: If you already have quite a large zshrc, or if you use
 oh-my-zsh, **compinit** will probably already be loaded. If you have a blank
