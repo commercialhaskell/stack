@@ -30,6 +30,8 @@ nav:
   - User's guide (advanced): GUIDE_advanced.md
   - FAQ: faq.md
   - Configuration (project and global): yaml_configuration.md
+  - Snapshot and package location: pantry.md
+  - Snapshot specification: custom_snapshot.md
   - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
   - Stack and Visual Studio Code: Stack_and_VS_Code.md
@@ -41,10 +43,8 @@ nav:
   - Shell auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
   - Azure CI: azure_ci.md
-  - Custom snapshots: custom_snapshot.md
   - Code coverage: coverage.md
   - GHCi: ghci.md
-  - Pantry: pantry.md
   - Lock files: lock_files.md
 - Advanced documentation:
   - Build overview: build_overview.md
