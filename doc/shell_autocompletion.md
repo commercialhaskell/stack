@@ -36,7 +36,7 @@ within Stack is still lacking. For further information, see issue
     }
     ~~~
 
-=== Zsh
+=== "Zsh"
 
     The Zsh
     [manual](https://zsh.sourceforge.io/Doc/Release/Completion-System.html#Completion-System)
