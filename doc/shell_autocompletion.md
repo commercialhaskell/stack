@@ -1,50 +1,70 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Shell Auto-completion
+# Shell auto-completion
 
-Note: if you installed a package for you Linux distribution, the bash
-completion file was automatically installed (you may need the `bash-completion`
-package to have it take effect).
+The following adds support for the tab completion of standard Stack arguments in
+the Bash shell or the Z shell (Zsh). Completion of file names and executables
+within Stack is still lacking. For further information, see issue
+[#823](https://github.com/commercialhaskell/stack/issues/832).
 
-The following adds support for shell tab completion for standard Stack
-arguments, although completion for filenames and executables etc. within Stack
-is still lacking (see [issue
-823](https://github.com/commercialhaskell/stack/issues/832)).
+=== "Bash"
 
-## for bash users
+    Issue the following command or add it to your `~/.bashrc` file:
 
-You need to run following command:
+    ~~~bash
+    eval "$(stack --bash-completion-script stack)"
+    ~~~
 
-~~~bash
-eval "$(stack --bash-completion-script stack)"
-~~~
+    !!! info
 
-You can also add it to your `.bashrc` file if you want.
+        Stack's hidden option `--bash-completion-script <stack_executable_name>`
+        outputs a command that can be evaluated by Bash. For example:
 
-## for ZSH users
+        ~~~text
+        stack --bash-completion-script stack
+        _stack.exe()
+        {
+            local CMDLINE
+            local IFS=$'\n'
+            CMDLINE=(--bash-completion-index $COMP_CWORD)
 
-documentation says:
-> Zsh can handle bash completions functions. The latest development version of
-> zsh has a function bashcompinit, that when run will allow zsh to read bash
-> completion specifications and functions. This is documented in the zshcompsys
-> man page. To use it all **you need to do is run bashcompinit at any time
-> after compinit**. It will define complete and compgen functions corresponding
-> to the bash builtins.
+            for arg in ${COMP_WORDS[@]}; do
+                CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
+            done
 
-You must so:
-  1. launch compinint
-  2. launch bashcompinit
-  3. eval stack bash completion script
+            COMPREPLY=( $(stack "${CMDLINE[@]}") )
+        }
+        ~~~
 
-~~~shell
-autoload -U +X compinit && compinit
-autoload -U +X bashcompinit && bashcompinit
-eval "$(stack --bash-completion-script stack)"
-~~~
+=== "Zsh"
 
-:information_source: If you already have quite a large zshrc, or if you use
-oh-my-zsh, **compinit** will probably already be loaded. If you have a blank
-zsh config, all of the 3 lines above are necessary.
+    The Zsh
+    [manual](https://zsh.sourceforge.io/Doc/Release/Completion-System.html#Completion-System)
+    explains:
 
-:gem: tip: instead of running those 3 lines from your shell every time you want
-to use stack, you can add those 3 lines in your $HOME/.zshrc file
+    > The function `bashcompinit` provides compatibility with bash’s
+    programmable completion system. When run it will define the functions,
+    `compgen` and `complete` which correspond to the bash builtins with the same
+    names. It will then be possible to use completion specifications and
+    functions written for bash.
+
+    Consequently, you must:
+
+    1.  launch `compinint`
+    2.  launch `bashcompinit`
+    3.  eval Stack's Bash completion script
+
+    Issue the following commands or that them to your `~/.zshrc` file:
+
+    ~~~zsh
+    autoload -U +X compinit
+    compinit
+    autoload -U +X bashcompinit
+    bashcompinit
+    eval "$(stack --bash-completion-script stack)"
+    ~~~
+
+    !!! info
+
+        If you already have quite a large `.zshrc` file, or if you use
+        `oh-my-zsh`, `compinit` will probably already be loaded.

@@ -125,62 +125,169 @@ about how these dependencies get specified.
 In addition to specifying targets, you can also control what gets built, or
 retained, with the following flags:
 
-* `--haddock`, to build documentation.  This may cause a lot of packages to get
-  re-built, so that the documentation links work.
+### The `stack build --dependencies-only` flag
 
-* `--force-dirty`, to force rebuild of packages even when it doesn't seem
-  necessary based on file dirtiness.
+Pass the flag to skip building the targets. The flag `--only-dependencies` has
+the same effect.
 
-* `--reconfigure`, to force reconfiguration even when it doesn't seem necessary
-  based on file dirtiness. This is sometimes useful with custom `Setup.hs`
-  files, in particular when they depend on external data files.
+### The `stack build --[no-]dry-run` flag
 
-* `--dry-run`, to build nothing and output information about the build plan.
+Default: Disabled
 
-* `--only-dependencies`, to skip building the targets.
+Set the flag to build nothing and output information about the build plan.
 
-* `--only-snapshot`, to only build snapshot dependencies, which are cached and
-  shared with other projects.
+### The `stack build --flag` option
 
-* `--keep-going`, to continue building packages even after some build step
-  fails. The packages which depend upon the failed build won't get built.
+`stack build --flag <package_name>:[-]<flag_name>` sets (or unsets) the
+specified Cabal flag for the specified package.
 
-* `--keep-tmp-files`, to keep intermediate files and build directories that
-  would otherwise be considered temporary and deleted. It may be useful to
-  inspect these, if a build fails. By default, they are not kept.
+This option can be specified multiple times to set (or unset) multiple Cabal
+flags.
 
-* `--skip`, to skip building components of a local package. It allows
-  you to skip test suites and benchmark without specifying other components
-  (e.g. `stack test --skip long-test-suite` will run the tests without the
-  `long-test-suite` test suite). Be aware that skipping executables won't work
-  the first time the package is built due to
-  [an issue in cabal](https://github.com/commercialhaskell/stack/issues/3229).
-  This option can be specified multiple times to skip multiple components.
+The same Cabal flag name can be set (or unset) for multiple packages (at the
+command line only) with:
 
-## Flags
+~~~text
+stack build --flag *:[-]<flag)name>
+~~~
+
+!!! note
+
+    Currently you needs to list all of your modules that interpret flags in the
+    `other-modules` section of a Cabal file. Cabal (the tool) has a different
+    behavior currently and doesn't require that the modules be listed. This may
+    change in a future release.
+
+### The `stack build --[no-]force-dirty` flag
+
+Default: Disabled
+
+Set the flag to force rebuild of packages even when it doesn't seem necessary
+based on file dirtiness.
+
+### The `stack build --[no-]haddock` flag
+
+Default: Disabled
+
+Set the flag to build Haddock documentation. This may cause a lot of packages to
+get re-built, so that the documentation links work.
+
+### The `stack build --[no-]keep-going` flag
+
+Default (`stack build`): Disabled
+
+Default (`stack test` or `stack bench`): Enabled
+
+Set the flag to continue building packages even after some build step fails.
+The packages which depend upon the failed build won't get built.
+
+### The `stack build --[no-]keep-tmp-files` flag
+
+Default: Disabled
+
+Set the flag to keep intermediate files and build directories that would
+otherwise be considered temporary and deleted. It may be useful to inspect
+these, if a build fails. By default, they are not kept.
+
+### The `stack build --only-dependencies` flag
+
+Pass the flag to skip building the targets. The flag `--dependencies-only` has
+the same effect.
+
+### The `stack build --[no-]reconfigure` flag
+
+Default: Disabled
+
+Set the flag to force reconfiguration even when it doesn't seem necessary based
+on file dirtiness. This is sometimes useful with custom `Setup.hs` files, in
+particular when they depend on external data files.
+
+### The `stack build --skip` option
+
+`stack build --skip <component>` skips building the specified components of a
+local package. It allows you to skip test suites and benchmark without
+specifying other components (e.g. `stack test --skip long-test-suite` will run
+the tests without the `long-test-suite` test suite). Be aware that skipping
+executables won't work the first time the package is built due to an issue in
+[Cabal](https://github.com/commercialhaskell/stack/issues/3229).
+
+This option can be specified multiple times to skip multiple components.
+
+### The `stack build --only-snapshot` flag
+
+Pass the flag to build only snapshot dependencies, which are cached and shared
+with other projects.
+
+## Other flags and options
 
 There are a number of other flags accepted by `stack build`. Instead of listing
 all of them, please use `stack build --help`. Some particularly convenient ones
 worth mentioning here since they compose well with the rest of the build system
 as described:
 
-* `--file-watch` will rebuild your project every time a file changes, by default
-  it will take into account all files belonging to the targets you specify,
-  alternatively one could specify `--watch-all` which will make Stack watch
-  any local files (from project packages or from local dependencies)
-* `--exec "cmd [args]"` will run a command after a successful build
+### The `stack build --coverage` flag
 
-To come back to the composable approach described above, consider this final
-example (which uses the [wai repository](https://github.com/yesodweb/wai/)). The
+Pass the flag to generate a code coverage report. For further information, see
+the [code coverage](coverage.md) documentation.
+
+### The `stack build --exec` option
+
+`stack build --exec "<command> [<arguments>]"` will run a command after a
+successful build.
+
+### The `stack build --file-watch` flag
+
+Pass the flag to rebuild your project every time a file changes. By default it
+will take into account all files belonging to the targets you specify. See also
+the `--watch-all` flag.
+
+### The `stack build --[no-]interleaved-output` flag
+
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
+
+Default: Enabled
+
+Set the flag to have the output of all packages being built scroll by in a
+streaming fashion. The output from each package built will be prefixed by the
+package name, e.g. `mtl> Building ...`. This will include the output from
+dependencies being built, not just targets.
+
+Unset the flag to disable this behaviour. When disabled:
+
+* When building a single target package (e.g., `stack build` in a project
+  with only one package, or `stack build <package_name>` in a multi-package
+  project), the build output from GHC will be hidden for building all
+  dependencies, and will be displayed for the one target package.
+* By default, when building multiple target packages, the output from these
+  will end up in a log file instead of on the console unless it contains
+  errors or warnings, to avoid problems of interleaved output and decrease
+  console noise. If you would like to see this content instead, you can use
+  the `dump-logs` option.
+
+### The `stack build --pedantic` flag
+
+Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
+`-Wall` turns on all warning options that indicate potentially suspicious code.
+`-Werror` makes any warning into a fatal error.
+
+### The `stack build --watch-all` flag
+
+Pass the flag to rebuild your project every time any local file changes (from
+project packages or from local dependencies). See also the `--file-watch` flag.
+
+## Composition
+
+To come back to the composable approach described above, consider this example
+(which uses the `wai` [repository](https://github.com/yesodweb/wai/)). The
 command:
 
 ~~~text
 stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
 ~~~
 
-This command will start Stack up in file watch mode, waiting for files in your
-project to change. When first starting, and each time a file changes, it will do
-all of the following.
+will start Stack up in file watch mode, waiting for files in your project to
+change. When first starting, and each time a file changes, it will do all of the
+following.
 
 * Build the wai-extra package and its test suites
 * Build the `warp` executable
@@ -191,25 +298,3 @@ all of the following.
 * If all of that succeeds:
     * Copy generated executables to the local bin path
     * Run the command `echo Yay, it worked!`
-
-## Build output
-
-Starting with Stack 2.1, output of all packages being built scrolls by in a
-streaming fashion. The output from each package built will be prefixed by the
-package name, e.g. `mtl> Building ...`. This will include the output from
-dependencies being built, not just targets.
-
-To disable this behaviour, you can pass `--no-interleaved-output`, or add
-`interleaved-output: false` to your `stack.yaml` file.  When disabled:
-
-  * When building a single target package (e.g., `stack build` in a project
-    with only one package, or `stack build package-name` in a multi-package
-    project), the build output from GHC will be hidden for building all
-    dependencies, and will be displayed for the one target package.
-
-  * By default, when building multiple target packages, the output from these
-    will end up in a log file instead of on the console unless it contains
-    errors or warnings, to avoid problems of interleaved output and decrease
-    console noise. If you would like to see this content instead, you can use
-    the `--dump-logs` command line option, or add `dump-logs: all` to your
-    YAML configuration file (`stack.yaml` or `config.yaml`).
