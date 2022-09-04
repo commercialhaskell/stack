@@ -35,16 +35,16 @@ nav:
   - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
   - Code coverage: coverage.md
-  - Stack and Visual Studio Code: Stack_and_VS_Code.md
-  - Developing on Windows: developing_on_windows.md
+  - REPL environment: ghci.md
   - Dependency visualization: dependency_visualization.md
   - Docker integration: docker_integration.md
   - Nix integration: nix_integration.md
   - Non-standard project initialization: nonstandard_project_init.md
+  - Stack and Visual Studio Code: Stack_and_VS_Code.md
+  - Developing on Windows: developing_on_windows.md
   - Shell auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
   - Azure CI: azure_ci.md
-  - GHCi: ghci.md
   - Lock files: lock_files.md
 - Advanced documentation:
   - Build overview: build_overview.md

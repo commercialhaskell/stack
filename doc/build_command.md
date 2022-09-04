@@ -264,6 +264,12 @@ Unset the flag to disable this behaviour. When disabled:
   console noise. If you would like to see this content instead, you can use
   the `dump-logs` option.
 
+### The `stack build --pedantic` flag
+
+Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
+`-Wall` turns on all warning options that indicate potentially suspicious code.
+`-Werror` makes any warning into a fatal error.
+
 ### The `stack build --watch-all` flag
 
 Pass the flag to rebuild your project every time any local file changes (from
