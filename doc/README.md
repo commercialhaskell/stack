@@ -203,11 +203,11 @@ Stack does not stand alone. It is built on the great work provided by:
   packages and a [library](https://hackage.haskell.org/package/Cabal) for
   performing builds.
 
-  !!! info
+    !!! info
 
-      Cabal is also the name of another build tool, provided the `cabal-install`
-      package. This guide distinguishes between then by Cabal (the library) and
-      Cabal (the tool).
+        Cabal is also the name of another build tool, provided the `cabal-install`
+        package. This guide distinguishes between then by Cabal (the library) and
+        Cabal (the tool).
 
 * The __Hackage Haskell Package Repository__, a
   [repository](https://hackage.haskell.org/) of Haskell packages providing
@@ -260,9 +260,9 @@ The following assumes that you already have installed a version of Stack and the
 3. Build the `stack` executable using a pre-existing installation of Stack with
    the command:
 
-   ~~~text
-   stack build
-   ~~~
+    ~~~text
+    stack build
+    ~~~
 
 4. Once the `stack` executable has been built, check its version with the
    command:
