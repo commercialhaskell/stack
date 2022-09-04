@@ -63,7 +63,11 @@ nav:
 
 markdown_extensions:
 - admonition
+- attr_list
 - pymdownx.details
+- pymdownx.emoji:
+    emoji_index: !!python/name:materialx.emoji.twemoji
+    emoji_generator: !!python/name:materialx.emoji.to_svg
 - pymdownx.highlight:
     anchor_linenums: true
 - pymdownx.inlinehilite
