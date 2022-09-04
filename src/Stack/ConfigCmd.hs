@@ -48,7 +48,8 @@ import           Stack.Prelude
 import           Data.Coerce (coerce)
 import           Pantry.Internal.AesonExtended
                  (ToJSON(..), FromJSON, (.=), WithJSONWarnings (WithJSONWarnings), object)
-import Data.Aeson.Encode.Pretty (encodePretty)
+import Data.Aeson.Encode.Pretty (encodePretty, encodePretty', confCompare)
+import qualified Data.Aeson.Encode.Pretty as Aeson (defConfig)
 import qualified Data.Aeson.Key as Key
 import Data.Aeson.KeyMap (KeyMap)
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -128,10 +129,16 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 encodeDumpProject :: RawYaml -> ConfigDumpFormat -> Project -> ByteString
-encodeDumpProject _ ConfigDumpJson = toStrictBytes . encodePretty
-encodeDumpProject rawConfig ConfigDumpYaml = \p -> let e = Yaml.encode p in
+encodeDumpProject rawConfig ConfigDumpYaml p = let e = Yaml.encode p in
     Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
         either (const e) encodeUtf8 (cfgRedress rawConfig d ""))
+encodeDumpProject rawConfig ConfigDumpJson p = let e = Yaml.encode p in
+    Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
+        toStrictBytes $ encodePretty' (Aeson.defConfig{confCompare = cfgKeyCompare rawConfig d ""}) d)
+
+cfgKeyCompare :: RawYaml -> KeyMap Yaml.Value -> Text -> (Text -> Text -> Ordering)
+cfgKeyCompare (yamlLines -> configLines) (fmap Key.toText . KeyMap.keys -> keys) cmdKey =
+    compareInOrder configLines (coerce keys) (coerce cmdKey)
 
 encodeDumpStackBy :: ToJSON a => (Config -> a) -> ConfigCmdDumpStack -> (Config -> ByteString)
 encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpYaml) = Yaml.encode . f
