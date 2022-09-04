@@ -129,12 +129,17 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 encodeDumpProject :: RawYaml -> ConfigDumpFormat -> Project -> ByteString
-encodeDumpProject rawConfig ConfigDumpYaml p = let e = Yaml.encode p in
-    Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
+encodeDumpProject rawConfig format p
+    | ConfigDumpYaml <- format = dumpProject (\e d ->
         either (const e) encodeUtf8 (cfgRedress rawConfig d ""))
-encodeDumpProject rawConfig ConfigDumpJson p = let e = Yaml.encode p in
-    Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
-        toStrictBytes $ encodePretty' (Aeson.defConfig{confCompare = cfgKeyCompare rawConfig d ""}) d)
+    | ConfigDumpJson <- format = dumpProject (\_ d ->
+        let cmp = cfgKeyCompare rawConfig d ""
+        in toStrictBytes $ encodePretty' (Aeson.defConfig{confCompare = cmp}) d)
+    where
+        -- REVIEW: Is there a way to encode straight to keymap?
+        -- encode project to bytestring then decode to keymap.
+        dumpProject f = let e = Yaml.encode p in Yaml.decodeEither' e &
+            either (const e) (\(d :: KeyMap Yaml.Value) -> f e d)
 
 cfgKeyCompare :: RawYaml -> KeyMap Yaml.Value -> Text -> (Text -> Text -> Ordering)
 cfgKeyCompare (yamlLines -> configLines) (fmap Key.toText . KeyMap.keys -> keys) cmdKey =
