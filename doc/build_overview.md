@@ -1,15 +1,17 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
 
-# Build Overview
+# Build overview
 
-__NOTE__ This document should *not be considered accurate* until this
-note is removed.
+!!! warning
 
-This is a work-in-progress document covering the build process used by Stack.
-It was started following the Pantry rewrite work in Stack (likely to
-land as Stack 2.0), and contains some significant changes/simplifications from
-how things used to work. This document will likely not fully be reflected in
-the behavior of Stack itself until late in the Stack 2.0 development cycle.
+    This document should not be considered accurate until this warning is
+    removed.
+
+    This is a work-in-progress document covering the build process used by
+    Stack. It was started following the Pantry rewrite work in Stack 2.1.1, and
+    contains some significant changes/simplifications from how things used to
+    work. This document will likely not fully be reflected in the behavior of
+    Stack itself until late in the Stack 2.0 development cycle.
 
 ## Terminology
 
@@ -65,7 +67,8 @@ This file is parsed to provide the following config values:
 * `ghc-options` (optional field, defaults to `{}`)
 
 `flags` and `ghc-options` break down into both _by name_ (applied to a
-specific package) and _general_ (general option `*` for flags is only available in CLI).
+specific package) and _general_ (general option `*` for flags is only available
+in CLI).
 
 ## Wanted compiler, dependencies, and project packages
 
@@ -95,9 +98,12 @@ specific package) and _general_ (general option `*` for flags is only available 
   in the corresponding package cabal file, it's an error.
 * We are now left with the following:
     * A wanted compiler version
-    * A map from package name to immutable packages with package config (flags, GHC options, hidden)
-    * A map from package name to mutable packages as dependencies with package config
-    * A map from package name to mutable packages as project packages with package config
+    * A map from package name to immutable packages with package config (flags,
+      GHC options, hidden)
+    * A map from package name to mutable packages as dependencies with package
+      config
+    * A map from package name to mutable packages as project packages with
+      package config
 
 ## Get actual compiler
 
@@ -202,8 +208,10 @@ a hash of the following information:
 Motivation: Any package built from the immutable dependency map and
 installed in this database will never need to be rebuilt.
 
-*FIXME* Caveat: do we need to take profiling settings into account
-here? How about Haddock status?
+!!! bug "To do"
+
+    Caveat: do we need to take profiling settings into account here? How about
+    Haddock status?
 
 ## Determine actual target components
 
@@ -233,10 +241,12 @@ We now have a set of tasks of packages/components to build, with full
 config information for each package, and dependencies that must be
 built first.
 
-*FIXME* There's some logic to deal with cyclic dependencies between
-test suites and benchmarks, where a task can be broken up into
-individual components versus be kept as a single task. Need to
-document this better. Currently it's the "all in one" logic.
+!!! bug "To do"
+
+    There's some logic to deal with cyclic dependencies between test suites and
+    benchmarks, where a task can be broken up into individual components versus
+    be kept as a single task. Need to document this better. Currently it's the
+    "all in one" logic.
 
 ## Unregister local modified packages
 
