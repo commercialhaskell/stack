@@ -53,18 +53,20 @@ GitHub repository.
 
     === "x86_64"
 
-        * Download the latest release:
+        * Click
+          [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
+          to download an archive file with the latest release.
 
-          * [Linux 64-bit (static)](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
+        * Extract the archive and place the `stack` executable somewhere on your
+          PATH (see the [Path](#path) section below).
 
-        * Extract the archive and place `stack` somewhere on your PATH (see the
-          [Path](#path) section below).
-
-        * Ensure you have required system dependencies installed. These include GCC, GNU
-          Make, xz, perl, libgmp, libffi, and zlib. We also recommend Git and GPG.
+        * Ensure you have the required system dependencies installed. These
+          include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
+          recommend Git and GPG.
 
         The installation of system dependencies will depend on the package
-        manager for your Linux distribution.
+        manager for your Linux distribution. Notes are provided for Arch Linux,
+        CentOS, Debian, Fedora, Gentoo and Ubuntu.
 
         === "Arch Linux"
 
@@ -107,10 +109,18 @@ GitHub repository.
     including Arch Linux, Debian, Fedora, NixOS, openSUSE/SUSE Linux Enterprise,
     and Ubuntu.
 
+    !!! info "Linux packages that lag behind Stack's current version"
+
+        The Stack version available as a Linix package may lag behind Stack's
+        current version. If so, using `stack upgrade --binary-only` is
+        recommended after installing it. For Stack versions before 1.3.0 which
+        do not support `--binary-only`, just `stack upgrade` may work too.
+
     === "Arch Linux"
 
-        The Arch community respository provides an official package. You can
-        install it with the command:
+        The Arch community package respository provides an official
+        [package](ttps://www.archlinux.org/packages/community/x86_64/stack/).
+        You can install it with the command:
 
         ~~~text
         sudo pacman -S stack
@@ -120,32 +130,28 @@ GitHub repository.
         the day. The package is also always rebuilt and updated when one of its
         dependencies gets an update.
 
-        - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
-        - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
+        The Arch User Repository (AUR) also provides a
+        [package](https://aur.archlinux.org/packages/haskell-stack-git).
+        However, its Stack version lags behind, so running
+        `stack upgrade --binary-only` is recommended after installing it. For
+        older Stack versions which do not support `--binary-only`, just
+        `stack upgrade` may work too.
 
-        In order to use `stack setup` with older versions of GHC or on a 32-bit
-        system, you may need the
+        To use `stack setup` with versions of GHC before 7.10.3 or on a
+        32-bit system, you may need the AUR
         [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
-        AUR package installed. If this package is not installed, Stack may not be
-        able to install older (< 7.10.3) or 32-bit GHC versions.
-
-        If you use the
-        [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell),
-        you can also get the `haskell-stack-tool` package from there.
+        package installed.
 
     === "Debian"
 
         There are Debian
         [packages](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
         for Stretch and up. However, the distribution's Stack version lags
-        behind, so running `stack upgrade --binary-only` is recommended after
-        installing it. For older Stack versions which do not support
-        `--binary-only`, just `stack upgrade` may work too.
+        behind.
 
     === "Fedora"
 
-        Fedora includes builds of Stack, but the version may lag behind, so we
-        recommend running `stack upgrade` after installing it.
+        Fedora includes Stack, but its Stack version may lag behind.
 
     === "NixOS"
 
@@ -184,34 +190,29 @@ GitHub repository.
         For more information on using Stack together with Nix, please see the
         [NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
 
-    === "openSUSE/SUSE Linux Enterprise"
+    === "SUSE"
 
-        There is also an unofficial SUSE package. This Stack version may lag
-        behind, so we recommend running `stack upgrade` after installing it.
-        To install it:
+        There is also an unofficial package for openSUSE or SUSE Linux
+        Enterprise. Its Stack version may lag behind. To install it:
 
-        1.  Add the appropriate OBS repository:
-
-            * openSUSE Tumbleweed
-
-              all needed is in distribution
-
-            * openSUSE Leap
-
-                ~~~text
-                sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
-                ~~~
-
-            * SUSE Linux Enterprise 12
-
-                ~~~text
-                sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
-                ~~~
-
-        2.  Install:
+        === openSUSE Tumbleweed
 
             ~~~text
             sudo zypper in stack
+            ~~~
+
+        === openSUSE Leap
+
+            ~~~text
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+            sudo zypeer in stack
+            ~~~
+
+        === SUSE Linux Enterprise 12
+
+            ~~~text
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
+            sude zypper in stack
             ~~~
 
     === "Ubuntu"
@@ -219,9 +220,7 @@ GitHub repository.
         There are Ubuntu
         [packages](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
         for Ubuntu 18.04 and up. However, the distribution's Stack version lags
-        behind, so we recommend running `stack upgrade --binary-only` after
-        installing it. For older Stack versions which do not support
-        `--binary-only`, just `stack upgrade` may work too.
+        behind.
 
     It is possible to set up auto-completion of Stack commands. For further
     information, see the [shell auto-completion](shell_autocompletion.md)
@@ -229,8 +228,7 @@ GitHub repository.
 
 === "macOS"
 
-    For most Linux distributions, the easiest way to install Stack is to
-    command:
+    The easiest way to install Stack is to command:
 
     ~~~text
     curl -sSL https://get.haskellstack.org/ | sh
@@ -250,15 +248,18 @@ GitHub repository.
         to `/usr/local/bin`. If you prefer more control, follow the manual
         installation instructions below.
 
-    We generally test on the current version of macOS and do our best to keep it
-    compatible with the three most recent major versions. Stack may also work on
-    older versions.
+    !!! info
+
+        We generally test on the current version of macOS and do our best to
+        keep it compatible with the three most recent major versions. Stack may
+        also work on older versions.
 
     ### Manual download
 
-    * Download the latest release:
-
-      * [macOS 64-bit](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
+    * Click
+      [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
+      to download an archive file with the latest release for x86_64
+      architectures.
 
     * Extract the archive and place `stack` somewhere on your PATH (see the
       [Path](#path) section below).
@@ -310,11 +311,11 @@ GitHub repository.
     If you are on macOS 10.12 (Sierra) and encounter GHC panic while building, see
     this [issue](https://github.com/commercialhaskell/stack/issues/2577)
 
-    On Apple silicon chip (AArch64/ARM64) architectures, the installation of Stack
-    or some packages (e.g. `network`) requiring C source compilation might fail with
-    `configure: error: C compiler cannot build executables`. In that case you should
-    pass `-arch arm64` as part of the `CFLAGS` environment variable. This setting
-    will be picked up by the C compiler of your choice.
+    On Apple silicon chip (AArch64/ARM64) architectures, the installation of
+    Stack or some packages (e.g. `network`) requiring C source compilation might
+    fail with `configure: error: C compiler cannot build executables`. In that
+    case you should pass `-arch arm64` as part of the `CFLAGS` environment
+    variable. This setting will be picked up by the C compiler of your choice.
 
     ~~~bash
     # Assuming BASH below
@@ -361,39 +362,57 @@ GitHub repository.
 
     ### Manual download
 
-    * Download the latest release:
-
-      * [64-bit Windows](https://get.haskellstack.org/stable/windows-x86_64.zip)
+    * Click
+      [:material-cloud-download-outline:](https://get.haskellstack.org/stable/windows-x86_64.zip)
+      to download an archive file with the latest release.
 
     * Unpack the archive and place `stack.exe` somewhere on your PATH (see the
       [Path](#path) section below).
 
     * Now you can run Stack from the command line in a terminal.
 
+!!! info
+
+    Stack can also be installed using the separate
+    [GHCup](https://www.haskell.org/ghcup/) installer for Haskell-related tools.
+    Unlike Stack, other build tools do not automatically install GHC. GHCup can
+    be used to install GHC for those other tools and Stack can be configured to
+    use the version of GHC that GHCup has installed.
+
 ## Path
 
 You can install Stack by copying the executable file anywhere on your PATH. A
 good place to install is the same directory where Stack itself will install
-executables. On Unix-like operating systems, that directory is:
+executables, which depends on the operating system:
 
-~~~text
-$HOME/.local/bin
-~~~
+=== "Unix-like"
 
-On Windows, that directory is:
+    Stack installs executables to:
 
-~~~text
-%APPDATA%\local\bin
-~~~
+    ~~~text
+    $HOME/.local/bin
+    ~~~
 
-For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+    If you don't have that directory in your PATH, you may need to update your
+    PATH. That can be done by editing the `~/.bashrc` file.
+
+=== "Windows"
+
+    Stack installs executables to:
+
+    ~~~text
+    %APPDATA%\local\bin
+    ~~~
+
+    For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+    If you don't have that directory in your PATH, you may need to update your
+    PATH. That can be done by searching for 'Edit Environment variables for your
+    account' under Start.
 
 If you don't have that directory in your PATH, you may need to update your PATH.
 On Unix-like operating systems, that can be done by editing the `~/.bashrc`
 file.
-
-If you're curious about the choice of these directories, see
-[issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
 ## China-based users
 
@@ -437,19 +456,33 @@ package-indices:
 
 To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first set
 up an environment variable `http_proxy` and then run the Stack command. For
-example, on Unix-like operating systems:
+example:
 
-~~~text
-export http_proxy=IP:PORT
-stack install
-~~~
+=== "Unix-like"
 
-On most operating systems, it is not mandatory for programs to follow the
-"system-wide" HTTP proxy. Some programs, such as browsers, do honor this
-"system-wide" HTTP proxy setting, while other programs, including bash, do not.
-That means configuring "http proxy setting" in your Control Panel (Windows) or
-System Preferences (Mac) would not result in Stack traffic going through the
-proxy.
+    ~~~text
+    export http_proxy=IP:PORT
+    stack install
+    ~~~
+
+    On most operating systems, it is not mandatory for programs to follow the
+    "system-wide" HTTP proxy. Some programs, such as browsers, do honor this
+    "system-wide" HTTP proxy setting, while other programs, including Bash, do
+    not. That means configuring "http proxy setting" in your System Preferences
+    (macOS) would not result in Stack traffic going through the proxy.
+
+=== "Windows"
+
+    ~~~text
+    $Env:http_proxy=IP:PORT
+    stack install
+    ~~~
+
+    It is not mandatory for programs to follow the "system-wide" HTTP proxy.
+    Some programs, such as browsers, do honor this "system-wide" HTTP proxy
+    setting, while other programs do not. That means configuring
+    "http proxy setting" in your Control Panel would not result in Stack traffic
+    going through the proxy.
 
 ## Upgrade Stack
 
