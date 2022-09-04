@@ -127,7 +127,7 @@ retained, with the following flags:
 
 ### The `stack build --dependencies-only` flag
 
-Set the flag to skip building the targets. The flag `--only-dependencies` has
+Pass the flag to skip building the targets. The flag `--only-dependencies` has
 the same effect.
 
 ### The `stack build --[no-]dry-run` flag
@@ -191,7 +191,7 @@ these, if a build fails. By default, they are not kept.
 
 ### The `stack build --only-dependencies` flag
 
-Set the flag to skip building the targets. The flag `--dependencies-only` has
+Pass the flag to skip building the targets. The flag `--dependencies-only` has
 the same effect.
 
 ### The `stack build --[no-]reconfigure` flag
@@ -215,7 +215,7 @@ This option can be specified multiple times to skip multiple components.
 
 ### The `stack build --only-snapshot` flag
 
-Set the flag to build only snapshot dependencies, which are cached and shared
+Pass the flag to build only snapshot dependencies, which are cached and shared
 with other projects.
 
 ## Other flags and options
@@ -225,6 +225,11 @@ all of them, please use `stack build --help`. Some particularly convenient ones
 worth mentioning here since they compose well with the rest of the build system
 as described:
 
+### The `stack build --coverage` flag
+
+Pass the flag to generate a code coverage report. For further information, see
+the [code coverage](coverage.md) documentation.
+
 ### The `stack build --exec` option
 
 `stack build --exec "<command> [<arguments>]"` will run a command after a
@@ -232,7 +237,7 @@ successful build.
 
 ### The `stack build --file-watch` flag
 
-Set the flag to rebuild your project every time a file changes. By default it
+Pass the flag to rebuild your project every time a file changes. By default it
 will take into account all files belonging to the targets you specify. See also
 the `--watch-all` flag.
 
@@ -261,7 +266,7 @@ Unset the flag to disable this behaviour. When disabled:
 
 ### The `stack build --watch-all` flag
 
-Set the flag to rebuild your project every time any local file changes (from
+Pass the flag to rebuild your project every time any local file changes (from
 project packages or from local dependencies). See also the `--file-watch` flag.
 
 ## Composition
