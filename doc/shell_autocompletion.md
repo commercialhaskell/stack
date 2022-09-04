@@ -15,26 +15,26 @@ within Stack is still lacking. For further information, see issue
     eval "$(stack --bash-completion-script stack)"
     ~~~
 
-!!! info
+    !!! info
 
-    Stack's hidden option `--bash-completion-script <stack_executable_name>`
-    outputs a command that can be evaluated by Bash. For example:
+        Stack's hidden option `--bash-completion-script <stack_executable_name>`
+        outputs a command that can be evaluated by Bash. For example:
 
-    ~~~text
-    stack --bash-completion-script stack
-    _stack.exe()
-    {
-        local CMDLINE
-        local IFS=$'\n'
-        CMDLINE=(--bash-completion-index $COMP_CWORD)
+        ~~~text
+        stack --bash-completion-script stack
+        _stack.exe()
+        {
+            local CMDLINE
+            local IFS=$'\n'
+            CMDLINE=(--bash-completion-index $COMP_CWORD)
 
-        for arg in ${COMP_WORDS[@]}; do
-            CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
-        done
+            for arg in ${COMP_WORDS[@]}; do
+                CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
+            done
 
-        COMPREPLY=( $(stack "${CMDLINE[@]}") )
-    }
-    ~~~
+            COMPREPLY=( $(stack "${CMDLINE[@]}") )
+        }
+        ~~~
 
 === "Zsh"
 

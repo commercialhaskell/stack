@@ -34,6 +34,7 @@ nav:
   - Snapshot specification: custom_snapshot.md
   - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
   - Build command: build_command.md
+  - Code coverage: coverage.md
   - Stack and Visual Studio Code: Stack_and_VS_Code.md
   - Developing on Windows: developing_on_windows.md
   - Dependency visualization: dependency_visualization.md
@@ -43,7 +44,6 @@ nav:
   - Shell auto-completion: shell_autocompletion.md
   - Travis CI: travis_ci.md
   - Azure CI: azure_ci.md
-  - Code coverage: coverage.md
   - GHCi: ghci.md
   - Lock files: lock_files.md
 - Advanced documentation:
