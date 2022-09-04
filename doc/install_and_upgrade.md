@@ -1,421 +1,418 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Install/upgrade
+# Install or upgrade
 
-For common Unix-like operating systems, including macOS, all you need to do is
-command:
+## Install Stack
 
-~~~text
-curl -sSL https://get.haskellstack.org/ | sh
-~~~
+Stack can be installed on most Linux distributions, macOS and Windows.
 
-or:
+Stack is open to supporting more operating systems. To request support for an
+operating system, please submit an
+[issue](https://github.com/commercialhaskell/stack/issues/new) at Stack's
+GitHub repository.
 
-~~~text
-wget -qO- https://get.haskellstack.org/ | sh
-~~~
+!!! info "Releases on GitHub"
 
+    Stack executables are also available on the
+    [releases](https://github.com/commercialhaskell/stack/releases) page of
+    Stack's GitHub repository.
 
-This script will ask for root access using `sudo`. It needs this access in order
-to use your platform's package manager to install dependencies and to install to
-`/usr/local/bin`. If you prefer more control, follow the manual installation
-instructions for your platform below.
+!!! info "`https://get.haskellstack.org/stable` URLs"
 
-Binaries for other operating systems are listed below, and available on
-[the GitHub release page](https://github.com/fpco/stack/releases). For the
-future, we are open to supporting more operating systems (to request one, please
-[submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
+    URLs with the format
+    `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` point to the
+    latest stable release. See the manual download links for examples.
 
-Binary packages are signed with this [signing key](SIGNING_KEY.md).
+=== "Linux"
 
-If you are writing a script that needs to download the latest binary, you can
-use URLs like `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>`
-(e.g. https://get.haskellstack.org/stable/linux-x86_64.tar.gz) that always
-point to the latest stable release.
+    For most Linux distributions, the easiest way to install Stack is to
+    command:
 
-## Windows
-
-We recommend installing to the default location with these installers, as that
-will make `stack install` and `stack upgrade` work correctly out of the box.
-
-  * [64-bit Windows Installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe)
-
-You may see a "Windows Defender SmartScreen prevented an unrecognized app from
-starting" warning when you try to run the installer. If so, click on
-**More info**, and then click on the **Run anyway** button that appears.
-
-### Manual download
-
-* Download the latest release:
-
-    * [64-bit Windows](https://get.haskellstack.org/stable/windows-x86_64.zip)
-
-* Unpack the archive and place `stack.exe` somewhere on your PATH (see the
-  [Path](#path) section below).
-
-* Now you can run Stack from the command line in a terminal.
-
-## macOS
-
-We generally test on the current version of macOS and do our best to keep it
-compatible with the three most recent major versions. Stack may also work on
-older versions.
-
-### Installer script
-
-Command:
-
-~~~text
-curl -sSL https://get.haskellstack.org/ | sh
-~~~
-
-### Manual download
-
-* Download the latest release:
-
-    * [macOS 64-bit](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
-
-* Extract the archive and place `stack` somewhere on your PATH (see the
-  [Path](#path) section below).
-
-* Now you can run Stack from the command line in a terminal.
-
-### Using Homebrew
-
-[Homebrew](https://brew.sh/) is a popular package manager for macOS. If you have
-its `brew` tool installed, you can just command:
-
-~~~text
-brew install haskell-stack
-~~~
-
-* The Homebrew formula and bottles are **unofficial** and lag slightly behind
-  new Stack releases, but tend to be updated within a day or two.
-
-* Normally, Homebrew will install from a pre-built binary (aka "pour from a
-  bottle"), but if it starts trying to build everything from source (which will
-  take hours), see
-  [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
-
-### Notes
-
-After installation, running `stack setup` might fail with
-`configure: error: cannot run C compiled programs.` in which case you should
-command:
-
-~~~text
-xcode-select --install
-~~~
-
-Starting with macOs 10.14 (Mojave) running `xcode-select --install`
-[might not be enough](https://forums.developer.apple.com/thread/104296). You
-will need to install additional headers with commands:
-
-~~~text
-cd /Library/Developer/CommandLineTools/Packages/
-open macOS_SDK_headers_for_macOS_10.14.pkg
-~~~
-
-If you are on OS X 10.11 (El Capitan) and encounter either of these problems,
-see the linked FAQ entries:
-
-* [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
-* [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
-
-
-If you are on macOS 10.12 (Sierra) and encounter GHC panic while building, see
-this [issue](https://github.com/commercialhaskell/stack/issues/2577)
-
-
-On Apple silicon chip (AArch64/ARM64) architectures, the installation of Stack
-or some packages (e.g. `network`) requiring C source compilation might fail with
-`configure: error: C compiler cannot build executables`. In that case you should
-pass `-arch arm64` as part of the `CFLAGS` environment variable. This setting
-will be picked up by the C compiler of your choice.
-
-~~~bash
-# Assuming BASH below
-
-# passing CFLAGS in-line with the command giving rise to the error
-CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
-CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
-
-# -- OR --
-
-# ~/.bash_profile
-# NOTE: only do this if you do not have to cross-compile, or remember to unset
-# CFLAGS when needed
-export CFLAGS="-arch arm64 ${CFLAGS:-}"
-~~~
-
-The setting instructs the C compiler to compile objects for ARM64. These can
-then be linked with libraries built for ARM64. Without the instruction, the C
-compiler, invoked by Cabal running in x86-64, would compile x86-64 objects and
-attempt to link them with existing ARM64 libraries, resulting in the error
-above.
-
-## Ubuntu
-
-Use the [generic Linux option](#linux).
-
-There is also a
-[Ubuntu package](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
-for Ubuntu 16.10 and up, but the distribution's Stack version lags behind, so we
-recommend running `stack upgrade --binary-only` after installing it. For older
-Stack versions which do not support `--binary-only`, just `stack upgrade` may
-work too. The version in Ubuntu 16.04 is too old to upgrade successfully, and so
-in that case Stack should be installed from a
-[release tarball](https://github.com/commercialhaskell/stack/releases).
-
-## Debian
-
-Use the [generic Linux option](#linux).
-
-There is also a
-[Debian package](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
-for Stretch and up, but the distribution's Stack version lags behind, so running
-`stack upgrade --binary-only` is recommended after installing it. For older
-Stack versions which do not support `--binary-only`, just `stack upgrade` may
-work too.
-
-## <a name="centos"></a>CentOS / Red Hat / Amazon Linux
-
-Use the [generic Linux option](#linux).
-
-There is also an unofficial
-[Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/).
-This Stack version may lag behind, so we recommend running `stack upgrade` after
-installing it.
-
-## Fedora
-
-Use the [generic Linux option](#linux).
-
-Fedora includes builds of Stack, but the version may lag behind, so we recommend
-running `stack upgrade` after installing it.
-
-## <a name="suse"></a>openSUSE / SUSE Linux Enterprise
-
-Use the [generic Linux option](#linux).
-
-There is also an unofficial SUSE package. This Stack version may lag behind, so
-we recommend running `stack upgrade` after installing it. To install it:
-
-1. Add the appropriate OBS repository:
-
-    * openSUSE Tumbleweed
-
-      all needed is in distribution
-
-    * openSUSE Leap
-
-      ~~~text
-      sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
-      ~~~
-
-    * SUSE Linux Enterprise 12
-
-      ~~~text
-      sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
-      ~~~
-
-2. Install:
-
-   ~~~text
-   sudo zypper in stack
-   ~~~
-
-## Arch Linux
-
-There is an official package in the Arch community repository. So you can
-install it with the command:
-
-~~~text
-sudo pacman -S stack
-~~~
-
-This version may slightly lag behind, but it should be updated within the day.
-The package is also always rebuilt and updated when one of its dependencies gets
-an update.
-
-- [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
-- [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
-
-In order to use `stack setup` with older versions of GHC or on a 32-bit system,
-you may need the
-[ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
-AUR package installed. If this package is not installed, Stack may not be able
-to install older (< 7.10.3) or 32-bit GHC versions.
-
-If you use the
-[ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you
-can also get the `haskell-stack-tool` package from there.
-
-## NixOS
-
-Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can
-install the latest Stack release into their profile with the command:
-
-~~~text
-nix-env -f "<nixpkgs>" -iA stack
-~~~
-
-Alternatively, the package can be built from source as follows.
-
-1. Clone the git repo, with the command:
-
-   ~~~text
-   git clone https://github.com/commercialhaskell/stack.git
-   ~~~
-
-2. Create a `shell.nix` file with the command:
-
-   ~~~text
-   cabal2nix --shell ./. --no-check --no-haddock > shell.nix
-   ~~~
-
-   Note that the tests fail on NixOS, so disable them with `--no-check`. Also,
-   Haddock currently doesn't work for Stack, so `--no-haddock` disables it.
-
-3. Install Stack to your user profile with the command:
-
-   ~~~text
-   nix-env -i -f shell.nix
-   ~~~
-
-For more information on using Stack together with Nix, please see the
-[NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
-
-## <a name="linux"></a>Linux (generic)
-
-### Installer script
-
-Command:
-
-~~~text
-curl -sSL https://get.haskellstack.org/ | sh
-~~~
-
-or:
-
-~~~text
-wget -qO- https://get.haskellstack.org/ | sh
-~~~
-
-### Manual download
-
-* Download the latest release:
-
-    * [Linux 64-bit (static)](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
-
-    <!--
-    * [Linux 32-bit, standard](https://get.haskellstack.org/stable/linux-i386.tar.gz)
-      (note: requires libgmp.so.10, and will not work on some older
-      distributions that have libgmp.so.3, such as CentOS 6)
-    -->
-
-    <!-- * [Linux ARMv7](https://get.haskellstack.org/stable/linux-arm.tar.gz) -->
-
-    <!-- * [Linux AArch64](https://get.haskellstack.org/stable/linux-aarch64.tar.gz) -->
-
-* Extract the archive and place `stack` somewhere on your PATH (see the
-  [Path](#path) section below).
-
-* Ensure you have required system dependencies installed. These include GCC, GNU
-  Make, xz, perl, libgmp, libffi, and zlib. We also recommend Git and GPG. To
-  install these using your package manager:
-
-  * Debian / Ubuntu, command:
-
-        ~~~text
-        sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-        ~~~
-
-  * Fedora / CentOS, command:
-
-        ~~~text
-        sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
-        ~~~
-
-    (use `yum` instead of `dnf` on CentOS and Fedora <= 21)
-
-    * Fedora 24: In order to use `stack setup` on a 32-bit system, you may
-      need to run `sudo dnf install ncurses-compat-libs`. If this package is
-      not installed, Stack may not be able to install 32-bit GHC versions.
-
-  * Arch Linux, command:
-
-        ~~~text
-        sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
-        ~~~
-
-    * In order to use `stack setup` with older versions of GHC or on a
-      32-bit system, you may need the
-      [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
-      AUR package installed. If this package is not installed, Stack may
-      not be able to install older (< 7.10.3) or 32-bit GHC versions.
-
-    * Gentoo users, make sure to have the `ncurses` package with
-      `USE=tinfo` (without it, Stack will not be able to install GHC).
-
-* Now you can run Stack from the command line in a terminal.
-
-<!--
-## FreeBSD
-
-(only 64-bit currently available, tested on FreeBSD 10.3-RELEASE)
-
-### Installer script
-
-Run:
-
+    ~~~text
     curl -sSL https://get.haskellstack.org/ | sh
+    ~~~
 
-### Manual download
+    or:
 
-* Install required dependencies:
+    ~~~text
+    wget -qO- https://get.haskellstack.org/ | sh
+    ~~~
 
-        pkg install devel/gmake perl5 lang/gcc misc/compat8x misc/compat9x converters/libiconv ca_root_nss
+    !!! note
 
-* Download the latest release:
+        The script at [get.haskellstack.org](https://get.haskellstack.org/) will
+        ask for root access using `sudo`. It needs such access in order to use
+        your platform's package manager to install dependencies and to install
+        to `/usr/local/bin`. If you prefer more control, follow the manual
+        installation instructions for your platform below.
 
-    * [FreeBSD 64-bit](https://get.haskellstack.org/stable/freebsd-x86_64.tar.gz)
+    ### Manual download
 
-* Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
+    Manual download for Linux distributions depends on your machine
+    architecture, x86_64 or AArch64/ARM64.
 
-* Now you can run `stack` from the terminal.
--->
+    === "x86_64"
+
+        * Click
+          [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
+          to download an archive file with the latest release.
+
+        * Extract the archive and place the `stack` executable somewhere on your
+          PATH (see the [Path](#path) section below).
+
+        * Ensure you have the required system dependencies installed. These
+          include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
+          recommend Git and GPG.
+
+        The installation of system dependencies will depend on the package
+        manager for your Linux distribution. Notes are provided for Arch Linux,
+        CentOS, Debian, Fedora, Gentoo and Ubuntu.
+
+        === "Arch Linux"
+
+            ~~~text
+            sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
+            ~~~
+
+        === "CentOS"
+
+            ~~~text
+            sudo yum install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+            ~~~
+
+        === "Debian"
+
+            ~~~text
+            sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+            ~~~
+
+        === "Fedora"
+
+            ~~~text
+            sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+            ~~~
+
+        === "Gentoo"
+
+            Ensure you have the `ncurses` package with `USE=tinfo`. Wwithout it,
+            Stack will not be able to install GHC.
+
+        === "Ubuntu"
+
+            ~~~text
+            sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+            ~~~
+
+    ### Linux packages
+
+    Some Linux distributions have official or unofficial packages for Stack,
+    including Arch Linux, Debian, Fedora, NixOS, openSUSE/SUSE Linux Enterprise,
+    and Ubuntu.
+
+    !!! info "Linux packages that lag behind Stack's current version"
+
+        The Stack version available as a Linix package may lag behind Stack's
+        current version. If so, using `stack upgrade --binary-only` is
+        recommended after installing it. For Stack versions before 1.3.0 which
+        do not support `--binary-only`, just `stack upgrade` may work too.
+
+    === "Arch Linux"
+
+        The Arch community package respository provides an official
+        [package](ttps://www.archlinux.org/packages/community/x86_64/stack/).
+        You can install it with the command:
+
+        ~~~text
+        sudo pacman -S stack
+        ~~~
+
+        This version may slightly lag behind, but it should be updated within
+        the day. The package is also always rebuilt and updated when one of its
+        dependencies gets an update.
+
+        The Arch User Repository (AUR) also provides a
+        [package](https://aur.archlinux.org/packages/haskell-stack-git).
+        However, its Stack version lags behind, so running
+        `stack upgrade --binary-only` is recommended after installing it. For
+        older Stack versions which do not support `--binary-only`, just
+        `stack upgrade` may work too.
+
+        To use `stack setup` with versions of GHC before 7.10.3 or on a
+        32-bit system, you may need the AUR
+        [ncurses5-compat-libs](https://aur.archlinux.org/packages/ncurses5-compat-libs/)
+        package installed.
+
+    === "Debian"
+
+        There are Debian
+        [packages](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+        for Stretch and up. However, the distribution's Stack version lags
+        behind.
+
+    === "Fedora"
+
+        Fedora includes Stack, but its Stack version may lag behind.
+
+    === "NixOS"
+
+        Users who follow the `nixos-unstable` channel or the Nixpkgs `master`
+        branch can install the latest Stack release into their profile with the
+        command:
+
+        ~~~text
+        nix-env -f "<nixpkgs>" -iA stack
+        ~~~
+
+        Alternatively, the package can be built from source as follows.
+
+        1.  Clone the git repo, with the command:
+
+            ~~~text
+            git clone https://github.com/commercialhaskell/stack.git
+            ~~~
+
+        2.  Create a `shell.nix` file with the command:
+
+            ~~~text
+            cabal2nix --shell ./. --no-check --no-haddock > shell.nix
+            ~~~
+
+            Note that the tests fail on NixOS, so disable them with
+            `--no-check`. Also, Haddock currently doesn't work for Stack, so
+            `--no-haddock` disables it.
+
+        3.  Install Stack to your user profile with the command:
+
+            ~~~text
+            nix-env -i -f shell.nix
+            ~~~
+
+        For more information on using Stack together with Nix, please see the
+        [NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
+
+    === "SUSE"
+
+        There is also an unofficial package for openSUSE or SUSE Linux
+        Enterprise. Its Stack version may lag behind. To install it:
+
+        === openSUSE Tumbleweed
+
+            ~~~text
+            sudo zypper in stack
+            ~~~
+
+        === openSUSE Leap
+
+            ~~~text
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+            sudo zypeer in stack
+            ~~~
+
+        === SUSE Linux Enterprise 12
+
+            ~~~text
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
+            sude zypper in stack
+            ~~~
+
+    === "Ubuntu"
+
+        There are Ubuntu
+        [packages](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+        for Ubuntu 18.04 and up. However, the distribution's Stack version lags
+        behind.
+
+    It is possible to set up auto-completion of Stack commands. For further
+    information, see the [shell auto-completion](shell_autocompletion.md)
+    documentation.
+
+=== "macOS"
+
+    The easiest way to install Stack is to command:
+
+    ~~~text
+    curl -sSL https://get.haskellstack.org/ | sh
+    ~~~
+
+    or:
+
+    ~~~text
+    wget -qO- https://get.haskellstack.org/ | sh
+    ~~~
+
+    !!! note
+
+        The script at [get.haskellstack.org](https://get.haskellstack.org/) will
+        ask for root access using `sudo`. It needs such access in order to use
+        your platform's package manager to install dependencies and to install
+        to `/usr/local/bin`. If you prefer more control, follow the manual
+        installation instructions below.
+
+    !!! info
+
+        We generally test on the current version of macOS and do our best to
+        keep it compatible with the three most recent major versions. Stack may
+        also work on older versions.
+
+    ### Manual download
+
+    * Click
+      [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
+      to download an archive file with the latest release for x86_64
+      architectures.
+
+    * Extract the archive and place `stack` somewhere on your PATH (see the
+      [Path](#path) section below).
+
+    * Now you can run Stack from the command line in a terminal.
+
+    ### Using Homebrew
+
+    [Homebrew](https://brew.sh/) is a popular package manager for macOS. If you
+    have its `brew` tool installed, you can just command:
+
+    ~~~text
+    brew install haskell-stack
+    ~~~
+
+    * The Homebrew formula and bottles are **unofficial** and lag slightly
+      behind new Stack releases, but tend to be updated within a day or two.
+
+    * Normally, Homebrew will install from a pre-built binary (aka "pour from a
+      bottle"), but if it starts trying to build everything from source (which
+      will take hours), see
+      [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
+
+    ### Notes
+
+    After installation, running `stack setup` might fail with
+    `configure: error: cannot run C compiled programs.` in which case you should
+    command:
+
+    ~~~text
+    xcode-select --install
+    ~~~
+
+    Starting with macOs 10.14 (Mojave) running `xcode-select --install`
+    [might not be enough](https://forums.developer.apple.com/thread/104296). You
+    will need to install additional headers with commands:
+
+    ~~~text
+    cd /Library/Developer/CommandLineTools/Packages/
+    open macOS_SDK_headers_for_macOS_10.14.pkg
+    ~~~
+
+    If you are on OS X 10.11 (El Capitan) and encounter either of these problems,
+    see the linked FAQ entries:
+
+    * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
+    * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
+
+    If you are on macOS 10.12 (Sierra) and encounter GHC panic while building, see
+    this [issue](https://github.com/commercialhaskell/stack/issues/2577)
+
+    On Apple silicon chip (AArch64/ARM64) architectures, the installation of
+    Stack or some packages (e.g. `network`) requiring C source compilation might
+    fail with `configure: error: C compiler cannot build executables`. In that
+    case you should pass `-arch arm64` as part of the `CFLAGS` environment
+    variable. This setting will be picked up by the C compiler of your choice.
+
+    ~~~bash
+    # Assuming BASH below
+
+    # passing CFLAGS in-line with the command giving rise to the error
+    CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
+    CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
+
+    # -- OR --
+
+    # ~/.bash_profile
+    # NOTE: only do this if you do not have to cross-compile, or remember to unset
+    # CFLAGS when needed
+    export CFLAGS="-arch arm64 ${CFLAGS:-}"
+    ~~~
+
+    The setting instructs the C compiler to compile objects for ARM64. These can
+    then be linked with libraries built for ARM64. Without the instruction, the C
+    compiler, invoked by Cabal running in x86-64, would compile x86-64 objects and
+    attempt to link them with existing ARM64 libraries, resulting in the error
+    above.
+
+    It is possible to set up auto-completion of Stack commands. For further
+    information, see the [shell auto-completion](shell_autocompletion.md)
+    documentation.
+
+=== "Windows"
+
+    On 64-bit Windows, you can download and install the
+    [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
+
+    !!! note "Anti-virus software"
+
+        Systems with antivirus software may need to add Stack to the list of
+        'trusted' applications.
+
+        You may see a "Windows Defender SmartScreen prevented an unrecognized
+        app from starting" warning when you try to run the installer. If so,
+        click on **More info**, and then click on the **Run anyway** button that
+        appears.
+
+    We recommend installing to the default location with the installer, as that
+    will make `stack install` and `stack upgrade` work correctly out of the box.
+
+    ### Manual download
+
+    * Click
+      [:material-cloud-download-outline:](https://get.haskellstack.org/stable/windows-x86_64.zip)
+      to download an archive file with the latest release.
+
+    * Unpack the archive and place `stack.exe` somewhere on your PATH (see the
+      [Path](#path) section below).
+
+    * Now you can run Stack from the command line in a terminal.
+
+!!! info
+
+    Stack can also be installed using the separate
+    [GHCup](https://www.haskell.org/ghcup/) installer for Haskell-related tools.
+    Unlike Stack, other build tools do not automatically install GHC. GHCup can
+    be used to install GHC for those other tools and Stack can be configured to
+    use the version of GHC that GHCup has installed.
 
 ## Path
 
 You can install Stack by copying the executable file anywhere on your PATH. A
 good place to install is the same directory where Stack itself will install
-executables. On Unix-like operating systems, that directory is:
+executables, which depends on the operating system:
 
-~~~text
-$HOME/.local/bin
-~~~
+=== "Unix-like"
 
-On Windows, that directory is:
+    Stack installs executables to:
 
-~~~text
-%APPDATA%\local\bin
-~~~
+    ~~~text
+    $HOME/.local/bin
+    ~~~
 
-For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+    If you don't have that directory in your PATH, you may need to update your
+    PATH. That can be done by editing the `~/.bashrc` file.
+
+=== "Windows"
+
+    Stack installs executables to:
+
+    ~~~text
+    %APPDATA%\local\bin
+    ~~~
+
+    For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+    If you don't have that directory in your PATH, you may need to update your
+    PATH. That can be done by searching for 'Edit Environment variables for your
+    account' under Start.
 
 If you don't have that directory in your PATH, you may need to update your PATH.
 On Unix-like operating systems, that can be done by editing the `~/.bashrc`
 file.
-
-If you're curious about the choice of these directories, see
-[issue #153](https://github.com/commercialhaskell/stack/issues/153)
-
-## Shell auto-completion
-
-On Unix-like operating systems, it is possible to set up auto-completion of
-Stack commands. For further information, see the
-[shell auto-completion](shell_autocompletion.md) documentation.
 
 ## China-based users
 
@@ -459,54 +456,97 @@ package-indices:
 
 To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first set
 up an environment variable `http_proxy` and then run the Stack command. For
-example, on Unix-like operating systems:
+example:
 
-~~~text
-export http_proxy=IP:PORT
-stack install
-~~~
+=== "Unix-like"
 
-On most operating systems, it is not mandatory for programs to follow the
-"system-wide" HTTP proxy. Some programs, such as browsers, do honor this
-"system-wide" HTTP proxy setting, while other programs, including bash, do not.
-That means configuring "http proxy setting" in your Control Panel (Windows) or
-System Preferences (Mac) would not result in Stack traffic going through the
-proxy.
+    ~~~text
+    export http_proxy=IP:PORT
+    stack install
+    ~~~
 
-## Upgrade
+    On most operating systems, it is not mandatory for programs to follow the
+    "system-wide" HTTP proxy. Some programs, such as browsers, do honor this
+    "system-wide" HTTP proxy setting, while other programs, including Bash, do
+    not. That means configuring "http proxy setting" in your System Preferences
+    (macOS) would not result in Stack traffic going through the proxy.
 
-There are essentially four different approaches to upgrade:
+=== "Windows"
 
-* Stack itself ships with an `upgrade` command, which downloads a `stack` binary
-  or builds it from source and install it to the default `install` directory (eg
-  `stack path --local-bin`; see the [Path](#Path) section above). You can use
-  `stack upgrade` to get the latest official release, and `stack upgrade --git`
-  to install from Git and live on the bleeding edge. Make sure the default
-  `install` directory is on your PATH and takes precedence over the system
-  installed `stack`, or copy `stack` from that directory to the system location
-  afterward. For more information, see
-  [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+    ~~~text
+    $Env:http_proxy=IP:PORT
+    stack install
+    ~~~
 
-* If you're using a package manager and are happy with sticking with the
-  officially released binaries from the distribution (which may the lag behind
-  latest version of Stack significantly), simply follow your normal package
-  manager strategies for upgrading (eg `apt-get update && apt-get upgrade`).
+    It is not mandatory for programs to follow the "system-wide" HTTP proxy.
+    Some programs, such as browsers, do honor this "system-wide" HTTP proxy
+    setting, while other programs do not. That means configuring
+    "http proxy setting" in your Control Panel would not result in Stack traffic
+    going through the proxy.
 
-* The `get.haskellstack.org` script supports the `-f` argument to over-write the
-  current Stack executable. For example, command:
+## Upgrade Stack
 
-  ~~~text
-  curl -sSL https://get.haskellstack.org/ | sh -s - -f
-  ~~~
+There are different approaches to upgrading Stack, which vary as between
+Unix-like operating systems (including macOS) and Windows.
 
-  or:
+=== "Unix-like"
 
-  ~~~text
-  wget -qO- https://get.haskellstack.org/ | sh -s - -f
-  ~~~
+    There are essentially four different approaches:
 
-* Manually follow the steps above to download the newest binaries from the
-  release page and replace the old binary.
+    1.  Stack itself ships with an `upgrade` command, which downloads a `stack`
+        executable or builds it from source and install it to the default
+        `install` directory (eg `stack path --local-bin`; see the
+        [Path](#Path) section above). You can use `stack upgrade` to get the
+        latest official release, and `stack upgrade --git` to install from
+        GitHub and live on the bleeding edge. Make sure the default `install`
+        directory is on your PATH and takes precedence over the system installed
+        `stack`, or copy `stack` from that directory to the system location
+        afterward. For more information, see
+        [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+
+    2.  If you're using a package manager and are happy with sticking with the
+        officially released binaries from the distribution (which may the lag behind
+        latest version of Stack significantly), simply follow your normal package
+        manager strategies for upgrading. For example:
+
+        ~~~text
+        apt-get update
+        apt-get upgrade
+        ~~~
+
+    3.  The `get.haskellstack.org` script supports the `-f` argument to
+        over-write the current Stack executable. For example, command:
+
+        ~~~text
+        curl -sSL https://get.haskellstack.org/ | sh -s - -f
+        ~~~
+
+        or:
+
+        ~~~text
+        wget -qO- https://get.haskellstack.org/ | sh -s - -f
+        ~~~
+
+    4.  Manually follow the steps above to download the newest executable from
+        the GitHub releases page and replace the old executable.
+
+=== "Windows"
+
+    There are essentially two different approaches:
+
+    1.  Stack itself ships with an `upgrade` command, which downloads a `stack`
+        executable or builds it from source and install it to the default
+        `install` directory (eg `stack path --local-bin`; see the
+        [Path](#Path) section above). You can use `stack upgrade` to get the
+        latest official release, and `stack upgrade --git` to install from
+        GitHub and live on the bleeding edge. Make sure the default `install`
+        directory is on your PATH and takes precedence over the system installed
+        `stack`, or copy `stack` from that directory to the system location
+        afterward. For more information, see
+        [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+
+    2.  Manually follow the steps above to download the newest executable from
+        the GitHub releases page and replace the old executable.
 
 ## Install earlier versions
 
