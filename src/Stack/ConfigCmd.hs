@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Make changes to project or global configuration.
 module Stack.ConfigCmd
@@ -49,6 +50,7 @@ import           Pantry.Internal.AesonExtended
                  (ToJSON(..), FromJSON, (.=), WithJSONWarnings (WithJSONWarnings), object)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
+import Data.Aeson.KeyMap (KeyMap)
 import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.ByteString.Builder (byteString)
 import qualified Data.Map.Merge.Strict as Map
@@ -125,9 +127,11 @@ configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
-encodeDumpProject :: ConfigDumpFormat -> (Project -> ByteString)
-encodeDumpProject ConfigDumpYaml = Yaml.encode
-encodeDumpProject ConfigDumpJson = toStrictBytes . Aeson.encode
+encodeDumpProject :: RawYaml -> ConfigDumpFormat -> Project -> ByteString
+encodeDumpProject _ ConfigDumpJson = toStrictBytes . Aeson.encode
+encodeDumpProject rawConfig ConfigDumpYaml = \p -> let e = Yaml.encode p in
+    Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
+        either (const e) encodeUtf8 (cfgRedress rawConfig d ""))
 
 encodeDumpStackBy :: ToJSON a => (Config -> a) -> ConfigCmdDumpStack -> (Config -> ByteString)
 encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpYaml) = Yaml.encode . f
@@ -151,9 +155,11 @@ cfgReadProject scope = do
 
 cfgCmdDumpProject :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpProject -> RIO env ()
 cfgCmdDumpProject (ConfigCmdDumpProject dumpFormat) = do
+    configFilePath <- cfgLocation CommandScopeProject
+    rawConfig <- mkRaw <$> liftIO (readFileUtf8 (toFilePath configFilePath))
     project <- cfgReadProject CommandScopeProject
     project & maybe (logError "Couldn't find project") (\p ->
-        encodeDumpProject dumpFormat p
+        encodeDumpProject rawConfig dumpFormat p
         & decodeUtf8'
         & either throwM (logInfo . display))
 
@@ -250,32 +256,34 @@ cfgRead scope = do
     liftIO (Yaml.decodeFileEither (toFilePath configFilePath)) >>=
         either throwM (return . (configFilePath,))
 
+cfgRedress :: RawYaml -> KeyMap Yaml.Value -> Text -> Either UnicodeException Text
+cfgRedress (yamlLines -> configLines) config@(fmap Key.toText . KeyMap.keys -> keys) cmdKey =
+    unmkRaw . redress configLines <$>
+        encodeInOrder configLines (coerce keys) (coerce cmdKey) config
+
+cfgRedressWrite :: RawYaml -> KeyMap Yaml.Value -> Text -> (Text -> RIO env ()) -> RIO env ()
+cfgRedressWrite rawConfig config cmdKey write =
+    either throwM write (cfgRedress rawConfig config cmdKey)
+
 cfgCmdSet :: (HasConfig env, HasGHCVariant env) => ConfigCmdSet -> RIO env ()
 cfgCmdSet cmd = do
-    configFilePath <- cfgLocation $ configCmdSetScope cmd
     -- We don't need to worry about checking for a valid yaml here
+    configFilePath <- cfgLocation $ configCmdSetScope cmd
     rawConfig <- mkRaw <$> liftIO (readFileUtf8 (toFilePath configFilePath))
     (config :: Yaml.Object) <- either throwM return (Yaml.decodeEither' . encodeUtf8 $ coerce rawConfig)
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let cmdKey = cfgCmdSetOptionName cmd
         config' = KeyMap.insert (Key.fromText cmdKey) newValue config
-        yamlKeys = Key.toText <$> KeyMap.keys config
     if config' == config
         then logInfo
                  (fromString (toFilePath configFilePath) <>
                   " already contained the intended configuration and remains \
                   \unchanged.")
-        else do
-            let configLines = yamlLines rawConfig
-            either
-                throwM
-                (\updated -> do
-                    let redressed = unmkRaw $ redress configLines updated
-                    writeBinaryFileAtomic configFilePath . byteString $ encodeUtf8 redressed
+        else cfgRedressWrite rawConfig config' cmdKey (\redressed -> do
+            writeBinaryFileAtomic configFilePath . byteString $ encodeUtf8 redressed
 
-                    let file = fromString $ toFilePath configFilePath
-                    logInfo (file <> " has been updated."))
-                (encodeInOrder configLines (coerce yamlKeys) (coerce cmdKey) config')
+            let file = fromString $ toFilePath configFilePath
+            logInfo (file <> " has been updated."))
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)
