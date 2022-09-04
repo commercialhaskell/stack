@@ -225,7 +225,7 @@ Default: `{}`
 
 Command line equivalent (takes precedence): `stack build --flag` option
 
-Flags can be set for each package separately, e.g.
+Flags can be set for each package separately. For example:
 
 ~~~yaml
 flags:

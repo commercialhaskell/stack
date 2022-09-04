@@ -2,132 +2,34 @@
 
 # Non-standard project initialization
 
-## Introduction
-The purpose of this page is to collect information about issues that arise when
-users either have an existing Cabal project or another nonstandard setup such
-as a private Hackage database.
+You may need to configure Stack to work with an existing project that has one or
+more Cabal files but no Stack project-level configuration file (`stack.yaml`).
 
-## Using a Cabal file
+## The `stack init` command
 
-New users may be confused by the fact that you must add dependencies to the
-package's Cabal file, even in the case when you have already listed the package
-in the `stack.yaml` file. In most cases, dependencies for your package that are
-in the Stackage snapshot need *only* be added to the Cabal file. Stack makes
-heavy use of Cabal under the hood. In general, your Stack packages should also
-end up being valid packages for Cabal (the tool).
+The `stack init` command:
 
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/105>
+* finds all of the Cabal files in your current directory and subdirectories
+  (unless you use `--ignore-subdirs`) and determines the packages and versions
+  they require
+* Finds the best combination of snapshot and package flags that allows
+  everything to compile with minimum external dependencies
+* Tries to look for the best matching snapshot from latest Haskell LTS, latest
+  Stackage Nightly, and other Haskell LTS, in that order
 
-## Passing Flags to Cabal
+If `stack init` finds a match, it will generate a `stack.yaml` file.
 
-Any build command, `bench`, `install`, `haddock`, `test`, etc. takes a `--flag`
-option which passes flags to cabal. Another way to do this is using the flags
-field in a `stack.yaml`, with the option to specify flags on a per package
-basis.
+You can specify the directory, or directories to include in the search for
+Cabal files.
 
-As an example, in a `stack.yaml` for multi-package project with packages `foo`,
-`bar`, `baz`:
+### The `stack init --force` flag
 
-~~~yaml
-flags:
-  foo:
-    release: true
-  bar:
-    default: true
-  baz:
-    manual: true
-~~~
+Set the flag to force the over-writing of any existing `stack.yaml` file.
 
-It is also possible to pass the same flag to multiple packages, i.e.
-`stack build --flag *:necessary`
+### The `stack init --ignore-subdirs` flag
 
-Currently one needs to list all of your modules that interpret flags in the
-`other-modules` section of a cabal file. Cabal (the tool) has a different
-behavior currently and doesn't require that the modules be listed. This may
-change in a future release.
+Set the flag to not search for Cabal files in subdirectories.
 
+### The `stack init --omit-packages` flag
 
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/191>
-  - <https://github.com/commercialhaskell/stack/issues/417>
-  - <https://github.com/commercialhaskell/stack/issues/335>
-  - <https://github.com/commercialhaskell/stack/issues/301>
-  - <https://github.com/commercialhaskell/stack/issues/365>
-  - <https://github.com/commercialhaskell/stack/issues/105>
-
-## Selecting a Resolver
-
-`stack init` or `stack new` will try to default to the current Haskell LTS
-present on `https://www.stackage.org/snapshots` if no snapshot has been
-previously used locally, and to the latest LTS snapshot locally used for a
-build otherwise. Using an incorrect resolver can cause a build to fail if the
-version of GHC it requires is not present.
-
-In order to override the resolver entry at project initialization one can pass
-`--prefer-lts` or `--prefer-nightly`. These options will choose the latest LTS
-or nightly versions locally used.  Alternatively the `--resolver` option can be
-used with the name of any snapshots on Stackage, or with `lts` or `nightly` to
-select the latest versions, disregarding previously used ones. This is not the
-default so as to avoid unnecessary recompilation time.
-
-:TODO: Document `--solver`
-
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/468>
-  - <https://github.com/commercialhaskell/stack/issues/464>
-
-## Using git Repositories
-
-Stack has support for packages that reside in remote git locations. Please see
-the [YAML configuration
-documentation](yaml_configuration.md#git-and-mercurial-repos) for more
-information.
-
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/254>
-  - <https://github.com/commercialhaskell/stack/issues/199>
-
-## Private Hackage
-Working with a private Hackage is currently supported in certain situations.
-There exist special entries in `stack.yaml` that may help you. In a
-`stack.yaml` file, it is possible to add lines for packages in your database
-referencing the sdist locations via an `http` entry, or to use a `Hackage`
-entry.
-
-The recommended stack workflow is to use git submodules instead of a private
-Hackage. Either by using git submodules and listing the directories in the
-packages section of `stack.yaml`, or by adding the private dependencies as git
-URIs with a commit SHA to the `stack.yaml`. This has the large benefit of
-eliminating the need to manage a Hackage database and pointless version bumps.
-
-For further information see [YAML configuration](yaml_configuration.md)
-
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/445>
-  - <https://github.com/commercialhaskell/stack/issues/565>
-
-## Custom Snapshots
-See [Custom Snapshots](custom_snapshot.md).
-
-### Issues Referenced
-  - <https://github.com/commercialhaskell/stack/issues/111>
-  - <https://github.com/commercialhaskell/stack/issues/253>
-  - <https://github.com/commercialhaskell/stack/issues/137>
-
-## Intra-package Targets
-
-Stack supports intra-package targets, similar to `cabal build COMPONENTS` for
-situations when you don't want to build every target inside your package.
-
-For example, command:
-
-~~~text
-stack build stack:lib:stack
-stack test stack:test:stack-integration-test
-~~~
-
-Note: this does require prefixing the component name with the package name.
-
-### Issues referenced
-  - <https://github.com/commercialhaskell/stack/issues/201>
+Set the flag to exclude any conflicting or incompatible user packages.
