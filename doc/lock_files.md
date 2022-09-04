@@ -26,12 +26,12 @@ project, snapshot packages and snapshots themselves so that:
 * Rerunning `stack build` in the future is deterministic in the build plan, not
   depending on mutable state in the world like Hackage revisions
 
-  !!! note
+    !!! note
 
-      If, for example, a tarball available remotely is deleted or the hash
-      changes, it will not be possible for Stack to perform the build. However,
-      by deterministic, we mean it either performs the same build or fails,
-      never accidentally doing something different.
+        If, for example, a tarball available remotely is deleted or the hash
+        changes, it will not be possible for Stack to perform the build.
+        However, by deterministic, we mean it either performs the same build or
+        fails, never accidentally doing something different.
 
 This document explains the contents of a lock file, how they are used, and how
 they are created and updated.
@@ -104,10 +104,10 @@ The lock file contains the following information:
 
 * Completed package locations for extra deps and packages in snapshot files
 
-  !!! note
+    !!! note
 
-      This only applies to _immutable_ packages. Mutable packages are not
-      included in the lock file.
+        This only applies to _immutable_ packages. Mutable packages are not
+        included in the lock file.
 
 * Completed information for the snapshot locations
 
