@@ -205,9 +205,9 @@ Stack does not stand alone. It is built on the great work provided by:
 
     !!! info
 
-        Cabal is also the name of another build tool, provided the `cabal-install`
-        package. This guide distinguishes between then by Cabal (the library) and
-        Cabal (the tool).
+        Cabal is also the name of another build tool, provided by the
+        `cabal-install` package. This guide distinguishes between them by Cabal
+        (the library) and Cabal (the tool).
 
 * The __Hackage Haskell Package Repository__, a
   [repository](https://hackage.haskell.org/) of Haskell packages providing
@@ -244,40 +244,40 @@ label on the GitHub issue tracker.
 The following assumes that you already have installed a version of Stack and the
 [Git application](https://git-scm.com/).
 
-1. Clone the `stack` repository from GitHub with the command:
+1.  Clone the `stack` repository from GitHub with the command:
 
     ~~~text
     git clone https://github.com/commercialhaskell/stack.git`
     ~~~
 
-2. Change the current working directory to the cloned `stack` directory with the
-   command:
+2.  Change the current working directory to the cloned `stack` directory with the
+    command:
 
     ~~~text
     cd stack
     ~~~
 
-3. Build the `stack` executable using a pre-existing installation of Stack with
-   the command:
+3.  Build the `stack` executable using a pre-existing installation of Stack with
+    the command:
 
     ~~~text
     stack build
     ~~~
 
-4. Once the `stack` executable has been built, check its version with the
-   command:
+4.  Once the `stack` executable has been built, check its version with the
+    command:
 
     ~~~text
     stack exec -- stack --version
     ~~~
 
-   Make sure the version is the latest one.
+    Make sure the version is the latest one.
 
-5. In the GitHub respository's issue tracker, look for issues tagged with
-   [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
-   and
-   [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
-   labels.
+5.  In the GitHub respository's issue tracker, look for issues tagged with
+    [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
+    and
+    [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
+    labels.
 
 If you need to check your changes quickly command:
 
