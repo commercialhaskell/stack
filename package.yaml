@@ -52,6 +52,7 @@ dependencies:
 - base >= 4.16.3.0 && < 5
 - Cabal >= 3.6.3.0
 - aeson >= 2.0.3.0
+- aeson-pretty
 - annotated-wl-pprint
 - ansi-terminal
 - array

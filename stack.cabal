@@ -229,6 +229,7 @@ library
   build-depends:
       Cabal >=3.6.3.0
     , aeson >=2.0.3.0
+    , aeson-pretty
     , annotated-wl-pprint
     , ansi-terminal
     , array
@@ -353,6 +354,7 @@ executable stack
   build-depends:
       Cabal >=3.6.3.0
     , aeson >=2.0.3.0
+    , aeson-pretty
     , annotated-wl-pprint
     , ansi-terminal
     , array
@@ -476,6 +478,7 @@ executable stack-integration-test
   build-depends:
       Cabal >=3.6.3.0
     , aeson >=2.0.3.0
+    , aeson-pretty
     , annotated-wl-pprint
     , ansi-terminal
     , array
@@ -607,6 +610,7 @@ test-suite stack-test
       Cabal >=3.6.3.0
     , QuickCheck
     , aeson >=2.0.3.0
+    , aeson-pretty
     , annotated-wl-pprint
     , ansi-terminal
     , array

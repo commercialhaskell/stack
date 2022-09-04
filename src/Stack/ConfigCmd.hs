@@ -48,7 +48,7 @@ import           Stack.Prelude
 import           Data.Coerce (coerce)
 import           Pantry.Internal.AesonExtended
                  (ToJSON(..), FromJSON, (.=), WithJSONWarnings (WithJSONWarnings), object)
-import qualified Data.Aeson as Aeson
+import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.Aeson.Key as Key
 import Data.Aeson.KeyMap (KeyMap)
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -128,18 +128,18 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 
 encodeDumpProject :: RawYaml -> ConfigDumpFormat -> Project -> ByteString
-encodeDumpProject _ ConfigDumpJson = toStrictBytes . Aeson.encode
+encodeDumpProject _ ConfigDumpJson = toStrictBytes . encodePretty
 encodeDumpProject rawConfig ConfigDumpYaml = \p -> let e = Yaml.encode p in
     Yaml.decodeEither' e & either (const e) (\(d :: KeyMap Yaml.Value) ->
         either (const e) encodeUtf8 (cfgRedress rawConfig d ""))
 
 encodeDumpStackBy :: ToJSON a => (Config -> a) -> ConfigCmdDumpStack -> (Config -> ByteString)
 encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpYaml) = Yaml.encode . f
-encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpJson) = toStrictBytes . Aeson.encode . f
+encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpJson) = toStrictBytes . encodePretty . f
 
 encodeDumpStack :: ConfigDumpFormat -> (DumpStack -> ByteString)
 encodeDumpStack ConfigDumpYaml = Yaml.encode
-encodeDumpStack ConfigDumpJson = toStrictBytes . Aeson.encode
+encodeDumpStack ConfigDumpJson = toStrictBytes . encodePretty
 
 cfgReadProject :: (HasConfig env, HasLogFunc env) => CommandScope -> RIO env (Maybe Project)
 cfgReadProject scope = do
