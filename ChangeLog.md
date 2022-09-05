@@ -1,12 +1,8 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
+## v2.9.0.1 (release candidate)
 
 **Changes since v2.7.5:**
-
-Major changes:
 
 Behavior changes:
 
