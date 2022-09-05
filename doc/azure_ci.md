@@ -39,11 +39,14 @@ We provide two fully baked configuration ready to be used on your projects:
   - [azure-windows-template.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-windows-template.yml)
     : Template for Azure Windows build
 
-  __NOTE__: It is likely going to be necessary to modify this configuration to
-  match the needs of your project, such as tweaking the build matrix to alter
-  which GHC versions you test against, or to specify GHC-version-specific
-  `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
-  first time around. See the multiple GHC section below for more information.
+  !!! note
+
+      It is likely going to be necessary to modify this configuration to match
+      the needs of your project, such as tweaking the build matrix to alter
+      which GHC versions you test against, or to specify GHC-version-specific
+      `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
+      first time around. See the multiple GHC section below for more
+      information.
 
 ## Creating Azure Pipelines
 

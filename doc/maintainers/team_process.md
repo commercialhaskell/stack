@@ -84,7 +84,7 @@ etc) that amounts to about one or two hours spent per week being on-call.
 Again, these estimates will evolve over time as we settle into an optimal
 process, but for now we anticipate growing the team to about eight members
 (which is the size of the `Stackage` team as well), each of whom is likely to
-spend about two hours in total on upkeep work every eight weeks. 
+spend about two hours in total on upkeep work every eight weeks.
 
 
 ## Issue and pull request interaction guidelines
@@ -138,7 +138,7 @@ question. If you're not sure who's best to consult you should ask on
 
 Try to be clear to the requester that you're opening the discussion up to more
 participants and that the proposal will require thoughtful consideration
-(probably a majority vote) before any decision is made. 
+(probably a majority vote) before any decision is made.
 
 Also remember that busy schedules, lack of complete familiarity with a given
 subject, strong-yet-opposing opinions held by equally rational people, and many
@@ -150,7 +150,7 @@ on-track and concrete.
 respectful "no".*
 
 *If feasible, propose alternative solutions or educate the user in preference to
-complicating `Stack` or accepting scope-creep.* 
+complicating `Stack` or accepting scope-creep.*
 
 With respect to assessing a PR's code, @snoyberg has outlined some
 [tips for successfully getting one's work merged
@@ -205,11 +205,13 @@ When closing an issue, please provide a brief explanation for why the issue was
 closed, such as a reference to a PR, a comment about lack of clarification,
 etc.
 
-__NOTE__ The following sections establish rules under which a bug report will
-be closed by the maintainer team. The goal is to avoid a situation where issues
-linger in an indeterminate state. The maintainer team is allowed to disregard
-these "rules" at any point. In other words: the goal isn't to allow people to
-"lawyer" issues.
+!!! note
+
+    The following sections establish rules under which a bug report will be
+    closed by the maintainer team. The goal is to avoid a situation where issues
+    linger in an indeterminate state. The maintainer team is allowed to
+    disregard these "rules" at any point. In other words: the goal isn't to
+    allow people to "lawyer" issues.
 
 ### Discussion
 

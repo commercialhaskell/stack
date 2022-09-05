@@ -250,9 +250,11 @@ Stack will automatically install build tools required by your packages or their
 dependencies, in particular [Alex](https://hackage.haskell.org/package/alex) and
 [Happy](https://hackage.haskell.org/package/happy).
 
-__NOTE__: This works when using LTS or nightly resolvers, not with GHC or
-custom resolvers. You can manually install build tools by running, e.g.,
-`stack build alex happy`.
+!!! note
+
+    This works when using LTS or nightly resolvers, not with GHC or custom
+    resolvers. You can manually install build tools by running, e.g.,
+    `stack build alex happy`.
 
 ## How does Stack choose which snapshot to use when creating a new configuration file?
 

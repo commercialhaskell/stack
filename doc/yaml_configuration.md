@@ -238,7 +238,7 @@ then the snapshot package will automatically be promoted to be an extra-dep.
 
 ### drop-packages
 
-(Since 2.0)
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 Default: `[]`
 
@@ -306,7 +306,7 @@ options below are listed in alphabetic order.
 
 ### allow-different-user
 
-(Since 1.0.1)
+[:octicons-tag-24: 1.0.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.0.1.0)
 
 Restrictions: POSIX systems only.
 
@@ -329,7 +329,7 @@ process.
 
 ### allow-newer
 
-(Since 0.1.7)
+[:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
 Default: `false`
 
@@ -343,7 +343,7 @@ allow-newer: true
 
 ### apply-ghc-options
 
-(Since 0.1.6)
+[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
 Default: `locals`
 
@@ -374,7 +374,7 @@ including `x86_64`, `i386` and `aarch64`.
 
 ### build
 
-(Since 1.1.0)
+[:octicons-tag-24: 1.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.1.0)
 
 Default:
 
@@ -448,7 +448,7 @@ files, the American spelling is the alternative that has priority.)
 
 ### compiler
 
-(Since 0.1.7)
+[:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
 Command line equivalent (takes precedence): `--compiler` option
 
@@ -465,7 +465,7 @@ compiler-check: match-exact
 
 #### Building GHC from source (experimental)
 
-(Since 2.0)
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 Stack supports building the GHC compiler from source. The version to build and
 to use is defined by a a Git commit ID and an Hadrian "flavour" (Hadrian is the
@@ -538,7 +538,7 @@ fully managed by Stack.
 
 ### compiler-check
 
-(Since 0.1.4)
+[:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
 Default: `match-minor`
 
@@ -555,7 +555,7 @@ versions. Valid values:
 
 ### concurrent-tests
 
-(Since 0.1.2.0)
+[:octicons-tag-24: 0.1.2.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.2.0)
 
 Default: `true`
 
@@ -571,7 +571,7 @@ concurrent-tests: false
 
 ### configure-options
 
-(Since 2.0)
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 Options which are passed to the configure step of the Cabal build process.
 These can either be set by package name, or using the `$everything`,
@@ -614,7 +614,7 @@ For further information, see the
 
 ### dump-logs
 
-(Since 1.3.0)
+[:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
 Default: `warning`
 
@@ -670,7 +670,7 @@ may well make sense to include these there as well.
 
 ### extra-path
 
-(Since 0.1.4.0)
+[:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
 This option specifies additional directories to prepend to the PATH. These will
 be used when resolving the location of executables, and will also be visible in
@@ -689,7 +689,7 @@ compiler's binary directory - will take precedence over those specified here
 
 ### ghc-build
 
-(Since 1.3.0)
+[:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
 Default: `standard`
 
@@ -706,7 +706,7 @@ arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
 
 ### ghc-options
 
-(Since 0.1.4)
+[:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
 Allows specifying per-package and global GHC options:
 
@@ -732,14 +732,16 @@ mirrors the behavior for the
 [`apply-ghc-options` setting](#apply-ghc-options), which affects command line
 parameters.
 
-NOTE: Prior to Stack 1.6.0, the `$locals`, `$targets`, and `$everything` keys
-were not supported. Instead, you could use `"*"` for the behavior represented
-now by `$everything`. It is highly recommended to switch to the new, more
-expressive, keys.
+!!! note
+
+    Prior to Stack 1.6.0, the `$locals`, `$targets`, and `$everything` keys
+    were not supported. Instead, you could use `"*"` for the behavior
+    represented now by `$everything`. It is highly recommended to switch to the
+    new, more expressive, keys.
 
 ### ghc-variant
 
-(Since 0.1.5)
+[:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
 Default: `standard`
 
@@ -767,7 +769,7 @@ This option is incompatible with `system-ghc: true`.
 
 ### hackage-base-url
 
-(Since 1.9.1)
+[:octicons-tag-24: 1.9.1](https://github.com/commercialhaskell/stack/releases/tag/v1.9.1)
 
 Default: `https://hackage.haskell.org/`
 
@@ -779,7 +781,8 @@ hackage-base-url: https://hackage.example.com/
 
 ### hide-source-paths
 
-Default: `true` (since 2.0)
+Default: `true`
+([:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1))
 
 Whether to use the `-fhide-source-paths` option by default for GHC >= 8.2:
 
@@ -820,7 +823,8 @@ will receive a warning if this configuration value is set.
 
 ### install-ghc
 
-Default: `true` (since 1.5.0)
+Default: `true`
+([:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0))
 
 Command line equivalent (takes precedence): `--[no-]install-ghc` flag
 
@@ -851,32 +855,44 @@ Target directory for `stack install` and `stack build --copy-bins`.
 
 ### local-programs-path
 
-(Since 1.3.0)
+[:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
-Default (on Unix-like operating systems): `programs` directory in the Stack
-root.
+The behaviour of this option differs between Unix-like operating systems and
+Windows.
 
-Default (on Windows): `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
-environment variable exists.
+=== "Unix-like"
 
-This overrides the location of the Stack 'programs' directory, where tools like
-GHC and (on Windows) MSYS2 get installed.
+    Default: `programs` directory in the Stack root.
 
-__NOTE__: On Windows, if there is a space character in the `%LOCALAPPDATA%` path
-(which may be the case if the relevant user account name and its corresponding
-user profie path have a space) this may cause problems with building packages
-that make use of the GNU project's `autoconf` package and `configure` shell
-script files. That may be the case particularly if there is no corresponding
-short name ('8 dot 3' name) for the directory in the path with the space (which
-may be the case if '8 dot 3' names have been stripped or their creation not
-enabled by default). If there are problems building, it will be necessary to
-override the default location of Stack's 'programs' directory to specify an
-alternative path that does not contain space characters. Examples of packages on
-Hackage that make use of `configure` are `network` and `process`.
+    This overrides the location of the Stack 'programs' directory, where tools
+    like GHC get installed.
+
+=== "Windows"
+
+    Default: `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
+    environment variable exists.
+
+    This overrides the location of the Stack 'programs' directory, where tools
+    like GHC and MSYS2 get installed.
+
+    !!! warning
+
+        If there is a space character in the `%LOCALAPPDATA%` path (which may be
+        the case if the relevant user account name and its corresponding user
+        profile path have a space) this may cause problems with building
+        packages that make use of the GNU project's `autoconf` package and
+        `configure` shell script files. That may be the case particularly if
+        there is no corresponding short name ('8 dot 3' name) for the directory
+        in the path with the space (which may be the case if '8 dot 3' names
+        have been stripped or their creation not enabled by default). If there
+        are problems building, it will be necessary to override the default
+        location of Stack's 'programs' directory to specify an alternative path
+        that does not contain space characters. Examples of packages on
+        Hackage that make use of `configure` are `network` and `process`.
 
 ### modify-code-page
 
-(Since 0.1.6)
+[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
 Restrictions: Windows systems only.
 
@@ -892,7 +908,7 @@ modify-code-page: false
 
 ### nix
 
-(since 0.1.10.0)
+[:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
 Default:
 
@@ -957,13 +973,15 @@ default. For more information on this change, see
 
 ### pvp-bounds
 
-(Since 0.1.5)
+[:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
-__NOTE__ As of Stack 1.6.0, this feature does not reliably work, due to issues
-with the Cabal library's printer. Stack will generate a warning when a lossy
-conversion occurs, in which case you may need to disable this setting. For
-further information, see issue
-[#3550](https://github.com/commercialhaskell/stack/issues/3550).
+!!! warning
+
+    As of Stack 1.6.0, this feature does not reliably work, due to issues with
+    the Cabal library's printer. Stack will generate a warning when a lossy
+    conversion occurs, in which case you may need to disable this setting. For
+    further information, see issue
+    [#3550](https://github.com/commercialhaskell/stack/issues/3550).
 
 When using the `sdist` and `upload` commands, this setting determines whether
 the Cabal file's dependencies should be modified to reflect PVP lower and upper
@@ -984,18 +1002,20 @@ pvp-bounds: none
 For further information, see the announcement
 [blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
-__NOTE__ Since Stack 1.5.0, each of the values listed above supports adding
-`-revision` to the end of each value, e.g. `pvp-bounds: both-revision`. This
-means that, when uploading to Hackage, Stack will first upload your tarball with
-an unmodified Cabal file, and then upload a Cabal file revision with the PVP
-bounds added. This can be useful - especially combined with the
-[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field) -
-as a method to ensure PVP compliance without having to proactively fix bounds
-issues for Stackage maintenance.
+!!! note
+
+    Since Stack 1.5.0, each of the values listed above supports adding
+    `-revision` to the end of each value, e.g. `pvp-bounds: both-revision`. This
+    means that, when uploading to Hackage, Stack will first upload your tarball
+    with an unmodified Cabal file, and then upload a Cabal file revision with
+    the PVP bounds added. This can be useful - especially combined with the
+    [Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field) -
+    as a method to ensure PVP compliance without having to proactively fix
+    bounds issues for Stackage maintenance.
 
 ### recommend-stack-upgrade
 
-(Since 2.0)
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 When Stack notices that a new version of Stack is available, should it notify
 the user?
@@ -1006,7 +1026,7 @@ recommend-stack-upgrade: true
 
 ### rebuild-ghc-options
 
-(Since 0.1.6)
+[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
 Default: `false`
 
@@ -1031,7 +1051,7 @@ to be used for this project. Example: `require-stack-version: "== 0.1.*"`
 
 ### save-hackage-creds
 
-(Since 1.5.0)
+[:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0)
 
 Default: `true`
 
@@ -1044,7 +1064,7 @@ save-hackage-creds: true
 
 ### setup-info
 
-(Since 0.1.5)
+[:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
 The `setup-info` dictionary specifies download locations for tools to be
 installed during set-up, such as GHC or, on Windows, 7z and MSYS2. The
@@ -1130,7 +1150,7 @@ setup-info-locations: []
 
 ### setup-info-locations
 
-(Since 2.3)
+[:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
 Command line equivalent (takes precedence): `--setup-info-yaml` option
 
@@ -1222,7 +1242,7 @@ matches what your project expects?
 
 ### skip-msys
 
-(Since 0.1.2.0)
+[:octicons-tag-24: 0.1.2.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.2.0)
 
 Restrictions: Windows systems only
 
@@ -1240,7 +1260,7 @@ skip-msys: true
 
 ### snapshot-location-base
 
-(Since 2.5.0)
+[:octicons-tag-24: 2.5.1](https://github.com/commercialhaskell/stack/releases/tag/v2.5.1)
 
 Default: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/
 (as set in the `pantry` library)
@@ -1305,7 +1325,7 @@ files, the American spelling is the alternative that has priority.)
 
 ### stack-developer-mode
 
-(Since 2.3.3)
+[:octicons-tag-24: 2.3.3](https://github.com/commercialhaskell/stack/releases/tag/v2.3.3)
 
 Default (official distributed binaries): `false`
 
@@ -1429,7 +1449,7 @@ with-hpack: /usr/local/bin/hpack
 
 ### work-dir
 
-(Since 0.1.10.0)
+[:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
 Default: `.stack-work`
 
