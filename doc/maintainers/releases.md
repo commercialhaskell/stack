@@ -295,18 +295,47 @@ final release.
     Announce the release candidate to the following mailing lists
 
     * haskell-cafe@haskell.org
+
+        !!! note
+
+            You have to be a member of the mailing list to post to it. See the
+            list's
+            [interface](https://mail.haskell.org/cgi-bin/mailman/listinfo/haskell-cafe)
+
     * haskell-stack@googlegroups.com
+
+        !!! note
+
+            Members of the group can post but posts from new members are held
+            for moderation.
+
     * commercialhaskell@googlegroups.com
 
-    Use the subject (change 'first' to 'second' etc for subsequent release
-    candidates):
+        !!! note
+
+            Members of the group can post but posts from new members are held
+            for moderation.
+
+    Announce the release candidate on the
+    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest).
+
+    Announce the release candidate in the `#stack-users` channel of the Haskell
+    Foundation's Slack workspace.
+
+    Announce the release candidate in Reddit's
+    [Haskell](https://www.reddit.com/r/haskell/) community.
+
+    In each case, use the subject (change 'first' to 'second' etc for subsequent
+    release candidates):
+
     * `ANN: first release candidate for stack-X.Y.Z`
 
-    Include the release description from Github.
+    In the message, include:
 
-    Include a link to the Github Release
-    (`https://github.com/commercialhaskell/stack/releases/tag/rc/vX.Y.Z.A`) to
-    download it.
+    * a link to the release on GitHub
+      (`https://github.com/commercialhaskell/stack/releases/tag/rc/vX.Y.Z.A`) to
+      download it
+    * the release description from Github.
 
 === "Final Release"
 
@@ -479,10 +508,18 @@ final release.
     Announce the release on the
     [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest).
 
-    Use the subject:
+    Announce the release in the `#stack-users` channel of the Haskell
+    Foundation's Slack workspace.
+
+    Announce the release in Reddit's
+    [Haskell](https://www.reddit.com/r/haskell/) community.
+
+    In each case, use the subject:
     * `ANN: stack-X.Y.Z`
 
-    Include the release description from Github.
+    In the message, include:
+
+    * the release description from Github.
 
     ### J: Update Docker images
 
