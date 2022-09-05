@@ -93,10 +93,7 @@ extra-deps:
 - lifted-base-0.2.3.12@sha256:e94ad0692c9c5d85c373e508f23654f2da8ac8c3e475c2b65ffbc04fb165ad69,3369
 - lukko-0.1.1.3@sha256:c084c043a40632d3cafcac50fb5eeff84d91edb070a54baa94945f1c976f97c0,4556
 - megaparsec-9.2.1@sha256:0b709575e3440a7bc07ef3f57ada765c1808151d56103d9fe42f6faa9763fe2e,3220
-# A fork of memory that builds on GHC 9.4.2
-- git: https://github.com/parsonsmatt/hs-memory.git
-  commit: 696383fbfb334c9247f9b406e1489b9ab294927d
-# - memory-0.17.0@sha256:c8809b0b3026193c813a88c1f626758c923fae7e0b0d6b96b91c6ce5e14173ec,4468
+- memory-0.18.0@sha256:e12bde756b01c1a28c62e46f0f8433c4890898051a786794a7d88907ca14abca,4468
 - microlens-0.4.13.0@sha256:40794f266977558e1138ac034701fa3ff66518bc4ca6a1fba5c575d4157cf0ba,4573
 - microlens-mtl-0.2.0.2@sha256:ab8f264c6fecd763818c2e73740487ac371a4fd92cc32031c1c9de284a10518e,1875
 - microlens-th-0.4.3.10@sha256:601fe4d52e6b5e7246aedbde50ebb3096b6d7da331e603dc22d04d9dd577f7bf,2258
@@ -186,6 +183,7 @@ extra-deps:
 - yaml-0.11.8.0@sha256:049261f85bdcaf06e5298709edcfd0337fe706683b3631a81dc49aa4a18ba1a5,4936
 - zip-archive-0.4.2.1@sha256:15385412cda223a137b4c5be389c02c3e0b7a810d61e5cec997d9e0062480ca8,3915
 - zlib-0.6.3.0@sha256:8214a9d37580f17f8b675109578a5dbe6853559eef156e34dc2233f1123ace33,5216
+
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install

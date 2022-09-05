@@ -1,14 +1,8 @@
 # GHC 9.2.4
-resolver: nightly-2022-08-02
+resolver: nightly-2022-09-05
 
 packages:
 - .
-
-extra-deps:
-# nightly-2022-08-02 provides hi-file-parser-0.1.2.0, which does not accomodate
-# GHC 9.4.1
-- hi-file-parser-0.1.3.0@sha256:b868e1bcb73fffe5963de6879f0a0a4c5ced97e08fc09c2c9428af884cdcaa74,2488
-- pantry-0.5.7@sha256:f96119ad2cc3771fe0891939d8a29c7f089fb333a70646e8deb2ec60532ea948,3914
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

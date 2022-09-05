@@ -1,4 +1,4 @@
-resolver: nightly-2022-08-02
+resolver: nightly-2022-09-05
 extra-deps:
 - acme-cuteboy-0.1.0.0
 - acme-dont-1.1

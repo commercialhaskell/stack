@@ -586,16 +586,12 @@ packages:
   original:
     hackage: megaparsec-9.2.1@sha256:0b709575e3440a7bc07ef3f57ada765c1808151d56103d9fe42f6faa9763fe2e,3220
 - completed:
-    commit: 696383fbfb334c9247f9b406e1489b9ab294927d
-    git: https://github.com/parsonsmatt/hs-memory.git
-    name: memory
+    hackage: memory-0.18.0@sha256:e12bde756b01c1a28c62e46f0f8433c4890898051a786794a7d88907ca14abca,4468
     pantry-tree:
-      sha256: 3829ea7ff37c5d2063825858920bfc54fd8f96f976da5bcc6ad8e50bc5c653aa
-      size: 2748
-    version: 0.17.0
+      sha256: 55d15393452ad50b1f8dbe3ff2c4961a3cde9381f2c348f904449a3339c6951d
+      size: 2436
   original:
-    commit: 696383fbfb334c9247f9b406e1489b9ab294927d
-    git: https://github.com/parsonsmatt/hs-memory.git
+    hackage: memory-0.18.0@sha256:e12bde756b01c1a28c62e46f0f8433c4890898051a786794a7d88907ca14abca,4468
 - completed:
     hackage: microlens-0.4.13.0@sha256:40794f266977558e1138ac034701fa3ff66518bc4ca6a1fba5c575d4157cf0ba,4573
     pantry-tree:

@@ -45,7 +45,6 @@ extra-source-files:
     doc/docker_integration.md
     doc/faq.md
     doc/ghci.md
-    doc/ghcjs.md
     doc/glossary.md
     doc/GUIDE.md
     doc/GUIDE_advanced.md

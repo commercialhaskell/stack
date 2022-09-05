@@ -38,5 +38,5 @@ RUN stack build shake
 
 COPY etc/scripts/release.hs /src
 
-RUN stack script --resolver nightly-2022-08-02 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
+RUN stack script --resolver nightly-2022-09-05 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
 RUN cp /src/release /home/stack

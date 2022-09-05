@@ -2,7 +2,7 @@ flags: {}
 packages:
 - '.'
 extra-deps: []
-resolver: nightly-2022-08-02
+resolver: nightly-2022-09-05
 build:
   haddock-arguments:
     haddock-args:
