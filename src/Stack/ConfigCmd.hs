@@ -159,12 +159,9 @@ cfgReadProject scope = do
     (configFilePath, yamlConfig) <- cfgRead scope
     let parser = parseProjectAndConfigMonoid (parent configFilePath)
     case Yaml.parseEither parser yamlConfig of
-        Left err -> do
-            logError . display $ T.pack err
-            return Nothing
-        Right (WithJSONWarnings res _warnings) -> do
-            ProjectAndConfigMonoid project _ <- liftIO res
-            return $ Just project
+        Left err -> logError (display $ T.pack err) >> return Nothing
+        Right (WithJSONWarnings res _warnings) -> liftIO res >>=
+            \(ProjectAndConfigMonoid project _) -> return $ Just project
 
 cfgCmdDumpProject :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpProject -> RIO env ()
 cfgCmdDumpProject (ConfigCmdDumpProject dumpFormat) = do
