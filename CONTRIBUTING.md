@@ -122,9 +122,11 @@ extensions.
 
 Those files are rendered on [haskellstack.org](http://haskellstack.org) by
 [Read the Docs](https://readthedocs.org/) using
-[MkDocs](https://www.mkdocs.org/). The `stable` branch of the repository
-provides the 'stable' version of the online documentation. The `master` branch
-provides the 'latest' version of the documentation.
+[MkDocs](https://www.mkdocs.org/) and the
+[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme. The
+`stable` branch of the repository provides the 'stable' version of the online
+documentation. The `master` branch provides the 'latest' version of the
+documentation.
 
 The 'stable' version of the online documentation is intended to be applicable to
 the latest released version of Stack. If you would like to help with that
@@ -138,13 +140,22 @@ from the content of files at the point in the responsitory's history specified
 by the corresponding release tag. Consequently, that content is fixed once
 released.
 
-The Markdown syntax supported by MkDocs can differ from the GitHub Flavored
-Markdown ([GFM](https://github.github.com/gfm/)) supported for content on
-GitHub.com. Please refer to the
+The Markdown syntax supported by MkDocs and the Material for MkDocs theme can
+differ from the GitHub Flavored Markdown ([GFM](https://github.github.com/gfm/))
+supported for content on GitHub.com. Please refer to the
 [MkDocs documentation](https://www.mkdocs.org/user-guide/writing-your-docs/#writing-with-markdown)
+and the
+[Material for MkDocs reference](https://squidfunk.github.io/mkdocs-material/reference/)
 to ensure your pull request will achieve the desired rendering.
 
-The configuration file for MkDocs is `mkdocs.yml`.
+The configuration file for MkDocs is `mkdocs.yml`. The extensions to the basic
+Markdown syntax used include:
+
+* admonitions
+* code blocks, with syntax highlighting provided by
+  [Pygments](https://pygments.org/)
+* content tabs, which can be nested
+* icons and emojis
 
 The files in the `doc` directory of the repository include two symbolic links
 (symlinks), `ChangeLog.md` and `CONTRIBUTING.md`. Users of Git on Windows should

@@ -111,6 +111,30 @@ markdown_extensions:
 - pymdownx.superfences
 ~~~
 
+Other extensions to the basic Markdown syntax used include:
+
+* Admonitions
+
+    !!! info
+
+        This is an example of an 'info' admonition.
+
+* Content tabs, which can be nested
+
+    !!! info
+
+        Content tabs are used so that users of different operating systems, or
+        different distributions of Linux, can be presented with content specific
+        to their needs.
+
+* icons and emojis
+
+    !!! info
+
+        The `octicons-tag-24` icon (:octicons-tag-24:) is used to refer to
+        versions of Stack. The `material-cloud-download-outline` icon
+        (:material-cloud-download-outline:) is used to signify a download link.
+
 ## Testing
 
 Online documentation can be tested by establishing a branch on the respository

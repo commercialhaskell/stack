@@ -2,7 +2,7 @@
 
 # Nix integration
 
-(since 0.1.10.0)
+[:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
 [Nix](https://nixos.org/) is a purely functional package manager. Stack can be
 configured to integrate with Nix.
