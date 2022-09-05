@@ -23,7 +23,7 @@ import Test.Hspec
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "system-ghc: true\n" ++
   "nix:\n" ++
@@ -32,7 +32,7 @@ sampleConfigNixEnabled =
 
 sampleConfigNixDisabled :: String
 sampleConfigNixDisabled =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "nix:\n" ++
   "   enable: False"
@@ -101,6 +101,6 @@ spec = beforeAll setup $ do
           nixEnable (configNix config) `shouldBe` trueOnNonWindows
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \config -> do
         nixPackages (configNix config) `shouldBe` ["glpk"]
-        v <- parseVersionThrowing "7.10.3"
+        v <- parseVersionThrowing "9.0.2"
         ghc <- either throwIO return $ nixCompiler (WCGhc v)
-        ghc `shouldBe` "haskell.compiler.ghc7103"
+        ghc `shouldBe` "haskell.compiler.ghc902"
