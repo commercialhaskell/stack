@@ -1464,6 +1464,8 @@ Stack's 'work' directory.
 
 ### GHC installation customisation (experimental)
 
+[:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
+
 On Unix-like operating systems and Windows, Stack's installation procedure can
 be fully customised by placing a `sh` shell script (a 'hook') in the Stack root
 directory at `hooks/ghc-install.sh`. On Unix-like operating systems, the script
@@ -1522,5 +1524,3 @@ For "ghcjs", additional variables are:
 
 * `HOOK_GHC_VERSION = <ver>`
 * `HOOK_GHCJS_VERSION = <ver>`
-
-Since 2.7.x
