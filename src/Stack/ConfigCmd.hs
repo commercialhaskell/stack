@@ -48,10 +48,10 @@ import           Stack.Prelude
 import           Data.Coerce (coerce)
 import           Pantry.Internal.AesonExtended
                  (ToJSON(..), FromJSON, (.=), WithJSONWarnings (WithJSONWarnings), object)
-import Data.Aeson.Encode.Pretty (encodePretty, encodePretty', confCompare)
+import           Data.Aeson.Encode.Pretty (encodePretty, encodePretty', confCompare)
 import qualified Data.Aeson.Encode.Pretty as Aeson (defConfig)
 import qualified Data.Aeson.Key as Key
-import Data.Aeson.KeyMap (KeyMap)
+import           Data.Aeson.KeyMap (KeyMap)
 import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.ByteString.Builder (byteString)
 import qualified Data.Map.Merge.Strict as Map
