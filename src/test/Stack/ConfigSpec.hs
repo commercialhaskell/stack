@@ -24,12 +24,12 @@ import Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "packages: ['.']\n"
 
 buildOptsConfig :: String
 buildOptsConfig =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  library-profiling: true\n" ++
@@ -56,24 +56,24 @@ buildOptsConfig =
 
 hpackConfig :: String
 hpackConfig =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
 resolverConfig :: String
 resolverConfig =
-  "resolver: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
   "packages: ['.']\n"
 
 snapshotConfig :: String
 snapshotConfig =
-  "snapshot: lts-2.10\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n"
 
 resolverSnapshotConfig :: String
 resolverSnapshotConfig =
-  "resolver: lts-2.10\n" ++
-  "snapshot: lts-2.10\n" ++
+  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n"
 
 stackDotYaml :: Path Rel File
@@ -123,11 +123,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \Project{..} ->
-        projectResolver `shouldBe` RSLSynonym (LTS 2 10)
+        projectResolver `shouldBe` RSLSynonym (LTS 19 22)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \Project{..} ->
-        projectResolver `shouldBe` RSLSynonym (LTS 2 10)
+        projectResolver `shouldBe` RSLSynonym (LTS 19 22)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (return ()))
@@ -213,7 +213,7 @@ spec = beforeAll setup $ do
             yamlAbs = parentDir </> yamlRel
             packageYaml = childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
-        writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
+        writeFile (toFilePath yamlAbs) "resolver: ghc-9.0"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
             BuildConfig{..} <- runRIO config $ withBuildConfig ask
