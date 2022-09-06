@@ -1,8 +1,6 @@
-# This workflow has been disabled on the Stack repository because Stan does not
-# yet support GHC >= 9.0. See: https://github.com/kowainik/stan/issues/423.
-#
-# On enabling a disabled workflow, see:
-# https://docs.github.com/en/actions/managing-workflow-runs/disabling-and-enabling-a-workflow#disabling-a-workflow
+# This workflow has been disabled by renaming the file `stan.yml.disabled`
+# because Stan does not yet support GHC >= 9.0.
+# See: https://github.com/kowainik/stan/issues/423.
 #
 name: stan
 
