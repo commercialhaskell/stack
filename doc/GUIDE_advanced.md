@@ -78,23 +78,8 @@ the command, see the [build command](build_command.md) documentation.
 
 ## The `stack config` commands
 
-The `stack config` commands provide assistence with accessing or modifying
+The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
-
-## The `stack config env` command
-
-`stack config env` outputs a script that sets or unsets environment variables
-for a Stack environment. Flags modify the script that is output:
-
-* `--[no-]locals` (enabled by default) include/exclude local package information
-* `--[no-]ghc-package-path` (enabled by default) set `GHC_PACKAGE_PATH`
-  environment variable or not
-* `--[no-]stack-exe` (enabled by default) set `STACK_EXE` environment variable
-  or not
-* `--[no-]locale-utf8` (disabled by default) set the `GHC_CHARENC`
-  environment variable to `UTF-8` or not
-* `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
-  environment variable
 
 ## The `stack config set` commands
 
@@ -127,6 +112,21 @@ Known bug:
 YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
+
+## The `stack config env` command
+
+`stack config env` outputs a script that sets or unsets environment variables
+for a Stack environment. Flags modify the script that is output:
+
+* `--[no-]locals` (enabled by default) include/exclude local package information
+* `--[no-]ghc-package-path` (enabled by default) set `GHC_PACKAGE_PATH`
+  environment variable or not
+* `--[no-]stack-exe` (enabled by default) set `STACK_EXE` environment variable
+  or not
+* `--[no-]locale-utf8` (disabled by default) set the `GHC_CHARENC`
+  environment variable to `UTF-8` or not
+* `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
+  environment variable
 
 ## The `stack dot` command
 
