@@ -186,10 +186,10 @@ instance ToJSON DumpStack where
         ]
 
 cfgCmdDumpStack :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpStack -> RIO env ()
-cfgCmdDumpStack (ConfigCmdDumpStack scope dumpFormat)
-    | DumpStackScopeEffective <- scope = cfgCmdDumpStackEffective dumpFormat
-    | DumpStackScopeProject <- scope = cfgDumpStack CommandScopeProject dumpFormat
-    | DumpStackScopeGlobal <- scope = cfgDumpStack CommandScopeGlobal dumpFormat
+cfgCmdDumpStack (ConfigCmdDumpStack scope dumpFormat) = dumpFormat & case scope of
+    DumpStackScopeEffective -> cfgCmdDumpStackEffective
+    DumpStackScopeProject -> cfgDumpStack CommandScopeProject
+    DumpStackScopeGlobal -> cfgDumpStack CommandScopeGlobal
 
 cfgDumpStack
     :: (HasConfig env, HasLogFunc env)
