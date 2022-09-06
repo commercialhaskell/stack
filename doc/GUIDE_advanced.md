@@ -81,17 +81,48 @@ the command, see the [build command](build_command.md) documentation.
 The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
 
+## The `stack config dump-*` commands
+
+These commands dump YAML but can dump JSON with an added `--json` flag.
+
+## The `stack config dump-project` command
+
+The `stack config dump-project` command dumps project-only configuration. Any
+non-project configuration in the project is removed.
+
+## The `stack config dump-stack` command
+
+The `stack config dump-stack` command dumps configuration related to the
+operation of stack itself. This is non-project configuration. With `--lens` we
+can look at the configuration coming from the global settings, from stack
+settings within the project or the effective combination from those two
+locations.
+
+## The `stack config get` commands
+
+The `stack config get` commands gets values of keys in YAML configuration
+files but only those that can also be set.
+
+## The `stack config get resolver` command
+
+Gets the effective resolver.
+
+## The `stack config get *-ghc` commands
+
+The `--global` option will get these settings' global value.
+
+## The `stack config get system-ghc` commands
+
+Gets whether stack should use the system GHC installation.
+
+## The `stack config get install-ghc` command
+
+Gets whether stack should install GHC by itself.
+
 ## The `stack config set` commands
 
 The `stack config set` commands allow the values of keys in YAML configuration
 files to be set. See `stack config set` for the available keys.
-
-## The `stack config set install-ghc` command
-
-`stack config set install-ghc true` or `false` sets the `install-ghc` key in a
-YAML configuration file, accordingly. By default, the project-level
-configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
-user-specific global configuration file (`config.yaml`).
 
 ## The `stack config set resolver` command
 
@@ -109,6 +140,13 @@ Known bug:
 ## The `stack config set system-ghc` command
 
 `stack config set system-ghc true` or `false` sets the `system-ghc` key in a
+YAML configuration file, accordingly. By default, the project-level
+configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
+user-specific global configuration file (`config.yaml`).
+
+## The `stack config set install-ghc` command
+
+`stack config set install-ghc true` or `false` sets the `install-ghc` key in a
 YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
