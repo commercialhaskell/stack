@@ -173,6 +173,7 @@ cfgCmdDumpProject (ConfigCmdDumpProject dumpFormat) = do
         & decodeUtf8'
         & either throwM (logInfo . display))
 
+-- | The subset of stack's configuration that we dump.
 data DumpStack =
     DumpStack
         { dsInstallGHC :: !(Maybe Bool)
