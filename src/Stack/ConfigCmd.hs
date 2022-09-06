@@ -146,9 +146,9 @@ cfgKeyCompare :: RawYaml -> KeyMap Yaml.Value -> Text -> (Text -> Text -> Orderi
 cfgKeyCompare (yamlLines -> configLines) (fmap Key.toText . KeyMap.keys -> keys) cmdKey =
     compareInOrder configLines (coerce keys) (coerce cmdKey)
 
-encodeDumpStackBy :: ToJSON a => (Config -> a) -> ConfigCmdDumpStack -> (Config -> ByteString)
-encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpYaml) = Yaml.encode . f
-encodeDumpStackBy f (ConfigCmdDumpStack _ ConfigDumpJson) = toStrictBytes . encodePretty . f
+encodeDumpBy :: ToJSON a => (Config -> a) -> ConfigDumpFormat -> (Config -> ByteString)
+encodeDumpBy f ConfigDumpYaml = Yaml.encode . f
+encodeDumpBy f ConfigDumpJson = toStrictBytes . encodePretty . f
 
 encodeDumpStack :: ConfigDumpFormat -> (DumpStack -> ByteString)
 encodeDumpStack ConfigDumpYaml = Yaml.encode
@@ -186,8 +186,8 @@ instance ToJSON DumpStack where
         ]
 
 cfgCmdDumpStack :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpStack -> RIO env ()
-cfgCmdDumpStack cmd@(ConfigCmdDumpStack scope dumpFormat)
-    | DumpStackScopeEffective <- scope = cfgCmdDumpStackEffective cmd
+cfgCmdDumpStack (ConfigCmdDumpStack scope dumpFormat)
+    | DumpStackScopeEffective <- scope = cfgCmdDumpStackEffective dumpFormat
     | DumpStackScopeProject <- scope = cfgDumpStack CommandScopeProject dumpFormat
     | DumpStackScopeGlobal <- scope = cfgDumpStack CommandScopeGlobal dumpFormat
 
@@ -208,8 +208,8 @@ cfgDumpStack scope dumpFormat = do
                 & decodeUtf8'
                 & either throwM (logInfo . display)
 
-cfgCmdDumpStackEffective :: (HasConfig env, HasLogFunc env) => ConfigCmdDumpStack -> RIO env ()
-cfgCmdDumpStackEffective cmd = do
+cfgCmdDumpStackEffective :: (HasConfig env, HasLogFunc env) => ConfigDumpFormat -> RIO env ()
+cfgCmdDumpStackEffective dumpFormat = do
     conf <- view configL
     let f Config{..} =
             DumpStack
@@ -217,7 +217,7 @@ cfgCmdDumpStackEffective cmd = do
                 , dsSystemGHC = Just configSystemGHC
                 }
     conf
-        & encodeDumpStackBy f cmd
+        & encodeDumpBy f dumpFormat
         & decodeUtf8'
         & either throwM (logInfo . display)
 
