@@ -78,7 +78,7 @@ the command, see the [build command](build_command.md) documentation.
 
 ## The `stack config` commands
 
-The `stack config` commands provide assistence with accessing or modifying
+The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
 
 ## The `stack config env` command
