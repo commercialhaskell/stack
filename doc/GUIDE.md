@@ -1307,7 +1307,7 @@ follows the Unix convention of `--` to separate these. For example, command:
 stack exec --package stm -- echo I installed the stm package via --package stm
 ~~~
 
-yields ouput like:
+yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config
