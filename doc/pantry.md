@@ -6,7 +6,7 @@
 
 This document describes:
 
-* the specificaton of a snapshot location (in the `resolver` key)
+* the specification of a snapshot location (in the `resolver` key)
 * the specification of a package location (in the `extra-deps` key and in a
   snapshot)
 
