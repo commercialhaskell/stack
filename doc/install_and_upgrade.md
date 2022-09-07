@@ -111,7 +111,7 @@ GitHub repository.
 
     !!! info "Linux packages that lag behind Stack's current version"
 
-        The Stack version available as a Linix package may lag behind Stack's
+        The Stack version available as a Linux package may lag behind Stack's
         current version. If so, using `stack upgrade --binary-only` is
         recommended after installing it. For Stack versions before 1.3.0 which
         do not support `--binary-only`, just `stack upgrade` may work too.
