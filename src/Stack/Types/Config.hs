@@ -1817,7 +1817,7 @@ newtype DockerEntrypoint = DockerEntrypoint
 data DockerUser = DockerUser
     { duUid :: UserID -- ^ uid
     , duGid :: GroupID -- ^ gid
-    , duGroups :: [GroupID] -- ^ Supplemantal groups
+    , duGroups :: [GroupID] -- ^ Supplemental groups
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 
