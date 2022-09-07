@@ -408,7 +408,7 @@ workflow does not run. Its intent is to apply Stan to Stack.
 
 ## Slack channel
 
-If you're making deep changes and real-time communcation with the Stack team
+If you're making deep changes and real-time communication with the Stack team
 would be helpful, we have a `#stack-collaborators` Slack channel in the
 Haskell Foundation workspace. To join the workspace, follow this
 [link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).
