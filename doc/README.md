@@ -280,7 +280,7 @@ The following assumes that you already have installed a version of Stack and the
 
     Make sure the version is the latest one.
 
-5.  In the GitHub respository's issue tracker, look for issues tagged with
+5.  In the GitHub repository's issue tracker, look for issues tagged with
     [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
     and
     [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)

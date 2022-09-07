@@ -1194,7 +1194,7 @@ Relative paths are resolved relative to the `stack.yaml` file (either the one in
 the local project or the global `stack.yaml`).
 
 Relative paths may also be used for the installation paths to tools (such as GHC
-or 7z). This allows vendoring the tools inside a monorepo (a single respository
+or 7z). This allows vendoring the tools inside a monorepo (a single repository
 storing many projects). For example:
 
 Directory structure:

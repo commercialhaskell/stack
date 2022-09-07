@@ -136,7 +136,7 @@ changes/additions based off the
 [stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The specific versions of the online documentation (eg `v: v2.7.5`) are generated
-from the content of files at the point in the responsitory's history specified
+from the content of files at the point in the repository's history specified
 by the corresponding release tag. Consequently, that content is fixed once
 released.
 
