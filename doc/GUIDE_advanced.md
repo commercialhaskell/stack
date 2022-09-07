@@ -442,7 +442,7 @@ For further information, see the [Azure CI](azure_ci.md) documentation.
 
 ### Travis
 
-For futher information, see the [Travis CI](travis_ci.md) documentation.
+For further information, see the [Travis CI](travis_ci.md) documentation.
 
 ## Editor integration
 
