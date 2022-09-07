@@ -250,16 +250,36 @@ ghc-9.0.2
 Hackage only accepts packages for uploading in a standard form, a compressed
 archive ('tarball') in the format produced by Cabal's `sdist` action.
 
-`stack sdist` generates an file for your package, in the format accepted by
+`stack sdist` generates a file for your package, in the format accepted by
 Hackage for uploads. The command will report the location of the generated file.
-The location can be changed from the default using the
-`--tar-dir <path_to_directory>` option.
 
-By default, the command will check the package for common mistakes. This can be
-disabled with the flag `--ignore-check`.
+### The `stack sdist --ignore-check` flag
 
-Setting the flag `--test-tarball` will cause Stack to attempt to build the
-resulting package archive, to test it.
+Pass the flag to disable checks of the package for common mistakes. By default,
+the command will check the package for common mistakes.
+
+### The `stack sdist --pvp-bounds` option
+
+The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
+PVP version bounds should be added to the Cabal file of the package. The
+available modes for basic use are: `none`, `lower`, `upper`, and `both`. The
+available modes for use with Cabal file revisions are `lower-revision`,
+`upper-revision` and `both-revision`.
+
+For futher information, see the
+[YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
+
+### The `stack sdist --tar-dir` option
+
+The `--tar-dir <path_to_directory>` option determines whether the package
+archive should be copied to the specified directory.
+
+### The `stack sdist --[no-]test-tarball` flag
+
+Default: Disabled
+
+Set the flag to cause Stack to test the resulting package archive, by attempting
+to build it.
 
 ## The `stack templates` command
 
@@ -350,43 +370,99 @@ accepts an optional `--to` argument to specify the destination directory.
 
 ## The `stack upload` command
 
-`stack upload` uploads an sdist to Hackage. As of version
-[1.1.0](https://docs.haskellstack.org/en/v1.1.0/ChangeLog/) Stack will also
-attempt to GPG sign your packages as per
-[our blog post](https://www.fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
+Hackage accepts packages for uploading in a standard form, a compressed archive
+('tarball') in the format produced by Cabal's `sdist` action.
 
-* `--no-signature` disables signing of packages
-* `--candidate` upload a
-  [package candidate](http://hackage.haskell.org/upload#candidates)
-* Hackage API key can be used instead of username and password. For example, on
-  Unix-like operating systems command:
+`stack upload` generates a file for your package, in the format accepted by
+Hackage for uploads, and uploads the package to Hackage. For example, if the
+current working directory is the root directory of your project:
 
-  ~~~text
-  HACKAGE_KEY=<api_key>
-  stack upload .
-  ~~~
+~~~text
+stack upload .
+~~~
 
-  and on Windows (with PowerShell) command:
+### The `HACKAGE_USERNAME` and `HACKAGE_PASSWORD` environment variables
 
-  ~~~text
-  $Env:HACKAGE_KEY=<api_key>
-  stack upload .
-  ~~~
+[:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
-* `username` and `password` can be read by setting the following environment
-  variables. On Unix-like operating systems command:
+`stack upload` will request a Hackage username and password to authenticate.
+This can be avoided by setting the `HACKAGE_USERNAME` and `HACKAGE_PASSWORD`
+environment variables. For
+example:
 
-  ~~~text
-  export $HACKAGE_USERNAME="<username>"
-  export $HACKAGE_PASSWORD="<password>"
-  ~~~
+=== "Unix-like"
 
-  and on Windows (with PowerShell) command:
+    ~~~text
+    export $HACKAGE_USERNAME="<username>"
+    export $HACKAGE_PASSWORD="<password>"
+    stack upload .
+    ~~~
 
-  ~~~text
-  $Env:HACKAGE_USERNAME='<username>'
-  $Env:HACKAGE_PASSWORD='<password>'
-  ~~~
+=== "Windows (with PowerShell)"
+
+    ~~~text
+    $Env:HACKAGE_USERNAME='<username>'
+    $Env:HACKAGE_PASSWORD='<password>'
+    stack upload .
+    ~~~
+
+### The `HACKAGE_KEY` environment variable
+
+[:octicons-tag-24: 2.7.5](https://github.com/commercialhaskell/stack/releases/tag/v2.7.5)
+
+Hackage allows its members to register an API authentification token and to
+authenticate using the token.
+
+A Hackage API authentification token can be used with `stack upload` instead of
+username and password, by setting the `HACKAGE_KEY` environment variable. For
+example:
+
+=== "Unix-like"
+
+     ~~~text
+     HACKAGE_KEY=<api_authentification_token>
+     stack upload .
+     ~~~
+
+=== "Windows (with PowerShell)"
+
+     ~~~text
+     $Env:HACKAGE_KEY=<api_authentification_token>
+     stack upload .
+     ~~~
+
+### The `stack upload --candidate` flag
+
+Pass the flag to upload a
+[package candidate](http://hackage.haskell.org/upload#candidates).
+
+### The `stack upload --ignore-check` flag
+
+Pass the flag to disable checks of the package for common mistakes. By default,
+the command will check the package for common mistakes.
+
+### The `stack upload --pvp-bounds` option
+
+The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
+PVP version bounds should be added to the Cabal file of the package. The
+available modes for basic use are: `none`, `lower`, `upper`, and `both`. The
+available modes for use with Cabal file revisions are `lower-revision`,
+`upper-revision` and `both-revision`.
+
+For futher information, see the
+[YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
+
+### The `stack upload --tar-dir` option
+
+The `--tar-dir <path_to_directory>` option determines whether the package
+archive should be copied to the specified directory.
+
+### The `stack upload --[no-]test-tarball` flag
+
+Default: Disabled
+
+Set the flag to cause Stack to test the resulting package archive, by attempting
+to build it.
 
 ## Docker integration
 
