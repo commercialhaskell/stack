@@ -862,7 +862,7 @@ Behavior changes:
   optimizations/laziness. See:
   [#4125](https://github.com/commercialhaskell/stack/issues/4125).
 * Mustache templating is not applied to large files (over 50kb) to
-  avoid performance degredation. See:
+  avoid performance degradation. See:
   [#4133](https://github.com/commercialhaskell/stack/issues/4133).
 * `stack upload` signs the package by default, as documented. `--no-signature`
   turns the signing off.
