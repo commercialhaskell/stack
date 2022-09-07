@@ -104,7 +104,7 @@ upgrade builtHash (UpgradeOpts mbo mso) =
         (_, Just so@(SourceOpts (Just _))) -> source so
         (Just bo, Just so) -> binary bo `catchAny` \e -> do
             prettyWarnL
-               [ flow "Exception occured when trying to perform binary upgrade:"
+               [ flow "Exception occurred when trying to perform binary upgrade:"
                , fromString . show $ e
                , line <> flow "Falling back to source upgrade"
                ]
