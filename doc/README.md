@@ -101,7 +101,7 @@ stack exec my-project-exe
 - The `stack build` command will build the template project and create an
   executable named `my-project-exe` (on Windows, `my-project-exe.exe`). First,
   if necessary, Stack will download a version of GHC in an isolated location.
-  That won't interfere with other GHC instalations on your system.
+  That won't interfere with other GHC installations on your system.
 - The `stack exec my-project-exe` command will run (execute) the built
   executable, in Stack's environment.
 
