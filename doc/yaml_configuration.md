@@ -700,7 +700,7 @@ machine architecture), (optional) GHC variant and (optional) GHC build.
 See [`setup-info`](#setup-info).
 
 `ghc-build` specifies a specialized architecture for the GHC executable.
-Normally this is determined automatically, but it can be overriden. Possible
+Normally this is determined automatically, but it can be overridden. Possible
 arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
 `ncurses6`, `int-native` and `integersimple`.
 
