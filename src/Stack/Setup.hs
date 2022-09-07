@@ -1841,7 +1841,7 @@ getUtf8EnvVars compilerVer =
                 case utf8Locales of
                     [] -> Nothing
                     (v:_) -> Just v
-    -- Filter the list of locales for any with the given prefixes (case-insitive).
+    -- Filter the list of locales for any with the given prefixes (case-insensitive).
     matchingLocales
         :: [Text] -> Text -> [Text]
     matchingLocales utf8Locales prefix =
