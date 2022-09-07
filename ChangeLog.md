@@ -1948,7 +1948,7 @@ Other enhancements:
   [#1620](https://github.com/commercialhaskell/stack/issues/1620)
 * `DESTDIR` is filtered from environment when installing GHC. See
   [#1460](https://github.com/commercialhaskell/stack/issues/1460)
-* `stack haddock` now supports `--hadock-arguments`. See
+* `stack haddock` now supports `--haddock-arguments`. See
   [#2144](https://github.com/commercialhaskell/stack/issues/2144)
 * Signing: warn if GPG_TTY is not set as per `man gpg-agent`
 
