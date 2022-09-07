@@ -90,7 +90,7 @@ nixCompilerVersion compilerVersion =
     WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
     WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
 
--- Exceptions thown specifically by Stack.Nix
+-- Exceptions thrown specifically by Stack.Nix
 data StackNixException
   = NixCannotUseShellFileAndPackagesException
     -- ^ Nix can't be given packages and a shell file at the same time
