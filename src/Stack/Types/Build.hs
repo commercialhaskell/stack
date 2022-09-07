@@ -217,7 +217,7 @@ instance Show StackBuildException where
           doubleIndent = indent . indent
     show (TestSuiteTypeUnsupported interface) =
               "Unsupported test suite type: " <> show interface
-     -- Supressing duplicate output
+     -- Suppressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
       showBuildError False exitCode (Just taskProvides') execName fullArgs logFiles bss
     show (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
