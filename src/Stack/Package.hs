@@ -973,7 +973,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                      else maybe mempty (resolveConditions rc addDeps) mcs
                 condSatisfied c =
                   case c of
-                    Var v -> varSatisifed v
+                    Var v -> varSatisfied v
                     Lit b -> b
                     CNot c' ->
                       not (condSatisfied c')
@@ -981,7 +981,7 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                       condSatisfied cx || condSatisfied cy
                     CAnd cx cy ->
                       condSatisfied cx && condSatisfied cy
-                varSatisifed v =
+                varSatisfied v =
                   case v of
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
