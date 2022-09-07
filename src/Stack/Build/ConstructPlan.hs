@@ -481,7 +481,7 @@ tellExecutables _name (PSFilePath lp)
     | otherwise = return ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
-tellExecutables name (PSRemote pkgloc _version _fromSnaphot cp) =
+tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
     tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
 
 tellExecutablesUpstream ::
@@ -529,7 +529,7 @@ installPackage :: PackageName
 installPackage name ps minstalled = do
     ctx <- ask
     case ps of
-        PSRemote pkgLoc _version _fromSnaphot cp -> do
+        PSRemote pkgLoc _version _fromSnapshot cp -> do
             planDebug $ "installPackage: Doing all-in-one build for upstream package " ++ show name
             package <- loadPackage ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
             resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
@@ -645,7 +645,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
                 case ps of
                     PSFilePath lp ->
                       TTLocalMutable lp
-                    PSRemote pkgLoc _version _fromSnaphot _cp ->
+                    PSRemote pkgLoc _version _fromSnapshot _cp ->
                       TTRemotePackage mutable package pkgLoc
             , taskAllInOne = isAllInOne
             , taskCachePkgSrc = toCachePkgSrc ps

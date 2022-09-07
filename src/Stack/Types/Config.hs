@@ -595,7 +595,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
-    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snaphot layer (RSL) in logs.
+    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snapshot layer (RSL) in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
