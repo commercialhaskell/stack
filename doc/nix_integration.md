@@ -322,7 +322,7 @@ Nix organizes its packages in snapshots of packages (each snapshot being a
 environment variable. This package set can be different depending on when you
 installed Nix and which nixpkgs channel you're using (similar to the LTS channel
 for stable packages and the nightly channel for bleeding edge packages in
-[Stackage](https://www.stackage.org/)). This is bad for reproducibilty so that
+[Stackage](https://www.stackage.org/)). This is bad for reproducibility so that
 nixpkgs should be pinned, i.e., set to the same package set for every developer
 of your project.
 
