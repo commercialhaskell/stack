@@ -248,7 +248,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   , rrPackageType = PTProject
                   }
                 matches -> Left $ T.concat
-                    [ "Ambiugous component name "
+                    [ "Ambiguous component name "
                     , cname
                     , ", matches: "
                     , T.pack $ show matches
