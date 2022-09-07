@@ -581,7 +581,7 @@ Behavior changes:
 * Interleaved output is now turned on by default, see
   [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
   addition, the `packagename> ` prefix is no longer included in
-  interelaved mode when only building a single target.
+  interleaved mode when only building a single target.
 * The `-fhide-source-paths` GHC option is now enabled by default and
   can be disabled via the `hide-source-paths` configuration option in
   `stack.yaml`. See
