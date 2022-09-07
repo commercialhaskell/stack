@@ -356,7 +356,7 @@ systems. Its 'Cache dependencies on Windows' step caches the same information
 on Windows, but takes into account that a relevant directory is located outside
 of the Stack root.
 
-### Integration-based - `intergration-tests.yml`
+### Integration-based - `integration-tests.yml`
 
 This workflow will run if:
 * there is a pull request
