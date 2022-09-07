@@ -467,7 +467,7 @@ We've specified the `acme-missiles` package in the `package.yaml` file (see
 above), but `acme-missiles` is not part of that LTS package set, so building
 failed.
 
-To add `acme-missles` to the available packages, we'll use the `extra-deps` key
+To add `acme-missiles` to the available packages, we'll use the `extra-deps` key
 in the `stack.yaml` file. That key defines extra packages, not present in the
 resolver, that will be needed as dependencies. You can add this like so:
 
