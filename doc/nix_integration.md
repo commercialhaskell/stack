@@ -104,7 +104,7 @@ above to use Nix flakes. The `flake.nix` file is:
 
         myDevTools = [
           hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
-          hPkgs.ghcid # Continous terminal Haskell compile checker
+          hPkgs.ghcid # Continuous terminal Haskell compile checker
           hPkgs.ormolu # Haskell formatter
           hPkgs.hlint # Haskell codestyle checker
           hPkgs.hoogle # Lookup Haskell documentation
