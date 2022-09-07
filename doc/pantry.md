@@ -228,7 +228,7 @@ fonts export-ignore
 ### Local or remote archives
 
 You can use filepaths referring to local archive files or HTTP or HTTPS URLs
-refering to remote archive files, either tarballs or ZIP files.
+referring to remote archive files, either tarballs or ZIP files.
 
 !!! note
 
