@@ -341,9 +341,9 @@ This workflow will run if:
 * commits are pushed to these branches: `master`, `stable` and `rc/**`.
 * requested
 
-The workflow has two jobs: `pendantic` and `unit-tests`.
+The workflow has two jobs: `pedantic` and `unit-tests`.
 
-The `pendantic` job runs on `ubuntu` only and builds Stack with the
+The `pedantic` job runs on `ubuntu` only and builds Stack with the
 `--pedantic` flag.
 
 The `unit-tests` job runs on a matrix of operating systems and Stack

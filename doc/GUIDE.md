@@ -841,7 +841,7 @@ stack build --pedantic --haddock --test --exec "echo Yay, it succeeded" --file-w
 
 This command will:
 
-* turn on all warnings and errors (the `--pendantic` flag)
+* turn on all warnings and errors (the `--pedantic` flag)
 * build your library and executables
 * generate Haddocks (the `--haddock` flag)
 * build and run your test suite (the `--test` flag)
