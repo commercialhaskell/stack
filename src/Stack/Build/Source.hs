@@ -332,7 +332,7 @@ loadLocalPackage pp = do
         --
         -- - testpkg has tests enabled, but not benchmarks.
         --
-        -- - benchpkg has benchmarks enablde, but not tests.
+        -- - benchpkg has benchmarks enabled, but not tests.
         --
         -- The latter two configurations are used to compute the deps
         -- when --enable-benchmarks or --enable-tests are configured.
