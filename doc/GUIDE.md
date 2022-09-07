@@ -952,7 +952,7 @@ end up including the helloworld-test component as well.
 
 You can bypass this implicit adding of components by being much more explicit,
 and stating the components directly. For example, the following will not build
-the `helloworld-exe` executable once all executables have been sucessfully
+the `helloworld-exe` executable once all executables have been successfully
 built:
 
 ~~~text
