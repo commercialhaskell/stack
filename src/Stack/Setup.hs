@@ -322,7 +322,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                         $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
 
                           -- Make sure that any .ghc.environment files
-                          -- are ignored, since we're settting up our
+                          -- are ignored, since we're setting up our
                           -- own package databases. See
                           -- https://github.com/commercialhaskell/stack/issues/4706
                         $ (case cpCompilerVersion compilerPaths of
