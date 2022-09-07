@@ -1848,7 +1848,7 @@ singleTest :: HasEnvConfig env
            -> RIO env ()
 singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
-    -- fullblown 'withSingleContext'.
+    -- full blown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
     mcurator <- view $ buildConfigL.to bcCurator
     let pname = pkgName $ taskProvides task
