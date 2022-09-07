@@ -409,7 +409,7 @@ generateBuildInfoOpts BioInput {..} =
         [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir) ]
     componentAutogen = componentAutogenDir biCabalVersion biComponentName biDistDir
     toIncludeDir "." = Just biCabalDir
-    toIncludeDir relDir = concatAndColapseAbsDir biCabalDir relDir
+    toIncludeDir relDir = concatAndCollapseAbsDir biCabalDir relDir
     includeOpts =
         map ("-I" <>) (biConfigIncludeDirs <> pkgIncludeOpts)
     pkgIncludeOpts =
