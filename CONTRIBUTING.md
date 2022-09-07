@@ -46,7 +46,7 @@ there is ever a bad change, it can always be rolled back.
 
 Stack's maintainers are long-term contributors to the project. Michael Snoyman
 (@snoyberg) was the founder of Stack, and its initial maintainer - and he has
-added others. Michael's current interests and priorties mean that he is no
+added others. Michael's current interests and priorities mean that he is no
 longer actively involved in adding new features to Stack.
 
 Maintainers are recognized for their contributions including:
