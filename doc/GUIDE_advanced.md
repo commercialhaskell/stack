@@ -18,7 +18,7 @@ quit.
 
 ## The `stack --[no-]rsl-in-log` flag
 
-[:octicons-tag-24: 2.7.6](https://github.com/commercialhaskell/stack/releases/tag/v2.7.6)
+[:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
 
 Default: Disabled
 
