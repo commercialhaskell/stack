@@ -291,12 +291,12 @@ applyTemplate project template nonceParams dir templateText = do
 
     (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
     unless (S.null missingKeys) $ do
-      let missingParamters = MissingParameters
+      let missingParameters = MissingParameters
                                project
                                template
                                missingKeys
                                (configUserConfigPath config)
-      logInfo ("\n" <> displayShow missingParamters <> "\n")
+      logInfo ("\n" <> displayShow missingParameters <> "\n")
     return $ M.fromList results
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
