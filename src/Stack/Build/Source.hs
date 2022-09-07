@@ -147,7 +147,7 @@ hashSourceMapData boptsCli sm = do
     immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
     bc <- view buildConfigL
     let -- extra bytestring specifying GHC options supposed to be applied to
-        -- GHC boot packages so we'll have differrent hashes when bare
+        -- GHC boot packages so we'll have different hashes when bare
         -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
         -- with profiling or without
         bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
