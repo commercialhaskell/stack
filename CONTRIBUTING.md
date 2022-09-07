@@ -397,7 +397,7 @@ named artifacts to path `_release`.
 Its step 'Hash and sign assets' makes use of a 'secret' environment variable
 `RELEASE_SIGNING_KEY` established by the owner of the Stack repository. The
 variable contains the private key for the GPG key with ID 0x575159689BEFB442.
-That key is imported into GPG and then used by GPG to create a detached signture
+That key is imported into GPG and then used by GPG to create a detached signature
 for each file.
 
 ### Inactive - `stan.yml`
