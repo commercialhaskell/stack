@@ -101,7 +101,7 @@ jobs:
     env:
       CAN_SIGN: ${{ secrets.RELEASE_SIGNING_KEY != '' }}
     outputs:
-      arm64: ${{ fromJSON(steps.runners.outputs.arm64) }}
+      arm64: ${{ steps.runners.outputs.arm64 }}
       can-sign: ${{ env.CAN_SIGN }}
     steps:
     - name: Check for hosted runners
