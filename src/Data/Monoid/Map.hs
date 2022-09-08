@@ -6,7 +6,7 @@ module Data.Monoid.Map where
 import qualified Data.Map as M
 import           Stack.Prelude
 
--- | Utility newtype wrapper to make make Map's Monoid also use the
+-- | Utility newtype wrapper to make Map's Monoid also use the
 -- element's Monoid.
 newtype MonoidMap k a = MonoidMap (Map k a)
     deriving (Eq, Ord, Read, Show, Generic, Functor)
