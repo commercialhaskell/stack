@@ -217,7 +217,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
             Left "Couldn't parse GitHub response as a JSON object with a \"content\" field"
     }
 
-settingsFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) =
     asIsFromUrl $ concat ["https://gitlab.com",                "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
 settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
     asIsFromUrl $ concat ["https://bitbucket.org",             "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
