@@ -3,7 +3,7 @@ import Data.List (isInfixOf, stripPrefix)
 import StackTest
 
 main :: IO ()
-main = unless isWindows $ do -- depedency issues on Windows
+main = unless isWindows $ do -- dependency issues on Windows
     let isBuild package line =
           case stripPrefix package line of
             Just x -> "> build" `isInfixOf` line

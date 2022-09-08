@@ -25,7 +25,7 @@ instance PersistField ConfigCacheType where
     toPersistValue (ConfigCacheTypeFlagExecutable v) =
         PersistText $ "exe:" <> T.pack (packageIdentifierString v)
     fromPersistValue (PersistText t) =
-        fromMaybe (Left $ "Unexected ConfigCacheType value: " <> t) $
+        fromMaybe (Left $ "Unexpected ConfigCacheType value: " <> t) $
         config <|> fmap lib (T.stripPrefix "lib:" t) <|>
         fmap exe (T.stripPrefix "exe:" t)
       where
@@ -40,7 +40,7 @@ instance PersistField ConfigCacheType where
                 maybe (Left $ "Unexpected ConfigCacheType value: " <> t) Right $
                 parsePackageIdentifier (T.unpack v)
             Right $ ConfigCacheTypeFlagExecutable pkgId
-    fromPersistValue _ = Left "Unexected ConfigCacheType type"
+    fromPersistValue _ = Left "Unexpected ConfigCacheType type"
 
 instance PersistFieldSql ConfigCacheType where
     sqlType _ = SqlString

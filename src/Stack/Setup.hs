@@ -58,7 +58,7 @@ import              Distribution.Version (mkVersion)
 import              Network.HTTP.Client (redirectCount)
 import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
                                               getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
-                                              mkDownloadRequest, parseRequest, parseUrlThrow, setGithubHeaders,
+                                              mkDownloadRequest, parseRequest, parseUrlThrow, setGitHubHeaders,
                                               setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse,
                                               setRequestMethod)
 import              Network.HTTP.Simple (getResponseHeader)
@@ -322,7 +322,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                         $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
 
                           -- Make sure that any .ghc.environment files
-                          -- are ignored, since we're settting up our
+                          -- are ignored, since we're setting up our
                           -- own package databases. See
                           -- https://github.com/commercialhaskell/stack/issues/4706
                         $ (case cpCompilerVersion compilerPaths of
@@ -1259,7 +1259,7 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     go possibleCompilers Nothing
   where
     -- This will stop as soon as one of the builds doesn't throw an @UnknownOSKey@ or
-    -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is non-existent,
+    -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is nonexistent,
     -- not if the download or install fails for some other reason).
     -- The @Unknown*@ exceptions thrown by each attempt are combined into a single exception
     -- (if only @UnknownOSKey@ is thrown, then the first of those is rethrown, but if any
@@ -1841,7 +1841,7 @@ getUtf8EnvVars compilerVer =
                 case utf8Locales of
                     [] -> Nothing
                     (v:_) -> Just v
-    -- Filter the list of locales for any with the given prefixes (case-insitive).
+    -- Filter the list of locales for any with the given prefixes (case-insensitive).
     matchingLocales
         :: [Text] -> Text -> [Text]
     matchingLocales utf8Locales prefix =
@@ -1858,7 +1858,7 @@ getUtf8EnvVars compilerVer =
 
 -- | Information on a binary release of Stack
 data StackReleaseInfo
-  = SRIGithub !Value
+  = SRIGitHub !Value
   -- ^ Metadata downloaded from GitHub releases about available binaries.
   | SRIHaskellStackOrg !HaskellStackOrg
   -- ^ Information on the latest available binary for the current platforms.
@@ -1871,8 +1871,8 @@ data HaskellStackOrg = HaskellStackOrg
 
 downloadStackReleaseInfo
   :: (HasPlatform env, HasLogFunc env)
-  => Maybe String -- Github org
-  -> Maybe String -- Github repo
+  => Maybe String -- GitHub org
+  -> Maybe String -- GitHub repo
   -> Maybe String -- ^ optional version
   -> RIO env StackReleaseInfo
 downloadStackReleaseInfo Nothing Nothing Nothing = do
@@ -1903,7 +1903,7 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
         -- Try out different URLs. If we've exhausted all of them, fall back to GitHub.
         loop [] = do
           logDebug "Could not get binary from haskellstack.org, trying GitHub"
-          downloadStackReleaseInfoGithub Nothing Nothing Nothing
+          downloadStackReleaseInfoGitHub Nothing Nothing Nothing
 
         -- Try the next URL
         loop (url:urls) = do
@@ -1932,16 +1932,16 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
                       pure $ SRIHaskellStackOrg hso
             locs -> logDebug ("Multiple location headers found: " <> displayShow locs) *> loop urls
     loop urls0
-downloadStackReleaseInfo morg mrepo mver = downloadStackReleaseInfoGithub morg mrepo mver
+downloadStackReleaseInfo morg mrepo mver = downloadStackReleaseInfoGitHub morg mrepo mver
 
--- | Same as above, but always uses Github
-downloadStackReleaseInfoGithub
+-- | Same as above, but always uses GitHub
+downloadStackReleaseInfoGitHub
   :: (MonadIO m, MonadThrow m)
-  => Maybe String -- Github org
-  -> Maybe String -- Github repo
+  => Maybe String -- GitHub org
+  -> Maybe String -- GitHub repo
   -> Maybe String -- ^ optional version
   -> m StackReleaseInfo
-downloadStackReleaseInfoGithub morg mrepo mver = liftIO $ do
+downloadStackReleaseInfoGitHub morg mrepo mver = liftIO $ do
     let org = fromMaybe "commercialhaskell" morg
         repo = fromMaybe "stack" mrepo
     let url = concat
@@ -1955,10 +1955,10 @@ downloadStackReleaseInfoGithub morg mrepo mver = liftIO $ do
                 Just ver -> "tags/v" ++ ver
             ]
     req <- parseRequest url
-    res <- httpJSON $ setGithubHeaders req
+    res <- httpJSON $ setGitHubHeaders req
     let code = getResponseStatusCode res
     if code >= 200 && code < 300
-        then return $ SRIGithub $ getResponseBody res
+        then return $ SRIGitHub $ getResponseBody res
         else throwString $ "Could not get release information for Stack from: " ++ url
 
 preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
@@ -2053,7 +2053,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
       `catchAny` (logError . displayShow)
   where
 
-    findArchive (SRIGithub val) pattern = do
+    findArchive (SRIGitHub val) pattern = do
         Object top <- return val
         Array assets <- KeyMap.lookup "assets" top
         getFirst $ fold $ fmap (First . findMatch pattern') assets
@@ -2071,7 +2071,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     handleTarball :: Path Abs File -> Bool -> T.Text -> IO ()
     handleTarball tmpFile isWindows url = do
-        req <- fmap setGithubHeaders $ parseUrlThrow $ T.unpack url
+        req <- fmap setGitHubHeaders $ parseUrlThrow $ T.unpack url
         withResponse req $ \res -> do
             entries <- fmap (Tar.read . LBS.fromChunks)
                      $ lazyConsume
@@ -2160,7 +2160,7 @@ performPathChecking newFile executablePath = do
         | otherwise -> throwM e
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
-getDownloadVersion (SRIGithub val) = do
+getDownloadVersion (SRIGitHub val) = do
     Object o <- Just val
     String rawName <- KeyMap.lookup "name" o
     -- drop the "v" at the beginning of the name

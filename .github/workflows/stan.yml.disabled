@@ -1,15 +1,16 @@
+# This workflow has been disabled by renaming the file `stan.yml.disabled`
+# because Stan does not yet support GHC >= 9.0.
+# See: https://github.com/kowainik/stan/issues/423.
+#
 name: stan
 
-# Disabled because Stan does not yet support GHC >= 9.0. See:
-# https://github.com/kowainik/stan/issues/423
-
-# on:
-#   pull_request:
-#   push:
-#     branches:
-#     - master
-#     - stable
-#     - rc/**
+on:
+  pull_request:
+  push:
+    branches:
+    - master
+    - stable
+    - rc/**
 
 jobs:
   build:

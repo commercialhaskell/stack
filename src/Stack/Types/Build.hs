@@ -142,7 +142,7 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug"
-    show (CompilerVersionMismatch mactual (expected, earch) ghcVariant ghcBuild check mstack resolution) = concat
+    show (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) = concat
                 [ case mactual of
                     Nothing -> "No compiler found, expected "
                     Just (actual, arch) -> concat
@@ -159,7 +159,7 @@ instance Show StackBuildException where
                     NewerMinor -> "minor version match or newer with "
                 , T.unpack $ utf8BuilderToText $ display expected
                 , " ("
-                , C.display earch
+                , C.display eArch
                 , ghcVariantSuffix ghcVariant
                 , compilerBuildSuffix ghcBuild
                 , ") (based on "
@@ -217,7 +217,7 @@ instance Show StackBuildException where
           doubleIndent = indent . indent
     show (TestSuiteTypeUnsupported interface) =
               "Unsupported test suite type: " <> show interface
-     -- Supressing duplicate output
+     -- Suppressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
       showBuildError False exitCode (Just taskProvides') execName fullArgs logFiles bss
     show (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =

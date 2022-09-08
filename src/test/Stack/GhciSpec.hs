@@ -107,7 +107,7 @@ spec = do
           let res = scriptToLazyByteString $ renderScriptIntero packages_multiplePackages Nothing []
           res `shouldBeLE` interoScript_multipleProjectsWithLib
 
--- Exptected Intero scripts
+-- Expected Intero scripts
 
 interoScript_projectWithLib :: Text
 interoScript_projectWithLib = [text|

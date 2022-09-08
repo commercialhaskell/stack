@@ -164,7 +164,7 @@ mkRaw = addSentinels . RawYaml
 unmkRaw :: RawYaml -> Text
 unmkRaw = coerce . removeSentinels
 
--- | This is leaking implementation but adding a sentinal key-value to the end
+-- | This is leaking implementation but adding a sentinel key-value to the end
 -- of YAML is a cheap way to ensure trailing newlines are not swallowed.
 addSentinels :: RawYaml -> RawYaml
 addSentinels (RawYaml x) = RawYaml $ x <> endSentinel
