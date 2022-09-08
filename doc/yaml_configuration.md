@@ -623,7 +623,7 @@ Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 In the case of *non-interleaved* output and *more than one* target package,
 Stack sends the build output from GHC for each target package to a log file,
 unless an error occurs. For further information, see the
-[`stack build --[no-\]interleaved-output` flag](build_command.md#the-stack-build---no-interleaved-output-flag)
+[`stack build --[no-]interleaved-output` flag](build_command.md#the-stack-build---no-interleaved-output-flag)
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
