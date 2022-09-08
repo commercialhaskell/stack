@@ -1068,7 +1068,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     -- Output to the console if this is the last task, and the user
     -- asked to build it specifically. When the action is a
     -- 'ConcurrencyDisallowed' action (benchmarks), then we can also be
-    -- sure to have excluse access to the console, so output is also
+    -- sure to have exclusive access to the console, so output is also
     -- sent to the console in this case.
     --
     -- See the discussion on #426 for thoughts on sending output to the
