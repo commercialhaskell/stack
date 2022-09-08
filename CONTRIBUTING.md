@@ -307,7 +307,7 @@ Where `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 directory.
 
-You may also achieve this through GHCi with tihs command:
+You may also achieve this through GHCi with this command:
 
 ~~~text
 stack ghci stack:stack-integration-test
