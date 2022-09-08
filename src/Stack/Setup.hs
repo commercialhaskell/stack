@@ -1259,7 +1259,7 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
     go possibleCompilers Nothing
   where
     -- This will stop as soon as one of the builds doesn't throw an @UnknownOSKey@ or
-    -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is non-existent,
+    -- @UnknownCompilerVersion@ exception (so it will only try subsequent builds if one is nonexistent,
     -- not if the download or install fails for some other reason).
     -- The @Unknown*@ exceptions thrown by each attempt are combined into a single exception
     -- (if only @UnknownOSKey@ is thrown, then the first of those is rethrown, but if any
