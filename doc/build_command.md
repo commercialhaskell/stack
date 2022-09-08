@@ -247,22 +247,51 @@ the `--watch-all` flag.
 
 Default: Enabled
 
-Set the flag to have the output of all packages being built scroll by in a
-streaming fashion. The output from each package built will be prefixed by the
-package name, e.g. `mtl> Building ...`. This will include the output from
-dependencies being built, not just targets.
+Set the flag for interleaved output. With interleaved output, each line of
+output from each package being built (targets and dependencies) is sent to the
+console as it happens and output relating to different packages can be
+interleaved. Each line will be prefixed with the name of the relevant package.
+The spacing between the prefix and the output will be set based on the longest
+relevant package name, so that the start of the output itself aligns. For
+example (extract):
 
-Unset the flag to disable this behaviour. When disabled:
+~~~text
+hpack            > build
+mustache         > configure
+hpack            > Preprocessing library for hpack-0.35.0..
+hpack            > Building library for hpack-0.35.0..
+mustache         > Configuring mustache-2.4.1...
+hpack            > [ 1 of 29] Compiling Data.Aeson.Config.Key
+hpack            > [ 2 of 29] Compiling Data.Aeson.Config.KeyMap
+mustache         > build
+hpack            > [ 3 of 29] Compiling Data.Aeson.Config.Util
+mustache         > Preprocessing library for mustache-2.4.1..
+mustache         > Building library for mustache-2.4.1..
+hpack            > [ 4 of 29] Compiling Hpack.Haskell
+hpack            > [ 5 of 29] Compiling Hpack.Utf8
+mustache         > [1 of 8] Compiling Paths_mustache
+hpack            > [ 6 of 29] Compiling Imports
+hpack            > [ 7 of 29] Compiling Hpack.Util
+mustache         > [2 of 8] Compiling Text.Mustache.Internal
+~~~
 
-* When building a single target package (e.g., `stack build` in a project
-  with only one package, or `stack build <package_name>` in a multi-package
-  project), the build output from GHC will be hidden for building all
-  dependencies, and will be displayed for the one target package.
-* By default, when building multiple target packages, the output from these
-  will end up in a log file instead of on the console unless it contains
-  errors or warnings, to avoid problems of interleaved output and decrease
-  console noise. If you would like to see this content instead, you can use
-  the `dump-logs` option.
+Unset the flag for non-interleaved output. With non-interleaved output, the
+build output from GHC (as opposed to from Stack) in respect of dependencies is
+ignored. The behaviour then depends whether there is one target package or more
+than one. There can be one target if the project has a single package or if one
+package is targetted in a multi-package project (for example, using
+`stack build <package_name>`).
+
+* **One target package:** The build output for the target package is sent to the
+  console as it happens.
+
+* **More than one target package:** The build output from GHC
+  (as opposed to from Stack) for each target package is sent to a log file for
+  that package, unless it contains warnings or errors. At the end of the build,
+  the location of the directory containing the log files is reported. To also
+  output the contents of the log files to the console at the end of the build,
+  use Stack's `dump-logs` option. For further information about that option, see
+  the [YAML configuration](yaml_configuration.md#dump-logs) documentation.
 
 ### The `stack build --pedantic` flag
 
