@@ -356,7 +356,7 @@ data Config =
          -- match cabal.
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
-         -- (If Nothing, the default is used.)
+         -- (If Nothing, the 'default' default template is used.)
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
