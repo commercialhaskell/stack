@@ -105,7 +105,7 @@ data DotPayload = DotPayload
   } deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
--- options. Returns a set of local names and and a map from package names to
+-- options. Returns a set of local names and a map from package names to
 -- dependencies.
 createPrunedDependencyGraph :: DotOpts
                             -> RIO Runner
