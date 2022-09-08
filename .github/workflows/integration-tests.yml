@@ -151,6 +151,8 @@ jobs:
 
   github-release:
     name: Create GitHub release
+    permissions:
+      contents: write
     needs:
     - integration-tests
     - linux-arm64
