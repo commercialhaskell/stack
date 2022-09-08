@@ -119,7 +119,7 @@ jobs:
 
   linux-arm64:
     name: Linux ARM64
-    runs-on: ${{ needs.configuration.outputs.arm64 }}
+    runs-on: ${{ fromJSON(needs.configuration.outputs.arm64) }}
     needs: configuration
     steps:
     - name: Skipping ARM64
