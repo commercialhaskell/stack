@@ -700,7 +700,7 @@ machine architecture), (optional) GHC variant and (optional) GHC build.
 See [`setup-info`](#setup-info).
 
 `ghc-build` specifies a specialized architecture for the GHC executable.
-Normally this is determined automatically, but it can be overriden. Possible
+Normally this is determined automatically, but it can be overridden. Possible
 arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
 `ncurses6`, `int-native` and `integersimple`.
 
@@ -723,7 +723,7 @@ Since Stack 1.6.0, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
 flag). However, setting options via `$everything` on all flags will not do so
 (see
-[Github discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
+[GitHub discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.
 
@@ -1206,7 +1206,7 @@ Relative paths are resolved relative to the `stack.yaml` file (either the one in
 the local project or the global `stack.yaml`).
 
 Relative paths may also be used for the installation paths to tools (such as GHC
-or 7z). This allows vendoring the tools inside a monorepo (a single respository
+or 7z). This allows vendoring the tools inside a monorepo (a single repository
 storing many projects). For example:
 
 Directory structure:
@@ -1476,6 +1476,8 @@ Stack's 'work' directory.
 
 ### GHC installation customisation (experimental)
 
+[:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
+
 On Unix-like operating systems and Windows, Stack's installation procedure can
 be fully customised by placing a `sh` shell script (a 'hook') in the Stack root
 directory at `hooks/ghc-install.sh`. On Unix-like operating systems, the script
@@ -1534,5 +1536,3 @@ For "ghcjs", additional variables are:
 
 * `HOOK_GHC_VERSION = <ver>`
 * `HOOK_GHCJS_VERSION = <ver>`
-
-Since 2.7.x

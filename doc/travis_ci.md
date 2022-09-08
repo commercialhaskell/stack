@@ -66,7 +66,7 @@ the Travis machines.
 ## Installing Stack
 
 Currently there is only one reasonable way to install Stack: fetch precompiled
-binary from the Github.
+binary from the GitHub.
 
 ~~~yaml
 before_install:

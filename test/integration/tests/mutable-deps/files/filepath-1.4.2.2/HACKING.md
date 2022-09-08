@@ -1,7 +1,7 @@
 # Hacking
 
 Most of the code is in `System/FilePath/Internal.hs` which is `cpphs`'d into both `System/FilePath/Posix.hs`
-and `System/FilePath/Windows.hs` via `make cpp` and commited to the repo. This Internal module is a bit weird
+and `System/FilePath/Windows.hs` via `make cpp` and committed to the repo. This Internal module is a bit weird
 in that it isn't really a Haskell module, but is more an include file.
 
 The library has extensive doc tests. Anything starting with `-- >` is transformed into a doc test as a predicate
