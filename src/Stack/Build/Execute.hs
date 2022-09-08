@@ -958,7 +958,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             logInfo ""
             logInfo "  stack exec pacman -- --sync --refresh autoconf"
             logInfo ""
-            logInfo $ "Some versions of perl from MYSY2 are broken. See " <>
+            logInfo $ "Some versions of perl from MSYS2 are broken. See " <>
               "https://github.com/msys2/MSYS2-packages/issues/1611 and " <>
               "https://github.com/commercialhaskell/stack/pull/4781. To " <>
               "test if perl in the required location is working, try command:"
