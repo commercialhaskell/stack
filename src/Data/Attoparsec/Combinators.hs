@@ -20,6 +20,6 @@ alternating a b = a <|> b
 pured :: (Applicative g,Applicative f) => g a -> g (f a)
 pured = fmap pure
 
--- | Concatting the result of an action.
+-- | Concating the result of an action.
 concating :: (Monoid m,Applicative f) => f [m] -> f m
 concating = fmap mconcat
