@@ -119,7 +119,7 @@ GitHub repository.
     === "Arch Linux"
 
         The Arch community package respository provides an official
-        [package](ttps://www.archlinux.org/packages/community/x86_64/stack/).
+        [package](https://www.archlinux.org/packages/community/x86_64/stack/).
         You can install it with the command:
 
         ~~~text
