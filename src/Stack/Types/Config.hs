@@ -1621,7 +1621,7 @@ platformVariantSuffix :: PlatformVariant -> String
 platformVariantSuffix PlatformVariantNone = ""
 platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
--- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
+-- | Specialized variant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
     = GHCStandard
     -- ^ Standard bindist
