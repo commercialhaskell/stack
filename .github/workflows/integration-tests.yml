@@ -95,14 +95,42 @@ jobs:
         name: ${{ runner.os }}
         path: _release/stack-*
 
+  configuration:
+    name: Check for self-hosted runners
+    runs-on: ubuntu-latest
+    outputs:
+      arm64: ${{ fromJSON(steps.runners.outputs.arm64) }}
+    steps:
+    - name: Check for hosted runners
+      id: runners
+      shell: bash
+      env:
+        SELF_HOSTED_RUNNERS: ${{ secrets.SELF_HOSTED_RUNNERS || (github.repository_owner == 'commercialhaskell' && 'arm64') }}
+      run: |
+        echo "::set-output name=runners::$SELF_HOSTED_RUNNERS"
+        if echo "$SELF_HOSTED_RUNNERS" | grep -q 'arm64'; then
+          echo '::set-output name=arm64::"[\"self-hosted\", \"linux\", \"ARM64\"]"'
+        else
+          echo '::set-output name=arm64::"ubuntu-latest"'
+        fi
+
   linux-arm64:
     name: Linux ARM64
-    runs-on: [self-hosted, linux, ARM64]
+    runs-on: ${{ needs.configuration.outputs.arm64 }}
+    needs: configuration
     steps:
+    - name: Skipping ARM64
+      if: needs.configuration.outputs.arm64 == 'ubuntu-latest'
+      shell: bash
+      run: |
+        echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
+
     - name: Clone project
+      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
       uses: actions/checkout@v3
 
     - name: Build bindist
+      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
       shell: bash
       run: |
         set -ex
@@ -112,6 +140,7 @@ jobs:
         docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
 
     - name: Upload bindist
+      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
       uses: actions/upload-artifact@v3
       with:
         name: Linux-ARM64
@@ -141,6 +170,7 @@ jobs:
         name: Windows
         path: _release
     - name: Download Linux-ARM64 artifact
+      if: contains(needs.configuration.outputs.runners, 'arm64')
       uses: actions/download-artifact@v3
       with:
         name: Linux-ARM64
