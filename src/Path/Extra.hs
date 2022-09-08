@@ -84,7 +84,7 @@ dropRoot (Path l) = Path (FP.dropDrive l)
 -- is to be used in conjunction with 'forgivingAbsence' and
 -- 'resolveFile'.
 --
--- Previously the idiom @forgivingAbsence (relsoveFile …)@ alone was used,
+-- Previously the idiom @forgivingAbsence (resolveFile …)@ alone was used,
 -- which relied on 'canonicalizePath' throwing 'isDoesNotExistError' when
 -- path does not exist. As it turns out, this behavior is actually not
 -- intentional and unreliable, see
