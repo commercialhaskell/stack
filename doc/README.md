@@ -264,7 +264,7 @@ The following assumes that you already have installed a version of Stack and the
     cd stack
     ~~~
 
-3.  Build the `stack` executable using a pre-existing installation of Stack with
+3.  Build the `stack` executable using a preexisting installation of Stack with
     the command:
 
     ~~~text
