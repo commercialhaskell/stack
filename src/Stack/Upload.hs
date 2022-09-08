@@ -238,7 +238,7 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
             503 -> do
                 logError "service unavailable"
                 logError "This error some times gets sent even though the upload succeeded"
-                logError "Check on Hackage to see if your pacakge is present"
+                logError "Check on Hackage to see if your package is present"
                 liftIO $ printBody res
             code -> do
                 logError $ "unhandled status code: " <> fromString (show code)

@@ -398,7 +398,7 @@ circumstances, cause problems with building packages that make use of the GNU
 project's `autoconf` package and `configure` shell script files. It may be
 necessary to override the default location of Stack's programs folder. See the
 [local-programs-path](yaml_configuration.md#local-programs-path) option for more
-informaton.
+information.
 
 See issue [#4726](https://github.com/commercialhaskell/stack/issues/4726).
 

@@ -356,7 +356,7 @@ data Config =
          -- match cabal.
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
-         -- (If Nothing, the default default is used.)
+         -- (If Nothing, the default is used.)
          ,configAllowDifferentUser  :: !Bool
          -- ^ Allow users other than the stack root owner to use the stack
          -- installation.
@@ -595,7 +595,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
       -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
-    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snaphot layer (RSL) in logs.
+    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snapshot layer (RSL) in logs.
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
     , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
@@ -860,7 +860,7 @@ data ConfigMonoid =
     -- ^ See 'configMonoidAllowNewer'
     ,configMonoidDefaultTemplate     :: !(First TemplateName)
     -- ^ The default template to use when none is specified.
-    -- (If Nothing, the default default is used.)
+    -- (If Nothing, the default is used.)
     , configMonoidAllowDifferentUser :: !(First Bool)
     -- ^ Allow users other than the stack root owner to use the stack
     -- installation.
@@ -1621,7 +1621,7 @@ platformVariantSuffix :: PlatformVariant -> String
 platformVariantSuffix PlatformVariantNone = ""
 platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
--- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
+-- | Specialized variant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
     = GHCStandard
     -- ^ Standard bindist
@@ -1817,7 +1817,7 @@ newtype DockerEntrypoint = DockerEntrypoint
 data DockerUser = DockerUser
     { duUid :: UserID -- ^ uid
     , duGid :: GroupID -- ^ gid
-    , duGroups :: [GroupID] -- ^ Supplemantal groups
+    , duGroups :: [GroupID] -- ^ Supplemental groups
     , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
 

@@ -34,7 +34,7 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
                                            getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
-                                           setForceDownload, setGithubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
+                                           setForceDownload, setGitHubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -202,7 +202,7 @@ asIsFromUrl url = TemplateDownloadSettings
 
 -- | Construct a URL for downloading from a repo.
 settingsFromRepoTemplatePath :: RepoTemplatePath -> TemplateDownloadSettings
-settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
+settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
     -- T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
     TemplateDownloadSettings
     { tplDownloadUrl = concat ["https://api.github.com/repos/", T.unpack user, "/stack-templates/contents/", T.unpack name]
@@ -217,7 +217,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
             Left "Couldn't parse GitHub response as a JSON object with a \"content\" field"
     }
 
-settingsFromRepoTemplatePath (RepoTemplatePath Gitlab user name) =
+settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) =
     asIsFromUrl $ concat ["https://gitlab.com",                "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
 settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
     asIsFromUrl $ concat ["https://bitbucket.org",             "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
@@ -291,12 +291,12 @@ applyTemplate project template nonceParams dir templateText = do
 
     (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
     unless (S.null missingKeys) $ do
-      let missingParamters = MissingParameters
+      let missingParameters = MissingParameters
                                project
                                template
                                missingKeys
                                (configUserConfigPath config)
-      logInfo ("\n" <> displayShow missingParamters <> "\n")
+      logInfo ("\n" <> displayShow missingParameters <> "\n")
     return $ M.fromList results
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
@@ -345,7 +345,7 @@ runTemplateInits dir = do
 templatesHelp :: HasLogFunc env => RIO env ()
 templatesHelp = do
   let url = defaultTemplatesHelpUrl
-  req <- liftM setGithubHeaders (parseUrlThrow url)
+  req <- liftM setGitHubHeaders (parseUrlThrow url)
   resp <- httpLbs req `catch` (throwM . FailedToDownloadTemplatesHelp)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> throwM $ BadTemplatesHelpEncoding url err
@@ -356,7 +356,7 @@ templatesHelp = do
 
 -- | The default service to use to download templates.
 defaultRepoService :: RepoService
-defaultRepoService = Github
+defaultRepoService = GitHub
 
 -- | Default web URL to get the `stack templates` help output.
 defaultTemplatesHelpUrl :: String

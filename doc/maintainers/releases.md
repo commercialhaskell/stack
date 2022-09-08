@@ -332,9 +332,9 @@ Use the subject (as applicable):
 * `ANN: stack-X.Y.Z`; or
 * `ANN: first release candidate for stack-X.Y.x`
 
-Include the release description from Github.
+Include the release description from GitHub.
 
-For release candidates, also include a link to the Github Release
+For release candidates, also include a link to the GitHub Release
 (`https://github.com/commercialhaskell/stack/releases/tag/vX.Y.Z`) to download
 it.
 

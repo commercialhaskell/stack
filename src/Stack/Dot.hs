@@ -105,7 +105,7 @@ data DotPayload = DotPayload
   } deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
--- options. Returns a set of local names and and a map from package names to
+-- options. Returns a set of local names and a map from package names to
 -- dependencies.
 createPrunedDependencyGraph :: DotOpts
                             -> RIO Runner
@@ -119,7 +119,7 @@ createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
                        then dotPrune dotOpts
                        else Set.insert "base" (dotPrune dotOpts)
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
-  logDebug "Returning prouned dependency graph"
+  logDebug "Returning pruned dependency graph"
   return (localNames, prunedGraph)
 
 -- | Create the dependency graph, the result is a map from a package

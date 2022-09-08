@@ -78,7 +78,7 @@ the command, see the [build command](build_command.md) documentation.
 
 ## The `stack config` commands
 
-The `stack config` commands provide assistence with accessing or modifying
+The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
 
 ## The `stack config env` command
@@ -290,7 +290,7 @@ All done.
 
 The default templates repository is
 https://github.com/commercialhaskell/stack-templates. You can download templates
-from a different Github user by prefixing the username and a slash. Command:
+from a different GitHub user by prefixing the username and a slash. Command:
 
 ~~~text
 stack new my-yesod-project yesodweb/simple
@@ -442,7 +442,7 @@ For further information, see the [Azure CI](azure_ci.md) documentation.
 
 ### Travis
 
-For futher information, see the [Travis CI](travis_ci.md) documentation.
+For further information, see the [Travis CI](travis_ci.md) documentation.
 
 ## Editor integration
 

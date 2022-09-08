@@ -101,7 +101,7 @@ stack exec my-project-exe
 - The `stack build` command will build the template project and create an
   executable named `my-project-exe` (on Windows, `my-project-exe.exe`). First,
   if necessary, Stack will download a version of GHC in an isolated location.
-  That won't interfere with other GHC instalations on your system.
+  That won't interfere with other GHC installations on your system.
 - The `stack exec my-project-exe` command will run (execute) the built
   executable, in Stack's environment.
 
@@ -264,7 +264,7 @@ The following assumes that you already have installed a version of Stack and the
     cd stack
     ~~~
 
-3.  Build the `stack` executable using a pre-existing installation of Stack with
+3.  Build the `stack` executable using a preexisting installation of Stack with
     the command:
 
     ~~~text
@@ -280,7 +280,7 @@ The following assumes that you already have installed a version of Stack and the
 
     Make sure the version is the latest one.
 
-5.  In the GitHub respository's issue tracker, look for issues tagged with
+5.  In the GitHub repository's issue tracker, look for issues tagged with
     [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
     and
     [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)

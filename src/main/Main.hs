@@ -812,7 +812,7 @@ evalCmd EvalOpts {..} = execCmd execOpts
 ghciCmd :: GhciOpts -> RIO Runner ()
 ghciCmd ghciOpts =
   let boptsCLI = defaultBuildOptsCLI
-          -- using only additional packages, targets then get overriden in `ghci`
+          -- using only additional packages, targets then get overridden in `ghci`
           { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
           , boptsCLIInitialBuildSteps = True
           , boptsCLIFlags = ghciFlags ghciOpts

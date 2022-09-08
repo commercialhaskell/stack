@@ -49,7 +49,7 @@ data RepoTemplatePath = RepoTemplatePath
     deriving (Eq, Ord, Show)
 
 -- | Services from which templates can be retrieved from a repository.
-data RepoService = Github | Gitlab | Bitbucket
+data RepoService = GitHub | GitLab | Bitbucket
     deriving (Eq, Ord, Show)
 
 instance FromJSON TemplateName where
@@ -114,15 +114,15 @@ templatePath :: TemplateName -> TemplatePath
 templatePath (TemplateName _ fp) = fp
 
 defaultRepoUserForService :: RepoService -> Maybe Text
-defaultRepoUserForService Github = Just "commercialhaskell"
+defaultRepoUserForService GitHub = Just "commercialhaskell"
 defaultRepoUserForService _      = Nothing
 
 -- | Parses a template path of the form @github:user/template@.
 parseRepoPath :: String -> Maybe RepoTemplatePath
 parseRepoPath s =
   case T.splitOn ":" (T.pack s) of
-    ["github"    , rest] -> parseRepoPathWithService Github rest
-    ["gitlab"    , rest] -> parseRepoPathWithService Gitlab rest
+    ["github"    , rest] -> parseRepoPathWithService GitHub rest
+    ["gitlab"    , rest] -> parseRepoPathWithService GitLab rest
     ["bitbucket" , rest] -> parseRepoPathWithService Bitbucket rest
     _                    -> Nothing
 

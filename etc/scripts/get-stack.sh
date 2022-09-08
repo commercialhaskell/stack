@@ -69,7 +69,7 @@ post_install_separator() {
   info ""
 }
 
-# determines the the CPU's instruction set
+# determines the CPU's instruction set
 get_isa() {
   if uname -m | grep -Eq 'armv[78]l?' ; then
     echo arm
@@ -302,7 +302,7 @@ do_osx_install() {
   info ""
 }
 
-# # Attempts to insall on FreeBSD.  Installs dependencies with
+# # Attempts to install on FreeBSD.  Installs dependencies with
 # # 'pkg install' and then downloads bindist.
 # do_freebsd_install() {
 #   install_dependencies() {

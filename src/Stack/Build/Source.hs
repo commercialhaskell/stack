@@ -147,7 +147,7 @@ hashSourceMapData boptsCli sm = do
     immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
     bc <- view buildConfigL
     let -- extra bytestring specifying GHC options supposed to be applied to
-        -- GHC boot packages so we'll have differrent hashes when bare
+        -- GHC boot packages so we'll have different hashes when bare
         -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
         -- with profiling or without
         bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
@@ -332,7 +332,7 @@ loadLocalPackage pp = do
         --
         -- - testpkg has tests enabled, but not benchmarks.
         --
-        -- - benchpkg has benchmarks enablde, but not tests.
+        -- - benchpkg has benchmarks enabled, but not tests.
         --
         -- The latter two configurations are used to compute the deps
         -- when --enable-benchmarks or --enable-tests are configured.

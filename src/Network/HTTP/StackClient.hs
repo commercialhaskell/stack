@@ -41,7 +41,7 @@ module Network.HTTP.StackClient
   , partFileRequestBody
   , partBS
   , partLBS
-  , setGithubHeaders
+  , setGitHubHeaders
   , download
   , redownload
   , verifiedDownload
@@ -113,8 +113,8 @@ withResponse
 withResponse = Network.HTTP.Simple.withResponse . setUserAgent
 
 -- | Set the user-agent request header
-setGithubHeaders :: Request -> Request
-setGithubHeaders = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
+setGitHubHeaders :: Request -> Request
+setGitHubHeaders = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
 
 -- | Download the given URL to the given location. If the file already exists,
 -- no download is performed. Otherwise, creates the parent directory, downloads

@@ -12,7 +12,7 @@ main = do
   doesExist ("./bin/happy" ++ exeExt)
 
   -- Default install
-  -- This seems to fail due to direcory being cleaned up,
+  -- This seems to fail due to directory being cleaned up,
   -- a manual test of the default stack install is required
   -- defaultDir <- getAppUserDataDirectory "local"
   -- stack ["install", "happy"]

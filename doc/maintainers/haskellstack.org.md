@@ -137,7 +137,7 @@ Other extensions to the basic Markdown syntax used include:
 
 ## Testing
 
-Online documentation can be tested by establishing a branch on the respository
+Online documentation can be tested by establishing a branch on the repository
 that is then configured on the Read the Docs web site as 'Active' but
 'Hidden' - for example branch `mkdocs-test`. As the branch is 'Hidden' it does
 not appear in the Read the Docs flyout or search results.

@@ -467,7 +467,7 @@ We've specified the `acme-missiles` package in the `package.yaml` file (see
 above), but `acme-missiles` is not part of that LTS package set, so building
 failed.
 
-To add `acme-missles` to the available packages, we'll use the `extra-deps` key
+To add `acme-missiles` to the available packages, we'll use the `extra-deps` key
 in the `stack.yaml` file. That key defines extra packages, not present in the
 resolver, that will be needed as dependencies. You can add this like so:
 
@@ -496,7 +496,7 @@ You can also see a
 [list of all available snapshots](https://www.stackage.org/snapshots). You'll
 notice two flavors: LTS (for "Long Term Support") and Nightly. You can read more
 about them on the
-[LTS Haskell Github page](https://github.com/commercialhaskell/lts-haskell#readme).
+[LTS Haskell GitHub page](https://github.com/commercialhaskell/lts-haskell#readme).
 If you're not sure which to use, start with LTS Haskell (which Stack will lean
 towards by default as well).
 
@@ -841,7 +841,7 @@ stack build --pedantic --haddock --test --exec "echo Yay, it succeeded" --file-w
 
 This command will:
 
-* turn on all warnings and errors (the `--pendantic` flag)
+* turn on all warnings and errors (the `--pedantic` flag)
 * build your library and executables
 * generate Haddocks (the `--haddock` flag)
 * build and run your test suite (the `--test` flag)
@@ -952,7 +952,7 @@ end up including the helloworld-test component as well.
 
 You can bypass this implicit adding of components by being much more explicit,
 and stating the components directly. For example, the following will not build
-the `helloworld-exe` executable once all executables have been sucessfully
+the `helloworld-exe` executable once all executables have been successfully
 built:
 
 ~~~text
@@ -1307,7 +1307,7 @@ follows the Unix convention of `--` to separate these. For example, command:
 stack exec --package stm -- echo I installed the stm package via --package stm
 ~~~
 
-yields ouput like:
+yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config

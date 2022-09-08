@@ -46,7 +46,7 @@ there is ever a bad change, it can always be rolled back.
 
 Stack's maintainers are long-term contributors to the project. Michael Snoyman
 (@snoyberg) was the founder of Stack, and its initial maintainer - and he has
-added others. Michael's current interests and priorties mean that he is no
+added others. Michael's current interests and priorities mean that he is no
 longer actively involved in adding new features to Stack.
 
 Maintainers are recognized for their contributions including:
@@ -136,7 +136,7 @@ changes/additions based off the
 [stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The specific versions of the online documentation (eg `v: v2.7.5`) are generated
-from the content of files at the point in the responsitory's history specified
+from the content of files at the point in the repository's history specified
 by the corresponding release tag. Consequently, that content is fixed once
 released.
 
@@ -307,7 +307,7 @@ Where `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 directory.
 
-You may also achieve this through GHCi with tihs command:
+You may also achieve this through GHCi with this command:
 
 ~~~text
 stack ghci stack:stack-integration-test
@@ -341,9 +341,9 @@ This workflow will run if:
 * commits are pushed to these branches: `master`, `stable` and `rc/**`.
 * requested
 
-The workflow has two jobs: `pendantic` and `unit-tests`.
+The workflow has two jobs: `pedantic` and `unit-tests`.
 
-The `pendantic` job runs on `ubuntu` only and builds Stack with the
+The `pedantic` job runs on `ubuntu` only and builds Stack with the
 `--pedantic` flag.
 
 The `unit-tests` job runs on a matrix of operating systems and Stack
@@ -356,7 +356,7 @@ systems. Its 'Cache dependencies on Windows' step caches the same information
 on Windows, but takes into account that a relevant directory is located outside
 of the Stack root.
 
-### Integration-based - `intergration-tests.yml`
+### Integration-based - `integration-tests.yml`
 
 This workflow will run if:
 * there is a pull request
@@ -397,7 +397,7 @@ named artifacts to path `_release`.
 Its step 'Hash and sign assets' makes use of a 'secret' environment variable
 `RELEASE_SIGNING_KEY` established by the owner of the Stack repository. The
 variable contains the private key for the GPG key with ID 0x575159689BEFB442.
-That key is imported into GPG and then used by GPG to create a detached signture
+That key is imported into GPG and then used by GPG to create a detached signature
 for each file.
 
 ### Inactive - `stan.yml`
@@ -408,7 +408,7 @@ workflow does not run. Its intent is to apply Stan to Stack.
 
 ## Slack channel
 
-If you're making deep changes and real-time communcation with the Stack team
+If you're making deep changes and real-time communication with the Stack team
 would be helpful, we have a `#stack-collaborators` Slack channel in the
 Haskell Foundation workspace. To join the workspace, follow this
 [link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).

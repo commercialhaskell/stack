@@ -8,7 +8,7 @@ module Path.Extra
   ,dropRoot
   ,parseCollapsedAbsDir
   ,parseCollapsedAbsFile
-  ,concatAndColapseAbsDir
+  ,concatAndCollapseAbsDir
   ,rejectMissingFile
   ,rejectMissingDir
   ,pathToByteString
@@ -48,8 +48,8 @@ parseCollapsedAbsFile = parseAbsFile . collapseFilePath
 -- | Add a relative FilePath to the end of a Path
 -- We can't parse the FilePath first because we need to account for ".."
 -- in the FilePath (#2895)
-concatAndColapseAbsDir :: MonadThrow m => Path Abs Dir -> FilePath -> m (Path Abs Dir)
-concatAndColapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> rel)
+concatAndCollapseAbsDir :: MonadThrow m => Path Abs Dir -> FilePath -> m (Path Abs Dir)
+concatAndCollapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> rel)
 
 -- | Collapse intermediate "." and ".." directories from a path.
 --
@@ -84,7 +84,7 @@ dropRoot (Path l) = Path (FP.dropDrive l)
 -- is to be used in conjunction with 'forgivingAbsence' and
 -- 'resolveFile'.
 --
--- Previously the idiom @forgivingAbsence (relsoveFile …)@ alone was used,
+-- Previously the idiom @forgivingAbsence (resolveFile …)@ alone was used,
 -- which relied on 'canonicalizePath' throwing 'isDoesNotExistError' when
 -- path does not exist. As it turns out, this behavior is actually not
 -- intentional and unreliable, see

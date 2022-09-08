@@ -94,7 +94,7 @@ GitHub repository.
 
         === "Gentoo"
 
-            Ensure you have the `ncurses` package with `USE=tinfo`. Wwithout it,
+            Ensure you have the `ncurses` package with `USE=tinfo`. Without it,
             Stack will not be able to install GHC.
 
         === "Ubuntu"
@@ -111,15 +111,15 @@ GitHub repository.
 
     !!! info "Linux packages that lag behind Stack's current version"
 
-        The Stack version available as a Linix package may lag behind Stack's
+        The Stack version available as a Linux package may lag behind Stack's
         current version. If so, using `stack upgrade --binary-only` is
         recommended after installing it. For Stack versions before 1.3.0 which
         do not support `--binary-only`, just `stack upgrade` may work too.
 
     === "Arch Linux"
 
-        The Arch community package respository provides an official
-        [package](ttps://www.archlinux.org/packages/community/x86_64/stack/).
+        The Arch community package repository provides an official
+        [package](https://www.archlinux.org/packages/community/x86_64/stack/).
         You can install it with the command:
 
         ~~~text
@@ -205,7 +205,7 @@ GitHub repository.
 
             ~~~text
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
-            sudo zypeer in stack
+            sudo zypper in stack
             ~~~
 
         === SUSE Linux Enterprise 12

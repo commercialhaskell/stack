@@ -33,7 +33,7 @@ the steps required to upgrade the MSYS2 version used by Stack.
 
 4.  Create a new release tagged and named `msys2-YYYYMMDD` in the `master`
     branch of the
-    [commercialhaskell/stackage-content](https://github.com/commericalhaskell/stackage-content)
+    [commercialhaskell/stackage-content](https://github.com/commercialhaskell/stackage-content)
     GitHub repository, uploading the tarball file(s) into that release.
 
 5.  Changes need to be made to the

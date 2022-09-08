@@ -230,7 +230,7 @@ loadDockerImageExeCache imageId exePath exeTimestamp =
     fmap (dockerImageExeCacheCompatible . entityVal) <$>
     getBy (DockerImageExeCacheUnique imageId (toFilePath exePath) exeTimestamp)
 
--- | Sest the record of whether an executable is compatible with a Docker image
+-- | Sets the record of whether an executable is compatible with a Docker image
 saveDockerImageExeCache ::
        (HasConfig env, HasLogFunc env)
     => Text

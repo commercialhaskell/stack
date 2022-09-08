@@ -175,14 +175,14 @@ Other enhancements:
 * Added `--candidate` flag to `upload` command to upload a package candidate
   rather than publishing the package.
 
-* Error output using `--no-interleaved-output` no longer prepends indentating
+* Error output using `--no-interleaved-output` no longer prepends indenting
   whitespace. This allows emacs compilation-mode and vim quickfix to locate
   and track errors. See
   [#5523](https://github.com/commercialhaskell/stack/pull/5523)
 
 Bug fixes:
 
-* `stack new` now suppports branches other than `master` as default for
+* `stack new` now supports branches other than `master` as default for
   GitHub repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
 
@@ -258,7 +258,7 @@ Bug fixes:
 * Fix the problem of `stack repl foo:test:bar` failing without a project
   build before that. See
   [#5213](https://github.com/commercialhaskell/stack/issues/5213)
-* Fix `stack sdist` introducing unneded sublibrary syntax when using
+* Fix `stack sdist` introducing unnecessary sublibrary syntax when using
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
 
@@ -299,7 +299,7 @@ Release notes:
     * macOS: https://get.haskellstack.org/stable/osx-x86_64.tar.gz
     * Windows 64-bit: https://get.haskellstack.org/stable/windows-x86_64.zip
 
-  As always, binaries for specific versions are available from the Github
+  As always, binaries for specific versions are available from the GitHub
   releases: https://github.com/commercialhaskell/stack/releases.
 
 **Changes since v2.1.3.1**
@@ -581,7 +581,7 @@ Behavior changes:
 * Interleaved output is now turned on by default, see
   [#4702](https://github.com/commercialhaskell/stack/issues/4702). In
   addition, the `packagename> ` prefix is no longer included in
-  interelaved mode when only building a single target.
+  interleaved mode when only building a single target.
 * The `-fhide-source-paths` GHC option is now enabled by default and
   can be disabled via the `hide-source-paths` configuration option in
   `stack.yaml`. See
@@ -862,7 +862,7 @@ Behavior changes:
   optimizations/laziness. See:
   [#4125](https://github.com/commercialhaskell/stack/issues/4125).
 * Mustache templating is not applied to large files (over 50kb) to
-  avoid performance degredation. See:
+  avoid performance degradation. See:
   [#4133](https://github.com/commercialhaskell/stack/issues/4133).
 * `stack upload` signs the package by default, as documented. `--no-signature`
   turns the signing off.
@@ -898,7 +898,7 @@ Other enhancements:
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
 * `stack new` now allows template names of the form `username/foo` to
-  download from a user other than `commercialstack` on Github, and can be
+  download from a user other than `commercialstack` on GitHub, and can be
   prefixed with the service `github:`, `gitlab:`, or `bitbucket:`. See
   [#4039](https://github.com/commercialhaskell/stack/issues/4039)
 * Switch to `githash` to include some unmerged bugfixes in `gitrev`
@@ -1009,7 +1009,7 @@ Other enhancements:
   that is compatible (rather than only checking a single one).   This is
   relevant on Linux where different distributions may have different
   combinations of libtinfo 5/6, ncurses 5/6, and gmp 4/5, and will allow
-  simpifying the setup-info metadata YAML for future GHC releases.
+  simplifying the setup-info metadata YAML for future GHC releases.
 * The build progress bar reports names of packages currently building.
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
@@ -1481,7 +1481,7 @@ Behavior changes:
 
 * The default package metadata backend has been changed from Git to
   the 01-index.tar.gz file, from the hackage-security project. This is
-  intended to address some download speed issues from Github for
+  intended to address some download speed issues from GitHub for
   people in certain geographic regions. There is now full support for
   checking out specific Cabal file revisions from downloaded tarballs
   as well. If you manually specify a package index with only a Git
@@ -1948,7 +1948,7 @@ Other enhancements:
   [#1620](https://github.com/commercialhaskell/stack/issues/1620)
 * `DESTDIR` is filtered from environment when installing GHC. See
   [#1460](https://github.com/commercialhaskell/stack/issues/1460)
-* `stack haddock` now supports `--hadock-arguments`. See
+* `stack haddock` now supports `--haddock-arguments`. See
   [#2144](https://github.com/commercialhaskell/stack/issues/2144)
 * Signing: warn if GPG_TTY is not set as per `man gpg-agent`
 

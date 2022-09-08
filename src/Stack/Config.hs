@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 
 -- | The general Stack configuration that starts everything off. This should
--- be smart to falback if there is no stack.yaml, instead relying on
+-- be smart to fallback if there is no stack.yaml, instead relying on
 -- whatever files are available.
 --
 -- If there is no stack.yaml, and there is a cabal.config, we

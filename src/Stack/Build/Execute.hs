@@ -601,7 +601,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
     run <- askRunInIO
 
-    -- If running tests concurrently with eachother, then create an MVar
+    -- If running tests concurrently with each other, then create an MVar
     -- which is empty while each test is being run.
     concurrentTests <- view $ configL.to configConcurrentTests
     mtestLock <- if concurrentTests then return Nothing else Just <$> liftIO (newMVar ())
@@ -958,7 +958,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             logInfo ""
             logInfo "  stack exec pacman -- --sync --refresh autoconf"
             logInfo ""
-            logInfo $ "Some versions of perl from MYSY2 are broken. See " <>
+            logInfo $ "Some versions of perl from MSYS2 are broken. See " <>
               "https://github.com/msys2/MSYS2-packages/issues/1611 and " <>
               "https://github.com/commercialhaskell/stack/pull/4781. To " <>
               "test if perl in the required location is working, try command:"
@@ -1068,7 +1068,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     -- Output to the console if this is the last task, and the user
     -- asked to build it specifically. When the action is a
     -- 'ConcurrencyDisallowed' action (benchmarks), then we can also be
-    -- sure to have excluse access to the console, so output is also
+    -- sure to have exclusive access to the console, so output is also
     -- sent to the console in this case.
     --
     -- See the discussion on #426 for thoughts on sending output to the
@@ -1848,7 +1848,7 @@ singleTest :: HasEnvConfig env
            -> RIO env ()
 singleTest topts testsToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
-    -- fullblown 'withSingleContext'.
+    -- full blown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
     mcurator <- view $ buildConfigL.to bcCurator
     let pname = pkgName $ taskProvides task
