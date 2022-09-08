@@ -14,7 +14,7 @@ spec =
       let pathOf s = either error templatePath (parseTemplateNameFromString s)
 
       it "parses out the TemplatePath" $ do
-        pathOf "github:user/name"     `shouldBe` RepoPath (RepoTemplatePath Github    "user" "name.hsfiles")
+        pathOf "github:user/name"     `shouldBe` RepoPath (RepoTemplatePath GitHub    "user" "name.hsfiles")
         pathOf "bitbucket:user/name"  `shouldBe` RepoPath (RepoTemplatePath Bitbucket "user" "name.hsfiles")
         pathOf "gitlab:user/name"     `shouldBe` RepoPath (RepoTemplatePath Gitlab    "user" "name.hsfiles")
 

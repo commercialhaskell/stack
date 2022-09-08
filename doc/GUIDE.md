@@ -496,7 +496,7 @@ You can also see a
 [list of all available snapshots](https://www.stackage.org/snapshots). You'll
 notice two flavors: LTS (for "Long Term Support") and Nightly. You can read more
 about them on the
-[LTS Haskell Github page](https://github.com/commercialhaskell/lts-haskell#readme).
+[LTS Haskell GitHub page](https://github.com/commercialhaskell/lts-haskell#readme).
 If you're not sure which to use, start with LTS Haskell (which Stack will lean
 towards by default as well).
 

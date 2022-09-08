@@ -118,7 +118,7 @@ jobs:
         path: _release/stack-*
 
   github-release:
-    name: Create Github release
+    name: Create GitHub release
     needs:
     - integration-tests
     - linux-arm64
@@ -157,11 +157,11 @@ jobs:
           shasum -a 256 "$asset" >"$asset.sha256"
           gpg --digest-algo=sha512 --detach-sig --armor -u 0x575159689BEFB442 "$asset"
         done
-    - name: Set Github ref variables
+    - name: Set GitHub ref variables
       id: github_ref_vars
       run: |
         echo ::set-output name=SOURCE_TAG::${GITHUB_REF#refs/tags/}
-    - name: Create Github release (final)
+    - name: Create GitHub release (final)
       if: "!startsWith(github.ref, 'refs/tags/rc/')"
       uses: actions/create-release@v1
       env:
@@ -180,7 +180,7 @@ jobs:
           [INSERT CONTRIBUTORS]
         draft: true
         prerelease: false
-    - name: Create Github release (release candidate)
+    - name: Create GitHub release (release candidate)
       if: "startsWith(github.ref, 'refs/tags/rc/')"
       uses: actions/create-release@v1
       env:
@@ -193,7 +193,7 @@ jobs:
           [INSERT CHANGELOG]
         draft: true
         prerelease: true
-    - name: Upload assets to Github release (final)
+    - name: Upload assets to GitHub release (final)
       if: "!startsWith(github.ref, 'refs/tags/rc/')"
       uses: xresloader/upload-to-github-release@v1
       env:
@@ -204,7 +204,7 @@ jobs:
         draft: true
         prerelease: false
         overwrite: true
-    - name: Upload assets to Github release (release candidate)
+    - name: Upload assets to GitHub release (release candidate)
       if: "startsWith(github.ref, 'refs/tags/rc/')"
       uses: xresloader/upload-to-github-release@v1
       env:

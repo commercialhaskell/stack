@@ -44,7 +44,7 @@ There are essentially four different ways of specifying a snapshot location:
 4.  Via a _convenience synonym_, which provides a short form for some common
     URLs. These are:
 
-    * Github: `github:user/repo:path` is treated as:
+    * GitHub: `github:user/repo:path` is treated as:
 
         ~~~text
         https://raw.githubusercontent.com/user/repo/master/path

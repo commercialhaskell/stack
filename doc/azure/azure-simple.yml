@@ -5,7 +5,7 @@
 #
 # https://docs.haskellstack.org/en/stable/azure_ci/
 #
-# Copy these contents into the root directory of your Github project in a file
+# Copy these contents into the root directory of your GitHub project in a file
 # named azure-pipelines.yml
 
 # Choose a agent virtual image

@@ -290,7 +290,7 @@ All done.
 
 The default templates repository is
 https://github.com/commercialhaskell/stack-templates. You can download templates
-from a different Github user by prefixing the username and a slash. Command:
+from a different GitHub user by prefixing the username and a slash. Command:
 
 ~~~text
 stack new my-yesod-project yesodweb/simple

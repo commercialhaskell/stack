@@ -48,10 +48,10 @@ upgradeOpts = UpgradeOpts
           help "Download a specific stack version"))
         <*> optional (strOption
          (long "github-org" <>
-          help "Github organization name"))
+          help "GitHub organization name"))
         <*> optional (strOption
          (long "github-repo" <>
-          help "Github repository name"))
+          help "GitHub repository name"))
 
     sourceOpts = SourceOpts
         <$> ((\fromGit repo branch -> if fromGit then Just (repo, branch) else Nothing)
@@ -76,8 +76,8 @@ data BinaryOpts = BinaryOpts
     -- than what we are
     , _boVersion :: !(Maybe String)
     -- ^ specific version to download
-    , _boGithubOrg :: !(Maybe String)
-    , _boGithubRepo :: !(Maybe String)
+    , _boGitHubOrg :: !(Maybe String)
+    , _boGitHubRepo :: !(Maybe String)
     }
     deriving Show
 newtype SourceOpts = SourceOpts (Maybe (String, String)) -- repo and branch
@@ -131,7 +131,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
         case mdownloadVersion of
             Nothing -> do
                 prettyErrorL $
-                    flow "Unable to determine upstream version from Github metadata"
+                    flow "Unable to determine upstream version from GitHub metadata"
                   :
                   [ line <> flow "Rerun with --force-download to force an upgrade"
                     | not force]

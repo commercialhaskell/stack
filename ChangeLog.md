@@ -299,7 +299,7 @@ Release notes:
     * macOS: https://get.haskellstack.org/stable/osx-x86_64.tar.gz
     * Windows 64-bit: https://get.haskellstack.org/stable/windows-x86_64.zip
 
-  As always, binaries for specific versions are available from the Github
+  As always, binaries for specific versions are available from the GitHub
   releases: https://github.com/commercialhaskell/stack/releases.
 
 **Changes since v2.1.3.1**
@@ -898,7 +898,7 @@ Other enhancements:
   This should help with
   [#3510](https://github.com/commercialhaskell/stack/issues/3510).
 * `stack new` now allows template names of the form `username/foo` to
-  download from a user other than `commercialstack` on Github, and can be
+  download from a user other than `commercialstack` on GitHub, and can be
   prefixed with the service `github:`, `gitlab:`, or `bitbucket:`. See
   [#4039](https://github.com/commercialhaskell/stack/issues/4039)
 * Switch to `githash` to include some unmerged bugfixes in `gitrev`
@@ -1481,7 +1481,7 @@ Behavior changes:
 
 * The default package metadata backend has been changed from Git to
   the 01-index.tar.gz file, from the hackage-security project. This is
-  intended to address some download speed issues from Github for
+  intended to address some download speed issues from GitHub for
   people in certain geographic regions. There is now full support for
   checking out specific Cabal file revisions from downloaded tarballs
   as well. If you manually specify a package index with only a Git

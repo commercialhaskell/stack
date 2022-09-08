@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # This script will download official GHC bindists from download.haskell.org and upload
-# them to the Github Release that Stack uses.
+# them to the GitHub Release that Stack uses.
 #
 # Prerequisites:
-#  - Create a Github release with tag `ghc-X.Y.Z-release`
+#  - Create a GitHub release with tag `ghc-X.Y.Z-release`
 #  - Set GITHUB_AUTH_TOKEN to a token that has permission to upload assets to a Release
 #
 # To use:
@@ -31,7 +31,7 @@ UPLOAD_URL="$(curl --fail -sSLH "Authorization: token $GITHUB_AUTH_TOKEN" https:
 if [[ -z "$UPLOAD_URL" ]]; then
   set +x
   echo
-  echo "$0: Could not get upload URL from Github" >&2
+  echo "$0: Could not get upload URL from GitHub" >&2
   exit 1
 fi
 echo 'ghc:' >stack-setup-$GHCVER.yaml

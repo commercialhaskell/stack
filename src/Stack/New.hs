@@ -34,7 +34,7 @@ import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
                                            getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
-                                           setForceDownload, setGithubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
+                                           setForceDownload, setGitHubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
 import           Stack.Constants
@@ -202,7 +202,7 @@ asIsFromUrl url = TemplateDownloadSettings
 
 -- | Construct a URL for downloading from a repo.
 settingsFromRepoTemplatePath :: RepoTemplatePath -> TemplateDownloadSettings
-settingsFromRepoTemplatePath (RepoTemplatePath Github user name) =
+settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
     -- T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
     TemplateDownloadSettings
     { tplDownloadUrl = concat ["https://api.github.com/repos/", T.unpack user, "/stack-templates/contents/", T.unpack name]
@@ -345,7 +345,7 @@ runTemplateInits dir = do
 templatesHelp :: HasLogFunc env => RIO env ()
 templatesHelp = do
   let url = defaultTemplatesHelpUrl
-  req <- liftM setGithubHeaders (parseUrlThrow url)
+  req <- liftM setGitHubHeaders (parseUrlThrow url)
   resp <- httpLbs req `catch` (throwM . FailedToDownloadTemplatesHelp)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> throwM $ BadTemplatesHelpEncoding url err
@@ -356,7 +356,7 @@ templatesHelp = do
 
 -- | The default service to use to download templates.
 defaultRepoService :: RepoService
-defaultRepoService = Github
+defaultRepoService = GitHub
 
 -- | Default web URL to get the `stack templates` help output.
 defaultTemplatesHelpUrl :: String
