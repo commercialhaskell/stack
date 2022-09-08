@@ -285,13 +285,15 @@ package is targetted in a multi-package project (for example, using
 * **One target package:** The build output for the target package is sent to the
   console as it happens.
 
-* **More than one target package:** The build output from GHC
-  (as opposed to from Stack) for each target package is sent to a log file for
-  that package, unless it contains warnings or errors. At the end of the build,
-  the location of the directory containing the log files is reported. To also
-  output the contents of the log files to the console at the end of the build,
-  use Stack's `dump-logs` option. For further information about that option, see
-  the [YAML configuration](yaml_configuration.md#dump-logs) documentation.
+* **More than one target package:** The build output from GHC (as opposed to
+  from Stack) for each target package is sent to a log file for that package,
+  unless an error occurs. At the end of the build, the location of the directory
+  containing the log files is reported. To also output the contents of the log
+  files to the console at the end of the build, use Stack's `dump-logs` option.
+  For further information about that option, see the
+  [YAML configuration](yaml_configuration.md#dump-logs) documentation. The
+  default `dump-logs` mode is to output the contents of the log files that are
+  warnings.
 
 ### The `stack build --pedantic` flag
 
