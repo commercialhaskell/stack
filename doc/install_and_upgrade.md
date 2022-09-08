@@ -94,7 +94,7 @@ GitHub repository.
 
         === "Gentoo"
 
-            Ensure you have the `ncurses` package with `USE=tinfo`. Wwithout it,
+            Ensure you have the `ncurses` package with `USE=tinfo`. Without it,
             Stack will not be able to install GHC.
 
         === "Ubuntu"
