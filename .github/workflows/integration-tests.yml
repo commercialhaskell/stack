@@ -98,8 +98,11 @@ jobs:
   configuration:
     name: Check for self-hosted runners
     runs-on: ubuntu-latest
+    env:
+      CAN_SIGN: ${{ secrets.RELEASE_SIGNING_KEY != '' }}
     outputs:
       arm64: ${{ fromJSON(steps.runners.outputs.arm64) }}
+      can-sign: ${{ env.CAN_SIGN }}
     steps:
     - name: Check for hosted runners
       id: runners
@@ -176,6 +179,7 @@ jobs:
         name: Linux-ARM64
         path: _release
     - name: Hash and sign assets
+      if: needs.configuration.outputs.can-sign
       shell: bash
       env:
         RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
