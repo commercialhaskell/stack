@@ -205,7 +205,7 @@ GitHub repository.
 
             ~~~text
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
-            sudo zypeer in stack
+            sudo zypper in stack
             ~~~
 
         === SUSE Linux Enterprise 12
