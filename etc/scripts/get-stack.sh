@@ -302,7 +302,7 @@ do_osx_install() {
   info ""
 }
 
-# # Attempts to insall on FreeBSD.  Installs dependencies with
+# # Attempts to install on FreeBSD.  Installs dependencies with
 # # 'pkg install' and then downloads bindist.
 # do_freebsd_install() {
 #   install_dependencies() {
