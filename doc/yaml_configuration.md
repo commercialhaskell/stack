@@ -700,7 +700,7 @@ machine architecture), (optional) GHC variant and (optional) GHC build.
 See [`setup-info`](#setup-info).
 
 `ghc-build` specifies a specialized architecture for the GHC executable.
-Normally this is determined automatically, but it can be overriden. Possible
+Normally this is determined automatically, but it can be overridden. Possible
 arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
 `ncurses6`, `int-native` and `integersimple`.
 
@@ -723,7 +723,7 @@ Since Stack 1.6.0, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
 flag). However, setting options via `$everything` on all flags will not do so
 (see
-[Github discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
+[GitHub discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.
 
@@ -975,6 +975,11 @@ default. For more information on this change, see
 
 [:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
+Default: `none`
+
+Command line equivalent (takes precedence): `stack sdist --pvp-bounds` option or
+`stack upload --pvp-bounds` option
+
 !!! warning
 
     As of Stack 1.6.0, this feature does not reliably work, due to issues with
@@ -985,7 +990,11 @@ default. For more information on this change, see
 
 When using the `sdist` and `upload` commands, this setting determines whether
 the Cabal file's dependencies should be modified to reflect PVP lower and upper
-bounds. Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
+bounds.
+
+#### Basic use
+
+Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
 lower bounds), and both (and upper and lower bounds). The algorithm it follows
 is:
 
@@ -1002,16 +1011,19 @@ pvp-bounds: none
 For further information, see the announcement
 [blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
-!!! note
+#### Use with Cabal file revisions
 
-    Since Stack 1.5.0, each of the values listed above supports adding
-    `-revision` to the end of each value, e.g. `pvp-bounds: both-revision`. This
-    means that, when uploading to Hackage, Stack will first upload your tarball
-    with an unmodified Cabal file, and then upload a Cabal file revision with
-    the PVP bounds added. This can be useful - especially combined with the
-    [Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field) -
-    as a method to ensure PVP compliance without having to proactively fix
-    bounds issues for Stackage maintenance.
+[:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0)
+
+Each of the values listed above supports adding `-revision` to the end of the
+value, e.g. `pvp-bounds: both-revision`. This means that, when uploading to
+Hackage, Stack will first upload your tarball with an unmodified Cabal file, and
+then upload a Cabal file revision with the PVP bounds added.
+
+This can be useful - especially combined with the
+[Stackage no-revisions feature](http://www.snoyman.com/blog/2017/04/stackages-no-revisions-field) -
+as a method to ensure PVP compliance without having to proactively fix bounds
+issues for Stackage maintenance.
 
 ### recommend-stack-upgrade
 
@@ -1194,7 +1206,7 @@ Relative paths are resolved relative to the `stack.yaml` file (either the one in
 the local project or the global `stack.yaml`).
 
 Relative paths may also be used for the installation paths to tools (such as GHC
-or 7z). This allows vendoring the tools inside a monorepo (a single respository
+or 7z). This allows vendoring the tools inside a monorepo (a single repository
 storing many projects). For example:
 
 Directory structure:

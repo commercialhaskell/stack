@@ -87,7 +87,7 @@ necessary (they are not, if only Stack is being used).
 
 For this workaround to work, however, there can be no differences between the
 version of GHC that the GHCup-supplied HLS was built with and the version that
-Stack has installed. A slight inconvenience here is also the posibility of false
+Stack has installed. A slight inconvenience here is also the possibility of false
 messages from the start-up that need to be ignored. In principle, those messages
 can be disabled by
 [setting the following](https://github.com/haskell/vscode-haskell#setting-a-specific-toolchain)

@@ -30,7 +30,7 @@ The following terms are used in Stack's documentation.
 |Homebrew           |A [package manager](https://brew.sh/) for macOS or Linux, or its executable `brew`.|
 |Hoogle             |A Haskell API [search engine](https://hoogle.haskell.org/).|
 |Hpack              |A [format](https://github.com/sol/hpack) for Haskell packages or the executable `hpack` that produces a Cabal file from `package.yaml`.|
-|Linux              |A family of operating systems based on the Linux kernal.  |
+|Linux              |A family of operating systems based on the Linux kernel.  |
 |macOS              |The primary operating system for Apple's Mac computers. Previously known as Mac OS X or OS X.|
 |Make               |A [build automation tool](https://www.gnu.org/software/make/).|
 |MSYS2              |The [MSYS2](https://www.msys2.org/) software distribution and building platform for Windows.|

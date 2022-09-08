@@ -12,7 +12,7 @@
     git push origin ghc-X.Y.Z-release
     ~~~
 
-* [Publish a new Github release](https://github.com/commercialhaskell/ghc/releases/new)
+* [Publish a new GitHub release](https://github.com/commercialhaskell/ghc/releases/new)
   with tag `ghc-X.Y.Z-release` and same name, with description noting where the
   binidsts are mirrored from. For example:
 
@@ -23,7 +23,7 @@
     ~~~
 
 * Download all the relevant GHC bindists from their sources, and upload them to
-  the just-created Github release (see
+  the just-created GitHub release (see
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml)
   for the ones we used in the last GHC release).
 
@@ -34,7 +34,7 @@
   this. See the comments within the script.
 
 * [Edit stack-setup-2.yaml](https://github.com/fpco/stackage-content/edit/master/stack/stack-setup-2.yaml)
-  and add the new bindists, pointing to the Github release version. Be sure to
+  and add the new bindists, pointing to the GitHub release version. Be sure to
   update the `content-length` and `sha1` values.
 
   Before committing, test using a command like:

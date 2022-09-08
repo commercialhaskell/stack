@@ -36,7 +36,7 @@ When your project has these properties, you will get the following:
 2.  A unified textual and HTML report, considering the coverage on all local
     libraries, based on all of the tests that were run.
 
-3.  An index of all generated HTML reports, in `index.html` in the the local
+3.  An index of all generated HTML reports, in `index.html` in the local
     HPC root directory.
 
 ## The `stack hpc report` command

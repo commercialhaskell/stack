@@ -6,7 +6,7 @@
 
 This document describes:
 
-* the specificaton of a snapshot location (in the `resolver` key)
+* the specification of a snapshot location (in the `resolver` key)
 * the specification of a package location (in the `extra-deps` key and in a
   snapshot)
 
@@ -44,7 +44,7 @@ There are essentially four different ways of specifying a snapshot location:
 4.  Via a _convenience synonym_, which provides a short form for some common
     URLs. These are:
 
-    * Github: `github:user/repo:path` is treated as:
+    * GitHub: `github:user/repo:path` is treated as:
 
         ~~~text
         https://raw.githubusercontent.com/user/repo/master/path
@@ -228,7 +228,7 @@ fonts export-ignore
 ### Local or remote archives
 
 You can use filepaths referring to local archive files or HTTP or HTTPS URLs
-refering to remote archive files, either tarballs or ZIP files.
+referring to remote archive files, either tarballs or ZIP files.
 
 !!! note
 

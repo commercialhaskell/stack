@@ -104,7 +104,7 @@ above to use Nix flakes. The `flake.nix` file is:
 
         myDevTools = [
           hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
-          hPkgs.ghcid # Continous terminal Haskell compile checker
+          hPkgs.ghcid # Continuous terminal Haskell compile checker
           hPkgs.ormolu # Haskell formatter
           hPkgs.hlint # Haskell codestyle checker
           hPkgs.hoogle # Lookup Haskell documentation
@@ -322,7 +322,7 @@ Nix organizes its packages in snapshots of packages (each snapshot being a
 environment variable. This package set can be different depending on when you
 installed Nix and which nixpkgs channel you're using (similar to the LTS channel
 for stable packages and the nightly channel for bleeding edge packages in
-[Stackage](https://www.stackage.org/)). This is bad for reproducibilty so that
+[Stackage](https://www.stackage.org/)). This is bad for reproducibility so that
 nixpkgs should be pinned, i.e., set to the same package set for every developer
 of your project.
 
@@ -354,7 +354,7 @@ default values:
 nix:
 
   # false by default. Must be present and set to `true` to enable Nix, except on
-  # NixOS where it is enabled by default (see #3938).  You can set set it in
+  # NixOS where it is enabled by default (see #3938).  You can set it in
   # your `$HOME/.stack/config.yaml` to enable Nix for all your projects without
   # having to repeat it
   enable: true
