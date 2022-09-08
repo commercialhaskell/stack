@@ -209,10 +209,12 @@ Hackage-only release:
 **Changes since v2.3.3**
 
 Major changes:
+
 * Add the `snapshot-location-base` yaml configuration option, which allows to
   override the default location of snapshot configuration files. This option
   affects how snapshot synonyms (LTS/Nightly) are expanded to URLs by the
   `pantry` library.
+
 * `docker-network` configuration key added to override docker `--net` arg
 
 Behavior changes:
