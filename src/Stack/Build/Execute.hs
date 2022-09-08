@@ -601,7 +601,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
 
     run <- askRunInIO
 
-    -- If running tests concurrently with eachother, then create an MVar
+    -- If running tests concurrently with each other, then create an MVar
     -- which is empty while each test is being run.
     concurrentTests <- view $ configL.to configConcurrentTests
     mtestLock <- if concurrentTests then return Nothing else Just <$> liftIO (newMVar ())
