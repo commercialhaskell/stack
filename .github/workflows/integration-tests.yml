@@ -101,8 +101,9 @@ jobs:
     env:
       CAN_SIGN: ${{ secrets.RELEASE_SIGNING_KEY != '' }}
     outputs:
-      arm64: ${{ steps.runners.outputs.arm64 }}
+      arm64-runner: ${{ steps.runners.outputs.arm64 }}
       can-sign: ${{ env.CAN_SIGN }}
+      test-arm64: ${{ steps.runners.outputs.test-arm64 }}
     steps:
     - name: Check for hosted runners
       id: runners
@@ -113,27 +114,29 @@ jobs:
         echo "::set-output name=runners::$SELF_HOSTED_RUNNERS"
         if echo "$SELF_HOSTED_RUNNERS" | grep -q 'arm64'; then
           echo "::set-output name=arm64::['self-hosted', 'linux', 'ARM64']"
+          echo ::set-output name=test-arm64::true
         else
-          echo '::set-output name=arm64::"ubuntu-latest"'
+          echo "::set-output name=arm64::'ubuntu-latest'"
+          echo ::set-output name=test-arm64::false
         fi
 
   linux-arm64:
     name: Linux ARM64
-    runs-on: ${{ fromJSON(needs.configuration.outputs.arm64) }}
+    runs-on: ${{ fromJSON(needs.configuration.outputs.arm64-runner) }}
     needs: configuration
     steps:
     - name: Skipping ARM64
-      if: needs.configuration.outputs.arm64 == 'ubuntu-latest'
+      if: needs.configuration.outputs.test-arm64 == 'false'
       shell: bash
       run: |
         echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
 
     - name: Clone project
-      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
+      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/checkout@v3
 
     - name: Build bindist
-      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
+      if: needs.configuration.outputs.test-arm64 == 'true'
       shell: bash
       run: |
         set -ex
@@ -143,7 +146,7 @@ jobs:
         docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
 
     - name: Upload bindist
-      if: needs.configuration.outputs.arm64 != 'ubuntu-latest'
+      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/upload-artifact@v3
       with:
         name: Linux-ARM64
