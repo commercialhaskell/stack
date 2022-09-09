@@ -1665,79 +1665,85 @@ for future uses of Stack:
 
 ## Comparison to other tools
 
-Stack is not the only tool around for building Haskell code. Stack came into
-existence due to limitations with some of the existing tools. If you're
-unaffected by those limitations and are happily building Haskell code, you may
-not need Stack. If you're suffering from some of the common problems in other
-tools, give Stack a try instead.
+Stack is not the only tool available for building Haskell code. Stack came into
+existence due to limitations at that time with some of the existing tools. If
+you are happily building Haskell code with other tools, you may not need Stack.
+If you're experiencing problems with other tools, give Stack a try instead.
 
-If you're a new user who has no experience with other tools, we recommend going
-with Stack. The defaults match modern best practices in Haskell development, and
-there are less corner cases you need to be aware of. You *can* develop Haskell
-code with other tools, but you probably want to spend your time writing code,
-not convincing a tool to do what you want.
+If you're a new user who has no experience with other tools, we recommend Stack.
+The defaults match modern best practices in Haskell development, and there are
+fewer corner cases you need to be aware of. You *can* develop Haskell code with
+other tools, but you probably want to spend your time writing code, not
+convincing a tool to do what you want.
 
-Before jumping into the differences, let me clarify an important similarity:
+### Underlying package format
 
-__Same package format.__ Stack, Cabal (the tool), and presumably all other tools
-share the same underlying Cabal package format, consisting of a Cabal file,
-modules, etc. This is a Good Thing: we can share the same set of upstream
-libraries, and collaboratively work on the same project with Stack, Cabal (the
-tool), and NixOS. In that sense, we're sharing the same ecosystem.
+Before turning to differences, we clarify an important similarity: Stack, Cabal
+(the tool), and presumably all other tools share the same underlying package
+format of Cabal (the library). This is a Good Thing: we can share the same set
+of upstream libraries, and collaboratively work on the same project with Stack,
+Cabal (the tool), and NixOS. In that sense, we're sharing the same ecosystem.
 
-Now the differences:
+### Curation vs dependency solving
 
-* __Curation vs dependency solving as a default__.
-    * Stack defaults to using curation (Stackage snapshots, LTS Haskell,
-      Nightly, etc) as a default instead of defaulting to dependency solving, as
-      Cabal (the tool) does. This is just a default: as described above, Stack
-      can use dependency solving if desired, and Cabal (the tool) can use
-      curation. However, most users will stick to the defaults. The Stack team
-      firmly believes that the majority of users want to simply ignore
-      dependency resolution nightmares and get a valid build plan from day one,
-      which is why we've made this selection of default behavior.
-* __Reproducible__.
-    * Stack goes to great lengths to ensure that `stack build` today does the
-      same thing tomorrow. Cabal (the tool) does not: build plans can be
-      affected by the presence of pre-installed packages, and running
-      `cabal update` can cause a previously successful build to fail. With
-      Stack, changing the build plan is always an explicit decision.
-* __Automatically building dependencies__.
-    * With Cabal (the tool), you need to use `cabal install` to trigger
-      dependency building. This is somewhat necessary due to the previous point,
-      since building dependencies can, in some cases, break existing installed
-      packages. So for example, in Stack, `stack test` does the same job as
-      `cabal install --run-tests`, though the latter *additionally* performs an
-      installation that you may not want. The closer equivalent command sequence
-      is: `cabal install --enable-tests --only-dependencies`,
-      `cabal configure --enable-tests`, `cabal build && cabal test` (newer
-      versions of Cabal (the tool) may make this command sequence shorter).
-* __Isolated by default__.
-    * This has been a pain point for new Stack users. In Cabal, the default
-      behavior is a non-isolated build where working on two projects can cause
-      the user package database to become corrupted. The Cabal solution to this
-      is sandboxes. Stack, however, provides this behavior by default via its
-      databases. In other words: when you use Stack, there's __no need for
-      sandboxes__, everything is (essentially) sandboxed by default.
+* Stack uses 'curation' (snapshots and Stack's project-level configuration file
+  (`stack.yaml`) define precisely the set of packages available for a project).
+  The Stack team firmly believes that the majority of users want to simply
+  ignore dependency resolution nightmares and get a valid build plan from day
+  one. That's why we've made 'curation' the focus of Stack.
 
-__Other tools for comparison (including active and historical)__
+* Cabal (the tool) can use 'curation' too but its origins are in dependency
+  solving.
 
-* [cabal-dev](https://hackage.haskell.org/package/cabal-dev). This is deprecated
-  in favor of Cabal (the tool).
+### Emphasis on reproducibility
+
+* Stack goes to great lengths to ensure that `stack build` today does the
+  same thing tomorrow. With Stack, changing the build plan is always an explicit
+  decision.
+
+* Cabal (the tool) does not go to the same lengths: build plans can be affected
+  by the presence of pre-installed packages, and running `cabal update` can
+  cause a previously successful build to fail.
+
+### Automatic building of dependencies
+
+* Stack's automatically builds dependencies. So for example, in Stack,
+  `stack test` does the same job as:
+
+    ~~~text
+    cabal install --enable-tests --only-dependencies
+    cabal configure --enable-tests
+    cabal build
+    cabal test
+    ~~~
+
+  (newer versions of Cabal (the tool) may make this command sequence shorter).
+
+* With Cabal (the tool), you need to use `cabal install` to trigger dependency
+  building. This is somewhat necessary as building dependencies can, in some
+  cases, break existing installed packages.
+
+### Isolation
+
+* Stack is isolated - provides 'sandboxed' behaviour - by default, via its
+  databases. In other words: when you use Stack, there's
+  __no need for sandboxes__, everything is (essentially) sandboxed by default.
+
+* With Cabal (the tool), the default behavior is a non-isolated build where
+  working on two projects can cause the user package database to become
+  corrupted. The Cabal solution to this is sandboxes.
+
+### Tools other than Stack and Cabal (the tool)
+
 * [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of
-  the multi-package functionality of Stack. If you're still using Cabal (the
-  tool), `cabal-meta` is relevant. For Stack work, the feature set is fully
-  subsumed by Stack.
-* [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly
-  irrelevant in the presence of both Stack and Cabal sandboxes, both of which
-  make it easier to add additional package sources easily. The mega-sdist
-  executable that ships with cabal-src is, however, still relevant. Its
-  functionality may some day be folded into Stack
-* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an
-  initial attempt to make Cabal (the tool) work more easily with curated
-  snapshots, but due to a slight impedance mismatch between cabal.config
-  constraints and snapshots, it did not work as well as hoped. It is deprecated
-  in favor of Stack.
+  the multi-package functionality of Stack. Still relevant for Cabal (the
+  tool).
+* [cabal-src](https://hackage.haskell.org/package/cabal-src). Deprecated in
+  favor of Stack in 2016.
+* [stackage-cli](https://hackage.haskell.org/package/stackage-cli).Deprecated
+  in favor of Stack in 2015.
+* [cabal-dev](https://hackage.haskell.org/package/cabal-dev). Deprecated in
+  favor of Cabal (the tool) in 2013.
 
 ## More resources
 
