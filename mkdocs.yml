@@ -57,6 +57,7 @@ nav:
     - Add GHC version: maintainers/ghc.md
     - Docker images: maintainers/docker.md
     - Upgrading MSYS2: maintainers/msys.md
+    - Upgrading 7-Zip: maintainers/7zip.md
     - HaskellStack.org: maintainers/haskellstack.org.md
 - Signing key: SIGNING_KEY.md
 - Glossary: glossary.md
