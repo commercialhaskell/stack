@@ -1707,8 +1707,8 @@ Cabal (the tool), and NixOS. In that sense, we're sharing the same ecosystem.
 
 ### Automatic building of dependencies
 
-* Stack's automatically builds dependencies. So for example, in Stack,
-  `stack test` does the same job as:
+*   Stack's automatically builds dependencies. So for example, in Stack,
+    `stack test` does the same job as:
 
     ~~~text
     cabal install --enable-tests --only-dependencies
@@ -1717,11 +1717,11 @@ Cabal (the tool), and NixOS. In that sense, we're sharing the same ecosystem.
     cabal test
     ~~~
 
-  (newer versions of Cabal (the tool) may make this command sequence shorter).
+    (newer versions of Cabal (the tool) may make this command sequence shorter).
 
-* With Cabal (the tool), you need to use `cabal install` to trigger dependency
-  building. This is somewhat necessary as building dependencies can, in some
-  cases, break existing installed packages.
+*   With Cabal (the tool), you need to use `cabal install` to trigger dependency
+    building. This is somewhat necessary as building dependencies can, in some
+    cases, break existing installed packages.
 
 ### Isolation
 
