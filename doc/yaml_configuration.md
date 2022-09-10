@@ -620,16 +620,23 @@ Default: `warning`
 
 Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 
-Control which log output from local non-dependency packages to print to the
-console. By default, Stack will only do this when building a single target
-package or if the log contains warnings, to avoid generating unnecessarily
-verbose output.
+In the case of *non-interleaved* output and *more than one* target package,
+Stack sends the build output from GHC for each target package to a log file,
+unless an error occurs. For further information, see the
+[`stack build --[no-]interleaved-output` flag](build_command.md#the-stack-build---no-interleaved-output-flag)
+documentation.
+
+The value of the `dump-logs` key controls what, if any, log file content is sent
+('dumped') to the console at the end of the build. Possible values are:
 
 ~~~yaml
-dump-logs: none      # don't dump logs even if they contain warnings
-dump-logs: warning   # dump logs that contain warnings
-dump-logs: all       # dump all logs for local non-dependency packages
+dump-logs: none      # don't dump the content of any log files
+dump-logs: warning   # dump the content of log files that are warnings
+dump-logs: all       # dump all of the content of log files
 ~~~
+
+At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
+`--dump-logs` is equivalent to `dump-logs: all`.
 
 ### extra-include-dirs
 
