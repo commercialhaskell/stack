@@ -87,15 +87,16 @@ cfgCmdSet cmd = do
                   \unchanged.")
         else do
             let configLines = yamlLines rawConfig
+            let keys = coerce yamlKeys
             either
                 throwM
                 (\updated -> do
-                    let redressed = unmkRaw $ redress configLines updated
+                    let redressed = unmkRaw $ redress keys configLines updated
                     writeBinaryFileAtomic configFilePath . byteString $ encodeUtf8 redressed
 
                     let file = fromString $ toFilePath configFilePath
                     logInfo (file <> " has been updated."))
-                (encodeInOrder configLines (coerce yamlKeys) (coerce cmdKey) config')
+                (encodeInOrder configLines keys (coerce cmdKey) config')
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)

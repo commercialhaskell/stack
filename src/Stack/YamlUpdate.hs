@@ -47,6 +47,8 @@ newtype YamlLineComment = YamlLineComment (Int, Text)
 -- | A mapping from the line number after an encoding that strips blank lines
 -- and comments to a line number of the original document.
 newtype YamlLineReindex = YamlLineReindex (Int, Int)
+-- | A range of line numbers with a multi-line strings.
+newtype YamlMulti = YamlMulti (Int, Int)
 
 data YamlLines =
     YamlLines
@@ -82,14 +84,14 @@ yamlLines :: RawYaml -> [RawYamlLine]
 yamlLines x = RawYamlLine <$> T.lines (coerce x)
 
 -- | Puts blank lines and comments from the original lines into the update.
-redress :: [RawYamlLine] -> RawYaml -> RawYaml
-redress rawLines (RawYaml t) =
+redress :: [YamlKey] -> [RawYamlLine] -> RawYaml -> RawYaml
+redress keys rawLines (RawYaml t) =
   let xs = zip [1 ..] (T.lines t)
   in  RawYaml . T.concat $
         [
           T.unlines . fromMaybe [x] $ do
               Pegged{newIndex = i', leading, partComments, spanComments}
-                <- fetchPegged rawLines (i, j)
+                <- fetchPegged keys rawLines (i, j)
 
               let x' = maybe
                           x
@@ -104,8 +106,9 @@ redress rawLines (RawYaml t) =
         | (j, _) <- drop 1 xs ++ [(0, "")]
         ]
 
-fetchPegged :: [RawYamlLine] -> (Int, Int) -> Maybe Pegged
-fetchPegged (pegLines -> yl@YamlLines{reindices}) (i, j) = do
+fetchPegged :: [YamlKey] -> [RawYamlLine] -> (Int, Int) -> Maybe Pegged
+fetchPegged keys rawLines (i, j) = do
+  let yl@YamlLines{reindices} = pegLines keys rawLines
   let reindex = flip L.lookup (coerce reindices)
 
   i' <- reindex i
@@ -154,9 +157,9 @@ encodeInOrder rawLines keysFound upsertKey@(YamlKey k) yObject =
 
   in  RawYaml <$> decodeUtf8' (Yaml.encodePretty keyCmp yObject)
 
-endSentinel :: Text
-endSentinel =
-  "ED10F56C-562E-4847-A50B-7541C1732A15: 2986F150-E4A0-41D8-AB9C-8BD82FA12DC4"
+endSentinelKey, endSentinel :: Text
+endSentinelKey = "ED10F56C-562E-4847-A50B-7541C1732A15"
+endSentinel = endSentinelKey <> ": 2986F150-E4A0-41D8-AB9C-8BD82FA12DC4"
 
 mkRaw :: Text -> RawYaml
 mkRaw = addSentinels . RawYaml
@@ -196,10 +199,17 @@ dropToComment = T.dropWhile (/= '#')
 
 -- | Gather enough information about lines to peg line numbers so that blank
 -- lines and comments can be reinserted later.
-pegLines :: [RawYamlLine] -> YamlLines
-pegLines rawLines =
-  let (ls, rs) = partitionEithers
-                   [ if | y == "" -> Left . Left $ YamlLineBlank i
+pegLines :: [YamlKey] -> [RawYamlLine] -> YamlLines
+pegLines keys rawLines =
+  YamlLines blanks wholeLineComments partLineComments reindex
+  where
+      inRange xs x = any (\(YamlMulti (i, j)) -> i < x && x < j - 1) xs
+      multiLineValue = inRange (multiLines keys rawLines)
+
+      (ls, rs) = partitionEithers
+                   [ if | multiLineValue i -> Right $ Right i
+
+                        | y == "" -> Left . Left $ YamlLineBlank i
 
                         | "#" `T.isPrefixOf` T.dropWhile (== ' ') y ->
                             Left . Right $ YamlLineComment (i, y)
@@ -215,8 +225,27 @@ pegLines rawLines =
 
       (blanks, wholeLineComments) = partitionEithers ls
       (partLineComments, contentLines) = partitionEithers rs
-      indexLines =
-        L.sort $ contentLines ++ (commentLineNumber <$> partLineComments)
+      indexLines = L.sort $ contentLines ++ (commentLineNumber <$> partLineComments)
       reindex = zipWith (curry YamlLineReindex) [1 ..] indexLines
 
-  in  YamlLines blanks wholeLineComments partLineComments reindex
+-- | Given top-level keys, finds the line range of multi-line strings.
+multiLines :: [YamlKey] -> [RawYamlLine] -> [YamlMulti]
+multiLines (fmap (<> ":") . filter (/= endSentinelKey) . coerce -> keys) (coerce -> rawLines) =
+  [ YamlMulti (start, fromMaybe (length rawLines) end)
+  | start <- starts
+  , let end = L.find (> start) fields
+  ]
+  where
+    starts = catMaybes $
+      [ if | ": |" `T.isSuffixOf` rawLine -> Just i
+           | ": <" `T.isSuffixOf` rawLine -> Just i
+           | otherwise -> Nothing
+      | rawLine <- rawLines
+      | i <- [1 ..]
+      ]
+
+    fields = L.sort . catMaybes $
+      [ if any (`T.isPrefixOf` rawLine) keys then Just i else Nothing
+      | rawLine <- rawLines
+      | i <- [1 ..]
+      ]
