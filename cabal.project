@@ -1,0 +1,3 @@
+-- With cabal projects, import is available with cabal-install >= 3.8.
+import: https://www.stackage.org/nightly-2022-09-05/cabal.config
+packages: .
