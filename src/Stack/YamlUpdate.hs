@@ -237,8 +237,8 @@ multiLines (fmap (<> ":") . filter (/= endSentinelKey) . coerce -> keys) (coerce
   ]
   where
     starts = catMaybes $
-      [ if | ": |" `T.isSuffixOf` rawLine -> Just i
-           | ": <" `T.isSuffixOf` rawLine -> Just i
+      [ if | ": |" `T.isInfixOf` rawLine -> Just i
+           | ": <" `T.isInfixOf` rawLine -> Just i
            | otherwise -> Nothing
       | rawLine <- rawLines
       | i <- [1 ..]
