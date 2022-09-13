@@ -212,7 +212,6 @@ library
       Stack.Unpack
       Stack.Upgrade
       Stack.Upload
-      Stack.YamlUpdate
       System.Info.ShortPathName
       System.Permissions
       System.Process.Pager
