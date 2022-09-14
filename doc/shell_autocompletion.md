@@ -2,10 +2,10 @@
 
 # Shell auto-completion
 
-The following adds support for the tab completion of standard Stack arguments in
-the Bash shell or the Z shell (Zsh). Completion of file names and executables
-within Stack is still lacking. For further information, see issue
-[#823](https://github.com/commercialhaskell/stack/issues/832).
+The following adds support for the tab completion of standard Stack arguments to
+some of the more popular shell programs: Bash, zsh, and fish. Completion of file
+names and executables within Stack is still lacking. For further information,
+see issue [#823](https://github.com/commercialhaskell/stack/issues/832).
 
 === "Bash"
 
@@ -68,3 +68,12 @@ within Stack is still lacking. For further information, see issue
 
         If you already have quite a large `.zshrc` file, or if you use
         `oh-my-zsh`, `compinit` will probably already be loaded.
+
+=== "Fish"
+
+    Add the output of the following command to your preferred completions file
+    (e.g. `~/.config/fish/completions/stack.fish`).
+
+    ~~~fish
+    stack --fish-completion-script stack
+    ~~~
