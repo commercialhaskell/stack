@@ -49,36 +49,19 @@ see issue [#823](https://github.com/commercialhaskell/stack/issues/832).
 
 === "Zsh"
 
-    The Zsh
-    [manual](https://zsh.sourceforge.io/Doc/Release/Completion-System.html#Completion-System)
-    explains:
-
-    > The function `bashcompinit` provides compatibility with bash’s
-    programmable completion system. When run it will define the functions,
-    `compgen` and `complete` which correspond to the bash builtins with the same
-    names. It will then be possible to use completion specifications and
-    functions written for bash.
-
-    Consequently, you must:
-
-    1.  launch `compinint`
-    2.  launch `bashcompinit`
-    3.  eval Stack's Bash completion script
-
-    Issue the following commands or that them to your `~/.zshrc` file:
+    Add the output of the following command to your preferred completions file
+    (e.g. `~/.config/zsh/completions/_stack`).
 
     ~~~zsh
-    autoload -U +X compinit
-    compinit
-    autoload -U +X bashcompinit
-    bashcompinit
-    eval "$(stack --bash-completion-script stack)"
+    stack --zsh-completion-script $(which stack)
     ~~~
 
-    !!! info
+    You won't need to `source` these, but do update your `fpath`:
 
-        If you already have quite a large `.zshrc` file, or if you use
-        `oh-my-zsh`, `compinit` will probably already be loaded.
+    ~~~zsh
+    fpath=($HOME/.config/zsh/completions $fpath)
+    autoload -U compinit && compinit
+    ~~~
 
 === "Fish"
 
