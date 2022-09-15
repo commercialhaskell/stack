@@ -75,5 +75,5 @@ see issue [#823](https://github.com/commercialhaskell/stack/issues/832).
     (e.g. `~/.config/fish/completions/stack.fish`).
 
     ~~~fish
-    stack --fish-completion-script stack
+    stack --fish-completion-script $(which stack)
     ~~~
