@@ -7,34 +7,45 @@ some of the more popular shell programs: Bash, zsh, and fish. Completion of file
 names and executables within Stack is still lacking. For further information,
 see issue [#823](https://github.com/commercialhaskell/stack/issues/832).
 
-=== "Bash"
+!!! info
 
-    Issue the following command or add it to your `~/.bashrc` file:
+    Stack's hidden option `--bash-completion-script <stack_executable_name>`
+    outputs a command that can be evaluated by Bash. For example:
+
+    Stack's completion library provides
+    [hidden options](https://github.com/pcapriotti/optparse-applicative#bash-zsh-and-fish-completions)
+    for Bash, zsh, and fish which output commands used for shell
+    auto-completion. For example:
 
     ~~~bash
-    eval "$(stack --bash-completion-script stack)"
+    $ stack --bash-completion-script stack
+    _stack()
+    {
+        local CMDLINE
+        local IFS=$'\n'
+        CMDLINE=(--bash-completion-index $COMP_CWORD)
+    
+        for arg in ${COMP_WORDS[@]}; do
+            CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
+        done
+    
+        COMPREPLY=( $(stack "${CMDLINE[@]}") )
+    }
+    
+    complete -o filenames -F _stack stack
     ~~~
 
-    !!! info
 
-        Stack's hidden option `--bash-completion-script <stack_executable_name>`
-        outputs a command that can be evaluated by Bash. For example:
+=== "Bash"
 
-        ~~~text
-        stack --bash-completion-script stack
-        _stack.exe()
-        {
-            local CMDLINE
-            local IFS=$'\n'
-            CMDLINE=(--bash-completion-index $COMP_CWORD)
+    Add the output of the following command to your preferred completions file
+    (e.g. `~/.config/bash_completions.d/stack`).
 
-            for arg in ${COMP_WORDS[@]}; do
-                CMDLINE=(${CMDLINE[@]} --bash-completion-word $arg)
-            done
+    ~~~bash
+    stack --bash-completion-script $(which stack)
+    ~~~
 
-            COMPREPLY=( $(stack "${CMDLINE[@]}") )
-        }
-        ~~~
+    You may need to `source` this.
 
 === "Zsh"
 
