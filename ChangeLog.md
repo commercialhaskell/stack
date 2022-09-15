@@ -42,6 +42,7 @@ Other enhancements:
 * `tools` subcommand added to `stack ls`, to list stack's installed tools.
 * `stack uninstall` shows how to uninstall Stack.
 * `--ghc-variant` accepts `int-native` as a variant.
+* Update documentaion for shell auto-completion with Bash and zsh. Added fish.
 
 Bug fixes:
 
