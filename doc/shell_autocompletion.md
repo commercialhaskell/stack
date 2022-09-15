@@ -9,9 +9,6 @@ see issue [#823](https://github.com/commercialhaskell/stack/issues/832).
 
 !!! info
 
-    Stack's hidden option `--bash-completion-script <stack_executable_name>`
-    outputs a command that can be evaluated by Bash. For example:
-
     Stack's completion library provides
     [hidden options](https://github.com/pcapriotti/optparse-applicative#bash-zsh-and-fish-completions)
     for Bash, zsh, and fish which output commands used for shell
