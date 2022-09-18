@@ -17,10 +17,10 @@ module Stack.ConfigCmd
        ,cfgCmdName) where
 
 import           Stack.Prelude
-import           Data.Coerce (coerce)
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
-import           Data.ByteString.Builder (byteString)
+import           Data.Attoparsec.Text as P (Parser, parseOnly, skip, skipWhile,
+                                           string, takeText, takeWhile)
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
@@ -37,7 +37,6 @@ import           Stack.Constants
 import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
-import           Stack.YamlUpdate
 
 data ConfigCmdSet
     = ConfigCmdSetResolver (Unresolved AbstractResolver)
@@ -73,29 +72,90 @@ cfgCmdSet cmd = do
                          PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
                          PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> return (configUserConfigPath conf)
-    -- We don't need to worry about checking for a valid yaml here
-    rawConfig <- mkRaw <$> liftIO (readFileUtf8 (toFilePath configFilePath))
-    (config :: Yaml.Object) <- either throwM return (Yaml.decodeEither' . encodeUtf8 $ coerce rawConfig)
+    rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
+    config <- either throwM return (Yaml.decodeEither' $ encodeUtf8 rawConfig)
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
-    let cmdKey = cfgCmdSetOptionName cmd
-        config' = KeyMap.insert (Key.fromText cmdKey) newValue config
-        yamlKeys = Key.toText <$> KeyMap.keys config
-    if config' == config
-        then logInfo
-                 (fromString (toFilePath configFilePath) <>
-                  " already contained the intended configuration and remains \
-                  \unchanged.")
-        else do
-            let configLines = yamlLines rawConfig
-            either
-                throwM
-                (\updated -> do
-                    let redressed = unmkRaw $ redress configLines updated
-                    writeBinaryFileAtomic configFilePath . byteString $ encodeUtf8 redressed
+    let yamlLines = T.lines rawConfig
+        cmdKey = cfgCmdSetOptionName cmd  -- Text
+        cmdKey' = Key.fromText cmdKey     -- Data.Aeson.Key.Key
+        newValue' = T.stripEnd $
+            decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
+        file = toFilePath configFilePath  -- String
+        file' = display $ T.pack file     -- Utf8Builder
+    newYamlLines <- case KeyMap.lookup cmdKey' config of
+        Nothing -> do
+            logInfo $ file' <> " has been extended."
+            pure $ yamlLines <> [cmdKey <> ": " <> newValue']
+        Just oldValue -> if oldValue == newValue
+            then do
+                logInfo $ file' <> " already contained the intended \
+                    \configuration and remains unchanged."
+                pure yamlLines
+            else switchLine file' cmdKey newValue' [] yamlLines
+    liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
+  where
+    switchLine file cmdKey _ searched [] = do
+        logWarn $ display cmdKey <> " not found in YAML file " <> file <>
+            " as a single line. Multi-line key:value formats are not supported."
+        pure $ reverse searched
+    switchLine file cmdKey newValue searched (oldLine:rest) =
+        case parseOnly (parseLine cmdKey) oldLine of
+            Left _ ->
+                switchLine file cmdKey newValue (oldLine:searched) rest
+            Right (kt, spaces1, spaces2, comment) -> do
+                let newLine = renderKey cmdKey kt <> spaces1 <> ":" <>
+                        spaces2 <> newValue <> comment
+                logInfo $ file <> " has been updated."
+                pure $ reverse searched <> (newLine:rest)
 
-                    let file = fromString $ toFilePath configFilePath
-                    logInfo (file <> " has been updated."))
-                (encodeInOrder configLines (coerce yamlKeys) (coerce cmdKey) config')
+    -- This assumes that a top-level key will not be indented in the YAML file.
+    parseLine :: Text -> Parser (KeyType, Text, Text, Text)
+    parseLine key = do
+        kt <- parseKey key
+        spaces1 <- P.takeWhile (== ' ')
+        skip (== ':')
+        spaces2 <- P.takeWhile (== ' ')
+        skipWhile (/= ' ')
+        comment <- takeText
+        pure (kt, spaces1, spaces2, comment)
+
+    -- If the key is, for example, install-ghc, this recognises install-ghc,
+    -- 'install-ghc' or "install-ghc".
+    parseKey :: Text -> Parser KeyType
+    parseKey k =   parsePlainKey k
+               <|> parseSingleQuotedKey k
+               <|> parseDoubleQuotedKey k
+
+    parsePlainKey :: Text -> Parser KeyType
+    parsePlainKey key = do
+      _ <- string key
+      pure PlainKey
+
+    parseSingleQuotedKey :: Text -> Parser KeyType
+    parseSingleQuotedKey = parseQuotedKey SingleQuotedKey '\''
+
+    parseDoubleQuotedKey :: Text -> Parser KeyType
+    parseDoubleQuotedKey = parseQuotedKey DoubleQuotedKey '"'
+
+    parseQuotedKey :: KeyType -> Char -> Text -> Parser KeyType
+    parseQuotedKey kt c key = do
+        skip (==c)
+        _ <- string key
+        skip (==c)
+        pure kt
+
+    renderKey :: Text -> KeyType -> Text
+    renderKey key kt = case kt of
+        PlainKey -> key
+        SingleQuotedKey -> '\'' `T.cons` key `T.snoc` '\''
+        DoubleQuotedKey -> '"' `T.cons` key `T.snoc` '"'
+
+-- |Type representing types of representations of keys in YAML files.
+data KeyType
+    = PlainKey  -- ^ For example: install-ghc
+    | SingleQuotedKey  -- ^ For example: 'install-ghc'
+    | DoubleQuotedKey  -- ^ For example: "install-ghc"
+    deriving (Eq, Show)
 
 cfgCmdSetValue
     :: (HasConfig env, HasGHCVariant env)
