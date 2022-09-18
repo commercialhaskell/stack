@@ -363,19 +363,27 @@ final release.
 
     Wait for the GitHub
     [Integration Tests workflow](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
-    to complete for the branch you just created. This will create a draft GitHub
+    to complete for the tag you just created. This will create a draft GitHub
     release and upload the bindists (plus signatures and hashes) to it.
 
     Edit the draft
     [GitHub release](https://github.com/commercialhaskell/stack/releases/):
 
-    * Add the ChangeLog to the description.
-    * Get the list of contributors to the release and add it to the description.
-      For example, command:
+    *   Add the ChangeLog to the description.
+    *   Get the list of contributors to the release and add it to the
+        description. For example, command:
 
-        ~~~text
-        git shortlog -s origin/release..HEAD|sed $'s/^[0-9 \t]*/* /'|grep -v azure-pipelines|LC_ALL=C sort -f
-        ~~~
+        === "Unix-like"
+
+            ~~~text
+            git shortlog -s origin/release..HEAD|sed 's/^[0-9 \t]*/* /'|LC_ALL=C sort -f
+            ~~~
+
+        === "Windows (with PowerShell)"
+
+            ~~~text
+            (git shortlog -s origin/release..HEAD) -Replace '^[0-9 \t]*', '* ' | Sort-Object
+            ~~~
 
     Publish the GitHub release.
 
