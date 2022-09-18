@@ -37,7 +37,7 @@ standard ones or using system libraries with special requirements.
 ### Checking the Nix installation
 
 Once Nix is installed, the Nix commands (`nix-shell` etc) should be available.
-If they are not, it should be because the file
+If they are not, it could be because the file
 `$HOME/.nix-profile/etc/profile.d/nix.sh` is not sourced by your shell.
 
 You should either:
