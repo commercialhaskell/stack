@@ -13,7 +13,7 @@ output (e.g. `0.35.0`) and quit.
 
 ## The `stack --numeric-version` flag
 
-Stack will report its numeric version to standard output (e.g. `2.7.5`) and
+Stack will report its numeric version to standard output (e.g. `2.9.1`) and
 quit.
 
 ## The `stack --[no-]rsl-in-log` flag
