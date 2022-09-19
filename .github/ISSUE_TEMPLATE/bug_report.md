@@ -5,7 +5,7 @@ about: Report a bug in Stack
 
 Please follow the steps below for reporting a bug:
 
-Make sure that you are using the latest release (currently stack-2.7.5). See the
+Make sure that you are using the latest release (currently Stack 2.9.1). See the
 [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade)
 to upgrade.
 
@@ -19,10 +19,10 @@ For example:
 
 1. Remove directory *blah*.
 2. Run command `stack blah`.
-3. Edit file blah.
+3. Edit file *blah*.
 4. Run command `stack blah`.
 
-Include any `.yaml` configuration if relevant.
+Include any `.yaml` configuration, if relevant.
 
 ### Expected
 
@@ -45,12 +45,13 @@ stack <your command here> <args> --verbose
 
 ~~~text
 stack --version
-Version 1.9.1, Git revision f9d0042c141660e1d38f797e1d426be4a99b2a3c (6168 commits) x86_64 hpack-0.31.0
+Version 2.9.1, Git revision 409d56031b4240221d656db09b2ba476fe6bb5b1 x86_64 hpack-0.35.0
 ~~~
 
 ### Method of installation
 
-* Official binary, downloaded from stackage.org or fpcomplete's package repository
-* Via cabal-install
+* Official binary, downloaded via haskellstack.org or from Stack's repository
+* Via GHCup
+* Via Cabal (the tool)
 * An unofficial package repository (please specify which)
 * Other (please specify)
