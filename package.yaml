@@ -75,7 +75,7 @@ dependencies:
 - file-embed
 - filelock
 - filepath
-- fsnotify
+- fsnotify < 0.4
 - generic-deriving
 - hackage-security
 - hashable

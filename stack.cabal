@@ -252,7 +252,7 @@ library
     , file-embed
     , filelock
     , filepath
-    , fsnotify
+    , fsnotify <0.4
     , generic-deriving
     , hackage-security
     , hashable
@@ -376,7 +376,7 @@ executable stack
     , file-embed
     , filelock
     , filepath
-    , fsnotify
+    , fsnotify <0.4
     , generic-deriving
     , hackage-security
     , hashable
@@ -499,7 +499,7 @@ executable stack-integration-test
     , file-embed
     , filelock
     , filepath
-    , fsnotify
+    , fsnotify <0.4
     , generic-deriving
     , hackage-security
     , hashable
@@ -630,7 +630,7 @@ test-suite stack-test
     , file-embed
     , filelock
     , filepath
-    , fsnotify
+    , fsnotify <0.4
     , generic-deriving
     , hackage-security
     , hashable
