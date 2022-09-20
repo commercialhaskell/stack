@@ -31,7 +31,7 @@ spec = do
                         ]
   describe "Stack.Dot" $ do
     it "does nothing if depth is 0" $
-      resolveDependencies (Just 0) graph stubLoader `shouldBe` return graph
+      resolveDependencies (Just 0) graph stubLoader `shouldBe` pure graph
 
     it "with depth 1, more dependencies are resolved" $ do
       let graph' = Map.insert (pkgName "cycle")
@@ -79,7 +79,7 @@ pkgName = fromMaybe failure . parsePackageName . T.unpack
 
 -- Stub, simulates the function to load package dependencies
 stubLoader :: PackageName -> Identity (Set PackageName, DotPayload)
-stubLoader name = return . (, dummyPayload) . Set.fromList . map pkgName $ case show name of
+stubLoader name = pure . (, dummyPayload) . Set.fromList . map pkgName $ case show name of
   "StateVar" -> ["stm","transformers"]
   "array" -> []
   "bifunctors" -> ["semigroupoids","semigroups","tagged"]

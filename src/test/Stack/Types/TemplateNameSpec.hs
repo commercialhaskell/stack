@@ -37,7 +37,7 @@ spec =
 
           let colonAction =
                 do
-                  return $! pathOf "with:colon"
+                  pure $! pathOf "with:colon"
           colonAction `shouldThrow` anyErrorCall
 
         else do
@@ -48,4 +48,3 @@ spec =
           pathOf "c:\\home\\file"       `shouldBe` RelPath "c:\\home\\file.hsfiles" (Path "c:\\home\\file.hsfiles")
           pathOf "with/slash"           `shouldBe` RelPath "with/slash.hsfiles"     (Path "with/slash.hsfiles")
           pathOf "with:colon"           `shouldBe` RelPath "with:colon.hsfiles"     (Path "with:colon.hsfiles")
-

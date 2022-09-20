@@ -94,12 +94,12 @@ instance FromJSON Snapshots where
             case parseSnapName t of
                 Left e -> fail $ show e
                 Right (LTS _ _) -> fail "Unexpected LTS value"
-                Right (Nightly d) -> return d
+                Right (Nightly d) -> pure d
 
         isLTS = ("lts-" `T.isPrefixOf`)
 
         parseLTS = withText "LTS" $ \t ->
             case parseSnapName t of
                 Left e -> fail $ show e
-                Right (LTS x y) -> return $ IntMap.singleton x y
+                Right (LTS x y) -> pure $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"

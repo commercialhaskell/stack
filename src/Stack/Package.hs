@@ -182,7 +182,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
                   generatePkgDescOpts installMap installedMap
                   (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
                   cabalfp pkg componentFiles
-              return (componentsModules,componentFiles,componentsOpts)
+              pure (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
           (not . null . exposedModules)
@@ -230,15 +230,15 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
                      let setupHsPath = pkgDir </> relFileSetupHs
                          setupLhsPath = pkgDir </> relFileSetupLhs
                      setupHsExists <- doesFileExist setupHsPath
-                     if setupHsExists then return (S.singleton setupHsPath) else do
+                     if setupHsExists then pure (S.singleton setupHsPath) else do
                          setupLhsExists <- doesFileExist setupLhsPath
-                         if setupLhsExists then return (S.singleton setupLhsPath) else return S.empty
-                 else return S.empty
+                         if setupLhsExists then pure (S.singleton setupLhsPath) else pure S.empty
+                 else pure S.empty
              buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
                  let hpackPath = pkgDir </> relFileHpackPackageConfig
                  hpackExists <- doesFileExist hpackPath
-                 return $ if hpackExists then S.singleton hpackPath else S.empty
-             return (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
+                 pure $ if hpackExists then S.singleton hpackPath else S.empty
+             pure (componentModules, componentFiles, buildFiles <> dataFiles', warnings)
     pkgId = package pkg
     name = pkgName pkgId
 
@@ -301,12 +301,12 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
                 , biCabalVersion = cabalVer
                 }
             )
-    return
+    pure
         ( M.fromList
               (concat
                    [ maybe
                          []
-                         (return . generate CLib . libBuildInfo)
+                         (pure . generate CLib . libBuildInfo)
                          (library pkg)
                    , mapMaybe
                          (\sublib -> do
@@ -468,7 +468,7 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
     relCFilePath <- stripProperPrefix cabalDir cFilePath
     relOFilePath <-
         parseRelFile (replaceExtension (toFilePath relCFilePath) "o")
-    return (componentOutputDir namedComponent distDir </> relOFilePath)
+    pure (componentOutputDir namedComponent distDir </> relOFilePath)
 
 -- | Make the global autogen dir if Cabal version is new enough.
 packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
@@ -648,7 +648,7 @@ packageDescModulesAndFiles
 packageDescModulesAndFiles pkg = do
     (libraryMods,libDotCabalFiles,libWarnings) <-
         maybe
-            (return (M.empty, M.empty, []))
+            (pure (M.empty, M.empty, []))
             (asModuleAndFileMap libComponent libraryFiles)
             (library pkg)
     (subLibrariesMods,subLibDotCabalFiles,subLibWarnings) <-
@@ -681,7 +681,7 @@ packageDescModulesAndFiles pkg = do
             libDotCabalFiles <> subLibDotCabalFiles <> exeDotCabalFiles <> testDotCabalFiles <>
             benchDotCabalPaths
         warnings = libWarnings <> subLibWarnings <> exeWarnings <> testWarnings <> benchWarnings
-    return (modules, files, dfiles, warnings)
+    pure (modules, files, dfiles, warnings)
   where
     libComponent = const CLib
     internalLibComponent = CInternalLib . T.pack . maybe "" Cabal.unUnqualComponentName . libraryNameString . libName
@@ -690,7 +690,7 @@ packageDescModulesAndFiles pkg = do
     benchComponent = CBench . T.pack . Cabal.unUnqualComponentName . benchmarkName
     asModuleAndFileMap label f lib = do
         (a,b,c) <- f (label lib) lib
-        return (M.singleton (label lib) a, M.singleton (label lib) b, c)
+        pure (M.singleton (label lib) a, M.singleton (label lib) b, c)
     foldTuples = foldl' (<>) (M.empty, M.empty, [])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
@@ -705,7 +705,7 @@ resolveGlobFiles cabalFileVersion =
     resolve name =
         if '*' `elem` name
             then explode name
-            else liftM return (resolveFileOrWarn name)
+            else liftM pure (resolveFileOrWarn name)
     explode name = do
         dir <- asks (parent . ctxFile)
         names <-
@@ -725,7 +725,7 @@ resolveGlobFiles cabalFileVersion =
                               , line <> flow "in directory:"
                               , style Dir $ fromString dir
                               ]
-                          return []
+                          pure []
                       else throwIO e)
 
 -- | Get all files referenced by the benchmark.
@@ -803,7 +803,7 @@ resolveComponentFiles component build names = do
             ((if null dirs then [dir] else dirs) ++ agdirs)
             names
     cfiles <- buildOtherSources build
-    return (modules, files <> cfiles, warnings)
+    pure (modules, files <> cfiles, warnings)
   where
     autogenDirs = do
       cabalVer <- asks ctxCabalVer
@@ -824,11 +824,11 @@ buildOtherSources build = do
                 case result of
                     Nothing -> do
                         warnMissingFile "File" cwd fp file
-                        return Nothing
-                    Just p -> return $ Just (toCabalPath p)
+                        pure Nothing
+                    Just p -> pure $ Just (toCabalPath p)
     csources <- resolveDirFiles (cSources build) DotCabalCFilePath
     jsources <- resolveDirFiles (targetJsSources build) DotCabalFilePath
-    return (csources <> jsources)
+    pure (csources <> jsources)
 
 -- | Get the target's JS sources.
 targetJsSources :: BuildInfo -> [FilePath]
@@ -1007,9 +1007,9 @@ resolveFilesAndDeps
 resolveFilesAndDeps component dirs names0 = do
     (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
     warnings <- liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
-    return (foundModules, dotCabalPaths, warnings)
+    pure (foundModules, dotCabalPaths, warnings)
   where
-    loop [] _ = return ([], M.empty, [])
+    loop [] _ = pure ([], M.empty, [])
     loop names doneModules0 = do
         resolved <- resolveFiles dirs names
         let foundFiles = mapMaybe snd resolved
@@ -1027,7 +1027,7 @@ resolveFilesAndDeps component dirs names0 = do
         -- have been deleted.
         (resolvedFiles, resolvedModules, _) <-
             loop (map DotCabalModule (S.toList modulesRemaining)) doneModules
-        return
+        pure
             ( nubOrd $ foundFiles <> map DotCabalFilePath thDepFiles <> resolvedFiles
             , M.union
                   (M.fromList foundModules)
@@ -1037,19 +1037,19 @@ resolveFilesAndDeps component dirs names0 = do
         let unlistedModules =
                 foundModules `M.difference`
                 M.fromList (mapMaybe (fmap (, ()) . dotCabalModule) names0)
-        return $
+        pure $
             if M.null unlistedModules
                 then []
                 else [ UnlistedModulesWarning
                            component
                            (map fst (M.toList unlistedModules))]
     warnMissing _missingModules = do
-        return []
+        pure []
         -- TODO: bring this back - see
         -- https://github.com/commercialhaskell/stack/issues/2649
         {-
         cabalfp <- asks ctxFile
-        return $
+        pure $
             if null missingModules
                then []
                else [ MissingModulesWarning
@@ -1081,8 +1081,8 @@ getDependencies component dirs dotCabalPath =
     case dotCabalPath of
         DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
         DotCabalMainPath resolvedFile -> readResolvedHi resolvedFile
-        DotCabalFilePath{} -> return (S.empty, [])
-        DotCabalCFilePath{} -> return (S.empty, [])
+        DotCabalFilePath{} -> pure (S.empty, [])
+        DotCabalCFilePath{} -> pure (S.empty, [])
   where
     readResolvedHi resolvedFile = do
         dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
@@ -1090,7 +1090,7 @@ getDependencies component dirs dotCabalPath =
         let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
             stripSourceDir d = stripProperPrefix d resolvedFile
         case stripSourceDir sourceDir of
-            Nothing -> return (S.empty, [])
+            Nothing -> pure (S.empty, [])
             Just fileRel -> do
                 let hiPath =
                         FilePath.replaceExtension
@@ -1099,7 +1099,7 @@ getDependencies component dirs dotCabalPath =
                 dumpHIExists <- liftIO $ D.doesFileExist hiPath
                 if dumpHIExists
                     then parseHI hiPath
-                    else return (S.empty, [])
+                    else pure (S.empty, [])
 
 -- | Parse a .hi file into a set of modules and files.
 parseHI
@@ -1159,9 +1159,9 @@ parsePackageNameFromFilePath fp = do
     base <- clean $ toFilePath $ filename fp
     case parsePackageName base of
         Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
-        Just x -> return x
+        Just x -> pure x
   where clean = liftM reverse . strip . reverse
-        strip ('l':'a':'b':'a':'c':'.':xs) = return xs
+        strip ('l':'a':'b':'a':'c':'.':xs) = pure xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
 
 -- | Find a candidate for the given module-or-filename from the list
@@ -1176,16 +1176,16 @@ findCandidate dirs name = do
     let haskellPreprocessorExts = haskellDefaultPreprocessorExts ++ customPreprocessorExts
     candidates <- liftIO $ makeNameCandidates haskellPreprocessorExts
     case candidates of
-        [candidate] -> return (Just (cons candidate))
+        [candidate] -> pure (Just (cons candidate))
         [] -> do
             case name of
                 DotCabalModule mn
                   | display mn /= paths_pkg pkg -> logPossibilities dirs mn
-                _ -> return ()
-            return Nothing
+                _ -> pure ()
+            pure Nothing
         (candidate:rest) -> do
             warnMultiple name candidate rest
-            return (Just (cons candidate))
+            pure (Just (cons candidate))
   where
     cons =
         case name of
@@ -1231,7 +1231,7 @@ resolveDirFile x y = do
     -- The standard canonicalizePath does not work for this case
     p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
     exists <- doesFileExist p
-    return $ if exists then Just p else Nothing
+    pure $ if exists then Just p else Nothing
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
@@ -1278,7 +1278,7 @@ logPossibilities dirs mn = do
         mapM
             (\dir ->
                   do (_,files) <- listDir dir
-                     return
+                     pure
                          (map
                               filename
                               (filter
@@ -1296,7 +1296,7 @@ buildLogPath package' msuffix = do
   fp <- parseRelFile $ concat $
     packageIdentifierString (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]
-  return $ stack </> relDirLogs </> fp
+  pure $ stack </> relDirLogs </> fp
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
 resolveOrWarn :: Text
@@ -1309,7 +1309,7 @@ resolveOrWarn subject resolver path =
      dir <- asks (parent . ctxFile)
      result <- resolver dir path
      when (isNothing result) $ warnMissingFile subject cwd path file
-     return result
+     pure result
 
 warnMissingFile :: Text -> Path Abs Dir -> FilePath -> Path Abs File -> RIO Ctx ()
 warnMissingFile subject cwd path fromFile =
@@ -1344,7 +1344,7 @@ mkProjectPackage
   -> RIO env ProjectPackage
 mkProjectPackage printWarnings dir = do
   (gpd, name, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
-  return ProjectPackage
+  pure ProjectPackage
     { ppCabalFP = cabalfp
     , ppGPD' = gpd printWarnings
     , ppResolvedDir = dir
@@ -1366,7 +1366,7 @@ mkDepPackage pl = do
         PackageIdentifier name _ <- getPackageLocationIdent pli
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
-  return DepPackage
+  pure DepPackage
     { dpGPD' = gpdio
     , dpLocation = pl
     , dpName = name

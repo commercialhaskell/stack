@@ -177,7 +177,7 @@ instance Show StackBuildException where
       where
         noKnown'
             | Set.null noKnown = []
-            | otherwise = return $
+            | otherwise = pure $
                 "The following target packages were not found: " ++
                 intercalate ", " (map packageNameString $ Set.toList noKnown) ++
                 "\nSee https://docs.haskellstack.org/en/stable/build_command/#target-syntax for details."
@@ -204,7 +204,7 @@ instance Show StackBuildException where
                 Nothing -> " executable not found"
                 Just ec -> " exited with: " ++ show ec
             ]
-        , return $ case mlogFile of
+        , pure $ case mlogFile of
             Nothing -> "Logs printed to console"
             -- TODO Should we load up the full error output and print it here?
             Just logFile -> "Full log available at " ++ toFilePath logFile

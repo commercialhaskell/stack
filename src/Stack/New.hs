@@ -67,9 +67,9 @@ new opts forceOverwrite = do
     when (newOptsProjectName opts `elem` wiredInPackages) $
       throwM $ Can'tUseWiredInName (newOptsProjectName opts)
     pwd <- getCurrentDir
-    absDir <- if bare then return pwd
+    absDir <- if bare then pure pwd
                       else do relDir <- parseRelDir (packageNameString project)
-                              liftM (pwd </>) (return relDir)
+                              liftM (pwd </>) (pure relDir)
     exists <- doesDirExist absDir
     configTemplate <- view $ configL.to configDefaultTemplate
     let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
@@ -89,7 +89,7 @@ new opts forceOverwrite = do
             when (not forceOverwrite && bare) $ checkForOverwrite (M.keys files)
             writeTemplateFiles files
             runTemplateInits absDir
-            return absDir
+            pure absDir
   where
     cliOptionTemplate = newOptsTemplate opts
     project = newOptsProjectName opts
@@ -127,7 +127,7 @@ loadTemplate name logIt = do
             catch
                 (do f <- loadLocalFile relFile eitherByteStringToText
                     logIt LocalTemp
-                    return f)
+                    pure f)
                 (\(e :: NewException) -> do
                       case relSettings rawParam of
                         Just settings -> do
@@ -236,7 +236,7 @@ applyTemplate project template nonceParams dir templateText = do
     currentYear <- do
       now <- liftIO getCurrentTime
       let (year, _, _) = toGregorian (utctDay now)
-      return $ T.pack . show $ year
+      pure $ T.pack . show $ year
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
             nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
@@ -272,7 +272,7 @@ applyTemplate project template nonceParams dir templateText = do
               let etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) $ TL.toStrict text
               templateCompiled <- case etemplateCompiled of
                 Left e -> throwM $ InvalidTemplate template (show e)
-                Right t -> return t
+                Right t -> pure t
               let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
                   missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
               pure (LB.fromStrict $ encodeUtf8 applied, missingKeys)
@@ -287,7 +287,7 @@ applyTemplate project template nonceParams dir templateText = do
           (fp, mks1) <- applyMustache $ TLE.encodeUtf8 $ TL.pack fpOrig
           path <- parseRelFile $ TL.unpack $ TLE.decodeUtf8 fp
           (bytes', mks2) <- applyMustache bytes
-          return (mks <> mks1 <> mks2, (dir </> path, bytes'))
+          pure (mks <> mks1 <> mks2, (dir </> path, bytes'))
 
     (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
     unless (S.null missingKeys) $ do
@@ -297,17 +297,17 @@ applyTemplate project template nonceParams dir templateText = do
                                missingKeys
                                (configUserConfigPath config)
       logInfo ("\n" <> displayShow missingParameters <> "\n")
-    return $ M.fromList results
+    pure $ M.fromList results
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
     onlyMissingKeys _ = []
 
     mapAccumLM :: Monad m => (a -> b -> m(a, c)) -> a -> [b] -> m(a, [c])
-    mapAccumLM _ a [] = return (a, [])
+    mapAccumLM _ a [] = pure (a, [])
     mapAccumLM f a (x:xs) = do
       (a', c) <- f a x
       (a'', cs) <- mapAccumLM f a' xs
-      return (a'', c:cs)
+      pure (a'', c:cs)
 
 -- | Check if we're going to overwrite any existing files.
 checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
@@ -335,7 +335,7 @@ runTemplateInits
 runTemplateInits dir = do
     config <- view configL
     case configScmInit config of
-        Nothing -> return ()
+        Nothing -> pure ()
         Just Git ->
             withWorkingDir (toFilePath dir) $
             catchAny (proc "git" ["init"] runProcess_)

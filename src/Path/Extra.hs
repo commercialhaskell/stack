@@ -97,7 +97,7 @@ dropRoot (Path l) = Path (FP.dropDrive l)
 rejectMissingFile :: MonadIO m
   => Maybe (Path Abs File)
   -> m (Maybe (Path Abs File))
-rejectMissingFile Nothing = return Nothing
+rejectMissingFile Nothing = pure Nothing
 rejectMissingFile (Just p) = bool Nothing (Just p) `liftM` doesFileExist p
 
 -- | See 'rejectMissingFile'.
@@ -105,7 +105,7 @@ rejectMissingFile (Just p) = bool Nothing (Just p) `liftM` doesFileExist p
 rejectMissingDir :: MonadIO m
   => Maybe (Path Abs Dir)
   -> m (Maybe (Path Abs Dir))
-rejectMissingDir Nothing = return Nothing
+rejectMissingDir Nothing = pure Nothing
 rejectMissingDir (Just p) = bool Nothing (Just p) `liftM` doesDirExist p
 
 -- | Convert to a lazy ByteString using toFilePath and UTF8.

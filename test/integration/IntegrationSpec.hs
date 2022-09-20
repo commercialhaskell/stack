@@ -233,10 +233,10 @@ copyTree :: MonadIO m => FilePath -> FilePath -> m ()
 copyTree src dst =
     liftIO $
     runResourceT (sourceDirectoryDeep False src `connect` mapM_C go)
-        `catch` \(_ :: IOException) -> return ()
+        `catch` \(_ :: IOException) -> pure ()
   where
     go srcfp = liftIO $ do
-        Just suffix <- return $ stripPrefix src srcfp
+        Just suffix <- pure $ stripPrefix src srcfp
         let dstfp = dst </> stripHeadSeparator suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
         -- copying yaml files so lock files won't get created in

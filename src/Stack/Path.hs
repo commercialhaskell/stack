@@ -88,7 +88,7 @@ fillPathInfo = do
      piDistDir <- distRelativeDir
      piHpcDir <- hpcReportDir
      piCompiler <- getCompilerPath
-     return PathInfo {..}
+     pure PathInfo {..}
 
 pathParser :: OA.Parser [Text]
 pathParser =

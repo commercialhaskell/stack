@@ -13,9 +13,9 @@ mainOverride = do
     if "repl" `elem` args && "stack-initial-build-steps" `elem` args
         then do
             defaultMainWithHooks simpleUserHooks
-                { preRepl = \_ _ -> return emptyHookedBuildInfo
+                { preRepl = \_ _ -> pure emptyHookedBuildInfo
                 , replHook = stackReplHook
-                , postRepl = \_ _ _ _ -> return ()
+                , postRepl = \_ _ _ _ -> pure ()
                 }
         else main
 

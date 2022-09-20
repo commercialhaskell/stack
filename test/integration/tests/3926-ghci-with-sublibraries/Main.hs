@@ -26,7 +26,7 @@ replThread = repl [] $ do
 fileEditingThread :: IO ()
 fileEditingThread = do
   threadDelay 1000000
-  -- edit the internal library and return to ghci
+  -- edit the internal library and pure to ghci
   copy "src-internal/Internal.v2" "src-internal/Internal.hs"
   threadDelay 1000000
   -- edit the internal library and end thread, returning to ghci

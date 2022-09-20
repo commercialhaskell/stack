@@ -59,7 +59,7 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                     newDirs
             watch1 <- forM (Map.toList actions) $ \(k, mmv) -> do
                 mv <- mmv
-                return $
+                pure $
                     case mv of
                         Nothing -> Map.empty
                         Just v -> Map.singleton k v
@@ -69,19 +69,19 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                     $ Set.toList
                     $ Set.map parent files
 
-            keepListening _dir listen () = Just $ return $ Just listen
+            keepListening _dir listen () = Just $ pure $ Just listen
             stopListening = Map.map $ \f -> do
                 () <- f `catch` \ioe ->
                     -- Ignore invalid argument error - it can happen if
                     -- the directory is removed.
                     case ioe_type ioe of
-                        InvalidArgument -> return ()
+                        InvalidArgument -> pure ()
                         _ -> throwIO ioe
-                return Nothing
+                pure Nothing
             startListening = Map.mapWithKey $ \dir () -> do
                 let dir' = fromString $ toFilePath dir
                 listen <- watchDir manager dir' (const True) onChange
-                return $ Just listen
+                pure $ Just listen
 
     let watchInput = do
             line <- getLine

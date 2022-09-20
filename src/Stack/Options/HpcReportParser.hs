@@ -39,4 +39,4 @@ pvpBoundsOption =
             Left e ->
                 readerError e
             Right v ->
-                return v
+                pure v

@@ -112,7 +112,7 @@ getSDistTarball mpvpBounds pkgDir = do
               Left err ->
                 logError $ "Error building custom-setup dependencies: " <> displayShow err
               Right _ ->
-                return ()
+                pure ()
           Nothing ->
             logWarn "unexpected empty custom-setup dependencies"
     sourceMap <- view $ envConfigL.to envConfigSourceMap
@@ -138,7 +138,7 @@ getSDistTarball mpvpBounds pkgDir = do
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
-    let tarPath isDir fp = either throwString return
+    let tarPath isDir fp = either throwString pure
             (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
         -- convert a String of proper characters to a String of bytes
         -- in UTF8 encoding masquerading as characters. This is
@@ -160,7 +160,7 @@ getSDistTarball mpvpBounds pkgDir = do
                 (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp sourceMap
                 currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
                 tp <- liftIO $ tarPath False fp
-                return $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
+                pure $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
             | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
@@ -168,7 +168,7 @@ getSDistTarball mpvpBounds pkgDir = do
     dirEntries <- mapM packDir (dirsFromFiles files)
     fileEntries <- mapM packFile files
     mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
-    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)), mcabalFileRevision)
+    pure (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)), mcabalFileRevision)
 
 -- | Get the PVP bounds-enabled version of the given cabal file
 getCabalLbs :: HasEnvConfig env
@@ -221,7 +221,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
                           $ showGenericPackageDescription gpd
     case eres of
       Right roundtripped
-        | roundtripped == gpd -> return ()
+        | roundtripped == gpd -> pure ()
         | otherwise -> do
             prettyWarn $ vsep $ roundtripErrs ++
               [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
@@ -254,7 +254,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
           , flow $ "The parse error is: " ++ unlines (map show (toList errs))
           , ""
           ]
-    return
+    pure
       ( ident
       , TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd''
       )
@@ -305,7 +305,7 @@ readLocalPackage pkgDir = do
     (gpdio, _, cabalfp) <- loadCabalFilePath pkgDir
     gpd <- liftIO $ gpdio YesPrintWarnings
     let package = resolvePackage config gpd
-    return LocalPackage
+    pure LocalPackage
         { lpPackage = package
         , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
         , lpCabalFile = cabalfp
@@ -338,7 +338,7 @@ getSDistFileList lp deps =
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal CloseOnException KeepTHLoading ["sdist", "--list-sources", outFile]
                 contents <- liftIO (S.readFile outFile)
-                return (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
+                pure (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
   where
     package = lpPackage lp
     ac = ActionContext Set.empty [] ConcurrencyAllowed
@@ -365,7 +365,7 @@ normalizeTarballPaths fps = do
         logWarn $
             "Warning: These files are outside of the package directory, and will be omitted from the tarball: " <>
             displayShow outsideDir
-    return (nubOrd files)
+    pure (nubOrd files)
   where
     (outsideDir, files) = partitionEithers (map pathToEither fps)
     pathToEither fp = maybe (Left fp) Right (normalizePath fp)
@@ -441,7 +441,7 @@ checkPackageInExtractedTarball pkgDir = do
         logWarn $ "Package check reported the following warnings:\n" <>
                    mconcat (intersperse "\n" . fmap displayShow $ warnings)
     case NE.nonEmpty errors of
-        Nothing -> return ()
+        Nothing -> pure ()
         Just ne -> throwM $ CheckException ne
 
 buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
@@ -451,7 +451,7 @@ buildExtractedTarball pkgDir = do
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
-        return $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
+        pure $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
   pathsToKeep
     <- fmap Map.fromList
      $ flip filterM (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
@@ -506,7 +506,7 @@ packFileEntry filepath tarpath = do
   perms   <- getPermissions filepath
   content <- S.readFile filepath
   let size = fromIntegral (S.length content)
-  return (Tar.simpleEntry tarpath (Tar.NormalFile (L.fromStrict content) size)) {
+  pure (Tar.simpleEntry tarpath (Tar.NormalFile (L.fromStrict content) size)) {
     Tar.entryPermissions = if executable perms then Tar.executableFilePermissions
                                                else Tar.ordinaryFilePermissions,
     Tar.entryTime = mtime
@@ -515,14 +515,14 @@ packFileEntry filepath tarpath = do
 getModTime :: FilePath -> IO Tar.EpochTime
 getModTime path = do
     t <- getModificationTime path
-    return . floor . utcTimeToPOSIXSeconds $ t
+    pure . floor . utcTimeToPOSIXSeconds $ t
 
 getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => m PackageConfig
 getDefaultPackageConfig = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
-  return PackageConfig
+  pure PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = mempty

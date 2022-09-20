@@ -1,4 +1,4 @@
 import Lib
 
 main :: IO ()
-main = return ()
+main = pure ()

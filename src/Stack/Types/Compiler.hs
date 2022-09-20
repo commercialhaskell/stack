@@ -50,13 +50,13 @@ instance Display ActualCompiler where
 instance ToJSON ActualCompiler where
     toJSON = toJSON . compilerVersionText
 instance FromJSON ActualCompiler where
-    parseJSON (String t) = either (const $ fail "Failed to parse compiler version") return (parseActualCompiler t)
+    parseJSON (String t) = either (const $ fail "Failed to parse compiler version") pure (parseActualCompiler t)
     parseJSON _ = fail "Invalid CompilerVersion, must be String"
 instance FromJSONKey ActualCompiler where
     fromJSONKey = FromJSONKeyTextParser $ \k ->
         case parseActualCompiler k of
             Left _ -> fail $ "Failed to parse CompilerVersion " ++ T.unpack k
-            Right parsed -> return parsed
+            Right parsed -> pure parsed
 instance PersistField ActualCompiler where
   toPersistValue = toPersistValue . compilerVersionText
   fromPersistValue = (mapLeft tshow . parseActualCompiler) <=< fromPersistValue
@@ -118,7 +118,7 @@ newtype CompilerRepository
   deriving (Show)
 
 instance FromJSON CompilerRepository where
-  parseJSON = withText "CompilerRepository" (return . CompilerRepository)
+  parseJSON = withText "CompilerRepository" (pure . CompilerRepository)
 
 defaultCompilerRepository :: CompilerRepository
 defaultCompilerRepository = CompilerRepository "https://gitlab.haskell.org/ghc/ghc.git"

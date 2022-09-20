@@ -39,7 +39,7 @@ getGlobalDB pkgexe = do
     logDebug "Getting global package database location"
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg pkgexe [] ["list", "--global"] >>= either throwIO return
+    bs <- ghcPkg pkgexe [] ["list", "--global"] >>= either throwIO pure
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
     liftIO $ resolveDir' fp
   where
@@ -62,7 +62,7 @@ ghcPkg pkgexe@(GhcPkgExe pkgPath) pkgDbs args = do
       Left _ -> do
         mapM_ (createDatabase pkgexe) pkgDbs
         go
-      Right _ -> return eres
+      Right _ -> pure eres
   where
     pkg = toFilePath pkgPath
     go = tryAny $ BL.toStrict . fst <$> proc pkg args' readProcess_
@@ -88,13 +88,13 @@ createDatabase (GhcPkgExe pkgPath) db = do
                     fromString (toFilePath db) <>
                     " is corrupted (missing its package.cache file)."
                 logWarn "Proceeding with a recache"
-                return ["--package-db", toFilePath db, "recache"]
+                pure ["--package-db", toFilePath db, "recache"]
             else do
                 -- Creating the parent doesn't seem necessary, as ghc-pkg
                 -- seems to be sufficiently smart. But I don't feel like
                 -- finding out it isn't the hard way
                 ensureDir (parent db)
-                return ["init", toFilePath db]
+                pure ["init", toFilePath db]
         void $ proc (toFilePath pkgPath) args $ \pc ->
           readProcess_ pc `onException`
           logError ("Unable to create package database at " <> fromString (toFilePath db))
@@ -123,7 +123,7 @@ findGhcPkgField pkgexe pkgDbs name field = do
             pkgexe
             pkgDbs
             ["field", "--simple-output", name, T.unpack field]
-    return $
+    pure $
         case result of
             Left{} -> Nothing
             Right bs ->
@@ -142,7 +142,7 @@ unregisterGhcPkgIds pkgexe pkgDb epgids = do
     eres <- ghcPkg pkgexe [pkgDb] args
     case eres of
         Left e -> logWarn $ displayShow e
-        Right _ -> return ()
+        Right _ -> pure ()
   where
     (idents, gids) = partitionEithers $ toList epgids
     args = "unregister" : "--user" : "--force" :

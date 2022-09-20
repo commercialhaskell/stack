@@ -13,7 +13,6 @@ module Stack.SetupCmd
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Reader
 import qualified Data.Text as T
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Builder.Extra as OA
@@ -61,8 +60,8 @@ setupParser = SetupCmdOpts
             Left _ ->
                 case parseWantedCompiler (T.pack s) of
                     Left _ -> OA.readerError $ "Invalid version: " ++ s
-                    Right x -> return x
-            Right x -> return x
+                    Right x -> pure x
+            Right x -> pure x
 
 setup
     :: (HasBuildConfig env, HasGHCVariant env)

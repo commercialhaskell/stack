@@ -257,17 +257,17 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
             pure lp { lpPackage = applyForceCustomBuild globalCabalVersion $ lpPackage lp }
       pPackages <- for (smProject sourceMap) $ \pp -> do
         lp <- loadLocalPackage' pp
-        return $ PSFilePath lp
+        pure $ PSFilePath lp
       bopts <- view $ configL.to configBuild
       deps <- for (smDeps sourceMap) $ \dp ->
         case dpLocation dp of
           PLImmutable loc ->
-            return $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
+            pure $ PSRemote loc (getPLIVersion loc) (dpFromSnapshot dp) (dpCommon dp)
           PLMutable dir -> do
             pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
             lp <- loadLocalPackage' pp
-            return $ PSFilePath lp
-      return $ pPackages <> deps
+            pure $ PSFilePath lp
+      pure $ pPackages <> deps
 
 -- | Throw an exception if there are any snapshot packages in the plan.
 errorOnSnapshot :: Plan -> RIO env Plan
@@ -389,10 +389,10 @@ addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
     depsRes <- addPackageDeps package
     res <- case depsRes of
-        Left e -> return $ Left e
+        Left e -> pure $ Left e
         Right (missing, present, _minLoc) -> do
             ctx <- ask
-            return $ Right Task
+            pure $ Right Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
                     (packageVersion package)
@@ -433,19 +433,19 @@ addDep name = do
     case Map.lookup name m of
         Just res -> do
             planDebug $ "addDep: Using cached result for " ++ show name ++ ": " ++ show res
-            return res
+            pure res
         Nothing -> do
             res <- if name `elem` callStack ctx
                 then do
                     planDebug $ "addDep: Detected cycle " ++ show name ++ ": " ++ show (callStack ctx)
-                    return $ Left $ DependencyCycleDetected $ name : callStack ctx
+                    pure $ Left $ DependencyCycleDetected $ name : callStack ctx
                 else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
                     let mpackageInfo = Map.lookup name $ combinedMap ctx
                     planDebug $ "addDep: Package info for " ++ show name ++ ": " ++ show mpackageInfo
                     case mpackageInfo of
                         -- TODO look up in the package index and see if there's a
                         -- recommendation available
-                        Nothing -> return $ Left $ UnknownPackage name
+                        Nothing -> pure $ Left $ UnknownPackage name
                         Just (PIOnlyInstalled loc installed) -> do
                             -- FIXME Slightly hacky, no flags since
                             -- they likely won't affect executable
@@ -459,12 +459,12 @@ addDep name = do
                                       logWarn $ "No latest package revision found for: " <>
                                           fromString (packageNameString name) <> ", dependency callstack: " <>
                                           displayShow (map packageNameString $ callStack ctx)
-                                      return Nothing
+                                      pure Nothing
                                     Just (_rev, cfKey, treeKey) ->
-                                      return . Just $
+                                      pure . Just $
                                           PLIHackage (PackageIdentifier name version) cfKey treeKey
                             tellExecutablesUpstream name askPkgLoc loc Map.empty
-                            return $ Right $ ADRFound loc installed
+                            pure $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
                             installPackage name ps Nothing
@@ -472,13 +472,13 @@ addDep name = do
                             tellExecutables name ps
                             installPackage name ps (Just installed)
             updateLibMap name res
-            return res
+            pure res
 
 -- FIXME what's the purpose of this? Add a Haddock!
 tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _name (PSFilePath lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
-    | otherwise = return ()
+    | otherwise = pure ()
 -- Ignores ghcOptions because they don't matter for enumerating
 -- executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
@@ -548,7 +548,7 @@ installPackage name ps minstalled = do
                         let writerFunc w = case res of
                                 Left _ -> mempty
                                 _ -> w
-                        return (res, writerFunc)
+                        pure (res, writerFunc)
                     case res of
                         Right deps -> do
                           planDebug $ "installPackage: For " ++ show name ++ ", successfully added package deps"
@@ -564,7 +564,7 @@ installPackage name ps minstalled = do
                           -- FIXME: this redundantly adds the deps (but
                           -- they'll all just get looked up in the map)
                           addFinal lp tb finalAllInOne False
-                          return $ Right adr
+                          pure $ Right adr
                         Left _ -> do
                             -- Reset the state to how it was before
                             -- attempting to find an all-in-one build
@@ -579,7 +579,7 @@ installPackage name ps minstalled = do
                                 -- available for addFinal.
                                 updateLibMap name res'
                                 addFinal lp tb False False
-                            return res'
+                            pure res'
  where
    expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
      curator <- maybeCurator
@@ -595,7 +595,7 @@ resolveDepsAndInstall :: Bool
 resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
     res <- addPackageDeps package
     case res of
-        Left err -> return $ Left err
+        Left err -> pure $ Left err
         Right deps -> liftM Right $ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled deps
 
 -- | Checks if we need to install the given 'Package', given the results
@@ -616,15 +616,15 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled (missing,
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
         (Just installed, True) -> do
             shouldInstall <- checkDirtiness ps installed package present buildHaddocks
-            return $ if shouldInstall then Nothing else Just installed
+            pure $ if shouldInstall then Nothing else Just installed
         (Just _, False) -> do
             let t = T.intercalate ", " $ map (T.pack . packageNameString . pkgName) (Set.toList missing)
             tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
-            return Nothing
-        (Nothing, _) -> return Nothing
+            pure Nothing
+        (Nothing, _) -> pure Nothing
     let loc = psLocation ps
         mutable = installLocationIsMutable loc <> minMutable
-    return $ case mRightVersionInstalled of
+    pure $ case mRightVersionInstalled of
         Just installed -> ADRFound loc installed
         Nothing -> ADRToInstall Task
             { taskProvides = PackageIdentifier
@@ -708,13 +708,13 @@ addPackageDeps package = do
                             -- much
                             DependencyPlanFailures _ _  -> Couldn'tResolveItsDependencies (packageVersion package)
                 mlatestApplicable <- getLatestApplicableVersionAndRev
-                return $ Left (depname, (range, mlatestApplicable, bd))
+                pure $ Left (depname, (range, mlatestApplicable, bd))
             Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
-                return $ Left (depname, (range, Nothing, HasNoLibrary))
+                pure $ Left (depname, (range, Nothing, HasNoLibrary))
             Right adr -> do
                 addParent depname range Nothing
                 inRange <- if adrVersion adr `withinRange` range
-                    then return True
+                    then pure True
                     else do
                         let warn_ reason =
                                 tell mempty { wWarnings = (msg:) }
@@ -736,7 +736,7 @@ addPackageDeps package = do
                         if allowNewer
                             then do
                                 warn_ "allow-newer enabled"
-                                return True
+                                pure True
                             else do
                                 -- We ignore dependency information for packages in a snapshot
                                 x <- inSnapshot (packageName package) (packageVersion package)
@@ -744,27 +744,27 @@ addPackageDeps package = do
                                 if x && y
                                     then do
                                         warn_ "trusting snapshot over cabal file dependency information"
-                                        return True
-                                    else return False
+                                        pure True
+                                    else pure False
                 if inRange
                     then case adr of
-                        ADRToInstall task -> return $ Right
+                        ADRToInstall task -> pure $ Right
                             (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
-                        ADRFound loc (Executable _) -> return $ Right
+                        ADRFound loc (Executable _) -> pure $ Right
                             (Set.empty, Map.empty, installLocationIsMutable loc)
-                        ADRFound loc (Library ident gid _) -> return $ Right
+                        ADRFound loc (Library ident gid _) -> pure $ Right
                             (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
                     else do
                         mlatestApplicable <- getLatestApplicableVersionAndRev
-                        return $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
+                        pure $ Left (depname, (range, mlatestApplicable, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
         -- Note that the Monoid for 'InstallLocation' means that if any
         -- is 'Local', the result is 'Local', indicating that the parent
         -- package must be installed locally. Otherwise the result is
         -- 'Snap', indicating that the parent can either be installed
         -- locally or in the snapshot.
-        ([], pairs) -> return $ Right $ mconcat pairs
-        (errs, _) -> return $ Left $ DependencyPlanFailures
+        ([], pairs) -> pure $ Right $ mconcat pairs
+        (errs, _) -> pure $ Left $ DependencyPlanFailures
             package
             (Map.fromList errs)
   where
@@ -836,10 +836,10 @@ checkDirtiness ps installed package present buildHaddocks = do
                   Just files -> Just $ "local file changes: " <> addEllipsis (T.pack $ unwords $ Set.toList files)
                   Nothing -> Nothing
     case mreason of
-        Nothing -> return False
+        Nothing -> pure False
         Just reason -> do
             tell mempty { wDirty = Map.singleton (packageName package) reason }
-            return True
+            pure True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
@@ -934,10 +934,10 @@ packageDepsWithTools p = do
         menv <- liftIO $ configProcessContextSettings config settings
         mfound <- runRIO menv $ findExecutable $ T.unpack toolName
         case mfound of
-            Left _ -> return $ Just $ ToolWarning name (packageName p)
-            Right _ -> return Nothing
+            Left _ -> pure $ Just $ ToolWarning name (packageName p)
+            Right _ -> pure Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    return $ packageDeps p
+    pure $ packageDeps p
 
 -- | Warn about tools in the snapshot definition. States the tool name
 -- expected and the package name using it.
@@ -987,19 +987,19 @@ stripNonDeps deps plan = plan
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
     ctx <- ask
-    return $ fromMaybe False $ do
+    pure $ fromMaybe False $ do
         ps <- Map.lookup name (combinedMap ctx)
         case ps of
             PIOnlySource (PSRemote _ srcVersion FromSnapshot _) ->
-                return $ srcVersion == version
+                pure $ srcVersion == version
             PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->
-                return $ srcVersion == version
+                pure $ srcVersion == version
             -- OnlyInstalled occurs for global database
             PIOnlyInstalled loc (Library pid _gid _lic) ->
               assert (loc == Snap) $
               assert (pkgVersion pid == version) $
               Just True
-            _ -> return False
+            _ -> pure False
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
@@ -1252,4 +1252,4 @@ extendDepsPath ident dp = DepsPath
 
 -- Switch this to 'True' to enable some debugging putStrLn in this module
 planDebug :: MonadIO m => String -> m ()
-planDebug = if False then liftIO . putStrLn else \_ -> return ()
+planDebug = if False then liftIO . putStrLn else \_ -> pure ()

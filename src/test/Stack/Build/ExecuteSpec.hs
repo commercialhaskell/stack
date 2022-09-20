@@ -9,4 +9,4 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = return ()
+spec = pure ()

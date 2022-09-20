@@ -33,10 +33,10 @@ clean cleanOpts = do
   where
     cleanDir dir = do
       logDebug $ "Deleting directory: " <> fromString (toFilePath dir)
-      liftIO (ignoringAbsence (removeDirRecur dir) >> return False) `catchAny` \ex -> do
+      liftIO (ignoringAbsence (removeDirRecur dir) >> pure False) `catchAny` \ex -> do
         logError $ "Exception while recursively deleting " <> fromString (toFilePath dir) <> "\n" <> displayShow ex
         logError "Perhaps you do not have permission to delete these files or they are in use?"
-        return True
+        pure True
 
 dirsToDelete :: CleanOpts -> RIO BuildConfig [Path Abs Dir]
 dirsToDelete cleanOpts = do
@@ -54,7 +54,7 @@ dirsToDelete cleanOpts = do
         CleanFull -> do
             pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
             projectWorkDir <- getProjectWorkDir
-            return (projectWorkDir : pkgWorkDirs)
+            pure (projectWorkDir : pkgWorkDirs)
 
 -- | Options for @stack clean@.
 data CleanOpts

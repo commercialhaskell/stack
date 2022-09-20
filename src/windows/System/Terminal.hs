@@ -54,21 +54,21 @@ getTerminalWidth = do
                 (_, mbStdout, _, rStty) <- createProcess stty
                 exStty <- waitForProcess rStty
                 case exStty of
-                    ExitFailure _ -> return Nothing
+                    ExitFailure _ -> pure Nothing
                     ExitSuccess ->
-                        maybe (return Nothing)
+                        maybe (pure Nothing)
                               (\hSize -> do
                                   sizeStr <- hGetContents hSize
                                   case map read $ words sizeStr :: [Int] of
-                                    [_r, c] -> return $ Just c
-                                    _ -> return Nothing
+                                    [_r, c] -> pure $ Just c
+                                    _ -> pure Nothing
                               )
                               mbStdout
             else do
                 [left,_top,right,_bottom] <- forM [0..3] $ \i -> do
                     v <- peekByteOff p ((i*2) + posCONSOLE_SCREEN_BUFFER_INFO_srWindow)
-                    return $ fromIntegral (v :: Word16)
-                return $ Just (1+right-left)
+                    pure $ fromIntegral (v :: Word16)
+                pure $ Just (1+right-left)
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
@@ -104,7 +104,7 @@ fixCodePage mcp ghcVersion inner = do
                 | otherwise = id
 
         case (setInput, setOutput) of
-            (False, False) -> return ()
+            (False, False) -> pure ()
             (True, True) -> warn ""
             (True, False) -> warn " input"
             (False, True) -> warn " output"
@@ -122,5 +122,5 @@ hIsTerminalDeviceOrMinTTY :: MonadIO m => Handle -> m Bool
 hIsTerminalDeviceOrMinTTY h = do
   isTD <- hIsTerminalDevice h
   if isTD
-    then return True
+    then pure True
     else liftIO $ withHandleToHANDLE h isMinTTYHandle

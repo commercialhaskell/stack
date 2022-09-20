@@ -48,7 +48,7 @@ mkProjectPackage ::
     -> RIO env ProjectPackage
 mkProjectPackage printWarnings dir buildHaddocks = do
    (gpd, name, cabalfp) <- loadCabalFilePath (resolvedAbsolute dir)
-   return ProjectPackage
+   pure ProjectPackage
      { ppCabalFP = cabalfp
      , ppResolvedDir = dir
      , ppCommon = CommonPackage
@@ -78,7 +78,7 @@ additionalDepPackage buildHaddocks pl = do
         let PackageIdentifier name _ = packageLocationIdent pli
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
-  return DepPackage
+  pure DepPackage
     { dpLocation = pl
     , dpHidden = False
     , dpFromSnapshot = NotFromSnapshot
@@ -100,7 +100,7 @@ snapToDepPackage ::
     -> RIO env DepPackage
 snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
   run <- askRunInIO
-  return DepPackage
+  pure DepPackage
     { dpLocation = PLImmutable spLocation
     , dpHidden = spHidden
     , dpFromSnapshot = FromSnapshot
@@ -117,7 +117,7 @@ snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
 loadVersion :: MonadIO m => CommonPackage -> m Version
 loadVersion common = do
     gpd <- liftIO $ cpGPD common
-    return (pkgVersion $ PD.package $ PD.packageDescription gpd)
+    pure (pkgVersion $ PD.package $ PD.packageDescription gpd)
 
 getPLIVersion :: PackageLocationImmutable -> Version
 getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
@@ -157,7 +157,7 @@ actualFromGhc ::
     -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
     globals <- view $ compilerPathsL.to cpGlobalDump
-    return
+    pure
         SMActual
         { smaCompiler = ac
         , smaProject = smwProject smw
@@ -172,7 +172,7 @@ actualFromHints ::
     -> RIO env (SMActual GlobalPackageVersion)
 actualFromHints smw ac = do
     globals <- globalsFromHints (actualToWanted ac)
-    return
+    pure
         SMActual
         { smaCompiler = ac
         , smaProject = smwProject smw
@@ -187,7 +187,7 @@ globalCondCheck = do
   let condCheck (PD.OS os') = pure $ os' == os
       condCheck (PD.Arch arch') = pure $ arch' == arch
       condCheck c = Left c
-  return condCheck
+  pure condCheck
 
 checkFlagsUsedThrowing ::
        (MonadIO m, MonadThrow m)
@@ -267,13 +267,13 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
     deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
     let wc = snapshotCompiler snapshot
     globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc
-    return $ \projectPackages -> do
+    pure $ \projectPackages -> do
         prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
             pp <- mkProjectPackage printWarnings resolved buildHaddocks
             pure (cpName $ ppCommon pp, pp)
         compiler <- either throwIO pure $ wantedToActual
                   $ snapshotCompiler snapshot
-        return SMActual
+        pure SMActual
               { smaCompiler = compiler
               , smaProject = prjPkgs
               , smaDeps = Map.difference deps prjPkgs

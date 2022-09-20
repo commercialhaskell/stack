@@ -116,7 +116,7 @@ setupConfigFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                    -> m (Path Abs File)
 setupConfigFromDir fp = do
     dist <- distDirFromDir fp
-    return $ dist </> $(mkRelFile "setup-config")
+    pure $ dist </> $(mkRelFile "setup-config")
 
 -- | Package's build artifacts directory.
 distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -141,7 +141,7 @@ rootDistRelativeDir
   => m (Path Rel Dir)
 rootDistRelativeDir = do
     workDir <- view workDirL
-    return $ workDir </> $(mkRelDir "dist")
+    pure $ workDir </> $(mkRelDir "dist")
 
 -- | Package's working directory.
 workDirFromDir :: (MonadReader env m, HasConfig env)
@@ -166,7 +166,7 @@ distRelativeDir = do
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
     allDist <- rootDistRelativeDir
-    return $ allDist </> platformAndCabal
+    pure $ allDist </> platformAndCabal
 
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
@@ -174,7 +174,7 @@ projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
   -> m (Path Abs Dir)  -- ^ Docker sandbox
 projectDockerSandboxDir projectRoot = do
   workDir <- view workDirL
-  return $ projectRoot </> workDir </> $(mkRelDir "docker/")
+  pure $ projectRoot </> workDir </> $(mkRelDir "docker/")
 
 -- | Image staging dir from project root.
 imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
@@ -184,4 +184,4 @@ imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
 imageStagingDir projectRoot imageIdx = do
   workDir <- view workDirL
   idxRelDir <- parseRelDir (show imageIdx)
-  return $ projectRoot </> workDir </> $(mkRelDir "image") </> idxRelDir
+  pure $ projectRoot </> workDir </> $(mkRelDir "image") </> idxRelDir

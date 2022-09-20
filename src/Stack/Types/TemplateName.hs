@@ -54,7 +54,7 @@ data RepoService = GitHub | GitLab | Bitbucket
 
 instance FromJSON TemplateName where
     parseJSON = withText "TemplateName" $
-        either fail return . parseTemplateNameFromString . T.unpack
+        either fail pure . parseTemplateNameFromString . T.unpack
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
@@ -63,7 +63,7 @@ templateNameArgument :: O.Mod O.ArgumentFields TemplateName
 templateNameArgument =
     O.argument
         (do string <- O.str
-            either O.readerError return (parseTemplateNameFromString string))
+            either O.readerError pure (parseTemplateNameFromString string))
 
 -- | An argument which accepts a @key:value@ pair for specifying parameters.
 templateParamArgument :: O.Mod O.OptionFields (Text,Text)
@@ -71,7 +71,7 @@ templateParamArgument :: O.Mod O.OptionFields (Text,Text)
 templateParamArgument =
     O.option
         (do string <- O.str
-            either O.readerError return (parsePair string))
+            either O.readerError pure (parsePair string))
   where
     parsePair :: String -> Either String (Text, Text)
     parsePair s =

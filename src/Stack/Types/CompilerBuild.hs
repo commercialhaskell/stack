@@ -21,7 +21,7 @@ instance FromJSON CompilerBuild where
     parseJSON =
         withText
             "CompilerBuild"
-            (either (fail . show) return . parseCompilerBuild . T.unpack)
+            (either (fail . show) pure . parseCompilerBuild . T.unpack)
 
 -- | Descriptive name for compiler build
 compilerBuildName :: CompilerBuild -> String
@@ -35,6 +35,6 @@ compilerBuildSuffix (CompilerBuildSpecialized s) = '-' : s
 
 -- | Parse compiler build from a String.
 parseCompilerBuild :: (MonadThrow m) => String -> m CompilerBuild
-parseCompilerBuild "" = return CompilerBuildStandard
-parseCompilerBuild "standard" = return CompilerBuildStandard
-parseCompilerBuild name = return (CompilerBuildSpecialized name)
+parseCompilerBuild "" = pure CompilerBuildStandard
+parseCompilerBuild "standard" = pure CompilerBuildStandard
+parseCompilerBuild name = pure (CompilerBuildSpecialized name)

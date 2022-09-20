@@ -6,7 +6,7 @@ import Data.List (isPrefixOf)
 main :: IO ()
 main =
   if isWindows
-  then do return ()
+  then do pure ()
   else do
 
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do

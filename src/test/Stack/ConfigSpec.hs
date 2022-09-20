@@ -114,7 +114,7 @@ spec = beforeAll setup $ do
 
         toAbsPath path = do
           parentDir <- getCurrentDirectory >>= parseAbsDir
-          return (parentDir </> path)
+          pure (parentDir </> path)
 
         loadProject config inner = do
           yamlAbs <- toAbsPath stackDotYaml
@@ -130,7 +130,7 @@ spec = beforeAll setup $ do
         projectResolver `shouldBe` RSLSynonym (LTS 19 22)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
-      loadProject resolverSnapshotConfig (const (return ()))
+      loadProject resolverSnapshotConfig (const (pure ()))
         `shouldThrow` anyException
 
   describe "loadConfig" $ do
@@ -140,12 +140,12 @@ spec = beforeAll setup $ do
             loadConfig inner
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ example $
-      loadConfig' $ const $ return ()
+      loadConfig' $ const $ pure ()
 
     it "works with a blank config file" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) ""
       -- TODO(danburton): more specific test for exception
-      loadConfig' (const (return ())) `shouldThrow` anyException
+      loadConfig' (const (pure ())) `shouldThrow` anyException
 
     let configOverrideHpack = pcHpackExecutable . view pantryConfigL
 
@@ -225,5 +225,5 @@ spec = beforeAll setup $ do
         let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
             parsed = parseEither (parseConfigMonoid curDir) <$> left show (decodeEither' defaultConfigYaml)
         case parsed of
-            Right (Right _) -> return () :: IO ()
+            Right (Right _) -> pure () :: IO ()
             _ -> fail "Failed to parse default config yaml"

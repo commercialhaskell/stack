@@ -6,5 +6,5 @@ main = do
   stackCheckStderr ["build", "--dry-run"] $ \str ->
     case filter ("unknown-field-name" `isInfixOf`) (lines str) of
       [] -> error "unknown-field-name didn't appear once"
-      [_] -> return ()
+      [_] -> pure ()
       _:_:_ -> error "unknown-field-name appeared multiple times"

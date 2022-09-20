@@ -45,12 +45,12 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
     nixEnable <- case () of _
                                 | nixEnable0 && osIsWindows -> do
                                       logInfo "Note: Disabling nix integration, since this is being run in Windows"
-                                      return False
-                                | otherwise                 -> return nixEnable0
+                                      pure False
+                                | otherwise                 -> pure nixEnable0
 
     when (not (null nixPackages) && isJust nixInitFile) $
        throwIO NixCannotUseShellFileAndPackagesException
-    return NixOpts{..}
+    pure NixOpts{..}
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
@@ -107,4 +107,4 @@ isNixOS = liftIO $ do
     let fp = "/etc/os-release"
     ifM (doesFileExist fp)
         (T.isInfixOf "ID=nixos" <$> TIO.readFile fp)
-        (return False)
+        (pure False)

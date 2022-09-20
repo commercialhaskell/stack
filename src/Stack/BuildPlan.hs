@@ -362,11 +362,11 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
         cerrs = compilerErrors compiler errs
 
     if Map.null errs then
-        return $ BuildPlanCheckOk f
+        pure $ BuildPlanCheckOk f
     else if Map.null cerrs then do
-            return $ BuildPlanCheckPartial f errs
+            pure $ BuildPlanCheckPartial f errs
         else
-            return $ BuildPlanCheckFail f cerrs compiler
+            pure $ BuildPlanCheckFail f cerrs compiler
     where
         compilerErrors compiler errs
             | whichCompiler compiler == Ghc = ghcErrors errs
@@ -391,14 +391,14 @@ selectBestSnapshot pkgDirs snaps = do
         go mold mnew = do
             old@(_snap, _loc, bpc) <- mold
             case bpc of
-                BuildPlanCheckOk {} -> return old
+                BuildPlanCheckOk {} -> pure old
                 _ -> fmap (betterSnap old) mnew
 
         getResult loc = do
             candidate <- loadProjectSnapshotCandidate loc NoPrintWarnings False
             result <- checkSnapBuildPlan pkgDirs Nothing candidate
             reportResult result loc
-            return (candidate, loc, result)
+            pure (candidate, loc, result)
 
         betterSnap (s1, l1, r1) (s2, l2, r2)
           | compareBuildPlanCheck r1 r2 /= LT = (s1, l1, r1)

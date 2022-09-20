@@ -53,7 +53,7 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerS
        -- call onFailure handler if it's present and parsing options failed
        Failure f | Just onFailure <- mOnFailure -> onFailure f args
        parseResult -> handleParseResult parseResult
-     return (mappend c a,b)
+     pure (mappend c a,b)
   where parser = info (helpOption <*> versionOptions <*> complicatedParser "COMMAND|FILE" commonParser commandParser) desc
         desc = fullDesc <> header h <> progDesc pd <> footer footerStr
         versionOptions =

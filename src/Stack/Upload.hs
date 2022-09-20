@@ -94,7 +94,7 @@ loadAuth config = do
   case maybeHackageKey of
     Just key -> do
       logInfo "HACKAGE_KEY found in env, using that for credentials."
-      return $ HAKey key
+      pure $ HAKey key
     Nothing -> HACreds <$> loadUserAndPassword config
 
 -- | Load Hackage credentials, either from a save file or the command
@@ -116,7 +116,7 @@ loadUserAndPassword config = do
         logWarn "WARNING: You've set save-hackage-creds to false"
         logWarn "However, credentials were found at:"
         logWarn $ "  " <> fromString fp
-      return $ mkCreds fp
+      pure $ mkCreds fp
   where
     fromPrompt :: HasLogFunc m => FilePath -> RIO m HackageCreds
     fromPrompt fp = do
@@ -137,7 +137,7 @@ loadUserAndPassword config = do
           logInfo "Saved!"
           hFlush stdout
 
-      return hc
+      pure hc
 
 -- | Write contents to a file which is always private.
 --
@@ -165,7 +165,7 @@ credsFile :: Config -> IO FilePath
 credsFile config = do
     let dir = toFilePath (view stackRootL config) </> "upload"
     createDirectoryIfMissing True dir
-    return $ dir </> "credentials.json"
+    pure $ dir </> "credentials.json"
 
 addAPIKey :: HackageKey -> Request -> Request
 addAPIKey (HackageKey key) req =
@@ -174,7 +174,7 @@ addAPIKey (HackageKey key) req =
 applyAuth :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
 applyAuth haAuth req0 = do
     case haAuth of
-        HAKey key -> return (addAPIKey key req0)
+        HAKey key -> pure (addAPIKey key req0)
         HACreds creds -> applyCreds creds req0
 
 applyCreds :: HasLogFunc m => HackageCreds -> Request -> RIO m Request
@@ -191,8 +191,8 @@ applyCreds creds req0 = do
           case fromException e of
               Just e' -> logWarn $ fromString $ displayDigestAuthException e'
               Nothing -> logWarn $ fromString $ displayException e
-          return req0
-      Right req -> return req
+          pure req0
+      Right req -> pure req
 
 -- | Upload a single tarball with the given @Uploader@.  Instead of
 -- sending a file like 'upload', this sends a lazy bytestring.
@@ -227,7 +227,7 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
             401 -> do
                 logError "authentication failure"
                 case auth of
-                  HACreds creds -> handleIO (const $ return ()) (liftIO $ removeFile (hcCredsFile creds))
+                  HACreds creds -> handleIO (const $ pure ()) (liftIO $ removeFile (hcCredsFile creds))
                   _ -> pure ()
                 throwString "Authentication failure uploading to server"
             403 -> do

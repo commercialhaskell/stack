@@ -136,8 +136,8 @@ withRunnerGlobal go inner = do
     maybe defaultColorWhen pure $
     getFirst $ configMonoidColorWhen $ globalConfigMonoid go
   useColor <- case colorWhen of
-    ColorNever -> return False
-    ColorAlways -> return True
+    ColorNever -> pure False
+    ColorAlways -> pure True
     ColorAuto -> fromMaybe True <$>
                           hSupportsANSIWithoutEmulation stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth

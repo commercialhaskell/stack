@@ -5,4 +5,4 @@ import Language.Haskell.TH
 thFunc :: Q Exp
 thFunc = runIO $ do
   readFile "files/file.txt"
-  return $ LitE (IntegerL 5)
+  pure $ LitE (IntegerL 5)

@@ -164,7 +164,7 @@ execExtraHelp args helpOpt parser pd =
                                 parser <*>
                                 some (strArgument (metavar "OTHER ARGUMENTS") :: Parser String)))
                         (fullDesc <> progDesc pd))
-        return ()
+        pure ()
   where hiddenHelper = abortOption showHelpText (long "help" <> hidden <> internal)
 
 -- | 'option', specialized to 'Text'.
@@ -244,30 +244,30 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
     msearchDir <-
         case (isRelative inputSearchDir, pcoAbsolute, pcoRelative) of
             (True, _, True) -> do
-                rootDir <- maybe getCurrentDirectory return pcoRootDir
-                return $ Just (rootDir </> inputSearchDir)
-            (False, True, _) -> return $ Just inputSearchDir
-            _ -> return Nothing
+                rootDir <- maybe getCurrentDirectory pure pcoRootDir
+                pure $ Just (rootDir </> inputSearchDir)
+            (False, True, _) -> pure $ Just inputSearchDir
+            _ -> pure Nothing
     case msearchDir of
         Nothing
-            | input == "" && pcoAbsolute -> return ["/"]
-            | otherwise -> return []
+            | input == "" && pcoAbsolute -> pure ["/"]
+            | otherwise -> pure []
         Just searchDir -> do
-            entries <- getDirectoryContents searchDir `catch` \(_ :: IOException) -> return []
+            entries <- getDirectoryContents searchDir `catch` \(_ :: IOException) -> pure []
             fmap catMaybes $ forM entries $ \entry ->
                 -- Skip . and .. unless user is typing . or ..
-                if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."] then return Nothing else
+                if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."] then pure Nothing else
                     if searchPrefix `isPrefixOf` entry
                         then do
                             let path = searchDir </> entry
                             case (pcoFileFilter path, pcoDirFilter path) of
-                                (True, True) -> return $ Just (inputSearchDir </> entry)
+                                (True, True) -> pure $ Just (inputSearchDir </> entry)
                                 (fileAllowed, dirAllowed) -> do
                                     isDir <- doesDirectoryExist path
                                     if (if isDir then dirAllowed else fileAllowed)
-                                        then return $ Just (inputSearchDir </> entry)
-                                        else return Nothing
-                        else return Nothing
+                                        then pure $ Just (inputSearchDir </> entry)
+                                        else pure Nothing
+                        else pure Nothing
 
 unescapeBashArg :: String -> String
 unescapeBashArg ('\'' : rest) = rest

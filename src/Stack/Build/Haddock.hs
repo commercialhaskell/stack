@@ -51,12 +51,12 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
             let localDocs = haddockIndexFile (localDepsDocDir bco)
             localExists <- doesFileExist localDocs
             if localExists
-                then return localDocs
+                then pure localDocs
                 else do
                     let snapDocs = haddockIndexFile (snapDocDir bco)
                     snapExists <- doesFileExist snapDocs
                     if snapExists
-                        then return snapDocs
+                        then pure snapDocs
                         else throwString "No local or snapshot doc index found to open."
     docFile <-
         case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
@@ -69,7 +69,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                 let docFile = haddockIndexFile (docLocation </> pkgRelDir)
                 exists <- doesFileExist docFile
                 if exists
-                    then return docFile
+                    then pure docFile
                     else do
                         logWarn $
                             "Expected to find documentation at " <>
@@ -79,7 +79,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
             _ -> getDocIndex
     prettyInfo $ "Opening" <+> pretty docFile <+> "in the browser."
     _ <- liftIO $ openBrowser (toFilePath docFile)
-    return ()
+    pure ()
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts
@@ -221,7 +221,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
     toInterfaceOpt :: DumpPackage -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} =
         case dpHaddockInterfaces of
-            [] -> return Nothing
+            [] -> pure Nothing
             srcInterfaceFP:_ -> do
                 srcInterfaceAbsFile <- parseCollapsedAbsFile srcInterfaceFP
                 let (PackageIdentifier name _) = dpPackageIdent
@@ -236,7 +236,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
 
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
                 esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
-                return $
+                pure $
                     case esrcInterfaceModTime of
                         Left _ -> Nothing
                         Right srcInterfaceModTime ->
@@ -258,7 +258,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
             Left _ -> doCopy
             Right destInterfaceModTime
                 | destInterfaceModTime < srcInterfaceModTime -> doCopy
-                | otherwise -> return ()
+                | otherwise -> pure ()
       where
         doCopy = do
             ignoringAbsence (removeDirRecur destHtmlAbsDir)

@@ -44,9 +44,9 @@ findPathUp :: (MonadIO m,MonadThrow m)
 findPathUp pathType dir p upperBound =
   do entries <- listDir dir
      case find p (pathType entries) of
-       Just path -> return (Just path)
-       Nothing | Just dir == upperBound -> return Nothing
-               | parent dir == dir -> return Nothing
+       Just path -> pure (Just path)
+       Nothing | Just dir == upperBound -> pure Nothing
+               | parent dir == dir -> pure Nothing
                | otherwise -> findPathUp pathType (parent dir) p upperBound
 
 -- | Find files matching predicate below a root directory.
@@ -65,7 +65,7 @@ findFiles dir p traversep =
                                          then Just ()
                                          else Nothing)
                                (listDir dir)
-                               (\ _ -> return ([], []))
+                               (\ _ -> pure ([], []))
      filteredFiles <- evaluate $ force (filter p files)
      filteredDirs <- filterM (fmap not . isSymLink) dirs
      subResults <-
@@ -73,8 +73,8 @@ findFiles dir p traversep =
             (\entry ->
                if traversep entry
                   then findFiles entry p traversep
-                  else return [])
-     return (concat (filteredFiles : subResults))
+                  else pure [])
+     pure (concat (filteredFiles : subResults))
 
 isSymLink :: Path Abs t -> IO Bool
 isSymLink = fmap isSymbolicLink . getSymbolicLinkStatus . toFilePath
@@ -85,9 +85,9 @@ findInParents :: MonadIO m => (Path Abs Dir -> m (Maybe a)) -> Path Abs Dir -> m
 findInParents f path = do
     mres <- f path
     case mres of
-        Just res -> return (Just res)
+        Just res -> pure (Just res)
         Nothing -> do
             let next = parent path
             if next == path
-                then return Nothing
+                then pure Nothing
                 else findInParents f next

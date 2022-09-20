@@ -44,7 +44,7 @@ instance FromJSON GhcPkgId where
   parseJSON = withText "GhcPkgId" $ \t ->
     case parseGhcPkgId t of
       Left e -> fail $ show (e, t)
-      Right x -> return x
+      Right x -> pure x
 
 instance ToJSON GhcPkgId where
   toJSON g =
@@ -54,7 +54,7 @@ instance ToJSON GhcPkgId where
 parseGhcPkgId :: MonadThrow m => Text -> m GhcPkgId
 parseGhcPkgId x = go x
   where go =
-          either (const (throwM (GhcPkgIdParseFail x))) return .
+          either (const (throwM (GhcPkgIdParseFail x))) pure .
           parseOnly (ghcPkgIdParser <* endOfInput)
 
 -- | A parser for a package-version-hash pair.

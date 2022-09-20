@@ -4,15 +4,15 @@ import Distribution.TestSuite
 
 tests :: IO [Test]
 tests = do
-  return [   
+  pure [
       test "foo" Pass
     ]
 
 test :: String -> Result -> Test
 test name r = Test t
-  where          
+  where
     t = TestInstance {
-        run = return (Finished r)
+        run = pure (Finished r)
       , name = name
       , tags = []
       , options = []

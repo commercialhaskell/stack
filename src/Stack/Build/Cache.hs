@@ -67,8 +67,8 @@ getInstalledExes :: (HasEnvConfig env)
                  => InstallLocation -> RIO env [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
-    (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDir dir
-    return $
+    (_, files) <- liftIO $ handleIO (const $ pure ([], [])) $ listDir dir
+    pure $
         concat $
         M.elems $
         -- If there are multiple install records (from a stack version
@@ -119,7 +119,7 @@ buildCacheFile dir component = do
         CExe name -> nonLibComponent "exe" name
         CTest name -> nonLibComponent "test" name
         CBench name -> nonLibComponent "bench" name
-    return $ cachesDir </> smDirName </> cacheFileName
+    pure $ cachesDir </> smDirName </> cacheFileName
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: HasEnvConfig env
@@ -236,10 +236,10 @@ flagCacheKey installed = do
     installationRoot <- installationRootLocal
     case installed of
         Library _ gid _ ->
-            return $
+            pure $
             configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
         Executable ident ->
-            return $
+            pure $
             configCacheKey
                 installationRoot
                 (ConfigCacheTypeFlagExecutable ident)
@@ -337,7 +337,7 @@ getPrecompiledCacheKey loc copts buildHaddocks installedPackageIDs = do
   let input = (coNoDirs copts, installedPackageIDs)
       optionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
 
-  return $ precompiledCacheKey platformGhcDir compiler cabalVersion packageKey optionsHash buildHaddocks
+  pure $ precompiledCacheKey platformGhcDir compiler cabalVersion packageKey optionsHash buildHaddocks
 
 -- | Write out information about a newly built package
 writePrecompiledCache :: HasEnvConfig env
@@ -355,7 +355,7 @@ writePrecompiledCache baseConfigOpts loc copts buildHaddocks depIDs mghcPkgId su
   ec <- view envConfigL
   let stackRootRelative = makeRelative (view stackRootL ec)
   mlibpath <- case mghcPkgId of
-    Executable _ -> return Nothing
+    Executable _ -> pure Nothing
     Library _ ipid _ -> Just <$> pathFromPkgId stackRootRelative ipid
   sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
   exes' <- forM (Set.toList exes) $ \exe -> do
@@ -399,7 +399,7 @@ readPrecompiledCache loc copts buildHaddocks depIDs = do
     mkAbs pc0 = do
       stackRoot <- view stackRootL
       let mkAbs' = (stackRoot </>)
-      return PrecompiledCache
+      pure PrecompiledCache
         { pcLibrary = mkAbs' <$> pcLibrary pc0
         , pcSubLibs = mkAbs' <$> pcSubLibs pc0
         , pcExes = mkAbs' <$> pcExes pc0

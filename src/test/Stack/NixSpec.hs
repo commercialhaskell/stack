@@ -102,5 +102,5 @@ spec = beforeAll setup $ do
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \config -> do
         nixPackages (configNix config) `shouldBe` ["glpk"]
         v <- parseVersionThrowing "9.0.2"
-        ghc <- either throwIO return $ nixCompiler (WCGhc v)
+        ghc <- either throwIO pure $ nixCompiler (WCGhc v)
         ghc `shouldBe` "haskell.compiler.ghc902"

@@ -92,9 +92,9 @@ listInstalled :: (MonadIO m, MonadThrow m)
               -> m [Tool]
 listInstalled programsPath = do
     doesDirExist programsPath >>= \case
-        False -> return []
+        False -> pure []
         True -> do (_, files) <- listDir programsPath
-                   return $ mapMaybe toTool files
+                   pure $ mapMaybe toTool files
   where
     toTool fp = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
@@ -122,7 +122,7 @@ getCompilerVersion wc exe = do
             let (_, ghcVersion) = versionFromEnd $ BL.toStrict bs
             x <- ACGhc <$> parseVersionThrowing (T.unpack $ T.decodeUtf8 ghcVersion)
             logDebug $ "GHC version is: " <> display x
-            return x
+            pure x
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
     isValid c = c == '.' || ('0' <= c && c <= '9')
@@ -133,13 +133,13 @@ extraDirs tool = do
     config <- view configL
     dir <- installDir (configLocalPrograms config) tool
     case (configPlatform config, toolNameString tool) of
-        (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
+        (Platform _ Cabal.Windows, isGHC -> True) -> pure mempty
             { edBins =
                 [ dir </> relDirBin
                 , dir </> relDirMingw </> relDirBin
                 ]
             }
-        (Platform Cabal.I386 Cabal.Windows, "msys2") -> return mempty
+        (Platform Cabal.I386 Cabal.Windows, "msys2") -> pure mempty
             { edBins =
                 [ dir </> relDirMingw32 </> relDirBin
                 , dir </> relDirUsr </> relDirBin
@@ -153,7 +153,7 @@ extraDirs tool = do
                 , dir </> relDirMingw32 </> relDirBin
                 ]
             }
-        (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> return mempty
+        (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> pure mempty
             { edBins =
                 [ dir </> relDirMingw64 </> relDirBin
                 , dir </> relDirUsr </> relDirBin
@@ -167,14 +167,14 @@ extraDirs tool = do
                 , dir </> relDirMingw64 </> relDirBin
                 ]
             }
-        (_, isGHC -> True) -> return mempty
+        (_, isGHC -> True) -> pure mempty
             { edBins =
                 [ dir </> relDirBin
                 ]
             }
         (Platform _ x, toolName) -> do
             logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
-            return mempty
+            pure mempty
   where
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
 
@@ -184,7 +184,7 @@ installDir :: (MonadReader env m, MonadThrow m)
            -> m (Path Abs Dir)
 installDir programsDir tool = do
     relativeDir <- parseRelDir $ toolString tool
-    return $ programsDir </> relativeDir
+    pure $ programsDir </> relativeDir
 
 tempInstallDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir
@@ -192,4 +192,4 @@ tempInstallDir :: (MonadReader env m, MonadThrow m)
            -> m (Path Abs Dir)
 tempInstallDir programsDir tool = do
     relativeDir <- parseRelDir $ toolString tool ++ ".temp"
-    return $ programsDir </> relativeDir
+    pure $ programsDir </> relativeDir
