@@ -136,8 +136,8 @@ changes/additions based off the
 [stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
 The specific versions of the online documentation (eg `v: v2.9.1`) are generated
-from the content of files at the point in the repository's history specified
-by the corresponding release tag. Consequently, that content is fixed once
+from the content of files at the point in the repository's history specified by
+the corresponding release tag. Consequently, that content is fixed once
 released.
 
 The Markdown syntax supported by MkDocs and the Material for MkDocs theme can
@@ -189,14 +189,14 @@ updates with your pull request.
 
 ## Backwards Compatability
 
-The `stack` executable does not need to, and does not, strive for the same broad
+The Stack executable does not need to, and does not, strive for the same broad
 compatability with versions of GHC that a library package (such as `pantry`)
-would seek. Instead, the `stack` executable aims to define a well-known
-combination of dependencies on which it relies. That is applies in particular to
-the `Cabal` package, where the `stack` executable aims to support one, and only
-one, version of `Cabal` with each release of the executable. At the time of
-writing (April 2022) that combination is defined by resolver `lts-17.5` (for
-GHC 8.10.4, and including `Cabal-3.2.1.0`) - see `stack.yaml`.
+would seek. Instead, Stack aims to define a well-known combination of
+dependencies on which its executable relies. That applies in particular to the
+`Cabal` package, where Stack aims to support one, and only one, version of
+`Cabal` with each release of its executable. At the time of writing (September
+2022) that combination is defined by resolver `nightly-2022-09-05` (for
+GHC 9.2.4, and including `Cabal-3.6.3.0`) - see `stack.yaml`.
 
 ## Code Quality
 

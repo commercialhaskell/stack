@@ -8,7 +8,7 @@ Release notes:
 
 Major changes:
 
-Behaviour changes:
+Behavior changes:
 
 Other enhancements:
 
@@ -17,6 +17,11 @@ Bug fixes:
 ## v2.9.1
 
 **Changes since v2.7.5:**
+
+Release notes:
+
+* After an upgrade from an earlier version of Stack, on first use only,
+  Stack 2.9.1 may warn that it had trouble loading the CompilerPaths cache.
 
 Behavior changes:
 
