@@ -133,7 +133,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
                                            <- IntersectingVersionRange . unVersionRangeJSON <$> (
                                                  o ..:? dockerRequireDockerVersionArgName
                                                    ..!= VersionRangeJSON anyVersion)
-              return DockerOptsMonoid{..})
+              pure DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
 instance Semigroup DockerOptsMonoid where
@@ -156,17 +156,17 @@ instance FromJSON DockerStackExe where
     parseJSON a = do
         s <- parseJSON a
         case parseDockerStackExe s of
-            Right dse -> return dse
+            Right dse -> pure dse
             Left e -> fail (show e)
 
 -- | Parse 'DockerStackExe'.
 parseDockerStackExe :: (MonadThrow m) => String -> m DockerStackExe
 parseDockerStackExe t
-    | t == dockerStackExeDownloadVal = return DockerStackExeDownload
-    | t == dockerStackExeHostVal = return DockerStackExeHost
-    | t == dockerStackExeImageVal = return DockerStackExeImage
+    | t == dockerStackExeDownloadVal = pure DockerStackExeDownload
+    | t == dockerStackExeHostVal = pure DockerStackExeHost
+    | t == dockerStackExeImageVal = pure DockerStackExeImage
     | otherwise = case parseAbsFile t of
-        Just p -> return (DockerStackExePath p)
+        Just p -> pure (DockerStackExePath p)
         Nothing -> throwM (DockerStackExeParseException t)
 
 -- | Docker volume mount.
@@ -192,7 +192,7 @@ instance FromJSON Mount where
     s <- parseJSON v
     case readMaybe s of
       Nothing -> fail $ "Mount read failed: " ++ s
-      Just x -> return x
+      Just x -> pure x
 
 -- | Options for Docker repository or image.
 data DockerMonoidRepoOrImage
@@ -207,7 +207,7 @@ newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange
 instance FromJSON VersionRangeJSON where
   parseJSON = withText "VersionRange"
                 (\s -> maybe (fail ("Invalid cabal-style VersionRange: " ++ T.unpack s))
-                             (return . VersionRangeJSON)
+                             (pure . VersionRangeJSON)
                              (Distribution.Text.simpleParse (T.unpack s)))
 
 -- | Exceptions thrown by Stack.Docker.

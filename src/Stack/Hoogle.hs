@@ -50,7 +50,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
     generateDbIfNeeded hooglePath = do
         databaseExists <- checkDatabaseExists
         if databaseExists && not rebuild
-            then return ()
+            then pure ()
             else if setup || rebuild
                      then do
                          logWarn
@@ -75,7 +75,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
       config <- view configL
       runRIO config $ -- a bit weird that we have to drop down like this
         catch (withDefaultEnvConfig $ Stack.Build.build Nothing)
-              (\(_ :: ExitCode) -> return ())
+              (\(_ :: ExitCode) -> pure ())
     hooglePackageName = mkPackageName "hoogle"
     hoogleMinVersion = mkVersion [5, 0]
     hoogleMinIdent =
@@ -163,7 +163,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
         mhooglePath <- runRIO menv (findExecutable "hoogle") <>
           requiringHoogle NotMuted (findExecutable "hoogle")
         eres <- case mhooglePath of
-            Left _ -> return $ Left "Hoogle isn't installed."
+            Left _ -> pure $ Left "Hoogle isn't installed."
             Right hooglePath -> do
                 result <- withProcessContext menv
                         $ proc hooglePath ["--numeric-version"]
@@ -174,7 +174,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                         , " --numeric-version' did not respond with expected value. Got: "
                         , got
                         ]
-                return $ case result of
+                pure $ case result of
                     Left err -> unexpectedResult $ T.pack (show err)
                     Right bs -> case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
                         Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)

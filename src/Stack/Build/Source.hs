@@ -57,7 +57,7 @@ localDependencies = do
             PLMutable dir -> do
                 pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
                 Just <$> loadLocalPackage pp
-            _ -> return Nothing
+            _ -> pure Nothing
 
 -- | Given the parsed targets and build command line options constructs
 --   a source map
@@ -107,7 +107,7 @@ loadSourceMap smt boptsCli sma = do
     logDebug "Checking flags"
     checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
     logDebug "SourceMap constructed"
-    return
+    pure
         SourceMap
         { smTargets = smt
         , smCompiler = compiler
@@ -153,12 +153,12 @@ hashSourceMapData boptsCli sm = do
         bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
         hashedContent = toLazyByteString $ compilerPath <> compilerInfo <>
             getUtf8Builder (mconcat bootGhcOpts) <> mconcat immDeps
-    return $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
+    pure $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
 depPackageHashableContent DepPackage {..} = do
     case dpLocation of
-        PLMutable _ -> return ""
+        PLMutable _ -> pure ""
         PLImmutable pli -> do
             let flagToBs (f, enabled) =
                     if enabled
@@ -169,7 +169,7 @@ depPackageHashableContent DepPackage {..} = do
                 cabalConfigOpts = map display (cpCabalConfigOpts dpCommon)
                 haddocks = if cpHaddocks dpCommon then "haddocks" else ""
                 hash = immutableLocSha pli
-            return $ hash <> haddocks <> getUtf8Builder (mconcat flags) <>
+            pure $ hash <> haddocks <> getUtf8Builder (mconcat flags) <>
                 getUtf8Builder (mconcat ghcOptions) <>
                 getUtf8Builder (mconcat cabalConfigOpts)
 
@@ -250,7 +250,7 @@ loadCommonPackage ::
 loadCommonPackage common = do
     config <- getPackageConfig (cpFlags common) (cpGhcOptions common) (cpCabalConfigOpts common)
     gpkg <- liftIO $ cpGPD common
-    return $ resolvePackage config gpkg
+    pure $ resolvePackage config gpkg
 
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
 -- based on the selected components
@@ -355,7 +355,7 @@ loadLocalPackage pp = do
         checkCacheResult <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (Set.toList files)
-        return (component, checkCacheResult)
+        pure (component, checkCacheResult)
 
     let dirtyFiles = do
           checkCacheResults' <- checkCacheResults
@@ -370,7 +370,7 @@ loadLocalPackage pp = do
             M.fromList . map (\(c, (_, cache)) -> (c, cache))
             <$> checkCacheResults
 
-    return LocalPackage
+    pure LocalPackage
         { lpPackage = pkg
         , lpTestDeps = dvVersionRange <$> packageDeps testpkg
         , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
@@ -404,7 +404,7 @@ checkBuildCache :: forall m. (MonadIO m)
 checkBuildCache oldCache files = do
     fileTimes <- liftM Map.fromList $ forM files $ \fp -> do
         mdigest <- liftIO (getFileDigestMaybe (toFilePath fp))
-        return (toFilePath fp, mdigest)
+        pure (toFilePath fp, mdigest)
     liftM (mconcat . Map.elems) $ sequence $
         Map.mergeWithKey
             (\fp mdigest fci -> Just (go fp mdigest (Just fci)))
@@ -415,16 +415,16 @@ checkBuildCache oldCache files = do
   where
     go :: FilePath -> Maybe SHA256 -> Maybe FileCacheInfo -> m (Set FilePath, Map FilePath FileCacheInfo)
     -- Filter out the cabal_macros file to avoid spurious recompilations
-    go fp _ _ | takeFileName fp == "cabal_macros.h" = return (Set.empty, Map.empty)
+    go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
     -- Common case where it's in the cache and on the filesystem.
     go fp (Just digest') (Just fci)
-        | fciHash fci == digest' = return (Set.empty, Map.singleton fp fci)
-        | otherwise = return (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
+        | fciHash fci == digest' = pure (Set.empty, Map.singleton fp fci)
+        | otherwise = pure (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
     -- Missing file. Add it to dirty files, but no FileCacheInfo.
-    go fp Nothing _ = return (Set.singleton fp, Map.empty)
+    go fp Nothing _ = pure (Set.singleton fp, Map.empty)
     -- Missing cache. Add it to dirty files and compute FileCacheInfo.
     go fp (Just digest') Nothing =
-        return (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
+        pure (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
 addUnlistedToBuildCache
@@ -442,14 +442,14 @@ addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
                 Set.toList $
                 Set.map toFilePath files `Set.difference` Map.keysSet buildCache
         addBuildCache <- mapM addFileToCache newFiles
-        return ((component, addBuildCache), warnings)
-    return (M.fromList (map fst results), concatMap snd results)
+        pure ((component, addBuildCache), warnings)
+    pure (M.fromList (map fst results), concatMap snd results)
   where
     addFileToCache fp = do
         mdigest <- getFileDigestMaybe fp
         case mdigest of
-            Nothing -> return Map.empty
-            Just digest' -> return . Map.singleton fp $ FileCacheInfo digest'
+            Nothing -> pure Map.empty
+            Just digest' -> pure . Map.singleton fp $ FileCacheInfo digest'
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
 --   Note that the library component, if any, is always automatically added to the
@@ -468,7 +468,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
         componentsFiles =
             M.map (\files -> Set.union otherFiles (Set.map dotCabalGetPath $ Set.fromList files)) $
                 M.filterWithKey (\component _ -> component `elem` components) compFiles
-    return (componentsFiles, warnings)
+    pure (componentsFiles, warnings)
 
 -- | Get file digest, if it exists
 getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
@@ -478,7 +478,7 @@ getFileDigestMaybe fp = do
              (liftM Just . withSourceFile fp $ getDigest)
              (\e ->
                    if isDoesNotExistError e
-                       then return Nothing
+                       then pure Nothing
                        else throwM e))
   where
     getDigest src = runConduit $ src .| getZipSink (ZipSink SHA256.sinkHash)
@@ -493,7 +493,7 @@ getPackageConfig
 getPackageConfig flags ghcOptions cabalConfigOpts = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
-  return PackageConfig
+  pure PackageConfig
     { packageConfigEnableTests = False
     , packageConfigEnableBenchmarks = False
     , packageConfigFlags = flags

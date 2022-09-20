@@ -20,7 +20,7 @@ defaultColorWhen = do
   -- command line.
   supportsANSI <- hSupportsANSIWithoutEmulation stdout
   mIsNoColor <- lookupEnv "NO_COLOR"
-  return $ case mIsNoColor of
+  pure $ case mIsNoColor of
     Just _ -> ColorNever
     _      -> case supportsANSI of
       Just False -> ColorNever

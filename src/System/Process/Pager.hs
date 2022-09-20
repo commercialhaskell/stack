@@ -38,9 +38,9 @@ pageWriter writer =
                                                     hClose h)
             exit <- waitForProcess procHandle
             case exit of
-              ExitSuccess -> return ()
+              ExitSuccess -> pure ()
               ExitFailure n -> throwIO (PagerExitFailure (cmdspec pager) n)
-            return ()
+            pure ()
        Nothing -> writer stdout
   where
     cmdspecFromEnvVar = shell <$> MaybeT (lookupEnv "PAGER")

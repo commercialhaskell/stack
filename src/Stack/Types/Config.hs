@@ -259,9 +259,9 @@ instance FromJSON ColorWhen where
     parseJSON v = do
         s <- parseJSON v
         case s of
-            "never"  -> return ColorNever
-            "always" -> return ColorAlways
-            "auto"   -> return ColorAuto
+            "never"  -> pure ColorNever
+            "always" -> pure ColorAlways
+            "auto"   -> pure ColorAuto
             _ -> fail ("Unknown color use: " <> s <> ". Expected values of " <>
                        "option are 'never', 'always', or 'auto'.")
 
@@ -436,9 +436,9 @@ data ApplyGhcOptions = AGOTargets -- ^ all local targets
 instance FromJSON ApplyGhcOptions where
     parseJSON = withText "ApplyGhcOptions" $ \t ->
         case t of
-            "targets" -> return AGOTargets
-            "locals" -> return AGOLocals
-            "everything" -> return AGOEverything
+            "targets" -> pure AGOTargets
+            "locals" -> pure AGOLocals
+            "everything" -> pure AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
 
 -- | Which build log files to dump
@@ -449,15 +449,15 @@ data DumpLogs
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 instance FromJSON DumpLogs where
-  parseJSON (Bool True) = return DumpAllLogs
-  parseJSON (Bool False) = return DumpNoLogs
+  parseJSON (Bool True) = pure DumpAllLogs
+  parseJSON (Bool False) = pure DumpNoLogs
   parseJSON v =
     withText
       "DumpLogs"
       (\t ->
-          if | t == "none" -> return DumpNoLogs
-             | t == "warning" -> return DumpWarningLogs
-             | t == "all" -> return DumpAllLogs
+          if | t == "none" -> pure DumpNoLogs
+             | t == "warning" -> pure DumpWarningLogs
+             | t == "all" -> pure DumpAllLogs
              | otherwise -> fail ("Invalid DumpLogs: " ++ show t))
       v
 
@@ -622,9 +622,9 @@ readColorWhen :: ReadM ColorWhen
 readColorWhen = do
     s <- OA.readerAsk
     case s of
-        "never" -> return ColorNever
-        "always" -> return ColorAlways
-        "auto" -> return ColorAuto
+        "never" -> pure ColorNever
+        "always" -> pure ColorAlways
+        "auto" -> pure ColorAuto
         _ -> OA.readerError "Expected values of color option are 'never', 'always', or 'auto'."
 
 readStyles :: ReadM StylesUpdate
@@ -945,11 +945,11 @@ parseConfigMonoidObject rootDir obj = do
     templates <- obj ..:? "templates"
     (configMonoidScmInit,configMonoidTemplateParameters) <-
       case templates of
-        Nothing -> return (First Nothing,M.empty)
+        Nothing -> pure (First Nothing,M.empty)
         Just tobj -> do
           scmInit <- tobj ..:? configMonoidScmInitName
           params <- tobj ..:? configMonoidTemplateParametersName
-          return (First scmInit,fromMaybe M.empty params)
+          pure (First scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
     configMonoidCompilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
 
@@ -958,11 +958,11 @@ parseConfigMonoidObject rootDir obj = do
     optionsEverything <-
       case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of
         (Just _, Just _) -> fail "Cannot specify both `*` and `$everything` GHC options"
-        (Nothing, Just x) -> return x
+        (Nothing, Just x) -> pure x
         (Just x, Nothing) -> do
           tell "The `*` ghc-options key is not recommended. Consider using $locals, or if really needed, $everything"
-          return x
-        (Nothing, Nothing) -> return []
+          pure x
+        (Nothing, Nothing) -> pure []
 
     let configMonoidGhcOptionsByCat = coerce $ Map.fromList
           [ (AGOEverything, optionsEverything)
@@ -1010,7 +1010,7 @@ parseConfigMonoidObject rootDir obj = do
 
     configMonoidStackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
 
-    return ConfigMonoid {..}
+    pure ConfigMonoid {..}
 
 configMonoidWorkDirName :: Text
 configMonoidWorkDirName = "work-dir"
@@ -1341,7 +1341,7 @@ getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
 getProjectWorkDir = do
     root    <- view projectRootL
     workDir <- view workDirL
-    return (root </> workDir)
+    pure (root </> workDir)
 
 -- | Relative directory for the platform identifier
 platformOnlyRelDir
@@ -1357,7 +1357,7 @@ snapshotsDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m) => m (Path A
 snapshotsDir = do
     root <- view stackRootL
     platform <- platformGhcRelDir
-    return $ root </> relDirSnapshots </> platform
+    pure $ root </> relDirSnapshots </> platform
 
 -- | Installation root for dependencies
 installationRootDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
@@ -1365,14 +1365,14 @@ installationRootDeps = do
     root <- view stackRootL
     -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
     psc <- platformSnapAndCompilerRel
-    return $ root </> relDirSnapshots </> psc
+    pure $ root </> relDirSnapshots </> psc
 
 -- | Installation root for locals
 installationRootLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 installationRootLocal = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-    return $ workDir </> relDirInstall </> psc
+    pure $ workDir </> relDirInstall </> psc
 
 -- | Installation root for compiler tools
 bindirCompilerTools :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1381,7 +1381,7 @@ bindirCompilerTools = do
     platform <- platformGhcRelDir
     compilerVersion <- view actualCompilerVersionL
     compiler <- parseRelDir $ compilerVersionString compilerVersion
-    return $
+    pure $
         view stackRootL config </>
         relDirCompilerTools </>
         platform </>
@@ -1393,13 +1393,13 @@ hoogleRoot :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 hoogleRoot = do
     workDir <- getProjectWorkDir
     psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-    return $ workDir </> relDirHoogle </> psc
+    pure $ workDir </> relDirHoogle </> psc
 
 -- | Get the hoogle database path.
 hoogleDatabasePath :: (HasEnvConfig env) => RIO env (Path Abs File)
 hoogleDatabasePath = do
     dir <- hoogleRoot
-    return (dir </> relFileDatabaseHoo)
+    pure (dir </> relFileDatabaseHoo)
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
@@ -1439,7 +1439,7 @@ platformGhcVerOnlyRelDirStr = do
     platform <- view platformL
     platformVariant <- view platformVariantL
     ghcVariant <- view ghcVariantL
-    return $ mconcat [ Distribution.Text.display platform
+    pure $ mconcat [ Distribution.Text.display platform
                      , platformVariantSuffix platformVariant
                      , ghcVariantSuffix ghcVariant ]
 
@@ -1481,13 +1481,13 @@ compilerVersionDir = do
 packageDatabaseDeps :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
-    return $ root </> relDirPkgdb
+    pure $ root </> relDirPkgdb
 
 -- | Package database for installing local packages into
 packageDatabaseLocal :: (HasEnvConfig env) => RIO env (Path Abs Dir)
 packageDatabaseLocal = do
     root <- installationRootLocal
-    return $ root </> relDirPkgdb
+    pure $ root </> relDirPkgdb
 
 -- | Extra package databases
 packageDatabaseExtra :: (MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
@@ -1506,7 +1506,7 @@ hpcReportDir :: (HasEnvConfig env)
              => RIO env (Path Abs Dir)
 hpcReportDir = do
    root <- installationRootLocal
-   return $ root </> relDirHpc
+   pure $ root </> relDirHpc
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
@@ -1517,7 +1517,7 @@ extraBinDirs = do
     deps <- installationRootDeps
     local' <- installationRootLocal
     tools <- bindirCompilerTools
-    return $ \locals -> if locals
+    pure $ \locals -> if locals
         then [local' </> bindirSuffix, deps </> bindirSuffix, tools]
         else [deps </> bindirSuffix, tools]
 
@@ -1582,7 +1582,7 @@ parseProjectAndConfigMonoid rootDir =
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         mcurator <- jsonSubWarningsT (o ..:? "curator")
         drops <- o ..:? "drop-packages" ..!= mempty
-        return $ do
+        pure $ do
           deps' <- mapM (resolvePaths (Just rootDir)) deps
           resolver' <- resolvePaths (Just rootDir) resolver
           let project = Project
@@ -1606,7 +1606,7 @@ instance FromJSON SCM where
     parseJSON v = do
         s <- parseJSON v
         case s of
-            "git" -> return Git
+            "git" -> pure Git
             _ -> fail ("Unknown or unsupported SCM: " <> s)
 
 instance ToJSON SCM where
@@ -1638,7 +1638,7 @@ instance FromJSON GHCVariant where
     parseJSON =
         withText
             "GHCVariant"
-            (either (fail . show) return . parseGHCVariant . T.unpack)
+            (either (fail . show) pure . parseGHCVariant . T.unpack)
 
 -- | Render a GHC variant to a String.
 ghcVariantName :: GHCVariant -> String
@@ -1656,13 +1656,13 @@ ghcVariantSuffix v = "-" ++ ghcVariantName v
 parseGHCVariant :: (MonadThrow m) => String -> m GHCVariant
 parseGHCVariant s =
     case stripPrefix "custom-" s of
-        Just name -> return (GHCCustom name)
+        Just name -> pure (GHCCustom name)
         Nothing
-          | s == "" -> return GHCStandard
-          | s == "standard" -> return GHCStandard
-          | s == "integersimple" -> return GHCIntegerSimple
-          | s == "int-native" -> return GHCNativeBignum
-          | otherwise -> return (GHCCustom s)
+          | s == "" -> pure GHCStandard
+          | s == "standard" -> pure GHCStandard
+          | s == "integersimple" -> pure GHCIntegerSimple
+          | s == "int-native" -> pure GHCNativeBignum
+          | otherwise -> pure (GHCCustom s)
 
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 -- | Information for a file to download.
@@ -1684,7 +1684,7 @@ parseDownloadInfoFromObject o = do
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
     sha256TextMay <- o ..:? "sha256"
-    return
+    pure
         DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
@@ -1702,7 +1702,7 @@ instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
         CabalString version <- o ..: "version"
         downloadInfo <- parseDownloadInfoFromObject o
-        return VersionedDownloadInfo
+        pure VersionedDownloadInfo
             { vdiVersion = version
             , vdiDownloadInfo = downloadInfo
             }
@@ -1719,7 +1719,7 @@ instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
         configureOpts <- o ..:? "configure-opts" ..!= mempty
         configureEnv <- o ..:? "configure-env" ..!= mempty
         downloadInfo <- parseDownloadInfoFromObject o
-        return GHCDownloadInfo
+        pure GHCDownloadInfo
             { gdiConfigureOpts = configureOpts
             , gdiConfigureEnv = configureEnv
             , gdiDownloadInfo = downloadInfo
@@ -1741,7 +1741,7 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         (fmap unCabalStringMap -> siGHCs) <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
         (fmap unCabalStringMap -> siStack) <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
-        return SetupInfo {..}
+        pure SetupInfo {..}
 
 -- | For the @siGHCs@ field maps are deeply merged.
 -- For all fields the values from the first @SetupInfo@ win.
@@ -1805,7 +1805,7 @@ instance ToJSON PvpBounds where
   toJSON (PvpBounds typ asRevision) =
     toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
 instance FromJSON PvpBounds where
-  parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
+  parseJSON = withText "PvpBounds" (either fail pure . parsePvpBounds)
 
 -- | Data passed into Docker container for the Docker entrypoint's use
 newtype DockerEntrypoint = DockerEntrypoint
@@ -1832,14 +1832,14 @@ data GhcOptionKey
 instance FromJSONKey GhcOptionKey where
   fromJSONKey = FromJSONKeyTextParser $ \t ->
     case t of
-      "*" -> return GOKOldEverything
-      "$everything" -> return GOKEverything
-      "$locals" -> return GOKLocals
-      "$targets" -> return GOKTargets
+      "*" -> pure GOKOldEverything
+      "$everything" -> pure GOKEverything
+      "$locals" -> pure GOKLocals
+      "$targets" -> pure GOKTargets
       _ ->
         case parsePackageName $ T.unpack t of
           Nothing -> fail $ "Invalid package name: " ++ show t
-          Just x -> return $ GOKPackage x
+          Just x -> pure $ GOKPackage x
   fromJSONKeyList = FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
 
 newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
@@ -1848,7 +1848,7 @@ instance FromJSON GhcOptions where
   parseJSON = withText "GhcOptions" $ \t ->
     case parseArgs Escaping t of
       Left e -> fail e
-      Right opts -> return $ GhcOptions $ map T.pack opts
+      Right opts -> pure $ GhcOptions $ map T.pack opts
 
 -----------------------------------
 -- Lens classes
@@ -2149,7 +2149,7 @@ shouldForceGhcColorFlag = do
     canDoColor <- (>= mkVersion [8, 2, 1]) . getGhcVersion
               <$> view actualCompilerVersionL
     shouldDoColor <- view useColorL
-    return $ canDoColor && shouldDoColor
+    pure $ canDoColor && shouldDoColor
 
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env (Maybe String)

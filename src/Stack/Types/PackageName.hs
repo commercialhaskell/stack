@@ -18,7 +18,7 @@ packageNameArgument :: O.Mod O.ArgumentFields PackageName
 packageNameArgument =
     O.argument
         (do s <- O.str
-            either O.readerError return (p s))
+            either O.readerError pure (p s))
   where
     p s =
         case parsePackageName s of

@@ -120,7 +120,7 @@ createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
                        else Set.insert "base" (dotPrune dotOpts)
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
   logDebug "Returning pruned dependency graph"
-  return (localNames, prunedGraph)
+  pure (localNames, prunedGraph)
 
 -- | Create the dependency graph, the result is a map from a package
 -- name to a tuple of dependencies and payload if available. This
@@ -143,7 +143,7 @@ createDependencyGraph dotOpts = do
           -- Skip packages that can't be loaded - see
           -- https://github.com/commercialhaskell/stack/issues/2967
           | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
-              return (Set.empty, DotPayload (Just version) (Just $ Right BSD3) Nothing)
+              pure (Set.empty, DotPayload (Just version) (Just $ Right BSD3) Nothing)
           | otherwise =
               fmap (packageAllDeps &&& makePayload loc) (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
@@ -228,10 +228,10 @@ printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
                         Just (deps, payload) -> do
                           printTreeNode opts dotOpts depth newDepsCounts deps payload name
                           if Just depth == dotDependencyDepth dotOpts
-                             then return ()
+                             then pure ()
                              else printTree opts dotOpts (depth + 1) newDepsCounts deps dependencyMap
-                        -- TODO: Define this behaviour, maybe return an error?
-                        Nothing -> return ()
+                        -- TODO: Define this behaviour, maybe pure an error?
+                        Nothing -> pure ()
 
 printTreeNode :: ListDepsFormatOpts
               -> DotOpts
@@ -308,13 +308,13 @@ resolveDependencies :: (Applicative m, Monad m)
                     -> Map PackageName (Set PackageName, DotPayload)
                     -> (PackageName -> m (Set PackageName, DotPayload))
                     -> m (Map PackageName (Set PackageName, DotPayload))
-resolveDependencies (Just 0) graph _ = return graph
+resolveDependencies (Just 0) graph _ = pure graph
 resolveDependencies limit graph loadPackageDeps = do
   let values = Set.unions (fst <$> Map.elems graph)
       keys = Map.keysSet graph
       next = Set.difference values keys
   if Set.null next
-     then return graph
+     then pure graph
      else do
        x <- T.traverse (\name -> (name,) <$> loadPackageDeps name) (F.toList next)
        resolveDependencies (subtract 1 <$> limit)

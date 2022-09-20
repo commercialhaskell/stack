@@ -1,1 +1,1 @@
-main = return ()
+main = pure ()

@@ -357,7 +357,7 @@ getDefaultResolver initOpts mresolver pkgDirs = do
       Just ar -> do
         sl <- makeConcreteResolver ar
         c <- loadProjectSnapshotCandidate sl NoPrintWarnings False
-        return (c, sl)
+        pure (c, sl)
     getWorkingResolverPlan initOpts pkgDirs candidate loc
     where
         -- TODO support selecting best across regular and custom snapshots
@@ -367,7 +367,7 @@ getDefaultResolver initOpts mresolver pkgDirs = do
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot snaps)
-                _ -> return (c, l)
+                _ -> pure (c, l)
 
 getWorkingResolverPlan
     :: (HasConfig env, HasGHCVariant env)
@@ -393,13 +393,13 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
             eres <- checkBundleResolver initOpts snapLoc snapCandidate (Map.elems pkgDirs)
             -- if some packages failed try again using the rest
             case eres of
-                Right (f, edeps)-> return (snapLoc, f, edeps, pkgDirs)
+                Right (f, edeps)-> pure (snapLoc, f, edeps, pkgDirs)
                 Left ignored
                     | Map.null available -> do
                         logWarn $ "*** Could not find a working plan for any of " <>
                                 "the user packages.\nProceeding to create a " <>
                                 "config anyway."
-                        return (snapLoc, Map.empty, Map.empty, Map.empty)
+                        pure (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         when (Map.size available == Map.size pkgDirs) $
                             error "Bug: No packages to ignore"
@@ -433,20 +433,20 @@ checkBundleResolver
 checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
     result <- checkSnapBuildPlan pkgDirs Nothing snapCandidate
     case result of
-        BuildPlanCheckOk f -> return $ Right (f, Map.empty)
+        BuildPlanCheckOk f -> pure $ Right (f, Map.empty)
         BuildPlanCheckPartial _f e -> do -- FIXME:qrilka unused f
             if omitPackages initOpts
                 then do
                     warnPartial result
                     logWarn "*** Omitting packages with unsatisfied dependencies"
-                    return $ Left $ failedUserPkgs e
+                    pure $ Left $ failedUserPkgs e
                 else throwM $ ResolverPartial snapshotLoc (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
                            <> display snapshotLoc
                 logWarn $ display $ indent $ T.pack $ show result
-                return $ Left $ failedUserPkgs e
+                pure $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch snapshotLoc (show result)
     where
       indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
@@ -572,7 +572,7 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
               <> "Packages in upper level directories will be preferred.\n"
           Just msg -> error msg
 
-    return (Map.fromList
+    pure (Map.fromList
             $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
 
@@ -585,6 +585,6 @@ prettyPath ::
     -> m FilePath
 prettyPath path = do
     eres <- liftIO $ try $ makeRelativeToCurrentDir path
-    return $ case eres of
+    pure $ case eres of
         Left (_ :: PathException) -> toFilePath path
         Right res -> toFilePath res

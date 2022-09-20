@@ -77,11 +77,11 @@ main =
             projectRoot' <- getStackPath global0 "project-root"
             let global = global0
                     { gProjectRoot = projectRoot' }
-            return $ Just $ rules global args
+            pure $ Just $ rules global args
   where
     getStackPath global path = do
       out <- readProcess stackProgName (stackArgs global ++ ["path", "--" ++ path]) ""
-      return $ trim $ fromMaybe out $ stripPrefix (path ++ ":") out
+      pure $ trim $ fromMaybe out $ stripPrefix (path ++ ":") out
 
 -- | Additional command-line options.
 options :: [OptDescr (Either String (Global -> Global))]
@@ -206,7 +206,7 @@ rules global@Global{..} args = do
                 -- Instead, we sign the executable
                 liftIO $ copyFile (releaseBinDir </> binaryName </> stackExeFileName) out
                 case gCertificateName of
-                    Nothing -> return ()
+                    Nothing -> pure ()
                     Just certName ->
                         actionOnException
                             (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
@@ -271,7 +271,7 @@ rules global@Global{..} args = do
                 [[releaseStageDir </> binaryName </> stackExeFileName]
                 ,map ((releaseStageDir </> binaryName) </>) docFiles]
         need stageFiles
-        return stageFiles
+        pure stageFiles
 
     getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*.md"]
 

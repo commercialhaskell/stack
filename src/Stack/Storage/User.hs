@@ -172,7 +172,7 @@ readPrecompiledCache key = do
         pcExes <-
             mapM (parseRelFile . precompiledCacheExeValue . entityVal) =<<
             selectList [PrecompiledCacheExeParent ==. parentId] []
-        return (parentId, PrecompiledCache {..})
+        pure (parentId, PrecompiledCache {..})
 
 -- | Load 'PrecompiledCache' from the database.
 loadPrecompiledCache ::
@@ -200,7 +200,7 @@ savePrecompiledCache key@(UniquePrecompiledCacheParent precompiledCacheParentPla
                         [ PrecompiledCacheParentLibrary =.
                           precompiledCacheParentLibrary
                         ]
-                    return (parentId, Just old)
+                    pure (parentId, Just old)
         updateSet
             PrecompiledCacheSubLib
             PrecompiledCacheSubLibParent

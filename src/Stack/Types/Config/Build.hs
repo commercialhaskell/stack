@@ -254,7 +254,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
               buildMonoidSkipComponents <- o ..:? buildMonoidSkipComponentsName ..!= mempty
               buildMonoidInterleavedOutput <- FirstTrue <$> o ..:? buildMonoidInterleavedOutputName
               buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
-              return BuildOptsMonoid{..})
+              pure BuildOptsMonoid{..})
 
 buildMonoidLibProfileArgName :: Text
 buildMonoidLibProfileArgName = "library-profiling"
@@ -390,7 +390,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
               toMonoidCoverage <- FirstFalse <$> o ..:? toMonoidCoverageArgName
               toMonoidDisableRun <- FirstFalse <$> o ..:? toMonoidDisableRunArgName
               toMonoidMaximumTimeSeconds <- First <$> o ..:? toMonoidMaximumTimeSecondsArgName
-              return TestOptsMonoid{..})
+              pure TestOptsMonoid{..})
 
 toMonoidRerunTestsArgName :: Text
 toMonoidRerunTestsArgName = "rerun-tests"
@@ -431,7 +431,7 @@ defaultHaddockOpts = HaddockOpts {hoAdditionalArgs = []}
 instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
   parseJSON = withObjectWarnings "HaddockOptsMonoid"
     (\o -> do hoMonoidAdditionalArgs <- o ..:? hoMonoidAdditionalArgsName ..!= []
-              return HaddockOptsMonoid{..})
+              pure HaddockOptsMonoid{..})
 
 instance Semigroup HaddockOptsMonoid where
   (<>) = mappenddefault
@@ -467,7 +467,7 @@ instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid"
     (\o -> do beoMonoidAdditionalArgs <- First <$> o ..:? beoMonoidAdditionalArgsArgName
               beoMonoidDisableRun <- First <$> o ..:? beoMonoidDisableRunArgName
-              return BenchmarkOptsMonoid{..})
+              pure BenchmarkOptsMonoid{..})
 
 beoMonoidAdditionalArgsArgName :: Text
 beoMonoidAdditionalArgsArgName = "benchmark-arguments"

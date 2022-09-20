@@ -85,7 +85,7 @@ loadYamlThrow parser path = do
             Left err -> throwIO $ Yaml.AesonException err
             Right (WithJSONWarnings res warnings) -> do
                 logJSONWarnings (toFilePath path) warnings
-                return res
+                pure res
 
 lockCachedWanted ::
        (HasPantryConfig env, HasRunner env)

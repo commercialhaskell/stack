@@ -25,13 +25,13 @@ addDefaultTag
 addDefaultTag base mproject maresolver = do
   let exc = throwM $ ResolverNotSupportedException mproject maresolver
   lts <- case maresolver of
-    Just (ARResolver (RSLSynonym lts@(LTS _ _))) -> return lts
+    Just (ARResolver (RSLSynonym lts@(LTS _ _))) -> pure lts
     Just _aresolver -> exc
     Nothing ->
       case projectResolver <$> mproject of
-        Just (RSLSynonym lts@(LTS _ _)) -> return lts
+        Just (RSLSynonym lts@(LTS _ _)) -> pure lts
         _ -> exc
-  return $ base ++ ":" ++ show lts
+  pure $ base ++ ":" ++ show lts
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid
@@ -72,7 +72,7 @@ dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
             simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
         dockerStackExe = getFirst dockerMonoidStackExe
 
-    return DockerOpts{..}
+    pure DockerOpts{..}
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s

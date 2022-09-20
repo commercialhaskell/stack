@@ -17,9 +17,9 @@ readFlag = do
             pn' <-
                 case parsePackageName pn of
                     Nothing
-                        | pn == "*" -> return ACFAllProjectPackages
+                        | pn == "*" -> pure ACFAllProjectPackages
                         | otherwise -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return $ ACFByName x
+                    Just x -> pure $ ACFByName x
             let (b, flagS) =
                     case mflag of
                         '-':x -> (False, x)
@@ -27,6 +27,6 @@ readFlag = do
             flagN <-
                 case parseFlagName flagS of
                     Nothing -> readerError $ "Invalid flag name: " ++ flagS
-                    Just x -> return x
-            return $ Map.singleton pn' $ Map.singleton flagN b
+                    Just x -> pure x
+            pure $ Map.singleton pn' $ Map.singleton flagN b
         _ -> readerError "Must have a colon"

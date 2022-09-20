@@ -142,18 +142,18 @@ parseRawTargetDirs :: MonadIO m
                    -> m (Either Text [(RawInput, RawTarget)])
 parseRawTargetDirs root locals ri =
     case parseRawTarget t of
-        Just rt -> return $ Right [(ri, rt)]
+        Just rt -> pure $ Right [(ri, rt)]
         Nothing -> do
             mdir <- liftIO $ forgivingAbsence (resolveDir root (T.unpack t))
               >>= rejectMissingDir
             case mdir of
-                Nothing -> return $ Left $ "Directory not found: " `T.append` t
+                Nothing -> pure $ Left $ "Directory not found: " `T.append` t
                 Just dir ->
                     case mapMaybe (childOf dir) $ Map.toList locals of
-                        [] -> return $ Left $
+                        [] -> pure $ Left $
                             "No local directories found as children of " `T.append`
                             t
-                        names -> return $ Right $ map ((ri, ) . RTPackage) names
+                        names -> pure $ Right $ map ((ri, ) . RTPackage) names
   where
     childOf dir (name, pp) =
         if dir == ppRoot pp || isProperPrefixOf dir (ppRoot pp)
@@ -298,7 +298,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                                 ]
 
     go (RTPackage name)
-      | Map.member name locals = return $ Right ResolveResult
+      | Map.member name locals = pure $ Right ResolveResult
           { rrName = name
           , rrRaw = ri
           , rrComponent = Nothing
@@ -319,7 +319,7 @@ resolveRawTarget sma allLocs (ri, rt) =
     -- files!
 
     go (RTPackageIdentifier ident@(PackageIdentifier name version))
-      | Map.member name locals = return $ Left $ T.concat
+      | Map.member name locals = pure $ Left $ T.concat
             [ tshow (packageNameString name)
             , " target has a specific version number, but it is a local package."
             , "\nTo avoid confusion, we will not install the specified version or build the local one."
@@ -380,7 +380,7 @@ resolveRawTarget sma allLocs (ri, rt) =
             , rrPackageType = PTDependency
             }
 
-    -- This is actually an error case. We _could_ return a
+    -- This is actually an error case. We _could_ pure a
     -- Left value here, but it turns out to be better to defer
     -- this until the ConstructPlan phase, and let it complain
     -- about the missing package so that we get more errors
@@ -404,9 +404,9 @@ combineResolveResults
 combineResolveResults results = do
     addedDeps <- fmap Map.unions $ forM results $ \result ->
       case rrAddedDep result of
-        Nothing -> return Map.empty
+        Nothing -> pure Map.empty
         Just pl -> do
-          return $ Map.singleton (rrName result) pl
+          pure $ Map.singleton (rrName result) pl
 
     let m0 = Map.unionsWith (++) $ map (\rr -> Map.singleton (rrName rr) [rr]) results
         (errs, ms) = partitionEithers $ flip map (Map.toList m0) $ \(name, rrs) ->
@@ -425,7 +425,7 @@ combineResolveResults results = do
                       , T.unwords $ map (unRawInput . rrRaw) rrs
                       ]
 
-    return (errs, Map.unions ms, addedDeps)
+    pure (errs, Map.unions ms, addedDeps)
 
 ---------------------------------------------------------------------------------
 -- OK, let's do it!
@@ -455,12 +455,12 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs3, targets, addedDeps) <- combineResolveResults resolveResults
 
   case concat [errs1, errs2, errs3] of
-    [] -> return ()
+    [] -> pure ()
     errs -> throwIO $ TargetParseException errs
 
   case (Map.null targets, needTargets) of
-    (False, _) -> return ()
-    (True, AllowNoTargets) -> return ()
+    (False, _) -> pure ()
+    (True, AllowNoTargets) -> pure ()
     (True, NeedTargets)
       | null textTargets' && bcImplicitGlobal bconfig -> throwIO $ TargetParseException
           ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
@@ -471,7 +471,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
 
   addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
-  return SMTargets
+  pure SMTargets
     { smtTargets = targets
     , smtDeps = addedDeps'
     }

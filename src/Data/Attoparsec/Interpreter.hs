@@ -84,7 +84,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
                             in P.satisfyWith normalizeSpace $ const True
 
     comment start end = commentStart start
-      *> ((end >> return "")
+      *> ((end >> pure "")
           <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
 
     horizontalSpace = P.satisfy P.isHorizontalSpace
@@ -134,14 +134,14 @@ getInterpreterArgs file = do
       mapM_ stackWarn (lines err)
       stackWarn "Missing or unusable stack options specification"
       stackWarn "Using runghc without any additional stack options"
-      return ["runghc"]
+      pure ["runghc"]
 
     parseArgStr str =
       case P.parseOnly (argsParser Escaping) (pack str) of
         Left err -> handleFailure ("Error parsing command specified in the "
                         ++ "stack options comment: " ++ err)
         Right [] -> handleFailure "Empty argument list in stack options comment"
-        Right args -> return args
+        Right args -> pure args
 
     decodeError e =
       case e of

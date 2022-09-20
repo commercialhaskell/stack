@@ -58,7 +58,7 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
               nixMonoidShellOptions  <- First <$> o ..:? nixShellOptsArgName
               nixMonoidPath          <- First <$> o ..:? nixPathArgName
               nixMonoidAddGCRoots    <- FirstFalse <$> o ..:? nixAddGCRootsArgName
-              return NixOptsMonoid{..})
+              pure NixOptsMonoid{..})
 
 -- | Left-biased combine Nix options
 instance Semigroup NixOptsMonoid where

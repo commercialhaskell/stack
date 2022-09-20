@@ -130,7 +130,7 @@ readConfigCache (Entity parentId ConfigCacheParent {..}) = do
         selectList [ConfigCacheComponentParent ==. parentId] []
     let configCachePathEnvVar = configCacheParentPathEnvVar
     let configCacheHaddock = configCacheParentHaddock
-    return ConfigCache {..}
+    pure ConfigCache {..}
 
 -- | Load 'ConfigCache' from the database.
 loadConfigCache ::
@@ -141,11 +141,11 @@ loadConfigCache key =
     withProjectStorage $ do
         mparent <- getBy key
         case mparent of
-            Nothing -> return Nothing
+            Nothing -> pure Nothing
             Just parentEntity@(Entity _ ConfigCacheParent {..})
                 | configCacheParentActive ->
                     Just <$> readConfigCache parentEntity
-                | otherwise -> return Nothing
+                | otherwise -> pure Nothing
 
 -- | Insert or update 'ConfigCache' to the database.
 saveConfigCache ::
@@ -177,7 +177,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
                         , ConfigCacheParentActive =. True
                         , ConfigCacheParentPathEnvVar =. configCachePathEnvVar new
                         ]
-                    return (parentId, Just old)
+                    pure (parentId, Just old)
         updateList
             ConfigCacheDirOption
             ConfigCacheDirOptionParent

@@ -65,7 +65,7 @@ main = do
     (dir:_) -> do
       exists <- doesDirectoryExist dir
       unless exists $ fail $ unwords [show dir, "is not a directory or does not exist."]
-      return dir
+      pure dir
     _ -> fail "Expected the first CLI argument to be the target directory to place stack binaries."
   -- Parse platform from CLI args, with default.
   platform <- case tail args of
@@ -75,8 +75,8 @@ main = do
         , show defaultPlatform
         , "\n"
         ]
-      return defaultPlatform
-    [x] -> return x
+      pure defaultPlatform
+    [x] -> pure x
     _ -> fail "Expected at most two CLI argument, specifying target directory and target platform."
   -- Constants + common computation of urls / paths
   let minVersion = makeVersion [1, 0, 0]
@@ -147,14 +147,14 @@ readProcessIsSuccess :: FilePath -> [String] -> IO Bool
 readProcessIsSuccess name args = do
   (ec, out, err) <- readProcessWithExitCode name args ""
   case ec of
-    ExitSuccess -> return True
+    ExitSuccess -> pure True
     ExitFailure code -> do
       putStrLn $ unwords $ ["Running", name, "with args", show args, "failed with code", show code]
       putStrLn "stdout:"
       putStrLn out
       putStrLn "stderr:"
       putStrLn err
-      return False
+      pure False
 
 -- Damn, base has some ugly stuff... 'parseVersion' yields multiple
 -- parses treating numeric portions as version tags.. WTF. Seems like

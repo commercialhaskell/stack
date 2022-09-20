@@ -119,7 +119,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
     platforms0 <-
       case mplatform of
         Nothing -> preferredPlatforms
-        Just p -> return [("windows" `T.isInfixOf` T.pack p, p)]
+        Just p -> pure [("windows" `T.isInfixOf` T.pack p, p)]
     archiveInfo <- downloadStackReleaseInfo morg mrepo mver
 
     let mdownloadVersion = getDownloadVersion archiveInfo
@@ -135,7 +135,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
                   :
                   [ line <> flow "Rerun with --force-download to force an upgrade"
                     | not force]
-                return False
+                pure False
             Just downloadVersion -> do
                 prettyInfoL
                     [ flow "Current Stack version:"
@@ -143,18 +143,18 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
                     , flow "available download version:"
                     , fromString (versionString downloadVersion)
                     ]
-                return $ downloadVersion > stackVersion
+                pure $ downloadVersion > stackVersion
 
     toUpgrade <- case (force, isNewer) of
         (False, False) -> do
             prettyInfoS "Skipping binary upgrade, you are already running the most recent version"
-            return False
+            pure False
         (True, False) -> do
             prettyInfoS "Forcing binary upgrade"
-            return True
+            pure True
         (_, True) -> do
             prettyInfoS "Newer version detected, downloading"
-            return True
+            pure True
     when toUpgrade $ do
         config <- view configL
         downloadStackExe platforms0 archiveInfo (configLocalBin config) True $ \tmpFile -> do
@@ -176,7 +176,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         latestCommit <-
           case words remote of
             [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
-            x:_ -> return x
+            x:_ -> pure x
         when (isNothing builtHash) $
             prettyWarnS $
                        "Information about the commit this version of stack was "
@@ -186,7 +186,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         if builtHash == Just latestCommit
             then do
                 prettyInfoS "Already up-to-date, no upgrade required"
-                return Nothing
+                pure Nothing
             else do
                 prettyInfoS "Cloning stack"
                 -- NOTE: "--recursive" was added after v1.0.0 (and before the
@@ -201,7 +201,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 -- The following hack re-enables the lost ANSI-capability.
                 when osIsWindows $
                   void $ liftIO $ hSupportsANSIWithoutEmulation stdout
-                return $ Just $ tmp </> relDirStackProgName
+                pure $ Just $ tmp </> relDirStackProgName
       -- We need to access the Pantry database to find out about the
       -- latest Stack available on Hackage. We first use a standard
       -- Config to do this, and once we have the source load up the
@@ -218,7 +218,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         if version <= mkVersion' Paths.version
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
-                return Nothing
+                pure Nothing
             else do
                 suffix <- parseRelDir $ "stack-" ++ versionString version
                 let dir = tmp </> suffix

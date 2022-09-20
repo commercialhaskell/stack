@@ -100,7 +100,7 @@ build msetLocalFiles = do
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
-      [] -> return ()
+      [] -> pure ()
       localsIdents -> throwM $ LocalPackagesPresent localsIdents
 
     checkCabalVersion
@@ -229,7 +229,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
 warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
     logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
-warnAboutSplitObjs _ = return ()
+warnAboutSplitObjs _ = pure ()
 
 splitObjsWarning :: String
 splitObjsWarning = unwords
@@ -249,7 +249,7 @@ mkBaseConfigOpts boptsCli = do
     snapInstallRoot <- installationRootDeps
     localInstallRoot <- installationRootLocal
     packageExtraDBs <- packageDatabaseExtra
-    return BaseConfigOpts
+    pure BaseConfigOpts
         { bcoSnapDB = snapDBPath
         , bcoLocalDB = localDBPath
         , bcoSnapInstallRoot = snapInstallRoot
@@ -290,7 +290,7 @@ queryBuildInfo selectors0 =
     >>= select id selectors0
     >>= liftIO . TIO.putStrLn . addGlobalHintsComment . decodeUtf8 . Yaml.encode
   where
-    select _ [] value = return value
+    select _ [] value = pure value
     select front (sel:sels) value =
         case value of
             Object o ->
@@ -328,7 +328,7 @@ rawBuildInfo = do
     locals <- projectLocalPackages
     wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
     actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
-    return $ object
+    pure $ object
         [ "locals" .= Object (KeyMap.fromList $ map localToPair locals)
         , "compiler" .= object
             [ "wanted" .= wantedCompiler

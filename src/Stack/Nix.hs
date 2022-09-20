@@ -55,8 +55,8 @@ runShellAndExit = do
      -- (thus the void return type)
      compilerVersion <- withBuildConfig $ view wantedCompilerVersionL
 
-     ghc <- either throwIO return $ nixCompiler compilerVersion
-     ghcVersion <- either throwIO return $ nixCompilerVersion compilerVersion
+     ghc <- either throwIO pure $ nixCompiler compilerVersion
+     ghcVersion <- either throwIO pure $ nixCompilerVersion compilerVersion
      let pkgsInConfig = nixPackages (configNix config)
          pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
          pkgsStr = "[" <> T.intercalate " " pkgs <> "]"

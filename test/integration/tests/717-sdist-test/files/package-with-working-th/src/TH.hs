@@ -4,4 +4,4 @@ import Language.Haskell.TH
 
 thFunc :: Q Exp
 thFunc =
-  return $ LitE (IntegerL 5)
+  pure $ LitE (IntegerL 5)

@@ -41,7 +41,7 @@ runWithCwd cwdPath cmd args = do
     let cp = proc cmd args
     (ec, stdoutStr, _) <- readCreateProcessWithExitCode (cp { cwd = Just cwdPath }) ""
     unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
-    return stdoutStr
+    pure stdoutStr
 
 stackExe :: IO String
 stackExe = getEnv "STACK_EXE"
@@ -71,7 +71,7 @@ stackCleanFull = stackIgnoreException ["clean", "--full"]
 -- of Windows when we do stack clean. More info here: https://github.com/commercialhaskell/stack/issues/4936
 stackIgnoreException :: HasCallStack => [String] -> IO ()
 stackIgnoreException args = if isWindows
-                            then void (stack' args) `catch` (\(_e :: IOException) -> return ())
+                            then void (stack' args) `catch` (\(_e :: IOException) -> pure ())
                             else stack args
 
 stackErr :: HasCallStack => [String] -> IO ()
@@ -93,7 +93,7 @@ nextPrompt = do
     c <- liftIO $ hGetChar inputHandle
     if c == '>'
       then do _ <- liftIO $ hGetChar inputHandle
-              return ()
+              pure ()
       else nextPrompt
 
 replCommand :: String -> Repl ()
@@ -122,7 +122,7 @@ runRepl cmd args actions = do
 
     tempDir <- if isWindows
                     then fromMaybe "" <$> lookupEnv "TEMP"
-                    else return "/tmp"
+                    else pure "/tmp"
     let tempFP = tempDir ++ "/stderr"
 
     _ <- forkIO $ withFile tempFP WriteMode
@@ -138,7 +138,7 @@ repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
     stackExe' <- stackExe
     ec <- runRepl stackExe' ("repl":args) action
-    unless (ec == ExitSuccess) $ return ()
+    unless (ec == ExitSuccess) $ pure ()
         -- TODO: Understand why the exit code is 1 despite running GHCi tests
         -- successfully.
         -- else error $ "Exited with exit code: " ++ show ec
@@ -149,7 +149,7 @@ stackStderr args = do
     logInfo $ "Running: " ++ stackExe' ++ " " ++ unwords (map showProcessArgDebug args)
     (ec, _, err) <- readProcessWithExitCode stackExe' args ""
     hPutStr stderr err
-    return (ec, err)
+    pure (ec, err)
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stderr output if the process succeeded.
@@ -178,7 +178,7 @@ runEx' cmd args = do
     (ec, out, err) <- readProcessWithExitCode cmd args ""
     putStr out
     hPutStr stderr err
-    return (ec, out, err)
+    pure (ec, out, err)
 
 -- | Run stack with arguments and apply a check to the resulting
 -- stdout output if the process succeeded.
@@ -199,26 +199,26 @@ doesNotExist fp = do
     exists <- doesFileOrDirExist fp
     case exists of
       (Right msg) -> error msg
-      (Left _) -> return ()
+      (Left _) -> pure ()
 
 doesExist :: HasCallStack => FilePath -> IO ()
 doesExist fp = do
     logInfo $ "doesExist " ++ fp
     exists <- doesFileOrDirExist fp
     case exists of
-      (Right _) -> return ()
+      (Right _) -> pure ()
       (Left _) -> error "No file or directory exists"
 
 doesFileOrDirExist :: HasCallStack => FilePath -> IO (Either () String)
 doesFileOrDirExist fp = do
     isFile <- doesFileExist fp
     if isFile
-        then return (Right ("File exists: " ++ fp))
+        then pure (Right ("File exists: " ++ fp))
         else do
             isDir <- doesDirectoryExist fp
             if isDir
-                then return (Right ("Directory exists: " ++ fp))
-                else return (Left ())
+                then pure (Right ("Directory exists: " ++ fp))
+                else pure (Left ())
 
 copy :: HasCallStack => FilePath -> FilePath -> IO ()
 copy src dest = do
@@ -285,14 +285,14 @@ defaultResolverArg = "--resolver=nightly-2022-09-05"
 removeFileIgnore :: HasCallStack => FilePath -> IO ()
 removeFileIgnore fp = removeFile fp `catch` \e ->
   if isDoesNotExistError e
-    then return ()
+    then pure ()
     else throwIO e
 
 -- | Remove a directory and ignore any warnings about missing files.
 removeDirIgnore :: HasCallStack => FilePath -> IO ()
 removeDirIgnore fp = removeDirectoryRecursive fp `catch` \e ->
   if isDoesNotExistError e
-    then return ()
+    then pure ()
     else throwIO e
 
 -- | Changes to the specified working directory.

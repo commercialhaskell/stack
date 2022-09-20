@@ -154,14 +154,14 @@ ghci opts@GhciOpts{..} = do
     -- Parse to either file targets or build targets
     etargets <- preprocessTargets buildOptsCLI sma ghciTargets
     (inputTargets, mfileTargets) <- case etargets of
-        Right packageTargets -> return (packageTargets, Nothing)
+        Right packageTargets -> pure (packageTargets, Nothing)
         Left rawFileTargets -> do
             case mainIsTargets of
-                Nothing -> return ()
+                Nothing -> pure ()
                 Just _ -> throwM Can'tSpecifyFilesAndMainIs
             -- Figure out targets based on filepath targets
             (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
-            return (targetMap, Just (fileInfo, extraFiles))
+            pure (targetMap, Just (fileInfo, extraFiles))
     -- Get a list of all the local target packages.
     localTargets <- getAllLocalTargets opts inputTargets mainIsTargets localMap
     -- Get a list of all the non-local target packages.
@@ -174,7 +174,7 @@ ghci opts@GhciOpts{..} = do
     bopts <- view buildOptsL
     mainFile <-
         if ghciNoLoadModules
-            then return Nothing
+            then pure Nothing
             else do
               -- Figure out package files, in order to ask the user
               -- about which main module to load. See the note below for
@@ -216,8 +216,8 @@ preprocessTargets buildOptsCLI sma rawTargets = do
                 mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
                 case mpath of
                     Nothing -> throwM (MissingFileTarget fp)
-                    Just path -> return path
-            return (Left fileTargets)
+                    Just path -> pure path
+            pure (Left fileTargets)
         else do
             -- Try parsing targets before checking if both file and
             -- module targets are specified (see issue#3342).
@@ -227,7 +227,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
                     TargetParseException xs -> throwM (GhciTargetParseException xs)
                     _ -> throwM ex
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
-            return (Right $ smtTargets normalTargets)
+            pure (Right $ smtTargets normalTargets)
 
 parseMainIsTargets
      :: HasEnvConfig env
@@ -238,7 +238,7 @@ parseMainIsTargets
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
      let boptsCLI = buildOptsCLI { boptsCLITargets = [target] }
      targets <- parseTargets AllowNoTargets False boptsCLI sma
-     return $ smtTargets targets
+     pure $ smtTargets targets
 
 -- | Display PackageName + NamedComponent
 displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
@@ -252,7 +252,7 @@ findFileTargets
 findFileTargets locals fileTargets = do
     filePackages <- forM locals $ \lp -> do
         (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
-        return (lp, M.map (map dotCabalGetPath) compFiles)
+        pure (lp, M.map (map dotCabalGetPath) compFiles)
     let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
         foundFileTargetComponents =
             map (\fp -> (fp, ) $ sort $
@@ -269,19 +269,19 @@ findFileTargets locals fileTargets = do
                       ". This means that the correct ghc options might not be used."
                     , "Attempting to load the file anyway."
                     ]
-                return $ Left fp
+                pure $ Left fp
             [x] -> do
                 prettyInfo $
                     "Using configuration for" <+> displayPkgComponent x <+>
                     "to load" <+> pretty fp
-                return $ Right (fp, x)
+                pure $ Right (fp, x)
             (x:_) -> do
                 prettyWarn $
                     "Multiple components contain file target" <+>
                     pretty fp <> ":" <+>
                     mconcat (intersperse ", " (map displayPkgComponent xs)) <> line <>
                     "Guessing the first one," <+> displayPkgComponent x <> "."
-                return $ Right (fp, x)
+                pure $ Right (fp, x)
     let (extraFiles, associatedFiles) = partitionEithers results
         targetMap =
             foldl unionTargets M.empty $
@@ -291,7 +291,7 @@ findFileTargets locals fileTargets = do
             foldl (M.unionWith (<>)) M.empty $
             map (\(fp, (name, _)) -> M.singleton name [fp])
                 associatedFiles
-    return (targetMap, infoMap, extraFiles)
+    pure (targetMap, infoMap, extraFiles)
 
 getAllLocalTargets
     :: HasEnvConfig env
@@ -317,7 +317,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
     -- Figure out
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps localMap directlyWanted
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
-        then return directlyWanted
+        then pure directlyWanted
         else do
             let extraList =
                   mconcat $ intersperse ", " (map (fromString . packageNameString . fst) extraLoadDeps)
@@ -331,7 +331,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
                   "they are intermediate dependencies of your targets:\n    " <>
                   extraList <>
                   "\n(Use --skip-intermediate-deps to omit these)"
-            return (directlyWanted ++ extraLoadDeps)
+            pure (directlyWanted ++ extraLoadDeps)
 
 getAllNonLocalTargets
     :: Map PackageName Target
@@ -339,7 +339,7 @@ getAllNonLocalTargets
 getAllNonLocalTargets targets = do
   let isNonLocal (TargetAll PTDependency) = True
       isNonLocal _ = False
-  return $ map fst $ filter (isNonLocal . snd) (M.toList targets)
+  pure $ map fst $ filter (isNonLocal . snd) (M.toList targets)
 
 buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
 buildDepsAndInitialSteps GhciOpts{..} localTargets = do
@@ -351,18 +351,18 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
       Just nonEmptyTargets | not ghciNoBuild -> do
         eres <- buildLocalTargets nonEmptyTargets
         case eres of
-            Right () -> return ()
+            Right () -> pure ()
             Left err -> do
                 prettyError $ fromString (show err)
                 prettyWarn "Build failed, but trying to launch GHCi anyway"
       _ ->
-        return ()
+        pure ()
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
     let mres = (pkgName <$> parsePackageIdentifier name)
             <|> parsePackageNameThrowing name
-    maybe (throwM $ InvalidPackageOption name) return mres
+    maybe (throwM $ InvalidPackageOption name) pure mres
 
 runGhci
     :: HasEnvConfig env
@@ -438,9 +438,9 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                     menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
                     output <- withProcessContext menv
                             $ runGrabFirstLine (fromMaybe compilerExeName ghciGhcCommand) ["--version"]
-                    return $ "Intero" `isPrefixOf` output
-                _ -> return False
-    -- Since usage of 'exec' does not return, we cannot do any cleanup
+                    pure $ "Intero" `isPrefixOf` output
+                _ -> pure False
+    -- Since usage of 'exec' does not pure, we cannot do any cleanup
     -- on ghci exit. So, instead leave the generated files. To make this
     -- more efficient and avoid gratuitous generation of garbage, the
     -- file names are determined by hashing. This also has the nice side
@@ -468,15 +468,15 @@ writeMacrosFile outputDirectory pkgs = do
             let cabalMacros = bioCabalMacros bio
             exists <- liftIO $ doesFileExist cabalMacros
             if exists
-                then return $ Just cabalMacros
+                then pure $ Just cabalMacros
                 else do
                     prettyWarnL ["Didn't find expected autogen file:", pretty cabalMacros]
-                    return Nothing
+                    pure Nothing
     files <- liftIO $ mapM (S8.readFile . toFilePath) fps
-    if null files then return [] else do
+    if null files then pure [] else do
         out <- liftIO $ writeHashedFile outputDirectory relFileCabalMacrosH $
             S8.concat $ map (<> "\n#undef CURRENT_PACKAGE_KEY\n#undef CURRENT_COMPONENT_ID\n") files
-        return ["-optP-include", "-optP" <> toFilePath out]
+        pure ["-optP-include", "-optP" <> toFilePath out]
 
 writeGhciScript :: (MonadIO m) => Path Abs Dir -> GhciScript -> m [String]
 writeGhciScript outputDirectory script = do
@@ -484,7 +484,7 @@ writeGhciScript outputDirectory script = do
         LBS.toStrict $ scriptToLazyByteString script
     let scriptFilePath = toFilePath scriptPath
     setScriptPerms scriptFilePath
-    return ["-ghci-script=" <> scriptFilePath]
+    pure ["-ghci-script=" <> scriptFilePath]
 
 writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
 writeHashedFile outputDirectory relFile contents = do
@@ -495,7 +495,7 @@ writeHashedFile outputDirectory relFile contents = do
     unless alreadyExists $ do
         ensureDir outDir
         writeBinaryFileAtomic outFile $ byteString contents
-    return outFile
+    pure outFile
 
 renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
 renderScript isIntero pkgs mainFile onlyMain extraFiles = do
@@ -534,9 +534,9 @@ figureOutMainFile
     -> RIO env (Maybe (Path Abs File))
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
-        [] -> return Nothing
+        [] -> pure Nothing
         [c@(_,_,fp)] -> do logInfo ("Using main module: " <> RIO.display (renderCandidate c))
-                           return (Just fp)
+                           pure (Just fp)
         candidate:_ -> do
           borderedWarning $ do
             logWarn "The main module to load is ambiguous. Candidates are: "
@@ -566,7 +566,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
                     M.filterWithKey (\k _ -> k `S.member` wantedComponents)
                                     (ghciPkgMainIs pkg)
                 main <- mains
-                return (ghciPkgName pkg, component, main)
+                pure (ghciPkgName pkg, component, main)
               where
                 wantedComponents =
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
@@ -592,7 +592,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
             putStrLn
               "Not loading any main modules, as no valid module selected"
             putStrLn ""
-            return Nothing
+            pure Nothing
         Just op -> do
             let (_,_,fp) = candidates !! op
             putStrLn
@@ -600,7 +600,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
               show (op + 1) <> ", --main-is " <>
               toFilePath fp)
             putStrLn ""
-            return $ Just fp
+            pure $ Just fp
     renderComp c =
         case c of
             CLib -> "lib"
@@ -681,7 +681,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
                     (C.updatePackageDescription bi x)
                     (C.updatePackageDescription bi y))
               mbuildinfo
-    return GhciPkgDesc
+    pure GhciPkgDesc
       { ghciDescPkg = pkg
       , ghciDescCabalFp = cabalfp
       , ghciDescTarget = target
@@ -724,7 +724,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
         allWanted = wantedPackageComponents bopts target pkg
-    return
+    pure
         GhciPkgInfo
         { ghciPkgName = name
         , ghciPkgOpts = M.toList filteredOpts
@@ -838,7 +838,7 @@ borderedWarning f = do
     x <- f
     logWarn "* * * * * * * *"
     logWarn ""
-    return x
+    pure x
 
 -- TODO: Should this also tell the user the filepaths, not just the
 -- module name?
@@ -934,19 +934,19 @@ getExtraLoadDeps loadAllDeps localMap targets =
     go name = do
         cache <- get
         case (M.lookup name cache, M.lookup name localMap) of
-            (Just (Just _), _) -> return True
-            (Just Nothing, _) | not loadAllDeps -> return False
+            (Just (Just _), _) -> pure True
+            (Just Nothing, _) | not loadAllDeps -> pure False
             (_, Just lp) -> do
                 let deps = M.keys (packageDeps (lpPackage lp))
                 shouldLoad <- liftM or $ mapM go deps
                 if shouldLoad
                     then do
                         modify (M.insert name (Just (lpCabalFile lp, TargetComps (S.singleton CLib))))
-                        return True
+                        pure True
                     else do
                         modify (M.insert name Nothing)
-                        return False
-            (_, _) -> return False
+                        pure False
+            (_, _) -> pure False
 
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
 unionTargets = M.unionWith $ \l r ->
@@ -970,7 +970,7 @@ runGrabFirstLine :: (HasProcessContext env, HasLogFunc env) => String -> [String
 runGrabFirstLine cmd0 args =
   proc cmd0 args $ \pc -> do
     (out, _err) <- readProcess_ pc
-    return
+    pure
       $ TL.unpack
       $ TL.filter (/= '\r')
       $ TL.concat

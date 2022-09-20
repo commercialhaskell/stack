@@ -21,7 +21,7 @@ createDockerVolume sizeInMB = do
     ++ " --opt device=tmpfs"
     ++ " --opt o=size=" ++ show sizeInMB ++ "m"
   unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
-  return $ delete '\n' stdout
+  pure $ delete '\n' stdout
 
 removeDockerVolume :: Int -> String -> IO ()
 removeDockerVolume attempts name | attempts <= 0 =

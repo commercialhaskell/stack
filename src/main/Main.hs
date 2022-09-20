@@ -98,7 +98,7 @@ hSetTranslit h = do
           | '/' `notElem` name -> do
               enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
               hSetEncoding h enc'
-        _ -> return ()
+        _ -> pure ()
 
 main :: IO ()
 main = do
@@ -137,7 +137,7 @@ main = do
               expectVersion' <- parseVersionThrowing expectVersion
               unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
                   $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
-          _ -> return ()
+          _ -> pure ()
       withRunnerGlobal global $ run `catch` \e ->
           -- This special handler stops "stack: " from being printed before the
           -- exception
@@ -459,7 +459,7 @@ secondaryCommandHandler
 secondaryCommandHandler args f =
     -- don't even try when the argument looks like a path or flag
     if elem pathSeparator cmd || "-" `isPrefixOf` head args
-       then return f
+       then pure f
     else do
       mExternalExec <- D.findExecutable cmd
       case mExternalExec of
@@ -468,8 +468,8 @@ secondaryCommandHandler args f =
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
           _ <- exec ex (tail args)
-          return f
-        Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
+          pure f
+        Nothing -> pure $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
     -- FIXME this is broken when any options are specified before the command
     -- e.g. stack --verbosity silent cmd
@@ -495,15 +495,15 @@ interpreterHandler currentDir args f = do
   where
     firstArg = head args
 
-    spanM _ [] = return ([], [])
+    spanM _ [] = pure ([], [])
     spanM p xs@(x:xs') = do
       r <- p x
       if r
       then do
         (ys, zs) <- spanM p xs'
-        return (x:ys, zs)
+        pure (x:ys, zs)
       else
-        return ([], xs)
+        pure ([], xs)
 
     -- if the first argument contains a path separator then it might be a file,
     -- or a Stack option referencing a file. In that case we only show the
@@ -533,13 +533,13 @@ interpreterHandler currentDir args f = do
        -- hPutStrLn stderr $ unwords $
        --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
       (a,b) <- withArgs cmdArgs parseCmdLine
-      return (a,(b,mempty))
+      pure (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
 setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
   (wantedCompiler, compilerCheck, mstack) <-
     case scoCompilerVersion of
-      Just v -> return (v, MatchMinor, Nothing)
+      Just v -> pure (v, MatchMinor, Nothing)
       Nothing -> (,,)
         <$> view wantedCompilerVersionL
         <*> view (configL.to configCompilerCheck)
@@ -644,11 +644,11 @@ uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
         ]
     liftIO exitFailure
 uploadCmd uploadOpts = do
-    let partitionM _ [] = return ([], [])
+    let partitionM _ [] = pure ([], [])
         partitionM f (x:xs) = do
             r <- f x
             (as, bs) <- partitionM f xs
-            return $ if r then (x:as, bs) else (as, x:bs)
+            pure $ if r then (x:as, bs) else (as, x:bs)
         sdistOpts = uoptsSDistOpts uploadOpts
     (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
     (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
@@ -702,7 +702,7 @@ sdistCmd sdistOpts =
                         , flow "contains no packages, so no sdist tarballs will be generated."
                         ]
                     exitFailure
-                return dirs
+                pure dirs
             else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir
@@ -735,7 +735,7 @@ execCmd ExecOpts {..} =
                   then args :: [String]
                   else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
       (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
-          (ExecCmd cmd, args) -> return (cmd, args)
+          (ExecCmd cmd, args) -> pure (cmd, args)
           (ExecRun, args) -> getRunCmd args
           (ExecGhc, args) -> getGhcCmd eoPackages args
           (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
@@ -754,7 +754,7 @@ execCmd ExecOpts {..} =
           pkg <- getGhcPkgExe
           mId <- findGhcPkgField pkg [] name "id"
           case mId of
-              Just i -> return (head $ words (T.unpack i))
+              Just i -> pure (head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
               _      -> do
                   logError ("Could not find package id of package " <> fromString name)
@@ -777,7 +777,7 @@ execCmd ExecOpts {..} =
           case exe of
               Just (CExe exe') -> do
                 withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
-                return (T.unpack exe', args')
+                pure (T.unpack exe', args')
               _                -> do
                   logError "No executables found."
                   exitFailure
@@ -785,12 +785,12 @@ execCmd ExecOpts {..} =
       getGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs
           compiler <- view $ compilerPathsL.to cpCompiler
-          return (toFilePath compiler, pkgopts ++ args)
+          pure (toFilePath compiler, pkgopts ++ args)
 
       getRunGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs
           interpret <- view $ compilerPathsL.to cpInterpreter
-          return (toFilePath interpret, pkgopts ++ args)
+          pure (toFilePath interpret, pkgopts ++ args)
 
       runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
       runWithPath path callback = case path of

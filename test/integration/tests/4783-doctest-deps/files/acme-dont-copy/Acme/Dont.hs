@@ -28,4 +28,4 @@ module Acme.Dont where
 -- Regardless of the contents of the block, don't returns ().
 --
 don't :: (Monad m) => m a -> m ()
-don't _action = return ()
+don't _action = pure ()

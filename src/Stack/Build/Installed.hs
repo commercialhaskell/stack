@@ -35,15 +35,15 @@ toInstallMap sourceMap = do
     projectInstalls <-
         for (smProject sourceMap) $ \pp -> do
             version <- loadVersion (ppCommon pp)
-            return (Local, version)
+            pure (Local, version)
     depInstalls <-
         for (smDeps sourceMap) $ \dp ->
             case dpLocation dp of
                 PLImmutable pli -> pure (Snap, getPLIVersion pli)
                 PLMutable _ -> do
                     version <- loadVersion (dpCommon dp)
-                    return (Local, version)
-    return $ projectInstalls <> depInstalls
+                    pure (Local, version)
+    pure $ projectInstalls <> depInstalls
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: HasEnvConfig env
@@ -99,7 +99,7 @@ getInstalled {-opts-} installMap = do
             , installedLibs
             ]
 
-    return ( installedMap
+    pure ( installedMap
            , globalDumpPkgs
            , snapshotDumpPkgs
            , localDumpPkgs
@@ -126,7 +126,7 @@ loadDatabase installMap mdb lhs0 = do
             lhDeps
             const
             (lhs0 ++ lhs1)
-    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
+    pure (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
   where
     mloc = fmap fst mdb
     sinkDP =  CL.map (isAllowed installMap mloc &&& toLoadHelper mloc)
@@ -139,7 +139,7 @@ processLoadResult :: HasLogFunc env
                   => Maybe (InstalledPackageLocation, Path Abs Dir)
                   -> (Allowed, LoadHelper)
                   -> RIO env (Maybe LoadHelper)
-processLoadResult _ (Allowed, lh) = return (Just lh)
+processLoadResult _ (Allowed, lh) = pure (Just lh)
 processLoadResult mdb (reason, lh) = do
     logDebug $
         "Ignoring package " <>
@@ -154,7 +154,7 @@ processLoadResult mdb (reason, lh) = do
                 fromString (versionString wanted) <>
                 " instead of " <>
                 fromString (versionString actual)
-    return Nothing
+    pure Nothing
 
 data Allowed
     = Allowed

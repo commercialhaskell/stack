@@ -9,7 +9,7 @@ osIsWindows :: Bool
 osIsWindows = True
 
 setScriptPerms :: Monad m => FilePath -> m ()
-setScriptPerms _ = return ()
+setScriptPerms _ = pure ()
 
 setFileExecutable :: Monad m => FilePath -> m ()
-setFileExecutable _ = return ()
+setFileExecutable _ = pure ()

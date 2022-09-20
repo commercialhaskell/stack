@@ -126,7 +126,7 @@ withProcessContext pcNew inner = do
   let pcNew' = set workingDirL (view workingDirL pcOld) pcNew
   local (set processContextL pcNew') inner
 
--- | Remove a trailing carriage return if present
+-- | Remove a trailing carriage pure if present
 stripCR :: Text -> Text
 stripCR = T.dropSuffix "\r"
 
@@ -152,7 +152,7 @@ promptPassword txt = liftIO $ do
   password <- withoutInputEcho T.getLine
   -- Since the user's newline is not echoed, one needs to be inserted.
   T.putStrLn ""
-  return password
+  pure password
 
 -- | Prompt the user by sending text to stdout, and collecting a line of
 -- input from stdin. If something other than "y" or "n" is entered, then
@@ -162,8 +162,8 @@ promptBool :: MonadIO m => Text -> m Bool
 promptBool txt = liftIO $ do
   input <- prompt txt
   case input of
-    "y" -> return True
-    "n" -> return False
+    "y" -> pure True
+    "n" -> pure False
     _ -> do
       T.putStrLn "Please press either 'y' or 'n', and then enter."
       promptBool txt

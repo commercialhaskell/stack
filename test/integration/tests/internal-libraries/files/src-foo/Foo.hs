@@ -4,4 +4,4 @@ import Control.Monad.STM
 import Files
 
 foo :: IO String
-foo = atomically $ return $ "foo using " ++ files
+foo = atomically $ pure $ "foo using " ++ files

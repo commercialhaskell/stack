@@ -85,9 +85,9 @@ instance ToJSON VersionCheck where
 instance FromJSON VersionCheck where
     parseJSON = withText expected $ \t ->
         case t of
-            "match-minor" -> return MatchMinor
-            "match-exact" -> return MatchExact
-            "newer-minor" -> return NewerMinor
+            "match-minor" -> pure MatchMinor
+            "match-exact" -> pure MatchExact
+            "newer-minor" -> pure NewerMinor
             _ -> fail ("Expected " ++ expected ++ ", but got " ++ show t)
       where
         expected = "VersionCheck value (match-minor, match-exact, or newer-minor)"

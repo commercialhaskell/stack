@@ -68,12 +68,12 @@ cfgCmdSet cmd = do
                      mstackYamlOption <- view $ globalOptsL.to globalStackYaml
                      mstackYaml <- getProjectConfig mstackYamlOption
                      case mstackYaml of
-                         PCProject stackYaml -> return stackYaml
+                         PCProject stackYaml -> pure stackYaml
                          PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
                          PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
-                 CommandScopeGlobal -> return (configUserConfigPath conf)
+                 CommandScopeGlobal -> pure (configUserConfigPath conf)
     rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
-    config <- either throwM return (Yaml.decodeEither' $ encodeUtf8 rawConfig)
+    config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let yamlLines = T.lines rawConfig
         cmdKey = cfgCmdSetOptionName cmd  -- Text
@@ -166,11 +166,11 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     concreteResolver <- makeConcreteResolver newResolver'
     -- Check that the snapshot actually exists
     void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
-    return (Yaml.toJSON concreteResolver)
+    pure (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
-    return (Yaml.Bool bool')
+    pure (Yaml.Bool bool')
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') =
-    return (Yaml.Bool bool')
+    pure (Yaml.Bool bool')
 
 cfgCmdSetOptionName :: ConfigCmdSet -> Text
 cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"
@@ -226,8 +226,8 @@ readBool :: OA.ReadM Bool
 readBool = do
   s <- OA.readerAsk
   case s of
-    "true" -> return True
-    "false" -> return False
+    "true" -> pure True
+    "false" -> pure False
     _ -> OA.readerError ("Invalid value " ++ show s ++
            ": Expected \"true\" or \"false\"")
 

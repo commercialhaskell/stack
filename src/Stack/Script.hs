@@ -68,8 +68,8 @@ scriptCmd opts = do
         "Ignoring override stack.yaml file for script command: " <>
         fromString (toFilePath fp)
       SYLGlobalProject -> logError "Ignoring SYLGlobalProject for script command"
-      SYLDefault -> return ()
-      SYLNoProject _ -> assert False (return ())
+      SYLDefault -> pure ()
+      SYLNoProject _ -> assert False (pure ())
 
     file <- resolveFile' $ soFile opts
 
@@ -135,7 +135,7 @@ scriptCmd opts = do
                 packages -> do
                     let targets = concatMap wordsComma packages
                     targets' <- mapM parsePackageNameThrowing targets
-                    return $ Set.fromList targets'
+                    pure $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
             -- Optimization: use the relatively cheap ghc-pkg list
@@ -206,7 +206,7 @@ getPackagesFromImports
 getPackagesFromImports scriptFP = do
     (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
     if Set.null mns
-        then return pns
+        then pure pns
         else Set.union pns <$> getPackagesFromModuleNames mns
 
 getPackagesFromModuleNames
@@ -218,10 +218,10 @@ getPackagesFromModuleNames mns = do
         pns <- forM (Set.toList mns) $ \mn -> do
             pkgs <- getModulePackages mn
             case pkgs of
-                [] -> return Set.empty
-                [pn] -> return $ Set.singleton pn
+                [] -> pure Set.empty
+                [pn] -> pure $ Set.singleton pn
                 _ -> throwM $ AmbiguousModuleName mn pkgs
-        return $ Set.unions pns `Set.difference` blacklist
+        pure $ Set.unions pns `Set.difference` blacklist
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
@@ -256,7 +256,7 @@ mapSnapshotPackageModules = do
         Set.fromList <$> allExposedModules gpd
     -- source map construction process should guarantee unique package names
     -- in these maps
-    return $ globals <> installedDeps <> otherDeps
+    pure $ globals <> installedDeps <> otherDeps
 
 dumpedPackageModules :: Map PackageName a
                      -> [DumpPackage]
@@ -345,7 +345,7 @@ parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
     fold . mapMaybe (parseLine . stripCR') . S8.lines
   where
-    -- Remove any carriage return character present at the end, to
+    -- Remove any carriage pure character present at the end, to
     -- support Windows-style line endings (CRLF)
     stripCR' bs
       | S8.null bs = bs

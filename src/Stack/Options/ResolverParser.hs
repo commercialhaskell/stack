@@ -32,4 +32,4 @@ readCompilerVersion = do
     s <- readerAsk
     case parseWantedCompiler (T.pack s) of
         Left{} -> readerError $ "Failed to parse compiler: " ++ s
-        Right x -> return x
+        Right x -> pure x

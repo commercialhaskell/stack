@@ -1,4 +1,4 @@
 import Foo
 
 main :: IO ()
-main = return ()
+main = pure ()

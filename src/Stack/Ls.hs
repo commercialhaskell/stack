@@ -198,7 +198,7 @@ newtype LsException =
 instance Exception LsException
 
 parseSnapshot :: Value -> A.Parser Snapshot
-parseSnapshot = A.withArray "array of snapshot" (return . toSnapshot . V.toList)
+parseSnapshot = A.withArray "array of snapshot" (pure . toSnapshot . V.toList)
 
 displayTime :: Snapshot -> [Text]
 displayTime Snapshot {..} = [snapTime]
@@ -224,7 +224,7 @@ renderData False content = T.putStr content
 displaySnapshotData :: Bool -> SnapshotData -> IO ()
 displaySnapshotData term sdata =
     case L.reverse $ snaps sdata of
-        [] -> return ()
+        [] -> pure ()
         xs ->
             let snaps = T.concat $ L.map displaySingleSnap xs
             in renderData term snaps
@@ -270,9 +270,9 @@ handleLocal lsOpts = do
                     displayLocalSnapshot isStdoutTerminal $
                     L.filter (L.isPrefixOf "night") snapData
                 _ -> liftIO $ displayLocalSnapshot isStdoutTerminal snapData
-        LsDependencies _ -> return ()
-        LsStyles _ -> return ()
-        LsTools _ -> return ()
+        LsDependencies _ -> pure ()
+        LsStyles _ -> pure ()
+        LsTools _ -> pure ()
 
 handleRemote
     :: HasRunner env
@@ -295,9 +295,9 @@ handleRemote lsOpts = do
                     displaySnapshotData isStdoutTerminal $
                     filterSnapshotData snapData Nightly
                 _ -> liftIO $ displaySnapshotData isStdoutTerminal snapData
-        LsDependencies _ -> return ()
-        LsStyles _ -> return ()
-        LsTools _ -> return ()
+        LsDependencies _ -> pure ()
+        LsStyles _ -> pure ()
+        LsTools _ -> pure ()
   where
     urlInfo = "https://www.stackage.org/snapshots"
 

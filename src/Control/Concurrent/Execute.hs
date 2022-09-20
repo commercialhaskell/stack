@@ -108,11 +108,11 @@ runActions' ExecuteState {..} =
         errs <- readTVar esExceptions
         if null errs || esKeepGoing
             then inner
-            else return $ return ()
+            else pure $ pure ()
     withActions inner = do
         as <- readTVar esActions
         if null as
-            then return $ return ()
+            then pure $ pure ()
             else inner as
     loop = join $ atomically $ breakOnErrs $ withActions $ \as ->
         case break (Set.null . actionDeps) as of
@@ -122,12 +122,12 @@ runActions' ExecuteState {..} =
                     then do
                         unless esKeepGoing $
                             modifyTVar esExceptions (toException InconsistentDependencies:)
-                        return $ return ()
+                        pure $ pure ()
                     else retry
             (xs, action:ys) -> do
                 inAction <- readTVar esInAction
                 case actionConcurrency action of
-                  ConcurrencyAllowed -> return ()
+                  ConcurrencyAllowed -> pure ()
                   ConcurrencyDisallowed -> unless (Set.null inAction) retry
                 let as' = xs ++ ys
                     remaining = Set.union
@@ -135,7 +135,7 @@ runActions' ExecuteState {..} =
                         inAction
                 writeTVar esActions as'
                 modifyTVar esInAction (Set.insert $ actionId action)
-                return $ mask $ \restore -> do
+                pure $ mask $ \restore -> do
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
                         , acDownstream = downstreamActions (actionId action) as'
