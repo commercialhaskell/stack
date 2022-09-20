@@ -18,25 +18,33 @@
 
 ## Version scheme
 
-* Versions with an _even_ second component are development versions (the
-  `master` branch)
-* Versions with an _odd_ second component are stable versions (the `stable`
-  branch, or in a `rc/vX.Y` release candidate branch for not-yet-released
-  versions)
-* Versions with an _even_ third component (e.g. 1.6.2 and 1.7.0) are unreleased
-  versions
-* Versions with an _odd_ third component (e.g. 1.6.1 or 1.7.3) are released
-  versions
-* Pre-release unstable binaries will be released with the date as the fourth
-  component (e.g. 1.6.0.20171129)
-* Release candidate binaries will be released with an even third component and
-  and odd number as the fourth component (e.g. 1.7.0.1)
-* Hackage-only dependency compatibility patch releases add a fourth patchlevel
-  component (e.g. v1.7.3.1, in the `release` branch)
-* All branches _except_ `release` (which matches exactly the most recent
-  release) must have an even third component (development)
+A Stack package or executable may have a version with three or four components:
+X.Y.Z or X.Y.Z.A.
+
+### Development or stable versions
+
+* Versions with an _even_ 'Y' component are development versions (the `master`
+  branch)
+* Versions with an _odd_ 'Y' component are stable versions (the `stable` branch,
+  or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
+
+### Unreleased or released versions
+
+* Versions with an _even_ 'Z' component are unreleased versions (including
+  release candidates)
+* Versions with an _odd_ 'Z' component are released versions
+* Except for the `release` branch (which matches exactly the most recent
+  release), all branches must have an even 'Z' component
 * Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate
-  will always have a `0` third component (e.g. 1.7.0).
+  will always have a `0` 'Z' component
+
+### Use of a fourth component
+
+* Release candidate binaries will be released with an odd 'A' component
+* Hackage-only dependency compatibility patch releases add a 'A' component
+  (e.g. v1.7.3.1, in the `release` branch)
+* Pre-release unstable binaries will be released with the date as the 'A'
+  component (e.g. 2.10.0.20220920)
 
 Examples:
 
@@ -51,32 +59,30 @@ Examples:
 * `1.7.2.1`: release candidate for second release of 1.7.x series (`stable`
   branch)
 * `1.7.3`: second release of 1.7.x series (`release` branch)
-* `1.7.3.1`: first hackage-only patch of 1.7.3 (`release` branch)
-* `1.7.3.2`: second hackage-only patch of 1.7.3 (`release` branch)
+* `1.7.3.1`: first Hackage-only patch of 1.7.3 (`release` branch)
+* `1.7.3.2`: second Hackage-only patch of 1.7.3 (`release` branch)
 * `1.8.0`: unstable development code (`master` branch)
 * `1.8.0.20181004`: pre-release snapshot of unstable version (`master` branch)
 
 ## Pre-release checks
 
-1. Check for any P0 and P1 issues that should be dealt with before release
-2. Check for un-merged pull requests that should be merged before release
-3. Ensure the `release` and `stable` branches are merged to the `master` branch
-4. Check copyright dates, and update if needed
-5. Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
-   stackage snapshots and GHC versions (e.g.
-   https://github.com/commercialhaskell/stack/pull/4565/files)
-6. Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
-   nightly (go over the extra-deps too) and ensure the project builds and tests
-   pass. For example, command:
+1.  Check for any P0 and P1 issues that should be dealt with before release.
+2.  Check for un-merged pull requests that should be merged before release.
+3.  Ensure the `release` and `stable` branches are merged to the `master`
+    branch.
+4.  Check the copyright dates, and update if needed.
+5.  Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
+    stackage snapshots and GHC versions (e.g.
+    https://github.com/commercialhaskell/stack/pull/4565/files)
+6.  Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
+    nightly (go over the extra-deps too) and ensure the project builds and tests
+    pass. For example, command:
 
     ~~~text
     stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
     ~~~
 
-7. Ensure integration tests pass on a Windows, macOS, and Linux. Do so by
-   checking that the latest nightly build for the `master` branch succeeded in
-   Azure DevOps (or kick one off manually if any significant changes were made
-   since the last automated build).
+7.  Ensure the integration tests pass on Linux, macOS and Windows.
 
 ## Release preparation
 
