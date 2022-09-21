@@ -22,7 +22,7 @@ github: commercialhaskell/stack
 homepage: http://haskellstack.org
 custom-setup:
   dependencies:
-  - base >= 4.16.3.0 && < 5
+  - base >= 4.14.3.0 && < 5
   - Cabal
   - filepath
 extra-source-files:
@@ -49,7 +49,7 @@ ghc-options:
 - -fwarn-incomplete-record-updates
 - -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
-- base >= 4.16.3.0 && < 5
+- base >= 4.14.3.0 && < 5
 - Cabal >= 3.6.3.0
 - aeson >= 2.0.3.0
 - annotated-wl-pprint
