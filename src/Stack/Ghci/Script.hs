@@ -15,7 +15,7 @@ module Stack.Ghci.Script
   ) where
 
 import           Data.ByteString.Builder (toLazyByteString)
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Set as S
 import           Path
 import           Stack.Prelude
@@ -71,8 +71,8 @@ commandToBuilder (Add modules)
   | S.null modules = mempty
   | otherwise      =
        ":add "
-    <> mconcat (intersperse " " $
-         fmap (fromString . quoteFileName . either (mconcat . intersperse "." . components) toFilePath)
+    <> mconcat (L.intersperse " " $
+         fmap (fromString . quoteFileName . either (mconcat . L.intersperse "." . components) toFilePath)
               (S.toAscList modules))
     <> "\n"
 
@@ -83,8 +83,8 @@ commandToBuilder (Module modules)
   | S.null modules = ":module +\n"
   | otherwise      =
        ":module + "
-    <> mconcat (intersperse " "
-        $ fromString . quoteFileName . mconcat . intersperse "." . components <$> S.toAscList modules)
+    <> mconcat (L.intersperse " "
+        $ fromString . quoteFileName . mconcat . L.intersperse "." . components <$> S.toAscList modules)
     <> "\n"
 
 -- | Make sure that a filename with spaces in it gets the proper quotes.

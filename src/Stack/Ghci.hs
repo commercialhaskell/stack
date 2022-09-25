@@ -20,7 +20,8 @@ import           Control.Monad.State.Strict (State, execState, get, modify)
 import           Data.ByteString.Builder (byteString)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.List
+import           Data.Foldable (foldl)
+import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -206,7 +207,7 @@ preprocessTargets
     -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI sma rawTargets = do
     let (fileTargetsRaw, normalTargetsRaw) =
-            partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
+            L.partition (\t -> ".hs" `T.isSuffixOf` t || ".lhs" `T.isSuffixOf` t)
                       rawTargets
     -- Only use file targets if we have no normal targets.
     if not (null fileTargetsRaw) && null normalTargetsRaw
@@ -255,7 +256,7 @@ findFileTargets locals fileTargets = do
         pure (lp, M.map (map dotCabalGetPath) compFiles)
     let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
         foundFileTargetComponents =
-            map (\fp -> (fp, ) $ sort $
+            map (\fp -> (fp, ) $ L.sort $
                         concatMap (\(lp, files) -> map ((packageName (lpPackage lp), ) . fst)
                                                        (filter (elem fp . snd) (M.toList files))
                                   ) filePackages
@@ -279,7 +280,7 @@ findFileTargets locals fileTargets = do
                 prettyWarn $
                     "Multiple components contain file target" <+>
                     pretty fp <> ":" <+>
-                    mconcat (intersperse ", " (map displayPkgComponent xs)) <> line <>
+                    mconcat (L.intersperse ", " (map displayPkgComponent xs)) <> line <>
                     "Guessing the first one," <+> displayPkgComponent x <> "."
                 pure $ Right (fp, x)
     let (extraFiles, associatedFiles) = partitionEithers results
@@ -320,7 +321,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
         then pure directlyWanted
         else do
             let extraList =
-                  mconcat $ intersperse ", " (map (fromString . packageNameString . fst) extraLoadDeps)
+                  mconcat $ L.intersperse ", " (map (fromString . packageNameString . fst) extraLoadDeps)
             if ghciLoadLocalDeps
                 then logInfo $
                   "The following libraries will also be loaded into GHCi because " <>
@@ -393,25 +394,25 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
             | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
             | otherwise = bioOneWordOpts bio
         genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
-        (omittedOpts, ghcOpts) = partition badForGhci $
+        (omittedOpts, ghcOpts) = L.partition badForGhci $
             concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++ map T.unpack
               ( fold (configGhcOptionsByCat config) -- include everything, locals, and targets
              ++ concatMap (getUserOptions . ghciPkgName) pkgs
               )
         getUserOptions pkg = M.findWithDefault [] pkg (configGhcOptionsByName config)
         badForGhci x =
-            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
+            L.isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
         logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             mconcat (intersperse " " (fromString <$> nubOrd omittedOpts)))
+             mconcat (L.intersperse " " (fromString <$> nubOrd omittedOpts)))
     oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
     logInfo $
       "Configuring GHCi with the following packages: " <>
-      mconcat (intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
+      mconcat (L.intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
     compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
@@ -438,7 +439,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
                     menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
                     output <- withProcessContext menv
                             $ runGrabFirstLine (fromMaybe compilerExeName ghciGhcCommand) ["--version"]
-                    pure $ "Intero" `isPrefixOf` output
+                    pure $ "Intero" `L.isPrefixOf` output
                 _ -> pure False
     -- Since usage of 'exec' does not pure, we cannot do any cleanup
     -- on ghci exit. So, instead leave the generated files. To make this
@@ -571,7 +572,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
                 wantedComponents =
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
     renderCandidate c@(pkgName,namedComponent,mainIs) =
-        let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . elemIndex c
+        let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . L.elemIndex c
             pkgNameText = T.pack (packageNameString pkgName)
         in  candidateIndex candidates <> ". Package `" <>
             pkgNameText <>
@@ -587,14 +588,14 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
       let selected = fromMaybe
                       ((+1) $ length candidateIndices)
                       (readMaybe (T.unpack option) :: Maybe Int)
-      case elemIndex selected candidateIndices  of
+      case L.elemIndex selected candidateIndices  of
         Nothing -> do
             putStrLn
               "Not loading any main modules, as no valid module selected"
             putStrLn ""
             pure Nothing
         Just op -> do
-            let (_,_,fp) = candidates !! op
+            let (_,_,fp) = candidates L.!! op
             putStrLn
               ("Loading main module from candidate " <>
               show (op + 1) <> ", --main-is " <>
@@ -761,7 +762,7 @@ checkForIssues pkgs = do
             logWarn "Warning: There are cabal flags for this project which may prevent GHCi from loading your code properly."
             logWarn "In some cases it can also load some projects which would otherwise fail to build."
             logWarn ""
-            mapM_ (logWarn . RIO.display) $ intercalate [""] cabalFlagIssues
+            mapM_ (logWarn . RIO.display) $ L.intercalate [""] cabalFlagIssues
             logWarn ""
             logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
             logWarn ""
@@ -823,7 +824,7 @@ checkForIssues pkgs = do
         ]
     partitionComps f = (map fst xs, map fst ys)
       where
-        (xs, ys) = partition (any f . snd) compsWithOpts
+        (xs, ys) = L.partition (any f . snd) compsWithOpts
     compsWithOpts = map (\(k, bio) -> (k, bioOneWordOpts bio ++ bioOpts bio)) compsWithBios
     compsWithBios =
         [ ((ghciPkgName pkg, c), bio)

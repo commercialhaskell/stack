@@ -40,7 +40,7 @@ import qualified Data.Conduit.Filesystem as CF
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed (createSource)
 import qualified Data.Conduit.Text as CT
-import           Data.List hiding (any)
+import qualified Data.List as L
 import           Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty (toList)
 import           Data.List.Split (chunksOf)
@@ -110,7 +110,7 @@ preFetch plan
     | otherwise = do
         logDebug $
             "Prefetching: " <>
-            mconcat (intersperse ", " (RIO.display <$> Set.toList pkgLocs))
+            mconcat (L.intersperse ", " (RIO.display <$> Set.toList pkgLocs))
         fetchPackages pkgLocs
   where
     pkgLocs = Set.unions $ map toPkgLoc $ Map.elems $ planTasks plan
@@ -184,7 +184,7 @@ displayTask task =
     (if Set.null missing
         then ""
         else ", after: " <>
-             mconcat (intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
+             mconcat (L.intersperse "," (fromString . packageIdentifierString <$> Set.toList missing)))
   where
     missing = tcoMissing $ taskConfigOpts task
 
@@ -626,7 +626,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     let packageNames = map (\(ActionId pkgID _) -> pkgName pkgID) (toList inProgress)
                         nowBuilding :: [PackageName] -> Utf8Builder
                         nowBuilding []    = ""
-                        nowBuilding names = mconcat $ ": " : intersperse ", " (map (fromString . packageNameString) names)
+                        nowBuilding names = mconcat $ ": " : L.intersperse ", " (map (fromString . packageNameString) names)
                     when terminal $ run $
                         logSticky $
                             "Progress " <> RIO.display prev <> "/" <> RIO.display total <>
@@ -974,7 +974,7 @@ packageNamePrefix ee name' =
       paddedName =
         case eeLargestPackageName ee of
           Nothing -> name
-          Just len -> assert (len >= length name) $ RIO.take len $ name ++ repeat ' '
+          Just len -> assert (len >= length name) $ RIO.take len $ name ++ L.repeat ' '
    in fromString paddedName <> "> "
 
 announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Utf8Builder -> RIO env ()
@@ -1608,12 +1608,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       "- In" <+>
                       fromString (T.unpack (renderComponent comp)) <>
                       ":" <> line <>
-                      indent 4 (mconcat $ intersperse line $ map (style Good . fromString . C.display) modules)
+                      indent 4 (mconcat $ L.intersperse line $ map (style Good . fromString . C.display) modules)
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ prettyWarn $
                         "The following modules should be added to exposed-modules or other-modules in" <+>
                         pretty cabalfp <> ":" <> line <>
-                        indent 4 (mconcat $ intersperse line $ map showModuleWarning warnings) <>
+                        indent 4 (mconcat $ L.intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
@@ -1705,12 +1705,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
             runConduitRes
               $ CF.sourceDirectoryDeep False (toFilePath distDir)
-             .| CL.filter (isInfixOf ".dump-")
+             .| CL.filter (L.isInfixOf ".dump-")
              .| CL.mapM_ (\src -> liftIO $ do
                   parentDir <- parent <$> parseRelDir src
                   destBaseDir <- (ddumpDir </>) <$> stripProperPrefix distDir parentDir
                   -- exclude .stack-work dir
-                  unless (".stack-work" `isInfixOf` toFilePath destBaseDir) $ do
+                  unless (".stack-work" `L.isInfixOf` toFilePath destBaseDir) $ do
                     ensureDir destBaseDir
                     src' <- parseRelFile src
                     copyFile src' (destBaseDir </> filename src'))
@@ -1919,7 +1919,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                        Just (Library _ ghcPkgId _) -> [ghcPkgId]
                                        _ -> []
                 -- doctest relies on template-haskell in QuickCheck-based tests
-                thGhcId <- case find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
+                thGhcId <- case L.find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
                                 (Map.toList $ eeGlobalDumpPkgs ee) of
                   Just (ghcId, _) -> pure ghcId
                   Nothing -> error "template-haskell is a wired-in GHC boot library but it wasn't found"

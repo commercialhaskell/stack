@@ -25,7 +25,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.Data (cast)
-import           Data.List
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -84,7 +84,7 @@ instance Exception CheckException
 instance Show CheckException where
   show (CheckException xs) =
     "Package check reported the following errors:\n" ++
-    (intercalate "\n" . fmap show . NE.toList $ xs)
+    (List.intercalate "\n" . fmap show . NE.toList $ xs)
 
 -- | Given the path to a local package, creates its source
 -- distribution tarball.
@@ -436,10 +436,10 @@ checkPackageInExtractedTarball pkgDir = do
           let criticalIssue (Check.PackageBuildImpossible _) = True
               criticalIssue (Check.PackageDistInexcusable _) = True
               criticalIssue _ = False
-          in partition criticalIssue checks
+          in List.partition criticalIssue checks
     unless (null warnings) $
         logWarn $ "Package check reported the following warnings:\n" <>
-                   mconcat (intersperse "\n" . fmap displayShow $ warnings)
+                   mconcat (List.intersperse "\n" . fmap displayShow $ warnings)
     case NE.nonEmpty errors of
         Nothing -> pure ()
         Just ne -> throwM $ CheckException ne

@@ -17,7 +17,7 @@ module Stack.Build.ConstructPlan
 import           Stack.Prelude hiding (Display (..), loadPackage)
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map (MonoidMap(..))
@@ -285,12 +285,12 @@ instance Show NotOnlyLocal where
     [ "Specified only-locals, but I need to build snapshot contents:\n"
     , if null packages then "" else concat
         [ "Packages: "
-        , intercalate ", " (map packageNameString packages)
+        , L.intercalate ", " (map packageNameString packages)
         , "\n"
         ]
     , if null exes then "" else concat
         [ "Executables: "
-        , intercalate ", " (map T.unpack exes)
+        , L.intercalate ", " (map T.unpack exes)
         , "\n"
         ]
     ]
@@ -1037,7 +1037,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     mconcat $
       [ flow "While constructing the build plan, the following exceptions were encountered:"
       , line <> line
-      , mconcat (intersperse (line <> line) (mapMaybe pprintException exceptions'))
+      , mconcat (L.intersperse (line <> line) (mapMaybe pprintException exceptions'))
       , line <> line
       , flow "Some different approaches to resolving this:"
       , line <> line
@@ -1173,7 +1173,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             align (flow "is a library dependency, but the package provides no library")
         BDDependencyCycleDetected names -> Just $
             style Error (fromString $ packageNameString name) <+>
-            align (flow $ "dependency cycle detected: " ++ intercalate ", " (map packageNameString names))
+            align (flow $ "dependency cycle detected: " ++ L.intercalate ", " (map packageNameString names))
       where
         goodRange = style Good (fromString (Cabal.display range))
         latestApplicable mversion =
@@ -1215,9 +1215,9 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
     findShortest fuel paths =
         case targets of
             [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $ concatMap extendPath recurses
-            _ -> let (DepsPath _ _ path) = minimum (map snd targets) in path
+            _ -> let (DepsPath _ _ path) = L.minimum (map snd targets) in path
       where
-        (targets, recurses) = partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
+        (targets, recurses) = L.partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
     chooseBest :: DepsPath -> DepsPath -> DepsPath
     chooseBest x y = max x y
     -- Extend a path to all its parents.

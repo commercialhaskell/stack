@@ -15,7 +15,7 @@ import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -169,7 +169,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
   addCommands
   where
     failureCallback f args =
-      case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+      case L.stripPrefix "Invalid argument" (fst (renderFailure f "")) of
           Just _ -> if isInterpreter
                     then parseResultHandler args f
                     else secondaryCommandHandler args f
@@ -458,7 +458,7 @@ secondaryCommandHandler
   -> IO (ParserFailure ParserHelp)
 secondaryCommandHandler args f =
     -- don't even try when the argument looks like a path or flag
-    if elem pathSeparator cmd || "-" `isPrefixOf` head args
+    if elem pathSeparator cmd || "-" `L.isPrefixOf` L.head args
        then pure f
     else do
       mExternalExec <- D.findExecutable cmd
@@ -467,13 +467,13 @@ secondaryCommandHandler args f =
           -- TODO show the command in verbose mode
           -- hPutStrLn stderr $ unwords $
           --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- exec ex (tail args)
+          _ <- exec ex (L.tail args)
           pure f
         Nothing -> pure $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
   where
     -- FIXME this is broken when any options are specified before the command
     -- e.g. stack --verbosity silent cmd
-    cmd = stackProgName ++ "-" ++ head args
+    cmd = stackProgName ++ "-" ++ L.head args
     noSuchCmd name = errorHelp $ stringChunk
       ("Auxiliary command not found in path `" ++ name ++ "'")
 
@@ -493,7 +493,7 @@ interpreterHandler currentDir args f = do
     (file:fileArgs') -> runInterpreterCommand file stackArgs fileArgs'
     [] -> parseResultHandler (errorCombine (noSuchFile firstArg))
   where
-    firstArg = head args
+    firstArg = L.head args
 
     spanM _ [] = pure ([], [])
     spanM p xs@(x:xs') = do
@@ -754,7 +754,7 @@ execCmd ExecOpts {..} =
           pkg <- getGhcPkgExe
           mId <- findGhcPkgField pkg [] name "id"
           case mId of
-              Just i -> pure (head $ words (T.unpack i))
+              Just i -> pure (L.head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
               _      -> do
                   logError ("Could not find package id of package " <> fromString name)
@@ -769,7 +769,7 @@ execCmd ExecOpts {..} =
           let executables = filter isCExe $ concatMap Set.toList pkgComponents
           let (exe, args') = case args of
                              []   -> (firstExe, args)
-                             x:xs -> case find (\y -> y == CExe (T.pack x)) executables of
+                             x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
                                      Nothing -> (firstExe, args)
                                      argExe -> (argExe, xs)
                              where
@@ -882,7 +882,7 @@ listCmd names = withConfig NoReexec $ do
 -- | generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
-    let (tixFiles, targetNames) = partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+    let (tixFiles, targetNames) = L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
         boptsCLI = defaultBuildOptsCLI
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
     withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $

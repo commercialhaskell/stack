@@ -12,7 +12,7 @@ module Path.Find
 
 import RIO
 import System.IO.Error (isPermissionError)
-import Data.List
+import qualified Data.List as L
 import Path
 import Path.IO hiding (findFiles)
 import System.PosixCompat.Files (getSymbolicLinkStatus, isSymbolicLink)
@@ -43,7 +43,7 @@ findPathUp :: (MonadIO m,MonadThrow m)
            -> m (Maybe (Path Abs t))           -- ^ Absolute path.
 findPathUp pathType dir p upperBound =
   do entries <- listDir dir
-     case find p (pathType entries) of
+     case L.find p (pathType entries) of
        Just path -> pure (Just path)
        Nothing | Just dir == upperBound -> pure Nothing
                | parent dir == dir -> pure Nothing

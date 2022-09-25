@@ -16,7 +16,6 @@ module Stack.Build.Installed
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Set as Set
-import           Data.List
 import qualified Data.Map.Strict as Map
 import           Path
 import           Stack.Build.Cache

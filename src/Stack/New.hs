@@ -23,7 +23,7 @@ import qualified Data.ByteString.Base64 as B64
 import           Data.ByteString.Builder (lazyByteString)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -256,7 +256,7 @@ applyTemplate project template nonceParams dir templateText = do
     when (M.null files) $
          throwM (InvalidTemplate template "Template does not contain any files")
 
-    let isPkgSpec f = ".cabal" `isSuffixOf` f || f == "package.yaml"
+    let isPkgSpec f = ".cabal" `L.isSuffixOf` f || f == "package.yaml"
     unless (any isPkgSpec . M.keys $ files) $
          throwM (InvalidTemplate template
            "Template does not contain a .cabal or package.yaml file")
@@ -400,16 +400,16 @@ instance Show NewException where
     show (AlreadyExists path) =
         "Directory " <> toFilePath path <> " already exists. Aborting."
     show (MissingParameters name template missingKeys userConfigPath) =
-        intercalate
+        L.intercalate
             "\n"
             [ "The following parameters were needed by the template but not provided: " <>
-              intercalate ", " (S.toList missingKeys)
+              L.intercalate ", " (S.toList missingKeys)
             , "You can provide them in " <>
               toFilePath userConfigPath <>
               ", like this:"
             , "templates:"
             , "  params:"
-            , intercalate
+            , L.intercalate
                   "\n"
                   (map
                        (\key ->

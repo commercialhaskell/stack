@@ -21,7 +21,7 @@ module Stack.Coverage
 import           Stack.Prelude hiding (Display (..))
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -141,8 +141,9 @@ generateHpcReport pkgDir package tests = do
             -- #634 - this will likely be customizable in the future)
             Right mincludeName -> do
                 let extraArgs = case mincludeName of
-                        Just includeNames -> "--include" : intersperse "--include" (map (\n -> n ++ ":") includeNames)
                         Nothing -> []
+                        Just includeNames ->
+                            "--include" : L.intersperse "--include" (map (\n -> n ++ ":") includeNames)
                 mreportPath <- generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
                 forM_ mreportPath (displayReportPath "The" report . pretty)
 
@@ -254,7 +255,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                                  (dirs, _) <- listDir pkgPath
                                  liftM concat $ forM dirs $ \dir -> do
                                      (_, files) <- listDir dir
-                                     pure (filter ((".tix" `isSuffixOf`) . toFilePath) files)
+                                     pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
                              else pure []
     tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $
@@ -284,7 +285,7 @@ generateHpcUnifiedReport = do
         (dirs', _) <- listDir dir
         forM dirs' $ \dir' -> do
             (_, files) <- listDir dir'
-            pure (filter ((".tix" `isSuffixOf`) . toFilePath) files)
+            pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
     extraTixFiles <- findExtraTixFiles
     let tixFiles = tixFiles0  ++ extraTixFiles
         reportDir = outputDir </> relDirCombined </> relDirAll
@@ -324,7 +325,7 @@ generateUnionReport report reportDir tixFiles = do
         "The following modules are left out of the " <>
         RIO.display report <>
         " due to version mismatches: " <>
-        mconcat (intersperse ", " (map fromString errs))
+        mconcat (L.intersperse ", " (map fromString errs))
     tixDest <- liftM (reportDir </>) $ parseRelFile (dirnameString reportDir ++ ".tix")
     ensureDir (parent tixDest)
     liftIO $ writeTix (toFilePath tixDest) tix
@@ -435,7 +436,7 @@ sanitize :: String -> Text
 sanitize = LT.toStrict . htmlEscape . LT.pack
 
 dirnameString :: Path r Dir -> String
-dirnameString = dropWhileEnd isPathSeparator . toFilePath . dirname
+dirnameString = L.dropWhileEnd isPathSeparator . toFilePath . dirname
 
 findPackageFieldForBuiltPackage
     :: HasEnvConfig env
@@ -506,5 +507,5 @@ findExtraTixFiles = do
     if dirExists
         then do
             (_, files) <- listDir dir
-            pure $ filter ((".tix" `isSuffixOf`) . toFilePath) files
+            pure $ filter ((".tix" `L.isSuffixOf`) . toFilePath) files
         else pure []
