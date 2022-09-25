@@ -1,0 +1,20 @@
+cradle:
+  multi:
+    - path: "./.stack-work"
+      config: { cradle: { none } }
+    - path: "./Setup.hs"
+      config: { cradle: { none } }
+    - path: "./etc"
+      config: { cradle: { none } }
+    - path: "./"
+      config:
+        cradle:
+          stack:
+            - path: "./src"
+              component: "stack:lib"
+            - path: "./src/test"
+              component: "stack:test:stack-test"
+            - path: "./src/main"
+              component: "stack:exe:stack"
+            - path: "./test/integration"
+              component: "stack:exe:stack-integration-test"
