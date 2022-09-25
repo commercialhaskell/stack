@@ -1878,17 +1878,18 @@ downloadStackReleaseInfo
 downloadStackReleaseInfo Nothing Nothing Nothing = do
     platform <- view platformL
     -- Fallback list of URLs to try for upgrading.
-    let urls0 =
+    let domain = "https://get.haskellstack.org"
+        urls0 =
           case platform of
             Platform X86_64 Cabal.Linux ->
-              [ "https://get.haskellstack.org/upgrade/linux-x86_64-static.tar.gz"
-              , "https://get.haskellstack.org/upgrade/linux-x86_64.tar.gz"
+              [ domain <> "/upgrade/linux-x86_64-static.tar.gz"
+              , domain <> "/upgrade/linux-x86_64.tar.gz"
               ]
             Platform X86_64 Cabal.OSX ->
-              [ "https://get.haskellstack.org/upgrade/osx-x86_64.tar.gz"
+              [ domain <> "/upgrade/osx-x86_64.tar.gz"
               ]
             Platform X86_64 Cabal.Windows ->
-              [ "https://get.haskellstack.org/upgrade/windows-x86_64.tar.gz"
+              [ domain <> "/upgrade/windows-x86_64.tar.gz"
               ]
             _ -> []
         -- Helper function: extract the version from a GitHub releases URL.
@@ -1921,7 +1922,13 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
                 Left e -> logDebug ("Invalid UTF8: " <> displayShow (locBS, e)) *> loop urls
                 Right loc ->
                   case extractVersion loc of
-                    Left s -> logDebug ("No version found: " <> displayShow (url, loc, s)) *> loop (loc:urls)
+                    Left s -> do
+                        let fixedLoc =
+                              case T.take 1 loc of
+                                "/" -> domain <> loc
+                                _ -> loc
+                        logDebug ("No version found: " <> displayShow (url, fixedLoc, s))
+                        loop (fixedLoc:urls)
                     -- We found a valid URL, let's use it!
                     Right version -> do
                       let hso = HaskellStackOrg
