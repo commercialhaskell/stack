@@ -1901,6 +1901,8 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
           version1 <- maybe (Left "no leading v on version") Right $ stripPrefix "v" version0
           maybe (Left $ "Invalid version: " ++ show version1) Right $ parseVersion version1
 
+
+
         -- Try out different URLs. If we've exhausted all of them, fall back to GitHub.
         loop [] = do
           logDebug "Could not get binary from haskellstack.org, trying GitHub"
@@ -1908,36 +1910,44 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
 
         -- Try the next URL
         loop (url:urls) = do
-          -- Make a HEAD request without any redirects
-          req <- setRequestMethod "HEAD" <$> parseRequest (T.unpack url)
-          res <- httpLbs req { redirectCount = 0 }
+          let withReq f =
+                case parseRequest (T.unpack url) of
+                  Just r -> f r
+                  Nothing -> do
+                    logDebug $ "Bad URL tried: " <> displayShow url
+                    loop urls
+          let checkRedirect res f =
+                case getResponseHeader "location" res of
+                  [] -> logDebug "No location header found, continuing" *> loop urls
+                  -- Exactly one location header.
+                  [locBS] -> case decodeUtf8' locBS of
+                    Left e -> logDebug ("Invalid UTF8: " <> displayShow (locBS, e)) *> loop urls
+                    Right loc -> f loc
+                  locs -> logDebug ("Multiple location headers found: " <> displayShow locs) *> loop urls
 
-          -- Look for a redirect. We're looking for a standard GitHub releases
-          -- URL where we can extract version information from.
-          case getResponseHeader "location" res of
-            [] -> logDebug "No location header found, continuing" *> loop urls
-            -- Exactly one location header.
-            [locBS] ->
-              case decodeUtf8' locBS of
-                Left e -> logDebug ("Invalid UTF8: " <> displayShow (locBS, e)) *> loop urls
-                Right loc ->
-                  case extractVersion loc of
-                    Left s -> do
-                        let fixedLoc =
-                              case T.take 1 loc of
-                                "/" -> domain <> loc
-                                _ -> loc
-                        logDebug ("No version found: " <> displayShow (url, fixedLoc, s))
-                        loop (fixedLoc:urls)
-                    -- We found a valid URL, let's use it!
-                    Right version -> do
-                      let hso = HaskellStackOrg
-                                  { hsoUrl = loc
-                                  , hsoVersion = version
-                                  }
-                      logDebug $ "Downloading from haskellstack.org: " <> displayShow hso
-                      pure $ SRIHaskellStackOrg hso
-            locs -> logDebug ("Multiple location headers found: " <> displayShow locs) *> loop urls
+          withReq $ \req -> do
+            -- Make a HEAD request without any redirects
+            res <- httpLbs (setRequestMethod "HEAD" req) { redirectCount = 0 }
+            -- Look for a redirect. We're looking for a standard GitHub releases
+            -- URL where we can extract version information from.
+            checkRedirect res $ \loc ->
+              case extractVersion loc of
+                -- No version in URL, let's see where this goes.
+                Left s -> do
+                    let fixedLoc =
+                          case T.take 1 loc of
+                            "/" -> domain <> loc
+                            _ -> loc
+                    logDebug ("No version found: " <> displayShow (url, fixedLoc, s))
+                    loop (fixedLoc:urls)
+                -- We found a valid URL, let's use it!
+                Right version -> do
+                  let hso = HaskellStackOrg
+                              { hsoUrl = loc
+                              , hsoVersion = version
+                              }
+                  logDebug $ "Downloading from haskellstack.org: " <> displayShow hso
+                  pure $ SRIHaskellStackOrg hso
     loop urls0
 downloadStackReleaseInfo morg mrepo mver = downloadStackReleaseInfoGitHub morg mrepo mver
 
