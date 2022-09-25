@@ -938,6 +938,8 @@ For further information, see the
 
 ### package-indices
 
+[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
+
 Default:
 
 ~~~yaml
@@ -954,29 +956,47 @@ package-indices:
     - 772e9f4c7db33d251d5c6e357199c819e569d130857dc225549b40845ff0890d
     - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
     - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
-    key-threshold: 3 # number of keys required
+    key-threshold: 3
 
-    # ignore expiration date, see https://github.com/commercialhaskell/stack/pull/4614
     ignore-expiry: true
 ~~~
 
-Since Stack 1.11, this key may only be used to specify a single package index,
-which must use the Hackage Security format. For the motivation for this change,
-please see
-[issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
-Therefore, this key is most useful for providing an alternate Hackage mirror
-either for:
+!!! note
 
-* Bypassing a firewall
-* Faster download speeds
+    Before Stack 2.1.3, the default for `ignore-expiry` was `false`. For more
+    information, see
+    [issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
 
-If you provide a replacement index which does not mirror Hackage, it is likely
-that you'll end up with significant breakage, such as most snapshots failing to
+!!! note
+
+    Before Stack 2.1.1, Stack had a different approach to `package-indices`. For
+    more information, see
+    [issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
+
+Specify the package index. The index must use the
+[Hackage Security](https://hackage.haskell.org/package/hackage-security) format.
+This setting is most useful for providing a mirror of the official Hackage
+server for
+
+* bypassing a firewall; or
+* faster downloads.
+
+If the setting specifies an index that does not mirror Hackage, it is likely
+that will result in significant breakage, including most snapshots failing to
 work.
 
-Note: since Stack v2.1.3, `ignore-expiry` was changed to `true` by
-default. For more information on this change, see
-[issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
+In the case of Hackage, the keys of its root key holders are contained in the
+`haskell-infra/hackage-root-keys`
+[repository](https://github.com/haskell-infra/hackage-root-keys). The Hackage
+package index is signed. A signature is valid when three key holders have
+signed. The Hackage timestamp is also signed. A signature is valid when one key
+holder has signed.
+
+`key-threshold` specifies the minimum number of keyholders that must have signed
+the package index for it to be considered valid.
+
+`ignore-expiry` specifies whether or not the expiration of timestamps should be
+ignored.
 
 ### pvp-bounds
 
