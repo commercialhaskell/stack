@@ -24,7 +24,7 @@ module Stack.Setup.Installed
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
-import           Data.List hiding (concat, elem, maximumBy)
+import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
@@ -176,7 +176,7 @@ extraDirs tool = do
             logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
             pure mempty
   where
-    isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
+    isGHC n = "ghc" == n || "ghc-" `L.isPrefixOf` n
 
 installDir :: (MonadReader env m, MonadThrow m)
            => Path Abs Dir

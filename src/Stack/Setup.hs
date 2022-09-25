@@ -41,7 +41,6 @@ import              Data.Conduit.Lazy (lazyConsume)
 import qualified    Data.Conduit.List as CL
 import              Data.Conduit.Process.Typed (createSource)
 import              Data.Conduit.Zlib          (ungzip)
-import              Data.List hiding (concat, elem, maximumBy, any)
 import qualified    Data.Map as Map
 import qualified    Data.Set as Set
 import qualified    Data.Text as T

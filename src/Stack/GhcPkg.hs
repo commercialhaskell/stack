@@ -17,7 +17,7 @@ module Stack.GhcPkg
 import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
-import           Data.List
+import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (parent, (</>))
@@ -152,7 +152,7 @@ unregisterGhcPkgIds pkgexe pkgDb epgids = do
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text
 mkGhcPackagePath locals localdb deps extras globaldb =
-  T.pack $ intercalate [searchPathSeparator] $ concat
+  T.pack $ L.intercalate [searchPathSeparator] $ concat
     [ [toFilePathNoTrailingSep localdb | locals]
     , [toFilePathNoTrailingSep deps]
     , [toFilePathNoTrailingSep db | db <- reverse extras]

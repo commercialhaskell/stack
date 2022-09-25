@@ -23,7 +23,7 @@ import qualified    Pantry.SHA256 as SHA256
 import              Data.ByteString.Builder (toLazyByteString)
 import              Conduit (ZipSink (..), withSourceFile)
 import qualified    Distribution.PackageDescription as C
-import              Data.List
+import qualified    Data.List as L
 import qualified    Data.Map as Map
 import qualified    Data.Map.Strict as M
 import qualified    Data.Set as Set
@@ -363,7 +363,7 @@ loadLocalPackage pp = do
           pure $
             if not (Set.null allDirtyFiles)
                 then let tryStripPrefix y =
-                          fromMaybe y (stripPrefix (toFilePath $ ppRoot pp) y)
+                          fromMaybe y (L.stripPrefix (toFilePath $ ppRoot pp) y)
                       in Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
         newBuildCaches =
