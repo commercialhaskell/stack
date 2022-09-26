@@ -28,7 +28,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-
     - name: Pedantic build
-      run: stack --system-ghc build --pedantic
+      run: |
+        # Stack 2.9.3 is required to build Stack
+        stack upgrade
+        stack build --pedantic
   unit-tests:
     name: Unit tests
     runs-on: ${{ matrix.os }}
@@ -65,10 +68,20 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
+    - name: Update PATH on Windows
+      if: startsWith(runner.os, 'Windows')
+      run: |
+        # On Windows, `stack upgrade` fails to overwrite the stack executable at
+        # C:\hostedtoolcache\windows\stack\2.9.1\x64\, so add location of
+        # upgraded Stack executable to the PATH for subsequent steps:
+        Add-Content $env:GITHUB_PATH "C:\Users\runneradmin\AppData\Roaming\local\bin"
     - name: Run tests
       shell: bash
       run: |
         set -ex
+
+        # Stack 2.9.3 is required to build Stack
+        stack upgrade
 
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then

@@ -49,7 +49,7 @@ ghc-options:
 - -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
 dependencies:
 - base >= 4.14.3.0 && < 5
-- Cabal >= 3.6.3.0
+- Cabal >= 3.8.1.0
 - aeson >= 2.0.3.0
 - annotated-wl-pprint
 - ansi-terminal

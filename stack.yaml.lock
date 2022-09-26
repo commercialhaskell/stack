@@ -39,6 +39,20 @@ packages:
       size: 628
   original:
     hackage: rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
+- completed:
+    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
+    pantry-tree:
+      sha256: 0df207f33a2167f23ab8192b3c1e5722b60836bcdde18a0b5b24fb85b41c05ef
+      size: 8955
+  original:
+    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
+- completed:
+    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
+    pantry-tree:
+      sha256: 0471cade235bb93e1fd32630f6d5fa69735a879d2712f47067c51bed0c46d536
+      size: 11052
+  original:
+    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
 snapshots:
 - completed:
     sha256: a2cbcd2f37010a64c4ef74c21fd7e55982a07b49840d2bed306f9bac9981a9c3
