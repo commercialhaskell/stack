@@ -14,6 +14,10 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix ambiguous module name `Distribution.PackageDescription`, if compiling
+  `StackSetupShim` with `Cabal-syntax-3.8.1.0` in package database. See
+  [#5886](https://github.com/commercialhaskell/stack/pull/5886).
+
 ## v2.9.1
 
 **Changes since v2.7.5:**
