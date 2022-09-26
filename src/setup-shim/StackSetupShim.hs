@@ -1,6 +1,7 @@
+{-# LANGUAGE PackageImports #-}
 module StackSetupShim where
 import Main
-import Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
+import "Cabal" Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
 import Distribution.Simple
 import Distribution.Simple.Build
 import Distribution.Simple.Setup (ReplFlags, fromFlag, replDistPref, replVerbosity)
