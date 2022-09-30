@@ -410,10 +410,6 @@ executables, which depends on the operating system:
     PATH. That can be done by searching for 'Edit Environment variables for your
     account' under Start.
 
-If you don't have that directory in your PATH, you may need to update your PATH.
-On Unix-like operating systems, that can be done by editing the `~/.bashrc`
-file.
-
 ## China-based users
 
 If you're attempting to install Stack from within China:

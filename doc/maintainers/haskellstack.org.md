@@ -7,6 +7,9 @@ Stack project, using [Read the Docs](https://readthedocs.org/) with
 [MkDocs](https://www.mkdocs.org/) and the Material for MkDocs
 [theme](https://squidfunk.github.io/mkdocs-material/).
 
+The domain https://get.haskellstack.org provides URLs that redirect to URLs
+used to install the Stack executable.
+
 ## Read the Docs
 
 The Read the Docs project is named
@@ -135,9 +138,34 @@ Other extensions to the basic Markdown syntax used include:
         versions of Stack. The `material-cloud-download-outline` icon
         (:material-cloud-download-outline:) is used to signify a download link.
 
-## Testing
+## Testing online documentation
 
 Online documentation can be tested by establishing a branch on the repository
 that is then configured on the Read the Docs web site as 'Active' but
 'Hidden' - for example branch `mkdocs-test`. As the branch is 'Hidden' it does
 not appear in the Read the Docs flyout or search results.
+
+## get.haskellstack.org redirects
+
+The https://get.haskellstack.org redirects are implemented with
+[CloudFlare Pages](https://developers.cloudflare.com/pages/platform/redirects/)
+and a `_redirects` file in the root of the
+`commercialhaskell/get-haskellstack-org` GitHub
+[repository](https://github.com/commercialhaskell/get-haskellstack-org).
+
+Each redirect is defined as a line in the file with format:
+
+~~~text
+[source] [destination]
+~~~
+
+'Splats' are used in redirects. On matching, a splat (asterisk, `*`) will greedily match all characters and the matched value can be used in the redirect location with `:splat`.
+
+For example, for Stack 2.9.1:
+
+~~~text
+/stable/* https://github.com/commercialhaskell/stack/releases/download/v2.9.1/stack-2.9.1-:splat
+/upgrade/linux-x86_64-static.tar.gz https://github.com/commercialhaskell/stack/releases/download/v2.9.1/stack-2.9.1-linux-x86_64.tar.gz
+/upgrade/* https://github.com/commercialhaskell/stack/releases/download/v2.9.1/stack-2.9.1-:splat
+/ https://raw.githubusercontent.com/commercialhaskell/stack/stable/etc/scripts/get-stack.sh
+~~~
