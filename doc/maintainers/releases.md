@@ -440,20 +440,32 @@ final release.
 
     Ensure that the `stable` documentation has updated.
 
-    ### F: Update get.haskellstack.org
+    ### F: Update get.haskellstack.org redirects
 
-    Update
-    [get.haskellstack.org /stable and /upgrade rewrite rules](https://gitlab.com/fpco/operations/kube/fpcomplete-sites-project/-/blob/master/fpcomplete-redirects/get-haskellstack_virtualservice.yaml)
-    with the new version.
+    Update the https://get.haskellstack.org redirects by updating the
+    `_redirects` file in the root of the
+    `commercialhaskell/get-haskellstack-org` GitHub
+    [repository](https://github.com/commercialhaskell/get-haskellstack-org).
 
-    Sync the application in
-    [ArgoCD](https://v5.fpcomplete.com/argocd/applications/fpcomplete-redirects).
+    For further information, see the
+    [get.haskellstack.org redirects](haskellstack.org.md#gethaskellstackorg-redirects)
+    documentation.
 
-    Test with the command:
+    Test with the commands:
 
-    ~~~text
-    curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
-    ~~~
+    === "Unix-like"
+
+        ~~~text
+        curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >/dev/null
+        curl -vL https://get.haskellstack.org/upgrade/linux-x86_64.tar.gz >/dev/null
+        ~~~
+
+    === "Windows (with PowerShell)"
+
+        ~~~text
+        curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >NUL
+        curl -vL https://get.haskellstack.org/upgrade/linux-x86_64.tar.gz >NUL
+        ~~~
 
     and make sure it redirects to the new version.
 
