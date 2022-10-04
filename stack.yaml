@@ -6,6 +6,7 @@ packages:
 
 extra-deps:
 - pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
+- fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

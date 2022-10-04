@@ -24,7 +24,14 @@ packages:
       sha256: f161e8a2d20f5c2ab4f9003c69d438e8408f934f3cf4c80cb1f097a05b0f6282
       size: 2524
   original:
-    hackage: pantry-0.7.0
+    hackage: pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
+- completed:
+    hackage: fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
+    pantry-tree:
+      sha256: f8e89e81fe0ca6e285036e04b165119ccfc59e7e668c1bfc28927f39062c5949
+      size: 1280
+  original:
+    hackage: fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
 snapshots:
 - completed:
     sha256: 1c049df0b264500e22262aa42a6f0a81cddd639cfd04f55c4acb0359f282dab2

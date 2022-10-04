@@ -3,7 +3,8 @@
 {-# LANGUAGE TupleSections     #-}
 
 module Stack.FileWatch
-    ( fileWatch
+    ( WatchMode (WatchModePoll)
+    , fileWatch
     , fileWatchPoll
     ) where
 
@@ -27,7 +28,8 @@ fileWatchPoll
   :: (HasLogFunc env, HasTerm env)
   => ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
-fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
+fileWatchPoll =
+  fileWatchConf $ defaultConfig { confWatchMode = WatchModePoll 1000000 }
 
 -- | Run an action, watching for file changes
 --
