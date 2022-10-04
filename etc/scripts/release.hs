@@ -1,13 +1,15 @@
 {- stack script
     --resolver nightly-2022-09-05
     --extra-dep Cabal-3.6.3.0
+    --extra-dep directory-1.3.6.2
     --ghc-options -Wall
 -}
 
 -- The GitHub workflow `integration-tests.yml` works on all operating systems
--- other than Windows without the `--extra-dep Cabal-3.6.3.0` above. However, on
--- Windows, if it is omitted, then `stack release.hs` somehow calls on
--- Cabal-3.8.1.0, which causes an error.
+-- other than Windows without the `--extra-dep Cabal-3.6.3.0` and
+-- `--extra-dep directory-1.3.6.2` above. However, on Windows, if they are
+-- omitted, then `stack release.hs` somehow calls on Cabal-3.8.1.0 and
+-- directory-1.3.8.0, which causes an error.
 
 {-# LANGUAGE RecordWildCards #-}
 
