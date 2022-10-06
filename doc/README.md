@@ -105,13 +105,15 @@ stack exec my-project-exe
 - The `stack exec my-project-exe` command will run (execute) the built
   executable, in Stack's environment.
 
-For a complete list of Stack's commands and options, simply command:
+For a complete list of Stack's commands, and flags and options common to those
+commands, simply command:
 
 ~~~text
 stack
 ~~~
 
-For help on a particular Stack command, for example `stack build`, command:
+For help on a particular Stack command, including flags and options specific to
+that command, for example `stack build`, command:
 
 ~~~text
 stack build --help
