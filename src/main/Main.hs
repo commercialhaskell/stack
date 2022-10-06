@@ -163,7 +163,8 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
   hpackVersion
   "stack - The Haskell Tool Stack"
   ""
-  "stack's documentation is available at https://docs.haskellstack.org/"
+  "Stack's documentation is available at https://docs.haskellstack.org/. \
+  \Command 'stack COMMAND --help' for help about a Stack command."
   (globalOpts OuterGlobalOpts)
   (Just failureCallback)
   addCommands
@@ -446,8 +447,6 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                 then Just LevelError
                 else Nothing)
         where hide = kind /= OuterGlobalOpts
-
-    globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before

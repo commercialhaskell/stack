@@ -121,6 +121,7 @@ module Stack.Constants
     ,testGhcEnvRelFile
     ,relFileBuildLock
     ,stackDeveloperModeDefault
+    ,globalFooter
     )
     where
 
@@ -562,3 +563,8 @@ relFileBuildLock = $(mkRelFile "build-lock")
 -- | What should the default be for stack-developer-mode
 stackDeveloperModeDefault :: Bool
 stackDeveloperModeDefault = STACK_DEVELOPER_MODE_DEFAULT
+
+-- | The footer to the help for Stack's subcommands
+globalFooter :: String
+globalFooter =
+  "Command 'stack --help' for global options that apply to all subcommands."

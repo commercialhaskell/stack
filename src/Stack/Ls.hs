@@ -29,7 +29,7 @@ import RIO.PrettyPrint (useColorL)
 import RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import RIO.PrettyPrint.Types (StyleSpec)
 import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
-import Stack.Constants (osIsWindows)
+import Stack.Constants (osIsWindows, globalFooter)
 import Stack.Dot
 import Stack.Runners
 import Stack.Options.DotParser (listDepsOptsParser)
@@ -138,10 +138,10 @@ lsSnapCmd = OA.command "snapshots" $
     <> OA.footer localSnapshotMsg
 
 lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
-lsDepsCmd =
-    OA.command
-        "dependencies"
-        (OA.info lsDepOptsParser (OA.progDesc "View the dependencies"))
+lsDepsCmd = OA.command "dependencies" $
+    OA.info lsDepOptsParser $
+         OA.progDesc "View the dependencies"
+      <> OA.footer globalFooter
 
 lsStylesCmd :: OA.Mod OA.CommandFields LsCmds
 lsStylesCmd =
