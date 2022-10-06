@@ -1397,6 +1397,9 @@ system-ghc: true
 
 ### templates
 
+Command line equivalent (takes precedence): `stack new --param <key>:<value>`
+(or `-p`) option
+
 Templates used with `stack new` have a number of parameters that affect the
 generated code. These can be set for all new projects you create. The result of
 them can be observed in the generated LICENSE and Cabal files. The value for all
@@ -1455,7 +1458,6 @@ templates:
 ### urls
 
 Default:
-
 
 ~~~yaml
 urls:
