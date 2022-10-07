@@ -80,6 +80,12 @@ jobs:
         EOF
         fi
 
+        # In case GHCup hooks have been created, remove them
+        if [ -d $(stack path --stack-root)/hooks ]
+        then
+            rm -Rf $(stack path --stack-root)/hooks
+        fi
+
         # Do this in the same step as installing deps to get relevant env var modifications
         stack etc/scripts/release.hs check ${{ matrix.release-args }}
 
