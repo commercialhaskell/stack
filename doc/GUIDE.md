@@ -78,11 +78,14 @@ package name first:
 > of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
 > each of these words should contain at least one letter.
 
-(From the [Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
+(From the
+[Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
 
 We'll call our project `helloworld`, and we'll use the `new-template` project
 template. This template is used by default, but in our example we will refer to
-it expressly. Other templates are available, see the `stack templates` command.
+it expressly. Other templates are available. For further information about
+templates, see the `stack templates` command
+[documentation](GUIDE_advanced.md#the-stack-templates-command).
 
 From the root directory for all our Haskell projects, we command:
 
@@ -94,6 +97,24 @@ For this first Stack command, there's quite a bit of initial setup it needs to
 do (such as downloading the list of packages available upstream), so you'll see
 a lot of output. Over the course of this guide a lot of the content will begin
 to make more sense.
+
+After creating the project directory, and obtaining and populating the project
+template, Stack will initialise its own project-level configuration. For further
+information about setting paramaters to populate templates, see the YAML
+configuration [documentation](yaml_configuration.md#templates). For further
+information about initialisation, see the `stack init` command
+[documentation](#the-stack-init-command). The `stack new` and `stack init`
+commands have options and flags in common.
+
+!!! info
+
+    Pass the `--bare` flag to cause Stack to create the project in the current
+    working directory rather than in a new project directory.
+
+!!! info
+
+    Parameters to populate project templates can be set at the command line with
+    the `--param <key>:<value>` (or `-p`) option.
 
 We now have a project in the `helloworld` directory! We will change to that
 directory, with command:
@@ -1749,7 +1770,10 @@ Cabal (the tool), and NixOS. In that sense, we're sharing the same ecosystem.
 
 There are lots of resources available for learning more about Stack:
 
-* `stack --help`
+* `stack` or `stack --help` — lists Stack's commands, and flags and options
+  common to those commands
+* `stack <command> --help` — provides help on the particular Stack command,
+  including flags and options specific to the command
 * `stack --version` — identify the version and Git hash of the Stack executable
 * `--verbose` (or `-v`) — much more info about internal operations (useful for
   bug reports)

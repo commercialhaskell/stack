@@ -11,6 +11,18 @@ operating system, please submit an
 [issue](https://github.com/commercialhaskell/stack/issues/new) at Stack's
 GitHub repository.
 
+!!! info
+
+    In addition to the methods described below, Stack can also be installed
+    using the separate [GHCup](https://www.haskell.org/ghcup/) installer for
+    Haskell-related tools. GHCup provides Stack for some combinations of machine
+    architecture and operating system not provided elsewhere. Unlike Stack,
+    other build tools do not automatically install GHC. GHCup can be used to
+    install GHC for those other tools. By default, the script to install GHCup
+    (which can be run more than once) also configures Stack so that if Stack
+    needs a version of GHC, GHCup takes over obtaining and installing that
+    version.
+
 !!! info "Releases on GitHub"
 
     Stack executables are also available on the
@@ -371,14 +383,6 @@ GitHub repository.
 
     * Now you can run Stack from the command line in a terminal.
 
-!!! info
-
-    Stack can also be installed using the separate
-    [GHCup](https://www.haskell.org/ghcup/) installer for Haskell-related tools.
-    Unlike Stack, other build tools do not automatically install GHC. GHCup can
-    be used to install GHC for those other tools and Stack can be configured to
-    use the version of GHC that GHCup has installed.
-
 ## Path
 
 You can install Stack by copying the executable file anywhere on your PATH. A
@@ -409,6 +413,11 @@ executables, which depends on the operating system:
     If you don't have that directory in your PATH, you may need to update your
     PATH. That can be done by searching for 'Edit Environment variables for your
     account' under Start.
+
+!!! note
+
+    If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, GHCup
+    puts executable files in the `bin` directory in the GHCup root directory.
 
 ## China-based users
 
@@ -484,6 +493,12 @@ example:
 
 There are different approaches to upgrading Stack, which vary as between
 Unix-like operating systems (including macOS) and Windows.
+
+!!! note
+
+    If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
+    should also use GHCup to upgrade Stack. Stack's `upgrade` command will
+    likely install Stack to a different directory to the one used by GHCup.
 
 === "Unix-like"
 
