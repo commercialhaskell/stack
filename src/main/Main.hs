@@ -258,10 +258,14 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     "Update the package index"
                     updateCmd
                     (pure ())
-        addCommand' "upgrade"
-                    "Upgrade to the latest Stack"
-                    upgradeCmd
-                    upgradeOpts
+        addCommand'' "upgrade"
+                     "Upgrade Stack, installing to Stack's local-bin directory \
+                     \and, if different and permitted, the directory of the \
+                     \current Stack executable"
+                     upgradeCmd
+                     "Warning: if you use GHCup to install Stack, use only \
+                     \GHCup to upgrade Stack."
+                     upgradeOpts
         addCommand'
             "upload"
             "Upload a package to Hackage"
@@ -419,6 +423,17 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     -> AddCommand
         addCommand' cmd title constr =
             addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
+
+        -- addCommand with custom footer hiding global options
+        addCommand'' :: String
+                     -> String
+                     -> (a -> RIO Runner ())
+                     -> String
+                     -> Parser a
+                     -> AddCommand
+        addCommand'' cmd title constr cmdFooter =
+            addCommand cmd title (globalFooter <> " " <> cmdFooter) constr
+                       (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
 
         addSubCommands' :: String -> String -> AddCommand
                         -> AddCommand

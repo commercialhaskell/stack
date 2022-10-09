@@ -12,6 +12,11 @@ Behavior changes:
 
 Other enhancements:
 
+* Help documentation for `stack upgrade` warns that if GHCup is used to install
+  Stack, only GHCup should be used to upgrade Stack. That is because GHCup uses
+  an executable named `stack` to manage versions of Stack, that Stack will
+  likely overwrite on upgrade.
+
 Bug fixes:
 
 * Fix ambiguous module name `Distribution.PackageDescription`, if compiling
