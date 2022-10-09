@@ -497,8 +497,9 @@ Unix-like operating systems (including macOS) and Windows.
 !!! note
 
     If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
-    should also use GHCup to upgrade Stack. Stack's `upgrade` command will
-    likely install Stack to a different directory to the one used by GHCup.
+    should also use GHCup to upgrade Stack. GHCup uses an executable named
+    `stack` to manage versions of Stack, through a file `stack.shim`. Stack will
+    likely overwrite the executable on upgrade.
 
 === "Unix-like"
 
