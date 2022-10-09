@@ -54,12 +54,24 @@ directory. This will cause Stack to reinstall the alternative version, when it
 first needs GHC 9.0.2. Stack should distinguish what it builds with the
 alternative from what it has built, and cached, with the original GHC 9.0.2.)
 
+### GHCup and Stack >= 2.9.1
+
+From Stack 2.9.1, GHCup can configure Stack so that if Stack needs a version of
+GHC, GHCup takes over obtaining and installing that version. By default, the
+script to install GHCup (which can be run more than once) configures Stack in
+that way. For further information about how GHCup configures Stack, see the GHC
+installation customisation
+[documentation](yaml_configuration.md#ghc-installation-customisation).
+
 ### Workaround #1
 
-One workaround is to allow GHCup to install versions of GHC on the PATH and to
-cause Stack to use those versions of GHC, by making use of Stack's `install-ghc`
-option (which needs to be disabled) and Stack's `system-ghc` option (which needs
-to be enabled) (see [YAML configuration](yaml_configuration.md)).
+If GHCup does not configure Stack in the way described above, one workaround is
+to allow GHCup to install versions of GHC on the PATH and to cause Stack to use
+those versions of GHC, by making use of Stack's `install-ghc` option (which
+needs to be disabled) and Stack's `system-ghc` option (which needs to be
+enabled). For further information about these options, see the `install-ghc`
+[documentation](yaml_configuration.md#install-ghc) and the `system-ghc`
+[documentation](yaml_configuration.md#system-ghc).
 
 For this workaround to work, each time that a resolver is used that references a
 different version of GHC, then GHCup must be used to install it (if GHCup has
@@ -69,27 +81,20 @@ install GHC 9.0.2. That may be a minor inconvenience for some people, as one the
 primary benefits of Stack over other Haskell build tools has been that Stack
 automatically ensures that the necessary version of GHC is available.
 
-It is hoped that the next release of Stack will include a new feature that will
-allow the VS Code extension/GHCup to customise Stack, so that Stack can
-automatically obtain versions of GHC using GHCup and switch between GHC versions
-that GHCup has obtained. It is hoped a future release of the extension/GHCup
-will take advantage of that new feature. See
-[Stack #5585](https://github.com/commercialhaskell/stack/pull/5585) and
-[GHCup #392](https://gitlab.haskell.org/haskell/ghcup-hs/-/issues/392).
-
 ### Workaround #2
 
-Another partial workaround is to install GHCup so that it is 'empty' except for
-the current version of HLS, allow the VS Code extension to use GHCup to manage
-HLS requirements only, and to ignore any messages (if any) from the extension on
-start-up that installation of GHC, Cabal (the tool) and/or Stack are also
-necessary (they are not, if only Stack is being used).
+If GHCup does not configure Stack, another partial workaround is to install
+GHCup so that it is 'empty' except for the current version of HLS, allow the
+VS Code extension to use GHCup to manage HLS requirements only, and to ignore
+any messages (if any) from the extension on start-up that installation of GHC,
+Cabal (the tool) and/or Stack are also necessary (they are not, if only Stack is
+being used).
 
 For this workaround to work, however, there can be no differences between the
 version of GHC that the GHCup-supplied HLS was built with and the version that
-Stack has installed. A slight inconvenience here is also the possibility of false
-messages from the start-up that need to be ignored. In principle, those messages
-can be disabled by
+Stack has installed. A slight inconvenience here is also the possibility of
+false messages from the start-up that need to be ignored. In principle, those
+messages can be disabled by
 [setting the following](https://github.com/haskell/vscode-haskell#setting-a-specific-toolchain)
 for the VS Code extension:
 

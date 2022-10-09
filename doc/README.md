@@ -23,10 +23,20 @@ Stack features:
 Stack can be installed on most Unix-like operating systems (including macOS) and
 Windows.
 
+!!! info
+
+    In addition to the methods described below, Stack can also be installed
+    using the separate [GHCup](https://www.haskell.org/ghcup/) installer for
+    Haskell-related tools. GHCup provides Stack for some combinations of machine
+    architecture and operating system not provided elsewhere. By default, the
+    script to install GHCup (which can be run more than once) also configures
+    Stack so that if Stack needs a version of GHC, GHCup takes over obtaining
+    and installing that version.
+
 === "Unix-like"
 
-    For most Unix-like operating systems, the easiest way to install Stack is to
-    command:
+    For most Unix-like operating systems, the easiest way to install Stack
+    directly is to command:
 
     ~~~text
     curl -sSL https://get.haskellstack.org/ | sh
@@ -49,7 +59,8 @@ Windows.
 
 === "Windows"
 
-    On 64-bit Windows, you can download and install the
+    On 64-bit Windows, the easiest way to install Stack directly is to download
+    and install the
     [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
     !!! note
@@ -62,11 +73,6 @@ Windows.
     For other operating systems and direct downloads, see the
     [install and upgrade guide](install_and_upgrade.md).
 
-!!! info
-
-    Stack can also be installed using the separate
-    [GHCup](https://www.haskell.org/ghcup/) installer for Haskell-related tools.
-
 ## How to upgrade Stack
 
 If Stack is already installed, you can upgrade it to the latest version by the
@@ -75,6 +81,11 @@ command:
 ~~~text
 stack upgrade
 ~~~
+
+!!! note
+
+    If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
+    should also use GHCup, and not Stack, to upgrade Stack.
 
 ## Quick Start guide
 

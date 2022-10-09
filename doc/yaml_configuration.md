@@ -1,11 +1,16 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# YAML configuration
+# Configuration and customisation
 
-Stack is configured by the content of YAML files. Stack's YAML configuration
-options break down into [project-specific](#project-specific-configuration)
-options and [non-project-specific](#non-project-specific-configuration) options.
-They are configured at the project-level or globally.
+Stack is configured by the content of YAML files. Some Stack operations can also
+be customised by the use of scripts.
+
+## YAML configuration
+
+Stack's YAML configuration options break down into
+[project-specific](#project-specific-configuration) options and
+[non-project-specific](#non-project-specific-configuration) options. They are
+configured at the project-level or globally.
 
 The **project-level** configuration file (`stack.yaml`) contains
 project-specific options and may contain non-project-specific options.
@@ -1501,9 +1506,9 @@ Environment variable alternative (lowest precedence): `STACK_WORK`
 `work-dir` (or the contents of `STACK_WORK`) specifies the relative path of
 Stack's 'work' directory.
 
-## Customisation
+## Customisation scripts
 
-### GHC installation customisation (experimental)
+### GHC installation customisation
 
 [:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
 
@@ -1522,6 +1527,24 @@ The script is not run when `system-ghc: true`.
 When `install-ghc: false`, the script is still run, which allows you to ensure
 that only your script will install GHC and Stack won't default to its own
 installation logic, even when the script fails.
+
+The following environment variables are always available to the script:
+
+* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
+
+For "bindist", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+
+For "git", additional variables are:
+
+* `HOOK_GHC_COMMIT = <commit>`
+* `HOOK_GHC_FLAVOR = <flavor>`
+
+For "ghcjs", additional variables are:
+
+* `HOOK_GHC_VERSION = <ver>`
+* `HOOK_GHCJS_VERSION = <ver>`
 
 An example script is:
 
@@ -1548,20 +1571,28 @@ esac
 echo "location/to/ghc/executable"
 ~~~
 
-The following environment variables are always available to the script:
+If the following script is installed by GHCup, GHCup makes use of it, so that if
+Stack needs a version of GHC, GHCup takes over obtaining and installing that
+version:
 
-* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
+~~~sh
+#!/bin/sh
 
-For "bindist", additional variables are:
+set -eu
 
-* `HOOK_GHC_VERSION = <ver>`
-
-For "git", additional variables are:
-
-* `HOOK_GHC_COMMIT = <commit>`
-* `HOOK_GHC_FLAVOR = <flavor>`
-
-For "ghcjs", additional variables are:
-
-* `HOOK_GHC_VERSION = <ver>`
-* `HOOK_GHCJS_VERSION = <ver>`
+case $HOOK_GHC_TYPE in
+    bindist)
+        ghcdir=$(ghcup whereis --directory ghc "$HOOK_GHC_VERSION" || ghcup run --ghc "$HOOK_GHC_VERSION" --install) || exit 3
+        printf "%s/ghc" "${ghcdir}"
+        ;;
+    git)
+        # TODO: should be somewhat possible
+        >&2 echo "Hook doesn't support installing from source"
+        exit 1
+        ;;
+    *)
+        >&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
+        exit 2
+        ;;
+esac
+~~~
