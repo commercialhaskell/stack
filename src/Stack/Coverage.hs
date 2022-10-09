@@ -190,11 +190,11 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                             "Error: The " <>
                             RIO.display report <>
                             " did not consider any code. One possible cause of this is" <>
-                            " if your test-suite builds the library code (see stack " <>
+                            " if your test-suite builds the library code (see Stack " <>
                             (if html then "<a href='https://github.com/commercialhaskell/stack/issues/1008'>" else "") <>
                             "issue #1008" <>
                             (if html then "</a>" else "") <>
-                            "). It may also indicate a bug in stack or" <>
+                            "). It may also indicate a bug in Stack or" <>
                             " the hpc program. Please report this issue if you think" <>
                             " your coverage report should have meaningful results."
                     logError (msg False)

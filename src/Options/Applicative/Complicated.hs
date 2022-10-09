@@ -31,7 +31,7 @@ complicatedOptions
   -> Maybe String
   -- ^ version string
   -> String
-  -- ^ hpack numeric version, as string
+  -- ^ Hpack numeric version, as string
   -> String
   -- ^ header
   -> String
@@ -74,7 +74,7 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerS
           infoOption
             numericHpackVersion
             (long "hpack-numeric-version" <>
-             help "Show only hpack's version number")
+             help "Show only Hpack's version number")
 
 -- | Add a command to the options dispatcher.
 addCommand :: String   -- ^ command string

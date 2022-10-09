@@ -155,7 +155,7 @@ spec = beforeAll setup $ do
         liftIO $ configOverrideHpack config `shouldBe`
         HpackCommand "/usr/local/bin/hpack"
 
-    it "parses config bundled hpack" $ inTempDir $ do
+    it "parses config bundled Hpack" $ inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       loadConfig' $ \config ->
         liftIO $ configOverrideHpack config `shouldBe` HpackBundled

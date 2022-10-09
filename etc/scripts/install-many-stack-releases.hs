@@ -11,7 +11,7 @@
 
 -- # Usage summary
 --
--- This is a hacky script to install many stack releases to a target
+-- This is a hacky script to install many Stack releases to a target
 -- directory. By default it installs all releases `>= 1.0` (this can be
 -- changed by adjusting `minVersion` in the code). To use this on
 -- standard 64 bit linux systems, do the following:
@@ -19,7 +19,7 @@
 --     ./install-many-stack-releases.hs ~/.local/bin
 --
 -- It will then populate this folder with binaries like `stack-1.6.3`,
--- by downloading and unpacking stack releases to a temporary directory.
+-- by downloading and unpacking Stack releases to a temporary directory.
 -- It will only download releases that do not already have binaries in
 -- the target directory.
 --
@@ -66,7 +66,7 @@ main = do
       exists <- doesDirectoryExist dir
       unless exists $ fail $ unwords [show dir, "is not a directory or does not exist."]
       pure dir
-    _ -> fail "Expected the first CLI argument to be the target directory to place stack binaries."
+    _ -> fail "Expected the first CLI argument to be the target directory to place Stack binaries."
   -- Parse platform from CLI args, with default.
   platform <- case tail args of
     [] -> do
@@ -96,10 +96,10 @@ main = do
   -- Don't download super old versions
   let (newerVersions, olderVersions) =
         partition (>= minVersion) (mapMaybe readVersion releasesWithoutPrefix)
-  putStrLn "The following releases look like stack releases that are older than minVersion:"
+  putStrLn "The following releases look like Stack releases that are older than minVersion:"
   print (map showVersion olderVersions)
   putStrLn ""
-  putStrLn "The following releases look like recent enough stack releases:"
+  putStrLn "The following releases look like recent enough Stack releases:"
   print (map showVersion newerVersions)
   putStrLn ""
   -- Check which releases already exist.

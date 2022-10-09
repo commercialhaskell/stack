@@ -20,6 +20,6 @@ cleanOptsParser Clean = CleanShallow <$> packages <|> doFullClean
         flag'
             CleanFull
             (long "full" <>
-             help "Delete the project’s stack working directories (.stack-work by default).")
+             help "Delete the project’s Stack working directories (.stack-work by default).")
 
 cleanOptsParser Purge = pure CleanFull

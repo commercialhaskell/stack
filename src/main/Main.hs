@@ -6,7 +6,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Main stack tool entry point.
+-- | Main Stack tool entry point.
 
 module Main (main) where
 
@@ -217,7 +217,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                          (buildOptsParser Haddock)
         addCommand' "new"
          (unwords [ "Create a new project from a template."
-                  , "Run `stack templates' to see available templates. Will"
+                  , "Run 'stack templates' to see available templates. Will"
                   , "also initialise if there is no stack.yaml file."
                   , "Note: you can also specify a local file or a"
                   , "remote URL as a template; or force an initialisation."
@@ -225,15 +225,15 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     newCmd
                     newOptsParser
         addCommand' "templates"
-         (unwords [ "Show how to find templates available for `stack new'."
-                  , "`stack new' can accept a template from a remote repository"
+         (unwords [ "Show how to find templates available for 'stack new'."
+                  , "'stack new' can accept a template from a remote repository"
                   , "(default: github), local file or remote URL."
                   , "Note: this downloads the help file."
                   ] )
                     templatesCmd
                     (pure ())
         addCommand' "init"
-                    "Create stack project config from cabal or hpack package specifications"
+                    "Create Stack project configuration from Cabal or Hpack package specifications"
                     initCmd
                     initOptsParser
         addCommand' "setup"
@@ -245,7 +245,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     Stack.Path.path
                     Stack.Path.pathParser
         addCommand' "ls"
-                    "List command. (Supports snapshots, dependencies, stack's styles and installed tools)"
+                    "List command. (Supports snapshots, dependencies, Stack's styles and installed tools)"
                     lsCmd
                     lsParser
         addCommand' "unpack"
@@ -259,7 +259,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     updateCmd
                     (pure ())
         addCommand' "upgrade"
-                    "Upgrade to the latest stack"
+                    "Upgrade to the latest Stack"
                     upgradeCmd
                     upgradeOpts
         addCommand'
@@ -282,11 +282,11 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     (execOptsParser $ Just ExecGhc)
         addCommand' "hoogle"
                     ("Run hoogle, the Haskell API search engine. Use the '-- ARGUMENT(S)' syntax " ++
-                     "to pass Hoogle arguments, e.g. stack hoogle -- --count=20, or " ++
-                     "stack hoogle -- server --local.")
+                     "to pass Hoogle arguments, e.g. 'stack hoogle -- --count=20', or " ++
+                     "'stack hoogle -- server --local'.")
                     hoogleCmd
                     ((,,,) <$> many (strArgument
-                                 (metavar "-- ARGUMENT(S) (e.g. stack hoogle -- server --local)"))
+                                 (metavar "-- ARGUMENT(S) (e.g. 'stack hoogle -- server --local')"))
                           <*> boolFlags
                                   True
                                   "setup"
@@ -346,7 +346,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     cleanCmd
                     (cleanOptsParser Clean)
         addCommand' "purge"
-                    "Delete the project stack working directories (.stack-work by default). Shortcut for 'stack clean --full'"
+                    "Delete the project Stack working directories (.stack-work by default). Shortcut for 'stack clean --full'"
                     cleanCmd
                     (cleanOptsParser Purge)
         addCommand' "query"
@@ -378,7 +378,7 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
                     ((,) <$> outputFlag <*> cabalFileFlag)
                 addCommand'
                     "targets"
-                    "List all available stack targets"
+                    "List all available Stack targets"
                     ideTargetsCmd
                     outputFlag)
         addSubCommands'
@@ -552,7 +552,7 @@ cleanCmd = withConfig NoReexec . clean
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
   when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
-    logError "Error: When building with stack, you should not use the -prof GHC option"
+    logError "Error: When building with Stack, you should not use the -prof GHC option"
     logError "Instead, please use --library-profiling and --executable-profiling"
     logError "See: https://github.com/commercialhaskell/stack/issues/1015"
     exitFailure
@@ -850,7 +850,7 @@ initCmd initOpts = do
     go <- view globalOptsL
     withGlobalProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
--- | Create a project directory structure and initialize the stack config.
+-- | Create a project directory structure and initialize the Stack config.
 newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
 newCmd (newOpts, initOpts) =
     withGlobalProject $ withConfig YesReexec $ do

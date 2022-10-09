@@ -150,7 +150,7 @@ haskellDefaultPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 stackProgNameUpper :: String
 stackProgNameUpper = map toUpper stackProgName
 
--- | The filename used for the stack config file.
+-- | The filename used for the Stack project-level configuration file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
 
@@ -162,11 +162,11 @@ stackWorkEnvVar = "STACK_WORK"
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
 
--- | Option name for the global stack root.
+-- | Option name for the global Stack root.
 stackRootOptionName :: String
 stackRootOptionName = "stack-root"
 
--- | Deprecated option name for the global stack root.
+-- | Deprecated option name for the global Stack root.
 --
 -- Deprecated since stack-1.1.0.
 --
@@ -175,11 +175,11 @@ stackRootOptionName = "stack-root"
 deprecatedStackRootOptionName :: String
 deprecatedStackRootOptionName = "global-stack-root"
 
--- | Environment variable used to indicate stack is running in container.
+-- | Environment variable used to indicate Stack is running in container.
 inContainerEnvVar :: String
 inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
--- | Environment variable used to indicate stack is running in container.
+-- | Environment variable used to indicate Stack is running in container.
 -- although we already have STACK_IN_NIX_EXTRA_ARGS that is set in the same conditions,
 -- it can happen that STACK_IN_NIX_EXTRA_ARGS is set to empty.
 inNixShellEnvVar :: String

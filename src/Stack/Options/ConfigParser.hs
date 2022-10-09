@@ -54,7 +54,7 @@ configOptsParser currentDir hide0 =
     <$> optionalFirst (absDirOption
             ( long stackRootOptionName
             <> metavar (map toUpper stackRootOptionName)
-            <> help ("Absolute path to the global stack root directory " ++
+            <> help ("Absolute path to the global Stack root directory " ++
                      "(Overrides any STACK_ROOT environment variable)")
             <> hide
             ))
@@ -75,7 +75,8 @@ configOptsParser currentDir hide0 =
             hide
     <*> firstBoolFlagsTrue
             "install-ghc"
-            "downloading and installing GHC if necessary (can be done manually with stack setup)"
+            "downloading and installing GHC if necessary (can be done manually \
+            \with 'stack setup')"
             hide
     <*> optionalFirst (strOption
             ( long "arch"
@@ -142,7 +143,7 @@ configOptsParser currentDir hide0 =
     <*> many (
         strOption
             ( long "setup-info-yaml"
-           <> help "Alternate URL or relative / absolute path for stack dependencies"
+           <> help "Alternate URL or relative / absolute path for Stack dependencies"
            <> metavar "URL" ))
     <*> firstBoolFlagsTrue
             "modify-code-page"
@@ -150,14 +151,15 @@ configOptsParser currentDir hide0 =
             hide
     <*> firstBoolFlagsNoDefault
             "allow-different-user"
-            ("permission for users other than the owner of the stack root " ++
-                "directory to use a stack installation (POSIX only) " ++
+            ("permission for users other than the owner of the Stack root " ++
+                "directory to use a Stack installation (POSIX only) " ++
                 "(default: true inside Docker, otherwise false)")
             hide
     <*> fmap toDumpLogs
             (firstBoolFlagsNoDefault
              "dump-logs"
-             "dump the build output logs for local packages to the console (default: dump warning logs)"
+             "dump the build output logs for local packages to the console \
+             \(default: dump warning logs)"
              hide)
     <*> optionalFirst (option readColorWhen
              ( long "color"

@@ -580,8 +580,10 @@ installGhcBindist sopts getSetupInfo' installed = do
                         (mconcat
                              [ "To install the correct GHC into "
                              , T.pack (toFilePath (configLocalPrograms config))
-                             , ", try running \"stack setup\" or use the \"--install-ghc\" flag."
-                             , " To use your system GHC installation, run \"stack config set system-ghc --global true\", or use the \"--system-ghc\" flag."
+                             , ", try running 'stack setup' or use the '--install-ghc' flag."
+                             , " To use your system GHC installation, run \
+                               \'stack config set system-ghc --global true', \
+                               \or use the '--system-ghc' flag."
                              ])
                         (soptsResolveMissingGHC sopts)
                 throwM $ CompilerVersionMismatch
@@ -1435,7 +1437,8 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
                       "run in " <> pretty wd
                       )
                     <> line <> line <>
-                    "The following directories may now contain files, but won't be used by stack:"
+                    "The following directories may now contain files, but \
+                    \won't be used by Stack:"
                     <> line <>
                     "  -" <+> pretty tempDir
                     <> line <>
@@ -2046,7 +2049,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
     warnInstallSearchPathIssues destDir' ["stack"]
 
-    logInfo $ "New stack executable available at " <> fromString (toFilePath destFile)
+    logInfo $ "New Stack executable available at " <> fromString (toFilePath destFile)
 
     when checkPath $ performPathChecking destFile currExe
       `catchAny` (logError . displayShow)
@@ -2114,7 +2117,7 @@ performPathChecking
 performPathChecking newFile executablePath = do
   executablePath' <- parseAbsFile executablePath
   unless (toFilePath newFile == executablePath) $ do
-    logInfo $ "Also copying stack executable to " <> fromString executablePath
+    logInfo $ "Also copying Stack executable to " <> fromString executablePath
     tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
     eres <- tryIO $ do
       liftIO $ copyFile newFile tmpFile

@@ -68,7 +68,9 @@ instance Exception ExecuteException
 
 instance Show ExecuteException where
     show InconsistentDependencies =
-        "Inconsistent dependencies were discovered while executing your build plan. This should never happen, please report it as a bug to the stack team."
+        "Inconsistent dependencies were discovered while executing your build \
+        \plan. This should never happen, please report it as a bug to the \
+        \Stack team."
 
 runActions :: Int -- ^ threads
            -> Bool -- ^ keep going after one task has failed

@@ -764,7 +764,7 @@ checkForIssues pkgs = do
             logWarn ""
             mapM_ (logWarn . RIO.display) $ L.intercalate [""] cabalFlagIssues
             logWarn ""
-            logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+            logWarn "To resolve, remove the flag(s) from the Cabal file(s) and instead put them at the top of the haskell files."
             logWarn ""
         logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
         logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
@@ -878,7 +878,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       [ flow "Some targets"
       , parens $ fillSep $ punctuate "," $ map (style Good . fromString . packageNameString) nonLocalTargets
       , flow "are not local packages, and so cannot be directly loaded."
-      , flow "In future versions of stack, this might be supported - see"
+      , flow "In future versions of Stack, this might be supported - see"
       , style Url "https://github.com/commercialhaskell/stack/issues/1441"
       , "."
       , flow "It can still be useful to specify these, as they will be passed to ghci via -package flags."

@@ -315,7 +315,7 @@ data Config =
          ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
-         -- ^ Require a version of stack within this range.
+         -- ^ Require a version of Stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
          ,configOverrideGccPath     :: !(Maybe (Path Abs File))
@@ -358,7 +358,7 @@ data Config =
          -- ^ The default template to use when none is specified.
          -- (If Nothing, the 'default' default template is used.)
          ,configAllowDifferentUser  :: !Bool
-         -- ^ Allow users other than the stack root owner to use the stack
+         -- ^ Allow users other than the Stack root owner to use the Stack
          -- installation.
          ,configDumpLogs            :: !DumpLogs
          -- ^ Dump logs of local non-dependencies when doing a build.
@@ -511,7 +511,7 @@ data EvalOpts = EvalOpts
 data GlobalOpts = GlobalOpts
     { globalReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
     , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
-      -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
+      -- ^ Data used when Stack is acting as a Docker entrypoint (internal use only)
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
     , globalRSLInLog     :: !Bool -- ^ Whether to include raw snapshot layer (RSL) in logs.
@@ -592,7 +592,7 @@ data ProjectConfig a
 data GlobalOptsMonoid = GlobalOptsMonoid
     { globalMonoidReExecVersion :: !(First String) -- ^ Expected re-exec in container version
     , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
-      -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
+      -- ^ Data used when Stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
     , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
     , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snapshot layer (RSL) in logs.
@@ -862,7 +862,7 @@ data ConfigMonoid =
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the 'default' default template is used.)
     , configMonoidAllowDifferentUser :: !(First Bool)
-    -- ^ Allow users other than the stack root owner to use the stack
+    -- ^ Allow users other than the Stack root owner to use the Stack
     -- installation.
     , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
@@ -1229,13 +1229,13 @@ instance Show ConfigException where
         , T.unpack url, " downloaded to the file ", toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
-        [ "The version of stack you are using ("
+        [ "The version of Stack you are using ("
         , show (mkVersion' Meta.version)
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ").\n"
-        , "You can upgrade stack by running:\n\n"
+        , "You can upgrade Stack by running:\n\n"
         , "stack upgrade"
         ]
     show (NoMatchingSnapshot names) = concat
@@ -1265,12 +1265,12 @@ instance Show ConfigException where
     show (ParseGHCVariantException v) =
         "Invalid ghc-variant value: " ++ v
     show (BadStackRoot stackRoot) = concat
-        [ "Invalid stack root: '"
+        [ "Invalid Stack root: '"
         , toFilePath stackRoot
         , "'. Please provide a valid absolute path."
         ]
     show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
-        [ "Preventing creation of stack root '"
+        [ "Preventing creation of Stack root '"
         , toFilePath envStackRoot
         , "'. Parent directory '"
         , toFilePath parentDir
@@ -1285,14 +1285,14 @@ instance Show ConfigException where
         , "' to disable this precaution."
         ]
     show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
-        [ "stack can only control the "
+        [ "Stack can only control the "
         , configMonoidGHCVariantName
         , " of its own GHC installations. Please use '--no-"
         , configMonoidSystemGHCName
         , "'."
         ]
     show NixRequiresSystemGhc = T.unpack $ T.concat
-        [ "stack's Nix integration is incompatible with '--no-system-ghc'. "
+        [ "Stack's Nix integration is incompatible with '--no-system-ghc'. "
         , "Please use '--"
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
@@ -1443,7 +1443,7 @@ platformGhcVerOnlyRelDirStr = do
                      , platformVariantSuffix platformVariant
                      , ghcVariantSuffix ghcVariant ]
 
--- | This is an attempt to shorten stack paths on Windows to decrease our
+-- | This is an attempt to shorten Stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate
 -- SHA1 hash of the path used on other architectures, encode with base
 -- 16 and take first 8 symbols of it.
@@ -2044,12 +2044,12 @@ data CompilerPaths = CompilerPaths
   -- | Is this a Stack-sandboxed installation?
   , cpSandboxed :: !Bool
   , cpCabalVersion :: !Version
-  -- ^ This is the version of Cabal that stack will use to compile Setup.hs files
+  -- ^ This is the version of Cabal that Stack will use to compile Setup.hs files
   -- in the build process.
   --
-  -- Note that this is not necessarily the same version as the one that stack
+  -- Note that this is not necessarily the same version as the one that Stack
   -- depends on as a library and which is displayed when running
-  -- @stack ls dependencies | grep Cabal@ in the stack project.
+  -- @stack ls dependencies | grep Cabal@ in the Stack project.
   , cpGlobalDB :: !(Path Abs Dir)
   -- ^ Global package database
   , cpGhcInfo :: !ByteString

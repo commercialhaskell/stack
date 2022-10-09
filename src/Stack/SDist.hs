@@ -97,7 +97,7 @@ getSDistTarball
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
   -> RIO env (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
-  -- ^ Filename, tarball contents, and option cabal file revision to upload
+  -- ^ Filename, tarball contents, and option Cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
     config <- view configL
     let PvpBounds pvpBounds asRevision = fromMaybe (configPvpBounds config) mpvpBounds
@@ -148,13 +148,13 @@ getSDistTarball mpvpBounds pkgDir = do
         packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) =<< tarPath isDir fp
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
-            -- This is a cabal file, we're going to tweak it, but only
+            -- This is a Cabal file, we're going to tweak it, but only
             -- tweak it as a revision.
             | tweakCabal && isCabalFp fp && asRevision = do
                 lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp sourceMap
                 liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
                 packWith packFileEntry False fp
-            -- Same, except we'll include the cabal file in the
+            -- Same, except we'll include the Cabal file in the
             -- original tarball upload.
             | tweakCabal && isCabalFp fp = do
                 (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp sourceMap
@@ -170,11 +170,11 @@ getSDistTarball mpvpBounds pkgDir = do
     mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
     pure (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)), mcabalFileRevision)
 
--- | Get the PVP bounds-enabled version of the given cabal file
+-- | Get the PVP bounds-enabled version of the given Cabal file
 getCabalLbs :: HasEnvConfig env
             => PvpBoundsType
             -> Maybe Int -- ^ optional revision
-            -> Path Abs File -- ^ cabal file
+            -> Path Abs File -- ^ Cabal file
             -> SourceMap
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp sourceMap = do
@@ -210,7 +210,8 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     -- https://github.com/haskell/cabal/issues/2353
     -- https://github.com/haskell/cabal/issues/4863 (current issue)
     let roundtripErrs =
-          [ flow "Bug detected in Cabal library. ((parse . render . parse) === id) does not hold for the cabal file at"
+          [ flow "Bug detected in Cabal library. ((parse . render . parse) === \
+                 \id) does not hold for the Cabal file at"
           <+> pretty cabalfp
           , ""
           ]
@@ -224,12 +225,15 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
         | roundtripped == gpd -> pure ()
         | otherwise -> do
             prettyWarn $ vsep $ roundtripErrs ++
-              [ "This seems to be fixed in development versions of Cabal, but at time of writing, the fix is not in any released versions."
+              [ "This seems to be fixed in development versions of Cabal, but \
+                \at time of writing, the fix is not in any released versions."
               , ""
               ,  "Please see this GitHub issue for status:" <+> style Url "https://github.com/commercialhaskell/stack/issues/3549"
               , ""
               , fillSep
-                [ flow "If the issue is closed as resolved, then you may be able to fix this by upgrading to a newer version of stack via"
+                [ flow "If the issue is closed as resolved, then you may be \
+                       \able to fix this by upgrading to a newer version of \
+                       \Stack via"
                 , style Shell "stack upgrade"
                 , flow "for latest stable version or"
                 , style Shell "stack upgrade --git"
@@ -237,16 +241,23 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
                 ]
               , ""
               , fillSep
-                [ flow "If the issue is fixed, but updating doesn't solve the problem, please check if there are similar open issues, and if not, report a new issue to the stack issue tracker, at"
+                [ flow "If the issue is fixed, but updating doesn't solve the \
+                       \problem, please check if there are similar open \
+                       \issues, and if not, report a new issue to the Stack \
+                       \issue tracker, at"
                 , style Url "https://github.com/commercialhaskell/stack/issues/new"
                 ]
               , ""
-              , flow "If the issue is not fixed, feel free to leave a comment on it indicating that you would like it to be fixed."
+              , flow "If the issue is not fixed, feel free to leave a comment \
+                     \on it indicating that you would like it to be fixed."
               , ""
               ]
       Left (_version, errs) -> do
         prettyWarn $ vsep $ roundtripErrs ++
-          [ flow "In particular, parsing the rendered cabal file is yielding a parse error.  Please check if there are already issues tracking this, and if not, please report new issues to the stack and cabal issue trackers, via"
+          [ flow "In particular, parsing the rendered Cabal file is yielding a \
+                 \parse error. Please check if there are already issues \
+                 \tracking this, and if not, please report new issues to the \
+                 \Stack and Cabal issue trackers, via"
           , bulletedList
             [ style Url "https://github.com/commercialhaskell/stack/issues/new"
             , style Url "https://github.com/haskell/cabal/issues/new"
@@ -323,7 +334,8 @@ readLocalPackage pkgDir = do
         , lpUnbuildable = Set.empty
         }
 
--- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
+-- | Returns a newline-separate list of paths, and the absolute path to the
+-- Cabal file.
 getSDistFileList :: HasEnvConfig env => LocalPackage -> Map PackageIdentifier GhcPkgId -> RIO env (String, Path Abs File)
 getSDistFileList lp deps =
     withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do

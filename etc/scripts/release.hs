@@ -52,7 +52,8 @@ main =
         \flags args -> do
             -- build the default value of type Global, with predefined constants
 
-            -- 'stack build --dry-run' just ensures that 'stack.cabal' is generated from hpack
+            -- 'stack build --dry-run' just ensures that 'stack.cabal' is
+            -- generated from 'package.yaml'
             _ <- readProcess "stack" ["build", "--dry-run"] ""
             gStackPackageDescription <-
                 packageDescription <$> readGenericPackageDescription silent "stack.cabal"
@@ -350,7 +351,7 @@ dropDirectoryPrefix prefix path =
         Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
         Just stripped -> stripped
 
--- | String representation of stack package version.
+-- | String representation of Stack package version.
 stackVersionStr :: Global -> String
 stackVersionStr =
     display . pkgVersion . package . gStackPackageDescription

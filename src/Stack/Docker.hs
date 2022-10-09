@@ -464,7 +464,7 @@ entrypoint config@Config{} DockerEntrypoint{..} =
         Left _ -> pure ()
         Right ue -> do
           -- If the 'stack' user exists in the image, copy any build plans and package indices from
-          -- its original home directory to the host's stack root, to avoid needing to download them
+          -- its original home directory to the host's Stack root, to avoid needing to download them
           origStackHomeDir <- liftIO $ parseAbsDir (User.homeDirectory ue)
           let origStackRoot = origStackHomeDir </> relDirDotStackProgName
           buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)

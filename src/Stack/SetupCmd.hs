@@ -90,8 +90,8 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
             WCGhcGit{} -> "GHC (built from source)"
             WCGhcjs {} -> "GHCJS"
     if sandboxedGhc
-        then logInfo $ "stack will use a sandboxed " <> compiler <> " it installed"
-        else logInfo $ "stack will use the " <> compiler <> " on your PATH"
-    logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
+        then logInfo $ "Stack will use a sandboxed " <> compiler <> " it installed."
+        else logInfo $ "Stack will use the " <> compiler <> " on your PATH."
+    logInfo "For more information on paths, see 'stack path' and 'stack exec env'."
     logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
-    logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+    logInfo "'stack ghc', 'stack ghci', 'stack runghc', or 'stack exec'."

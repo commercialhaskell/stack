@@ -149,7 +149,7 @@ data UseHaddocks a = UseHaddocks a | WithoutHaddocks a
 -- removed, see #506
 paths :: [(String, Text, UseHaddocks (PathInfo -> Text))]
 paths =
-    [ ( "Global stack root directory"
+    [ ( "Global Stack root directory"
       , T.pack stackRootOptionName
       , WithoutHaddocks $ view (stackRootL.to toFilePathNoTrailingSep.to T.pack))
     , ( "Project root (derived from stack.yaml file)"
@@ -173,7 +173,7 @@ paths =
     , ( "Directory containing binaries specific to a particular compiler (e.g. intero)"
       , "compiler-tools-bin"
       , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piToolsDir )
-    , ( "Local bin dir where stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
+    , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
       , "local-bin"
       , WithoutHaddocks $ view $ configL.to configLocalBin.to toFilePathNoTrailingSep.to T.pack)
     , ( "Extra include directories"

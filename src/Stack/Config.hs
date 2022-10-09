@@ -186,7 +186,7 @@ getLatestResolver = do
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
     :: HasRunner env
-    => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+    => Path Abs Dir -- ^ Stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Maybe AbstractResolver
     -> ProjectConfig (Project, Path Abs File)
@@ -576,11 +576,11 @@ withBuildConfig inner = do
                    liftIO $ do
                        writeBinaryFileAtomic dest $ byteString $ S.concat
                            [ "# This is the implicit global project's config file, which is only used when\n"
-                           , "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n"
-                           , "# defaults for all projects.  To change stack's default settings, edit\n"
+                           , "# 'stack' is run outside of a real project. Settings here do _not_ act as\n"
+                           , "# defaults for all projects. To change Stack's default settings, edit\n"
                            , "# '", encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config), "' instead.\n"
                            , "#\n"
-                           , "# For more information about stack's configuration, see\n"
+                           , "# For more information about Stack's configuration, see\n"
                            , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
                            , "#\n"
                            , Yaml.encode p]
@@ -738,7 +738,7 @@ checkDuplicateNames locals =
     hasMultiples _ = False
 
 
--- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
+-- | Get the Stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
 -- On Windows, the second value is always 'True'.
 determineStackRootAndOwnership
@@ -921,7 +921,7 @@ loadProjectConfig mstackYaml = do
         ProjectAndConfigMonoid project config <- liftIO iopc
         pure (project, fp, config)
 
--- | Get the location of the default stack configuration file.
+-- | Get the location of the default Stack configuration file.
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
 getDefaultGlobalConfigPath
@@ -964,12 +964,12 @@ packagesParser = many (strOption
 
 defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
-  "# This file contains default non-project-specific settings for 'stack', used\n" <>
-  "# in all projects.  For more information about stack's configuration, see\n" <>
+  "# This file contains default non-project-specific settings for Stack, used\n" <>
+  "# in all projects. For more information about Stack's configuration, see\n" <>
   "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n" <>
   "\n" <>
-  "# The following parameters are used by \"stack new\" to automatically fill fields\n" <>
-  "# in the cabal config. We recommend uncommenting them and filling them out if\n" <>
+  "# The following parameters are used by 'stack new' to automatically fill fields\n" <>
+  "# in the Cabal file. We recommend uncommenting them and filling them out if\n" <>
   "# you intend to use 'stack new'.\n" <>
   "# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates\n" <>
   "templates:\n" <>
@@ -979,9 +979,9 @@ defaultConfigYaml =
   "#    copyright:\n" <>
   "#    github-username:\n" <>
   "\n" <>
-  "# The following parameter specifies stack's output styles; STYLES is a\n" <>
+  "# The following parameter specifies Stack's output styles; STYLES is a\n" <>
   "# colon-delimited sequence of key=value, where 'key' is a style name and\n" <>
   "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n" <>
-  "# Rendition) control codes (in decimal). Use \"stack ls stack-colors --basic\"\n" <>
+  "# Rendition) control codes (in decimal). Use 'stack ls stack-colors --basic'\n" <>
   "# to see the current sequence.\n" <>
   "# stack-colors: STYLES\n"

@@ -433,7 +433,7 @@ instance Show NewException where
         unlines (map (("  " ++) . toFilePath) fps) <>
         "Use --force to ignore this, and overwrite these files."
     show (FailedToDownloadTemplatesHelp ex) =
-        "Failed to download `stack templates` help. The HTTP error was: " <> show ex
+        "Failed to download 'stack templates' help. The HTTP error was: " <> show ex
     show (BadTemplatesHelpEncoding url err) =
         "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
     show (Can'tUseWiredInName name) =

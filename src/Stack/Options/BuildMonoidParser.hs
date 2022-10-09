@@ -139,7 +139,8 @@ buildOptsMonoidParser hide0 =
     forceDirty =
         firstBoolFlagsFalse
             "force-dirty"
-            "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change"
+            "Force treating all local packages as having dirty files (useful \
+            \for cases where Stack can't detect a file change"
             hide
     tests =
         firstBoolFlagsFalse

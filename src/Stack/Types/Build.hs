@@ -321,7 +321,7 @@ missingExeError isSimpleBuildType msg =
         "No module named \"Main\". The 'main-is' source file should usually \
         \have a header indicating that it's a 'Main' module." :
 
-        "A cabal file that refers to nonexistent other files (e.g. a \
+        "A Cabal file that refers to nonexistent other files (e.g. a \
         \license-file that doesn't exist). Running 'cabal check' may point \
         \out these issues." :
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Parsing of stack command line arguments
+-- | Parsing of Stack command line arguments
 
 module Data.Attoparsec.Args
     ( EscapingMode(..)

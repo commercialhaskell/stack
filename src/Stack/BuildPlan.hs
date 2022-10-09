@@ -115,7 +115,7 @@ instance Show BuildPlanException where
                 , ["Note: further dependencies may need to be added"]
                 ]
           where
-            go (dep, users) | Set.null users = packageNameString dep ++ " (internal stack error: this should never be null)"
+            go (dep, users) | Set.null users = packageNameString dep ++ " (internal Stack error: this should never be null)"
             go (dep, users) = concat
                 [ packageNameString dep
                 , " (used by "

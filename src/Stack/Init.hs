@@ -299,16 +299,16 @@ renderStackYaml p ignoredPackages dupPackages =
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"
         , ""
-        , "Require a specific version of stack, using version ranges"
+        , "Require a specific version of Stack, using version ranges"
         , "require-stack-version: -any # Default"
         , "require-stack-version: \""
           ++ C.display (C.orLaterVersion major) ++ "\""
         , ""
-        , "Override the architecture used by stack, especially useful on Windows"
+        , "Override the architecture used by Stack, especially useful on Windows"
         , "arch: i386"
         , "arch: x86_64"
         , ""
-        , "Extra directories used by stack for building"
+        , "Extra directories used by Stack for building"
         , "extra-include-dirs: [/path/to/dir]"
         , "extra-lib-dirs: [/path/to/dir]"
         , ""
@@ -470,10 +470,10 @@ getRecommendedSnapshots snapshots =
     supportedLtss = filter (>= minSupportedLts) ltss
     nightly = Nightly (snapshotsNightly snapshots)
 
--- |Yields the minimum LTS supported by stack.
+-- |Yields the minimum LTS supported by Stack.
 minSupportedLts :: SnapName
 minSupportedLts = LTS 3 0 -- See https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md
-                          -- under stack version 2.1.1.
+                          -- under Stack version 2.1.1.
 
 data InitOpts = InitOpts
     { searchDirs     :: ![T.Text]
@@ -532,8 +532,8 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
       pure (cabalfp, gpd)
 
     -- package name cannot be empty or missing otherwise
-    -- it will result in cabal solver failure.
-    -- stack requires packages name to match the cabal file name
+    -- it will result in Cabal solver failure.
+    -- Stack requires packages name to match the Cabal file name
     -- Just the latter check is enough to cover both the cases
 
     let normalizeString = T.unpack . T.normalize T.NFC . T.pack
@@ -545,8 +545,8 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
 
     when (nameMismatchPkgs /= []) $ do
         rels <- mapM prettyPath nameMismatchPkgs
-        error $ "Package name as defined in the .cabal file must match the " <>
-                ".cabal file name.\n" <>
+        error $ "Package name as defined in the Cabal file must match the " <>
+                "Cabal file name.\n" <>
                 "Please fix the following packages and try again:\n"
                 <> T.unpack (utf8BuilderToText (formatGroup rels))
 
