@@ -44,7 +44,7 @@ globalOptsParser currentDir kind defLogLevel =
           long "stack-colours" <>
           metavar "STYLES" <>
           value mempty <>
-          help "Specify stack's output styles; STYLES is a colon-delimited \
+          help "Specify Stack's output styles; STYLES is a colon-delimited \
                \sequence of key=value, where 'key' is a style name and 'value' \
                \is a semicolon-delimited list of 'ANSI' SGR (Select Graphic \
                \Rendition) control codes (in decimal). Use 'stack ls \

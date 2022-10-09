@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {- |  This module implements parsing of additional arguments embedded in a
-      comment when stack is invoked as a script interpreter
+      comment when Stack is invoked as a script interpreter
 
   ===Specifying arguments in script interpreter mode
   @/stack/@ can execute a Haskell source file using @/runghc/@ and if required
@@ -66,7 +66,7 @@ import           Stack.Prelude
 import           System.FilePath (takeExtension)
 import           System.IO (hPutStrLn)
 
--- | Parser to extract the stack command line embedded inside a comment
+-- | Parser to extract the Stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
 interpreterArgsParser :: Bool -> String -> P.Parser String
@@ -106,7 +106,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
                             then literateLineComment <|> literateBlockComment
                             else lineComment <|> blockComment
 
--- | Extract stack arguments from a correctly placed and correctly formatted
+-- | Extract Stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
 getInterpreterArgs :: String -> IO [String]
 getInterpreterArgs file = do
@@ -132,15 +132,15 @@ getInterpreterArgs file = do
 
     handleFailure err = do
       mapM_ stackWarn (lines err)
-      stackWarn "Missing or unusable stack options specification"
-      stackWarn "Using runghc without any additional stack options"
+      stackWarn "Missing or unusable Stack options specification"
+      stackWarn "Using runghc without any additional Stack options"
       pure ["runghc"]
 
     parseArgStr str =
       case P.parseOnly (argsParser Escaping) (pack str) of
         Left err -> handleFailure ("Error parsing command specified in the "
-                        ++ "stack options comment: " ++ err)
-        Right [] -> handleFailure "Empty argument list in stack options comment"
+                        ++ "Stack options comment: " ++ err)
+        Right [] -> handleFailure "Empty argument list in Stack options comment"
         Right args -> pure args
 
     decodeError e =

@@ -54,7 +54,7 @@ data DockerOpts = DockerOpts
   ,dockerEnv :: ![String]
     -- ^ Environment variables to set in the container.
   ,dockerStackExe :: !(Maybe DockerStackExe)
-    -- ^ Location of container-compatible stack executable
+    -- ^ Location of container-compatible Stack executable
   ,dockerSetUser :: !(Maybe Bool)
    -- ^ Set in-container user to match host's
   ,dockerRequireDockerVersion :: !VersionRange
@@ -98,7 +98,7 @@ data DockerOptsMonoid = DockerOptsMonoid
   ,dockerMonoidEnv :: ![String]
     -- ^ Environment variables to set in the container
   ,dockerMonoidStackExe :: !(First DockerStackExe)
-    -- ^ Location of container-compatible stack executable
+    -- ^ Location of container-compatible Stack executable
   ,dockerMonoidSetUser :: !(First Bool)
    -- ^ Set in-container user to match host's
   ,dockerMonoidRequireDockerVersion :: !IntersectingVersionRange
@@ -405,7 +405,7 @@ dockerNetworkArgName = "network"
 dockerPersistArgName :: Text
 dockerPersistArgName = "persist"
 
--- | Docker stack executable argument name.
+-- | Docker Stack executable argument name.
 dockerStackExeArgName :: Text
 dockerStackExeArgName = "stack-exe"
 

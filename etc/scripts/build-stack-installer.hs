@@ -81,13 +81,13 @@ main = do
       ] $ do
         deleteEnvVar HKCU "STACK_ROOT"
 
-    section "un.Compilers installed by stack"
+    section "un.Compilers installed by Stack"
       [ Unselected
       , Description "Remove %LOCALAPPDATA%/Programs/stack, which contains compilers that have been installed by Stack."
       ] $ do
         rmdir [Recursive] "$LOCALAPPDATA/Programs/stack"
 
-    section "un.stack snapshots and configuration"
+    section "un.Stack snapshots and configuration"
       [ Unselected
       , Description "Remove %APPDATA%/stack, which contains the user-defined global stack.yaml and the snapshot/compilation cache."
       ] $ do

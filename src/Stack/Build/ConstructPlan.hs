@@ -743,7 +743,7 @@ addPackageDeps package = do
                                 y <- inSnapshot depname (adrVersion adr)
                                 if x && y
                                     then do
-                                        warn_ "trusting snapshot over cabal file dependency information"
+                                        warn_ "trusting snapshot over Cabal file dependency information"
                                         pure True
                                     else pure False
                 if inRange
@@ -1008,7 +1008,7 @@ data ConstructPlanException
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq, Show)
 
--- | The latest applicable version and it's latest cabal file revision.
+-- | The latest applicable version and it's latest Cabal file revision.
 -- For display purposes only, Nothing if package not found
 type LatestApplicableVersion = Maybe (Version, BlobKey)
 
@@ -1157,12 +1157,12 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
               align ((if range == Cabal.anyVersion
                         then flow "needed"
                         else flow "must match" <+> goodRange) <> "," <> softline <>
-                     flow "but the stack configuration has no specified version" <+>
+                     flow "but the Stack configuration has no specified version" <+>
                      latestApplicable Nothing)
         -- TODO: For local packages, suggest editing constraints
         DependencyMismatch version -> Just $
             (style Error . fromString . packageIdentifierString) (PackageIdentifier name version) <+>
-            align (flow "from stack configuration does not match" <+> goodRange <+>
+            align (flow "from Stack configuration does not match" <+> goodRange <+>
                    latestApplicable (Just version))
         -- I think the main useful info is these explain why missing
         -- packages are needed. Instead lets give the user the shortest
@@ -1180,7 +1180,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             case mlatestApplicable of
                 Nothing
                     | isNothing mversion ->
-                        flow "(no package with that name found, perhaps there is a typo in a package's build-depends or an omission from the stack.yaml packages list?)"
+                        flow "(no package with that name found, perhaps there \
+                             \is a typo in a package's build-depends or an \
+                             \omission from the stack.yaml packages list?)"
                     | otherwise -> ""
                 Just (laVer, _)
                     | Just laVer == mversion -> softline <>

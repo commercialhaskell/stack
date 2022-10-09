@@ -148,19 +148,19 @@ lsStylesCmd =
     OA.command
         "stack-colors"
         (OA.info lsStylesOptsParser
-                 (OA.progDesc "View stack's output styles"))
+                 (OA.progDesc "View Stack's output styles"))
     <>
     OA.command
         "stack-colours"
         (OA.info lsStylesOptsParser
-                 (OA.progDesc "View stack's output styles (alias for \
+                 (OA.progDesc "View Stack's output styles (alias for \
                               \'stack-colors')"))
 
 lsToolsCmd :: OA.Mod OA.CommandFields LsCmds
 lsToolsCmd =
     OA.command
         "tools"
-        (OA.info lsToolsOptsParser (OA.progDesc "View stack's installed tools"))
+        (OA.info lsToolsOptsParser (OA.progDesc "View Stack's installed tools"))
 
 data Snapshot = Snapshot
     { snapId :: Text
@@ -333,7 +333,7 @@ localSnapshotMsg :: String
 localSnapshotMsg =
   "A local snapshot is identified by a hash code. " <> pagerMsg
 
--- | List stack's output styles
+-- | List Stack's output styles
 listStylesCmd :: ListStylesOpts -> RIO Config ()
 listStylesCmd opts = do
     lc <- ask
@@ -359,7 +359,7 @@ listStylesCmd opts = do
         ansi = fromString $ setSGRCode sgrs
         reset = fromString $ setSGRCode [Reset]
 
--- | List stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
+-- | List Stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
 listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
     localPrograms <- view $ configL.to configLocalPrograms

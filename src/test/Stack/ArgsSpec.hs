@@ -120,7 +120,7 @@ interpreterArgsSpec =
         <|> shebang <++> ["\n"]
         -- invalid shebang
         <|> blockSpace <++> [head (interpreterGenValid lineComment args)]
-        -- something between shebang and stack comment
+        -- something between shebang and Stack comment
         <|> shebang
             <++> newLine
             <++> blockSpace

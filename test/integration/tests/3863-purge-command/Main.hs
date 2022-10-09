@@ -18,7 +18,7 @@ main =
   stackCheckStdout [defaultResolverArg, "path", "--dist-dir"] $ \(trimEnd -> distDir) -> do
     stackCheckStdout [defaultResolverArg, "path", "--local-install-root"] $ \(trimEnd -> localInstallRoot) -> do
       -- Usually `.stack-work`
-      let stackWork = fromMaybe (error "There must be a stack working directory.") $
+      let stackWork = fromMaybe (error "There must be a Stack working directory.") $
             listToMaybe (splitDirectories distDir)
 
       -- First, clean the .stack-work directory.
@@ -44,5 +44,5 @@ main =
 
       -- The .stack-work directory should not exist after a purge
       stackIgnoreException [defaultResolverArg, "purge"]
-      -- See #4936 for details regarding the windows condition 
+      -- See #4936 for details regarding the windows condition
       unless isWindows $ doesNotExist stackWork

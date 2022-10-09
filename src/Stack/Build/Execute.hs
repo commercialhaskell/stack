@@ -842,7 +842,7 @@ ensureConfig :: HasEnvConfig env
              -> ExecuteEnv
              -> RIO env () -- ^ announce
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
-             -> Path Abs File -- ^ .cabal file
+             -> Path Abs File -- ^ Cabal file
              -> Task
              -> RIO env Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task = do
@@ -943,7 +943,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           fixupOnWindows
           logWarn $ "Unable to run autoreconf: " <> displayShow ex
           when osIsWindows $ do
-            logInfo $ "Check that executable perl is on the path in stack's " <>
+            logInfo $ "Check that executable perl is on the path in Stack's " <>
               "MSYS2 \\usr\\bin folder, and working, and that script file " <>
               "autoreconf is on the path in that location. To check that " <>
               "perl or autoreconf are on the path in the required location, " <>
@@ -1615,7 +1615,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         pretty cabalfp <> ":" <> line <>
                         indent 4 (mconcat $ L.intersperse line $ map showModuleWarning warnings) <>
                         line <> line <>
-                        "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
+                        "Missing modules in the Cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
         () <- announce ("build" <> RIO.display (annSuffix executableBuildStatuses))
         config <- view configL

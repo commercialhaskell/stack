@@ -71,7 +71,7 @@ getInstalledExes loc = do
     pure $
         concat $
         M.elems $
-        -- If there are multiple install records (from a stack version
+        -- If there are multiple install records (from a Stack version
         -- before https://github.com/commercialhaskell/stack/issues/2373
         -- was fixed), then we don't know which is correct - ignore them.
         M.fromListWith (\_ _ -> []) $
@@ -138,7 +138,7 @@ tryGetConfigCache :: HasEnvConfig env
 tryGetConfigCache dir =
     loadConfigCache $ configCacheKey dir ConfigCacheTypeConfig
 
--- | Try to read the mod time of the cabal file from the last build
+-- | Try to read the mod time of the Cabal file from the last build
 tryGetCabalMod :: HasEnvConfig env
                => Path Abs Dir -> RIO env (Maybe CTime)
 tryGetCabalMod dir = do
@@ -390,8 +390,8 @@ readPrecompiledCache loc copts buildHaddocks depIDs = do
     maybe (pure Nothing) (fmap Just . mkAbs) mcache
   where
     -- Since commit ed9ccc08f327bad68dd2d09a1851ce0d055c0422,
-    -- pcLibrary paths are stored as relative to the stack
-    -- root. Therefore, we need to prepend the stack root when
+    -- pcLibrary paths are stored as relative to the Stack
+    -- root. Therefore, we need to prepend the Stack root when
     -- checking that the file exists. For the older cached paths, the
     -- file will contain an absolute path, which will make `stackRoot
     -- </>` a no-op.

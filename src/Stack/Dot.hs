@@ -60,7 +60,7 @@ data DotOpts = DotOpts
     , dotPrune :: !(Set PackageName)
     -- ^ Package names to prune from the graph
     , dotTargets :: [Text]
-    -- ^ stack TARGETs to trace dependencies for
+    -- ^ Stack TARGETs to trace dependencies for
     , dotFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
     -- ^ Flags to apply when calculating dependencies
     , dotTestTargets :: Bool

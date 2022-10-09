@@ -42,7 +42,7 @@ data PackageException
 instance Exception PackageException
 instance Show PackageException where
     show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
-        [ "Unable to parse cabal file "
+        [ "Unable to parse Cabal file "
         , case loc of
             Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
             Right fp -> toFilePath fp
@@ -154,7 +154,7 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 type InstallMap = Map PackageName (InstallLocation, Version)
 
 -- | Files that the package depends on, relative to package directory.
--- Argument is the location of the .cabal file
+-- Argument is the location of the Cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env. HasEnvConfig env
                      => InstallMap
@@ -187,7 +187,7 @@ data CabalFileType
     | Modules
 
 -- | Files that the package depends on, relative to package directory.
--- Argument is the location of the .cabal file
+-- Argument is the location of the Cabal file
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall env. HasEnvConfig env
                       => Path Abs File
@@ -203,13 +203,13 @@ instance Show GetPackageFiles where
 -- | Warning generated when reading a package
 data PackageWarning
     = UnlistedModulesWarning NamedComponent [ModuleName]
-      -- ^ Modules found that are not listed in cabal file
+      -- ^ Modules found that are not listed in Cabal file
 
     -- TODO: bring this back - see
     -- https://github.com/commercialhaskell/stack/issues/2649
     {-
     | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
-      -- ^ Modules not found in file system, which are listed in cabal file
+      -- ^ Modules not found in file system, which are listed in Cabal file
     -}
 
 -- | Package build configuration
@@ -276,7 +276,7 @@ data LocalPackage = LocalPackage
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.
     , lpCabalFile     :: !(Path Abs File)
-    -- ^ The .cabal file
+    -- ^ The Cabal file
     , lpBuildHaddocks :: !Bool
     , lpForceDirty    :: !Bool
     , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
@@ -359,7 +359,7 @@ instance FromJSON FileCacheInfo where
   parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
     <$> o .: "hash"
 
--- | A descriptor from a .cabal file indicating one of the following:
+-- | A descriptor from a Cabal file indicating one of the following:
 --
 -- exposed-modules: Foo
 -- other-modules: Foo
@@ -383,7 +383,7 @@ dotCabalMain :: DotCabalDescriptor -> Maybe FilePath
 dotCabalMain (DotCabalMain m) = Just m
 dotCabalMain _ = Nothing
 
--- | A path resolved from the .cabal file, which is either main-is or
+-- | A path resolved from the Cabal file, which is either main-is or
 -- an exposed/internal/referenced module.
 data DotCabalPath
     = DotCabalModulePath !(Path Abs File)

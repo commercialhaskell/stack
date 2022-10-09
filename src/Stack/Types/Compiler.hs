@@ -37,7 +37,7 @@ data WhichCompiler
 
 -- | Specifies a compiler and its version number(s).
 --
--- Note that despite having this datatype, stack isn't in a hurry to
+-- Note that despite having this datatype, Stack isn't in a hurry to
 -- support compilers other than GHC.
 data ActualCompiler
     = ACGhc !Version

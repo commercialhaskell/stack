@@ -105,7 +105,7 @@ instance HasBuildConfig Ctx where
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
--- derived from the package's .cabal file.
+-- derived from the package's Cabal file.
 --
 -- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
 readDotBuildinfo :: MonadIO m
@@ -114,8 +114,8 @@ readDotBuildinfo :: MonadIO m
 readDotBuildinfo buildinfofp =
     liftIO $ readHookedBuildInfo silent (toFilePath buildinfofp)
 
--- | Resolve a parsed cabal file into a 'Package', which contains all of
--- the info needed for stack to build the 'Package' given the current
+-- | Resolve a parsed Cabal file into a 'Package', which contains all of
+-- the info needed for Stack to build the 'Package' given the current
 -- configuration.
 resolvePackage :: PackageConfig
                -> GenericPackageDescription
@@ -695,7 +695,7 @@ packageDescModulesAndFiles pkg = do
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles
-  :: CabalSpecVersion -- ^ cabal file version
+  :: CabalSpecVersion -- ^ Cabal file version
   -> [String]
   -> RIO Ctx (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
@@ -1150,8 +1150,10 @@ data CabalFileNameParseFail
 
 instance Exception CabalFileNameParseFail
 instance Show CabalFileNameParseFail where
-    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
-    show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
+    show (CabalFileNameParseFail fp) =
+        "Invalid file path for Cabal file, must have a .cabal extension: " ++ fp
+    show (CabalFileNameInvalidPackageName fp) =
+        "Cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName

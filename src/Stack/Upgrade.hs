@@ -42,10 +42,10 @@ upgradeOpts = UpgradeOpts
              <> showDefault))
         <*> switch
          (long "force-download" <>
-          help "Download the latest available stack executable")
+          help "Download the latest available Stack executable")
         <*> optional (strOption
          (long "binary-version" <>
-          help "Download a specific stack version"))
+          help "Download a specific Stack version"))
         <*> optional (strOption
          (long "github-org" <>
           help "GitHub organization name"))
@@ -179,7 +179,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             x:_ -> pure x
         when (isNothing builtHash) $
             prettyWarnS $
-                       "Information about the commit this version of stack was "
+                       "Information about the commit this version of Stack was "
                     <> "built from is not available due to how it was built. "
                     <> "Will continue by assuming an upgrade is needed "
                     <> "because we have no information to the contrary."
@@ -191,7 +191,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 prettyInfoS "Cloning stack"
                 -- NOTE: "--recursive" was added after v1.0.0 (and before the
                 -- next release).  This means that we can't use submodules in
-                -- the stack repo until we're comfortable with "stack upgrade
+                -- the Stack repo until we're comfortable with "stack upgrade
                 -- --git" not working for earlier versions.
                 let args = [ "clone", repo , "stack", "--depth", "1", "--recursive", "--branch", branch]
                 withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
@@ -212,7 +212,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         mversion <- getLatestHackageVersion YesRequireHackageIndex "stack" UsePreferredVersions
         (PackageIdentifierRevision _ version _) <-
           case mversion of
-            Nothing -> throwString "No stack found in package indices"
+            Nothing -> throwString "No Stack version found in package indices"
             Just version -> pure version
 
         if version <= mkVersion' Paths.version

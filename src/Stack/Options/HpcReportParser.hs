@@ -31,7 +31,7 @@ pvpBoundsOption =
          metavar "PVP-BOUNDS" <>
          completeWith ["none", "lower", "upper", "both"] <>
          help
-             "How PVP version bounds should be added to .cabal file: none, lower, upper, both")
+             "How PVP version bounds should be added to Cabal file: none, lower, upper, both")
   where
     readPvpBounds = do
         s <- readerAsk

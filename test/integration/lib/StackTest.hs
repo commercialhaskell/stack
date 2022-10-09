@@ -237,7 +237,7 @@ fileContentsMatch f1 f2 = do
 logInfo :: String -> IO ()
 logInfo = hPutStrLn stderr
 
--- TODO: use stack's process running utilities?  (better logging)
+-- TODO: use Stack's process running utilities?  (better logging)
 -- for now just copy+modifying this one from System.Process.Log
 
 -- | Show a process arg including speechmarks when necessary. Just for
