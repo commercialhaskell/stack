@@ -497,28 +497,28 @@ Unix-like operating systems (including macOS) and Windows.
 !!! note
 
     If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
-    should also use GHCup to upgrade Stack. Stack's `upgrade` command will
-    likely install Stack to a different directory to the one used by GHCup.
+    should also use GHCup to upgrade Stack. GHCup uses an executable named
+    `stack` to manage versions of Stack, through a file `stack.shim`. Stack will
+    likely overwrite the executable on upgrade.
 
 === "Unix-like"
 
     There are essentially four different approaches:
 
-    1.  Stack itself ships with an `upgrade` command, which downloads a `stack`
-        executable or builds it from source and install it to the default
-        `install` directory (eg `stack path --local-bin`; see the
-        [Path](#Path) section above). You can use `stack upgrade` to get the
-        latest official release, and `stack upgrade --git` to install from
-        GitHub and live on the bleeding edge. Make sure the default `install`
-        directory is on your PATH and takes precedence over the system installed
-        `stack`, or copy `stack` from that directory to the system location
-        afterward. For more information, see
-        [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+    1.  The `stack upgrade` command, which downloads a Stack executable, or
+        builds it from source, and installs it to Stack's 'local-bin' directory
+        (see `stack path --local-bin`). If different and permitted, it also
+        installs a copy in the directory of the current Stack executable. (If
+        copying is not permitted, copy `stack` from Stack's 'local-bin'
+        directory to the system location afterward.) You can use `stack upgrade`
+        to get the latest official release, and `stack upgrade --git` to install
+        from GitHub and live on the bleeding edge. Make sure the location of the
+        Stack executable is on the PATH. See the [Path](#Path) section above.
 
     2.  If you're using a package manager and are happy with sticking with the
-        officially released binaries from the distribution (which may the lag behind
-        latest version of Stack significantly), simply follow your normal package
-        manager strategies for upgrading. For example:
+        officially released binaries from the distribution (which may the lag
+        behind the latest version of Stack significantly), simply follow your
+        normal package manager strategies for upgrading. For example:
 
         ~~~text
         apt-get update
@@ -545,16 +545,15 @@ Unix-like operating systems (including macOS) and Windows.
 
     There are essentially two different approaches:
 
-    1.  Stack itself ships with an `upgrade` command, which downloads a `stack`
-        executable or builds it from source and install it to the default
-        `install` directory (eg `stack path --local-bin`; see the
-        [Path](#Path) section above). You can use `stack upgrade` to get the
-        latest official release, and `stack upgrade --git` to install from
-        GitHub and live on the bleeding edge. Make sure the default `install`
-        directory is on your PATH and takes precedence over the system installed
-        `stack`, or copy `stack` from that directory to the system location
-        afterward. For more information, see
-        [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
+    1.  The `stack upgrade` command, which downloads a Stack executable, or
+        builds it from source, and installs it to Stack's 'local-bin' directory
+        (see `stack path --local-bin`). If different and permitted, it also
+        installs a copy in the directory of the current Stack executable. (If
+        copying is not permitted, copy `stack` from Stack's 'local-bin'
+        directory to the system location afterward.) You can use `stack upgrade`
+        to get the latest official release, and `stack upgrade --git` to install
+        from GitHub and live on the bleeding edge. Make sure the location of the
+        Stack executable is on the PATH. See the [Path](#Path) section above.
 
     2.  Manually follow the steps above to download the newest executable from
         the GitHub releases page and replace the old executable.
@@ -562,8 +561,8 @@ Unix-like operating systems (including macOS) and Windows.
 ## Install earlier versions
 
 To install a specific version of Stack, navigate to the desired version on the
-[GitHub release page](https://github.com/fpco/stack/releases), and click the
-appropriate link under its "Assets" drop-down menu.
+[GitHub release page](https://github.com/commercialhaskell/stack/releases), and
+click the appropriate link under its "Assets" drop-down menu.
 
 Alternatively, use the URL
 `https://github.com/commercialhaskell/stack/releases/download/vVERSION/stack-VERSION-PLATFORM.EXTENSION`.
