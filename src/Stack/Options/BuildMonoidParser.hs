@@ -16,15 +16,14 @@ import           Stack.Types.Config.Build
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 =
-    BuildOptsMonoid <$> trace' <*> profile <*> noStrip <*>
-    libProfiling <*> exeProfiling <*> libStripping <*>
-    exeStripping <*> haddock <*> haddockOptsParser hideBool <*>
-    openHaddocks <*> haddockDeps <*> haddockInternal <*>
-    haddockHyperlinkSource <*> copyBins <*> copyCompilerTool <*>
-    preFetch <*> keepGoing <*> keepTmpFiles <*> forceDirty <*>
-    tests <*> testOptsParser hideBool <*> benches <*>
-    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*> skipComponents <*>
-    interleavedOutput <*> ddumpDir
+    BuildOptsMonoid <$> trace' <*> profile <*> noStrip <*> libProfiling <*>
+    exeProfiling <*> libStripping <*> exeStripping <*> haddock <*>
+    haddockOptsParser hideBool <*> openHaddocks <*> haddockDeps <*>
+    haddockInternal <*> haddockHyperlinkSource <*> copyBins <*>
+    copyCompilerTool <*> preFetch <*> keepGoing <*> keepTmpFiles <*>
+    forceDirty <*> tests <*> testOptsParser hideBool <*> benches <*>
+    benchOptsParser hideBool <*> reconfigure <*> cabalVerbose <*> splitObjs <*>
+    skipComponents <*> interleavedOutput <*> ddumpDir
   where
     hideBool = hide0 /= BuildCmdGlobalOpts
     hide =
@@ -38,34 +37,33 @@ buildOptsMonoidParser hide0 =
         flag
             False
             True
-            (long "trace" <>
-             help
-                 "Enable profiling in libraries, executables, etc. \
-                     \for all expressions and generate a backtrace on \
-                     \exception" <>
-             hideExceptGhci)
+            (  long "trace"
+            <> help
+                   "Enable profiling in libraries, executables, etc. for all \
+                   \expressions and generate a backtrace on exception"
+            <> hideExceptGhci)
     profile = Any <$>
         flag
             False
             True
-            (long "profile" <>
-             help
-                 "profiling in libraries, executables, etc. \
-                     \for all expressions and generate a profiling report\
-                     \ in tests or benchmarks" <>
-             hideExceptGhci)
+            (  long "profile"
+            <> help
+                   "Enable profiling in libraries, executables, etc. for all \
+                   \expressions and generate a profiling report in tests or \
+                   \benchmarks"
+            <> hideExceptGhci)
     noStrip = Any <$>
         flag
              False
              True
-             (long "no-strip" <>
-              help
-                  "Disable DWARF debugging symbol stripping in libraries, \
-                      \executables, etc. for all expressions, producing \
-                      \larger executables but allowing the use of standard \
-                      \debuggers/profiling tools/other utilities that use \
-                      \debugging symbols." <>
-             hideExceptGhci)
+             (  long "no-strip"
+             <> help
+                    "Disable DWARF debugging symbol stripping in libraries, \
+                    \executables, etc. for all expressions, producing larger \
+                    \executables but allowing the use of standard \
+                    \debuggers/profiling tools/other utilities that use \
+                    \debugging symbols."
+             <> hideExceptGhci)
     libProfiling =
         firstBoolFlagsFalse
             "library-profiling"
@@ -99,17 +97,20 @@ buildOptsMonoidParser hide0 =
     haddockDeps =
         firstBoolFlagsNoDefault
             "haddock-deps"
-            "building Haddocks for dependencies (default: true if building Haddocks, false otherwise)"
+            "building Haddocks for dependencies (default: true if building \
+            \Haddocks, false otherwise)"
             hide
     haddockInternal =
         firstBoolFlagsFalse
             "haddock-internal"
-            "building Haddocks for internal modules (like cabal haddock --internal)"
+            "building Haddocks for internal modules (like cabal haddock \
+            \--internal)"
             hide
     haddockHyperlinkSource =
         firstBoolFlagsTrue
             "haddock-hyperlink-source"
-            "building hyperlinked source for Haddock (like haddock --hyperlinked-source)"
+            "building hyperlinked source for Haddock (like haddock \
+            \--hyperlinked-source)"
             hide
     copyBins =
         firstBoolFlagsFalse
@@ -119,12 +120,14 @@ buildOptsMonoidParser hide0 =
     copyCompilerTool =
         firstBoolFlagsFalse
             "copy-compiler-tool"
-            "copying binaries of targets to compiler-tools-bin (see 'stack path')"
+            "copying binaries of targets to compiler-tools-bin (see 'stack \
+            \path')"
             hide
     keepGoing =
         firstBoolFlagsNoDefault
             "keep-going"
-            "continue running after a step fails (default: false for build, true for test/bench)"
+            "continue running after a step fails (default: false for build, \
+            \true for test/bench)"
             hide
     keepTmpFiles =
         firstBoolFlagsFalse
@@ -134,13 +137,14 @@ buildOptsMonoidParser hide0 =
     preFetch =
         firstBoolFlagsFalse
             "prefetch"
-             "Fetch packages necessary for the build immediately, useful with --dry-run"
+             "fetching packages necessary for the build immediately, useful \
+             \with --dry-run"
              hide
     forceDirty =
         firstBoolFlagsFalse
             "force-dirty"
-            "Force treating all local packages as having dirty files (useful \
-            \for cases where Stack can't detect a file change"
+            "forcing the treatment of all local packages as having dirty \
+            \files, useful for cases where Stack can't detect a file change"
             hide
     tests =
         firstBoolFlagsFalse
@@ -155,32 +159,35 @@ buildOptsMonoidParser hide0 =
     reconfigure =
         firstBoolFlagsFalse
              "reconfigure"
-             "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files"
+             "performing the configure step, even if unnecessary. Useful in \
+             \some corner cases with custom Setup.hs files"
             hide
     cabalVerbose = cabalVerbosityOptsParser hideBool
     splitObjs =
         firstBoolFlagsFalse
             "split-objs"
-            ("Enable split-objs, to reduce output size (at the cost of build time). " ++ splitObjsWarning)
+            (  "split-objs, to reduce output size (at the cost of build time). "
+            ++ splitObjsWarning)
             hide
     skipComponents = many
         (fmap
             T.pack
             (strOption
-                (long "skip" <>
-                 help "Skip given component (can be specified multiple times)" <>
-                 hide)))
+                (  long "skip"
+                <> help "Skip given component (can be specified multiple times)"
+                <> hide)))
     interleavedOutput =
         firstBoolFlagsTrue
             "interleaved-output"
-            "Print concurrent GHC output to the console with a prefix for the package name"
+            "printing concurrent GHC output to the console with a prefix for \
+            \the package name"
             hide
     ddumpDir =
         optionalFirst
             (strOption
-                (long "ddump-dir" <>
-                 help "Specify output ddump-files" <>
-                 hide))
+                (  long "ddump-dir"
+                <> help "Specify output ddump-files"
+                <> hide))
 
 -- | Parser for Cabal verbosity options
 cabalVerbosityOptsParser :: Bool -> Parser (First CabalVerbosity)
@@ -202,6 +209,6 @@ cabalVerboseParser :: Bool -> Parser (First CabalVerbosity)
 cabalVerboseParser hide =
   let pVerboseFlag = firstBoolFlagsFalse
                        "cabal-verbose"
-                       "Ask Cabal to be verbose in its output"
+                       "asking Cabal to be verbose in its output"
                        (hideMods hide)
   in  toFirstCabalVerbosity <$> pVerboseFlag
