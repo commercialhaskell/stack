@@ -366,10 +366,10 @@ configFromConfigMonoid
                & useColorL .~ useColor''
          go = runnerGlobalOpts configRunner'
 
-     hsc <-
+     pic <-
        case getFirst configMonoidPackageIndices of
-         Nothing -> pure defaultHackageSecurityConfig
-         Just [hsc] -> pure hsc
+         Nothing -> pure defaultPackageIndexConfig
+         Just [pic] -> pure pic
          Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
      mpantryRoot <- liftIO $ lookupEnv "PANTRY_ROOT"
      pantryRoot <-
@@ -405,7 +405,7 @@ configFromConfigMonoid
        let configRunner = configRunner'' & logFuncL .~ logFunc
        withLocalLogFunc logFunc $ withPantryConfig
          pantryRoot
-         hsc
+         pic
          (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
          clConnectionCount
          (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)

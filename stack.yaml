@@ -4,6 +4,9 @@ resolver: nightly-2022-09-05
 packages:
 - .
 
+extra-deps:
+- pantry-0.6.0@sha256:c87056df8151441911bece5c09d11738110284dc1eacb292686aa33c4308c8c2,4099
+
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install

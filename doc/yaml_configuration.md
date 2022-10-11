@@ -962,7 +962,6 @@ package-indices:
     - aa315286e6ad281ad61182235533c41e806e5a787e0b6d1e7eef3f09d137d2e9
     - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
     key-threshold: 3
-
     ignore-expiry: true
 ~~~
 
@@ -996,6 +995,9 @@ In the case of Hackage, the keys of its root key holders are contained in the
 package index is signed. A signature is valid when three key holders have
 signed. The Hackage timestamp is also signed. A signature is valid when one key
 holder has signed.
+
+If the `hackage-security` key is absent, the Hackage Security configuration will
+default to that for the official Hackage server.
 
 `key-threshold` specifies the minimum number of keyholders that must have signed
 the package index for it to be considered valid.

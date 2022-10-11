@@ -10,6 +10,11 @@ Major changes:
 
 Behavior changes:
 
+* In YAML configuration files, the `hackage-security` key of the
+  `package-indices` item can be omitted, and the Hackage Security configuration
+  for the item will default to that for the official Hackage server.
+  See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
+
 Other enhancements:
 
 * Help documentation for `stack upgrade` warns that if GHCup is used to install
