@@ -166,7 +166,16 @@ someFunc
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where
 to find `helloworld-exe` even though it is hidden in the `.stack-work`
-directory.
+directory. Command `stack path --bin-path` to see the PATH in the Stack
+environment.
+
+!!! info
+
+    On Windows, the Stack environment includes the `\mingw64\bin`, `\usr\bin`
+    and `\usr\local\bin` directories of the Stack-supplied MSYS2. If your
+    executable depends on files (for example, dynamic-link libraries) in those
+    directories and you want ro run it outside of the Stack environment, you
+    will need to ensure copies of those files are on the PATH.
 
 ### The `stack test` command
 
