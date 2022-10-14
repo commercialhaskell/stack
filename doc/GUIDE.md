@@ -133,8 +133,7 @@ stack build
 ~~~
 
 Stack needs a version of GHC in order to build your project. Stack will discover
-that you are missing it and will install it for you. You can do this manually by
-using the `stack setup` command.
+that you are missing it and will install it for you.
 
 You'll get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
@@ -288,38 +287,29 @@ at the [Hpack documentation](https://github.com/sol/hpack#quick-reference). The
 Cabal User Guide the definitive reference for the
 [Cabal file format](https://cabal.readthedocs.io/en/stable/cabal-package.html).
 
-### The `stack setup` command
+### The location of GHC
 
-As we saw above, the `build` command installed GHC for us. Just for kicks,
-let's manually run the `setup` command:
+As we saw above, the `build` command installed GHC for us. You can use the
+`stack path` command for quite a bit of path information (which we'll play with
+more later). We'll look at where GHC is installed:
 
-~~~text
-stack setup
-stack will use a sandboxed GHC it installed
-For more information on paths, see 'stack path' and 'stack exec env'
-To use this GHC and packages outside of a project, consider using:
-stack ghc, stack ghci, stack runghc, or stack exec
-~~~
+=== "Unix-like"
 
-Thankfully, the command is smart enough to know not to perform an installation
-twice. As the command output above indicates, you can use `stack path`
-for quite a bit of path information (which we'll play with more later).
+    Command:
 
-For now, we'll just look at where GHC is installed:
+    ~~~text
+    stack exec -- which ghc
+    /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2/bin/ghc
+    ~~~
 
-On Unix-like operating systems, command:
+=== "Windows (with PowerShell)"
 
-~~~text
-stack exec -- which ghc
-/home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2/bin/ghc
-~~~
+    Command:
 
-On Windows (with PowerShell), command:
-
-~~~text
-stack exec -- where.exe ghc
-C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.0.2\bin\ghc.exe
-~~~
+    ~~~text
+    stack exec -- where.exe ghc
+    C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.0.2\bin\ghc.exe
+    ~~~
 
 As you can see from that path (and as emphasized earlier), the installation is
 placed to not interfere with any other GHC installation, whether system-wide or
