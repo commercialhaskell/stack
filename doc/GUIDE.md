@@ -249,16 +249,17 @@ this:
 
 ~~~yaml
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/17.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/28.yaml
 packages:
 - .
 ~~~
 
 The value of the `resolver` key tells Stack *how* to build your package: which
 GHC version to use, versions of package dependencies, and so on. Our value here
-says to use [LTS Haskell 19.7](https://www.stackage.org/lts-19.7), which implies
-GHC 9.0.2 (which is why `stack setup` installs that version of GHC). There are a
-number of values you can use for `resolver`, which we'll cover later.
+says to use [LTS Haskell 19.28](https://www.stackage.org/lts-19.28), which
+implies GHC 9.0.2 (which is why `stack build` installs that version of GHC if it
+is not already available to Stack). There are a number of values you can use for
+`resolver`, which we'll cover later.
 
 The value of the `packages` key tells Stack which local packages to build. In
 our simple example, we have only a single package in our project, located in the
