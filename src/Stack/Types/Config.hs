@@ -788,7 +788,7 @@ data ConfigMonoid =
     -- ^ See: 'configPrefixTimestamps'
     , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
-    , configMonoidPackageIndices     :: !(First [HackageSecurityConfig])
+    , configMonoidPackageIndices     :: !(First [PackageIndexConfig])
     -- ^ See: @picIndices@
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
