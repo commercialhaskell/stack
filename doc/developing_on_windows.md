@@ -5,11 +5,13 @@
 On Windows, Stack comes with an installation of [MSYS2](https://www.msys2.org/).
 MSYS2 will be used by Stack to provide a Unix-like shell and environment for
 Stack. This may be necessary for installing some Haskell packages, such as those
-which use `configure` scripts. No matter which terminal software you choose
-(Windows Terminal, Console Windows Host, Command Prompt, PowerShell, Git bash or
-any other) you can use this environment too by executing all programs through
-`stack exec -- <program_name>`. This is especially useful if your
-project needs some additional tools during the build phase.
+which use `configure` scripts, or if your project needs some additional tools
+during the build phase.
+
+No matter which terminal software you choose (Windows Terminal, Console Windows
+Host, Command Prompt, PowerShell, Git bash or any other) you can use this
+environment too by executing all programs through
+`stack exec -- <program_name>`.
 
 Executables and libraries can be installed with the MSYS2 package manager
 `pacman`. All tools can be found in the
@@ -17,6 +19,13 @@ Executables and libraries can be installed with the MSYS2 package manager
 commands](https://github.com/msys2/msys2/wiki/Using-packages) that work with
 `pacman` is also available. Just remember that `pacman` &mdash; like all other
 tools &mdash; should be started with `stack exec -- pacman`.
+
+Command `stack path --bin-path` to see the PATH in the Stack environment. On
+Windows, it includes the `\mingw64\bin`, `\usr\bin` and `\usr\local\bin`
+directories of the Stack-supplied MSYS2. If your executable depends on files
+(for example, dynamic-link libraries) in those directories and you want ro run
+it outside of the Stack environment, you will need to ensure copies of those
+files are on the PATH.
 
 The Stack-supplied MSYS2 can itself be updated with the Stack-supplied `pacman`.
 See the MSYS2 guide
