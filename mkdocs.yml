@@ -23,7 +23,6 @@ extra_javascript:
 
 nav:
 - Home: README.md
-- Changelog: ChangeLog.md
 - Tool documentation:
   - Install/upgrade: install_and_upgrade.md
   - User's guide (introductory): GUIDE.md
@@ -61,6 +60,7 @@ nav:
     - HaskellStack.org: maintainers/haskellstack.org.md
 - Signing key: SIGNING_KEY.md
 - Glossary: glossary.md
+- Version history: ChangeLog.md
 
 markdown_extensions:
 - admonition
