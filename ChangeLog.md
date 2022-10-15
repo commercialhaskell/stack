@@ -28,7 +28,7 @@ Bug fixes:
   `StackSetupShim` with `Cabal-syntax-3.8.1.0` in package database. See
   [#5886](https://github.com/commercialhaskell/stack/pull/5886).
 
-## v2.9.1
+## v2.9.1 - 2022-09-19
 
 **Changes since v2.7.5:**
 
@@ -95,7 +95,7 @@ Bug fixes:
   multi-project repository with parallelism enabled. See
   [#5024](https://github.com/commercialhaskell/stack/issues/5024)
 
-## v2.7.5
+## v2.7.5 - 2022-03-06
 
 **Changes since v2.7.3:**
 
@@ -123,7 +123,7 @@ Bug fixes:
   [#5434](https://github.com/commercialhaskell/stack/issues/5434)
 
 
-## v2.7.3
+## v2.7.3 - 2021-07-20
 
 **Changes since v2.7.1:**
 
@@ -157,7 +157,7 @@ Bug fixes:
   [#5578](https://github.com/commercialhaskell/stack/issues/5578)
 
 
-## v2.7.1
+## v2.7.1 - 2021-05-07
 
 **Changes since v2.5.1.1:**
 
@@ -216,14 +216,14 @@ Bug fixes:
   [hi-file-parser#2](https://github.com/commercialhaskell/hi-file-parser/pull/2).
 
 
-## v2.5.1.1
+## v2.5.1.1 - 2020-12-09
 
 Hackage-only release:
 
 * Support build with persistent-2.11.x and optparse-applicative-0.16.x
 
 
-## v2.5.1
+## v2.5.1 - 2020-10-15
 
 **Changes since v2.3.3**
 
@@ -265,7 +265,7 @@ Bug fixes:
   [#5125](https://github.com/commercialhaskell/stack/issues/5125)
 
 
-## v2.3.3
+## v2.3.3 - 2020-08-06
 
 **Changes since v2.3.1**
 
@@ -283,7 +283,7 @@ Bug fixes:
   pvp-bounds. See
   [#5289](https://github.com/commercialhaskell/stack/issues/5289)
 
-## v2.3.1
+## v2.3.1 - 2020-04-29
 
 Release notes:
 
@@ -415,7 +415,7 @@ Bug fixes:
   used in multiple projects. See
   [#5147](https://github.com/commercialhaskell/stack/issues/5147)
 
-## v2.1.3.1
+## v2.1.3.1 - 2019-07-16
 
 Hackage-only release:
 
@@ -424,7 +424,7 @@ Hackage-only release:
 * Add `stack.yaml` back to hackage sdist, and add `snapshot.yaml`
 
 
-## v2.1.3
+## v2.1.3 - 2019-07-13
 
 **Changes since v2.1.1**
 
@@ -484,7 +484,7 @@ Other changes:
   package).
 
 
-## v2.1.1.1
+## v2.1.1.1 - 2019-06-14
 
 Hackage-only release that removes `stack.yaml` from the sdist.  This is because
 `stack.yaml` now defines a multi-package project, whereas Hackage works on the
@@ -498,7 +498,7 @@ to official binaries.  This package on Hackage is provided for convenience
 and bootstrapping purposes.
 
 
-## v2.1.1
+## v2.1.1 - 2019-06-13
 
 The Stack 2 release represents a series of significant changes to how Stack
 works internally. For the vast majority of cases, these changes are backwards
@@ -805,13 +805,13 @@ Bug fixes:
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
 
 
-## v1.9.3.1
+## v1.9.3.1 - 2019-04-18
 
 Hackage-only release with no user facing changes (added compatibility
 with `rio-0.1.9.2`).
 
 
-## v1.9.3
+## v1.9.3 - 2018-12-02
 
 Bug fixes:
 
@@ -824,7 +824,7 @@ Bug fixes:
 * Allow variables to appear in template file names.
 
 
-## v1.9.1.1
+## v1.9.1.1 - 2018-11-14
 
 Hackage-only release with no user facing changes.
 
@@ -833,7 +833,7 @@ Hackage-only release with no user facing changes.
   [#4364](https://github.com/commercialhaskell/stack/issues/4364#issuecomment-431600841)
 
 
-## v1.9.1
+## v1.9.1 - 2018-10-17
 
 Release notes:
 
@@ -992,7 +992,7 @@ Bug fixes:
   [#3739](https://github.com/commercialhaskell/stack/issues/3739)
 
 
-## v1.7.1
+## v1.7.1 - 2018-04-27
 
 Release notes:
 
@@ -1093,7 +1093,7 @@ Bug fixes:
   [#3821](https://github.com/commercialhaskell/stack/issues/3821).
 
 
-## v1.6.5
+## v1.6.5 - 2018-02-19
 
 Bug fixes:
 
@@ -1125,12 +1125,12 @@ Bug fixes:
   and Stack issue
   [#3073](https://github.com/commercialhaskell/stack/issues/3073).
 
-## v1.6.3.1
+## v1.6.3.1 - 2018-02-16
 
 Hackage-only release with no user facing changes (updated to build with
 newer version of Hpack dependency).
 
-## v1.6.3
+## v1.6.3 - 2017-12-23
 
 Enhancements:
 
@@ -1151,12 +1151,12 @@ Bug fixes:
   allowing the Cabal library to flatten the
   `GenericPackageDescription` itself.
 
-## v1.6.1.1
+## v1.6.1.1 - 2017-12-20
 
 Hackage-only release with no user facing changes (updated to build with
 newer dependency versions).
 
-## v1.6.1
+## v1.6.1 - 2017-12-07
 
 Major changes:
 
@@ -1368,7 +1368,7 @@ Bug fixes:
   [#3229](https://github.com/commercialhaskell/stack/issues/3229) for
   more info.
 
-## 1.5.1
+## 1.5.1 - 2017-08-05
 
 Bug fixes:
 
@@ -1379,7 +1379,7 @@ Bug fixes:
   Stack will both be less eager about Cabal file parsing and support
   Cabal 2.0. This patch simply bypasses the error for invalid parsing.
 
-## 1.5.0
+## 1.5.0 - 2017-07-25
 
 Behavior changes:
 
@@ -1474,7 +1474,7 @@ Bug fixes:
   have Windows-style line endings (CRLF)
 
 
-## 1.4.0
+## 1.4.0 - 2017-03-15
 
 Release notes:
 
@@ -1592,7 +1592,7 @@ Bug fixes:
   packages depending on local packages which have
   changed. ([#2904](https://github.com/commercialhaskell/stack/issues/2904))
 
-## 1.3.2
+## 1.3.2 - 2016-12-27
 
 Bug fixes:
 
@@ -1613,7 +1613,7 @@ Bug fixes:
   ignoring locale settings on a local machine. See
   [Yesod mailing list discussion](https://groups.google.com/d/msg/yesodweb/ZyWLsJOtY0c/aejf9E7rCAAJ)
 
-## 1.3.0
+## 1.3.0 - 2016-12-12
 
 Release notes:
 
@@ -1765,7 +1765,7 @@ Bug fixes:
 * `stack setup --reinstall` now behaves as expected.
   [#2554](https://github.com/commercialhaskell/stack/issues/2554)
 
-## 1.2.0
+## 1.2.0 - 2016-09-16
 
 Release notes:
 
@@ -1926,7 +1926,7 @@ Bug fixes:
 * Now consider a package to be dirty when an extra-source-file is changed.
   See [#2040](https://github.com/commercialhaskell/stack/issues/2040)
 
-## 1.1.2
+## 1.1.2 - 2016-05-20
 
 Release notes:
 
@@ -1996,7 +1996,7 @@ Bug fixes:
   [#1982](https://github.com/commercialhaskell/stack/issues/1982)
 * Signing: always use `--with-fingerprints`
 
-## 1.1.0
+## 1.1.0 - 2016-05-04
 
 Release notes:
 
@@ -2136,24 +2136,24 @@ Bug fixes:
 * Fix: Rebuilding when disabling profiling
   [#2023](https://github.com/commercialhaskell/stack/issues/2023).
 
-## 1.0.4.3
+## 1.0.4.3 - 2016-04-07
 
 Bug fixes:
 
 * Don't delete contents of ~/.ssh when using `stack clean --full` with Docker
   enabled [#2000](https://github.com/commercialhaskell/stack/issues/2000)
 
-## 1.0.4.2
+## 1.0.4.2 - 2016-03-09
 
-Build with path-io-1.0.0. There are no changes in behaviour from 1.0.4,
+Build with `path-io-1.0.0`. There are no changes in behaviour from 1.0.4, so no
+binaries are released for this version.
+
+## 1.0.4.1 - 2016-02-21
+
+Fixes build with `aeson-0.11.0.0`. There are no changes in behaviour from 1.0.4,
 so no binaries are released for this version.
 
-## 1.0.4.1
-
-Fixes build with aeson-0.11.0.0. There are no changes in behaviour from 1.0.4,
-so no binaries are released for this version.
-
-## 1.0.4
+## 1.0.4 - 2016-02-20
 
 Major changes:
 
@@ -2225,7 +2225,7 @@ Bug fixes:
 * Send "stack templates" output to stdout
   [#1792](https://github.com/commercialhaskell/stack/issues/1792).
 
-## 1.0.2
+## 1.0.2 - 2016-01-18
 
 Release notes:
 
@@ -2287,7 +2287,7 @@ Bug fixes:
 - Use globaldb path for querying Cabal version
   [#1647](https://github.com/commercialhaskell/stack/issues/1647)
 
-## 1.0.0
+## 1.0.0 - 2015-12-24
 
 Release notes:
 
@@ -2350,14 +2350,14 @@ Bug fixes:
   [#1535](https://github.com/commercialhaskell/stack/issues/1535)
 * Fix test coverage bug on windows
 
-## 0.1.10.1
+## 0.1.10.1 - 2015-12-13
 
 Bug fixes:
 
 * `stack image container` did not actually build an image
   [#1473](https://github.com/commercialhaskell/stack/issues/1473)
 
-## 0.1.10.0
+## 0.1.10.0 - 2015-12-04
 
 Release notes:
 
@@ -2425,7 +2425,7 @@ Bug fixes:
 * Send output of building setup to stderr
   [#1410](https://github.com/commercialhaskell/stack/issues/1410)
 
-## 0.1.8.0
+## 0.1.8.0 - 2015-11-20
 
 Major changes:
 
@@ -2502,7 +2502,7 @@ Bug fixes:
 * Fix: unlisted files in tests and benchmarks trigger extraneous second build
   [#838](https://github.com/commercialhaskell/stack/issues/838)
 
-## 0.1.6.0
+## 0.1.6.0 - 2015-10-15
 
 Major changes:
 
@@ -2577,7 +2577,7 @@ Bug fixes:
 * Ignore global packages when copying precompiled packages
   [#1146](https://github.com/commercialhaskell/stack/issues/1146)
 
-## 0.1.5.0
+## 0.1.5.0 - 2015-09-24
 
 Major changes:
 
@@ -2642,11 +2642,11 @@ Bug fixes:
 * Unlisted dependencies no longer trigger extraneous second build
   [#838](https://github.com/commercialhaskell/stack/issues/838)
 
-## 0.1.4.1
+## 0.1.4.1 - 2015-09-04
 
 Fix stack's own Haddocks.  No changes to functionality (only comments updated).
 
-## 0.1.4.0
+## 0.1.4.0 - 2015-09-04
 
 Major changes:
 
@@ -2710,14 +2710,14 @@ Bug fixes:
 * Truncated output on slow terminals
   [#413](https://github.com/commercialhaskell/stack/issues/413)
 
-## 0.1.3.1
+## 0.1.3.1 - 2015-08-12
 
 Bug fixes:
 
 * Ignore disabled executables
   [#763](https://github.com/commercialhaskell/stack/issues/763)
 
-## 0.1.3.0
+## 0.1.3.0 - 2015-08-12
 
 Major changes:
 
@@ -2796,7 +2796,7 @@ Bug fixes:
 * Fixed GHCi issue: Specifying -odir and -hidir as .stack-work/odir (#529)
 * Fixed GHCi issue: Specifying A instead of A.ext for modules (#498)
 
-## 0.1.2.0
+## 0.1.2.0 - 2015-07-05
 
 * Add `--prune` flag to `stack dot`
   [#487](https://github.com/commercialhaskell/stack/issues/487)
@@ -2834,7 +2834,7 @@ Bug fixes:
 * `stack upgrade` checks version before upgrading
   [#447](https://github.com/commercialhaskell/stack/issues/447)
 
-## 0.1.1.0
+## 0.1.1.0 - 2015-06-26
 
 * Remove GHC uncompressed tar file after installation
   [#376](https://github.com/commercialhaskell/stack/issues/376)
@@ -2875,7 +2875,7 @@ Bug fixes:
 * Mark packages uninstalled before rebuilding
   [#365](https://github.com/commercialhaskell/stack/issues/365)
 
-## 0.1.0.0
+## 0.1.0.0 - 2015-06-23
 
 * Fall back to Cabal dependency solver when a snapshot can't be found
 * Basic implementation of `stack new`
@@ -2889,7 +2889,7 @@ Bug fixes:
     * Use relative links
     * Generate module contents and index for all packages in project
 
-## 0.0.3
+## 0.0.3 - 2015-06-17
 
 * `--prefetch`
   [#297](https://github.com/commercialhaskell/stack/issues/297)
@@ -2904,7 +2904,7 @@ Bug fixes:
 * Specify intra-package target
   [#201](https://github.com/commercialhaskell/stack/issues/201)
 
-## 0.0.2
+## 0.0.2 - 2015-06-14
 
 * Fix some Windows specific bugs
   [#216](https://github.com/commercialhaskell/stack/issues/216)
@@ -2924,6 +2924,6 @@ Bug fixes:
   example)
 * Overhauled test running (allows cycles, avoids unnecessary recompilation, etc)
 
-## 0.0.1
+## 0.0.1 - 2015-06-09
 
 * First public release, beta quality
