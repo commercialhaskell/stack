@@ -10,10 +10,12 @@ Major changes:
 
 Behavior changes:
 
-* In YAML configuration files, the `hackage-security` key of the
-  `package-indices` item can be omitted, and the Hackage Security configuration
-  for the item will default to that for the official Hackage server.
-  See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
+* In YAML configuration files, the `package-index` key is introduced which takes
+  precedence over the existing `package-indices` key. The latter is deprecated.
+* In YAML configuration files, the `hackage-security` key of the `package-index`
+  key or the `package-indices` item can be omitted, and the Hackage Security
+  configuration for the item will default to that for the official Hackage
+  server. See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
 
 Other enhancements:
 
