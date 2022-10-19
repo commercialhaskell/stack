@@ -5,12 +5,12 @@
 
 packages:
 - completed:
-    hackage: pantry-0.6.0@sha256:c87056df8151441911bece5c09d11738110284dc1eacb292686aa33c4308c8c2,4099
+    hackage: pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
     pantry-tree:
-      sha256: a6ed2ac03d6ef3c156bf01390e70751c13cdfbdb2a24f626f5a3024d552f302d
+      sha256: f161e8a2d20f5c2ab4f9003c69d438e8408f934f3cf4c80cb1f097a05b0f6282
       size: 2524
   original:
-    hackage: pantry-0.6.0@sha256:c87056df8151441911bece5c09d11738110284dc1eacb292686aa33c4308c8c2,4099
+    hackage: pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
 snapshots:
 - completed:
     sha256: 1c049df0b264500e22262aa42a6f0a81cddd639cfd04f55c4acb0359f282dab2

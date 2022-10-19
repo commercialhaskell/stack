@@ -5,7 +5,7 @@ packages:
 - .
 
 extra-deps:
-- pantry-0.6.0@sha256:c87056df8151441911bece5c09d11738110284dc1eacb292686aa33c4308c8c2,4099
+- pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

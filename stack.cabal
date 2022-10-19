@@ -274,7 +274,7 @@ library
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.6.0
+    , pantry >=0.7.0
     , path
     , path-io
     , persistent >=2.13.3.5 && <2.14
@@ -398,7 +398,7 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.6.0
+    , pantry >=0.7.0
     , path
     , path-io
     , persistent >=2.13.3.5 && <2.14
@@ -523,7 +523,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.17.0.0
     , optparse-generic
-    , pantry >=0.6.0
+    , pantry >=0.7.0
     , path
     , path-io
     , persistent >=2.13.3.5 && <2.14
@@ -653,7 +653,7 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.6.0
+    , pantry >=0.7.0
     , path
     , path-io
     , persistent >=2.13.3.5 && <2.14

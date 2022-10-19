@@ -27,6 +27,10 @@ Bug fixes:
 * Fix ambiguous module name `Distribution.PackageDescription`, if compiling
   `StackSetupShim` with `Cabal-syntax-3.8.1.0` in package database. See
   [#5886](https://github.com/commercialhaskell/stack/pull/5886).
+* In YAML configuration files, if the `package-indices` key (or the
+  `hackage-security` key of its item) is omitted, the expiration of timestamps
+  is now ignored, as intended. See Pantry
+  [#63](https://github.com/commercialhaskell/pantry/pull/63)
 
 ## v2.9.1 - 2022-09-19
 

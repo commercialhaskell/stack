@@ -20,7 +20,7 @@ extra-deps:
 # Although Cabal-3.6.3.0 is a global package, it depends on process and so has
 # to be expressly added as an extra-dep
 - Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
-- pantry-0.6.0@sha256:c87056df8151441911bece5c09d11738110284dc1eacb292686aa33c4308c8c2,4099
+- pantry-0.7.0@sha256:9837367dab06a203d958864cd8b386d401ff61b69fafefa5f485fa6cee49e82f,4099
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
