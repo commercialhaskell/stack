@@ -788,8 +788,10 @@ data ConfigMonoid =
     -- ^ See: 'configPrefixTimestamps'
     , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
+    , configMonoidPackageIndex     :: !(First PackageIndexConfig)
+    -- ^ See: 'withPantryConfig'
     , configMonoidPackageIndices     :: !(First [PackageIndexConfig])
-    -- ^ See: @picIndices@
+    -- ^ Deprecated in favour of package-index
     , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
     ,configMonoidInstallGHC          :: !FirstTrue
@@ -921,6 +923,7 @@ parseConfigMonoidObject rootDir obj = do
           (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
           urls
 
+    configMonoidPackageIndex <- First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
     configMonoidPackageIndices <- First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
     configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
     configMonoidInstallGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
@@ -1036,6 +1039,10 @@ configMonoidPrefixTimestampsName = "build-output-timestamps"
 configMonoidUrlsName :: Text
 configMonoidUrlsName = "urls"
 
+configMonoidPackageIndexName :: Text
+configMonoidPackageIndexName = "package-index"
+
+-- Deprecated in favour of package-index
 configMonoidPackageIndicesName :: Text
 configMonoidPackageIndicesName = "package-indices"
 

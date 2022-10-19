@@ -366,11 +366,25 @@ configFromConfigMonoid
                & useColorL .~ useColor''
          go = runnerGlobalOpts configRunner'
 
+     let packageIndicesWarning =
+             "The 'package-indices' key is deprecated in favour of \
+             \'package-index'."
+
      pic <-
-       case getFirst configMonoidPackageIndices of
-         Nothing -> pure defaultPackageIndexConfig
-         Just [pic] -> pure pic
-         Just x -> error $ "When overriding the default package index, you must provide exactly one value, received: " ++ show x
+         case getFirst configMonoidPackageIndex of
+             Nothing ->
+                 case getFirst configMonoidPackageIndices of
+                     Nothing -> pure defaultPackageIndexConfig
+                     Just [pic] -> do
+                         logWarn $ fromString packageIndicesWarning
+                         pure pic
+                     Just x ->
+                         error $
+                             "When using the 'package-indices' key to override \
+                             \the default package index, you must provide \
+                             \exactly one value, received: " ++ show x ++
+                             "\n" ++ packageIndicesWarning
+             Just pic -> pure pic
      mpantryRoot <- liftIO $ lookupEnv "PANTRY_ROOT"
      pantryRoot <-
        case mpantryRoot of
