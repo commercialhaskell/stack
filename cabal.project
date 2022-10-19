@@ -2,17 +2,16 @@
 -- assist some users of that tool to develop Stack. For information about
 -- `cabal.project` files, see:
 -- https://cabal.readthedocs.io/en/stable/cabal-project.html.
-
+--
 -- For information about possible limitations of the `cabal.config` files
 -- corresponding to Stackage package sets that are made available by Stackage
 -- see: https://github.com/fpco/stackage-server/issues/232.
-
--- `import:` is only available to users of Cabal (the tool) >= 3.8.1.0.
-
-import: https://www.stackage.org/nightly-2022-09-05/cabal.config
-
--- Extra-deps (if any) would be specified by adding:
 --
--- constraints: <package_name> == <version_number>
+-- `import:` is only available to users of Cabal (the tool) >= 3.8.1.0.
+--
+-- The constraints in file `cabal.config` can be obtained by commanding:
+--
+-- > stack ls dependencies cabal > cabal.config
 
+import: cabal.config
 packages: .

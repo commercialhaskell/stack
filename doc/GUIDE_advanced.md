@@ -243,7 +243,89 @@ the available commands.
 ## The `stack ls dependencies` command
 
 `stack ls dependencies` lists all of the packages and versions used for a
-project.
+project. All local packages are considered by default, but a target can be
+specified as an argument. For further information, see the
+[target syntax](build_command.md#target-syntax) documentation.
+
+Subcommands specify the format of the output, as follows:
+
+* `text` (the default) lists the packages, each on a separate line. For example
+  (extract):
+
+    ~~~text
+    Cabal 3.6.3.0
+    Cabal-syntax 3.6.0.0
+    Glob 0.10.2
+    ~~~
+
+* `cabal` lists the packages in the format of exact Cabal constraints.
+  For example (extract):
+
+    ~~~text
+    constraints:
+    , Cabal ==3.6.3.0
+    , Cabal-syntax ==3.6.0.0
+    , Glob ==0.10.2
+    ~~~
+
+* `tree` lists dependencies in the format of a tree. For example (extract):
+
+    ~~~text
+    Packages
+    └─┬ stack 2.10.0
+      ├─┬ Cabal 3.6.3.0
+      │ ├─┬ Win32 2.12.0.1
+      │ │ ├─┬ base 4.16.3.0
+      │ │ │ ├─┬ ghc-bignum 1.2
+      │ │ │ │ └─┬ ghc-prim 0.8.0
+      │ │ │ │   └── rts 1.0.2
+      │ │ │ ├─┬ ghc-prim 0.8.0
+    ~~~
+
+* `json` lists dependencies in JSON format (an array of objects). For example
+  (extract):
+
+    ~~~text
+    [{"dependencies":["base","bytestring"],"license":"BSD3","location":{"type":"hackage","url":"https://hackage.haskell.org/package/zlib-0.6.3.0"},"name":"zlib","version":"0.6.3.0"},
+    ~~~
+
+  Each object has the following keys:
+
+    ~~~json
+    name: zlib
+    version: 0.6.3.0
+    location:
+      type: hackage
+      url: https://hackage.haskell.org/package/zlib-0.6.3.0
+    licence: BSD3
+    dependencies:
+    - base
+    - bytestring
+    ~~~
+
+The `--separator` option specifies the separator between the package name and
+its version. The default is a space character.
+
+Set the `--licence` flag, after the `text` or `tree` subcommand, to replace each
+package's version with its licence.
+
+Set the `--no-external` flag to exclude external dependencies.
+
+Set the `--no-include-base` flag to exclude dependencies on the `base` package.
+
+The `--depth` option limits the depth of dependency resolution.
+
+The `--prune <packages>` option prunes the specified packages from the output,
+where `<packages>` is a comma separated list of package names.
+
+The `--flag` option allows Cabal flags to be specified.
+
+Pass the `--test` flag to consider the dependencies of test suite components.
+
+Pass the `--bench` flag to consider the dependencies of benchmark components.
+
+Pass the `--global-hints` flag to use a hints file for global packages. The
+command then does not require an installed GHC.
 
 ## The `stack ls snapshots` command
 
