@@ -331,7 +331,7 @@ configFromConfigMonoid
          configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
          configRebuildGhcOptions = fromFirstFalse configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
-         configAllowNewer = fromFirst False configMonoidAllowNewer
+         configAllowNewer = fromFirst AllowNewerNone configMonoidAllowNewer
          configDefaultTemplate = getFirst configMonoidDefaultTemplate
          configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
          configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds

@@ -64,6 +64,8 @@ module Stack.Types.Config
   -- * Details
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
+  -- ** AllowNewer
+  ,AllowNewer(..)
   -- ** CabalConfigKey
   ,CabalConfigKey(..)
   -- ** ConfigException
@@ -188,7 +190,7 @@ import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
-                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
+                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool, String),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..),
                   FromJSONKeyFunction (FromJSONKeyTextParser))
@@ -354,7 +356,7 @@ data Config =
          -- ^ Rebuild on GHC options changes
          ,configApplyGhcOptions     :: !ApplyGhcOptions
          -- ^ Which packages to ghc-options on the command line apply to?
-         ,configAllowNewer          :: !Bool
+         ,configAllowNewer          :: !AllowNewer
          -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
          -- match cabal.
          ,configDefaultTemplate     :: !(Maybe TemplateName)
@@ -443,6 +445,21 @@ instance FromJSON ApplyGhcOptions where
             "locals" -> pure AGOLocals
             "everything" -> pure AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
+
+data AllowNewer
+  = AllowNewerAll
+  | AllowNewerNone
+  | AllowNewerPackages [String]
+  deriving (Show, Read, Eq, Ord)
+
+instance FromJSON AllowNewer where
+  parseJSON v =
+    case v of
+      Bool True -> pure AllowNewerAll
+      Bool False -> pure AllowNewerNone
+      String "all" -> pure AllowNewerAll
+      String "none" -> pure AllowNewerNone
+      _ -> AllowNewerPackages <$> parseJSON v
 
 -- | Which build log files to dump
 data DumpLogs
@@ -861,7 +878,7 @@ data ConfigMonoid =
     -- ^ See 'configMonoidRebuildGhcOptions'
     ,configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
-    ,configMonoidAllowNewer          :: !(First Bool)
+    ,configMonoidAllowNewer          :: !(First AllowNewer)
     -- ^ See 'configMonoidAllowNewer'
     ,configMonoidDefaultTemplate     :: !(First TemplateName)
     -- ^ The default template to use when none is specified.

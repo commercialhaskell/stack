@@ -136,7 +136,7 @@ checkCabalVersion = do
     allowNewer <- view $ configL.to configAllowNewer
     cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
-    when (allowNewer && cabalVer < mkVersion [1, 22]) $ throwM $
+    when (allowNewer /= AllowNewerNone && cabalVer < mkVersion [1, 22]) $ throwM $
         AllowNewerNotSupported cabalVer
     -- Since --exact-configuration is always passed, some old cabal
     -- versions can no longer be used. See the following link for why

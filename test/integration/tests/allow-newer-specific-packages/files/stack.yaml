@@ -1,0 +1,4 @@
+resolver: nightly-2022-10-18
+
+allow-newer:
+  - foo
