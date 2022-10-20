@@ -16,6 +16,8 @@ Behavior changes:
   key or the `package-indices` item can be omitted, and the Hackage Security
   configuration for the item will default to that for the official Hackage
   server. See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
+* Add the `stack config set package-index download-prefix` command to set the
+  location of Stack's package index in YAML configuration files.
 
 Other enhancements:
 
