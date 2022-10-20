@@ -80,6 +80,7 @@ data ListDepsFormatOpts = ListDepsFormatOpts { listDepsSep :: !Text
 data ListDepsFormat = ListDepsText ListDepsFormatOpts
                     | ListDepsTree ListDepsFormatOpts
                     | ListDepsJSON
+                    | ListDepsConstraints
 
 data ListDepsOpts = ListDepsOpts
     { listDepsFormat :: !ListDepsFormat
@@ -158,8 +159,15 @@ listDependencies opts = do
   liftIO $ case listDepsFormat opts of
       ListDepsTree treeOpts -> Text.putStrLn "Packages" >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
       ListDepsJSON -> printJSON pkgs resultGraph
-      ListDepsText textOpts -> void (Map.traverseWithKey go (snd <$> resultGraph))
-        where go name payload = Text.putStrLn $ listDepsLine textOpts name payload
+      ListDepsText textOpts ->
+        void $ Map.traverseWithKey (go "" textOpts) (snd <$> resultGraph)
+      ListDepsConstraints -> do
+        let constraintOpts = ListDepsFormatOpts " ==" False 
+        Text.putStrLn "constraints:"
+        void $ Map.traverseWithKey (go "  , " constraintOpts) (snd <$> resultGraph)
+  where
+    go prefix lineOpts name payload = Text.putStrLn $
+      prefix <> listDepsLine lineOpts name payload
 
 data DependencyTree = DependencyTree (Set PackageName) (Map PackageName (Set PackageName, DotPayload))
 

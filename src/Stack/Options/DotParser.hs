@@ -86,6 +86,9 @@ listDepsTextParser = ListDepsText <$> listDepsFormatOptsParser
 listDepsJsonParser :: Parser ListDepsFormat
 listDepsJsonParser = pure ListDepsJSON
 
+listDepsConstraintsParser :: Parser ListDepsFormat
+listDepsConstraintsParser = pure ListDepsConstraints
+
 toListDepsOptsParser :: Parser ListDepsFormat -> Parser ListDepsOpts
 toListDepsOptsParser formatParser = ListDepsOpts
       <$> formatParser
@@ -102,4 +105,5 @@ listDepsOptsParser = subparser
                      (  formatSubCommand "text" "Print dependencies as text (default)" listDepsTextParser
                      <> formatSubCommand "tree" "Print dependencies as tree" listDepsTreeParser
                      <> formatSubCommand "json" "Print dependencies as JSON" listDepsJsonParser
+                     <> formatSubCommand "constraints" "Print exact cabal constraints" listDepsConstraintsParser
                      ) <|> toListDepsOptsParser listDepsTextParser
