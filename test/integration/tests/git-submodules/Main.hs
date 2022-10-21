@@ -8,6 +8,8 @@ import Control.Monad (when)
 
 main :: IO ()
 main = when isLinux $ do
+    runShell "git config --global protocol.file.allow always"
+
     let
       gitInit = do
          runShell "git init ."
