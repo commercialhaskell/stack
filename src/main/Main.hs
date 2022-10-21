@@ -550,15 +550,22 @@ interpreterHandler currentDir args f = do
       pure (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
-setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ withBuildConfig $ do
-  (wantedCompiler, compilerCheck, mstack) <-
-    case scoCompilerVersion of
-      Just v -> pure (v, MatchMinor, Nothing)
-      Nothing -> (,,)
-        <$> view wantedCompilerVersionL
-        <*> view (configL.to configCompilerCheck)
-        <*> (Just <$> view stackYamlL)
-  setup sco wantedCompiler compilerCheck mstack
+setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
+  installGHC <- view $ configL.to configInstallGHC
+  if installGHC
+    then
+       withBuildConfig $ do
+       (wantedCompiler, compilerCheck, mstack) <-
+         case scoCompilerVersion of
+           Just v -> pure (v, MatchMinor, Nothing)
+           Nothing -> (,,)
+             <$> view wantedCompilerVersionL
+             <*> view (configL.to configCompilerCheck)
+             <*> (Just <$> view stackYamlL)
+       setup sco wantedCompiler compilerCheck mstack
+    else
+      logWarn "The --no-install-ghc flag is inconsistent with 'stack setup'. \
+              \No action taken."
 
 cleanCmd :: CleanOpts -> RIO Runner ()
 cleanCmd = withConfig NoReexec . clean

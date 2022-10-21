@@ -418,7 +418,8 @@ downloaded and installed. This option requires the use of the `--ghc-variant`
 option specifying a custom GHC variant.
 
 If Stack is configured not to install GHC (`install-ghc: false` or passing the
-`--no-install-ghc` flag) then `stack setup` will silently ignore the flag.
+`--no-install-ghc` flag) then `stack setup` will warn that the flag and the
+command are inconsistent and take no action.
 
 ## The `stack templates` command
 
