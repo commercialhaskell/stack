@@ -1,7 +1,12 @@
+{-# LANGUAGE CPP            #-}
 {-# LANGUAGE PackageImports #-}
 module StackSetupShim where
 import Main
+#if MIN_VERSION_Cabal(3,8,1)
+import Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
+#else
 import "Cabal" Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
+#endif
 import Distribution.Simple
 import Distribution.Simple.Build
 import Distribution.Simple.Setup (ReplFlags, fromFlag, replDistPref, replVerbosity)
