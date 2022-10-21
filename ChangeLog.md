@@ -16,6 +16,8 @@ Behavior changes:
   key or the `package-indices` item can be omitted, and the Hackage Security
   configuration for the item will default to that for the official Hackage
   server. See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
+* Add the `stack config set package-index download-prefix` command to set the
+  location of Stack's package index in YAML configuration files.
 
 * `stack setup` with the `--no-install-ghc` flag warns that the flag and the
   command are inconsistent and now takes no action. Previously the flag was

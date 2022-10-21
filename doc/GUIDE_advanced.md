@@ -108,6 +108,16 @@ YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
 user-specific global configuration file (`config.yaml`).
 
+## The `stack config set package-index download-prefix` command
+
+:octicons-tag-24: Unreleased
+
+`stack config set package-index download-prefix <url>` sets the
+`download-prefix` key of the `package-index` key in a YAML configuration file,
+accordingly. By default, the project-level configuration file (`stack.yaml`) is
+altered. The `--global` flag specifies the user-specific global configuration
+file (`config.yaml`).
+
 ## The `stack config set resolver` command
 
 `stack config set resolver <snapshot>` sets the `resolver` key in the

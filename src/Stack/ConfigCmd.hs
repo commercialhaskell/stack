@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -22,6 +23,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.Attoparsec.Text as P (Parser, parseOnly, skip, skipWhile,
                                            string, takeText, takeWhile)
 import qualified Data.Map.Merge.Strict as Map
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
@@ -39,11 +41,10 @@ import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
 
 data ConfigCmdSet
-    = ConfigCmdSetResolver (Unresolved AbstractResolver)
-    | ConfigCmdSetSystemGhc CommandScope
-                            Bool
-    | ConfigCmdSetInstallGhc CommandScope
-                             Bool
+    = ConfigCmdSetResolver !(Unresolved AbstractResolver)
+    | ConfigCmdSetSystemGhc !CommandScope !Bool
+    | ConfigCmdSetInstallGhc !CommandScope !Bool
+    | ConfigCmdSetDownloadPrefix !CommandScope !Text
 
 data CommandScope
     = CommandScopeGlobal
@@ -56,6 +57,7 @@ configCmdSetScope :: ConfigCmdSet -> CommandScope
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
+configCmdSetScope (ConfigCmdSetDownloadPrefix scope _) = scope
 
 cfgCmdSet
     :: (HasConfig env, HasGHCVariant env)
@@ -76,24 +78,46 @@ cfgCmdSet cmd = do
     config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
     newValue <- cfgCmdSetValue (parent configFilePath) cmd
     let yamlLines = T.lines rawConfig
-        cmdKey = cfgCmdSetOptionName cmd  -- Text
-        cmdKey' = Key.fromText cmdKey     -- Data.Aeson.Key.Key
+        cmdKeys = cfgCmdSetKeys cmd  -- Text
         newValue' = T.stripEnd $
             decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
         file = toFilePath configFilePath  -- String
         file' = display $ T.pack file     -- Utf8Builder
-    newYamlLines <- case KeyMap.lookup cmdKey' config of
+    newYamlLines <- case inConfig config cmdKeys of
         Nothing -> do
             logInfo $ file' <> " has been extended."
-            pure $ yamlLines <> [cmdKey <> ": " <> newValue']
+            pure $ writeLines yamlLines "" cmdKeys newValue'
         Just oldValue -> if oldValue == newValue
             then do
                 logInfo $ file' <> " already contained the intended \
                     \configuration and remains unchanged."
                 pure yamlLines
-            else switchLine file' cmdKey newValue' [] yamlLines
+            else switchLine file' (NE.last cmdKeys) newValue' [] yamlLines
     liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
   where
+    -- This assumes that if the key does not exist, the lines that can be
+    -- appended to include it are of a form like:
+    --
+    -- key1:
+    --   key2:
+    --     key3: value
+    --
+    writeLines yamlLines spaces cmdKeys value = case NE.tail cmdKeys of
+      [] -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
+      ks -> writeLines (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
+                       (spaces <> "  ")
+                       (NE.fromList ks)
+                       value
+
+    inConfig v cmdKeys = case v of
+        Yaml.Object obj ->
+            case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
+                Nothing -> Nothing
+                Just v' -> case NE.tail cmdKeys of
+                    [] -> Just v'
+                    ks -> inConfig v' (NE.fromList ks)
+        _ -> Nothing
+
     switchLine file cmdKey _ searched [] = do
         logWarn $ display cmdKey <> " not found in YAML file " <> file <>
             " as a single line. Multi-line key:value formats are not supported."
@@ -102,22 +126,22 @@ cfgCmdSet cmd = do
         case parseOnly (parseLine cmdKey) oldLine of
             Left _ ->
                 switchLine file cmdKey newValue (oldLine:searched) rest
-            Right (kt, spaces1, spaces2, comment) -> do
-                let newLine = renderKey cmdKey kt <> spaces1 <> ":" <>
-                        spaces2 <> newValue <> comment
+            Right (kt, spaces1, spaces2, spaces3, comment) -> do
+                let newLine = spaces1 <> renderKey cmdKey kt <> spaces2 <>
+                        ":" <> spaces3 <> newValue <> comment
                 logInfo $ file <> " has been updated."
                 pure $ reverse searched <> (newLine:rest)
 
-    -- This assumes that a top-level key will not be indented in the YAML file.
-    parseLine :: Text -> Parser (KeyType, Text, Text, Text)
+    parseLine :: Text -> Parser (KeyType, Text, Text, Text, Text)
     parseLine key = do
-        kt <- parseKey key
         spaces1 <- P.takeWhile (== ' ')
-        skip (== ':')
+        kt <- parseKey key
         spaces2 <- P.takeWhile (== ' ')
+        skip (== ':')
+        spaces3 <- P.takeWhile (== ' ')
         skipWhile (/= ' ')
         comment <- takeText
-        pure (kt, spaces1, spaces2, comment)
+        pure (kt, spaces1, spaces2, spaces3, comment)
 
     -- If the key is, for example, install-ghc, this recognises install-ghc,
     -- 'install-ghc' or "install-ghc".
@@ -167,15 +191,17 @@ cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
     -- Check that the snapshot actually exists
     void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
     pure (Yaml.toJSON concreteResolver)
-cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') =
-    pure (Yaml.Bool bool')
-cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') =
-    pure (Yaml.Bool bool')
+cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') = pure $ Yaml.Bool bool'
+cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') = pure $ Yaml.Bool bool'
+cfgCmdSetValue _ (ConfigCmdSetDownloadPrefix _ url) = pure $ Yaml.String url
 
-cfgCmdSetOptionName :: ConfigCmdSet -> Text
-cfgCmdSetOptionName (ConfigCmdSetResolver _) = "resolver"
-cfgCmdSetOptionName (ConfigCmdSetSystemGhc _ _) = configMonoidSystemGHCName
-cfgCmdSetOptionName (ConfigCmdSetInstallGhc _ _) = configMonoidInstallGHCName
+
+cfgCmdSetKeys :: ConfigCmdSet -> NonEmpty Text
+cfgCmdSetKeys (ConfigCmdSetResolver _) = ["resolver"]
+cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [configMonoidSystemGHCName]
+cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [configMonoidInstallGHCName]
+cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
+    ["package-index", "download-prefix"]
 
 cfgCmdName :: String
 cfgCmdName = "config"
@@ -187,30 +213,48 @@ cfgCmdEnvName :: String
 cfgCmdEnvName = "env"
 
 configCmdSetParser :: OA.Parser ConfigCmdSet
-configCmdSetParser = OA.hsubparser $
-  mconcat
-    [ OA.command "resolver"
-        ( OA.info
-            (ConfigCmdSetResolver <$>
-             OA.argument
-                 readAbstractResolver
-                 (OA.metavar "SNAPSHOT" <>
-                  OA.help "E.g. \"nightly\" or \"lts-7.2\""))
-            (OA.progDesc
-               "Change the resolver of the current project."))
-    , OA.command (T.unpack configMonoidSystemGHCName)
-        ( OA.info
-            (ConfigCmdSetSystemGhc <$> scopeFlag <*> boolArgument)
-            (OA.progDesc
-               "Configure whether Stack should use a system GHC installation \
-               \or not."))
-    , OA.command (T.unpack configMonoidInstallGHCName)
-        ( OA.info
-            (ConfigCmdSetInstallGhc <$> scopeFlag <*> boolArgument)
-            (OA.progDesc
-               "Configure whether Stack should automatically install GHC when \
-               \necessary."))
-    ]
+configCmdSetParser =
+      OA.hsubparser $
+        mconcat
+          [ OA.command "resolver"
+              ( OA.info
+                  (   ConfigCmdSetResolver
+                  <$> OA.argument
+                        readAbstractResolver
+                        (  OA.metavar "SNAPSHOT"
+                        <> OA.help "E.g. \"nightly\" or \"lts-7.2\"" ))
+                  ( OA.progDesc
+                      "Change the resolver of the current project." ))
+          , OA.command (T.unpack configMonoidSystemGHCName)
+              ( OA.info
+                  (   ConfigCmdSetSystemGhc
+                  <$> scopeFlag
+                  <*> boolArgument )
+                  ( OA.progDesc
+                      "Configure whether Stack should use a system GHC \
+                      \installation or not." ))
+          , OA.command (T.unpack configMonoidInstallGHCName)
+              ( OA.info
+                  (   ConfigCmdSetInstallGhc
+                  <$> scopeFlag
+                  <*> boolArgument )
+                  ( OA.progDesc
+                      "Configure whether Stack should automatically install \
+                      \GHC when necessary." ))
+          , OA.command "package-index"
+              ( OA.info
+                  ( OA.hsubparser $
+                      OA.command "download-prefix"
+                        ( OA.info
+                            (   ConfigCmdSetDownloadPrefix
+                            <$> scopeFlag
+                            <*> urlArgument )
+                            ( OA.progDesc
+                                "Configure download prefix for Stack's package \
+                                \index." )))
+                  ( OA.progDesc
+                      "Configure Stack's package index" ))
+          ]
 
 scopeFlag :: OA.Parser CommandScope
 scopeFlag = OA.flag
@@ -236,6 +280,16 @@ boolArgument = OA.argument
   readBool
   (  OA.metavar "true|false"
   <> OA.completeWith ["true", "false"]
+  )
+
+urlArgument :: OA.Parser Text
+urlArgument = OA.strArgument
+  (  OA.metavar "URL"
+  <> OA.value defaultDownloadPrefix
+  <> OA.showDefault
+  <> OA.help
+       "Location of package index. It is highly recommended to use only the \
+       \official Hackage server or a mirror."
   )
 
 configCmdEnvParser :: OA.Parser EnvSettings
