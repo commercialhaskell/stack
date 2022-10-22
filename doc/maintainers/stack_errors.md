@@ -7,45 +7,46 @@ In connection with considering Stack's support of the
 to take stock of the errors that Stack itself can raise, by reference to the
 `master` branch of the Stack repository. Last updated: 2022-10-22.
 
-* `Main.main`: catches exceptions from action `commandLineHandler`.
+*   `Main.main`: catches exceptions from action `commandLineHandler`.
 
-  `ExitCode`
+    `ExitCode`
 
-  `throwIO`
+    `throwIO`
 
-* `Main.main`: catches exceptions from action `run`.
+*   `Main.main`: catches exceptions from action `run`.
 
     ~~~text
     <exception>
     ~~~
 
-  `exitWith` or `exitFailure`
+    `exitWith` or `exitFailure`
 
-  The following types are instances of `Control.Exception.Exception` and `Show`.
-  Some data constructors have strict fields but that is not documented below:
+    The following types are instances of `Control.Exception.Exception` and
+    `Show`. Some data constructors have strict fields but that is not documented
+    below:
 
-  - `Control.Concurrent.ExecuteException`
+    -   `Control.Concurrent.ExecuteException`
 
         ~~~haskell
         = InconsistentDependencies
         ~~~
 
-  - `Main.MainException`
+    -   `Main.MainException`
 
         ~~~haskell
         = InvalidReExecVersion String String
         | InvalidPathForExec FilePath
         ~~~
 
-  - `Stack.Build.CabalVersionException`
+    -   `Stack.Build.CabalVersionException`
 
         ~~~haskell
         = CabalVersionException String
         ~~~
 
-    The `String` is a message.
+        The `String` is a message.
 
-  - `Stack.BuildPlan.BuildPlanException`
+    -   `Stack.BuildPlan.BuildPlanException`
 
         ~~~haskell
         = UnknownPackages (Path Abs File) (Map PackageName (Maybe Version, Set PackageName)) (Map PackageName (Set PackageIdentifier))
@@ -53,19 +54,19 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | NeitherCompilerOrResolverSpecified Text
         ~~~
 
-  - `Stack.Clean.StackCleanException`
+    -   `Stack.Clean.StackCleanException`
 
         ~~~haskell
         = NonLocalPackages [PackageName]
         ~~~
 
-  - `Stack.Coverage.CoverageException`
+    -   `Stack.Coverage.CoverageException`
 
         ~~~haskell
         = NonTestSuiteTarget PackageName
         ~~~
 
-  - `Stack.Ghci.Ghci.Exception`
+    -   `Stack.Ghci.Ghci.Exception`
 
         ~~~haskell
         = InvalidPackageOption String
@@ -76,19 +77,19 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | GhciTargetParseException [Text]
         ~~~
 
-  - `Stack.List.ListException`
+    -   `Stack.List.ListException`
 
         ~~~haskell
         = CouldNotParsePackageSelectors [String]
         ~~~
 
-  - `Stack.Ls.LsException` *
+    -   `Stack.Ls.LsException` *
 
         ~~~haskell
         = ParseFailure [Value]
         ~~~
 
-  - `Stack.New.NewException`
+    -   `Stack.New.NewException`
 
         ~~~haskell
         = FailedToLoadTemplate TemplateName FilePath
@@ -102,40 +103,40 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | Can'tUseWiredInName PackageName
         ~~~
 
-  - `Stack.Nix.StackNixException`
+    -   `Stack.Nix.StackNixException`
 
         ~~~haskell
         = CannotDetermineProjectRoot
         ~~~
 
-  - `Stack.Package.CabalFileNameParseFail`
+    -   `Stack.Package.CabalFileNameParseFail`
 
         ~~~haskell
         = CabalFileNameParseFail FilePath
         | CabalFileNameInvalidPackageName FilePath
         ~~~
 
-  - `Stack.PackageDump.PackageDumpException`
+    -   `Stack.PackageDump.PackageDumpException`
 
         ~~~haskell
         = MissingSingleField Text (Map Text [Line])
         | Couldn'tParseField Text [Line]
         ~~~
 
-  - `Stack.Script.StackScriptException`
+    -   `Stack.Script.StackScriptException`
 
         ~~~haskell
         = MutableDependenciesForScript [PackageName]
         | AmbiguousModuleName ModuleName [PackageName]
         ~~~
 
-  - `Stack.SDist.CheckException`
+    -   `Stack.SDist.CheckException`
 
         ~~~haskell
         = CheckException (NonEmpty PackageCheck)
         ~~~
 
-  - `Stack.Setup.SetupException`
+    -   `Stack.Setup.SetupException`
 
         ~~~haskell
         = UnsupportedSetupCombo OS Arch
@@ -152,32 +153,32 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | InvalidGhcAt (Path Abs File) SomeException
         ~~~
 
-  - `Stack.Unpack.UnpackException`
+    -   `Stack.Unpack.UnpackException`
 
         ~~~haskell
         = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
         | CouldNotParsePackageSelectors [String]
         ~~~
 
-  - `Stack.Build.ConstructPlan.NotOnlyLocal`
+    -   `Stack.Build.ConstructPlan.NotOnlyLocal`
 
         ~~~haskell
         = NotOnlyLocal [PackageName] [Text]
         ~~~
 
-  - `Stack.Config.Docker.StackDockerConfig.Execeiption`
+    -   `Stack.Config.Docker.StackDockerConfig.Execeiption`
 
         ~~~haskell
         = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
         ~~~
 
-  - `Stack.Config.Nix.StackNixException`
+    -   `Stack.Config.Nix.StackNixException`
 
         ~~~haskell
         = NixCannotUseShellFileAndPackagesException
         ~~~
 
-  - `Stack.Types.Build.StackBuildException`
+    -   `Stack.Types.Build.StackBuildException`
 
         ~~~haskell
         = Couldn'tFindPkgId PackageName
@@ -202,14 +203,14 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | CouldNotLockDistDir (Path Abs File)
         ~~~
 
-  - `Stack.Types.Compiler.CompilerException`
+    -   `Stack.Types.Compiler.CompilerException`
 
         ~~~haskell
         = GhcjsNotSupported
         | PantryException PantryException
         ~~~
 
-  - `Stack.Types.Config.ConfigException`
+    -   `Stack.Types.Config.ConfigException`
 
         ~~~haskell
         = ParseConfigFileException (Path Abs File) ParseException
@@ -232,7 +233,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         ~~~
 
-  - `Stack.Types.Docker.DockerException`
+    -   `Stack.Types.Docker.DockerException`
 
         ~~~haskell
         = DockerMustBeEnabledException
@@ -255,42 +256,42 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DockerStackExeParseException String
         ~~~
 
-  - `Stack.Types.GhcPkgId.GhcPkgIdParseFail`
+    -   `Stack.Types.GhcPkgId.GhcPkgIdParseFail`
 
         ~~~haskell
         = GhcPkgIdParseFail Text
         ~~~
 
-  - `Stack.Types.Package.PackageException`
+    -   `Stack.Types.Package.PackageException`
 
         ~~~haskell
         = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) (Maybe Version) [PError] [PWarning]
         | MismatchedCabalIdentifier PackageIdentifierRevision PackageIdentifier
         ~~~
 
-  - `Stack.Types.Resolver.BuildPlanTypesException`
+    -   `Stack.Types.Resolver.BuildPlanTypesException`
 
         ~~~haskell
         = ParseResolverException Text
         | FilepathInDownloadedSnapshot Text
         ~~~
 
-  - `System.Process.Pager.PagerException`
+    -   `System.Process.Pager.PagerException`
 
         ~~~haskell
         = PagerExitFailure CmdSpec Int
         ~~~
 
-  \* The instance of `Show` is derived.
+    \* The instance of `Show` is derived.
 
-  Stack also makes use of `UnlifIO.Exception.throwString`, which throws an
-  exception of type `UnliftIO.Exception.StringException`:
+    Stack also makes use of `UnlifIO.Exception.throwString`, which throws an
+    exception of type `UnliftIO.Exception.StringException`:
 
     ~~~haskell
     = StringException String CallStack
     ~~~
 
-* `Main.buildCmd`:
+*   `Main.buildCmd`:
 
     ~~~text
     Error: When building with Stack, you should not use the -prof GHC option
@@ -298,54 +299,54 @@ to take stock of the errors that Stack itself can raise, by reference to the
     See: https://github.com/commercialhaskell/stack/issues/1015
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Main.upgradeCmd`:
+*   `Main.upgradeCmd`:
 
     ~~~text
     You cannot use the --resolver option with the upgrade command
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Main.execCmd`:
+*   `Main.execCmd`:
 
     ~~~text
     Could not find package id of package <name>
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Main.execCmd`:
+*   `Main.execCmd`:
 
     ~~~text
     No executables found.
     ~~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Options.Applicative.Builder.Extra.enableDisableFlagsNoDefault`:
+*   `Options.Applicative.Builder.Extra.enableDisableFlagsNoDefault`:
 
     ~~~text
     enableDisableFlagsNoDefault.last
     ~~~
 
-  `StringException`
+    `StringException`
 
-  `impureThrow`
+    `impureThrow`
 
-* `Stack.Build.checkCabalVersion`:
+*   `Stack.Build.checkCabalVersion`:
 
     ~~~text
     Error: --allow-newer requires at least Cabal version 1.22, but version
     <version> was found.
     ~~~
 
-  `CabalVersionException`
+    `CabalVersionException`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Build.checkCabalVersion`:
+*   `Stack.Build.checkCabalVersion`:
 
     ~~~text
     Stack no longer supports Cabal versions older than 1.19.2, but version
@@ -353,101 +354,101 @@ to take stock of the errors that Stack itself can raise, by reference to the
     lts-3.0 or later / nightly-2015-05-05 or later.
     ~~~
 
-  `CabalVersionException`
+    `CabalVersionException`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Build.queryBuildInfo`:
+*   `Stack.Build.queryBuildInfo`:
 
     ~~~text
     Index out of range: <selector>"
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Build.queryBuildInfo`:
+*   `Stack.Build.queryBuildInfo`:
 
     ~~~text
     Encountered array and needed numeric selector: <selector>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Build.queryBuildInfo`:
+*   `Stack.Build.queryBuildInfo`:
 
     ~~~text
     Cannot apply selector to <value>: <selector>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Build.ConstructPlan.stripNonDeps`:
+*   `Stack.Build.ConstructPlan.stripNonDeps`:
 
     ~~~text
     Unexpected: task cycle for <package>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Build.Execute.getConfigCache`:
+*   `Stack.Build.Execute.getConfigCache`:
 
     ~~~text
     singleBuild: invariant violated, missing package ID missing: <id>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Build.Execute.singleBuild`:
+*   `Stack.Build.Execute.singleBuild`:
 
     ~~~text
     Invariant violated: cannot have an all-in-one build that also has a final
     build step.
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Build.Execute.singleBuild`:
+*   `Stack.Build.Execute.singleBuild`:
 
     ~~~text
     singleBuild: invariant violated: multiple results when describing installed package (<name>, <description>)
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Build.Execute.singleBuild`: catches exceptions in `cabal ...`
+*   `Stack.Build.Execute.singleBuild`: catches exceptions in `cabal ...`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Build.Source.getFileDigestMaybe`: catches exceptions in
-  `liftM Just . withSourceFile fp $ getDigest`
+*   `Stack.Build.Source.getFileDigestMaybe`: catches exceptions in
+    `liftM Just . withSourceFile fp $ getDigest`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Build.Execute.singleTest`:
+*   `Stack.Build.Execute.singleTest`:
 
     ~~~text
     template-haskell is a wired-in GHC boot library but it wasn't found
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Build.Haddock.openHaddocksInBrowser`:
+*   `Stack.Build.Haddock.openHaddocksInBrowser`:
 
     ~~~text
     No local or snapshot doc index found to open.
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.BuildPlan.checkBundleBuildPlan`:
+*   `Stack.BuildPlan.checkBundleBuildPlan`:
 
     ~~~text
     Bug: Duplicate packages are not expected here
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Clean.clean`:
+*   `Stack.Clean.clean`:
 
     ~~~text
     Exception while recursively deleting <dir>"
@@ -455,9 +456,9 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Perhaps you do not have permission to delete these files or they are in use?
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Stack.Config.configFromConfigMonoid`:
+*   `Stack.Config.configFromConfigMonoid`:
 
     ~~~text
     Stack's 'programs' path contains a space character and has no alternative
@@ -467,141 +468,141 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <path>
     ~~~
 
-* `Stack.Config.configFromConfigMonoid`:
+*   `Stack.Config.configFromConfigMonoid`:
 
     ~~~text
     When using the 'package-indices' key to override the default package index, you must provide exactly one value, received: <values>
     The 'package-indices' key is deprecated in favour of 'package-index'.
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Config.configFromConfigMonoid`:
+*   `Stack.Config.configFromConfigMonoid`:
 
     ~~~text
     Failed to parse PANTRY_ROOT environment variable (expected absolute
     directory): <path>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Config.determineStackRootAndOnwership`:
+*   `Stack.Config.determineStackRootAndOnwership`:
 
     ~~~text
     Failed to parse STACK_ROOT environment variable (expected absolute
     directory): <path>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Config.getDefaultLocalProgramsBase`:
+*   `Stack.Config.getDefaultLocalProgramsBase`:
 
     ~~~text
     Failed to parse LOCALAPPDATA environment variable (expected absolute
     directory): <path>
     ~~~
 
-  `StringException`
+    `StringException`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Config.makeConcreteResolver`:
+*   `Stack.Config.makeConcreteResolver`:
 
     ~~~text
     No LTS release found with major version <version>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Config.makeConcreteResolver`:
+*   `Stack.Config.makeConcreteResolver`:
 
     ~~~text
     No LTS releases found
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.ConfigCmd.cfgCmdSet`:
+*   `Stack.ConfigCmd.cfgCmdSet`:
 
     ~~~text
     config command used when no project configuration available
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    GHC major version not specified
-    ~~~
-
-  `StringException`
-
-* `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-  `StringException`
-
-* `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-  `StringException`
-
-* `Stack.Config.Nix.nixCompilerVersion`:
+*   `Stack.Config.Nix.nixCompiler`:
 
     ~~~text
     GHC major version not specified
     ~~~
 
-  `StringException`
+    `StringException`
 
-* `Stack.Config.Nix.nixCompilerVersion`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-  `StringException`
-
-* `Stack.Config.Nix.nixCompilerVersion`:
+*   `Stack.Config.Nix.nixCompiler`:
 
     ~~~text
     Only GHC is supported by stack --nix
     ~~~
 
-  `StringException`
+    `StringException`
 
-* `Stack.Constants.wiredInPackages`:
+*   `Stack.Config.Nix.nixCompiler`:
+
+    ~~~text
+    Only GHC is supported by stack --nix
+    ~~~
+
+    `StringException`
+
+*   `Stack.Config.Nix.nixCompilerVersion`:
+
+    ~~~text
+    GHC major version not specified
+    ~~~
+
+    `StringException`
+
+*   `Stack.Config.Nix.nixCompilerVersion`:
+
+    ~~~text
+    Only GHC is supported by stack --nix
+    ~~~
+
+    `StringException`
+
+*   `Stack.Config.Nix.nixCompilerVersion`:
+
+    ~~~text
+    Only GHC is supported by stack --nix
+    ~~~
+
+    `StringException`
+
+*   `Stack.Constants.wiredInPackages`:
 
     ~~~text
     Parse error in wiredInPackages
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Coverage.generateHpcReport`: catches exceptions from
-  `findPackageFieldForBuiltPackage`
+*   `Stack.Coverage.generateHpcReport`: catches exceptions from
+    `findPackageFieldForBuiltPackage`
 
-* `Stack.Coverage.generateHpcReportInternal`:
+*   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
     Didn't find .tix for <report> - expected to find it at <path>.
     ~~~
 
-* `Stack.Coverage.generateHpcReportInternal`:
+*   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
     <exception>
     Error occurred while producing <report>"
     ~~~
 
-* `Stack.Coverage.generateHpcReportInternal`:
+*   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
     Error: The <report> did not consider any code. One possible cause of this is
@@ -610,64 +611,64 @@ to take stock of the errors that Stack itself can raise, by reference to the
     you think your coverage report should have meaningful results.
     ~~~
 
-* `Stack.Coverage.generateHpcReportForTargets`:
+*   `Stack.Coverage.generateHpcReportForTargets`:
 
     ~~~text
     Error: Expected a local package, but <name> is either an extra-dep or in the
     snapshot.
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Coverage.generateHpcReportForTargets`:
+*   `Stack.Coverage.generateHpcReportForTargets`:
 
     ~~~text
     Not generating combined report, because no targets or tix files are
     specified.
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Coverage.readTixOrlog`:
+*   `Stack.Coverage.readTixOrlog`:
 
     ~~~text
     Error while reading tix: <exeception>
     ~~~
 
-* `Stack.Coverage.readTixOrlog`:
+*   `Stack.Coverage.readTixOrlog`:
 
     ~~~text
     Failed to read tix file <path>
     ~~~
 
-* `Stack.Coverage.updateTixFile`:
+*   `Stack.Coverage.updateTixFile`:
 
     ~~~text
     Failed to read <file>
     ~~~
 
-* `Stack.Dot.createDepLoader`:
+*   `Stack.Dot.createDepLoader`:
 
     ~~~text
     Invariant violated: Expected to find <packageId> in global DB
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Ghci.buildDepsAndInitialSteps`: catches exeception from
-  `buildLocalTargets`
+*   `Stack.Ghci.buildDepsAndInitialSteps`: catches exeception from
+    `buildLocalTargets`
 
     ~~~text
     <exception>
     ~~~
 
-* `Stack.GhcPkg.createDatabase`:
+*   `Stack.GhcPkg.createDatabase`:
 
     ~~~text
     Unable to create package database at <path>
     ~~~
 
-* `Stack.Hoogle.hoogleCmd`:
+*   `Stack.Hoogle.hoogleCmd`:
 
     ~~~text
     No Hoogle database. Not building one due to --no-setup
@@ -675,7 +676,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `exitWith (ExitFailure (-1))`
 
-* `Stack.Init.cabalPackagesCheck`:
+*   `Stack.Init.cabalPackagesCheck`:
 
     ~~~text
     Package name as defined in the Cabal file must match the Cabal file name.
@@ -683,18 +684,18 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <packages>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Init.cabalPackagesCheck`: has the possibility of passing a message. Not
-  currently used.
+*   `Stack.Init.cabalPackagesCheck`: has the possibility of passing a message.
+    Not currently used.
 
     ~~~text
     <message>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Init.getSnapshots'`:
+*   `Stack.Init.getSnapshots'`:
 
     ~~~text
     Unable to download snapshot list, and therefore could not generate a
@@ -711,40 +712,40 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Exception was: <exception>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Init.getWorkingResolverPlan`:
+*   `Stack.Init.getWorkingResolverPlan`:
 
     ~~~text
     Bug: No packages to ignore
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Init.getWorkingResolverPlan`:
+*   `Stack.Init.getWorkingResolverPlan`:
 
     ~~~text
     getWorkingResolverPlan.head
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Init.initProject`:
+*   `Stack.Init.initProject`:
 
     ~~~text
     Error: Stack configuration file " <path>  exists, use '--force' to overwrite
     it.
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Lock.loadYamlThrow`:
+*   `Stack.Lock.loadYamlThrow`:
 
-  `Data.Yaml.AesonException`
+    `Data.Yaml.AesonException`
 
-  `throwIO`
+    `throwIO`
 
-* `Stack.Lock.lockCachedWanted`:
+*   `Stack.Lock.lockCachedWanted`:
 
     ~~~text
     You indicated that Stack should error out on writing a lock file
@@ -752,230 +753,230 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <lock_file_contents>
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Stack.Package.componentNameToDir`:
+*   `Stack.Package.componentNameToDir`:
 
     ~~~text
     Invariant violated: component names should always parse as directory names
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Package.resolveGlobFiles`:
+*   `Stack.Package.resolveGlobFiles`:
 
-  `Control.Exception.Base.IOException`
+    `Control.Exception.Base.IOException`
 
-  `throwIO`
+    `throwIO`
 
-* `Stack.Runners.reexec`:
+*   `Stack.Runners.reexec`:
 
     ~~~text
     Cannot use both Docker and Nix at the same time
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Runners.reexec`:
+*   `Stack.Runners.reexec`:
 
     ~~~text
     Cannot use Nix from within a Docker container
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Runners.reexec`:
+*   `Stack.Runners.reexec`:
 
     ~~~text
     Cannot use Docker from within a Nix shell
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Runners.withConfig`:
+*   `Stack.Runners.withConfig`:
 
     ~~~text
     Error when running shouldUpgradeCheck: <exception>
     ~~~
 
-* `Stack.Runners.withGlobalProject`:
+*   `Stack.Runners.withGlobalProject`:
 
     ~~~text
     Cannot use this command with options which override the stack.yaml location
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Script.scriptCmd`:
+*   `Stack.Script.scriptCmd`:
 
-  Error used because warnings are surpressed.
+    Error used because warnings are surpressed.
 
     ~~~text
     Ignoring override stack.yaml file for script command: <path>
     ~~~
 
-* `Stack.Script.scriptCmd`:
+*   `Stack.Script.scriptCmd`:
 
-  Error used because warnings are surpressed.
+    Error used because warnings are surpressed.
 
     ~~~text
     Ignoring SYLGlobalProject for script command
     ~~~
 
-* `Stack.Script.scriptCmd`:
+*   `Stack.Script.scriptCmd`:
 
     ~~~text
     --no-run incompatible with arguments
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Script.scriptCmd`:
+*   `Stack.Script.scriptCmd`:
 
     ~~~text
     --no-run requires either --compile or --optimize
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.SDist.getCabalLbs`:
+*   `Stack.SDist.getCabalLbs`:
 
     ~~~text
     getCabalLbs: cabalfp /= cabalfp': (<cabalfp>, <cabalfp'>)
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.SDist.getSDistTarball`:
+*   `Stack.SDist.getSDistTarball`:
 
     ~~~text
     Error building custom-setup dependencies: <exception>
     ~~~
 
-* `Stack.SDist.getSDistTarball`: catches exception from
-  `Codec.Archive.Tar.Entry.toTarPath`
+*   `Stack.SDist.getSDistTarball`: catches exception from
+    `Codec.Archive.Tar.Entry.toTarPath`
 
     ~~~text
     <exception>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.buildGHCFromSource`:
+*   `Stack.Setup.buildGHCFromSource`:
 
     ~~~text
     Invalid working directory
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.buildGHCFromSource`:
+*   `Stack.Setup.buildGHCFromSource`:
 
     ~~~text
     No Hadrian build script found
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.buildGHCFromSource`:
+*   `Stack.Setup.buildGHCFromSource`:
 
     ~~~text
     Can't find hadrian generated bindist
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.downloadAndInstallCompiler`:
+*   `Stack.Setup.downloadAndInstallCompiler`:
 
     ~~~text
     downloadAndInstallCompiler: shouldn't be reached with ghc-git
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.downloadFromInfo`:
+*   `Stack.Setup.downloadFromInfo`:
 
     ~~~text
     Error: Unknown extension for url: <url>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.downloadOrUseLocal`:
+*   `Stack.Setup.downloadOrUseLocal`:
 
     ~~~text
     Error: `url` must be either an HTTP URL or a file path: <url>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.downloadStackExe`:
+*   `Stack.Setup.downloadStackExe`:
 
     ~~~text
     Unable to find binary Stack archive for platforms: <platforms>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.downloadStackExe`:
+*   `Stack.Setup.downloadStackExe`:
 
     ~~~text
     FIXME: Handle zip files
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.downloadStackExe`:
+*   `Stack.Setup.downloadStackExe`:
 
     ~~~text
     Unknown archive format for Stack archive: <url>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.downloadStackExe`:
+*   `Stack.Setup.downloadStackExe`:
 
     ~~~text
     "Stack executable <exe>  not found in archive from <url>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
+*   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
 
-* `Stack.Setup.downloadStackReleaseInfoGitHub`:
+*   `Stack.Setup.downloadStackReleaseInfoGitHub`:
 
     ~~~text
     Could not get release information for Stack from: <url>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.ensureCompiler`:
+*   `Stack.Setup.ensureCompiler`:
 
     ~~~text
     Not the compiler version we want
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.ensureCompiler`:
+*   `Stack.Setup.ensureCompiler`:
 
     ~~~text
     Not the architecture we want
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.ensureMsys`:
+*   `Stack.Setup.ensureMsys`:
 
     ~~~text
     MSYS2 not found for <os>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.ensureSandboxedCompiler`:
+*   `Stack.Setup.ensureSandboxedCompiler`:
 
     ~~~text
     Looked for sandboxed compiler named one of: <names>
@@ -983,25 +984,25 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Could not find sandboxed compiler
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.expectSingleUnpackedDir`:
+*   `Stack.Setup.expectSingleUnpackedDir`:
 
     ~~~text
     Expected a single directory within unpacked <file>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.installGHCPosix`:
+*   `Stack.Setup.installGHCPosix`:
 
     ~~~text
     Don't know how to deal with .7z files on non-Windows
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.installGHCPosix`:
+*   `Stack.Setup.installGHCPosix`:
 
     ~~~text
     <exception>
@@ -1017,214 +1018,214 @@ to take stock of the errors that Stack itself can raise, by reference to the
     For more information consider rerunning with --verbose flag
     ~~~
 
-  `exitFailure`
+    `exitFailure`
 
-* `Stack.Setup.installMsys2Windows`:
+*   `Stack.Setup.installMsys2Windows`:
 
     ~~~text
     Could not delete existing msys directory: <path>
     ~~~
 
-  `throwM`
+    `throwM`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     Could not find any of: <paths>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     GHC info is not valid UTF-8: <exception>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     GHC info does not parse as a list of pairs
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     Key 'Global Package DB' not found in GHC info
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     Key 'Target platform' not found in GHC info
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     Invalid target platform in GHC info: <platform>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.pathsFromCompiler`:
+*   `Stack.Setup.pathsFromCompiler`:
 
     ~~~text
     Cabal library not found in global package database for <compiler>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.performPathChecking`:
+*   `Stack.Setup.performPathChecking`:
 
     ~~~text
     Process exited with <exitcode>: <cmd> <args>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Setup.preferredPlatforms`:
+*   `Stack.Setup.preferredPlatforms`:
 
     ~~~text
     Binary upgrade not yet supported on OS: <os>
     ~~~
 
-  `StringException`
+    `StringException`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Setup.preferredPlatforms`:
+*   `Stack.Setup.preferredPlatforms`:
 
     ~~~text
     Binary upgrade not yet supported on arch: <arch>
     ~~~
 
-  `StringException`
+    `StringException`
 
-  `throwM`
+    `throwM`
 
-* `Stack.Setup.withUnpackedTarball7z`:
+*   `Stack.Setup.withUnpackedTarball7z`:
 
     ~~~text
     <name>  must be a tarball file
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Setup.withUnpackedTarball7z`:
+*   `Stack.Setup.withUnpackedTarball7z`:
 
     ~~~text
     Invalid <name> filename: <file>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Storage.User.loadCompilerPaths`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
     Compiler file metadata mismatch, ignoring cache
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Storage.User.loadCompilerPaths`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
     Global package cache file metadata mismatch, ignoring cache
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Storage.User.loadCompilerPaths`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
     Global dump did not parse correctly
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Storage.User.loadCompilerPaths`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
     Invalid arch: <arch>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Types.Build.showBuildError`:
+*   `Stack.Types.Build.showBuildError`:
 
     ~~~text
     Invariant violated: unexpected case in showBuildError
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Types.TemplateName.defaultTemplateName`:
+*   `Stack.Types.TemplateName.defaultTemplateName`:
 
     ~~~text
     Bug in Stack codebase, cannot parse default template name: <name>
     ~~~
 
-  `error`
+    `error`
 
-* `Stack.Upgrade.binaryUpgrade`:
+*   `Stack.Upgrade.binaryUpgrade`:
 
     ~~~text
     Non-success exit code from running newly downloaded executable
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Upgrade.sourceUpgrade`:
 
     ~~~text
     No commits found for branch <branch> on repo <repo>
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Upgrade.sourceUpgrade`:
 
     ~~~text
     No Stack version found in package indices
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Upgrade.sourceUpgrade`:
 
     ~~~text
     Latest version with no revision
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upgrade.upgrade`:
+*   `Stack.Upgrade.upgrade`:
 
     ~~~text
     You must allow either binary or source upgrade paths
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upload.uploadBytes`:
+*   `Stack.Upload.uploadBytes`:
 
     ~~~text
     authentication failure
     Authentication failure uploading to server
     ~~~
 
-  `throwString`
+    `throwString`
 
-* `Stack.Upload.uploadBytes`:
+*   `Stack.Upload.uploadBytes`:
 
     ~~~text
     forbidden upload
@@ -1233,7 +1234,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <Hackage_message>
     ~~~
 
-* `Stack.Upload.uploadBytes`:
+*   `Stack.Upload.uploadBytes`:
 
     ~~~text
     service unavailable
@@ -1242,7 +1243,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <Hackage_message>
     ~~~
 
-* `Stack.Upload.uploadBytes`:
+*   `Stack.Upload.uploadBytes`:
 
     ~~~text
     unhandled status code: <code>
@@ -1250,4 +1251,4 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Upload failed on <name>
     ~~~
 
-  `throwString`
+    `throwString`
