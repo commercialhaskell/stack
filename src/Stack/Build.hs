@@ -137,25 +137,56 @@ checkCabalVersion = do
     cabalVer <- view cabalVersionL
     -- https://github.com/haskell/cabal/issues/2023
     when (allowNewer && cabalVer < mkVersion [1, 22]) $ throwM $
-        CabalVersionException $
-            "Error: --allow-newer requires at least Cabal version 1.22, but version " ++
-            versionString cabalVer ++
-            " was found."
+        AllowNewerNotSupported cabalVer
     -- Since --exact-configuration is always passed, some old cabal
     -- versions can no longer be used. See the following link for why
     -- it's 1.19.2:
     -- https://github.com/haskell/cabal/blob/580fe6b6bf4e1648b2f66c1cb9da9f1f1378492c/cabal-install/Distribution/Client/Setup.hs#L592
     when (cabalVer < mkVersion [1, 19, 2]) $ throwM $
-        CabalVersionException $
-            "Stack no longer supports Cabal versions older than 1.19.2, but version " ++
-            versionString cabalVer ++
-            " was found.  To fix this, consider updating the resolver to lts-3.0 or later / nightly-2015-05-05 or later."
+        CabalVersionNotSupported cabalVer
 
-newtype CabalVersionException = CabalVersionException { unCabalVersionException :: String }
+data CabalVersionException
+    = AllowNewerNotSupported Version
+    | CabalVersionNotSupported Version
     deriving (Typeable)
 
-instance Show CabalVersionException where show = unCabalVersionException
+instance Show CabalVersionException where
+    show (AllowNewerNotSupported cabalVer) = concat
+        [ "Error: --allow-newer requires at least Cabal version 1.22, but "
+        , "version "
+        , versionString cabalVer
+        , " was found."
+        ]
+    show (CabalVersionNotSupported cabalVer) = concat
+        [ "Error: Stack no longer supports Cabal versions older than 1.19.2, "
+        , "but version "
+        , versionString cabalVer
+        , " was found. To fix this, consider updating the resolver to lts-3.0 "
+        , "or later or to nightly-2015-05-05 or later."
+        ]
+
 instance Exception CabalVersionException
+
+data QueryException
+    = SelectorNotFound [Text]
+    | IndexOutOfRange [Text]
+    | NoNumericSelector [Text]
+    | CannotApplySelector Value [Text]
+    deriving (Typeable)
+
+instance Show QueryException where
+    show (SelectorNotFound sels) = err "Selector not found" sels
+    show (IndexOutOfRange sels) = err "Index out of range" sels
+    show (NoNumericSelector sels) =
+        err "Encountered array and needed numeric selector" sels
+    show (CannotApplySelector value sels) =
+        err ("Cannot apply selector to " ++ show value) sels
+
+instance Exception QueryException
+
+-- Helper function for 'QueryException' instance of 'Show'
+err :: String -> [Text] -> String
+err msg sels = "Error: " ++ msg ++ ": " ++ show sels
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten
@@ -295,18 +326,18 @@ queryBuildInfo selectors0 =
         case value of
             Object o ->
                 case KeyMap.lookup (Key.fromText sel) o of
-                    Nothing -> err "Selector not found"
+                    Nothing -> throwIO $ SelectorNotFound sels'
                     Just value' -> cont value'
             Array v ->
                 case decimal sel of
                     Right (i, "")
                         | i >= 0 && i < V.length v -> cont $ v V.! i
-                        | otherwise -> err "Index out of range"
-                    _ -> err "Encountered array and needed numeric selector"
-            _ -> err $ "Cannot apply selector to " ++ show value
+                        | otherwise -> throwIO $ IndexOutOfRange sels'
+                    _ -> throwIO $ NoNumericSelector sels'
+            _ -> throwIO $ CannotApplySelector value sels'
       where
         cont = select (front . (sel:)) sels
-        err msg = throwString $ msg ++ ": " ++ show (front [sel])
+        sels' = front [sel]
     -- Include comments to indicate that this portion of the "stack
     -- query" API is not necessarily stable.
     addGlobalHintsComment
