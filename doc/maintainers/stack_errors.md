@@ -38,10 +38,20 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | InvalidPathForExec FilePath
         ~~~
 
+    -   `Stack.Build.QueryException`
+
+        ~~~haskell
+        = SelectorNotFound [Text]
+        | IndexOutOfRange [Text]
+        | NoNumericSelector [Text]
+        | CannotApplySelector Value [Text]
+        ~~~
+
     -   `Stack.Build.CabalVersionException`
 
         ~~~haskell
-        = CabalVersionException String
+        = AllowNewerNotSupported Version
+        | CabalVersionNotSupported Version
         ~~~
 
         The `String` is a message.
@@ -334,53 +344,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     `StringException`
 
     `impureThrow`
-
-*   `Stack.Build.checkCabalVersion`:
-
-    ~~~text
-    Error: --allow-newer requires at least Cabal version 1.22, but version
-    <version> was found.
-    ~~~
-
-    `CabalVersionException`
-
-    `throwM`
-
-*   `Stack.Build.checkCabalVersion`:
-
-    ~~~text
-    Stack no longer supports Cabal versions older than 1.19.2, but version
-    <version>  was found.  To fix this, consider updating the resolver to
-    lts-3.0 or later / nightly-2015-05-05 or later.
-    ~~~
-
-    `CabalVersionException`
-
-    `throwM`
-
-*   `Stack.Build.queryBuildInfo`:
-
-    ~~~text
-    Index out of range: <selector>"
-    ~~~
-
-    `throwString`
-
-*   `Stack.Build.queryBuildInfo`:
-
-    ~~~text
-    Encountered array and needed numeric selector: <selector>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Build.queryBuildInfo`:
-
-    ~~~text
-    Cannot apply selector to <value>: <selector>
-    ~~~
-
-    `throwString`
 
 *   `Stack.Build.ConstructPlan.stripNonDeps`:
 
