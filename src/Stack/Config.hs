@@ -164,12 +164,12 @@ makeConcreteResolver ar = do
             ARLatestLTSMajor x -> do
                 snapshots <- getSnapshots
                 case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> throwString $ "No LTS release found with major version " ++ show x
+                    Nothing -> throwIO $ NoLTSWithMajorVersion x
                     Just y -> pure $ RSLSynonym $ LTS x y
             ARLatestLTS -> do
                 snapshots <- getSnapshots
                 if IntMap.null $ snapshotsLts snapshots
-                   then throwString "No LTS releases found"
+                   then throwIO NoLTSFound
                    else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                         in pure $ RSLSynonym $ LTS x y
     logInfo $ "Selected resolver: " <> display r
@@ -366,10 +366,6 @@ configFromConfigMonoid
                & useColorL .~ useColor''
          go = runnerGlobalOpts configRunner'
 
-     let packageIndicesWarning =
-             "The 'package-indices' key is deprecated in favour of \
-             \'package-index'."
-
      pic <-
          case getFirst configMonoidPackageIndex of
              Nothing ->
@@ -378,19 +374,14 @@ configFromConfigMonoid
                      Just [pic] -> do
                          logWarn $ fromString packageIndicesWarning
                          pure pic
-                     Just x ->
-                         error $
-                             "When using the 'package-indices' key to override \
-                             \the default package index, you must provide \
-                             \exactly one value, received: " ++ show x ++
-                             "\n" ++ packageIndicesWarning
+                     Just x -> throwIO $ MultiplePackageIndices x
              Just pic -> pure pic
-     mpantryRoot <- liftIO $ lookupEnv "PANTRY_ROOT"
+     mpantryRoot <- liftIO $ lookupEnv pantryRootEnvVar
      pantryRoot <-
        case mpantryRoot of
          Just dir ->
            case parseAbsDir dir of
-             Nothing -> throwString $ "Failed to parse PANTRY_ROOT environment variable (expected absolute directory): " ++ show dir
+             Nothing -> throwIO $ ParseAbsolutePathException pantryRootEnvVar dir
              Just x -> pure x
          Nothing -> pure $ configStackRoot </> relDirPantry
 
@@ -468,23 +459,24 @@ getDefaultLocalProgramsBase :: MonadThrow m
                             -> ProcessContext
                             -> m (Path Abs Dir)
 getDefaultLocalProgramsBase configStackRoot configPlatform override =
-  let
-    defaultBase = configStackRoot </> relDirPrograms
-  in
     case configPlatform of
       -- For historical reasons, on Windows a subdirectory of LOCALAPPDATA is
       -- used instead of a subdirectory of STACK_ROOT. Unifying the defaults would
       -- mean that Windows users would manually have to move data from the old
       -- location to the new one, which is undesirable.
-      Platform _ Windows ->
-        case Map.lookup "LOCALAPPDATA" $ view envVarsL override of
-          Just t ->
-            case parseAbsDir $ T.unpack t of
-              Nothing -> throwM $ stringException ("Failed to parse LOCALAPPDATA environment variable (expected absolute directory): " ++ show t)
-              Just lad ->
-                pure $ lad </> relDirUpperPrograms </> relDirStackProgName
-          Nothing -> pure defaultBase
-      _ -> pure defaultBase
+        Platform _ Windows -> do
+            let envVars = view envVarsL override
+            case T.unpack <$> Map.lookup "LOCALAPPDATA" envVars of
+                Just t -> case parseAbsDir t of
+                    Nothing ->
+                        throwM $ ParseAbsolutePathException "LOCALAPPDATA" t
+                    Just lad ->
+                        pure $ lad </> relDirUpperPrograms </>
+                               relDirStackProgName
+                Nothing -> pure defaultBase
+        _ -> pure defaultBase
+  where
+    defaultBase = configStackRoot </> relDirPrograms
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
@@ -769,7 +761,8 @@ determineStackRootAndOwnership clArgs = liftIO $ do
                 case mstackRoot of
                     Nothing -> getAppUserDataDir stackProgName
                     Just x -> case parseAbsDir x of
-                        Nothing -> throwString ("Failed to parse STACK_ROOT environment variable (expected absolute directory): " ++ show x)
+                        Nothing ->
+                            throwIO $ ParseAbsolutePathException stackRootEnvVar x
                         Just parsed -> pure parsed
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
