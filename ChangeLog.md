@@ -23,6 +23,10 @@ Behavior changes:
   command are inconsistent and now takes no action. Previously the flag was
   silently ignored.
 
+* `stack test` will check if the process is running in a terminal. If so, it
+  will start the test suite in a way that it can use the terminal. This is
+  intended to support interactive terminal UI based testing.
+
 Other enhancements:
 
 * Help documentation for `stack upgrade` warns that if GHCup is used to install
