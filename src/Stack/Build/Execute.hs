@@ -96,6 +96,7 @@ import           RIO.PrettyPrint
 import           RIO.Process
 import           Pantry.Internal.Companion
 import           System.Random (randomIO)
+import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -1020,8 +1021,9 @@ withLockedDistDir announce root inner = do
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
 data OutputType
-  = OTLogFile !(Path Abs File) !Handle
-  | OTConsole !(Maybe Utf8Builder)
+  = OTLogFile       !(Path Abs File) !Handle
+  | OTConsolePrefix !(Maybe Utf8Builder)
+  | OTConsoleTTY
 
 -- | This sets up a context for executing build steps which need to run
 -- Cabal (via a compiled Setup.hs).  In particular it does the following:
@@ -1112,12 +1114,16 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     withOutputType pkgDir package inner
         -- Not in interleaved mode. When building a single wanted package, dump
         -- to the console with no prefix.
-        | console = inner $ OTConsole Nothing
+        | console = do
+            isTerminal <- hIsTerminalDeviceOrMinTTY stdout
+            case isTerminal of
+              True -> inner OTConsoleTTY
+              False -> inner $ OTConsolePrefix Nothing
 
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
         | boptsInterleavedOutput eeBuildOpts =
-             inner $ OTConsole $ Just $ packageNamePrefix ee $ packageName package
+             inner $ OTConsolePrefix $ Just $ packageNamePrefix ee $ packageName package
 
         -- Neither condition applies, dump to a file.
         | otherwise = do
@@ -1261,7 +1267,6 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                     runAndOutput compilerVer `catch` \ece -> do
                         (mlogFile, bss) <-
                             case outputType of
-                                OTConsole _ -> pure (Nothing, [])
                                 OTLogFile logFile h ->
                                     if keepOutputOpen == KeepOpen
                                     then pure (Nothing, []) -- expected failure build continues further
@@ -1273,6 +1278,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                                             .| CT.decodeUtf8Lenient
                                             .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                             .| CL.consume
+                                _ -> pure (Nothing, [])
                         throwM $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
                             taskProvides
@@ -1291,8 +1297,10 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                           void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                               (sinkWithTimestamps prefixWithTimestamps h)
                               (sinkWithTimestamps prefixWithTimestamps h)
-                        OTConsole mprefix ->
-                            let prefix = fold mprefix in
+                        OTConsoleTTY ->
+                          readProcessNull (toFilePath exeName) fullArgs
+                        OTConsolePrefix mprefix ->
+                          let prefix = fold mprefix in
                             void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                                 (outputSink KeepTHLoading LevelWarn compilerVer prefix)
                                 (outputSink stripTHLoading LevelInfo compilerVer prefix)
@@ -1973,16 +1981,15 @@ singleTest topts testsToRun ac ee task installedMap = do
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
                         case outputType of
-                          OTConsole _ -> do
+                          OTConsolePrefix _ -> do
                             logStickyDone ""
                             liftIO $ hFlush stdout
                             liftIO $ hFlush stderr
-                          OTLogFile _ _ -> pure ()
+                          _ -> pure ()
 
                         let output =
                                 case outputType of
-                                    OTConsole Nothing -> Nothing <$ inherit
-                                    OTConsole (Just prefix) -> fmap
+                                    OTConsolePrefix (Just prefix) -> fmap
                                       (\src -> Just $ runConduit $ src .|
                                                CT.decodeUtf8Lenient .|
                                                CT.lines .|
@@ -1990,36 +1997,40 @@ singleTest topts testsToRun ac ee task installedMap = do
                                                CL.mapM_ (\t -> logInfo $ prefix <> RIO.display t))
                                       createSource
                                     OTLogFile _ h -> Nothing <$ useHandleOpen h
+                                    _ -> Nothing <$ inherit
                             optionalTimeout action
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
                                     timeout (maxSecs * 1000000) action
                                 | otherwise = Just <$> action
 
                         mec <- withWorkingDir (toFilePath pkgDir) $
-                          optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
-                            stdinBS <-
-                              if isTestTypeLib
-                                then do
-                                  logPath <- buildLogPath package (Just stestName)
-                                  ensureDir (parent logPath)
-                                  pure $ BL.fromStrict
-                                       $ encodeUtf8 $ fromString $
-                                       show (logPath, mkUnqualComponentName (T.unpack testName))
-                                else pure mempty
-                            let pc = setStdin (byteStringInput stdinBS)
-                                   $ setStdout output
-                                   $ setStderr output
-                                     pc0
-                            withProcessWait pc $ \p -> do
-                              case (getStdout p, getStderr p) of
-                                (Nothing, Nothing) -> pure ()
-                                (Just x, Just y) -> concurrently_ x y
-                                (x, y) -> assert False $ concurrently_ (fromMaybe (pure ()) x) (fromMaybe (pure ()) y)
-                              waitExitCode p
+                          case outputType of
+                            OTConsoleTTY ->
+                              (Just <$>) $ proc (toFilePath exePath) args runProcess
+                            _ -> optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
+                              stdinBS <-
+                                if isTestTypeLib
+                                  then do
+                                    logPath <- buildLogPath package (Just stestName)
+                                    ensureDir (parent logPath)
+                                    pure $ BL.fromStrict
+                                         $ encodeUtf8 $ fromString $
+                                         show (logPath, mkUnqualComponentName (T.unpack testName))
+                                  else pure mempty
+                              let pc = setStdin (byteStringInput stdinBS)
+                                     $ setStdout output
+                                     $ setStderr output
+                                       pc0
+                              withProcessWait pc $ \p -> do
+                                case (getStdout p, getStderr p) of
+                                  (Nothing, Nothing) -> pure ()
+                                  (Just x, Just y) -> concurrently_ x y
+                                  (x, y) -> assert False $ concurrently_ (fromMaybe (pure ()) x) (fromMaybe (pure ()) y)
+                                waitExitCode p
                         -- Add a trailing newline, incase the test
                         -- output didn't finish with a newline.
                         case outputType of
-                          OTConsole Nothing -> logInfo ""
+                          OTConsolePrefix Nothing -> logInfo ""
                           _ -> pure ()
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
@@ -2059,10 +2070,10 @@ singleTest topts testsToRun ac ee task installedMap = do
 
             bs <- liftIO $
                 case outputType of
-                    OTConsole _ -> pure ""
                     OTLogFile logFile h -> do
                         hClose h
                         S.readFile $ toFilePath logFile
+                    _ -> pure ""
 
             let succeeded = Map.null errs
             unless (succeeded || expectFailure) $ throwM $ TestSuiteFailure
@@ -2070,7 +2081,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 errs
                 (case outputType of
                    OTLogFile fp _ -> Just fp
-                   OTConsole _ -> Nothing)
+                   _ -> Nothing)
                 bs
 
             setTestStatus pkgDir $ if succeeded then TSSuccess else TSFailure
