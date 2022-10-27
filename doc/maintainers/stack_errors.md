@@ -74,6 +74,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         = NonTestSuiteTarget PackageName
+        | NoTargetsOrTixSpecified
+        | NotLocalPackage PackageName
         ~~~
 
     -   `Stack.Ghci.Ghci.Exception`
@@ -573,24 +575,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     also indicate a bug in Stack or the hpc program. Please report this issue if
     you think your coverage report should have meaningful results.
     ~~~
-
-*   `Stack.Coverage.generateHpcReportForTargets`:
-
-    ~~~text
-    Error: Expected a local package, but <name> is either an extra-dep or in the
-    snapshot.
-    ~~~
-
-    `throwString`
-
-*   `Stack.Coverage.generateHpcReportForTargets`:
-
-    ~~~text
-    Not generating combined report, because no targets or tix files are
-    specified.
-    ~~~
-
-    `throwString`
 
 *   `Stack.Coverage.readTixOrlog`:
 

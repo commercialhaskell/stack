@@ -46,14 +46,29 @@ import           RIO.Process
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
-newtype CoverageException = NonTestSuiteTarget PackageName deriving Typeable
+data CoverageException
+    = NonTestSuiteTarget PackageName
+    | NoTargetsOrTixSpecified
+    | NotLocalPackage PackageName
+    deriving (Typeable)
+
+instance Show CoverageException where
+    show (NonTestSuiteTarget name) = concat
+        [ "Error: Can't specify anything except test-suites as hpc report "
+        , "targets ("
+        , packageNameString name
+        , " is used with a non test-suite target)"
+        ]
+    show NoTargetsOrTixSpecified =
+        "Error: Not generating combined report, because no targets or tix " ++
+        "files are specified."
+    show (NotLocalPackage name) = concat
+        [ "Error: Expected a local package, but "
+        , packageNameString name
+        , " is either an extra-dep or in the snapshot."
+        ]
 
 instance Exception CoverageException
-instance Show CoverageException where
-    show (NonTestSuiteTarget name) =
-        "Can't specify anything except test-suites as hpc report targets (" ++
-        packageNameString name ++
-        " is used with a non test-suite target)"
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: HasEnvConfig env => RIO env ()
@@ -235,10 +250,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
              targets <- view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
-                     TargetAll PTDependency -> throwString $
-                         "Error: Expected a local package, but " ++
-                         packageNameString name ++
-                         " is either an extra-dep or in the snapshot."
+                     TargetAll PTDependency -> throwIO $ NotLocalPackage name
                      TargetComps comps -> do
                          pkgPath <- hpcPkgPath name
                          forM (toList comps) $ \nc ->
@@ -258,8 +270,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                                      pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
                              else pure []
     tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
-    when (null tixPaths) $
-        throwString "Not generating combined report, because no targets or tix files are specified."
+    when (null tixPaths) $ throwIO NoTargetsOrTixSpecified
     outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
         Nothing -> pure (outputDir </> relDirCombined </> relDirCustom)
