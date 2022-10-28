@@ -40,6 +40,16 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
 
+data ConfigCmdException
+    = NoProjectConfigAvailable
+    deriving (Typeable)
+
+instance Show ConfigCmdException where
+    show NoProjectConfigAvailable =
+        "Error: config command used when no project configuration available"
+
+instance Exception ConfigCmdException
+
 data ConfigCmdSet
     = ConfigCmdSetResolver !(Unresolved AbstractResolver)
     | ConfigCmdSetSystemGhc !CommandScope !Bool
@@ -72,7 +82,8 @@ cfgCmdSet cmd = do
                      case mstackYaml of
                          PCProject stackYaml -> pure stackYaml
                          PCGlobalProject -> liftM (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         PCNoProject _extraDeps -> throwString "config command used when no project configuration available" -- maybe modify the ~/.stack/config.yaml file instead?
+                         PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
+                         -- maybe modify the ~/.stack/config.yaml file instead?
                  CommandScopeGlobal -> pure (configUserConfigPath conf)
     rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
     config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)

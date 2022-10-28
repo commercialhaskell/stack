@@ -190,6 +190,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         = NixCannotUseShellFileAndPackagesException
         ~~~
 
+    -   `Stack.ConfigCmd.ConfigCmdException`
+
+        ~~~haskell
+        = NoProjectConfigAvailable
+        ~~~
+
     -   `Stack.Types.Build.StackBuildException`
 
         ~~~haskell
@@ -441,14 +447,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     configuration option to specify an alternative path. The current path is:
     <path>
     ~~~
-
-*   `Stack.ConfigCmd.cfgCmdSet`:
-
-    ~~~text
-    config command used when no project configuration available
-    ~~~
-
-    `throwString`
 
 *   `Stack.Config.Nix.nixCompiler`:
 
