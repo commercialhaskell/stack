@@ -14,6 +14,7 @@ module Stack.Constants
     ,stackWorkEnvVar
     ,stackRootEnvVar
     ,stackRootOptionName
+    ,pantryRootEnvVar
     ,deprecatedStackRootOptionName
     ,inContainerEnvVar
     ,inNixShellEnvVar
@@ -165,6 +166,10 @@ stackRootEnvVar = "STACK_ROOT"
 -- | Option name for the global Stack root.
 stackRootOptionName :: String
 stackRootOptionName = "stack-root"
+
+-- | Environment variable used to override the location of the Pantry store
+pantryRootEnvVar :: String
+pantryRootEnvVar = "PANTRY_ROOT"
 
 -- | Deprecated option name for the global Stack root.
 --

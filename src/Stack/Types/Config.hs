@@ -69,6 +69,8 @@ module Stack.Types.Config
   -- ** ConfigException
   ,HpackExecutable(..)
   ,ConfigException(..)
+  ,ParseAbsolutePathException(..)
+  ,packageIndicesWarning
   -- ** ConfigMonoid
   ,ConfigMonoid(..)
   ,configMonoidInstallGHCName
@@ -1200,6 +1202,9 @@ data ConfigException
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoProject
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
+  | NoLTSWithMajorVersion Int
+  | NoLTSFound
+  | MultiplePackageIndices [PackageIndexConfig]
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -1314,7 +1319,34 @@ instance Show ConfigException where
             : (packageNameString name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
+    show (NoLTSWithMajorVersion n) =
+        "Error: No LTS release found with major version " ++ show n
+    show NoLTSFound = "Error: No LTS releases found"
+    show (MultiplePackageIndices pics) = concat
+        [ "Error: When using the 'package-indices' key to override the default "
+        , "package index, you must provide exactly one value, received: "
+        , show pics
+        , "\n"
+        , packageIndicesWarning
+        ]
 instance Exception ConfigException
+
+data ParseAbsolutePathException
+    = ParseAbsolutePathException String String
+    deriving (Typeable)
+
+instance Show ParseAbsolutePathException where
+    show (ParseAbsolutePathException envVar dir) = concat
+        [ "Error: Failed to parse "
+        , envVar
+        , " environment variable (expected absolute directory): "
+        , dir
+        ]
+instance Exception ParseAbsolutePathException
+
+packageIndicesWarning :: String
+packageIndicesWarning =
+    "The 'package-indices' key is deprecated in favour of 'package-index'."
 
 resolveOptions :: String
 resolveOptions =

@@ -243,6 +243,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | NixRequiresSystemGhc
         | NoResolverWhenUsingNoProject
         | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
+        | NoLTSWithMajorVersion Int
+        | NoLTSFound
+        | MultiplePackageIndices [PackageIndexConfig]
+        ~~~
+
+    -   `Stack.Types.Config.ParseAbsolutePathException`
+
+        ~~~haskell
+        = ParseAbsolutePathException String String
         ~~~
 
     -   `Stack.Types.Docker.DockerException`
@@ -432,60 +441,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     configuration option to specify an alternative path. The current path is:
     <path>
     ~~~
-
-*   `Stack.Config.configFromConfigMonoid`:
-
-    ~~~text
-    When using the 'package-indices' key to override the default package index, you must provide exactly one value, received: <values>
-    The 'package-indices' key is deprecated in favour of 'package-index'.
-    ~~~
-
-    `error`
-
-*   `Stack.Config.configFromConfigMonoid`:
-
-    ~~~text
-    Failed to parse PANTRY_ROOT environment variable (expected absolute
-    directory): <path>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Config.determineStackRootAndOnwership`:
-
-    ~~~text
-    Failed to parse STACK_ROOT environment variable (expected absolute
-    directory): <path>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Config.getDefaultLocalProgramsBase`:
-
-    ~~~text
-    Failed to parse LOCALAPPDATA environment variable (expected absolute
-    directory): <path>
-    ~~~
-
-    `StringException`
-
-    `throwM`
-
-*   `Stack.Config.makeConcreteResolver`:
-
-    ~~~text
-    No LTS release found with major version <version>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Config.makeConcreteResolver`:
-
-    ~~~text
-    No LTS releases found
-    ~~~
-
-    `throwString`
 
 *   `Stack.ConfigCmd.cfgCmdSet`:
 
