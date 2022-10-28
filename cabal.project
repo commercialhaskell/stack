@@ -9,6 +9,9 @@
 
 -- `import:` is only available to users of Cabal (the tool) >= 3.8.1.0.
 
+-- The constraints in cabal.config are from:
+-- > stack ls dependencies constraints > cabal.config
+
 import: cabal.config
 
 -- Extra-deps (if any) would be specified by adding:
