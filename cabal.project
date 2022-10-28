@@ -9,7 +9,7 @@
 
 -- `import:` is only available to users of Cabal (the tool) >= 3.8.1.0.
 
-import: stackage/ghc-9.2.4/cabal.config
+import: cabal.config
 
 -- Extra-deps (if any) would be specified by adding:
 --
