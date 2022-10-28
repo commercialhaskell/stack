@@ -56,6 +56,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         The `String` is a message.
 
+    -   `Stack.Build.ConstructPlan.NotOnlyLocal`
+
+        ~~~haskell
+        = NotOnlyLocal [PackageName] [Text]
+        ~~~
+
     -   `Stack.BuildPlan.BuildPlanException`
 
         ~~~haskell
@@ -68,6 +74,26 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         = NonLocalPackages [PackageName]
+        ~~~
+
+    -   `Stack.Config.Docker.StackDockerConfig.Execeiption`
+
+        ~~~haskell
+        = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
+        ~~~
+
+    -   `Stack.Config.Nix.ConfigNixException`
+
+        ~~~haskell
+        = NixCannotUseShellFileAndPackagesException
+        | GHCMajorVersionUnspecified
+        | OnlyGHCSupported
+        ~~~
+
+    -   `Stack.ConfigCmd.ConfigCmdException`
+
+        ~~~haskell
+        = NoProjectConfigAvailable
         ~~~
 
     -   `Stack.Coverage.CoverageException`
@@ -215,30 +241,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
         | CouldNotParsePackageSelectors [String]
-        ~~~
-
-    -   `Stack.Build.ConstructPlan.NotOnlyLocal`
-
-        ~~~haskell
-        = NotOnlyLocal [PackageName] [Text]
-        ~~~
-
-    -   `Stack.Config.Docker.StackDockerConfig.Execeiption`
-
-        ~~~haskell
-        = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
-        ~~~
-
-    -   `Stack.Config.Nix.StackNixException`
-
-        ~~~haskell
-        = NixCannotUseShellFileAndPackagesException
-        ~~~
-
-    -   `Stack.ConfigCmd.ConfigCmdException`
-
-        ~~~haskell
-        = NoProjectConfigAvailable
         ~~~
 
     -   `Stack.Types.Build.StackBuildException`
@@ -492,54 +494,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     configuration option to specify an alternative path. The current path is:
     <path>
     ~~~
-
-*   `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    GHC major version not specified
-    ~~~
-
-    `StringException`
-
-*   `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-    `StringException`
-
-*   `Stack.Config.Nix.nixCompiler`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-    `StringException`
-
-*   `Stack.Config.Nix.nixCompilerVersion`:
-
-    ~~~text
-    GHC major version not specified
-    ~~~
-
-    `StringException`
-
-*   `Stack.Config.Nix.nixCompilerVersion`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-    `StringException`
-
-*   `Stack.Config.Nix.nixCompilerVersion`:
-
-    ~~~text
-    Only GHC is supported by stack --nix
-    ~~~
-
-    `StringException`
 
 *   `Stack.Constants.wiredInPackages`:
 
