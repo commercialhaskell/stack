@@ -103,7 +103,7 @@ formatSubCommand cmd desc formatParser =
 listDepsOptsParser :: Parser ListDepsOpts
 listDepsOptsParser = subparser
                      (  formatSubCommand "text" "Print dependencies as text (default)" listDepsTextParser
+                     <> formatSubCommand "cabal" "Print dependencies as exact Cabal constraints" listDepsConstraintsParser
                      <> formatSubCommand "tree" "Print dependencies as tree" listDepsTreeParser
                      <> formatSubCommand "json" "Print dependencies as JSON" listDepsJsonParser
-                     <> formatSubCommand "constraints" "Print exact cabal constraints" listDepsConstraintsParser
                      ) <|> toListDepsOptsParser listDepsTextParser
