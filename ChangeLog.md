@@ -18,7 +18,6 @@ Behavior changes:
   server. See [#5870](https://github.com/commercialhaskell/stack/issues/5870).
 * Add the `stack config set package-index download-prefix` command to set the
   location of Stack's package index in YAML configuration files.
-
 * `stack setup` with the `--no-install-ghc` flag warns that the flag and the
   command are inconsistent and now takes no action. Previously the flag was
   silently ignored.
@@ -29,6 +28,8 @@ Other enhancements:
   Stack, only GHCup should be used to upgrade Stack. That is because GHCup uses
   an executable named `stack` to manage versions of Stack, that Stack will
   likely overwrite on upgrade.
+* Add `stack ls dependencies cabal` command, which lists dependencies in the
+  format of exact Cabal constraints.
 
 Bug fixes:
 
