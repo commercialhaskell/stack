@@ -2032,6 +2032,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         -- output didn't finish with a newline.
                         case outputType of
                           OTConsolePrefix Nothing -> logInfo ""
+                          OTConsoleTTY -> logInfo ""
                           _ -> pure ()
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
