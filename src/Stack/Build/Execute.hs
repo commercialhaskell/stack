@@ -1116,9 +1116,9 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
         -- to the console with no prefix.
         | console = do
             isTerminal <- hIsTerminalDeviceOrMinTTY stdout
-            case isTerminal of
-              True -> inner OTConsoleTTY
-              False -> inner $ OTConsolePrefix Nothing
+            if isTerminal
+              then inner OTConsoleTTY
+              else inner $ OTConsolePrefix Nothing
 
         -- If the user requested interleaved output, dump to the console with a
         -- prefix.
