@@ -1989,18 +1989,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                             liftIO $ hFlush stderr
                           _ -> pure ()
 
-                        let output =
-                                case outputType of
-                                    OTConsolePrefix (Just prefix) -> fmap
-                                      (\src -> Just $ runConduit $ src .|
-                                               CT.decodeUtf8Lenient .|
-                                               CT.lines .|
-                                               CL.map stripCR .|
-                                               CL.mapM_ (\t -> logInfo $ prefix <> RIO.display t))
-                                      createSource
-                                    OTLogFile _ h -> Nothing <$ useHandleOpen h
-                                    _ -> Nothing <$ inherit
-                            optionalTimeout action
+                        let optionalTimeout action
                                 | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
                                     timeout (maxSecs * 1000000) action
                                 | otherwise = Just <$> action
@@ -2019,6 +2008,16 @@ singleTest topts testsToRun ac ee task installedMap = do
                                          $ encodeUtf8 $ fromString $
                                          show (logPath, mkUnqualComponentName (T.unpack testName))
                                   else pure mempty
+                              let output = case outputType of
+                                    OTConsolePrefix (Just prefix) -> fmap
+                                      (\src -> Just $ runConduit $ src .|
+                                               CT.decodeUtf8Lenient .|
+                                               CT.lines .|
+                                               CL.map stripCR .|
+                                               CL.mapM_ (\t -> logInfo $ prefix <> RIO.display t))
+                                      createSource
+                                    OTLogFile _ h -> Nothing <$ useHandleOpen h
+                                    _ -> Nothing <$ inherit
                               let pc = setStdin (byteStringInput stdinBS)
                                      $ setStdout output
                                      $ setStderr output
