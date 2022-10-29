@@ -1297,13 +1297,15 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                           void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
                               (sinkWithTimestamps prefixWithTimestamps h)
                               (sinkWithTimestamps prefixWithTimestamps h)
-                        OTConsoleTTY ->
-                          readProcessNull (toFilePath exeName) fullArgs
-                        OTConsolePrefix mprefix ->
-                          let prefix = fold mprefix in
-                            void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
-                                (outputSink KeepTHLoading LevelWarn compilerVer prefix)
-                                (outputSink stripTHLoading LevelInfo compilerVer prefix)
+                        OTConsoleTTY -> runWithPrefix compilerVer ""
+                        OTConsolePrefix mprefix -> runWithPrefix compilerVer (fold mprefix)
+
+                    runWithPrefix :: ActualCompiler -> Utf8Builder -> RIO env ()
+                    runWithPrefix compilerVer prefix =
+                        void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
+                            (outputSink KeepTHLoading LevelWarn compilerVer prefix)
+                            (outputSink stripTHLoading LevelInfo compilerVer prefix)
+
                     outputSink
                         :: HasCallStack
                         => ExcludeTHLoading
