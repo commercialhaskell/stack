@@ -1983,6 +1983,10 @@ singleTest topts testsToRun ac ee task installedMap = do
                         -- Clear "Progress: ..." message before
                         -- redirecting output.
                         case outputType of
+                          OTConsoleTTY -> do
+                            logStickyDone ""
+                            liftIO $ hFlush stdout
+                            liftIO $ hFlush stderr
                           OTConsolePrefix _ -> do
                             logStickyDone ""
                             liftIO $ hFlush stdout
