@@ -152,6 +152,9 @@ paths =
     [ ( "Global Stack root directory"
       , T.pack stackRootOptionName
       , WithoutHaddocks $ view (stackRootL.to toFilePathNoTrailingSep.to T.pack))
+    , ( "Global Stack configuration file"
+      , T.pack stackGlobalConfigOptionName
+      , WithoutHaddocks $ view (stackGlobalConfigL.to toFilePath.to T.pack))
     , ( "Project root (derived from stack.yaml file)"
       , "project-root"
       , WithoutHaddocks $ view (projectRootL.to toFilePathNoTrailingSep.to T.pack))

@@ -169,6 +169,7 @@ module Stack.Types.Config
   ,buildOptsHaddockL
   ,globalOptsBuildOptsMonoidL
   ,stackRootL
+  ,stackGlobalConfigL
   ,cabalVersionL
   ,whichCompilerL
   ,envOverrideSettingsL
@@ -2037,6 +2038,9 @@ instance HasTerm EnvConfig where
 
 stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
 stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
+
+stackGlobalConfigL :: HasConfig s => Lens' s (Path Abs File)
+stackGlobalConfigL = configL.lens configUserConfigPath (\x y -> x { configUserConfigPath = y })
 
 -- | The compiler specified by the @SnapshotDef@. This may be
 -- different from the actual compiler used!
