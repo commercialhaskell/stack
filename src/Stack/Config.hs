@@ -763,7 +763,6 @@ determineStackRootAndOwnership clArgs = liftIO $ do
                       wantXdg <- fromMaybe "" <$> lookupEnv stackXdgEnvVar
                       if not (null wantXdg)
                         then do
-                          -- TODO: should `InvalidRelDir` be handled?
                           xdgRelDir <- parseRelDir stackProgName
                           (,)
                             <$> getXdgDir XdgConfig (Just xdgRelDir)
