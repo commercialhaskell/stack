@@ -760,16 +760,17 @@ determineStackRootAndOwnership clArgs = liftIO $ do
                 mstackRoot <- lookupEnv stackRootEnvVar
                 case mstackRoot of
                     Nothing -> do
-                      oldStyleRoot <- getAppUserDataDir stackProgName
-                      oldExists <- doesDirExist oldStyleRoot
-                      if oldExists
-                        then pure (oldStyleRoot, oldStyleRoot)
-                        else do
+                      wantXdg <- fromMaybe "" <$> lookupEnv stackXdgEnvVar
+                      if not (null wantXdg)
+                        then do
                           -- TODO: should `InvalidRelDir` be handled?
                           xdgRelDir <- parseRelDir stackProgName
                           (,)
                             <$> getXdgDir XdgConfig (Just xdgRelDir)
                             <*> getXdgDir XdgData (Just xdgRelDir)
+                        else do
+                          oldStyleRoot <- getAppUserDataDir stackProgName
+                          pure (oldStyleRoot, oldStyleRoot)
                     Just x -> case parseAbsDir x of
                         Nothing ->
                             throwIO $ ParseAbsolutePathException stackRootEnvVar x
