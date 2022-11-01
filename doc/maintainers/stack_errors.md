@@ -135,6 +135,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | Couldn'tParseField Text [Line]
         ~~~
 
+    -   `Stack.SDist.CheckException`
+
+        ~~~haskell
+        = CheckException (NonEmpty PackageCheck)
+        ~~~
+
     -   `Stack.Script.StackScriptException`
 
         ~~~haskell
@@ -142,10 +148,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | AmbiguousModuleName ModuleName [PackageName]
         ~~~
 
-    -   `Stack.SDist.CheckException`
+    -   `Stack.Setup.PerformPathCheckingException`
 
         ~~~haskell
-        = CheckException (NonEmpty PackageCheck)
+        = ProcessExited ExitCode String [String]
         ~~~
 
     -   `Stack.Setup.SetupException`
@@ -163,6 +169,36 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DockerStackExeNotFound Version Text
         | UnsupportedSetupConfiguration
         | InvalidGhcAt (Path Abs File) SomeException
+        | MSYS2NotFound Text
+        | UnwantedCompilerVersion
+        | UnwantedArchitecture
+        | SandboxedCompilerNotFound
+        | CompilerNotFound [String]
+        | GHCInfoNotValidUTF8 UnicodeException
+        | GHCInfoNotListOfPairs
+        | GHCInfoMissingGlobalPackageDB
+        | GHCInfoMissingTargetPlatform
+        | GHCInfoTargetPlatformInvalid String
+        | CabalNotFound (Path Abs File)
+        | HadrianScriptNotFound
+        | URLInvalid String
+        | UnknownArchiveExtension String
+        | Unsupported7z
+        | TarballInvalid String
+        | TarballFileInvalid String (Path Abs File)
+        | UnknownArchiveStructure (Path Abs File)
+        | StackReleaseInfoNotFound String
+        | StackBinaryArchiveNotFound [String]
+        | WorkingDirectoryInvalid
+        | HadrianBindistNotFound
+        | DownloadAndInstallCompilerError
+        | StackBinaryArchiveZipUnsupported
+        | StackBinaryArchiveUnsupported Text
+        | StackBinaryNotInArchive String Text
+        | FileTypeInArchiveInvalid Entry Text
+        | BinaryUpgradeOnOSUnsupported OS
+        | BinaryUpgradeOnArchUnsupported Arch
+        | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
         ~~~
 
     -   `Stack.Unpack.UnpackException`
@@ -762,145 +798,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `throwString`
 
-*   `Stack.Setup.buildGHCFromSource`:
-
-    ~~~text
-    Invalid working directory
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.buildGHCFromSource`:
-
-    ~~~text
-    No Hadrian build script found
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.buildGHCFromSource`:
-
-    ~~~text
-    Can't find hadrian generated bindist
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.downloadAndInstallCompiler`:
-
-    ~~~text
-    downloadAndInstallCompiler: shouldn't be reached with ghc-git
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.downloadFromInfo`:
-
-    ~~~text
-    Error: Unknown extension for url: <url>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.downloadOrUseLocal`:
-
-    ~~~text
-    Error: `url` must be either an HTTP URL or a file path: <url>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.downloadStackExe`:
-
-    ~~~text
-    Unable to find binary Stack archive for platforms: <platforms>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.downloadStackExe`:
-
-    ~~~text
-    FIXME: Handle zip files
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.downloadStackExe`:
-
-    ~~~text
-    Unknown archive format for Stack archive: <url>
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.downloadStackExe`:
-
-    ~~~text
-    "Stack executable <exe>  not found in archive from <url>
-    ~~~
-
-    `error`
-
 *   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
-
-*   `Stack.Setup.downloadStackReleaseInfoGitHub`:
-
-    ~~~text
-    Could not get release information for Stack from: <url>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.ensureCompiler`:
-
-    ~~~text
-    Not the compiler version we want
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.ensureCompiler`:
-
-    ~~~text
-    Not the architecture we want
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.ensureMsys`:
-
-    ~~~text
-    MSYS2 not found for <os>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.ensureSandboxedCompiler`:
-
-    ~~~text
-    Looked for sandboxed compiler named one of: <names>
-    Could not find it on the paths <paths>
-    Could not find sandboxed compiler
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.expectSingleUnpackedDir`:
-
-    ~~~text
-    Expected a single directory within unpacked <file>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.installGHCPosix`:
-
-    ~~~text
-    Don't know how to deal with .7z files on non-Windows
-    ~~~
-
-    `throwString`
 
 *   `Stack.Setup.installGHCPosix`:
 
@@ -919,114 +817,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     ~~~
 
     `exitFailure`
-
-*   `Stack.Setup.installMsys2Windows`:
-
-    ~~~text
-    Could not delete existing msys directory: <path>
-    ~~~
-
-    `throwM`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    Could not find any of: <paths>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    GHC info is not valid UTF-8: <exception>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    GHC info does not parse as a list of pairs
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    Key 'Global Package DB' not found in GHC info
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    Key 'Target platform' not found in GHC info
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    Invalid target platform in GHC info: <platform>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.pathsFromCompiler`:
-
-    ~~~text
-    Cabal library not found in global package database for <compiler>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.performPathChecking`:
-
-    ~~~text
-    Process exited with <exitcode>: <cmd> <args>
-    ~~~
-
-    `error`
-
-*   `Stack.Setup.preferredPlatforms`:
-
-    ~~~text
-    Binary upgrade not yet supported on OS: <os>
-    ~~~
-
-    `StringException`
-
-    `throwM`
-
-*   `Stack.Setup.preferredPlatforms`:
-
-    ~~~text
-    Binary upgrade not yet supported on arch: <arch>
-    ~~~
-
-    `StringException`
-
-    `throwM`
-
-*   `Stack.Setup.withUnpackedTarball7z`:
-
-    ~~~text
-    <name>  must be a tarball file
-    ~~~
-
-    `throwString`
-
-*   `Stack.Setup.withUnpackedTarball7z`:
-
-    ~~~text
-    Invalid <name> filename: <file>
-    ~~~
-
-    `throwString`
 
 *   `Stack.Storage.User.loadCompilerPaths`:
 
