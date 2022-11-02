@@ -5,12 +5,12 @@
 
 packages:
 - completed:
-    hackage: process-1.6.15.0@sha256:04df32d9497add5f0b90a27a3eceffa4bad5c2f41d038bd12ed6efc454db3faf,2845
+    hackage: process-1.6.16.0@sha256:1b9c267e475d4492b80edc1f58d08c458d4a10d17ea95294356443855b125616,2845
     pantry-tree:
-      sha256: 291f5800ffb87af7ed910582ae0ec00ef9ffab0643ed62c36fcfe58c52e90a24
+      sha256: dc130ef74f0400c0761f53abdbcf16588b568ccbe6d43a584a43846d6da08012
       size: 1545
   original:
-    hackage: process-1.6.15.0@sha256:04df32d9497add5f0b90a27a3eceffa4bad5c2f41d038bd12ed6efc454db3faf,2845
+    hackage: process-1.6.16.0@sha256:1b9c267e475d4492b80edc1f58d08c458d4a10d17ea95294356443855b125616,2845
 - completed:
     hackage: Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
     pantry-tree:

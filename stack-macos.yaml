@@ -1,5 +1,5 @@
 # This project-level configuration file is intended to be used with, and only
-# with, macOS. It specifies process-1.6.15.0 as a dependency, which includes
+# with, macOS. It specifies process-1.6.16.0 as a dependency, which includes
 # important bug fixes for macOS. When building test suite stack-test, Stack will
 # warn:
 #
@@ -16,7 +16,7 @@ packages:
 
 extra-deps:
 # GHC 9.2.4 comes with process-1.6.13.2, which lacks important bug fixes
-- process-1.6.15.0@sha256:04df32d9497add5f0b90a27a3eceffa4bad5c2f41d038bd12ed6efc454db3faf,2845
+- process-1.6.16.0@sha256:1b9c267e475d4492b80edc1f58d08c458d4a10d17ea95294356443855b125616,2845
 # Although Cabal-3.6.3.0 is a global package, it depends on process and so has
 # to be expressly added as an extra-dep
 - Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
