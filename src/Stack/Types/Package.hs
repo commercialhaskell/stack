@@ -197,11 +197,6 @@ data BuildInfoOpts = BuildInfoOpts
     , bioCabalMacros :: Path Abs File
     } deriving Show
 
--- | Files to get for a cabal package.
-data CabalFileType
-    = AllFiles
-    | Modules
-
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the Cabal file
 newtype GetPackageFiles = GetPackageFiles
