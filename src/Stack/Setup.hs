@@ -324,8 +324,8 @@ instance Pretty SetupPrettyException where
 string :: String -> StyleDoc
 string "" = mempty
 string ('\n':s) = line <> string s
-string s        = case (span (/='\n') s) of
-                      (xs, ys) -> fromString xs <> string ys
+string s        = let (xs, ys) = span (/='\n') s
+                  in  fromString xs <> string ys
 
 instance Exception SetupPrettyException
 
