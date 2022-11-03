@@ -29,7 +29,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import qualified Data.Map as Map
+import Stack.Types.Dependency (DepValue)
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -139,27 +139,6 @@ data Package =
 
 packageIdent :: Package -> PackageIdentifier
 packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
-
--- | The value for a map from dependency name. This contains both the
--- version range and the type of dependency, and provides a semigroup
--- instance.
-data DepValue = DepValue
-  { dvVersionRange :: !VersionRange
-  , dvType :: !DepType
-  }
-  deriving (Show,Typeable)
-instance Semigroup DepValue where
-  DepValue a x <> DepValue b y = DepValue (intersectVersionRanges a b) (x <> y)
-
--- | Is this package being used as a library, or just as a build tool?
--- If the former, we need to ensure that a library actually
--- exists. See
--- <https://github.com/commercialhaskell/stack/issues/2195>
-data DepType = AsLibrary | AsBuildTool
-  deriving (Show, Eq)
-instance Semigroup DepType where
-  AsLibrary <> _ = AsLibrary
-  AsBuildTool <> x = x
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =

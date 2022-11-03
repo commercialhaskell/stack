@@ -52,6 +52,7 @@ import           System.Environment (lookupEnv)
 import           System.IO (putStrLn)
 import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
+import Stack.Types.Dependency (DepValue(DepValue), DepType (AsLibrary))
 
 data PackageInfo
     =
