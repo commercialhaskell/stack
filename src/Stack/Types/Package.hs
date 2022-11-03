@@ -29,6 +29,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
+import qualified Data.Map as Map
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -278,11 +279,6 @@ data LocalPackage = LocalPackage
     -- "buildable: false".
     , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
-    , lpTestDeps      :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-tests in a normal build.
-    , lpBenchDeps     :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-benchmarks in a normal
-    -- build.
     , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.

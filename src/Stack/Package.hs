@@ -143,7 +143,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]
-    , packageAllDeps = S.fromList (M.keys deps)
+    , packageAllDeps = M.keysSet deps
     , packageLibraries =
         let mlib = do
               lib <- library pkg
