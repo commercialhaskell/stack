@@ -1,14 +1,14 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.2.
+# built with GHC 9.4.3.
 
-# GHC 9.4.2
-resolver: ghc-9.4.2
+# GHC 9.4.3
+resolver: ghc-9.4.3
 
 packages:
 - .
 
 extra-deps:
-# A Stackage snapshot does not exist for GHC 9.4.2, so everything that is not a
+# A Stackage snapshot does not exist for GHC 9.4.3, so everything that is not a
 # global package needs to be specified as an extra-dep.
 - Glob-0.10.2@sha256:dd2ddbecae8f84e8f4cacb5b856901a19c25ceaa11f2525d3ee88d034acb0081,2938
 - OneTuple-0.3.1@sha256:a848c096c9d29e82ffdd30a9998aa2931cbccb3a1bc137539d80f6174d31603e,2262
