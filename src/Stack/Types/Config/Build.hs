@@ -363,6 +363,7 @@ data TestOpts =
            ,toCoverage :: !Bool -- ^ Generate a code coverage report
            ,toDisableRun :: !Bool -- ^ Disable running of tests
            ,toMaximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
+           ,toAllowStdin :: !Bool -- ^ Whether to allow standard input
            } deriving (Eq,Show)
 
 defaultTestOpts :: TestOpts
@@ -372,6 +373,7 @@ defaultTestOpts = TestOpts
     , toCoverage = defaultFirstFalse toMonoidCoverage
     , toDisableRun = defaultFirstFalse toMonoidDisableRun
     , toMaximumTimeSeconds = Nothing
+    , toAllowStdin = defaultFirstTrue toMonoidAllowStdin
     }
 
 data TestOptsMonoid =
@@ -381,6 +383,7 @@ data TestOptsMonoid =
     , toMonoidCoverage :: !FirstFalse
     , toMonoidDisableRun :: !FirstFalse
     , toMonoidMaximumTimeSeconds :: !(First (Maybe Int))
+    , toMonoidAllowStdin :: !FirstTrue
     } deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings TestOptsMonoid) where
@@ -390,6 +393,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
               toMonoidCoverage <- FirstFalse <$> o ..:? toMonoidCoverageArgName
               toMonoidDisableRun <- FirstFalse <$> o ..:? toMonoidDisableRunArgName
               toMonoidMaximumTimeSeconds <- First <$> o ..:? toMonoidMaximumTimeSecondsArgName
+              toMonoidAllowStdin <- FirstTrue <$> o ..:? toMonoidTestsAllowStdinName
               pure TestOptsMonoid{..})
 
 toMonoidRerunTestsArgName :: Text
@@ -406,6 +410,9 @@ toMonoidDisableRunArgName = "no-run-tests"
 
 toMonoidMaximumTimeSecondsArgName :: Text
 toMonoidMaximumTimeSecondsArgName = "test-suite-timeout"
+
+toMonoidTestsAllowStdinName :: Text
+toMonoidTestsAllowStdinName = "tests-allow-stdin"
 
 instance Semigroup TestOptsMonoid where
   (<>) = mappenddefault

@@ -2024,16 +2024,22 @@ singleTest topts testsToRun ac ee task installedMap = do
 
                         mec <- withWorkingDir (toFilePath pkgDir) $
                           optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
-                            stdinBS <-
+                            changeStdin <-
                               if isTestTypeLib
                                 then do
                                   logPath <- buildLogPath package (Just stestName)
                                   ensureDir (parent logPath)
-                                  pure $ BL.fromStrict
+                                  pure $ setStdin
+                                       $ byteStringInput
+                                       $ BL.fromStrict
                                        $ encodeUtf8 $ fromString $
                                        show (logPath, mkUnqualComponentName (T.unpack testName))
-                                else pure mempty
-                            let pc = setStdin (byteStringInput stdinBS)
+                                else do
+                                  isTerminal <- view $ globalOptsL.to globalTerminal
+                                  if toAllowStdin topts && isTerminal
+                                    then pure id
+                                    else pure $ setStdin $ byteStringInput mempty
+                            let pc = changeStdin
                                    $ setStdout output
                                    $ setStderr output
                                      pc0

@@ -42,4 +42,8 @@ testOptsParser hide0 =
                     (long "test-suite-timeout" <>
                      help "Maximum test suite run time in seconds." <>
                      hide))
+        <*> firstBoolFlagsTrue
+                "tests-allow-stdin"
+                "allow standard input in test executables"
+                hide
    where hide = hideMods hide0

@@ -329,6 +329,20 @@ Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
 Pass the flag to rebuild your project every time any local file changes (from
 project packages or from local dependencies). See also the `--file-watch` flag.
 
+### The `stack build --tests-allow-stdin` flag
+
+:octicons-tag-24: Unreleased
+
+Default: Enabled
+
+Cabal defines a test suite interface
+['exitcode-stdio-1.0'](https://hackage.haskell.org/package/Cabal-syntax-3.8.1.0/docs/Distribution-Types-TestSuiteInterface.html#v:TestSuiteExeV1.0)
+where the test suite takes the form of an executable and the executable takes
+nothing on the standard input channel (`stdin`). Pass this flag to override that
+specification and allow the executable to receive input on that channel. If you
+pass `--no-tests-allow-stdin` and the executable seeks input on the standard
+input channel, an exception will be thown.
+
 ## Composition
 
 To come back to the composable approach described above, consider this example
