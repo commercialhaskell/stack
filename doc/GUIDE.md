@@ -1236,60 +1236,69 @@ for more information.
 
 Generally, you don't need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is
-useful. For example, command:
+useful. `stack path --help` explains the available options and, consequently,
+the output of the command:
 
 ~~~text
-stack path
-snapshot-doc-root: ...
-local-doc-root: ...
-local-hoogle-root: ...
-stack-root: ...
-project-root: ...
-config-location: ...
-bin-path: ...
-programs: ...
-compiler-exe: ...
-compiler-bin: ...
-compiler-tools-bin: ...
-local-bin: ...
-extra-include-dirs: ...
-extra-library-dirs: ...
-snapshot-pkg-db: ...
-local-pkg-db: ...
-global-pkg-db: ...
-ghc-package-path: ...
-snapshot-install-root: ...
-local-install-root: ...
-dist-dir: ...
-local-hpc-root: ...
-local-bin-path: ...
-ghc-paths: ...
+--stack-root             Global Stack root directory
+--project-root           Project root (derived from stack.yaml file)
+--config-location        Configuration location (where the stack.yaml file is)
+--bin-path               PATH environment variable
+--programs               Install location for GHC and other core tools (see
+                         'stack ls tools' command)
+--compiler-exe           Compiler binary (e.g. ghc)
+--compiler-bin           Directory containing the compiler binary (e.g. ghc)
+--compiler-tools-bin     Directory containing binaries specific to a
+                         particular compiler (e.g. intero)
+--local-bin              Directory where Stack installs executables (e.g.
+                         ~/.local/bin (Unix-like OSs) or %APPDATA%\local\bin
+                         (Windows))
+--extra-include-dirs     Extra include directories
+--extra-library-dirs     Extra library directories
+--snapshot-pkg-db        Snapshot package database
+--local-pkg-db           Local project package database
+--global-pkg-db          Global package database
+--ghc-package-path       GHC_PACKAGE_PATH environment variable
+--snapshot-install-root  Snapshot installation root
+--local-install-root     Local project installation root
+--snapshot-doc-root      Snapshot documentation root
+--local-doc-root         Local project documentation root
+--local-hoogle-root      Local project documentation root
+--dist-dir               Dist work directory, relative to package directory
+--local-hpc-root         Where HPC reports and tix files are stored
+--local-bin-path         DEPRECATED: Use '--local-bin' instead
+--ghc-paths              DEPRECATED: Use '--programs' instead
+--global-stack-root      DEPRECATED: Use '--stack-root' instead
 ~~~
 
-In addition, `stack path` accepts command line arguments to state which of
-these keys you're interested in, which can be convenient for scripting. As a
+In addition, `stack path` accepts the flags above on the command line to state
+which keys you're interested in. This can be convenient for scripting. As a
 simple example, let's find out the sandboxed versions of GHC that Stack
 installed:
 
-On Unix-like operating systems, command:
+=== "Unix-like"
 
-~~~text
-ls $(stack path --programs)/*.installed
-/home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2.installed
-~~~
+    Command:
 
-On Windows (with PowerShell), command:
+    ~~~text
+    ls $(stack path --programs)/*.installed
+    /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2.installed
+    ~~~
 
-~~~text
-dir "$(stack path --programs)/*.installed"
+=== "Windows (with PowerShell)"
 
-Directory: C:\Users\mikep\AppData\Local\Programs\stack\x86_64-windows
+    Command:
 
-Mode                 LastWriteTime         Length Name
-----                 -------------         ------ ----
--a---          27/07/2022  5:40 PM              9 ghc-9.0.2.installed
--a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
-~~~
+    ~~~text
+    dir "$(stack path --programs)/*.installed"
+
+    Directory: C:\Users\mikep\AppData\Local\Programs\stack\x86_64-windows
+
+    Mode                 LastWriteTime         Length Name
+    ----                 -------------         ------ ----
+    -a---          27/07/2022  5:40 PM              9 ghc-9.0.2.installed
+    -a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
+    ~~~
 
 While we're talking about paths, to wipe our Stack install completely, here's
 what typically needs to be removed:
