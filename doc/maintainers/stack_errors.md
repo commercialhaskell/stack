@@ -115,6 +115,16 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | GhciTargetParseException [Text]
         ~~~
 
+    -   `Stack.Init.InitException`
+
+        ~~~haskell
+        = ConfigFileAlreadyExists FilePath
+        | SnapshotDownloadFailure SomeException
+        | NoPackagesToIgnore
+        | PackagesToIgnoreBug
+        | PackageNameInvalid [FilePath]
+        ~~~
+
     -   `Stack.List.ListException`
 
         ~~~haskell
@@ -574,69 +584,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     ~~~
 
     `exitWith (ExitFailure (-1))`
-
-*   `Stack.Init.cabalPackagesCheck`:
-
-    ~~~text
-    Package name as defined in the Cabal file must match the Cabal file name.
-    Please fix the following packages and try again:
-    <packages>
-    ~~~
-
-    `error`
-
-*   `Stack.Init.cabalPackagesCheck`: has the possibility of passing a message.
-    Not currently used.
-
-    ~~~text
-    <message>
-    ~~~
-
-    `error`
-
-*   `Stack.Init.getSnapshots'`:
-
-    ~~~text
-    Unable to download snapshot list, and therefore could not generate a
-    stack.yaml file automatically
-    This sometimes happens due to missing Certificate Authorities on your
-    system. For more information, see:
-
-        https://github.com/commercialhaskell/stack/issues/234"
-
-    You can try again, or create your stack.yaml file by hand. See:"
-
-        http://docs.haskellstack.org/en/stable/yaml_configuration/"
-
-    Exception was: <exception>
-    ~~~
-
-    `throwString`
-
-*   `Stack.Init.getWorkingResolverPlan`:
-
-    ~~~text
-    Bug: No packages to ignore
-    ~~~
-
-    `error`
-
-*   `Stack.Init.getWorkingResolverPlan`:
-
-    ~~~text
-    getWorkingResolverPlan.head
-    ~~~
-
-    `error`
-
-*   `Stack.Init.initProject`:
-
-    ~~~text
-    Error: Stack configuration file " <path>  exists, use '--force' to overwrite
-    it.
-    ~~~
-
-    `throwString`
 
 *   `Stack.Lock.loadYamlThrow`:
 

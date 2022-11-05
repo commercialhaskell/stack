@@ -46,6 +46,49 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           Stack.Types.Version
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Init" module.
+data InitException
+    = ConfigFileAlreadyExists FilePath
+    | SnapshotDownloadFailure SomeException
+    | NoPackagesToIgnore
+    | PackagesToIgnoreBug
+    | PackageNameInvalid [FilePath]
+    deriving (Typeable)
+
+instance Show InitException where
+    show (ConfigFileAlreadyExists reldest) = concat
+        [ "Error: Stack configuration file "
+        , reldest
+        , " exists, use '--force' to overwrite it."
+        ]
+    show (SnapshotDownloadFailure e) = concat
+        [ "Error: Unable to download snapshot list, and therefore could not \
+          \generate a stack.yaml file automatically\n"
+        , "This sometimes happens due to missing Certificate Authorities on \
+          \your system. For more information, see:\n"
+        , "\n"
+        , "    https://github.com/commercialhaskell/stack/issues/234\n"
+        , "\n"
+        , "You can try again, or create your stack.yaml file by hand. See:\n"
+        , "\n"
+        , "    http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
+        , "\n"
+        , "Exception was: "
+        , show e
+        ]
+    show NoPackagesToIgnore = "Error: No packages to ignore"
+    show PackagesToIgnoreBug =
+        "Error: The impossible happened! No packages to ignore"
+    show (PackageNameInvalid rels) = concat
+        [ "Error: Package name as defined in the Cabal file must match the \
+          \Cabal file name.\n"
+        , "Please fix the following packages and try again:\n"
+        , T.unpack (utf8BuilderToText (formatGroup rels))
+        ]
+
+instance Exception InitException
+
 -- | Generate stack.yaml
 initProject
     :: (HasConfig env, HasGHCVariant env)
@@ -60,16 +103,14 @@ initProject currDir initOpts mresolver = do
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $
-        throwString
-            ("Error: Stack configuration file " <> reldest <>
-             " exists, use '--force' to overwrite it.")
+        throwIO $ ConfigFileAlreadyExists reldest
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
     logInfo "Looking for .cabal or package.yaml files to use to init the project."
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
-    (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs Nothing
+    (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs
     let makeRelDir dir =
             case stripProperPrefix currDir dir of
                 Nothing
@@ -318,22 +359,7 @@ renderStackYaml p ignoredPackages dupPackages =
 
 getSnapshots' :: HasConfig env => RIO env Snapshots
 getSnapshots' = do
-    getSnapshots `catchAny` \e -> do
-        logError $
-            "Unable to download snapshot list, and therefore could " <>
-            "not generate a stack.yaml file automatically"
-        logError $
-            "This sometimes happens due to missing Certificate Authorities " <>
-            "on your system. For more information, see:"
-        logError ""
-        logError "    https://github.com/commercialhaskell/stack/issues/234"
-        logError ""
-        logError "You can try again, or create your stack.yaml file by hand. See:"
-        logError ""
-        logError "    http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        logError ""
-        logError $ "Exception was: " <> displayShow e
-        throwString ""
+    getSnapshots `catchAny` \e -> throwIO $ SnapshotDownloadFailure e
 
 -- | Get the default resolver value
 getDefaultResolver
@@ -402,7 +428,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                         pure (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         when (Map.size available == Map.size pkgDirs) $
-                            error "Bug: No packages to ignore"
+                            throwM NoPackagesToIgnore
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
@@ -411,7 +437,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                           logWarn $ "*** Ignoring package: "
                                  <> fromString
                                       (case ignored of
-                                        [] -> error "getWorkingResolverPlan.head"
+                                        [] -> throwM PackagesToIgnoreBug
                                         x:_ -> packageNameString x)
 
                         go available
@@ -511,11 +537,10 @@ ignoredDirs = Set.fromList
 cabalPackagesCheck
     :: (HasConfig env, HasGHCVariant env)
      => [Path Abs Dir]
-     -> Maybe String
      -> RIO env
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
-cabalPackagesCheck cabaldirs dupErrMsg = do
+cabalPackagesCheck cabaldirs = do
     when (null cabaldirs) $ do
       logWarn "We didn't find any local package directories"
       logWarn "You may want to create a package with \"stack new\" instead"
@@ -545,10 +570,7 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
 
     when (nameMismatchPkgs /= []) $ do
         rels <- mapM prettyPath nameMismatchPkgs
-        error $ "Package name as defined in the Cabal file must match the " <>
-                "Cabal file name.\n" <>
-                "Please fix the following packages and try again:\n"
-                <> T.unpack (utf8BuilderToText (formatGroup rels))
+        throwIO $ PackageNameInvalid rels
 
     let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)
@@ -566,11 +588,9 @@ cabalPackagesCheck cabaldirs dupErrMsg = do
         logWarn $
             "Following packages have duplicate package names:\n" <>
             mconcat (intersperse "\n" (map formatGroup dups))
-        case dupErrMsg of
-          Nothing -> logWarn $
-                 "Packages with duplicate names will be ignored.\n"
-              <> "Packages in upper level directories will be preferred.\n"
-          Just msg -> error msg
+        logWarn $
+            "Packages with duplicate names will be ignored.\n" <>
+            "Packages in upper level directories will be preferred.\n"
 
     pure (Map.fromList
             $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
