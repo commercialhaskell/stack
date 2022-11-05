@@ -190,7 +190,7 @@ updates with your pull request.
 ## Backwards Compatability
 
 The Stack executable does not need to, and does not, strive for the same broad
-compatability with versions of GHC that a library package (such as `pantry`)
+compatibility with versions of GHC that a library package (such as `pantry`)
 would seek. Instead, Stack aims to define a well-known combination of
 dependencies on which its executable relies. That applies in particular to the
 `Cabal` package, where Stack aims to support one, and only one, version of

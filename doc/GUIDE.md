@@ -1764,6 +1764,16 @@ stack path --stack-root
 The location of the Stack root can be configured by setting the `STACK_ROOT`
 environment variable or using Stack's `--stack-root` option on the command line.
 
+Alternatively, Stack can follow the XDG specification by setting the `STACK_XDG`
+environment variable to anything non-empty:
+
+~~~bash
+export STACK_XDG=1
+~~~
+
+The global `config.yaml` will then go in `$XDG_CONFIG_HOME/stack` and the Stack
+root will be located in `$XDG_DATA_HOME/stack`.
+
 On Windows, the length of filepaths may be limited (to
 [MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
 and things can break when this limit is exceeded. Setting a Stack root with a

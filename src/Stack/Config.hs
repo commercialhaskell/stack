@@ -486,7 +486,7 @@ loadConfig inner = do
     mproject <- loadProjectConfig mstackYaml
     mresolver <- view $ globalOptsL.to globalResolver
     configArgs <- view $ globalOptsL.to globalConfigMonoid
-    (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
+    (configRoot, stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership configArgs
 
     let (mproject', addConfigMonoid) =
           case mproject of
@@ -494,7 +494,7 @@ loadConfig inner = do
             PCGlobalProject -> (PCGlobalProject, id)
             PCNoProject deps -> (PCNoProject deps, id)
 
-    userConfigPath <- getDefaultUserConfigPath stackRoot
+    userConfigPath <- getDefaultUserConfigPath configRoot
     extraConfigs0 <- getExtraConfigs userConfigPath >>=
         mapM (\file -> loadConfigYaml (parseConfigMonoid (parent file)) file)
     let extraConfigs =
@@ -751,19 +751,29 @@ determineStackRootAndOwnership
     :: (MonadIO m)
     => ConfigMonoid
     -- ^ Parsed command-line arguments
-    -> m (Path Abs Dir, Bool)
+    -> m (Path Abs Dir, Path Abs Dir, Bool)
 determineStackRootAndOwnership clArgs = liftIO $ do
-    stackRoot <- do
+    (configRoot, stackRoot) <- do
         case getFirst (configMonoidStackRoot clArgs) of
-            Just x -> pure x
+            Just x -> pure (x, x)
             Nothing -> do
                 mstackRoot <- lookupEnv stackRootEnvVar
                 case mstackRoot of
-                    Nothing -> getAppUserDataDir stackProgName
+                    Nothing -> do
+                      wantXdg <- fromMaybe "" <$> lookupEnv stackXdgEnvVar
+                      if not (null wantXdg)
+                        then do
+                          xdgRelDir <- parseRelDir stackProgName
+                          (,)
+                            <$> getXdgDir XdgConfig (Just xdgRelDir)
+                            <*> getXdgDir XdgData (Just xdgRelDir)
+                        else do
+                          oldStyleRoot <- getAppUserDataDir stackProgName
+                          pure (oldStyleRoot, oldStyleRoot)
                     Just x -> case parseAbsDir x of
                         Nothing ->
                             throwIO $ ParseAbsolutePathException stackRootEnvVar x
-                        Just parsed -> pure parsed
+                        Just parsed -> pure (parsed, parsed)
 
     (existingStackRootOrParentDir, userOwnsIt) <- do
         mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
@@ -779,8 +789,9 @@ determineStackRootAndOwnership clArgs = liftIO $ do
                     stackRoot
                     existingStackRootOrParentDir
 
+    configRoot' <- canonicalizePath configRoot
     stackRoot' <- canonicalizePath stackRoot
-    pure (stackRoot', userOwnsIt)
+    pure (configRoot', stackRoot', userOwnsIt)
 
 -- | @'checkOwnership' dir@ throws 'UserDoesn'tOwnDirectory' if @dir@
 -- isn't owned by the current user.

@@ -13,7 +13,9 @@ module Stack.Constants
     ,stackDotYaml
     ,stackWorkEnvVar
     ,stackRootEnvVar
+    ,stackXdgEnvVar
     ,stackRootOptionName
+    ,stackGlobalConfigOptionName
     ,pantryRootEnvVar
     ,deprecatedStackRootOptionName
     ,inContainerEnvVar
@@ -163,9 +165,17 @@ stackWorkEnvVar = "STACK_WORK"
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
 
+-- | Environment variable used to indicate XDG directories should be used.
+stackXdgEnvVar :: String
+stackXdgEnvVar = "STACK_XDG"
+
 -- | Option name for the global Stack root.
 stackRootOptionName :: String
 stackRootOptionName = "stack-root"
+
+-- | Option name for the global Stack configuration file.
+stackGlobalConfigOptionName :: String
+stackGlobalConfigOptionName = "global-config"
 
 -- | Environment variable used to override the location of the Pantry store
 pantryRootEnvVar :: String
