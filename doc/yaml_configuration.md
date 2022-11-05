@@ -26,11 +26,32 @@ preference):
 The **global** configuration file (`config.yaml`) contains only
 non-project-specific options.
 
-Stack obtains global configuration from a file named `config.yaml`:
+Stack obtains global configuration from a file named `config.yaml`. The location
+of this file depends on the operating system and whether Stack is configured to
+use the XDG Base Directory Specification.
 
-1. on Unix-like operating systems only, located in `/etc/stack` (for system-wide
-   options); and/or
-2. located in the Stack root (for user-specific options).
+=== "Unix-like"
+
+`config.yaml` is located in `/etc/stack` (for system-wide options); and/or in
+the Stack root (for user-specific options).
+
+=== "Windows"
+
+`config.yaml` is located in the Stack root.
+
+=== "XDG Base Directory Specification"
+
+    On Unix-like operating systems and Windows, Stack can be configured to
+    follow the XDG Base Directory Specification if the environment variable
+    `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
+    configuration if the Stack root location has been set on the command line or
+    the `STACK_ROOT` environment variable exists.
+
+    If Stack is following the XDG Base Directory Specification, the location of
+    `config.yaml` (for user-specific options) is `<XDG_CONFIG_HOME>/stack`. If
+    the `XDG_CONFIG_HOME` environment variable does not exist, the default is
+    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
+    Windows.
 
 This page is intended to document fully all YAML configuration options. If you
 identify any inaccuracies or incompleteness, please update the page, and if

@@ -42,12 +42,10 @@ package will be built against.
 
 Finally, Stack is __isolated__: it will not make changes outside of specific
 Stack directories. Stack-built files generally go in either the Stack root
-directory (default: `~/.stack` on Unix-like operating systems, or,
-`%LOCALAPPDATA%\Programs\stack` on Windows) or `./.stack-work` directories local
-to each project. The Stack root directory holds packages belonging to snapshots
-and any Stack-installed versions of GHC. Stack will not tamper with any system
-version of GHC or interfere with packages installed by other build tools (such
-as Cabal (the tool)).
+directory or `./.stack-work` directories local to each project. The Stack root
+directory holds packages belonging to snapshots and any Stack-installed versions
+of GHC. Stack will not tamper with any system version of GHC or interfere with
+packages installed by other build tools, such as Cabal (the tool).
 
 ## Downloading and Installation
 
@@ -1295,9 +1293,11 @@ While we're talking about paths, to wipe our Stack install completely, here's
 what typically needs to be removed:
 
 1. the Stack root folder (see `stack path --stack-root`, before you uninstall);
-2. on Windows, the folder containing Stack's tools (see `stack path --programs`,
+2. if different, the folder containing Stack's global YAML configuration file
+   (see `stack path --global-config`, before you uninstall);
+3. on Windows, the folder containing Stack's tools (see `stack path --programs`,
    before you uninstall), which is located outside of the Stack root folder; and
-3. the `stack` executable file (see `which stack`, on Unix-like operating
+4. the `stack` executable file (see `which stack`, on Unix-like operating
    systems, or `where.exe stack`, on Windows).
 
 You may also want to delete `.stack-work` folders in any Haskell projects that
@@ -1751,33 +1751,69 @@ is that it's the catch-all project whenever you're running Stack somewhere else.
 
 ## Setting the Stack root location
 
-The Stack root is a directory where Stack stores snapshot packages. On Unix-like
-operating systems, it is also where Stack stores tools such as GHC, in a
-`programs` directory. On Windows, the default location for such tools is outside
-the Stack root, in `%LOCALAPPDATA%\Programs\stack`. The location of the Stack
-root is reported by command:
+The Stack root is a directory where Stack stores important files. The location
+and contents of the directory depend on the operating system and/or whether
+Stack is configured to use the XDG Base Directory Specification.
+
+The location of the Stack root can be configured by setting the `STACK_ROOT`
+environment variable or using Stack's `--stack-root` option on the command line.
+
+=== "Unix-like"
+
+    The Stack root contains snapshot packages; tools such as GHC, in a
+    `programs` directory; and Stack's global YAML configuration file
+    (`config.yaml`).
+
+    The default Stack root is `~/.stack`.
+
+=== "Windows"
+
+    The Stack root contains snapshot packages; and Stack's global YAML
+    configuration file (`config.yaml`). The default location of tools such as
+    GHC and MSYS2 is outside of the Stack root.
+
+    The default Stack root is `%APPDIR%\stack`.
+
+    The default location of tools is `%LOCALAPPDATA%\Programs\stack`.
+
+    On Windows, the length of filepaths may be limited (to
+    [MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
+    and things can break when this limit is exceeded. Setting a Stack root with
+    a short path to its location (for example, `C:\sr`) can help.
+
+=== "XDG Base Directory Specification"
+
+    On Unix-like operating systems and Windows, Stack can be configured to
+    follow the XDG Base Directory Specification if the environment variable
+    `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
+    configuration if the Stack root location has been set on the command line or
+    the `STACK_ROOT` environment variable exists.
+
+    If Stack is following the XDG Base Directory Specification, the Stack root
+    contains what it would otherwise contain for the operating system, but
+    Stack's global YAML configuration file (`config.yaml`) may be located
+    elsewhere.
+
+    The Stack root is `<XDG_DATA_HOME>/stack`. If the `XDG_DATA_HOME`
+    environment variable does not exist, the default is `~/.local/share/stack`
+    on Unix-like operating systems and `%APPDIR%\stack` on Windows.
+
+    The location of `config.yaml` is `<XDG_CONFIG_HOME>/stack`. If the
+    `XDG_CONFIG_HOME` environment variable does not exist, the default is
+    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
+    Windows.
+
+The location of the Stack root is reported by command:
 
 ~~~text
 stack path --stack-root
 ~~~
 
-The location of the Stack root can be configured by setting the `STACK_ROOT`
-environment variable or using Stack's `--stack-root` option on the command line.
+The full path of Stack's global YAML configuration file is reported by command:
 
-Alternatively, Stack can follow the XDG specification by setting the `STACK_XDG`
-environment variable to anything non-empty:
-
-~~~bash
-export STACK_XDG=1
+~~~text
+stack path --global-config
 ~~~
-
-The global `config.yaml` will then go in `$XDG_CONFIG_HOME/stack` and the Stack
-root will be located in `$XDG_DATA_HOME/stack`.
-
-On Windows, the length of filepaths may be limited (to
-[MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
-and things can break when this limit is exceeded. Setting a Stack root with a
-short path to its location (for example, `C:\sr`) can help.
 
 ## `stack.yaml` versus Cabal files
 

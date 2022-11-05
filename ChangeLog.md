@@ -30,8 +30,10 @@ Other enhancements:
   likely overwrite on upgrade.
 * Add `stack ls dependencies cabal` command, which lists dependencies in the
   format of exact Cabal constraints.
-* Add `STACK_XDG` environment variable to use the XDG directory specification
-  for the Stack root.
+* Add `STACK_XDG` environment variable to use the XDG Base Directory
+  Specification for the Stack root and Stack's global YAML configuration file,
+  if the Stack root location is not set on the command line or by using the
+  `STACK_ROOT` environment variable.
 
 Bug fixes:
 

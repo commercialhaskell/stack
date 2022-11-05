@@ -46,9 +46,10 @@ The following terms are used in Stack's documentation.
 |Stack              |The Haskell Tool Stack project or its executable `stack`. |
 |`stack.yaml`       |A project-level configuration file used by Stack, which may also contain non-project-specific options.|
 |Stackage           |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
-|Stack root         |A directory in which Stack stores important files. See `stack path --stack-root`. On Windows, Stack also stores important files outside of the Stack root.|
+|Stack root         |A directory in which Stack stores important files. See `stack path --stack-root`. On Windows, or if Stack is configured to use the XDG Base Directory Specification, Stack also stores important files outside of the Stack root.|
 |Unix-like operating systems|Linux, FreeBSD and macOS.                         |
 |VS Code            |[Visual Studio Code](https://code.visualstudio.com/), a source code editor.|
 |Windows            |A group of operating systems developed by Microsoft.      |
 |WSL                |[Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/). Provides a Linux environment on Windows.|
+|XDG Base Directory Specification|A [specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) of directories relative to which files should be located.|
 |YAML               |A human-friendly [data serialization language](https://yaml.org/).|
