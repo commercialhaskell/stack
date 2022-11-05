@@ -17,26 +17,55 @@ the steps required to upgrade the MSYS2 version used by Stack.
     64 bit version; the location for the 32 bit version was `C:\msys32`). Do not
     use the installed version; it will create a `.bash_history` file if you do.
 
-3.  Create a tarball for each relevant directory (eg `C:\msys64`). That requires
-    a version of [`tar`](https://www.gnu.org/software/tar/tar.html) that
-    supports the compression option `--xz`. The version of `tar` that is
-    supplied with Windows (`C:\Windows\System32\tar.exe`) does not support that
-    option, but MSYS2 can supply a [version](https://packages.msys2.org/package/tar)
-    that does (using its `pacman` tool). Using the existing Stack-supplied
-    MSYS2, in PowerShell and located in a folder with write permissions (so the
-    `.tar.xz` file can be created), command:
+3.  Create an `.tar.xz` archive file for each relevant directory (eg
+    `C:\msys64`). That is best done using the same `7z` executable in Stack's
+    'programs' directory (`stack path --programs`) that will be used to extract
+    files from the archive. That can be done in two steps: the first to create a
+    `.tar` archive, and the second to create a `.tar.xz` archive. If the current
+    working directory is Stack's 'programs' directory:
 
     ~~~text
-    stack exec -- pacman -S tar
-    stack exec -- tar cJf msys2-YYYYMMDD-x86_64.tar.xz C:\msys64
+    ./7z a msys2-YYYYMMDD-x86_64.tar C:\msys64
+    ./7z a msys2-YYYYMMDD-x86_65.tar.xz msys2-YYYYMMDD-x86_64.tar
+    rm msys2-YYYYMMDD-x86_64.tar # Tidy up
     ~~~
 
-4.  Create a new release tagged and named `msys2-YYYYMMDD` in the `master`
+    !!! note
+
+        Previously, the advice was that creating the archive file required a
+        version of [`tar`](https://www.gnu.org/software/tar/tar.html) that
+        supported the compression option `--xz`. The version of `tar` that is
+        supplied with Windows (`C:\Windows\System32\tar.exe`) does not support
+        that option, but MSYS2 can supply a
+        [version](https://packages.msys2.org/package/tar) that does (using its
+        `pacman` tool). Using the existing Stack-supplied MSYS2, in PowerShell
+        and located in a folder with write permissions (so the `.tar.xz` file
+        can be created), it was advised to command:
+
+        ~~~text
+        stack exec -- pacman -S tar
+        stack exec -- tar cJf msys2-YYYYMMDD-x86_64.tar.xz C:\msys64
+        ~~~
+
+        However, in the case of `msys2-20220503` that resulted in an archive
+        that could not extracted on a terminal that did not have elevated rights
+        ('Run as administrator') due to errors
+        `ERROR: Cannot create symbolic link : A required privilege is not held by the client`.
+
+4.  Test that the Stack-supplied `7z` executable can extract the files in the
+    archive that has been created without error:
+
+    ~~~test
+    ./7z x msys2-YYYYMMDD-x86_64.tar.xz
+    ./7z x msys2-YYYYMMDD-x86_64.tar
+    ~~~
+
+5.  Create a new release tagged and named `msys2-YYYYMMDD` in the `master`
     branch of the
     [commercialhaskell/stackage-content](https://github.com/commercialhaskell/stackage-content)
     GitHub repository, uploading the tarball file(s) into that release.
 
-5.  Changes need to be made to the
+6.  Changes need to be made to the
     [stackage-content/stack/stack-setup-2.yaml](https://github.com/commercialhaskell/stackage-content/blob/master/stack/stack-setup-2.yaml)
     file, to switch over to using the newly uploaded files. For example
     (extract):
@@ -66,7 +95,7 @@ the steps required to upgrade the MSYS2 version used by Stack.
 
     The `sha256:` key only accepts lowercase hash results as values.
 
-6.  The changed `stack-setup-2.yaml` file should be tested locally. This can be
+7.  The changed `stack-setup-2.yaml` file should be tested locally. This can be
     done by:
 
     * temporarily disabling the existing local copy of MSYS2 by changing the
@@ -82,5 +111,5 @@ the steps required to upgrade the MSYS2 version used by Stack.
     If all is well, the command should proceed to download the updated version
     of MSYS2 that has been specified.
 
-7.  Raise a pull request on `commercialhaskell/stackage-contents` for the
+8.  Raise a pull request on `commercialhaskell/stackage-contents` for the
     changes to the locally-tested `stack-setup-2.yaml` file.
