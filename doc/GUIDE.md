@@ -1239,6 +1239,7 @@ the output of the command:
 
 ~~~text
 --stack-root             Global Stack root directory
+--global-config          Global Stack configuration file
 --project-root           Project root (derived from stack.yaml file)
 --config-location        Configuration location (where the stack.yaml file is)
 --bin-path               PATH environment variable

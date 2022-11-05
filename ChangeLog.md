@@ -34,6 +34,9 @@ Other enhancements:
   Specification for the Stack root and Stack's global YAML configuration file,
   if the Stack root location is not set on the command line or by using the
   `STACK_ROOT` environment variable.
+* Add `stack path --global-config`, to yield the full path of Stack's
+  user-specific global YAML configuration file (`config.yaml`).
+
 
 Bug fixes:
 
