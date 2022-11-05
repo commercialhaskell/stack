@@ -37,13 +37,35 @@ import           Stack.Types.Version (stackMinorVersion, minorVersion)
 import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
 import           System.Terminal (getTerminalWidth)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Runners" module.
+data RunnersException
+  = CommandInvalid
+  | DockerAndNixInvalid
+  | NixWithinDockerInvalid
+  | DockerWithinNixInvalid
+  deriving (Typeable)
+
+instance Show RunnersException where
+  show CommandInvalid =
+    "Error: Cannot use this command with options which override the stack.yaml \
+    \location"
+  show DockerAndNixInvalid =
+    "Error: Cannot use both Docker and Nix at the same time"
+  show NixWithinDockerInvalid =
+    "Error: Cannot use Nix from within a Docker container"
+  show DockerWithinNixInvalid =
+    "Error: Cannot use Docker from within a Nix shell"
+
+instance Exception RunnersException
+
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a
 withGlobalProject inner = do
   oldSYL <- view stackYamlLocL
   case oldSYL of
     SYLDefault -> local (set stackYamlLocL SYLGlobalProject) inner
-    _ -> throwString "Cannot use this command with options which override the stack.yaml location"
+    _ -> throwIO CommandInvalid
 
 -- | Helper for 'withEnvConfig' which passes in some default arguments:
 --
@@ -105,12 +127,12 @@ reexec inner = do
   nixEnable' <- asks $ nixEnable . configNix
   dockerEnable' <- asks $ dockerEnable . configDocker
   case (nixEnable', dockerEnable') of
-    (True, True) -> throwString "Cannot use both Docker and Nix at the same time"
+    (True, True) -> throwIO DockerAndNixInvalid
     (False, False) -> inner
 
     -- Want to use Nix
     (True, False) -> do
-      whenM getInContainer $ throwString "Cannot use Nix from within a Docker container"
+      whenM getInContainer $ throwIO NixWithinDockerInvalid
       isReexec <- view reExecL
       if isReexec
       then inner
@@ -118,7 +140,7 @@ reexec inner = do
 
     -- Want to use Docker
     (False, True) -> do
-      whenM getInNixShell $ throwString "Cannot use Docker from within a Nix shell"
+      whenM getInNixShell $ throwIO DockerWithinNixInvalid
       inContainer <- getInContainer
       if inContainer
         then do
