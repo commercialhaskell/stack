@@ -57,7 +57,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
                     snapExists <- doesFileExist snapDocs
                     if snapExists
                         then pure snapDocs
-                        else throwString "No local or snapshot doc index found to open."
+                        else throwIO HaddockIndexNotFound
     docFile <-
         case (cliTargets, map (`Map.lookup` pkgLocations) (Set.toList buildTargets)) of
             ([_], [Just (pkgId, iloc)]) -> do

@@ -812,7 +812,7 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                       Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                         -> installedToGhcPkgId ident installed
                 Just installed -> installedToGhcPkgId ident installed
-                _ -> error $ "singleBuild: invariant violated, missing package ID missing: " ++ show ident
+                _ -> throwM $ PackageIdMissingBug ident
         installedToGhcPkgId ident (Library ident' x _) = assert (ident == ident') $ Just (ident, x)
         installedToGhcPkgId _ (Executable _) = Nothing
         missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
@@ -1625,7 +1625,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 | otherwise                  = KeepTHLoading
         cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
-                (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                (_, True, True) -> throwM AllInOneBuildBug
                 (TTLocalMutable lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
                 (TTLocalMutable lp, False, True) -> finalComponentOptions lp
                 (TTLocalMutable lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
@@ -1774,7 +1774,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             [dp] -> do
                 liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
                 pure $ Just (dpGhcPkgId dp)
-            _ -> error $ "singleBuild: invariant violated: multiple results when describing installed package " ++ show (name, dps)
+            _ -> throwM $ MulipleResultsBug name dps
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
@@ -1922,7 +1922,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 thGhcId <- case L.find ((== "template-haskell") . pkgName . dpPackageIdent. snd)
                                 (Map.toList $ eeGlobalDumpPkgs ee) of
                   Just (ghcId, _) -> pure ghcId
-                  Nothing -> error "template-haskell is a wired-in GHC boot library but it wasn't found"
+                  Nothing -> throwIO TemplateHaskellNotFoundBug
                 -- env variable GHC_ENVIRONMENT is set for doctest so module names for
                 -- packages with proper dependencies should no longer get ambiguous
                 -- see e.g. https://github.com/doctest/issues/119
