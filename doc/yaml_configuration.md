@@ -32,12 +32,12 @@ use the XDG Base Directory Specification.
 
 === "Unix-like"
 
-`config.yaml` is located in `/etc/stack` (for system-wide options); and/or in
-the Stack root (for user-specific options).
+    `config.yaml` is located in `/etc/stack` (for system-wide options); and/or
+    in the Stack root (for user-specific options).
 
 === "Windows"
 
-`config.yaml` is located in the Stack root.
+    `config.yaml` is located in the Stack root.
 
 === "XDG Base Directory Specification"
 
