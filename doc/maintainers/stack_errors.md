@@ -135,6 +135,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | Couldn'tParseField Text [Line]
         ~~~
 
+    -   `Stack.Runners.RunnersException`
+
+        ~~~haskell
+        = CommandInvalid
+        | DockerAndNixInvalid
+        | NixWithinDockerInvalid
+        | DockerWithinNixInvalid
+        ~~~
+
     -   `Stack.SDist.CheckException`
 
         ~~~haskell
@@ -705,43 +714,11 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `throwIO`
 
-*   `Stack.Runners.reexec`:
-
-    ~~~text
-    Cannot use both Docker and Nix at the same time
-    ~~~
-
-    `throwString`
-
-*   `Stack.Runners.reexec`:
-
-    ~~~text
-    Cannot use Nix from within a Docker container
-    ~~~
-
-    `throwString`
-
-*   `Stack.Runners.reexec`:
-
-    ~~~text
-    Cannot use Docker from within a Nix shell
-    ~~~
-
-    `throwString`
-
 *   `Stack.Runners.withConfig`:
 
     ~~~text
     Error when running shouldUpgradeCheck: <exception>
     ~~~
-
-*   `Stack.Runners.withGlobalProject`:
-
-    ~~~text
-    Cannot use this command with options which override the stack.yaml location
-    ~~~
-
-    `throwString`
 
 *   `Stack.Script.scriptCmd`:
 
