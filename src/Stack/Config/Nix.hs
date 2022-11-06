@@ -8,7 +8,6 @@ module Stack.Config.Nix
        (nixOptsFromMonoid
        ,nixCompiler
        ,nixCompilerVersion
-       ,StackNixException(..)
        ) where
 
 import Stack.Prelude
@@ -20,6 +19,24 @@ import Stack.Constants
 import Stack.Types.Config
 import Stack.Types.Nix
 import System.Directory (doesFileExist)
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Config.Nix" module.
+data ConfigNixException
+  = NixCannotUseShellFileAndPackagesException
+    -- ^ Nix can't be given packages and a shell file at the same time
+  | GHCMajorVersionUnspecified
+  | OnlyGHCSupported
+  deriving (Typeable)
+
+instance Show ConfigNixException where
+  show NixCannotUseShellFileAndPackagesException =
+    "Error: You cannot have packages and a shell-file filled at the same time \
+    \in your nix-shell configuration."
+  show GHCMajorVersionUnspecified = "Error: GHC major version not specified"
+  show OnlyGHCSupported = "Error: Only GHC is supported by stack --nix"
+
+instance Exception ConfigNixException
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
@@ -54,7 +71,7 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
 
-nixCompiler :: WantedCompiler -> Either StringException T.Text
+nixCompiler :: WantedCompiler -> Either ConfigNixException T.Text
 nixCompiler compilerVersion =
   case compilerVersion of
     WCGhc version ->
@@ -76,31 +93,19 @@ nixCompiler compilerVersion =
               <> T.pack (versionString version) <> "\"\
               \else haskell.compiler.${builtins.head compilers})"
             _ -> "haskell.compiler.ghc" <> T.concat (x : y : minor)
-        _ -> Left $ stringException "GHC major version not specified"
-    WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
-    WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
+        _ -> Left GHCMajorVersionUnspecified
+    WCGhcjs{} -> Left OnlyGHCSupported
+    WCGhcGit{} -> Left OnlyGHCSupported
 
-nixCompilerVersion :: WantedCompiler -> Either StringException T.Text
+nixCompilerVersion :: WantedCompiler -> Either ConfigNixException T.Text
 nixCompilerVersion compilerVersion =
   case compilerVersion of
     WCGhc version ->
       case T.split (== '.') (fromString $ versionString version) of
         x : y : minor -> Right $ "ghc" <> T.concat (x : y : minor)
-        _ -> Left $ stringException "GHC major version not specified"
-    WCGhcjs{} -> Left $ stringException "Only GHC is supported by stack --nix"
-    WCGhcGit{} -> Left $ stringException "Only GHC is supported by stack --nix"
-
--- Exceptions thrown specifically by Stack.Nix
-data StackNixException
-  = NixCannotUseShellFileAndPackagesException
-    -- ^ Nix can't be given packages and a shell file at the same time
-    deriving (Typeable)
-
-instance Exception StackNixException
-
-instance Show StackNixException where
-  show NixCannotUseShellFileAndPackagesException =
-    "You cannot have packages and a shell-file filled at the same time in your nix-shell configuration."
+        _ -> Left GHCMajorVersionUnspecified
+    WCGhcjs{} -> Left OnlyGHCSupported
+    WCGhcGit{} -> Left OnlyGHCSupported
 
 isNixOS :: MonadIO m => m Bool
 isNixOS = liftIO $ do
