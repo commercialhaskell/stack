@@ -71,10 +71,11 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DuplicatePackagesBug
         ~~~
 
-    -   `Stack.Clean.StackCleanException`
+    -   `Stack.Clean.CleanException`
 
         ~~~haskell
         = NonLocalPackages [PackageName]
+        | DeletionFailures [(Path Abs Dir, SomeException)]
         ~~~
 
     -   `Stack.Config.Docker.StackDockerConfig.Execeiption`
@@ -434,16 +435,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     `liftM Just . withSourceFile fp $ getDigest`
 
     `throwM`
-
-*   `Stack.Clean.clean`:
-
-    ~~~text
-    Exception while recursively deleting <dir>"
-    <execption>
-    Perhaps you do not have permission to delete these files or they are in use?
-    ~~~
-
-    `exitFailure`
 
 *   `Stack.Config.configFromConfigMonoid`:
 
