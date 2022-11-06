@@ -68,6 +68,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         = UnknownPackages (Path Abs File) (Map PackageName (Maybe Version, Set PackageName)) (Map PackageName (Set PackageIdentifier))
         | SnapshotNotFound SnapName
         | NeitherCompilerOrResolverSpecified Text
+        | DuplicatePackagesBug
         ~~~
 
     -   `Stack.Clean.StackCleanException`
@@ -276,6 +277,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | CabalCopyFailed Bool String
         | LocalPackagesPresent [PackageIdentifier]
         | CouldNotLockDistDir (Path Abs File)
+        | TaskCycleBug PackageIdentifier
+        | PackageIdMissingBug PackageIdentifier
+        | AllInOneBuildBug
+        | MulipleResultsBug PackageName [DumpPackage]
+        | TemplateHaskellNotFoundBug
+        | HaddockIndexNotFound
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
@@ -419,39 +426,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `impureThrow`
 
-*   `Stack.Build.ConstructPlan.stripNonDeps`:
-
-    ~~~text
-    Unexpected: task cycle for <package>
-    ~~~
-
-    `error`
-
-*   `Stack.Build.Execute.getConfigCache`:
-
-    ~~~text
-    singleBuild: invariant violated, missing package ID missing: <id>
-    ~~~
-
-    `error`
-
-*   `Stack.Build.Execute.singleBuild`:
-
-    ~~~text
-    Invariant violated: cannot have an all-in-one build that also has a final
-    build step.
-    ~~~
-
-    `error`
-
-*   `Stack.Build.Execute.singleBuild`:
-
-    ~~~text
-    singleBuild: invariant violated: multiple results when describing installed package (<name>, <description>)
-    ~~~
-
-    `error`
-
 *   `Stack.Build.Execute.singleBuild`: catches exceptions in `cabal ...`
 
     `throwM`
@@ -460,30 +434,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     `liftM Just . withSourceFile fp $ getDigest`
 
     `throwM`
-
-*   `Stack.Build.Execute.singleTest`:
-
-    ~~~text
-    template-haskell is a wired-in GHC boot library but it wasn't found
-    ~~~
-
-    `error`
-
-*   `Stack.Build.Haddock.openHaddocksInBrowser`:
-
-    ~~~text
-    No local or snapshot doc index found to open.
-    ~~~
-
-    `throwString`
-
-*   `Stack.BuildPlan.checkBundleBuildPlan`:
-
-    ~~~text
-    Bug: Duplicate packages are not expected here
-    ~~~
-
-    `error`
 
 *   `Stack.Clean.clean`:
 

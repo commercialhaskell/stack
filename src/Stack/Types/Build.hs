@@ -74,8 +74,8 @@ import           Stack.Types.Version
 import           System.FilePath                 (pathSeparator)
 import           RIO.Process                     (showProcessArgDebug)
 
-----------------------------------------------
--- Exceptions
+-- | Type representing exceptions thrown by functions exported by the modules
+-- with names beginning @Stack.Build@.
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
@@ -122,19 +122,13 @@ data StackBuildException
   | CabalCopyFailed Bool String
   | LocalPackagesPresent [PackageIdentifier]
   | CouldNotLockDistDir !(Path Abs File)
+  | TaskCycleBug PackageIdentifier
+  | PackageIdMissingBug PackageIdentifier
+  | AllInOneBuildBug
+  | MulipleResultsBug PackageName [DumpPackage]
+  | TemplateHaskellNotFoundBug
+  | HaddockIndexNotFound
   deriving Typeable
-
-data FlagSource = FSCommandLine | FSStackYaml
-    deriving (Show, Eq, Ord)
-
-data UnusedFlags = UFNoPackage FlagSource PackageName
-                 | UFFlagsNotDefined
-                       FlagSource
-                       PackageName
-                       (Set FlagName) -- defined in package
-                       (Set FlagName) -- not defined
-                 | UFSnapshot PackageName
-    deriving (Show, Eq, Ord)
 
 instance Show StackBuildException where
     show (Couldn'tFindPkgId name) =
@@ -304,13 +298,46 @@ instance Show StackBuildException where
             ]
     show (ConstructPlanFailed msg) = msg
     show (LocalPackagesPresent locals) = unlines
-      $ "Local packages are not allowed when using the script command. Packages found:"
-      : map (\ident -> "- " ++ packageIdentifierString ident) locals
+        $ "Local packages are not allowed when using the script command. Packages found:"
+        : map (\ident -> "- " ++ packageIdentifierString ident) locals
     show (CouldNotLockDistDir lockFile) = unlines
-      [ "Locking the dist directory failed, try to lock file:"
-      , "  " ++ toFilePath lockFile
-      , "Maybe you're running another copy of Stack?"
-      ]
+        [ "Locking the dist directory failed, try to lock file:"
+        , "  " ++ toFilePath lockFile
+        , "Maybe you're running another copy of Stack?"
+        ]
+    show (TaskCycleBug pid) =
+        "Error: The impossible happened! Unexpected task cycle for "
+        ++ packageNameString (pkgName pid)
+    show (PackageIdMissingBug ident) =
+        "Error: The impossible happened! singleBuild: missing package ID \
+        \missing: "
+        ++ show ident
+    show AllInOneBuildBug =
+        "Error: The impossible happened! Cannot have an all-in-one build that \
+        \also has a final build step."
+    show (MulipleResultsBug name dps) =
+        "Error: The impossible happened! singleBuild: multiple results when \
+        \describing installed package "
+        ++ show (name, dps)
+    show TemplateHaskellNotFoundBug =
+        "Error: The impossible happened! template-haskell is a wired-in GHC \
+        \boot library but it wasn't found"
+    show HaddockIndexNotFound =
+        "Error: No local or snapshot doc index found to open."
+
+instance Exception StackBuildException
+
+data FlagSource = FSCommandLine | FSStackYaml
+    deriving (Show, Eq, Ord)
+
+data UnusedFlags = UFNoPackage FlagSource PackageName
+                 | UFFlagsNotDefined
+                       FlagSource
+                       PackageName
+                       (Set FlagName) -- defined in package
+                       (Set FlagName) -- not defined
+                 | UFSnapshot PackageName
+    deriving (Show, Eq, Ord)
 
 missingExeError :: Bool -> String -> String
 missingExeError isSimpleBuildType msg =
@@ -362,8 +389,6 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
    where
     removeTrailingSpaces = dropWhileEnd isSpace . unlines
     dropQuotes = filter ('\"' /=)
-
-instance Exception StackBuildException
 
 ----------------------------------------------
 

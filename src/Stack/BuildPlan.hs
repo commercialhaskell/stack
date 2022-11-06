@@ -22,6 +22,7 @@ module Stack.BuildPlan
     ) where
 
 import           Stack.Prelude hiding (Display (..))
+import           Control.Exception (throw)
 import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import           Data.List (intercalate)
@@ -46,6 +47,8 @@ import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Compiler
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.BuildPlan" module.
 data BuildPlanException
     = UnknownPackages
         (Path Abs File) -- stack.yaml file
@@ -53,8 +56,9 @@ data BuildPlanException
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
     | NeitherCompilerOrResolverSpecified T.Text
+    | DuplicatePackagesBug
     deriving (Typeable)
-instance Exception BuildPlanException
+
 instance Show BuildPlanException where
     show (SnapshotNotFound snapName) = unlines
         [ "SnapshotNotFound " ++ snapName'
@@ -129,10 +133,16 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
-    show (NeitherCompilerOrResolverSpecified url) =
-        "Failed to load custom snapshot at " ++
-        T.unpack url ++
-        ", because no 'compiler' or 'resolver' is specified."
+    show (NeitherCompilerOrResolverSpecified url) = concat
+        [ "Failed to load custom snapshot at "
+        , T.unpack url
+        , ", because no 'compiler' or 'resolver' is specified."
+        ]
+    show DuplicatePackagesBug =
+        "Error: The impossible happened. Duplicate packages are not expected \
+        \here"
+
+instance Exception BuildPlanException
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
@@ -307,7 +317,7 @@ checkBundleBuildPlan platform compiler pool flags gpds =
         flags' f gpd = fromMaybe Map.empty (Map.lookup (gpdPackageName gpd) f)
         pool' = Map.union (gpdPackages gpds) pool
 
-        dupError _ _ = error "Bug: Duplicate packages are not expected here"
+        dupError _ _ = throw DuplicatePackagesBug
 
 data BuildPlanCheck =
       BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
