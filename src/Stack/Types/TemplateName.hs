@@ -17,12 +17,26 @@ module Stack.Types.TemplateName
   , defaultTemplateName
   ) where
 
+import           Control.Exception (throw)
 import           Data.Aeson (FromJSON (..), withText)
 import qualified Data.Text as T
 import           Network.HTTP.StackClient (parseRequest)
 import qualified Options.Applicative as O
 import           Path
 import           Stack.Prelude
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Types.TemplateName" module.
+newtype TypeTemplateNameException
+    = DefaultTemplateNameNotParsedBug String
+    deriving Typeable
+
+instance Show TypeTemplateNameException where
+    show (DefaultTemplateNameNotParsedBug s) =
+        "Error: The impossible happened! Cannot parse default template name: "
+        ++ s
+
+instance Exception TypeTemplateNameException
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath
@@ -102,7 +116,7 @@ parseTemplateNameFromString fname =
 defaultTemplateName :: TemplateName
 defaultTemplateName =
   case parseTemplateNameFromString "new-template" of
-    Left s -> error $ "Bug in Stack codebase, cannot parse default template name: " ++ s
+    Left s -> throw $ DefaultTemplateNameNotParsedBug s
     Right x -> x
 
 -- | Get a text representation of the template name.

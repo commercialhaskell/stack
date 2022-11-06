@@ -14,6 +14,7 @@ import Pantry.Internal.AesonExtended
 import Data.ByteString.Builder (byteString)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
+import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import Path (parent)
 import Path.Extended (addExtension)
@@ -22,6 +23,25 @@ import Stack.Prelude
 import Stack.SourceMap
 import Stack.Types.Config
 import Stack.Types.SourceMap
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Lock" module.
+data LockException
+    = WritingLockFileError (Path Abs File) Locked
+    deriving Typeable
+
+instance Show LockException where
+    show (WritingLockFileError lockFile newLocked) = concat
+        [ "Error: You indicated that Stack should error out on writing a lock \
+          \file\n"
+        , "You indicated that Stack should error out on writing a lock file\n"
+        , "Stack just tried to write the following lock file contents to "
+        , toFilePath lockFile
+        , "\n"
+        , T.unpack $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
+        ]
+
+instance Exception LockException
 
 data LockedLocation a b = LockedLocation
     { llOriginal :: a
@@ -139,13 +159,7 @@ lockCachedWanted stackFile resolver fillWanted = do
           writeBinaryFileAtomic lockFile $
             header <>
             byteString (Yaml.encode newLocked)
-        LFBErrorOnWrite -> do
-          logError "You indicated that Stack should error out on writing a lock file"
-          logError $
-            "I just tried to write the following lock file contents to " <>
-            fromString (toFilePath lockFile)
-          logError $ display $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
-          exitFailure
+        LFBErrorOnWrite -> throwIO $ WritingLockFileError lockFile newLocked
         LFBIgnore -> pure ()
         LFBReadOnly -> pure ()
     pure wanted

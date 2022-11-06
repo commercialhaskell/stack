@@ -46,6 +46,7 @@ module Stack.Types.Build
     where
 
 import           Stack.Prelude
+import           Control.Exception               (throw)
 import           Data.Aeson                      (ToJSON, FromJSON)
 import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
@@ -74,8 +75,8 @@ import           Stack.Types.Version
 import           System.FilePath                 (pathSeparator)
 import           RIO.Process                     (showProcessArgDebug)
 
--- | Type representing exceptions thrown by functions exported by the modules
--- with names beginning @Stack.Build@.
+-- | Type representing exceptions thrown by functions exported by modules with
+-- names beginning @Stack.Build@.
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | CompilerVersionMismatch
@@ -128,6 +129,7 @@ data StackBuildException
   | MulipleResultsBug PackageName [DumpPackage]
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
+  | ShowBuildErrorBug
   deriving Typeable
 
 instance Show StackBuildException where
@@ -324,6 +326,8 @@ instance Show StackBuildException where
         \boot library but it wasn't found"
     show HaddockIndexNotFound =
         "Error: No local or snapshot doc index found to open."
+    show ShowBuildErrorBug =
+        "Error: The impossible happened! Unexpected case in showBuildError"
 
 instance Exception StackBuildException
 
@@ -372,7 +376,7 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
       logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
   in "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
-       (False, Nothing) -> error "Invariant violated: unexpected case in showBuildError"
+       (False, Nothing) -> throw ShowBuildErrorBug
        (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')
        (True, Nothing) -> "simple Setup.hs"
        (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')

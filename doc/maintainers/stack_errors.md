@@ -106,6 +106,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | NotLocalPackage PackageName
         ~~~
 
+    -   `Stack.Dot.DotException`
+
+        ~~~haskell
+        = DependencyNotFoundBug GhcPkgId
+        | PackageNotFoundBug PackageName
+        ~~~
+
     -   `Stack.Ghci.Ghci.Exception`
 
         ~~~haskell
@@ -139,6 +146,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         = ParseFailure [Value]
         ~~~
 
+    -   `Stack.Lock.LockException`
+
+        ~~~haskell
+        = WritingLockFileError (Path Abs File) Locked
+        ~~~
+
     -   `Stack.New.NewException`
 
         ~~~haskell
@@ -157,13 +170,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         = CannotDetermineProjectRoot
-        ~~~
-
-    -   `Stack.Package.CabalFileNameParseFail`
-
-        ~~~haskell
-        = CabalFileNameParseFail FilePath
-        | CabalFileNameInvalidPackageName FilePath
         ~~~
 
     -   `Stack.PackageDump.PackageDumpException`
@@ -370,6 +376,9 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) (Maybe Version) [PError] [PWarning]
         | MismatchedCabalIdentifier PackageIdentifierRevision PackageIdentifier
+        | CabalFileNameParseFail FilePath
+        | CabalFileNameInvalidPackageName FilePath
+        | ComponentNotParsedBug
         ~~~
 
     -   `Stack.Types.Resolver.BuildPlanTypesException`
@@ -377,6 +386,22 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         = ParseResolverException Text
         | FilepathInDownloadedSnapshot Text
+        ~~~
+
+    -   `Stack.Types.TemplateName.TypesTemplateNameException`
+
+        ~~~haskell
+        = DefaultTemplateNameNotParsedBug String
+        ~~~
+
+    -   `Stack.Upgrade.UpgradeException`
+
+        ~~~haskell
+        = NeitherBinaryOrSourceSpecified
+        | ExecutableFailure
+        | CommitsNotFound String String
+        | StackInPackageIndexNotFound
+        | VersionWithNoRevision
         ~~~
 
     -   `System.Process.Pager.PagerException`
@@ -508,14 +533,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Failed to read <file>
     ~~~
 
-*   `Stack.Dot.createDepLoader`:
-
-    ~~~text
-    Invariant violated: Expected to find <packageId> in global DB
-    ~~~
-
-    `error`
-
 *   `Stack.Ghci.buildDepsAndInitialSteps`: catches exeception from
     `buildLocalTargets`
 
@@ -542,24 +559,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     `Data.Yaml.AesonException`
 
     `throwIO`
-
-*   `Stack.Lock.lockCachedWanted`:
-
-    ~~~text
-    You indicated that Stack should error out on writing a lock file
-    I just tried to write the following lock file contents to <path>
-    <lock_file_contents>
-    ~~~
-
-    `exitFailure`
-
-*   `Stack.Package.componentNameToDir`:
-
-    ~~~text
-    Invariant violated: component names should always parse as directory names
-    ~~~
-
-    `error`
 
 *   `Stack.Package.resolveGlobFiles`:
 
@@ -632,58 +631,34 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `exitFailure`
 
-*   `Stack.Types.Build.showBuildError`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
-    Invariant violated: unexpected case in showBuildError
-    ~~~
-
-    `error`
-
-*   `Stack.Types.TemplateName.defaultTemplateName`:
-
-    ~~~text
-    Bug in Stack codebase, cannot parse default template name: <name>
-    ~~~
-
-    `error`
-
-*   `Stack.Upgrade.binaryUpgrade`:
-
-    ~~~text
-    Non-success exit code from running newly downloaded executable
+    Compiler file metadata mismatch, ignoring cache
     ~~~
 
     `throwString`
 
-*   `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
-    No commits found for branch <branch> on repo <repo>
+    Global package cache file metadata mismatch, ignoring cache
     ~~~
 
     `throwString`
 
-*   `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
-    No Stack version found in package indices
+    Global dump did not parse correctly
     ~~~
 
     `throwString`
 
-*   `Stack.Upgrade.sourceUpgrade`:
+*   `Stack.Storage.User.loadCompilerPaths`:
 
     ~~~text
-    Latest version with no revision
-    ~~~
-
-    `throwString`
-
-*   `Stack.Upgrade.upgrade`:
-
-    ~~~text
-    You must allow either binary or source upgrade paths
+    Invalid arch: <arch>
     ~~~
 
     `throwString`
