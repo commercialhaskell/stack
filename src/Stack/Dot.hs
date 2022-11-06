@@ -16,6 +16,7 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
+import           Control.Exception (throw)
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
@@ -48,6 +49,27 @@ import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.SourceMap
 import           Stack.Build.Target(NeedTargets(..), parseTargets)
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Dot" module.
+data DotException
+  = DependencyNotFoundBug GhcPkgId
+  | PackageNotFoundBug PackageName
+  deriving Typeable
+
+instance Show DotException where
+  show (DependencyNotFoundBug depId) = concat
+    [ "Error: The impossible happened! Expected to find "
+    , ghcPkgIdString depId
+    , " in global DB"
+    ]
+  show (PackageNotFoundBug pkgName) = concat
+    [ "Error: The impossible happened! The '"
+    , packageNameString pkgName
+    , "' package was not found in any of the dependency sources"
+    ]
+
+instance Exception DotException
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
@@ -377,7 +399,7 @@ createDepLoader
   -> PackageName
   -> RIO DotConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
-  fromMaybe noDepsErr
+  fromMaybe (throwIO $ PackageNotFoundBug pkgName)
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
  where
   projectPackageDeps = loadDeps <$> Map.lookup pkgName (smProject sourceMap)
@@ -413,13 +435,9 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
      where
       deps = map ghcIdToPackageName (dpDepends dump)
       ghcIdToPackageName depId =
-        let errText = "Invariant violated: Expected to find "
-        in  maybe (error (errText ++ ghcPkgIdString depId ++ " in global DB"))
-                  Stack.Prelude.pkgName
-                  (Map.lookup depId globalIdMap)
-
-  noDepsErr = error ("Invariant violated: The '" ++ packageNameString pkgName
-              ++ "' package was not found in any of the dependency sources")
+        maybe (throw $ DependencyNotFoundBug depId)
+              Stack.Prelude.pkgName
+              (Map.lookup depId globalIdMap)
 
   payloadFromLocal pkg loc =
     DotPayload (Just $ packageVersion pkg)

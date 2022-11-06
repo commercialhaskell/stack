@@ -1,7 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -28,6 +27,7 @@ module Stack.Package
   ,applyForceCustomBuild
   ) where
 
+import           Control.Exception (throw)
 import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -515,8 +515,7 @@ buildDir distDir = distDir </> relDirBuild
 -- component names.
 componentNameToDir :: Text -> Path Rel Dir
 componentNameToDir name =
-  fromMaybe (error "Invariant violated: component names should always parse as directory names")
-            (parseRelDir (T.unpack name))
+  fromMaybe (throw ComponentNotParsedBug) (parseRelDir (T.unpack name))
 
 -- | Get all dependencies of the package (buildable targets only).
 --
@@ -1142,18 +1141,6 @@ resolveFiles
     -> RIO Ctx [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names =
     forM names (\name -> liftM (name, ) (findCandidate dirs name))
-
-data CabalFileNameParseFail
-  = CabalFileNameParseFail FilePath
-  | CabalFileNameInvalidPackageName FilePath
-  deriving (Typeable)
-
-instance Exception CabalFileNameParseFail
-instance Show CabalFileNameParseFail where
-    show (CabalFileNameParseFail fp) =
-        "Invalid file path for Cabal file, must have a .cabal extension: " ++ fp
-    show (CabalFileNameInvalidPackageName fp) =
-        "Cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName

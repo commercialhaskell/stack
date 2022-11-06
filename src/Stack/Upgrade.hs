@@ -27,6 +27,34 @@ import           System.Process              (rawSystem, readProcess)
 import           RIO.PrettyPrint
 import           RIO.Process
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Upgrade" module.
+data UpgradeException
+    = NeitherBinaryOrSourceSpecified
+    | ExecutableFailure
+    | CommitsNotFound String String
+    | StackInPackageIndexNotFound
+    | VersionWithNoRevision
+    deriving Typeable
+
+instance Show UpgradeException where
+    show NeitherBinaryOrSourceSpecified =
+        "Error: You must allow either binary or source upgrade paths"
+    show ExecutableFailure =
+        "Error: Non-success exit code from running newly downloaded executable"
+    show (CommitsNotFound branch repo) = concat
+        [ "Error: No commits found for branch "
+        , branch
+        , " on repo "
+        , repo
+        ]
+    show StackInPackageIndexNotFound =
+        "Error: No Stack version found in package indices"
+    show VersionWithNoRevision =
+        "Error: Latest version with no revision"
+
+instance Exception UpgradeException
+
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts
     <$> (sourceOnly <|> optional binaryOpts)
@@ -97,7 +125,7 @@ upgrade builtHash (UpgradeOpts mbo mso) =
         -- FIXME It would be far nicer to capture this case in the
         -- options parser itself so we get better error messages, but
         -- I can't think of a way to make it happen.
-        (Nothing, Nothing) -> throwString "You must allow either binary or source upgrade paths"
+        (Nothing, Nothing) -> throwIO NeitherBinaryOrSourceSpecified
         (Just bo, Nothing) -> binary bo
         (Nothing, Just so) -> source so
         -- See #2977 - if --git or --git-repo is specified, do source upgrade.
@@ -160,9 +188,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
         downloadStackExe platforms0 archiveInfo (configLocalBin config) True $ \tmpFile -> do
             -- Sanity check!
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
-
-            unless (ec == ExitSuccess)
-                    $ throwString "Non-success exit code from running newly downloaded executable"
+            unless (ec == ExitSuccess) (throwIO ExecutableFailure)
 
 sourceUpgrade
   :: Maybe String
@@ -175,7 +201,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         remote <- liftIO $ System.Process.readProcess "git" ["ls-remote", repo, branch] []
         latestCommit <-
           case words remote of
-            [] -> throwString $ "No commits found for branch " ++ branch ++ " on repo " ++ repo
+            [] -> throwIO $ CommitsNotFound branch repo
             x:_ -> pure x
         when (isNothing builtHash) $
             prettyWarnS $
@@ -212,7 +238,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         mversion <- getLatestHackageVersion YesRequireHackageIndex "stack" UsePreferredVersions
         (PackageIdentifierRevision _ version _) <-
           case mversion of
-            Nothing -> throwString "No Stack version found in package indices"
+            Nothing -> throwIO StackInPackageIndexNotFound
             Just version -> pure version
 
         if version <= mkVersion' Paths.version
@@ -224,7 +250,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 let dir = tmp </> suffix
                 mrev <- getLatestHackageRevision YesRequireHackageIndex "stack" version
                 case mrev of
-                  Nothing -> throwString "Latest version with no revision"
+                  Nothing -> throwIO VersionWithNoRevision
                   Just (_rev, cfKey, treeKey) -> do
                     let ident = PackageIdentifier "stack" version
                     unpackPackageLocation dir $ PLIHackage ident cfKey treeKey

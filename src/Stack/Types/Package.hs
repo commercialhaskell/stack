@@ -30,7 +30,8 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 
--- | All exceptions thrown by the library.
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Package" module.
 data PackageException
   = PackageInvalidCabalFile
       !(Either PackageIdentifierRevision (Path Abs File))
@@ -38,8 +39,11 @@ data PackageException
       ![PError]
       ![PWarning]
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
+  | CabalFileNameParseFail FilePath
+  | CabalFileNameInvalidPackageName FilePath
+  | ComponentNotParsedBug
   deriving Typeable
-instance Exception PackageException
+
 instance Show PackageException where
     show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Unable to parse Cabal file "
@@ -81,6 +85,18 @@ instance Show PackageException where
         , "\nExpected: "
         , T.unpack $ utf8BuilderToText $ display pir
         ]
+    show (CabalFileNameParseFail fp) =
+        "Invalid file path for Cabal file, must have a .cabal extension: "
+        ++ fp
+    show (CabalFileNameInvalidPackageName fp) =
+        "Cabal file names must use valid package names followed by a .cabal "
+        ++ "extension, the following is invalid: "
+        ++ fp
+    show ComponentNotParsedBug =
+        "Error: The impossible happened! Component names should always parse "
+        ++ "as directory names"
+
+instance Exception PackageException
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
 -- thing.
