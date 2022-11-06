@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-10-22.
+`master` branch of the Stack repository. Last updated: 2022-11-06.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -630,38 +630,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     ~~~
 
     `exitFailure`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Compiler file metadata mismatch, ignoring cache
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Global package cache file metadata mismatch, ignoring cache
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Global dump did not parse correctly
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Invalid arch: <arch>
-    ~~~
-
-    `throwString`
 
 *   `Stack.Upload.uploadBytes`:
 
