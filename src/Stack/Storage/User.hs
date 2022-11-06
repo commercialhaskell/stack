@@ -52,6 +52,28 @@ import Stack.Types.Config (HasConfig, configL, configUserStorage, CompilerPaths 
 import System.Posix.Types (COff (..))
 import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Storage.User" module.
+data StorageUserException
+    = CompilerFileMetadataMismatch
+    | GlobalPackageCacheFileMetadataMismatch
+    | GlobalDumpParseFailure
+    | CompilerCacheArchitectureInvalid Text
+    deriving Typeable
+
+instance Show StorageUserException where
+    show CompilerFileMetadataMismatch =
+        "Error: Compiler file metadata mismatch, ignoring cache"
+    show GlobalPackageCacheFileMetadataMismatch =
+        "Error: Global package cache file metadata mismatch, ignoring cache"
+    show GlobalDumpParseFailure =
+        "Error: Global dump did not parse correctly"
+    show (CompilerCacheArchitectureInvalid compilerCacheArch) =
+        "Error: Invalid arch: "
+        ++ show compilerCacheArch
+
+instance Exception StorageUserException
+
 share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"
     ]
@@ -274,12 +296,12 @@ loadCompilerPaths compiler build sandboxed = do
     when
       (compilerCacheGhcSize /= sizeToInt64 (fileSize compilerStatus) ||
        compilerCacheGhcModified /= timeToInt64 (modificationTime compilerStatus))
-      (throwString "Compiler file metadata mismatch, ignoring cache")
+      (throwIO CompilerFileMetadataMismatch)
     globalDbStatus <- liftIO $ getFileStatus $ compilerCacheGlobalDb FP.</> "package.cache"
     when
       (compilerCacheGlobalDbCacheSize /= sizeToInt64 (fileSize globalDbStatus) ||
        compilerCacheGlobalDbCacheModified /= timeToInt64 (modificationTime globalDbStatus))
-      (throwString "Global package cache file metadata mismatch, ignoring cache")
+      (throwIO GlobalPackageCacheFileMetadataMismatch)
 
     -- We could use parseAbsFile instead of resolveFile' below to
     -- bypass some system calls, at the cost of some really wonky
@@ -292,11 +314,11 @@ loadCompilerPaths compiler build sandboxed = do
     cabalVersion <- parseVersionThrowing $ T.unpack compilerCacheCabalVersion
     globalDump <-
       case readMaybe $ T.unpack compilerCacheGlobalDump of
-        Nothing -> throwString "Global dump did not parse correctly"
+        Nothing -> throwIO GlobalDumpParseFailure
         Just globalDump -> pure globalDump
     arch <-
       case simpleParse $ T.unpack compilerCacheArch of
-        Nothing -> throwString $ "Invalid arch: " ++ show compilerCacheArch
+        Nothing -> throwIO $ CompilerCacheArchitectureInvalid compilerCacheArch
         Just arch -> pure arch
 
     pure CompilerPaths
