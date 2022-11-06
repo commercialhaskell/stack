@@ -200,7 +200,6 @@ library
       Stack.Types.Config
       Stack.Types.Config.Build
       Stack.Types.Docker
-      Stack.Types.Dependency
       Stack.Types.GhcPkgId
       Stack.Types.NamedComponent
       Stack.Types.Nix
@@ -221,6 +220,7 @@ library
   other-modules:
       Path.Extended
       Stack.Types.Cache
+      Stack.Types.Dependency
   autogen-modules:
       Paths_stack
   hs-source-dirs:
