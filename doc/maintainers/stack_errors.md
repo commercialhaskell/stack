@@ -188,11 +188,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         = CheckException (NonEmpty PackageCheck)
         ~~~
 
-    -   `Stack.Script.StackScriptException`
+    -   `Stack.Script.ScriptException`
 
         ~~~haskell
         = MutableDependenciesForScript [PackageName]
         | AmbiguousModuleName ModuleName [PackageName]
+        | ArgumentsWithNoRunInvalid
+        | NoRunWithoutCompilationInvalid
         ~~~
 
     -   `Stack.Setup.PerformPathCheckingException`
@@ -586,22 +588,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     ~~~text
     Ignoring SYLGlobalProject for script command
     ~~~
-
-*   `Stack.Script.scriptCmd`:
-
-    ~~~text
-    --no-run incompatible with arguments
-    ~~~
-
-    `throwString`
-
-*   `Stack.Script.scriptCmd`:
-
-    ~~~text
-    --no-run requires either --compile or --optimize
-    ~~~
-
-    `throwString`
 
 *   `Stack.SDist.getCabalLbs`:
 

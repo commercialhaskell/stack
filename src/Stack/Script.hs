@@ -40,20 +40,32 @@ import qualified RIO.Directory as Dir
 import           RIO.Process
 import qualified RIO.Text as T
 
-data StackScriptException
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Script" module.
+data ScriptException
     = MutableDependenciesForScript [PackageName]
     | AmbiguousModuleName ModuleName [PackageName]
+    | ArgumentsWithNoRunInvalid
+    | NoRunWithoutCompilationInvalid
   deriving Typeable
 
-instance Exception StackScriptException
-
-instance Show StackScriptException where
+instance Show ScriptException where
     show (MutableDependenciesForScript names) = unlines
-        $ "No mutable packages are allowed in the `script` command. Mutable packages found:"
+        $ "No mutable packages are allowed in the `script` command. Mutable \
+          \packages found:"
         : map (\name -> "- " ++ packageNameString name) names
     show (AmbiguousModuleName mname pkgs) = unlines
-        $ ("Module " ++ moduleNameString mname ++ " appears in multiple packages: ")
-        : [unwords $ map packageNameString pkgs ]
+        $ (  "Module "
+          ++ moduleNameString mname
+          ++ " appears in multiple packages: "
+          )
+        : [ unwords $ map packageNameString pkgs ]
+    show ArgumentsWithNoRunInvalid =
+        "Error: --no-run incompatible with arguments"
+    show NoRunWithoutCompilationInvalid =
+        "Error: --no-run requires either --compile or --optimize"
+
+instance Exception ScriptException
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
@@ -90,9 +102,9 @@ scriptCmd opts = do
     case shouldRun of
       YesRun -> pure ()
       NoRun -> do
-        unless (null $ soArgs opts) $ throwString "--no-run incompatible with arguments"
+        unless (null $ soArgs opts) $ throwIO ArgumentsWithNoRunInvalid
         case shouldCompile of
-          SEInterpret -> throwString "--no-run requires either --compile or --optimize"
+          SEInterpret -> throwIO NoRunWithoutCompilationInvalid
           SECompile -> pure ()
           SEOptimize -> pure ()
 
