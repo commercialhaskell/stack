@@ -248,6 +248,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
         ~~~
 
+    -   `Stack.Storage.User.StorageUserException`
+
+        ~~~haskell
+        = CompilerFileMetadataMismatch
+        | GlobalPackageCacheFileMetadataMismatch
+        | GlobalDumpParseFailure
+        | CompilerCacheArchitectureInvalid Text
+        ~~~
+
     -   `Stack.Unpack.UnpackException`
 
         ~~~haskell
@@ -636,38 +645,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     ~~~
 
     `exitFailure`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Compiler file metadata mismatch, ignoring cache
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Global package cache file metadata mismatch, ignoring cache
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Global dump did not parse correctly
-    ~~~
-
-    `throwString`
-
-*   `Stack.Storage.User.loadCompilerPaths`:
-
-    ~~~text
-    Invalid arch: <arch>
-    ~~~
-
-    `throwString`
 
 *   `Stack.Types.Build.showBuildError`:
 
