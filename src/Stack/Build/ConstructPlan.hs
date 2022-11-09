@@ -734,6 +734,7 @@ addPackageDeps package = do
                                     , "."
                                     ]
                         allowNewer <- view $ configL.to configAllowNewer
+                        allowNewerDeps <- view $ configL.to configAllowNewerDeps
                         let inSnapshotCheck = do
                                 -- We ignore dependency information for packages in a snapshot
                                 x <- inSnapshot (packageName package) (packageVersion package)
@@ -743,17 +744,17 @@ addPackageDeps package = do
                                         warn_ "trusting snapshot over Cabal file dependency information"
                                         pure True
                                     else pure False
-                        case allowNewer of
-                            AllowNewerAll -> do
+                        if allowNewer
+                            then do
                                 warn_ "allow-newer enabled"
-                                pure True
-                            AllowNewerPackages xs ->
-                                if packageNameString (packageName package) `elem` xs
-                                    then do
-                                        warn_ "allow-newer enabled for specific package"
-                                        pure True
-                                    else inSnapshotCheck
-                            AllowNewerNone -> inSnapshotCheck
+                                case allowNewerDeps of
+                                    Nothing -> pure True
+                                    Just boundsIgnoredDeps ->
+                                        pure $ packageName package `elem` boundsIgnoredDeps
+                            else do
+                                when (isJust allowNewerDeps) $
+                                    warn_ "allow-newer-deps are specified but allow-newer isn't enabled"
+                                inSnapshotCheck
 
 
                 if inRange

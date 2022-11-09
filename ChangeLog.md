@@ -36,7 +36,10 @@ Other enhancements:
   `STACK_ROOT` environment variable.
 * Add `stack path --global-config`, to yield the full path of Stack's
   user-specific global YAML configuration file (`config.yaml`).
-
+* Add support for specifying that `allow-newer` should only apply to certain
+  packages (`allow-newer-deps: ['foo', 'bar']`). This field has no effect
+  unless `allow-newer` is enabled, and simply restricts the set of packages for
+  which version bounds should be ignored.
 
 Bug fixes:
 

@@ -9,10 +9,12 @@ version:        0
 build-type:     Simple
 
 library
+  exposed-modules:
+      Foo
   other-modules:
       Paths_foo
   hs-source-dirs:
       src
   build-depends:
-      base ==4.14.*
+      base ==4.13.*
   default-language: Haskell2010

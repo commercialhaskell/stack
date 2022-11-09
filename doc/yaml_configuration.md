@@ -357,18 +357,27 @@ process.
 
 [:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
-Default: `none`
+Default: `false`
 
-For which packages should version bounds in Cabal files be ignored? This also
-ignores lower bounds. The name `allow-newer` is chosen to match the
-commonly-used Cabal option.
+Whether to ignore version bounds in Cabal files. This also ignores lower bounds.
+The name `allow-newer` is chosen to match the commonly-used Cabal option.
+
 
 ~~~yaml
-allow-newer: all # ignore version bounds listed in Cabal files in all packages
-# allow-newer: none # consider version bounds listed in Cabal files
-# allow-newer: false # identical to allow-newer: none
-# allow-newer: true # identical to allow-newer: true
-# allow-newer: ['foo', 'bar'] # ignore version bounds listed in the Cabal files for packages 'foo' and 'bar'
+allow-newer: true
+~~~
+
+### allow-newer-deps
+
+Default: `none`
+
+Determines a subset of packages to which `allow-newer` should apply. This option
+has no effect (but warns) if `allow-newer` is `false`.
+
+~~~yaml
+allow-newer-deps:
+  - foo
+  - bar
 ~~~
 
 ### apply-ghc-options

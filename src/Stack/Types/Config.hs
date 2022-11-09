@@ -64,8 +64,8 @@ module Stack.Types.Config
   -- * Details
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
-  -- ** AllowNewer
-  ,AllowNewer(..)
+  -- ** AllowNewerDeps
+  ,AllowNewerDeps(..)
   -- ** CabalConfigKey
   ,CabalConfigKey(..)
   -- ** ConfigException
@@ -190,7 +190,7 @@ import           Crypto.Hash (hashWith, SHA1(..))
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
                  (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
-                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool, String),
+                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings,
                   jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..),
                   FromJSONKeyFunction (FromJSONKeyTextParser))
@@ -356,9 +356,12 @@ data Config =
          -- ^ Rebuild on GHC options changes
          ,configApplyGhcOptions     :: !ApplyGhcOptions
          -- ^ Which packages to ghc-options on the command line apply to?
-         ,configAllowNewer          :: !AllowNewer
+         ,configAllowNewer          :: !Bool
          -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
          -- match cabal.
+         ,configAllowNewerDeps      :: !(Maybe [PackageName])
+         -- ^ Ignore dependency upper and lower bounds only for specified
+         -- packages. No effect unless allow-newer is enabled.
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
          -- (If Nothing, the 'default' default template is used.)
@@ -446,20 +449,18 @@ instance FromJSON ApplyGhcOptions where
             "everything" -> pure AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
 
-data AllowNewer
-  = AllowNewerAll
-  | AllowNewerNone
-  | AllowNewerPackages [String]
-  deriving (Show, Read, Eq, Ord)
+newtype AllowNewerDeps = AllowNewerDeps [PackageName]
+  deriving (Show, Read, Eq, Ord, Generic)
 
-instance FromJSON AllowNewer where
-  parseJSON v =
-    case v of
-      Bool True -> pure AllowNewerAll
-      Bool False -> pure AllowNewerNone
-      String "all" -> pure AllowNewerAll
-      String "none" -> pure AllowNewerNone
-      _ -> AllowNewerPackages <$> parseJSON v
+instance Semigroup AllowNewerDeps where
+  (<>) = mappenddefault
+
+instance Monoid AllowNewerDeps where
+  mappend = (<>)
+  mempty = memptydefault
+
+instance FromJSON AllowNewerDeps where
+  parseJSON = fmap (AllowNewerDeps . fmap C.mkPackageName) . parseJSON
 
 -- | Which build log files to dump
 data DumpLogs
@@ -878,8 +879,10 @@ data ConfigMonoid =
     -- ^ See 'configMonoidRebuildGhcOptions'
     ,configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
-    ,configMonoidAllowNewer          :: !(First AllowNewer)
+    ,configMonoidAllowNewer          :: !(First Bool)
     -- ^ See 'configMonoidAllowNewer'
+    ,configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
+    -- ^ See 'configMonoidAllowNewerDeps'
     ,configMonoidDefaultTemplate     :: !(First TemplateName)
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the 'default' default template is used.)
@@ -1008,6 +1011,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidRebuildGhcOptions <- FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- First <$> obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
+    configMonoidAllowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
@@ -1155,6 +1159,9 @@ configMonoidApplyGhcOptionsName = "apply-ghc-options"
 
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"
+
+configMonoidAllowNewerDepsName :: Text
+configMonoidAllowNewerDepsName = "allow-newer-deps"
 
 configMonoidDefaultTemplateName :: Text
 configMonoidDefaultTemplateName = "default-template"
