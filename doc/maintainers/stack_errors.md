@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-11-10.
+`master` branch of the Stack repository. Last updated: 2022-11-11.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -13,17 +13,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     `throwIO`
 
-*   `Main.main`: catches exceptions from action `run`.
+*   `Main.main`: catches exceptions from action `run`:
 
-    ~~~text
-    <exception>
-    ~~~
-
-    `exitWith` or `exitFailure`
+    -   `ExitCode` (`exitWith`)
+    -   `PrettyException` (`exitFailure`)
+    -   `SomeException` (`exitFailure`)
 
     The following types are instances of `Control.Exception.Exception` and
-    `Show`. Some data constructors have strict fields but that is not documented
-    below:
+    `Show`. Some are instances of `Stack.Prelude.PrettyException`. Some data
+    constructors have strict fields but that is not documented below:
 
     -   `Control.Concurrent.ExecuteException`
 
@@ -36,6 +34,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         = InvalidReExecVersion String String
         | InvalidPathForExec FilePath
+        ~~~
+
+    -   `Main.MainPrettyException`
+
+        ~~~haskell
+        = GHCProfOptionInvalid
+        | ResolverOptionInvalid
+        | PackageIdNotFound String
+        | ExecutableToRunNotFound
         ~~~
 
     -   `Stack.Build.QueryException`
@@ -425,40 +432,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     = StringException String CallStack
     ~~~
 
-*   `Main.buildCmd`:
-
-    ~~~text
-    Error: When building with Stack, you should not use the -prof GHC option
-    Instead, please use --library-profiling and --executable-profiling"
-    See: https://github.com/commercialhaskell/stack/issues/1015
-    ~~~
-
-    `exitFailure`
-
-*   `Main.upgradeCmd`:
-
-    ~~~text
-    You cannot use the --resolver option with the upgrade command
-    ~~~
-
-    `exitFailure`
-
-*   `Main.execCmd`:
-
-    ~~~text
-    Could not find package id of package <name>
-    ~~~
-
-    `exitFailure`
-
-*   `Main.execCmd`:
-
-    ~~~text
-    No executables found.
-    ~~~~
-
-    `exitFailure`
-
 *   `Options.Applicative.Builder.Extra.enableDisableFlagsNoDefault`:
 
     ~~~text
@@ -618,24 +591,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     `throwString`
 
 *   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
-
-*   `Stack.Setup.installGHCPosix`:
-
-    ~~~text
-    <exception>
-    Error encountered while <step> GHC with
-    <cmd> <args>
-    <cmd> <args>
-    run in <wd>
-
-    The following directories may now contain files, but won't be used by Stack:
-      - <temp_dir>
-      - <dest_dir>
-
-    For more information consider rerunning with --verbose flag
-    ~~~
-
-    `exitFailure`
 
 *   `Stack.Upload.uploadBytes`:
 
