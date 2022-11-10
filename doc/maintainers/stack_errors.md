@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-11-06.
+`master` branch of the Stack repository. Last updated: 2022-11-10.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -254,6 +254,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | BinaryUpgradeOnOSUnsupported OS
         | BinaryUpgradeOnArchUnsupported Arch
         | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
+        ~~~
+
+    -   `Stack.Setup.SetupPrettyException`
+
+        ~~~haskell
+        = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`

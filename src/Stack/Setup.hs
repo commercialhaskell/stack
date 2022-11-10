@@ -289,6 +289,46 @@ instance Show SetupException where
 
 instance Exception SetupException
 
+-- | Type representing pretty exceptions thrown by functions exported by the
+-- "Stack.Setup" module
+data SetupPrettyException
+    = GHCInstallFailed SomeException String String [String] (Path Abs Dir)
+          (Path Abs Dir) (Path Abs Dir)
+    deriving (Show, Typeable)
+
+instance Pretty SetupPrettyException where
+    pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
+         string (show ex)
+      <> line
+      <> hang 2 (  flow "Error encountered while" <+> fromString step <+> flow "GHC with"
+                <> line
+                <> style Shell (fromString (unwords (cmd : args)))
+                <> line
+                -- TODO: Figure out how to insert \ in the appropriate spots
+                -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
+                <> flow "run in" <+> pretty wd
+                )
+      <> line <> line
+      <> flow "The following directories may now contain files, but won't be \
+              \used by Stack:"
+      <> line
+      <> "  -" <+> pretty tempDir
+      <> line
+      <> "  -" <+> pretty destDir
+      <> line <> line
+      <> flow "For more information consider rerunning with --verbose flag"
+      <> line
+
+-- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
+-- the @rio-prettyprint@ package.
+string :: String -> StyleDoc
+string "" = mempty
+string ('\n':s) = line <> string s
+string s        = case (span (/='\n') s) of
+                      (xs, ys) -> fromString xs <> string ys
+
+instance Exception SetupPrettyException
+
 -- | Type representing exceptions thrown by 'performPathChecking'
 data PerformPathCheckingException
     = ProcessExited ExitCode String [String]
@@ -1563,28 +1603,9 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
           void $ withWorkingDir (toFilePath wd) $
                 withProcessContext menv' $
                 sinkProcessStderrStdout cmd args logStderr logStdout
-                `catchAny` \ex -> do
-                  logError $ displayShow ex
-                  prettyError $ hang 2 (
-                      "Error encountered while" <+> step <+> "GHC with"
-                      <> line <>
-                      style Shell (fromString (unwords (cmd : args)))
-                      <> line <>
-                      -- TODO: Figure out how to insert \ in the appropriate spots
-                      -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
-                      "run in " <> pretty wd
-                      )
-                    <> line <> line <>
-                    "The following directories may now contain files, but \
-                    \won't be used by Stack:"
-                    <> line <>
-                    "  -" <+> pretty tempDir
-                    <> line <>
-                    "  -" <+> pretty destDir
-                    <> line <> line <>
-                    "For more information consider rerunning with --verbose flag"
-                    <> line
-                  exitFailure
+                `catchAny` \ex ->
+                    throwIO $ PrettyException
+                      (GHCInstallFailed ex step cmd args wd tempDir destDir)
 
     logSticky $
       "Unpacking GHC into " <>

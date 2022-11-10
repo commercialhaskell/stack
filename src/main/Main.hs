@@ -129,23 +129,37 @@ main = do
   case eGlobalRun of
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
-    Right (globalMonoid,run) -> do
+    Right (globalMonoid, run) -> do
       global <- globalOptsFromMonoid isTerminal globalMonoid
       when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
       case globalReExecVersion global of
-          Just expectVersion -> do
-              expectVersion' <- parseVersionThrowing expectVersion
-              unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
-                  $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
-          _ -> pure ()
-      withRunnerGlobal global $ run `catch` \e ->
-          -- This special handler stops "stack: " from being printed before the
-          -- exception
-          case fromException e of
-              Just ec -> exitWith ec
-              Nothing -> do
-                  logError $ fromString $ displayException e
-                  exitFailure
+        Just expectVersion -> do
+            expectVersion' <- parseVersionThrowing expectVersion
+            unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
+                $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+        _ -> pure ()
+      withRunnerGlobal global $ run `catches`
+        [ Handler handleExitCode
+        , Handler handlePrettyException
+        , Handler handleSomeException
+        ]
+
+-- | Handle ExitCode exceptions.
+handleExitCode :: ExitCode -> RIO Runner a
+handleExitCode = exitWith
+
+-- | Handle PrettyException exceptions.
+handlePrettyException :: PrettyException -> RIO Runner a
+handlePrettyException e = do
+  prettyError $ pretty e
+  exitFailure
+
+-- | Handle SomeException exceptions. This special handler stops "stack: " from
+-- being printed before the exception.
+handleSomeException :: SomeException -> RIO Runner a
+handleSomeException (SomeException e) = do
+  logError $ fromString $ displayException e
+  exitFailure
 
 -- Vertically combine only the error component of the first argument with the
 -- error component of the second.

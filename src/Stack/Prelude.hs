@@ -1,9 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
 
 module Stack.Prelude
-  ( withSystemTempDir
+  ( PrettyException (..)
+  , withSystemTempDir
   , withKeepSystemTempDir
   , sinkProcessStderrStdout
   , sinkProcessStdout
@@ -25,41 +27,64 @@ module Stack.Prelude
   , module X
   ) where
 
-import           RIO                  as X
-import           RIO.File             as X hiding (writeBinaryFileAtomic)
-import           Data.Conduit         as X (ConduitM, runConduit, (.|))
-import           Path                 as X (Abs, Dir, File, Path, Rel,
-                                            toFilePath)
-import           Pantry               as X hiding (Package (..), loadSnapshot)
+import           Data.Monoid as X
+                   ( First (..), Any (..), Sum (..), Endo (..) )
 
-import           Data.Monoid          as X (First (..), Any (..), Sum (..), Endo (..))
-
-import qualified Path.IO
-
-import           System.IO.Echo (withoutInputEcho)
-
+import           Data.Conduit as X ( ConduitM, runConduit, (.|) )
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed (withLoggedProcess_, createSource, byteStringInput)
-import           RIO.Process (HasProcessContext (..), ProcessContext, setStdin, closed, getStderr, getStdout, proc, withProcessWait_, setStdout, setStderr, ProcessConfig, readProcess_, workingDirL, waitExitCode)
-
+import           Data.Conduit.Process.Typed
+                   ( withLoggedProcess_, createSource, byteStringInput)
 import qualified Data.Text.IO as T
+import           Pantry as X hiding ( Package (..), loadSnapshot )
+import           Path as X
+                   ( Abs, Dir, File, Path, Rel, toFilePath )
+import qualified Path.IO
+import           RIO as X
+import           RIO.File as X hiding ( writeBinaryFileAtomic )
+import           RIO.PrettyPrint ( Pretty (..) )
+import           RIO.Process
+                   ( HasProcessContext (..), ProcessContext, setStdin, closed
+                   , getStderr, getStdout, proc, withProcessWait_, setStdout
+                   , setStderr, ProcessConfig, readProcess_, workingDirL
+                   , waitExitCode
+                   )
 import qualified RIO.Text as T
+import           System.IO.Echo ( withoutInputEcho )
+
+-- | Type representing pretty exceptions
+data PrettyException
+  = forall e. (Pretty e, Exception e) => PrettyException e
+  deriving Typeable
+
+instance Show PrettyException where
+  show (PrettyException e) = show e
+
+instance Pretty PrettyException where
+  pretty (PrettyException e) = pretty e
+
+instance Exception PrettyException
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
-withSystemTempDir str inner = withRunInIO $ \run -> Path.IO.withSystemTempDir str $ run . inner
+withSystemTempDir str inner = withRunInIO $ \run ->
+  Path.IO.withSystemTempDir str $ run . inner
 
 -- | Like `withSystemTempDir`, but the temporary directory is not deleted.
-withKeepSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
+withKeepSystemTempDir :: MonadUnliftIO m
+                      => String
+                      -> (Path Abs Dir -> m a)
+                      -> m a
 withKeepSystemTempDir str inner = withRunInIO $ \run -> do
   path <- Path.IO.getTempDir
   dir <- Path.IO.createTempDir path str
   run $ inner dir
 
--- | Consume the stdout and stderr of a process feeding strict 'ByteString's to the consumers.
+-- | Consume the stdout and stderr of a process feeding strict 'ByteString's to
+-- the consumers.
 --
--- Throws a 'ReadProcessException' if unsuccessful in launching, or 'ExitCodeException' if the process itself fails.
+-- Throws a 'ReadProcessException' if unsuccessful in launching, or
+-- 'ExitCodeException' if the process itself fails.
 sinkProcessStderrStdout
   :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command
@@ -120,7 +145,10 @@ readProcessNull name args =
 
 -- | Use the new 'ProcessContext', but retain the working directory
 -- from the parent environment.
-withProcessContext :: HasProcessContext env => ProcessContext -> RIO env a -> RIO env a
+withProcessContext :: HasProcessContext env
+                   => ProcessContext
+                   -> RIO env a
+                   -> RIO env a
 withProcessContext pcNew inner = do
   pcOld <- view processContextL
   let pcNew' = set workingDirL (view workingDirL pcOld) pcNew
