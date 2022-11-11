@@ -24,9 +24,14 @@ import           RIO.Process
 import           Distribution.Version (mkVersion')
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Options.Applicative
+                   ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
+                   , handleParseResult, help, helpError, idm, long, metavar
+                   , overFailure, renderFailure, strArgument, switch )
 import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
+                   ( boolFlags, execExtraHelp, extraHelpOption, textOption )
 import           Options.Applicative.Complicated
+                   ( addCommand, addSubCommands, complicatedOptions )
 import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
@@ -88,17 +93,56 @@ import qualified System.FilePath as FP
 import           System.IO (hPutStrLn, hGetEncoding, hSetEncoding)
 import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 
--- | Change the character encoding of the given Handle to transliterate
--- on unsupported characters instead of throwing an exception
-hSetTranslit :: Handle -> IO ()
-hSetTranslit h = do
-    menc <- hGetEncoding h
-    case fmap textEncodingName menc of
-        Just name
-          | '/' `notElem` name -> do
-              enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
-              hSetEncoding h enc'
-        _ -> pure ()
+-- | Type representing exceptions thrown by functions in the "Main" module.
+data MainException
+  = InvalidReExecVersion String String
+  | InvalidPathForExec FilePath
+  deriving Typeable
+
+instance Show MainException where
+  show (InvalidReExecVersion expected actual) = concat
+    [ "When re-executing '"
+    , stackProgName
+    , "' in a container, the incorrect version was found\nExpected: "
+    , expected
+    , "; found: "
+    , actual
+    ]
+  show (InvalidPathForExec path) = concat
+    [ "Got an invalid --cwd argument for stack exec ("
+    , path
+    , ")"
+    ]
+
+instance Exception MainException
+
+-- | Type representing pretty exceptions thrown by functions in the "Main"
+-- module.
+data MainPrettyException
+  = GHCProfOptionInvalid
+  | ResolverOptionInvalid
+  | PackageIdNotFound !String
+  | ExecutableToRunNotFound
+  deriving (Show, Typeable)
+
+instance Pretty MainPrettyException where
+  pretty GHCProfOptionInvalid =
+       flow "When building with Stack, you should not use GHC's '-prof' \
+            \option. Instead, please use Stack's '--library-profiling' and \
+            \'--executable-profiling' flags. See:" <+>
+            style Url "https://github.com/commercialhaskell/stack/issues/1015"
+    <> "."
+  pretty ResolverOptionInvalid =
+    flow "The '--resolver' option cannot be used with Stack's 'upgrade' \
+         \command."
+  pretty (PackageIdNotFound name) =
+       flow "The impossible happened! Could not find the package id of the \
+            \package" <+> style Target (fromString name)
+    <> "."
+  pretty ExecutableToRunNotFound =
+    flow "No executables found."
+
+instance Exception MainPrettyException
 
 main :: IO ()
 main = do
@@ -143,6 +187,18 @@ main = do
         , Handler handlePrettyException
         , Handler handleSomeException
         ]
+
+-- | Change the character encoding of the given Handle to transliterate on
+-- unsupported characters instead of throwing an exception
+hSetTranslit :: Handle -> IO ()
+hSetTranslit h = do
+  menc <- hGetEncoding h
+  case fmap textEncodingName menc of
+    Just name
+      | '/' `notElem` name -> do
+          enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
+          hSetEncoding h enc'
+    _ -> pure ()
 
 -- | Handle ExitCode exceptions.
 handleExitCode :: ExitCode -> RIO Runner a
@@ -588,10 +644,7 @@ cleanCmd = withConfig NoReexec . clean
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
   when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
-    logError "Error: When building with Stack, you should not use the -prof GHC option"
-    logError "Instead, please use --library-profiling and --executable-profiling"
-    logError "See: https://github.com/commercialhaskell/stack/issues/1015"
-    exitFailure
+    throwIO $ PrettyException GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
       FileWatchPoll -> fileWatchPoll (inner . Just)
@@ -665,9 +718,7 @@ upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts' = do
   go <- view globalOptsL
   case globalResolver go of
-    Just _ -> do
-      logError "You cannot use the --resolver option with the upgrade command"
-      liftIO exitFailure
+    Just _ -> throwIO $ PrettyException ResolverOptionInvalid
     Nothing ->
       withGlobalProject $
       upgrade
@@ -796,9 +847,7 @@ execCmd ExecOpts {..} =
           case mId of
               Just i -> pure (L.head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
-              _      -> do
-                  logError ("Could not find package id of package " <> fromString name)
-                  exitFailure
+              _      -> throwIO $ PrettyException (PackageIdNotFound name)
 
       getPkgOpts pkgs =
           map ("-package-id=" ++) <$> mapM getPkgId pkgs
@@ -818,9 +867,7 @@ execCmd ExecOpts {..} =
               Just (CExe exe') -> do
                 withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
                 pure (T.unpack exe', args')
-              _                -> do
-                  logError "No executables found."
-                  exitFailure
+              _ -> throwIO $ PrettyException ExecutableToRunNotFound
 
       getGhcCmd pkgs args = do
           pkgopts <- getPkgOpts pkgs
@@ -927,20 +974,3 @@ hpcReportCmd hropts = do
           { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
     withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
         generateHpcReportForTargets hropts tixFiles targetNames
-
-data MainException = InvalidReExecVersion String String
-                   | InvalidPathForExec FilePath
-     deriving (Typeable)
-instance Exception MainException
-instance Show MainException where
-    show (InvalidReExecVersion expected actual) = concat
-        [ "When re-executing '"
-        , stackProgName
-        , "' in a container, the incorrect version was found\nExpected: "
-        , expected
-        , "; found: "
-        , actual]
-    show (InvalidPathForExec path) = concat
-        [ "Got an invalid --cwd argument for stack exec ("
-        , path
-        , ")"]
