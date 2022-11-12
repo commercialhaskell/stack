@@ -22,38 +22,63 @@ module Stack.Upload
     ) where
 
 import           Stack.Prelude
-import           Data.Aeson                            (FromJSON (..),
-                                                        ToJSON (..),
-                                                        decode', toEncoding, fromEncoding,
-                                                        object, withObject,
-                                                        (.:), (.=))
-import           Data.ByteString.Builder               (lazyByteString)
-import qualified Data.ByteString.Char8                 as S
-import qualified Data.ByteString.Lazy                  as L
-import qualified Data.Conduit.Binary                   as CB
-import qualified Data.Text                             as T
-import           Network.HTTP.StackClient              (Request,
-                                                        RequestBody(RequestBodyLBS),
-                                                        Response,
-                                                        withResponse,
-                                                        httpNoBody,
-                                                        getGlobalManager,
-                                                        getResponseStatusCode,
-                                                        getResponseBody,
-                                                        setRequestHeader,
-                                                        parseRequest,
-                                                        formDataBody, partFileRequestBody,
-                                                        partBS, partLBS,
-                                                        applyDigestAuth,
-                                                        displayDigestAuthException)
+import           Conduit ( mapOutput, sinkList )
+import           Data.Aeson
+                   ( FromJSON (..), ToJSON (..), decode', toEncoding
+                   , fromEncoding, object, withObject, (.:), (.=)
+                   )
+import           Data.ByteString.Builder ( lazyByteString )
+import qualified Data.ByteString.Char8 as S
+import qualified Data.ByteString.Lazy as L
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Text as T
+import           Network.HTTP.StackClient
+                   ( Request, RequestBody (RequestBodyLBS), Response
+                   , withResponse, httpNoBody, getGlobalManager
+                   , getResponseStatusCode, getResponseBody, setRequestHeader
+                   , parseRequest, formDataBody, partFileRequestBody, partBS
+                   , partLBS, applyDigestAuth, displayDigestAuthException
+                   )
+import           RIO.PrettyPrint
+                   ( Pretty (..), Style (..), StyleDoc, (<+>), flow, line
+                   , style, vsep
+                   )
 import           Stack.Options.UploadParser
 import           Stack.Types.Config
-import           System.Directory                      (createDirectoryIfMissing,
-                                                        removeFile, renameFile)
-import           System.Environment                    (lookupEnv)
-import           System.FilePath                       ((</>), takeFileName, takeDirectory)
-import           System.PosixCompat.Files              (setFileMode)
+import           System.Directory
+                   ( createDirectoryIfMissing, removeFile, renameFile )
+import           System.Environment ( lookupEnv )
+import           System.FilePath ( (</>), takeFileName, takeDirectory )
+import           System.PosixCompat.Files ( setFileMode )
 
+-- | Type representing pretty exceptions thrown by functions exported by the
+-- "Stack.Upload" module.
+data UploadPrettyException
+    = AuthenticationFailure
+    | ArchiveUploadFailure Int [String] String
+    deriving (Show, Typeable)
+
+instance Pretty UploadPrettyException where
+    pretty AuthenticationFailure =
+           flow "authentification failure"
+        <> line
+        <> flow "Authentication failure uploading to server"
+    pretty (ArchiveUploadFailure code res tarName) =
+           flow "unhandled status code:" <+> fromString (show code)
+        <> line
+        <> flow "Upload failed on" <+> style File (fromString tarName)
+        <> line
+        <> vsep (map string res)
+
+-- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
+-- the @rio-prettyprint@ package.
+string :: String -> StyleDoc
+string "" = mempty
+string ('\n':s) = line <> string s
+string s        = let (xs, ys) = span (/='\n') s
+                  in  fromString xs <> string ys
+
+instance Exception UploadPrettyException
 
 newtype HackageKey = HackageKey Text
     deriving (Eq, Show)
@@ -225,11 +250,10 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
         case getResponseStatusCode res of
             200 -> logInfo "done!"
             401 -> do
-                logError "authentication failure"
                 case auth of
                   HACreds creds -> handleIO (const $ pure ()) (liftIO $ removeFile (hcCredsFile creds))
                   _ -> pure ()
-                throwString "Authentication failure uploading to server"
+                throwIO $ PrettyException AuthenticationFailure
             403 -> do
                 logError "forbidden upload"
                 logError "Usually means: you've already uploaded this package/version combination"
@@ -241,9 +265,9 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
                 logError "Check on Hackage to see if your package is present"
                 liftIO $ printBody res
             code -> do
-                logError $ "unhandled status code: " <> fromString (show code)
-                liftIO $ printBody res
-                throwString $ "Upload failed on " <> fromString tarName
+                let resBody = mapOutput show (getResponseBody res)
+                resBody' <- liftIO $ runConduit $ resBody .| sinkList
+                throwIO $ PrettyException (ArchiveUploadFailure code resBody' tarName)
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
 printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout

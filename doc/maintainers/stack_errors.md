@@ -85,7 +85,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DeletionFailures [(Path Abs Dir, SomeException)]
         ~~~
 
-    -   `Stack.Config.Docker.StackDockerConfig.Execeiption`
+    -   `Stack.Config.Docker.StackDockerConfigExeceiption`
 
         ~~~haskell
         = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
@@ -278,13 +278,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | CompilerCacheArchitectureInvalid Text
         ~~~
 
-    -   `Stack.Unpack.UnpackException`
-
-        ~~~haskell
-        = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
-        | CouldNotParsePackageSelectors [String]
-        ~~~
-
     -   `Stack.Types.Build.StackBuildException`
 
         ~~~haskell
@@ -415,6 +408,20 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | CommitsNotFound String String
         | StackInPackageIndexNotFound
         | VersionWithNoRevision
+        ~~~
+
+    -   `Stack.Upload.UploadPrettyException`
+
+        ~~~haskell
+        = AuthenticationFailure
+        | ArchiveUploadFailure Int [String] String
+        ~~~
+
+    -   `Stack.Unpack.UnpackException`
+
+        ~~~haskell
+        = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
+        | CouldNotParsePackageSelectors [String]
         ~~~
 
     -   `System.Process.Pager.PagerException`
@@ -595,15 +602,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Upload.uploadBytes`:
 
     ~~~text
-    authentication failure
-    Authentication failure uploading to server
-    ~~~
-
-    `throwString`
-
-*   `Stack.Upload.uploadBytes`:
-
-    ~~~text
     forbidden upload
     Usually means: you've already uploaded this package/version combination
     Ignoring error and continuing, full message from Hackage below:
@@ -618,13 +616,3 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Check on Hackage to see if your package is present
     <Hackage_message>
     ~~~
-
-*   `Stack.Upload.uploadBytes`:
-
-    ~~~text
-    unhandled status code: <code>
-    <Hackage_message>
-    Upload failed on <name>
-    ~~~
-
-    `throwString`
