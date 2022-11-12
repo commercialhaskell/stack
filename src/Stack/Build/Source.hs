@@ -315,24 +315,12 @@ loadLocalPackage pp = do
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
             }
-        testconfig = config
-            { packageConfigEnableTests = True
-            , packageConfigEnableBenchmarks = False
-            }
-        benchconfig = config
-            { packageConfigEnableTests = False
-            , packageConfigEnableBenchmarks = True
-            }
 
-        -- We resolve the package in 4 different configurations:
+        -- We resolve the package in 2 different configurations:
         --
         -- - pkg doesn't have tests or benchmarks enabled.
         --
         -- - btpkg has them enabled if they are present.
-        --
-        -- - testpkg has tests enabled, but not benchmarks.
-        --
-        -- - benchpkg has benchmarks enabled, but not tests.
         --
         -- The latter two configurations are used to compute the deps
         -- when --enable-benchmarks or --enable-tests are configured.
@@ -343,8 +331,6 @@ loadLocalPackage pp = do
         btpkg
             | Set.null tests && Set.null benches = Nothing
             | otherwise = Just (resolvePackage btconfig gpkg)
-        testpkg = resolvePackage testconfig gpkg
-        benchpkg = resolvePackage benchconfig gpkg
 
     componentFiles <- memoizeRefWith $ fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
 
@@ -372,8 +358,6 @@ loadLocalPackage pp = do
 
     pure LocalPackage
         { lpPackage = pkg
-        , lpTestDeps = dvVersionRange <$> packageDeps testpkg
-        , lpBenchDeps = dvVersionRange <$> packageDeps benchpkg
         , lpTestBench = btpkg
         , lpComponentFiles = componentFiles
         , lpBuildHaddocks = cpHaddocks (ppCommon pp)

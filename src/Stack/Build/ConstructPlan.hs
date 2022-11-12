@@ -52,6 +52,7 @@ import           System.Environment (lookupEnv)
 import           System.IO (putStrLn)
 import           RIO.PrettyPrint
 import           RIO.Process (findExecutable, HasProcessContext (..))
+import           Stack.Types.Dependency (DepValue(DepValue), DepType (AsLibrary))
 
 data PackageInfo
     =
@@ -684,7 +685,8 @@ addEllipsis t
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
 addPackageDeps package = do
     ctx <- ask
-    deps' <- packageDepsWithTools package
+    checkAndWarnForUnknownTools package
+    let deps' = packageDeps package
     deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
         eres <- addDep depname
         let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
@@ -925,8 +927,8 @@ psLocation PSRemote{} = Snap
 
 -- | Get all of the dependencies for a given package, including build
 -- tool dependencies.
-packageDepsWithTools :: Package -> M (Map PackageName DepValue)
-packageDepsWithTools p = do
+checkAndWarnForUnknownTools :: Package -> M ()
+checkAndWarnForUnknownTools p = do
     -- Check whether the tool is on the PATH before warning about it.
     warnings <- fmap catMaybes $ forM (Set.toList $ packageUnknownTools p) $
       \name@(ExeName toolName) -> do
@@ -938,7 +940,7 @@ packageDepsWithTools p = do
             Left _ -> pure $ Just $ ToolWarning name (packageName p)
             Right _ -> pure Nothing
     tell mempty { wWarnings = (map toolWarningText warnings ++) }
-    pure $ packageDeps p
+    pure ()
 
 -- | Warn about tools in the snapshot definition. States the tool name
 -- expected and the package name using it.

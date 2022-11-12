@@ -29,6 +29,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
+import Stack.Types.Dependency (DepValue)
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -139,27 +140,6 @@ data Package =
 packageIdent :: Package -> PackageIdentifier
 packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
 
--- | The value for a map from dependency name. This contains both the
--- version range and the type of dependency, and provides a semigroup
--- instance.
-data DepValue = DepValue
-  { dvVersionRange :: !VersionRange
-  , dvType :: !DepType
-  }
-  deriving (Show,Typeable)
-instance Semigroup DepValue where
-  DepValue a x <> DepValue b y = DepValue (intersectVersionRanges a b) (x <> y)
-
--- | Is this package being used as a library, or just as a build tool?
--- If the former, we need to ensure that a library actually
--- exists. See
--- <https://github.com/commercialhaskell/stack/issues/2195>
-data DepType = AsLibrary | AsBuildTool
-  deriving (Show, Eq)
-instance Semigroup DepType where
-  AsLibrary <> _ = AsLibrary
-  AsBuildTool <> x = x
-
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =
     PackageIdentifier (packageName pkg) (packageVersion pkg)
@@ -196,11 +176,6 @@ data BuildInfoOpts = BuildInfoOpts
     -- https://github.com/commercialhaskell/stack/issues/1255)
     , bioCabalMacros :: Path Abs File
     } deriving Show
-
--- | Files to get for a cabal package.
-data CabalFileType
-    = AllFiles
-    | Modules
 
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the Cabal file
@@ -283,11 +258,6 @@ data LocalPackage = LocalPackage
     -- "buildable: false".
     , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
-    , lpTestDeps      :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-tests in a normal build.
-    , lpBenchDeps     :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-benchmarks in a normal
-    -- build.
     , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.

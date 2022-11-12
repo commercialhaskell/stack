@@ -77,6 +77,7 @@ import           System.IO.Error
 import           RIO.Process
 import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (Style (Module))
+import           Stack.Types.Dependency (DepValue(..), DepType (..))
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
@@ -143,7 +144,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]
-    , packageAllDeps = S.fromList (M.keys deps)
+    , packageAllDeps = M.keysSet deps
     , packageLibraries =
         let mlib = do
               lib <- library pkg

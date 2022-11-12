@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
 -- | Generate haddocks
@@ -107,7 +107,7 @@ generateLocalHaddockIndex
 generateLocalHaddockIndex bco localDumpPkgs locals = do
     let dumpPackages =
             mapMaybe
-                (\LocalPackage{lpPackage = Package{..}} ->
+                (\LocalPackage{lpPackage = Package{packageName, packageVersion}} ->
                     F.find
                         (\dp -> dpPackageIdent dp == PackageIdentifier packageName packageVersion)
                         localDumpPkgs)
@@ -139,7 +139,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
         depDocDir
   where
     getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
-    getGhcPkgId LocalPackage{lpPackage = Package{..}} =
+    getGhcPkgId LocalPackage{lpPackage = Package{packageName, packageVersion}} =
         let pkgId = PackageIdentifier packageName packageVersion
             mdpPkg = F.find (\dp -> dpPackageIdent dp == pkgId) localDumpPkgs
         in fmap dpGhcPkgId mdpPkg
@@ -219,7 +219,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
                 fromString (toFilePath destIndexFile)
   where
     toInterfaceOpt :: DumpPackage -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
-    toInterfaceOpt DumpPackage {..} =
+    toInterfaceOpt DumpPackage {dpHaddockInterfaces, dpPackageIdent, dpHaddockHtml} =
         case dpHaddockInterfaces of
             [] -> pure Nothing
             srcInterfaceFP:_ -> do
