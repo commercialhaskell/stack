@@ -24,8 +24,10 @@ import           Prelude (Read (..))
 newtype GhcPkgIdParseFail
   = GhcPkgIdParseFail Text
   deriving Typeable
+
 instance Show GhcPkgIdParseFail where
     show (GhcPkgIdParseFail bs) = "Invalid package ID: " ++ show bs
+
 instance Exception GhcPkgIdParseFail
 
 -- | A ghc-pkg package identifier.

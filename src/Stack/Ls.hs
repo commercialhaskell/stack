@@ -39,6 +39,19 @@ import System.Process.Pager (pageText)
 import System.Directory (listDirectory)
 import System.IO (putStrLn)
 
+-- | Type representing exceptions thrown by functions exported by the "Stack.Ls"
+-- module.
+newtype LsException
+    = ParseFailure [Value]
+    deriving Typeable
+
+instance Show LsException where
+    show (ParseFailure val) =
+        "Error: Failure to parse values as a snapshot: "
+        ++ show val
+
+instance Exception LsException
+
 data LsView
     = Local
     | Remote
@@ -189,12 +202,6 @@ toSnapshot [String sid, String stitle, String stime] =
     , snapTime = stime
     }
 toSnapshot val = impureThrow $ ParseFailure val
-
-newtype LsException =
-    ParseFailure [Value]
-    deriving (Show, Typeable)
-
-instance Exception LsException
 
 parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot = A.withArray "array of snapshot" (pure . toSnapshot . V.toList)

@@ -15,11 +15,13 @@ import RIO.Process (HasProcessContext)
 import Path ((</>), parseRelDir)
 import Path.IO (doesDirExist)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Unpack" module.
 data UnpackException
   = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
   | CouldNotParsePackageSelectors [String]
-    deriving Typeable
-instance Exception UnpackException
+  deriving Typeable
+
 instance Show UnpackException where
     show (UnpackDirectoryAlreadyExists dirs) = unlines
         $ "Unable to unpack due to already present directories:"
@@ -27,6 +29,8 @@ instance Show UnpackException where
     show (CouldNotParsePackageSelectors strs) = unlines
       $ "The following package selectors are not valid package names or identifiers:"
       : map ("- " ++) strs
+
+instance Exception UnpackException
 
 -- | Intended to work for the command line command.
 unpackPackages

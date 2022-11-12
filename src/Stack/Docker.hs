@@ -10,17 +10,17 @@
 
 -- | Run commands in Docker containers
 module Stack.Docker
-  (dockerCmdName
-  ,dockerHelpOptName
-  ,dockerPullCmdName
-  ,entrypoint
-  ,preventInContainer
-  ,pull
-  ,reset
-  ,reExecArgName
-  ,StackDockerException(..)
-  ,getProjectRoot
-  ,runContainerAndExit
+  ( dockerCmdName
+  , dockerHelpOptName
+  , dockerPullCmdName
+  , entrypoint
+  , preventInContainer
+  , pull
+  , reset
+  , reExecArgName
+  , DockerException(..)
+  , getProjectRoot
+  , runContainerAndExit
   ) where
 
 import           Stack.Prelude

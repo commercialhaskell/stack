@@ -27,6 +27,19 @@ import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Nix" module.
+data NixException
+  = CannotDetermineProjectRoot
+    -- ^ Can't determine the project root (location of the shell file if any).
+  deriving (Typeable)
+
+instance Show NixException where
+  show CannotDetermineProjectRoot =
+    "Cannot determine project root directory."
+
+instance Exception NixException
+
 runShellAndExit :: RIO Config void
 runShellAndExit = do
    inContainer <- getInContainer -- TODO we can probably assert that this is False based on Stack.Runners now
@@ -121,15 +134,3 @@ nixCmdName = "nix"
 
 nixHelpOptName :: String
 nixHelpOptName = nixCmdName ++ "-help"
-
--- | Exceptions thrown by "Stack.Nix".
-data StackNixException
-  = CannotDetermineProjectRoot
-    -- ^ Can't determine the project root (location of the shell file if any).
-  deriving (Typeable)
-
-instance Exception StackNixException
-
-instance Show StackNixException where
-  show CannotDetermineProjectRoot =
-    "Cannot determine project root directory."

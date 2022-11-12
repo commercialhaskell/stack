@@ -21,6 +21,22 @@ import System.Process ( createProcess, cmdspec, shell, proc, waitForProcess
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT, MaybeT))
 import qualified Data.Text.IO as T
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "System.Process.Pager" module.
+data PagerException
+  = PagerExitFailure CmdSpec Int
+  deriving Typeable
+
+instance Show PagerException where
+  show (PagerExitFailure cmd n) =
+    let
+      getStr (ShellCommand c) = c
+      getStr (RawCommand exePath _) = exePath
+    in
+      "Pager (`" ++ getStr cmd ++ "') exited with non-zero status: " ++ show n
+
+instance Exception PagerException
+
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()
 pageWriter writer =
@@ -50,16 +66,3 @@ pageWriter writer =
 -- | Run pager to display a 'Text'
 pageText :: Text -> IO ()
 pageText = pageWriter . flip T.hPutStr
-
--- | Exception running pager.
-data PagerException = PagerExitFailure CmdSpec Int
-  deriving Typeable
-instance Show PagerException where
-  show (PagerExitFailure cmd n) =
-    let
-      getStr (ShellCommand c) = c
-      getStr (RawCommand exePath _) = exePath
-    in
-      "Pager (`" ++ getStr cmd ++ "') exited with non-zero status: " ++ show n
-
-instance Exception PagerException

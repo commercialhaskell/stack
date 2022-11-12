@@ -27,7 +27,7 @@ data ConfigNixException
     -- ^ Nix can't be given packages and a shell file at the same time
   | GHCMajorVersionUnspecified
   | OnlyGHCSupported
-  deriving (Typeable)
+  deriving Typeable
 
 instance Show ConfigNixException where
   show NixCannotUseShellFileAndPackagesException =

@@ -244,6 +244,172 @@ import           Casa.Client (CasaRepoPrefix)
 -- Re-exports
 import           Stack.Types.Config.Build as X
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Config" module.
+data ConfigException
+  = ParseConfigFileException (Path Abs File) ParseException
+  | ParseCustomSnapshotException Text ParseException
+  | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
+  | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
+  | UnableToExtractArchive Text (Path Abs File)
+  | BadStackVersionException VersionRange
+  | NoMatchingSnapshot (NonEmpty SnapName)
+  | ResolverMismatch !RawSnapshotLocation String
+  | ResolverPartial !RawSnapshotLocation String
+  | NoSuchDirectory FilePath
+  | ParseGHCVariantException String
+  | BadStackRoot (Path Abs Dir)
+  | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
+  | UserDoesn'tOwnDirectory (Path Abs Dir)
+  | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
+  | NixRequiresSystemGhc
+  | NoResolverWhenUsingNoProject
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
+  | NoLTSWithMajorVersion Int
+  | NoLTSFound
+  | MultiplePackageIndices [PackageIndexConfig]
+  deriving Typeable
+
+instance Show ConfigException where
+    show (ParseConfigFileException configFile exception) = concat
+        [ "Could not parse '"
+        , toFilePath configFile
+        , "':\n"
+        , Yaml.prettyPrintParseException exception
+        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        ]
+    show (ParseCustomSnapshotException url exception) = concat
+        [ "Could not parse '"
+        , T.unpack url
+        , "':\n"
+        , Yaml.prettyPrintParseException exception
+        , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
+        ]
+    show (NoProjectConfigFound dir mcmd) = concat
+        [ "Unable to find a stack.yaml file in the current directory ("
+        , toFilePath dir
+        , ") or its ancestors"
+        , case mcmd of
+            Nothing -> ""
+            Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
+        ]
+    show (UnexpectedArchiveContents dirs files) = concat
+        [ "When unpacking an archive specified in your stack.yaml file, "
+        , "did not find expected contents. Expected: a single directory. Found: "
+        , show ( map (toFilePath . dirname) dirs
+               , map (toFilePath . filename) files
+               )
+        ]
+    show (UnableToExtractArchive url file) = concat
+        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
+        , T.unpack url, " downloaded to the file ", toFilePath $ filename file
+        ]
+    show (BadStackVersionException requiredRange) = concat
+        [ "The version of Stack you are using ("
+        , show (mkVersion' Meta.version)
+        , ") is outside the required\n"
+        ,"version range specified in stack.yaml ("
+        , T.unpack (versionRangeText requiredRange)
+        , ").\n"
+        , "You can upgrade Stack by running:\n\n"
+        , "stack upgrade"
+        ]
+    show (NoMatchingSnapshot names) = concat
+        [ "None of the following snapshots provides a compiler matching "
+        , "your package(s):\n"
+        , unlines $ map (\name -> "    - " <> show name)
+                        (NonEmpty.toList names)
+        , resolveOptions
+        ]
+    show (ResolverMismatch resolver errDesc) = concat
+        [ "Resolver '"
+        , T.unpack $ utf8BuilderToText $ display resolver
+        , "' does not have a matching compiler to build some or all of your "
+        , "package(s).\n"
+        , errDesc
+        , resolveOptions
+        ]
+    show (ResolverPartial resolver errDesc) = concat
+        [ "Resolver '"
+        , T.unpack $ utf8BuilderToText $ display resolver
+        , "' does not have all the packages to match your requirements.\n"
+        , unlines $ fmap ("    " <>) (lines errDesc)
+        , resolveOptions
+        ]
+    show (NoSuchDirectory dir) =
+        "No directory could be located matching the supplied path: " ++ dir
+    show (ParseGHCVariantException v) =
+        "Invalid ghc-variant value: " ++ v
+    show (BadStackRoot stackRoot) = concat
+        [ "Invalid Stack root: '"
+        , toFilePath stackRoot
+        , "'. Please provide a valid absolute path."
+        ]
+    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
+        [ "Preventing creation of Stack root '"
+        , toFilePath envStackRoot
+        , "'. Parent directory '"
+        , toFilePath parentDir
+        , "' is owned by someone else."
+        ]
+    show (UserDoesn'tOwnDirectory dir) = concat
+        [ "You are not the owner of '"
+        , toFilePath dir
+        , "'. Aborting to protect file permissions."
+        , "\nRetry with '--"
+        , T.unpack configMonoidAllowDifferentUserName
+        , "' to disable this precaution."
+        ]
+    show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
+        [ "Stack can only control the "
+        , configMonoidGHCVariantName
+        , " of its own GHC installations. Please use '--no-"
+        , configMonoidSystemGHCName
+        , "'."
+        ]
+    show NixRequiresSystemGhc = T.unpack $ T.concat
+        [ "Stack's Nix integration is incompatible with '--no-system-ghc'. "
+        , "Please use '--"
+        , configMonoidSystemGHCName
+        , "' or disable the Nix integration."
+        ]
+    show NoResolverWhenUsingNoProject = "When using the script command, you must provide a resolver argument"
+    show (DuplicateLocalPackageNames pairs) = concat
+        $ "The same package name is used in multiple local packages\n"
+        : map go pairs
+      where
+        go (name, dirs) = unlines
+            $ ""
+            : (packageNameString name ++ " used in:")
+            : map goLoc dirs
+        goLoc loc = "- " ++ show loc
+    show (NoLTSWithMajorVersion n) =
+        "Error: No LTS release found with major version " ++ show n
+    show NoLTSFound = "Error: No LTS releases found"
+    show (MultiplePackageIndices pics) = concat
+        [ "Error: When using the 'package-indices' key to override the default "
+        , "package index, you must provide exactly one value, received: "
+        , show pics
+        , "\n"
+        , packageIndicesWarning
+        ]
+
+instance Exception ConfigException
+
+data ParseAbsolutePathException
+    = ParseAbsolutePathException String String
+    deriving Typeable
+
+instance Show ParseAbsolutePathException where
+    show (ParseAbsolutePathException envVar dir) = concat
+        [ "Error: Failed to parse "
+        , envVar
+        , " environment variable (expected absolute directory): "
+        , dir
+        ]
+
+instance Exception ParseAbsolutePathException
+
 -- | The base environment that almost everything in Stack runs in,
 -- based off of parsing command line options in 'GlobalOpts'. Provides
 -- logging and process execution.
@@ -1183,167 +1349,6 @@ configMonoidNoRunCompileName = "script-no-run-compile"
 
 configMonoidStackDeveloperModeName :: Text
 configMonoidStackDeveloperModeName = "stack-developer-mode"
-
-data ConfigException
-  = ParseConfigFileException (Path Abs File) ParseException
-  | ParseCustomSnapshotException Text ParseException
-  | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
-  | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
-  | UnableToExtractArchive Text (Path Abs File)
-  | BadStackVersionException VersionRange
-  | NoMatchingSnapshot (NonEmpty SnapName)
-  | ResolverMismatch !RawSnapshotLocation String
-  | ResolverPartial !RawSnapshotLocation String
-  | NoSuchDirectory FilePath
-  | ParseGHCVariantException String
-  | BadStackRoot (Path Abs Dir)
-  | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir) -- ^ @$STACK_ROOT@, parent dir
-  | UserDoesn'tOwnDirectory (Path Abs Dir)
-  | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
-  | NixRequiresSystemGhc
-  | NoResolverWhenUsingNoProject
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
-  | NoLTSWithMajorVersion Int
-  | NoLTSFound
-  | MultiplePackageIndices [PackageIndexConfig]
-  deriving Typeable
-instance Show ConfigException where
-    show (ParseConfigFileException configFile exception) = concat
-        [ "Could not parse '"
-        , toFilePath configFile
-        , "':\n"
-        , Yaml.prettyPrintParseException exception
-        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        ]
-    show (ParseCustomSnapshotException url exception) = concat
-        [ "Could not parse '"
-        , T.unpack url
-        , "':\n"
-        , Yaml.prettyPrintParseException exception
-        , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
-        ]
-    show (NoProjectConfigFound dir mcmd) = concat
-        [ "Unable to find a stack.yaml file in the current directory ("
-        , toFilePath dir
-        , ") or its ancestors"
-        , case mcmd of
-            Nothing -> ""
-            Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
-        ]
-    show (UnexpectedArchiveContents dirs files) = concat
-        [ "When unpacking an archive specified in your stack.yaml file, "
-        , "did not find expected contents. Expected: a single directory. Found: "
-        , show ( map (toFilePath . dirname) dirs
-               , map (toFilePath . filename) files
-               )
-        ]
-    show (UnableToExtractArchive url file) = concat
-        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
-        , T.unpack url, " downloaded to the file ", toFilePath $ filename file
-        ]
-    show (BadStackVersionException requiredRange) = concat
-        [ "The version of Stack you are using ("
-        , show (mkVersion' Meta.version)
-        , ") is outside the required\n"
-        ,"version range specified in stack.yaml ("
-        , T.unpack (versionRangeText requiredRange)
-        , ").\n"
-        , "You can upgrade Stack by running:\n\n"
-        , "stack upgrade"
-        ]
-    show (NoMatchingSnapshot names) = concat
-        [ "None of the following snapshots provides a compiler matching "
-        , "your package(s):\n"
-        , unlines $ map (\name -> "    - " <> show name)
-                        (NonEmpty.toList names)
-        , resolveOptions
-        ]
-    show (ResolverMismatch resolver errDesc) = concat
-        [ "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have a matching compiler to build some or all of your "
-        , "package(s).\n"
-        , errDesc
-        , resolveOptions
-        ]
-    show (ResolverPartial resolver errDesc) = concat
-        [ "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have all the packages to match your requirements.\n"
-        , unlines $ fmap ("    " <>) (lines errDesc)
-        , resolveOptions
-        ]
-    show (NoSuchDirectory dir) =
-        "No directory could be located matching the supplied path: " ++ dir
-    show (ParseGHCVariantException v) =
-        "Invalid ghc-variant value: " ++ v
-    show (BadStackRoot stackRoot) = concat
-        [ "Invalid Stack root: '"
-        , toFilePath stackRoot
-        , "'. Please provide a valid absolute path."
-        ]
-    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
-        [ "Preventing creation of Stack root '"
-        , toFilePath envStackRoot
-        , "'. Parent directory '"
-        , toFilePath parentDir
-        , "' is owned by someone else."
-        ]
-    show (UserDoesn'tOwnDirectory dir) = concat
-        [ "You are not the owner of '"
-        , toFilePath dir
-        , "'. Aborting to protect file permissions."
-        , "\nRetry with '--"
-        , T.unpack configMonoidAllowDifferentUserName
-        , "' to disable this precaution."
-        ]
-    show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
-        [ "Stack can only control the "
-        , configMonoidGHCVariantName
-        , " of its own GHC installations. Please use '--no-"
-        , configMonoidSystemGHCName
-        , "'."
-        ]
-    show NixRequiresSystemGhc = T.unpack $ T.concat
-        [ "Stack's Nix integration is incompatible with '--no-system-ghc'. "
-        , "Please use '--"
-        , configMonoidSystemGHCName
-        , "' or disable the Nix integration."
-        ]
-    show NoResolverWhenUsingNoProject = "When using the script command, you must provide a resolver argument"
-    show (DuplicateLocalPackageNames pairs) = concat
-        $ "The same package name is used in multiple local packages\n"
-        : map go pairs
-      where
-        go (name, dirs) = unlines
-            $ ""
-            : (packageNameString name ++ " used in:")
-            : map goLoc dirs
-        goLoc loc = "- " ++ show loc
-    show (NoLTSWithMajorVersion n) =
-        "Error: No LTS release found with major version " ++ show n
-    show NoLTSFound = "Error: No LTS releases found"
-    show (MultiplePackageIndices pics) = concat
-        [ "Error: When using the 'package-indices' key to override the default "
-        , "package index, you must provide exactly one value, received: "
-        , show pics
-        , "\n"
-        , packageIndicesWarning
-        ]
-instance Exception ConfigException
-
-data ParseAbsolutePathException
-    = ParseAbsolutePathException String String
-    deriving (Typeable)
-
-instance Show ParseAbsolutePathException where
-    show (ParseAbsolutePathException envVar dir) = concat
-        [ "Error: Failed to parse "
-        , envVar
-        , " environment variable (expected absolute directory): "
-        , dir
-        ]
-instance Exception ParseAbsolutePathException
 
 packageIndicesWarning :: String
 packageIndicesWarning =

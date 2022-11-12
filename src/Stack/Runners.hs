@@ -44,7 +44,7 @@ data RunnersException
   | DockerAndNixInvalid
   | NixWithinDockerInvalid
   | DockerWithinNixInvalid
-  deriving (Typeable)
+  deriving Typeable
 
 instance Show RunnersException where
   show CommandInvalid =

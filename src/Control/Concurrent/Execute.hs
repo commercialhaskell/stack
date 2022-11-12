@@ -18,6 +18,20 @@ import           Stack.Prelude
 import           Data.List (sortBy)
 import qualified Data.Set                 as Set
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Control.Concurrent.Execute" module.
+data ExecuteException
+    = InconsistentDependencies
+    deriving Typeable
+
+instance Show ExecuteException where
+    show InconsistentDependencies =
+        "Inconsistent dependencies were discovered while executing your build \
+        \plan. This should never happen, please report it as a bug to the \
+        \Stack team."
+
+instance Exception ExecuteException
+
 data ActionType
     = ATBuild
       -- ^ Action for building a package's library and executables. If
@@ -60,17 +74,6 @@ data ExecuteState = ExecuteState
     , esCompleted  :: TVar Int
     , esKeepGoing  :: Bool
     }
-
-data ExecuteException
-    = InconsistentDependencies
-    deriving Typeable
-instance Exception ExecuteException
-
-instance Show ExecuteException where
-    show InconsistentDependencies =
-        "Inconsistent dependencies were discovered while executing your build \
-        \plan. This should never happen, please report it as a bug to the \
-        \Stack team."
 
 runActions :: Int -- ^ threads
            -> Bool -- ^ keep going after one task has failed

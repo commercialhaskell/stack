@@ -30,6 +30,19 @@ import           Stack.Prelude
 import           Stack.Types.Version
 import           Distribution.Version (mkVersion)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Types.Compiler" module.
+data CompilerException
+  = GhcjsNotSupported
+  | PantryException PantryException
+  deriving Typeable
+
+instance Show CompilerException where
+    show GhcjsNotSupported = "GHCJS is no longer supported by Stack"
+    show (PantryException p) = displayException p
+
+instance Exception CompilerException
+
 -- | Variety of compiler to use.
 data WhichCompiler
     = Ghc
@@ -62,15 +75,6 @@ instance PersistField ActualCompiler where
   fromPersistValue = (mapLeft tshow . parseActualCompiler) <=< fromPersistValue
 instance PersistFieldSql ActualCompiler where
   sqlType _ = SqlString
-
-data CompilerException
-  = GhcjsNotSupported
-  | PantryException PantryException
-
-instance Show CompilerException where
-    show GhcjsNotSupported = "GHCJS is no longer supported by Stack"
-    show (PantryException p) = displayException p
-instance Exception CompilerException
 
 wantedToActual :: WantedCompiler -> Either CompilerException ActualCompiler
 wantedToActual (WCGhc x) = Right $ ACGhc x

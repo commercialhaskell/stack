@@ -40,9 +40,11 @@ import           Stack.Types.Config
 import           Stack.Types.Resolver
 import           System.Environment (getEnvironment)
 
+-- | Type repesenting exceptions thrown by functions exported by the
+-- "Stack.ConfigCmd" module.
 data ConfigCmdException
     = NoProjectConfigAvailable
-    deriving (Typeable)
+    deriving Typeable
 
 instance Show ConfigCmdException where
     show NoProjectConfigAvailable =
