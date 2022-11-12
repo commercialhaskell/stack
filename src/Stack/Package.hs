@@ -27,7 +27,6 @@ module Stack.Package
   ,applyForceCustomBuild
   ) where
 
-import           Control.Exception (throw)
 import           Data.List (find, isPrefixOf, unzip)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -515,7 +514,7 @@ buildDir distDir = distDir </> relDirBuild
 -- component names.
 componentNameToDir :: Text -> Path Rel Dir
 componentNameToDir name =
-  fromMaybe (throw ComponentNotParsedBug) (parseRelDir (T.unpack name))
+  fromMaybe (impureThrow ComponentNotParsedBug) (parseRelDir (T.unpack name))
 
 -- | Get all dependencies of the package (buildable targets only).
 --

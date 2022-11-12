@@ -136,10 +136,23 @@ import           Distribution.Package (mkPackageName)
 import qualified Hpack.Config as Hpack
 import qualified Language.Haskell.TH.Syntax as TH (runIO, lift)
 import           Path as FL
+import           RIO
 import           Stack.Prelude
 import           Stack.Types.Compiler
 import           System.Permissions (osIsWindows)
 import           System.Process (readProcess)
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Constants" module.
+data ConstantsException
+  = WiredInPackagesNotParsedBug
+  deriving Typeable
+
+instance Show ConstantsException where
+  show WiredInPackagesNotParsedBug =
+    "Error: The impossible happened! Parse error in wiredInPackages."
+
+instance Exception ConstantsException
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -202,21 +215,22 @@ inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
 wiredInPackages :: Set PackageName
-wiredInPackages =
-    maybe (error "Parse error in wiredInPackages") Set.fromList mparsed
-  where
-    mparsed = mapM parsePackageName
-      [ "ghc-prim"
-      , "integer-gmp"
-      , "integer-simple"
-      , "base"
-      , "rts"
-      , "template-haskell"
-      , "dph-seq"
-      , "dph-par"
-      , "ghc"
-      , "interactive"
-      ]
+wiredInPackages = case mparsed of
+  Just parsed -> Set.fromList parsed
+  Nothing -> impureThrow WiredInPackagesNotParsedBug
+ where
+  mparsed = mapM parsePackageName
+    [ "ghc-prim"
+    , "integer-gmp"
+    , "integer-simple"
+    , "base"
+    , "rts"
+    , "template-haskell"
+    , "dph-seq"
+    , "dph-par"
+    , "ghc"
+    , "interactive"
+    ]
 
 -- | Just to avoid repetition and magic strings.
 cabalPackageName :: PackageName

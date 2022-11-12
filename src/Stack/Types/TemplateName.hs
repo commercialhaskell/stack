@@ -17,7 +17,6 @@ module Stack.Types.TemplateName
   , defaultTemplateName
   ) where
 
-import           Control.Exception (throw)
 import           Data.Aeson (FromJSON (..), withText)
 import qualified Data.Text as T
 import           Network.HTTP.StackClient (parseRequest)
@@ -116,7 +115,7 @@ parseTemplateNameFromString fname =
 defaultTemplateName :: TemplateName
 defaultTemplateName =
   case parseTemplateNameFromString "new-template" of
-    Left s -> throw $ DefaultTemplateNameNotParsedBug s
+    Left s -> impureThrow $ DefaultTemplateNameNotParsedBug s
     Right x -> x
 
 -- | Get a text representation of the template name.

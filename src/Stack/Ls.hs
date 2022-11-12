@@ -8,7 +8,6 @@ module Stack.Ls
   , lsParser
   ) where
 
-import Control.Exception (throw)
 import Data.Aeson
 import Data.Array.IArray ((//), elems)
 import Distribution.Package (mkPackageName)
@@ -189,7 +188,7 @@ toSnapshot [String sid, String stitle, String stime] =
     , snapTitle = stitle
     , snapTime = stime
     }
-toSnapshot val = throw $ ParseFailure val
+toSnapshot val = impureThrow $ ParseFailure val
 
 newtype LsException =
     ParseFailure [Value]

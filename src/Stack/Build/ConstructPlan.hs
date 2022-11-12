@@ -15,7 +15,6 @@ module Stack.Build.ConstructPlan
     ) where
 
 import           Stack.Prelude hiding (Display (..), loadPackage)
-import           Control.Exception (throw)
 import           Control.Monad.RWS.Strict hiding ((<>))
 import           Control.Monad.State.Strict (execState)
 import qualified Data.List as L
@@ -979,7 +978,7 @@ stripNonDeps deps plan = plan
         when (providesDep task) $ collectMissing mempty (taskProvides task)
 
     collectMissing dependents pid = do
-      when (pid `elem` dependents) $ throw $ TaskCycleBug pid
+      when (pid `elem` dependents) $ impureThrow $ TaskCycleBug pid
       modify'(<> Set.singleton pid)
       mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
 
