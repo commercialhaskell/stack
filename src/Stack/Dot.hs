@@ -16,7 +16,6 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
-import           Control.Exception (throw)
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
@@ -435,7 +434,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
      where
       deps = map ghcIdToPackageName (dpDepends dump)
       ghcIdToPackageName depId =
-        maybe (throw $ DependencyNotFoundBug depId)
+        maybe (impureThrow $ DependencyNotFoundBug depId)
               Stack.Prelude.pkgName
               (Map.lookup depId globalIdMap)
 

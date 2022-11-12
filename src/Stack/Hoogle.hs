@@ -25,6 +25,28 @@ import           Stack.Types.SourceMap
 import qualified RIO.Map as Map
 import           RIO.Process
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Hoogle" module.
+data HoogleException
+  = HoogleDatabaseNotFound
+  | HoogleNotFound !Text
+  | HoogleOnPathNotFound
+  deriving Typeable
+
+instance Show HoogleException where
+  show HoogleDatabaseNotFound =
+    "Error: No Hoogle database. Not building one due to '--no-setup'."
+  show (HoogleNotFound e) =
+    "Error: "
+    ++ T.unpack e
+    ++ "\n"
+    ++ "Not installing Hoogle due to '--no-setup'."
+  show HoogleOnPathNotFound =
+    "Error: Cannot find Hoogle executable on PATH, after installing. This \
+    \shouldn't happen. It may be a bug."
+
+instance Exception HoogleException
+
 -- | Helper type to duplicate log messages
 data Muted = Muted | NotMuted
 
@@ -61,10 +83,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                          logInfo "Built docs."
                          generateDb hooglePath
                          logInfo "Generated DB."
-                     else do
-                         logError
-                             "No Hoogle database. Not building one due to --no-setup"
-                         bail
+                     else throwIO HoogleDatabaseNotFound
     generateDb :: Path Abs File -> RIO EnvConfig ()
     generateDb hooglePath = do
         do dir <- hoogleRoot
@@ -86,9 +105,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
         mhooglePath' <- findExecutable "hoogle"
         case mhooglePath' of
             Right hooglePath -> parseAbsFile hooglePath
-            Left _ -> do
-                logWarn "Couldn't find hoogle in path after installing.  This shouldn't happen, may be a bug."
-                bail
+            Left _ -> throwIO HoogleOnPathNotFound
     requiringHoogle :: Muted -> RIO EnvConfig x -> RIO EnvConfig x
     requiringHoogle muted f = do
         hoogleTarget <- do
@@ -151,8 +168,6 @@ hoogleCmd (args,setup,rebuild,startServer) =
           (toFilePath hooglePath)
           (hoogleArgs ++ databaseArg)
           runProcess_
-    bail :: RIO EnvConfig a
-    bail = exitWith (ExitFailure (-1))
     checkDatabaseExists = do
         path <- hoogleDatabasePath
         liftIO (doesFileExist path)
@@ -193,9 +208,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                 | setup -> do
                     logWarn $ display err <> " Automatically installing (use --no-setup to disable) ..."
                     installHoogle
-                | otherwise -> do
-                    logWarn $ display err <> " Not installing it due to --no-setup."
-                    bail
+                | otherwise -> throwIO $ HoogleNotFound err
     envSettings =
         EnvSettings
         { esIncludeLocals = True

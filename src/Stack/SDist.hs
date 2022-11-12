@@ -18,13 +18,14 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
-import           Control.Concurrent.Execute (ActionContext(..), Concurrency(..))
-import           Stack.Prelude hiding (Display (..))
+import           Control.Concurrent.Execute
+                   ( ActionContext(..), Concurrency(..) )
+import           Stack.Prelude hiding ( Display (..) )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Char (toLower)
-import           Data.Data (cast)
+import           Data.Char ( toLower )
+import           Data.Data ( cast )
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
@@ -35,19 +36,25 @@ import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
-import           Distribution.Package (Dependency (..))
+import           Distribution.Package ( Dependency (..) )
 import qualified Distribution.PackageDescription as Cabal
 import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
-import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
-import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion, hasUpperBound, hasLowerBound)
+import           Distribution.PackageDescription.PrettyPrint
+                   ( showGenericPackageDescription )
+import           Distribution.Version
+                   ( simplifyVersionRange, orLaterVersion, earlierVersion
+                   , hasUpperBound, hasLowerBound
+                   )
 import           Path
-import           Path.IO hiding (getModificationTime, getPermissions, withSystemTempDir)
+import           Path.IO
+                   hiding
+                     ( getModificationTime, getPermissions, withSystemTempDir )
 import           RIO.PrettyPrint
-import           Stack.Build (mkBaseConfigOpts, build, buildLocalTargets)
+import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.Source (projectLocalPackages)
+import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.Types.GhcPkgId
 import           Stack.Package
 import           Stack.SourceMap
@@ -56,11 +63,27 @@ import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           System.Directory (getModificationTime, getPermissions)
+import           System.Directory ( getModificationTime, getPermissions )
 import qualified System.FilePath as FP
 
--- | Special exception to throw when you want to fail because of bad results
--- of package check.
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.SDist" module.
+data SDistException
+  = CheckException (NonEmpty Check.PackageCheck)
+  | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
+  | ToTarPathException String
+  deriving (Typeable)
+
+instance Show SDistException where
+  show (CheckException xs) =
+    "Error: Package check reported the following errors:\n" ++
+    (List.intercalate "\n" . fmap show . NE.toList $ xs)
+  show (CabalFilePathsInconsistentBug cabalfp cabalfp') =
+    "Error: The impossible happened! Two Cabal file paths are inconsistent: "
+    ++ show (cabalfp, cabalfp')
+  show (ToTarPathException e) = e
+
+instance Exception SDistException
 
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]
@@ -74,17 +97,6 @@ data SDistOpts = SDistOpts
   , sdoptsTarPath :: Maybe FilePath
   -- ^ Where to copy the tarball
   }
-
-newtype CheckException
-  = CheckException (NonEmpty Check.PackageCheck)
-  deriving (Typeable)
-
-instance Exception CheckException
-
-instance Show CheckException where
-  show (CheckException xs) =
-    "Package check reported the following errors:\n" ++
-    (List.intercalate "\n" . fmap show . NE.toList $ xs)
 
 -- | Given the path to a local package, creates its source
 -- distribution tarball.
@@ -138,8 +150,10 @@ getSDistTarball mpvpBounds pkgDir = do
     -- for upload (both GZip.compress and Tar.write are lazy).
     -- However, it seems less error prone and more predictable to read
     -- everything in at once, so that's what we're doing for now:
-    let tarPath isDir fp = either throwString pure
-            (Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)))
+    let tarPath isDir fp =
+            case Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)) of
+                Left e -> throwIO $ ToTarPathException e
+                Right tp -> pure tp
         -- convert a String of proper characters to a String of bytes
         -- in UTF8 encoding masquerading as characters. This is
         -- necessary for tricking the tar package into proper
@@ -180,8 +194,8 @@ getCabalLbs :: HasEnvConfig env
 getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
     gpd <- liftIO $ gpdio NoPrintWarnings
-    unless (cabalfp == cabalfp')
-      $ error $ "getCabalLbs: cabalfp /= cabalfp': " ++ show (cabalfp, cabalfp')
+    unless (cabalfp == cabalfp') $
+      throwIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
     installMap <- toInstallMap sourceMap
     (installedMap, _, _, _) <- getInstalled installMap
     let internalPackages = Set.fromList $

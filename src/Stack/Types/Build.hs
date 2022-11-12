@@ -45,8 +45,6 @@ module Stack.Types.Build
     )
     where
 
-import           Stack.Prelude
-import           Control.Exception               (throw)
 import           Data.Aeson                      (ToJSON, FromJSON)
 import qualified Data.ByteString                 as S
 import           Data.Char                       (isSpace)
@@ -65,6 +63,7 @@ import           Distribution.Version            (mkVersion)
 import           Path                            (parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
@@ -376,7 +375,7 @@ showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles
       logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
   in "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
-       (False, Nothing) -> throw ShowBuildErrorBug
+       (False, Nothing) -> impureThrow ShowBuildErrorBug
        (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')
        (True, Nothing) -> "simple Setup.hs"
        (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')

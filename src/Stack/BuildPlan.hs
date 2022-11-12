@@ -22,7 +22,6 @@ module Stack.BuildPlan
     ) where
 
 import           Stack.Prelude hiding (Display (..))
-import           Control.Exception (throw)
 import qualified Data.Foldable as F
 import qualified Data.Set as Set
 import           Data.List (intercalate)
@@ -317,7 +316,7 @@ checkBundleBuildPlan platform compiler pool flags gpds =
         flags' f gpd = fromMaybe Map.empty (Map.lookup (gpdPackageName gpd) f)
         pool' = Map.union (gpdPackages gpds) pool
 
-        dupError _ _ = throw DuplicatePackagesBug
+        dupError _ _ = impureThrow DuplicatePackagesBug
 
 data BuildPlanCheck =
       BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))

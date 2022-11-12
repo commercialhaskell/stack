@@ -45,6 +45,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | ExecutableToRunNotFound
         ~~~
 
+    -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
+
+        ~~~haskell
+        = FlagNotFoundBug
+        ~~~
+
     -   `Stack.Build.QueryException`
 
         ~~~haskell
@@ -105,6 +111,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         = NoProjectConfigAvailable
         ~~~
 
+    -   `Stack.Constants.ConstantsException`
+
+        ~~~haskell
+        = WiredInPackagesNotParsedBug
+        ~~~
+
     -   `Stack.Coverage.CoverageException`
 
         ~~~haskell
@@ -129,6 +141,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | Can'tSpecifyFilesAndTargets
         | Can'tSpecifyFilesAndMainIs
         | GhciTargetParseException [Text]
+        ~~~
+
+
+    -   `Stack.Hoogle.HoogleException`
+
+        ~~~haskell
+        = HoogleDatabaseNotFound
+        | HoogleNotFound String
+        | HoogleOnPathNotFound
         ~~~
 
     -   `Stack.Init.InitException`
@@ -195,10 +216,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DockerWithinNixInvalid
         ~~~
 
-    -   `Stack.SDist.CheckException`
+    -   `Stack.SDist.SDistException`
 
         ~~~haskell
         = CheckException (NonEmpty PackageCheck)
+        | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
+        | ToTarPathException
         ~~~
 
     -   `Stack.Script.ScriptException`
@@ -432,23 +455,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     \* The instance of `Show` is derived.
 
-    Stack also makes use of `UnlifIO.Exception.throwString`, which throws an
-    exception of type `UnliftIO.Exception.StringException`:
-
-    ~~~haskell
-    = StringException String CallStack
-    ~~~
-
-*   `Options.Applicative.Builder.Extra.enableDisableFlagsNoDefault`:
-
-    ~~~text
-    enableDisableFlagsNoDefault.last
-    ~~~
-
-    `StringException`
-
-    `impureThrow`
-
 *   `Stack.Build.Execute.singleBuild`: catches exceptions in `cabal ...`
 
     `throwM`
@@ -468,16 +474,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
     <path>
     ~~~
 
-*   `Stack.Constants.wiredInPackages`:
-
-    ~~~text
-    Parse error in wiredInPackages
-    ~~~
-
-    `error`
-
 *   `Stack.Coverage.generateHpcReport`: catches exceptions from
     `findPackageFieldForBuiltPackage`
+
+    ~~~text
+    <exception>
+    ~~~
 
 *   `Stack.Coverage.generateHpcReportInternal`:
 
@@ -532,14 +534,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Unable to create package database at <path>
     ~~~
 
-*   `Stack.Hoogle.hoogleCmd`:
-
-    ~~~text
-    No Hoogle database. Not building one due to --no-setup
-    ~~~
-
-    `exitWith (ExitFailure (-1))`
-
 *   `Stack.Lock.loadYamlThrow`:
 
     `Data.Yaml.AesonException`
@@ -574,30 +568,17 @@ to take stock of the errors that Stack itself can raise, by reference to the
     Ignoring SYLGlobalProject for script command
     ~~~
 
-*   `Stack.SDist.getCabalLbs`:
-
-    ~~~text
-    getCabalLbs: cabalfp /= cabalfp': (<cabalfp>, <cabalfp'>)
-    ~~~
-
-    `error`
-
 *   `Stack.SDist.getSDistTarball`:
 
     ~~~text
     Error building custom-setup dependencies: <exception>
     ~~~
 
-*   `Stack.SDist.getSDistTarball`: catches exception from
-    `Codec.Archive.Tar.Entry.toTarPath`
+*   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
 
     ~~~text
     <exception>
     ~~~
-
-    `throwString`
-
-*   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
 
 *   `Stack.Upload.uploadBytes`:
 

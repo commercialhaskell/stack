@@ -46,6 +46,19 @@ import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirector
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExtension)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Options.Applicative.Builder.Extra" module.
+data OptionsApplicativeExtraException
+  = FlagNotFoundBug
+  deriving Typeable
+
+instance Show OptionsApplicativeExtraException where
+  show FlagNotFoundBug =
+    "Error: The impossible happened! No valid flags found in \
+    \enableDisableFlagsNoDefault."
+
+instance Exception OptionsApplicativeExtraException
+
 -- | Enable/disable flags for a 'Bool'.
 boolFlags :: Bool                 -- ^ Default value
           -> String               -- ^ Flag name
@@ -129,7 +142,7 @@ enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
   where
     last xs =
       case reverse xs of
-        [] -> impureThrow $ stringException "enableDisableFlagsNoDefault.last"
+        [] -> impureThrow FlagNotFoundBug
         x:_ -> x
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
