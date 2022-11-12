@@ -1,6 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Stack.Types.Dependency where
+module Stack.Types.Dependency
+  (DepValue(..)
+  ,DepType(..)
+  )
+  where
 
 import Stack.Prelude
 import Distribution.Types.VersionRange (VersionRange)
@@ -14,7 +18,7 @@ data DepValue = DepValue
   { dvVersionRange :: !VersionRange
   , dvType :: !DepType
   }
-  deriving (Show,Typeable)
+  deriving (Show, Typeable)
 instance Semigroup DepValue where
   DepValue a x <> DepValue b y = DepValue (intersectVersionRanges a b) (x <> y)
 

@@ -77,7 +77,7 @@ import           System.IO.Error
 import           RIO.Process
 import           RIO.PrettyPrint
 import qualified RIO.PrettyPrint as PP (Style (Module))
-import Stack.Types.Dependency (DepValue(..), DepType (..))
+import           Stack.Types.Dependency (DepValue(..), DepType (..))
 
 data Ctx = Ctx { ctxFile :: !(Path Abs File)
                , ctxDistDir :: !(Path Abs Dir)
