@@ -42,7 +42,7 @@ import           Path as X
 import qualified Path.IO
 import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
-import           RIO.PrettyPrint ( Pretty (..) )
+import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
 import           RIO.Process
                    ( HasProcessContext (..), ProcessContext, setStdin, closed
                    , getStderr, getStdout, proc, withProcessWait_, setStdout
@@ -51,19 +51,6 @@ import           RIO.Process
                    )
 import qualified RIO.Text as T
 import           System.IO.Echo ( withoutInputEcho )
-
--- | Type representing pretty exceptions
-data PrettyException
-  = forall e. (Pretty e, Exception e) => PrettyException e
-  deriving Typeable
-
-instance Show PrettyException where
-  show (PrettyException e) = show e
-
-instance Pretty PrettyException where
-  pretty (PrettyException e) = pretty e
-
-instance Exception PrettyException
 
 -- | Path version
 withSystemTempDir :: MonadUnliftIO m => String -> (Path Abs Dir -> m a) -> m a
